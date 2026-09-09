@@ -3,6 +3,7 @@ import { getPiPrefillHandlerSourceLines } from './prefill-extension-source'
 import { getAgentStatusInputRedactionSourceLines } from './agent-status-input-redaction-source'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 import { getOmpSessionOwnerHandlerSourceLines } from './omp-session-status-owner-source'
+import { getPiAgentStatusAsyncSubagentSourceLines } from './agent-status-async-subagent-source'
 import { getPiAgentStatusUiPromptHandlerSourceLines } from './agent-status-ui-prompt-source'
 
 // Why: keep the generated handler registrations separate from hook transport;
@@ -200,6 +201,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '  })',
     '',
     ...approvalHandlers,
+    ...getPiAgentStatusAsyncSubagentSourceLines(kind),
     ...getPiAgentStatusUiPromptHandlerSourceLines(kind),
     ...modelSelectHandler,
     "  // Why: capture the assistant's final text on each completed message",
