@@ -2,7 +2,7 @@ import { reconcileCodexSubagentTranscript } from '../../codex-subagent-transcrip
 import type { AgentHookEventPayload } from '../listener-event'
 import type { HookListenerState } from '../listener-state'
 import { buildCodexChildDrivenStatusPayload } from './codex-events'
-import { getOrCreateCodexSubagentRoster, markCodexLeadTurnInterrupted } from './codex-state'
+import { getOrCreateAgentDescendantRoster, markCodexLeadTurnInterrupted } from './codex-state'
 
 /** Polling reads new host-owned records without replaying the hook that started the turn. */
 export function pollCodexTranscriptStatus<T extends AgentHookEventPayload>(
@@ -15,7 +15,7 @@ export function pollCodexTranscriptStatus<T extends AgentHookEventPayload>(
   }
   const changed = reconcileCodexSubagentTranscript(
     transcript,
-    getOrCreateCodexSubagentRoster(state, original.paneKey),
+    getOrCreateAgentDescendantRoster(state, original.paneKey),
     transcript.parent.filePath
   )
   const interrupted =

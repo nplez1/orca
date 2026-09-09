@@ -6,13 +6,13 @@ import {
   createCodexSubagentTranscriptState,
   reconcileCodexSubagentTranscript
 } from './codex-subagent-transcript'
-import type { CodexSubagentRoster } from './codex-subagent-roster'
+import type { AgentDescendantRoster } from './agent-descendant-roster'
 
 it('skips decoding 1,000 message/token records and unchanged reads, but retains an abort', () => {
   const directory = mkdtempSync(join(tmpdir(), 'codex-status-budget-'))
   const path = join(directory, 'rollout.jsonl')
   const state = createCodexSubagentTranscriptState()
-  const roster: CodexSubagentRoster = new Map()
+  const roster: AgentDescendantRoster = new Map()
   writeFileSync(path, '')
   reconcileCodexSubagentTranscript(state, roster, path)
   const irrelevantRecords = Array.from({ length: 1_000 }, (_, i) =>
