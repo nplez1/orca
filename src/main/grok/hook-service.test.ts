@@ -256,6 +256,7 @@ describe('GrokHookService', () => {
         'Stop',
         'StopCancelled',
         'StopFailure',
+        'StopCancelled',
         'SubagentStart',
         'SubagentStop',
         'UserPromptSubmit'
