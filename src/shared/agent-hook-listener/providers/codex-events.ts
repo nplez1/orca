@@ -10,10 +10,10 @@ import {
   type AgentLeadStatusResolution
 } from '../../agent-lead-status-fold'
 import {
-  codexRosterToSnapshots,
-  finishCodexSubagent,
-  upsertCodexSubagent
-} from '../../codex-subagent-roster'
+  agentDescendantRosterToSnapshots,
+  finishAgentDescendant,
+  upsertAgentDescendant
+} from '../../agent-descendant-roster'
 import { reconcileCodexSubagentTranscript } from '../../codex-subagent-transcript'
 import {
   codexTurnApprovalsAreAutoReviewed,
@@ -27,7 +27,7 @@ import { readString } from '../tool-input-preview'
 import {
   codexMainAgentStatusForPayload,
   codexOutcomeRestatedByStop,
-  getOrCreateCodexSubagentRoster,
+  getOrCreateAgentDescendantRoster,
   getOrCreateCodexSubagentTranscriptState,
   hasCodexTranscriptSubagents,
   resolveCodexPaneStatus,
@@ -63,7 +63,7 @@ export function buildCodexStatusPayload(
     lastAssistantMessage: snapshot.lastAssistantMessage,
     lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
     interrupted: mainAgentTurnInterrupted(lead),
-    subagents: codexRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey)),
+    subagents: agentDescendantRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey)),
     mainAgent: codexMainAgentStatusForPayload(lead)
   })
 }
@@ -92,9 +92,9 @@ export function normalizeCodexSubagentLifecycleEvent(
   if (!agentId) {
     return null
   }
-  const roster = getOrCreateCodexSubagentRoster(state, paneKey)
+  const roster = getOrCreateAgentDescendantRoster(state, paneKey)
   if (eventName === 'SubagentStart') {
-    upsertCodexSubagent(
+    upsertAgentDescendant(
       roster,
       agentId,
       {
@@ -105,7 +105,7 @@ export function normalizeCodexSubagentLifecycleEvent(
       Date.now()
     )
   } else {
-    finishCodexSubagent(roster, agentId)
+    finishAgentDescendant(roster, agentId)
   }
   return buildCodexChildDrivenStatusPayload(state, eventName, paneKey, hookPayload)
 }
@@ -181,7 +181,7 @@ export function normalizeCodexEvent(
     if (transcriptState.parent.filePath === transcriptPath) {
       reconcileCodexSubagentTranscript(
         transcriptState,
-        getOrCreateCodexSubagentRoster(state, paneKey),
+        getOrCreateAgentDescendantRoster(state, paneKey),
         transcriptPath
       )
     } else {
@@ -191,7 +191,7 @@ export function normalizeCodexEvent(
   if (transcriptPath && !agentId) {
     reconcileCodexSubagentTranscript(
       getOrCreateCodexSubagentTranscriptState(state, paneKey),
-      getOrCreateCodexSubagentRoster(state, paneKey),
+      getOrCreateAgentDescendantRoster(state, paneKey),
       transcriptPath
     )
   }
@@ -204,8 +204,8 @@ export function normalizeCodexEvent(
       transcriptPath,
       stateName
     )
-    upsertCodexSubagent(
-      getOrCreateCodexSubagentRoster(state, paneKey),
+    upsertAgentDescendant(
+      getOrCreateAgentDescendantRoster(state, paneKey),
       agentId,
       {
         agentType: readString(hookPayload, 'agent_type'),

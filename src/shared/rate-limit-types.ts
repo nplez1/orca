@@ -166,6 +166,7 @@ export type RateLimitState = {
    * decide whether the OpenCode Go bar stays visible.
    */
   opencodeGoApiKeyConfigured: boolean
+  /**
    * True when a DeepSeek API key is persisted on disk. Like the MiniMax flags
    * this is main-derived, so it is the durable signal that keeps an
    * API-key-only provider visible before its first fetch lands.

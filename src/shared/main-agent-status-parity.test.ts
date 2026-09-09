@@ -24,7 +24,7 @@ import type {
   AgentWorkingMode,
   ParsedAgentStatusPayload
 } from './agent-status-types'
-import { codexRosterChildWorkLiveness, seedCodexSubagentRoster } from './codex-subagent-roster'
+import { codexRosterChildWorkLiveness, seedAgentDescendantRoster } from './agent-descendant-roster'
 import { structuredAgentSessionAgentStatus } from './structured-agent-session-agent-status'
 import type { AgentJournalTurnOutcome } from './agent-turn-outcome'
 
@@ -505,7 +505,7 @@ describe('mainAgent status parity across lanes', () => {
       expect(row).toEqual(lane.expect)
       // Codex's child evidence is the roster on the row: every child a spawned agent thread.
       const roster = new Map()
-      seedCodexSubagentRoster(roster, payload.subagents ?? [])
+      seedAgentDescendantRoster(roster, payload.subagents ?? [])
       expect(row).toEqual(refold(row.mainAgent, codexRosterChildWorkLiveness(roster)))
     })
   })
