@@ -8,7 +8,7 @@ import {
 } from '../agent-status-legacy-adapter'
 import type { AgentStatusLegacyIngressCaller } from '../agent-status-legacy-ingress-manifest'
 import type { ClaudeSubagentRoster } from '../claude-subagent-roster'
-import type { CodexSubagentRoster } from '../codex-subagent-roster'
+import type { AgentDescendantRoster } from '../agent-descendant-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
 import type { AgentHookEventPayload, ToolSnapshot } from './listener-event'
 import {
@@ -44,7 +44,7 @@ export type HookListenerState = {
    *  even when no SessionStart arrives — the backstop for the exits that emit no terminating hook. */
   claudeSessionOwnerByPaneKey: Map<string, string>
   /** Live thread-spawn children per Codex pane. */
-  codexSubagentRosterByPaneKey: Map<string, CodexSubagentRoster>
+  codexSubagentRosterByPaneKey: Map<string, AgentDescendantRoster>
   /** Incremental parent/child rollout cursors for Codex collaboration v2. */
   codexSubagentTranscriptByPaneKey: Map<string, CodexSubagentTranscriptState>
   /** Root Codex state/model, kept separate from child hook traffic. */
@@ -56,6 +56,11 @@ export type HookListenerState = {
   lastLaunchTokenByPaneKey: Map<string, string>
   /** Copilot background work that can outlive the foreground turn. */
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
+  /** Live descendants for every provider that does not own a roster of its own. */
+  descendantRosterByPaneKey: Map<string, AgentDescendantRoster>
+  /** What the LEAD session last said, before descendants gated it — so draining the
+   *  last child republishes the lead's verdict instead of the gated one. */
+  descendantLeadStateByPaneKey: Map<string, AgentStatusState>
 }
 
 export type GrokActiveTurn = {
@@ -124,7 +129,9 @@ export function createHookListenerState(
     grokActiveTurnByPaneKey: new Map(),
     opencodeSessionPaneBySessionId: new Map(),
     lastLaunchTokenByPaneKey: new Map(),
-    copilotBackgroundWorkByPaneKey: new Map()
+    copilotBackgroundWorkByPaneKey: new Map(),
+    descendantRosterByPaneKey: new Map(),
+    descendantLeadStateByPaneKey: new Map()
   }
   legacyStatusAdapterByState.set(state, adapter)
   return state
@@ -214,6 +221,8 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   unbindOpenCodeSessionsOfPane(state, paneKey)
   deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
   state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+  state.descendantRosterByPaneKey.delete(paneKey)
+  state.descendantLeadStateByPaneKey.delete(paneKey)
 }
 
 /** Does this pane still hold anything that can ASSERT a state — a stored row, or a Claude latch that
@@ -233,7 +242,9 @@ export function paneHasStateClaims(state: HookListenerState, paneKey: string): b
     state.claudeSessionOwnerByPaneKey.has(paneKey) ||
     state.codexSubagentRosterByPaneKey.has(paneKey) ||
     state.codexLeadStateByPaneKey.has(paneKey) ||
-    state.copilotBackgroundWorkByPaneKey.has(paneKey)
+    state.copilotBackgroundWorkByPaneKey.has(paneKey) ||
+    state.descendantRosterByPaneKey.has(paneKey) ||
+    state.descendantLeadStateByPaneKey.has(paneKey)
   )
 }
 
@@ -292,6 +303,8 @@ export function movePaneCacheState(
   moveOpenCodeSessionBindings(state, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.lastLaunchTokenByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.descendantRosterByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.descendantLeadStateByPaneKey, fromPaneKey, toPaneKey)
 }
 
 export function clearPaneTurnCacheState(state: HookListenerState, paneKey: string): void {
@@ -344,4 +357,6 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.opencodeSessionPaneBySessionId.clear()
   state.lastLaunchTokenByPaneKey.clear()
   state.copilotBackgroundWorkByPaneKey.clear()
+  state.descendantRosterByPaneKey.clear()
+  state.descendantLeadStateByPaneKey.clear()
 }

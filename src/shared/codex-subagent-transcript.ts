@@ -12,11 +12,11 @@ import { readApprovalsReviewer } from './codex-subagent-reviewer'
 import type { CodexApprovalsReviewer } from './codex-subagent-reviewer'
 
 import {
-  finishCodexSubagent,
-  setCodexSubagentModel,
-  upsertCodexSubagent,
-  type CodexSubagentRoster
-} from './codex-subagent-roster'
+  finishAgentDescendant,
+  setAgentDescendantModel,
+  upsertAgentDescendant,
+  type AgentDescendantRoster
+} from './agent-descendant-roster'
 
 // Why: retire a child whose rollout stays unreadable this long, else a deleted/never-written file pins a phantom row forever.
 const CHILD_UNREADABLE_GRACE_MS = 60_000
@@ -189,7 +189,7 @@ export function hasTrackedCodexTranscriptSubagents(
 
 export function reconcileCodexSubagentTranscript(
   state: CodexSubagentTranscriptState,
-  roster: CodexSubagentRoster,
+  roster: AgentDescendantRoster,
   transcriptPath: string | undefined
 ): void {
   const normalizedPath = normalizedTranscriptPath(transcriptPath)
@@ -198,7 +198,7 @@ export function reconcileCodexSubagentTranscript(
   }
   if (state.parent.filePath !== normalizedPath) {
     for (const id of state.subagents.keys()) {
-      finishCodexSubagent(roster, id)
+      finishAgentDescendant(roster, id)
     }
     state.parent = { filePath: normalizedPath, offset: 0, carry: '' }
     state.subagents.clear()
@@ -219,7 +219,7 @@ export function reconcileCodexSubagentTranscript(
       continue
     }
     if (activity.kind === 'interrupted') {
-      finishCodexSubagent(roster, activity.id)
+      finishAgentDescendant(roster, activity.id)
       state.subagents.delete(activity.id)
       continue
     }
@@ -230,7 +230,7 @@ export function reconcileCodexSubagentTranscript(
     }
     tracked.description = activity.description ?? tracked.description
     state.subagents.set(activity.id, tracked)
-    upsertCodexSubagent(
+    upsertAgentDescendant(
       roster,
       activity.id,
       { description: tracked.description, state: 'working' },
@@ -262,12 +262,12 @@ export function reconcileCodexSubagentTranscript(
       // Why: re-applied every reconcile, not just on discovery — the parent's
       // own activity upsert can rebuild this child's roster entry, which would
       // otherwise drop a model found on an earlier poll.
-      setCodexSubagentModel(roster, id, tracked.model)
+      setAgentDescendantModel(roster, id, tracked.model)
       if (!childIsComplete(records)) {
         continue
       }
     }
-    finishCodexSubagent(roster, id)
+    finishAgentDescendant(roster, id)
     state.subagents.delete(id)
   }
 }
