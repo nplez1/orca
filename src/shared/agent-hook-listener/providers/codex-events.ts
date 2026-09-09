@@ -1,16 +1,17 @@
 import {
   AGENT_MODEL_MAX_LENGTH,
   normalizeAgentStatusPayload,
+  type AgentStatusState,
   type ParsedAgentStatusPayload
 } from '../../agent-status-types'
 import { normalizeOptionalField } from '../../agent-status-field-normalization'
 import { isAskUserQuestionTool } from '../../agent-question-answered-intent'
 import {
-  codexRosterEffectiveState,
-  codexRosterToSnapshots,
-  finishCodexSubagent,
-  upsertCodexSubagent
-} from '../../codex-subagent-roster'
+  agentDescendantEffectiveState,
+  agentDescendantRosterToSnapshots,
+  finishAgentDescendant,
+  upsertAgentDescendant
+} from '../../agent-descendant-roster'
 import { reconcileCodexSubagentTranscript } from '../../codex-subagent-transcript'
 import {
   codexTurnApprovalsAreAutoReviewed,
@@ -22,7 +23,7 @@ import { resolvePrompt, resolveToolState } from '../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../provider-event-routing'
 import { readString } from '../tool-input-preview'
 import {
-  getOrCreateCodexSubagentRoster,
+  getOrCreateAgentDescendantRoster,
   getOrCreateCodexSubagentTranscriptState,
   hasCodexTranscriptSubagents
 } from './codex-state'
@@ -33,7 +34,7 @@ export function buildCodexStatusPayload(
   promptText: string,
   paneKey: string,
   hookPayload: Record<string, unknown>,
-  options: { stateName: 'working' | 'waiting' | 'done'; updateLead: boolean }
+  options: { stateName: AgentStatusState; updateLead: boolean }
 ): ParsedAgentStatusPayload | null {
   const snapshot = options.updateLead
     ? resolveToolState(state, paneKey, extractToolFields('codex', eventName, hookPayload), {
@@ -54,7 +55,7 @@ export function buildCodexStatusPayload(
     interactivePrompt: snapshot.interactivePrompt,
     lastAssistantMessage: snapshot.lastAssistantMessage,
     lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
-    subagents: codexRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey))
+    subagents: agentDescendantRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey))
   })
 }
 
@@ -65,7 +66,7 @@ export function buildCodexChildDrivenStatusPayload(
   hookPayload: Record<string, unknown>
 ): ParsedAgentStatusPayload | null {
   const leadState = state.codexLeadStateByPaneKey.get(paneKey)?.state ?? 'working'
-  const stateName = codexRosterEffectiveState(
+  const stateName = agentDescendantEffectiveState(
     state.codexSubagentRosterByPaneKey.get(paneKey),
     leadState
   )
@@ -85,9 +86,9 @@ export function normalizeCodexSubagentLifecycleEvent(
   if (!agentId) {
     return null
   }
-  const roster = getOrCreateCodexSubagentRoster(state, paneKey)
+  const roster = getOrCreateAgentDescendantRoster(state, paneKey)
   if (eventName === 'SubagentStart') {
-    upsertCodexSubagent(
+    upsertAgentDescendant(
       roster,
       agentId,
       {
@@ -98,7 +99,7 @@ export function normalizeCodexSubagentLifecycleEvent(
       Date.now()
     )
   } else {
-    finishCodexSubagent(roster, agentId)
+    finishAgentDescendant(roster, agentId)
   }
   return buildCodexChildDrivenStatusPayload(state, eventName, paneKey, hookPayload)
 }
@@ -174,7 +175,7 @@ export function normalizeCodexEvent(
     if (transcriptState.parent.filePath === transcriptPath) {
       reconcileCodexSubagentTranscript(
         transcriptState,
-        getOrCreateCodexSubagentRoster(state, paneKey),
+        getOrCreateAgentDescendantRoster(state, paneKey),
         transcriptPath
       )
     } else {
@@ -184,7 +185,7 @@ export function normalizeCodexEvent(
   if (transcriptPath && !agentId) {
     reconcileCodexSubagentTranscript(
       getOrCreateCodexSubagentTranscriptState(state, paneKey),
-      getOrCreateCodexSubagentRoster(state, paneKey),
+      getOrCreateAgentDescendantRoster(state, paneKey),
       transcriptPath
     )
   }
@@ -197,8 +198,8 @@ export function normalizeCodexEvent(
       transcriptPath,
       stateName
     )
-    upsertCodexSubagent(
-      getOrCreateCodexSubagentRoster(state, paneKey),
+    upsertAgentDescendant(
+      getOrCreateAgentDescendantRoster(state, paneKey),
       agentId,
       {
         agentType: readString(hookPayload, 'agent_type'),
@@ -230,7 +231,7 @@ export function normalizeCodexEvent(
       normalizeOptionalField(hookPayload['model'], AGENT_MODEL_MAX_LENGTH) ??
       (eventName === 'SessionStart' ? undefined : previousLead?.model)
   })
-  const effectiveState = codexRosterEffectiveState(
+  const effectiveState = agentDescendantEffectiveState(
     state.codexSubagentRosterByPaneKey.get(paneKey),
     ownedState
   )
