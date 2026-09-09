@@ -3,6 +3,7 @@ import {
   AGENT_STATUS_MAX_SUBAGENTS,
   AGENT_STATUS_TOOL_INPUT_MAX_LENGTH,
   AGENT_TYPE_MAX_LENGTH,
+  type AgentStatusState,
   type AgentSubagentSnapshot
 } from './agent-status-types'
 import { normalizeOptionalField } from './agent-status-field-normalization'
@@ -11,11 +12,23 @@ import {
   type AgentChildWorkLiveness
 } from './agent-status-child-work-liveness'
 
-const CODEX_SUBAGENT_ID_MAX_LENGTH = 64
+/** Live descendants (subagents, spawned threads, async child runs) of one pane's
+ *  lead agent session, keyed by the provider-assigned child id.
+ *
+ *  Provider-agnostic on purpose: the pane rule "idle only when the lead is idle
+ *  AND no descendant is live" is one concept, so it has one implementation. A
+ *  provider contributes only how to READ a child out of its hook events
+ *  (`agent-hook-listener/descendant-events.ts`). Claude keeps its own roster
+ *  because its children carry provider-specific reconciliation (teammate
+ *  parking, `background_tasks` folding, restored-snapshot provenance) that no
+ *  other provider has; it implements the same pane rule in
+ *  `providers/claude-roster-state.ts`. */
 
-export type CodexSubagentRoster = Map<string, TrackedCodexSubagent>
+const AGENT_DESCENDANT_ID_MAX_LENGTH = 64
 
-type TrackedCodexSubagent = {
+export type AgentDescendantRoster = Map<string, TrackedAgentDescendant>
+
+type TrackedAgentDescendant = {
   agentType?: string
   description?: string
   model?: string
@@ -23,8 +36,8 @@ type TrackedCodexSubagent = {
   startedAt: number
 }
 
-export function upsertCodexSubagent(
-  roster: CodexSubagentRoster,
+export function upsertAgentDescendant(
+  roster: AgentDescendantRoster,
   id: string,
   fields: {
     agentType?: string
@@ -35,7 +48,7 @@ export function upsertCodexSubagent(
   now: number
 ): void {
   const normalizedId = id.trim()
-  if (normalizedId.length === 0 || normalizedId.length > CODEX_SUBAGENT_ID_MAX_LENGTH) {
+  if (normalizedId.length === 0 || normalizedId.length > AGENT_DESCENDANT_ID_MAX_LENGTH) {
     return
   }
   const agentType = normalizeOptionalField(fields.agentType, AGENT_TYPE_MAX_LENGTH)
@@ -61,18 +74,18 @@ export function upsertCodexSubagent(
   })
 }
 
-export function finishCodexSubagent(roster: CodexSubagentRoster, id: string): void {
+export function finishAgentDescendant(roster: AgentDescendantRoster, id: string): void {
   roster.delete(id.trim())
 }
 
 /**
  * Record the model a already-tracked child is running. Deliberately narrower
- * than `upsertCodexSubagent`: it never creates a roster entry and never touches
+ * than `upsertAgentDescendant`: it never creates a roster entry and never touches
  * `state`, so late model discovery from a child rollout cannot resurrect a
  * finished child nor move any child's lifecycle.
  */
-export function setCodexSubagentModel(
-  roster: CodexSubagentRoster,
+export function setAgentDescendantModel(
+  roster: AgentDescendantRoster,
   id: string,
   model: string | undefined
 ): void {
@@ -87,15 +100,15 @@ export function setCodexSubagentModel(
   existing.model = normalizedModel
 }
 
-export function seedCodexSubagentRoster(
-  roster: CodexSubagentRoster,
+export function seedAgentDescendantRoster(
+  roster: AgentDescendantRoster,
   snapshots: readonly AgentSubagentSnapshot[]
 ): void {
   for (const snapshot of snapshots) {
     if (snapshot.state !== 'working' && snapshot.state !== 'waiting') {
       continue
     }
-    upsertCodexSubagent(
+    upsertAgentDescendant(
       roster,
       snapshot.id,
       {
@@ -109,8 +122,8 @@ export function seedCodexSubagentRoster(
   }
 }
 
-export function codexRosterToSnapshots(
-  roster: CodexSubagentRoster | undefined
+export function agentDescendantRosterToSnapshots(
+  roster: AgentDescendantRoster | undefined
 ): AgentSubagentSnapshot[] | undefined {
   if (!roster || roster.size === 0) {
     return undefined
@@ -131,11 +144,30 @@ export function codexRosterToSnapshots(
  *  agent thread, classified by the one kind test the other lanes use, so a waiting child
  *  reads `waiting` and a live one `working`; nothing here is a watch loop. */
 export function codexRosterChildWorkLiveness(
-  roster: CodexSubagentRoster | undefined
+  roster: AgentDescendantRoster | undefined
 ): AgentChildWorkLiveness {
   return agentChildWorkLiveness(
     roster
       ? Array.from(roster.values(), (tracked) => ({ kind: 'agent' as const, state: tracked.state }))
       : undefined
   )
+}
+
+/** The pane's state once its live descendants are taken into account: a lead
+ *  `done` is only the pane's `done` when nothing is still running under it. A
+ *  descendant blocked on a human answer outranks the lead's own working state,
+ *  since that wait is the actionable one. */
+export function agentDescendantEffectiveState(
+  roster: AgentDescendantRoster | undefined,
+  leadState: AgentStatusState
+): AgentStatusState {
+  if (!roster || roster.size === 0) {
+    return leadState
+  }
+  for (const tracked of roster.values()) {
+    if (tracked.state === 'waiting') {
+      return 'waiting'
+    }
+  }
+  return leadState === 'done' ? 'working' : leadState
 }
