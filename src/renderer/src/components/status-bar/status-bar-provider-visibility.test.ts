@@ -78,6 +78,8 @@ function usageSettings(overrides: Partial<UsageProviderSettings> = {}): UsagePro
     opencodeGoApiKeyConfigured: false,
     grokAuthConfigured: false,
     cursorAuthConfigured: false,
+    deepseekApiKeyConfigured: false,
+    fireworksApiKeyConfigured: false,
     ...overrides
   }
 }
@@ -143,6 +145,8 @@ describe('hasUsageProviderSettings', () => {
     expect(hasUsageProviderSettings(usageSettings({ minimaxCookieConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ minimaxApiKeyConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ grokAuthConfigured: true }))).toBe(true)
+    expect(hasUsageProviderSettings(usageSettings({ deepseekApiKeyConfigured: true }))).toBe(true)
+    expect(hasUsageProviderSettings(usageSettings({ fireworksApiKeyConfigured: true }))).toBe(true)
   })
 
   it('does not treat empty or unloaded settings as configured', () => {
@@ -235,6 +239,76 @@ describe('hasUsageProviderSettingsForProvider', () => {
     ).toBe(true)
     expect(hasUsageProviderSettingsForProvider('grok', usageSettings())).toBe(false)
     expect(hasUsageProviderSettingsForProvider('grok', null)).toBe(false)
+  })
+
+  it('treats the persisted API key as the durable signal for DeepSeek and Fireworks', () => {
+    expect(
+      hasUsageProviderSettingsForProvider(
+        'deepseek',
+        usageSettings({ deepseekApiKeyConfigured: true })
+      )
+    ).toBe(true)
+    expect(
+      hasUsageProviderSettingsForProvider(
+        'fireworks',
+        usageSettings({ fireworksApiKeyConfigured: true })
+      )
+    ).toBe(true)
+    expect(hasUsageProviderSettingsForProvider('deepseek', usageSettings())).toBe(false)
+    expect(hasUsageProviderSettingsForProvider('fireworks', usageSettings())).toBe(false)
+    expect(hasUsageProviderSettingsForProvider('deepseek', null)).toBe(false)
+  })
+})
+
+describe('credits-only providers', () => {
+  const deepseekCredits = {
+    kind: 'balance' as const,
+    amount: { currencyCode: 'USD', units: '42', nanos: 0 }
+  }
+
+  it('counts a credits readout as usage data', () => {
+    // Why: the whole render path is window-shaped; without the credits term a
+    // funded DeepSeek/Fireworks account reads as "no data" and stays hidden.
+    expect(
+      isProviderConfigured(provider('ok', { provider: 'deepseek', credits: deepseekCredits }))
+    ).toBe(true)
+    expect(
+      isProviderConfigured(provider('fetching', { provider: 'deepseek', credits: deepseekCredits }))
+    ).toBe(true)
+    // One fetch in flight with no credits yet is still not proof of configuration.
+    expect(
+      isProviderConfigured(provider('fetching', { provider: 'deepseek', credits: null }))
+    ).toBe(false)
+  })
+
+  it('keeps a configured credits provider visible while its snapshot is pending', () => {
+    expect(
+      getVisibleUsageProvider('deepseek', null, usageSettings({ deepseekApiKeyConfigured: true }))
+    ).toMatchObject({ provider: 'deepseek', status: 'fetching', credits: null })
+    expect(
+      getVisibleUsageProvider('fireworks', null, usageSettings({ fireworksApiKeyConfigured: true }))
+    ).toMatchObject({ provider: 'fireworks', status: 'fetching', credits: null })
+  })
+
+  it('does not show the setup CTA when a live credits readout exists', () => {
+    expect(
+      isUsageEmptyState(
+        {
+          claude: provider('unavailable', { provider: 'claude' }),
+          codex: provider('unavailable', { provider: 'codex' }),
+          gemini: provider('unavailable'),
+          opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
+          kimi: provider('unavailable', { provider: 'kimi' }),
+          antigravity: provider('unavailable', { provider: 'antigravity' }),
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          grok: provider('unavailable', { provider: 'grok' }),
+          cursor: provider('unavailable', { provider: 'cursor' }),
+          deepseek: provider('ok', { provider: 'deepseek', credits: deepseekCredits }),
+          fireworks: provider('unavailable', { provider: 'fireworks' })
+        },
+        usageSettings()
+      )
+    ).toBe(false)
   })
 })
 
@@ -440,7 +514,9 @@ describe('isUsageEmptyState', () => {
           antigravity: undefined,
           minimax: undefined,
           grok: undefined,
-          cursor: undefined
+          cursor: undefined,
+          deepseek: undefined,
+          fireworks: undefined
         },
         usageSettings()
       )
@@ -460,7 +536,9 @@ describe('isUsageEmptyState', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           cursor: provider('unavailable', { provider: 'cursor' }),
-          zcode: provider('unavailable', { provider: 'zcode' })
+          zcode: provider('unavailable', { provider: 'zcode' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' }),
+          fireworks: provider('unavailable', { provider: 'fireworks' })
         },
         usageSettings()
       )
@@ -480,7 +558,9 @@ describe('isUsageEmptyState', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           cursor: provider('unavailable', { provider: 'cursor' }),
-          zcode: provider('unavailable', { provider: 'zcode' })
+          zcode: provider('unavailable', { provider: 'zcode' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' }),
+          fireworks: provider('unavailable', { provider: 'fireworks' })
         },
         usageSettings({
           codexManagedAccounts: [
@@ -513,7 +593,9 @@ describe('isUsageEmptyState', () => {
       minimax: provider('unavailable', { provider: 'minimax' }),
       grok: provider('unavailable', { provider: 'grok' }),
       cursor: provider('unavailable', { provider: 'cursor' }),
-      zcode: provider('unavailable', { provider: 'zcode' })
+      zcode: provider('unavailable', { provider: 'zcode' }),
+      deepseek: provider('unavailable', { provider: 'deepseek' }),
+      fireworks: provider('unavailable', { provider: 'fireworks' })
     }
     expect(isUsageEmptyState(settledProviders, usageSettings())).toBe(true)
     expect(isUsageEmptyState({ ...settledProviders, zcode: undefined }, usageSettings())).toBe(true)
@@ -533,7 +615,9 @@ describe('isUsageEmptyState', () => {
           grok: provider('unavailable', { provider: 'grok' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
           cursor: provider('unavailable', { provider: 'cursor' }),
-          zcode: provider('unavailable', { provider: 'zcode' })
+          zcode: provider('unavailable', { provider: 'zcode' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' }),
+          fireworks: provider('unavailable', { provider: 'fireworks' })
         },
         usageSettings({ antigravityUsageConfigured: true, geminiCliOAuthEnabled: true })
       )
@@ -555,7 +639,9 @@ describe('isUsageEmptyState', () => {
           grok: provider('unavailable', { provider: 'grok' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
           cursor: provider('unavailable', { provider: 'cursor' }),
-          zcode: provider('unavailable', { provider: 'zcode' })
+          zcode: provider('unavailable', { provider: 'zcode' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' }),
+          fireworks: provider('unavailable', { provider: 'fireworks' })
         },
         usageSettings({ antigravityUsageConfigured: true })
       )

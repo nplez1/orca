@@ -76,6 +76,8 @@ import { runtimeApi } from './api/runtime-bridge'
 import { runtimeEnvironmentsApi } from './api/runtime-environments-bridge'
 import { rateLimitsApi } from './api/rate-limits-bridge'
 import { minimaxCredentialsApi } from './api/minimax-credentials-bridge'
+import { deepseekCredentialsApi } from './api/deepseek-credentials-bridge'
+import { fireworksCredentialsApi } from './api/fireworks-credentials-bridge'
 import { grokAccountsApi } from './api/grok-accounts-bridge'
 import { cursorAccountsApi } from './api/cursor-accounts-bridge'
 import { sshApi } from './api/ssh-bridge'
@@ -175,6 +177,8 @@ const api = {
   runtimeEnvironments: runtimeEnvironmentsApi,
   rateLimits: rateLimitsApi,
   minimaxCredentials: minimaxCredentialsApi,
+  deepseekCredentials: deepseekCredentialsApi,
+  fireworksCredentials: fireworksCredentialsApi,
   grokAccounts: grokAccountsApi,
   cursorAccounts: cursorAccountsApi,
   ssh: sshApi,

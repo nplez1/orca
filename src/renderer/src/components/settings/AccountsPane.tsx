@@ -18,6 +18,8 @@ import {
 import {
   getAccountsClaudeSearchEntries,
   getAccountsCodexSearchEntries,
+  getAccountsDeepSeekSearchEntries,
+  getAccountsFireworksSearchEntries,
   getAccountsGeminiSearchEntries,
   getAccountsCursorSearchEntries,
   getAccountsGrokSearchEntries,
@@ -52,7 +54,6 @@ import {
   createClaudeAccountActionRunner,
   createCodexAccountActionRunner
 } from './accounts-pane-account-actions'
-import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
 import { renderAccountsLocationSection } from './accounts-pane-location-section'
 import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
 import { renderCodexAccountsSection } from './accounts-pane-codex-section'
@@ -61,6 +62,9 @@ import {
   renderOpenCodeAccountsSection
 } from './accounts-pane-provider-setting-sections'
 import { renderMiniMaxAccountsSection } from './accounts-pane-minimax-section'
+import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
+import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
+import { useAccountsPaneCredentialSections } from './accounts-pane-credential-sections'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 
 export { getAccountsPaneSearchEntries }
@@ -84,15 +88,7 @@ export function AccountsPane({
   const recordedOpenCodeSettingEditsRef = useRef<Set<'cookie' | 'workspaceId' | 'apiKey'>>(
     new Set()
   )
-  const [miniMaxCookieDraft, setMiniMaxCookieDraft] = useState('')
-  const [miniMaxApiKeyDraft, setMiniMaxApiKeyDraft] = useState('')
-  const [miniMaxApiKeyConfigured, setMiniMaxApiKeyConfigured] = useState(false)
-  const [miniMaxApiKeyProtection, setMiniMaxApiKeyProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxConfigured, setMiniMaxConfigured] = useState(false)
-  const [miniMaxCookieProtection, setMiniMaxCookieProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxCredentialBusy, setMiniMaxCredentialBusy] = useState(false)
+  const credentialSections = useAccountsPaneCredentialSections(recordFeatureInteraction)
   const localAccountRuntime = getSelectedAccountRuntime(
     settings,
     wslSupportedPlatform,
@@ -230,34 +226,6 @@ export function AccountsPane({
     recordedOpenCodeSettingEditsRef.current.add(field)
     recordFeatureInteraction('usage-tracking')
   }
-  const refreshMiniMaxCredentialStatus = async (): Promise<void> => {
-    try {
-      const status = await window.api.minimaxCredentials.getStatus()
-      setMiniMaxConfigured(status.cookieConfigured)
-      setMiniMaxApiKeyConfigured(status.apiKeyConfigured)
-      setMiniMaxCookieProtection(status.cookieProtection)
-      setMiniMaxApiKeyProtection(status.apiKeyProtection)
-    } catch (error) {
-      console.error('Failed to load MiniMax credential status:', error)
-    }
-  }
-  const { saveMiniMaxCookie, clearMiniMaxCookie, saveMiniMaxApiKey, clearMiniMaxApiKey } =
-    createMiniMaxCredentialActions({
-      miniMaxCookieDraft,
-      setMiniMaxCookieDraft,
-      miniMaxApiKeyDraft,
-      setMiniMaxApiKeyDraft,
-      setMiniMaxApiKeyConfigured,
-      setMiniMaxApiKeyProtection,
-      setMiniMaxConfigured,
-      setMiniMaxCookieProtection,
-      setMiniMaxCredentialBusy,
-      recordFeatureInteraction
-    })
-
-  useEffect(() => {
-    void refreshMiniMaxCredentialStatus()
-  }, [])
 
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready
@@ -355,19 +323,9 @@ export function AccountsPane({
     runCodexAccountAction,
     recordOpenCodeSettingEdit,
     miniMaxRateLimits,
-    miniMaxApiKeyDraft,
-    setMiniMaxApiKeyDraft,
-    miniMaxApiKeyConfigured,
-    miniMaxApiKeyProtection,
-    saveMiniMaxApiKey,
-    clearMiniMaxApiKey,
-    miniMaxCookieDraft,
-    setMiniMaxCookieDraft,
-    miniMaxConfigured,
-    miniMaxCookieProtection,
-    miniMaxCredentialBusy,
-    saveMiniMaxCookie,
-    clearMiniMaxCookie
+    ...credentialSections.miniMax,
+    ...credentialSections.deepSeek,
+    ...credentialSections.fireworks
   }
   const visibleSections = [
     wslSupportedPlatform &&
@@ -389,6 +347,12 @@ export function AccountsPane({
       : null,
     matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries())
       ? renderMiniMaxAccountsSection(model)
+      : null,
+    matchesSettingsSearch(searchQuery, getAccountsDeepSeekSearchEntries())
+      ? renderDeepSeekAccountsSection(model)
+      : null,
+    matchesSettingsSearch(searchQuery, getAccountsFireworksSearchEntries())
+      ? renderFireworksAccountsSection(model)
       : null,
     matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries()) ? (
       <GrokAccountsSection key="grok" />

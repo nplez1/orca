@@ -45,6 +45,38 @@ export function createCursorAccountsApi(): NonNullable<Partial<PreloadApi>['curs
   }
 }
 
+export function createDeepSeekCredentialsApi(): NonNullable<
+  Partial<PreloadApi>['deepseekCredentials']
+> {
+  const notConfigured = { configured: false, apiKeyConfigured: false }
+  const unsupportedError = new Error(
+    'DeepSeek API key storage is only available in the desktop app.'
+  )
+  return {
+    getStatus: () => Promise.resolve(notConfigured),
+    saveApiKey: () => Promise.reject(unsupportedError),
+    clearApiKey: () => Promise.resolve(notConfigured)
+  }
+}
+
+export function createFireworksCredentialsApi(): NonNullable<
+  Partial<PreloadApi>['fireworksCredentials']
+> {
+  const notConfigured = {
+    configured: false,
+    apiKeyConfigured: false,
+    accountIdOverride: null
+  }
+  const unsupportedError = new Error(
+    'Fireworks credentials storage is only available in the desktop app.'
+  )
+  return {
+    getStatus: () => Promise.resolve(notConfigured),
+    save: () => Promise.reject(unsupportedError),
+    clear: () => Promise.resolve(notConfigured)
+  }
+}
+
 export function createGrokAccountsApi(): NonNullable<Partial<PreloadApi>['grokAccounts']> {
   const unsigned = {
     signedIn: false,

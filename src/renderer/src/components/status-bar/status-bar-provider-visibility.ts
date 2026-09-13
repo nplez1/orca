@@ -1,5 +1,6 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { hasCreditsData } from './provider-credits-format'
 
 export type UsageProviderSettings = Pick<
   GlobalSettings,
@@ -22,6 +23,10 @@ export type UsageProviderSettings = Pick<
   opencodeGoApiKeyConfigured: boolean
   grokAuthConfigured: boolean
   cursorAuthConfigured: boolean
+  // Why: DeepSeek/Fireworks credentials are API keys stored outside GlobalSettings;
+  // main derives these booleans each poll and the renderer never sees the key.
+  deepseekApiKeyConfigured: boolean
+  fireworksApiKeyConfigured: boolean
 }
 
 type UsageProviderSnapshots = {
@@ -35,17 +40,23 @@ type UsageProviderSnapshots = {
   grok: ProviderRateLimits | null | undefined
   cursor: ProviderRateLimits | null | undefined
   zcode?: ProviderRateLimits | null
+  deepseek: ProviderRateLimits | null | undefined
+  fireworks: ProviderRateLimits | null | undefined
 }
 
 type UsageProviderId = ProviderRateLimits['provider']
 
+// Why: credits count as usage data — DeepSeek/Fireworks publish no window at all,
+// so without this term every window-shaped caller reads them as "no data" and
+// hides a configured, funded account behind the invisible-bar state.
 function hasUsageData(provider: ProviderRateLimits): boolean {
   return Boolean(
     provider.session ||
     provider.weekly ||
     provider.fableWeekly ||
     provider.monthly ||
-    (provider.buckets && provider.buckets.length > 0)
+    (provider.buckets && provider.buckets.length > 0) ||
+    hasCreditsData(provider)
   )
 }
 
@@ -87,7 +98,9 @@ export function hasUsageProviderSettings(
     settings?.minimaxCookieConfigured === true ||
     settings?.minimaxApiKeyConfigured === true ||
     settings?.grokAuthConfigured === true ||
-    settings?.cursorAuthConfigured === true
+    settings?.cursorAuthConfigured === true ||
+    settings?.deepseekApiKeyConfigured === true ||
+    settings?.fireworksApiKeyConfigured === true
   )
 }
 
@@ -128,6 +141,12 @@ export function hasUsageProviderSettingsForProvider(
   if (providerId === 'cursor') {
     return settings.cursorAuthConfigured === true
   }
+  if (providerId === 'deepseek') {
+    return settings.deepseekApiKeyConfigured === true
+  }
+  if (providerId === 'fireworks') {
+    return settings.fireworksApiKeyConfigured === true
+  }
   return false
 }
 
@@ -142,6 +161,8 @@ function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRat
     ...(providerId === 'gemini' || providerId === 'cursor' || providerId === 'antigravity'
       ? { buckets: [] }
       : {}),
+    // Why: DeepSeek/Fireworks have no windows; their readout is the credits field.
+    ...(providerId === 'deepseek' || providerId === 'fireworks' ? { credits: null } : {}),
     updatedAt: 0,
     error: null,
     status: 'fetching'
@@ -187,7 +208,9 @@ export function isUsageEmptyState(
     isProviderSnapshotPending(providers.minimax) ||
     isProviderSnapshotPending(providers.grok) ||
     isProviderSnapshotPending(providers.cursor) ||
-    (providers.zcode !== undefined && isProviderSnapshotPending(providers.zcode))
+    (providers.zcode !== undefined && isProviderSnapshotPending(providers.zcode)) ||
+    isProviderSnapshotPending(providers.deepseek) ||
+    isProviderSnapshotPending(providers.fireworks)
   ) {
     return false
   }
@@ -202,6 +225,8 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.minimax) &&
     !isProviderConfigured(providers.grok) &&
     !isProviderConfigured(providers.cursor) &&
-    !isProviderConfigured(providers.zcode)
+    !isProviderConfigured(providers.zcode) &&
+    !isProviderConfigured(providers.deepseek) &&
+    !isProviderConfigured(providers.fireworks)
   )
 }

@@ -36,6 +36,8 @@ const {
   registerAgentHookHandlersMock,
   registerClaudeAccountHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
+  registerDeepSeekCredentialsHandlersMock,
+  registerFireworksCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
   registerCursorAccountHandlersMock,
   registerClipboardHandlersMock,
@@ -103,6 +105,8 @@ const {
   registerAgentHookHandlersMock: vi.fn(),
   registerClaudeAccountHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
+  registerDeepSeekCredentialsHandlersMock: vi.fn(),
+  registerFireworksCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
   registerCursorAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
@@ -336,6 +340,14 @@ vi.mock('../minimax-credentials', () => ({
   registerMiniMaxCredentialsHandlers: registerMiniMaxCredentialsHandlersMock
 }))
 
+vi.mock('../deepseek-credentials', () => ({
+  registerDeepSeekCredentialsHandlers: registerDeepSeekCredentialsHandlersMock
+}))
+
+vi.mock('../fireworks-credentials', () => ({
+  registerFireworksCredentialsHandlers: registerFireworksCredentialsHandlersMock
+}))
+
 vi.mock('../grok-accounts', () => ({
   registerGrokAccountHandlers: registerGrokAccountHandlersMock
 }))
@@ -441,6 +453,8 @@ describe('registerCoreHandlers', () => {
     registerAgentHookHandlersMock.mockReset()
     registerClaudeAccountHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
+    registerDeepSeekCredentialsHandlersMock.mockReset()
+    registerFireworksCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
     setTrustedClipboardRendererWebContentsIdMock.mockReset()
     registerUpdaterHandlersMock.mockReset()
@@ -540,6 +554,8 @@ describe('registerCoreHandlers', () => {
     expect(registerPetHandlersMock).toHaveBeenCalled()
     expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerDeepSeekCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerFireworksCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerCursorAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)
