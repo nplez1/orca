@@ -1,6 +1,8 @@
 import type { BrowserWindow } from 'electron'
 import { hasMiniMaxSessionCookie } from '../../minimax/minimax-cookie-store'
 import { hasMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
+import { hasDeepSeekApiKey } from '../../deepseek/deepseek-api-key-store'
+import { hasFireworksCredentials } from '../../fireworks/fireworks-credentials-store'
 import { RateLimitServiceAccountRefresh } from './service-account-refresh'
 import {
   type CodexAccountSelectionTarget,
@@ -10,6 +12,8 @@ import {
   type ClaudeAuthPreparationResolver,
   type OpenCodeGoRateLimitConfig,
   type MiniMaxRateLimitConfig,
+  type DeepSeekRateLimitConfig,
+  type FireworksRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
   type InactiveCodexAccountInfo,
   type InactiveClaudeAccountInfo,
@@ -46,6 +50,14 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
 
   setMiniMaxConfigResolver(resolver: () => MiniMaxRateLimitConfig): void {
     this.miniMaxConfigResolver = resolver
+  }
+
+  setDeepSeekConfigResolver(resolver: () => DeepSeekRateLimitConfig): void {
+    this.deepSeekConfigResolver = resolver
+  }
+
+  setFireworksConfigResolver(resolver: () => FireworksRateLimitConfig): void {
+    this.fireworksConfigResolver = resolver
   }
 
   setGeminiCliOAuthEnabledResolver(resolver: GeminiCliOAuthEnabledResolver): void {
@@ -126,6 +138,9 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
       minimaxCookieConfigured: hasMiniMaxSessionCookie(),
       minimaxApiKeyConfigured: hasMiniMaxApiKey(),
       opencodeGoApiKeyConfigured: this.openCodeGoApiKeyConfigured,
+      // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
+      deepseekApiKeyConfigured: hasDeepSeekApiKey(),
+      fireworksApiKeyConfigured: hasFireworksCredentials(),
       grokAuthConfigured: this.grokAuthConfigured,
       claudeTarget: this.claudeFetchTarget,
       codexTarget: this.codexFetchTarget,

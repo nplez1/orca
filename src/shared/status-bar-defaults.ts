@@ -8,6 +8,8 @@ export const DEFAULT_STATUS_BAR_ITEMS: StatusBarItem[] = [
   'opencode-go',
   'kimi',
   'minimax',
+  'deepseek',
+  'fireworks',
   'grok',
   'ssh',
   'resource-usage',

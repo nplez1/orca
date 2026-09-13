@@ -1,5 +1,7 @@
 import { fetchClaudeRateLimits } from '../claude-fetcher'
 import { fetchCodexRateLimits } from '../codex-fetcher'
+import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
+import { fetchFireworksRateLimits } from '../fireworks/fireworks-fetcher'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -30,8 +32,14 @@ export type FetchAllCyclePrepared = {
   opencodeGeneration: number
   miniMaxConfigChanged: boolean
   miniMaxGeneration: number
+  deepSeekConfigChanged: boolean
+  deepSeekGeneration: number
+  fireworksConfigChanged: boolean
+  fireworksGeneration: number
   claudeFetchGated: boolean
   results: [
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
@@ -84,6 +92,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
+    const deepSeekConfigResult = this.resolveDeepSeekConfig()
+    const deepSeekApiKey = deepSeekConfigResult.config.apiKey
+    const fireworksConfigResult = this.resolveFireworksConfig()
+    const fireworksApiKey = fireworksConfigResult.config.apiKey
+    const fireworksAccountIdOverride = fireworksConfigResult.config.accountIdOverride
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -110,6 +123,22 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
+    const currentDeepSeekConfigHash = `${deepSeekApiKey}|${deepSeekConfigResult.error ?? ''}`
+    const deepSeekConfigChanged = currentDeepSeekConfigHash !== this.lastDeepSeekConfigHash
+    if (deepSeekConfigChanged) {
+      this.lastDeepSeekConfigHash = currentDeepSeekConfigHash
+      this.deepseekFetchGeneration += 1
+    }
+    const deepSeekGeneration = this.deepseekFetchGeneration
+
+    const currentFireworksConfigHash = `${fireworksApiKey}|${fireworksAccountIdOverride ?? ''}|${fireworksConfigResult.error ?? ''}`
+    const fireworksConfigChanged = currentFireworksConfigHash !== this.lastFireworksConfigHash
+    if (fireworksConfigChanged) {
+      this.lastFireworksConfigHash = currentFireworksConfigHash
+      this.fireworksFetchGeneration += 1
+    }
+    const fireworksGeneration = this.fireworksFetchGeneration
+
     // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
     this.updateState({
       ...previousState,
@@ -127,6 +156,12 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       minimax: miniMaxConfigChanged
         ? this.withFetchingStatus(null, 'minimax')
         : this.withFetchingStatus(previousState.minimax, 'minimax'),
+      deepseek: deepSeekConfigChanged
+        ? this.withFetchingStatus(null, 'deepseek')
+        : this.withFetchingStatus(previousState.deepseek, 'deepseek'),
+      fireworks: fireworksConfigChanged
+        ? this.withFetchingStatus(null, 'fireworks')
+        : this.withFetchingStatus(previousState.fireworks, 'fireworks'),
       grok: this.withFetchingStatus(previousState.grok, 'grok')
     })
 
@@ -144,49 +179,66 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const claudeFetchGated =
       !options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude)
 
-    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
-      await Promise.allSettled([
-        claudeFetchGated
-          ? Promise.resolve(previousState.claude as ProviderRateLimits)
-          : fetchClaudeRateLimits({
-              authPreparation: claudeAuthPreparation,
-              allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-              allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-              networkProxySettings: this.networkProxySettingsResolver?.(),
-              signal
-            }),
-        codexFetchGated
-          ? Promise.resolve(previousState.codex as ProviderRateLimits)
-          : (missingWslCodexHome ??
-            fetchCodexRateLimits({
-              codexHomePath,
-              allowPtyFallback: this.shouldAllowCodexPtyFallback(),
-              signal
-            })),
-        fetchGeminiRateLimits(geminiCliOAuthEnabled),
-        fetchOpenCodeGoUsage({
-          settingsApiKey: openCodeGoApiKey,
-          // Why here: the key can also come from the environment or OpenCode's
-          // own store, so presence is only known once the fetch resolves it.
-          onApiKeyResolved: (resolution) => {
-            this.openCodeGoApiKeyConfigured = resolution.status === 'found'
-          },
-          cookie,
-          workspaceIdOverride: workspaceIdOverride || undefined,
-          networkProxySettings: this.networkProxySettingsResolver?.(),
-          signal
-        }),
-        this.fetchKimiWithResolvedHome(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels,
-              endpointMode: miniMaxEndpoint,
-              apiKey: miniMaxApiKey
-            })
-      ])
+    const [
+      claudeResult,
+      codexResult,
+      geminiResult,
+      opencodeGoResult,
+      kimiResult,
+      miniMaxResult,
+      deepSeekResult,
+      fireworksResult
+    ] = await Promise.allSettled([
+      claudeFetchGated
+        ? Promise.resolve(previousState.claude as ProviderRateLimits)
+        : fetchClaudeRateLimits({
+            authPreparation: claudeAuthPreparation,
+            allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
+            allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+            networkProxySettings: this.networkProxySettingsResolver?.(),
+            signal
+          }),
+      codexFetchGated
+        ? Promise.resolve(previousState.codex as ProviderRateLimits)
+        : (missingWslCodexHome ??
+          fetchCodexRateLimits({
+            codexHomePath,
+            allowPtyFallback: this.shouldAllowCodexPtyFallback(),
+            signal
+          })),
+      fetchGeminiRateLimits(geminiCliOAuthEnabled),
+      fetchOpenCodeGoUsage({
+        settingsApiKey: openCodeGoApiKey,
+        // Why here: the key can also come from the environment or OpenCode's
+        // own store, so presence is only known once the fetch resolves it.
+        onApiKeyResolved: (resolution) => {
+          this.openCodeGoApiKeyConfigured = resolution.status === 'found'
+        },
+        cookie,
+        workspaceIdOverride: workspaceIdOverride || undefined,
+        networkProxySettings: this.networkProxySettingsResolver?.(),
+        signal
+      }),
+      this.fetchKimiWithResolvedHome(),
+      miniMaxConfigResult.error
+        ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+        : fetchMiniMaxRateLimits({
+            cookie: miniMaxCookie,
+            groupId: miniMaxGroupId,
+            models: miniMaxModels,
+            endpointMode: miniMaxEndpoint,
+            apiKey: miniMaxApiKey
+          }),
+      deepSeekConfigResult.error
+        ? Promise.resolve(this.getApiKeyCredentialError('deepseek', deepSeekConfigResult.error))
+        : fetchDeepSeekRateLimits({ apiKey: deepSeekApiKey }),
+      fireworksConfigResult.error
+        ? Promise.resolve(this.getApiKeyCredentialError('fireworks', fireworksConfigResult.error))
+        : fetchFireworksRateLimits({
+            apiKey: fireworksApiKey,
+            accountIdOverride: fireworksAccountIdOverride
+          })
+    ])
 
     if (signal.aborted) {
       return null
@@ -206,6 +258,10 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       opencodeGeneration,
       miniMaxConfigChanged,
       miniMaxGeneration,
+      deepSeekConfigChanged,
+      deepSeekGeneration,
+      fireworksConfigChanged,
+      fireworksGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -213,7 +269,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult
+        miniMaxResult,
+        deepSeekResult,
+        fireworksResult
       ],
       grokResultPromise
     }

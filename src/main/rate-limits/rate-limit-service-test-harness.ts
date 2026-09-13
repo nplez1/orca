@@ -6,10 +6,14 @@ import { fetchCodexRateLimits } from './codex-fetcher'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './kimi-fetcher'
 import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
+import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
+import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
 import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
+import { hasDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
+import { hasFireworksCredentials } from '../fireworks/fireworks-credentials-store'
 
 export type Deferred<T> = {
   promise: Promise<T>
@@ -78,6 +82,26 @@ export function unavailableProvider(
   }
 }
 
+// Why: balance/spend providers have no quota window, so a window-shaped fixture would test a state they can never produce.
+export function creditsProvider(
+  provider: ProviderRateLimits['provider'],
+  kind: 'balance' | 'spend' = 'balance'
+): ProviderRateLimits {
+  return {
+    provider,
+    session: null,
+    weekly: null,
+    credits: {
+      kind,
+      amount: { currencyCode: 'USD', units: '42', nanos: 100_000_000 },
+      ...(kind === 'spend' ? { period: 'current-month' as const } : {})
+    },
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok'
+  }
+}
+
 // Why: beforeEach caches snapshot objects whose updatedAt is pinned at suite
 // start, so after 5 fake minutes every healthy provider looks stale and every
 // activation degrades to a full fetch. Backoff tests that reason about the
@@ -88,6 +112,10 @@ export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchOpenCodeGoUsage).mockImplementation(async () => okProvider('opencode-go', 0))
   vi.mocked(fetchKimiRateLimits).mockImplementation(async () => okProvider('kimi', 0))
   vi.mocked(fetchMiniMaxRateLimits).mockImplementation(async () => okProvider('minimax', 0))
+  vi.mocked(fetchDeepSeekRateLimits).mockImplementation(async () => unavailableProvider('deepseek'))
+  vi.mocked(fetchFireworksRateLimits).mockImplementation(async () =>
+    unavailableProvider('fireworks')
+  )
   vi.mocked(fetchGrokRateLimits).mockImplementation(async () => unavailableProvider('grok'))
 }
 
@@ -98,6 +126,9 @@ export function resetRateLimitProviderMocks(): void {
   vi.mocked(fetchOpenCodeGoUsage).mockResolvedValue(okProvider('opencode-go', 0, Date.now()))
   vi.mocked(fetchKimiRateLimits).mockResolvedValue(okProvider('kimi', 0, Date.now()))
   vi.mocked(fetchMiniMaxRateLimits).mockResolvedValue(okProvider('minimax', 0, Date.now()))
+  // Why: no API key is configured in these suites, so the credential flags must read false or the new providers report a spurious "configured" state.
+  vi.mocked(fetchDeepSeekRateLimits).mockResolvedValue(unavailableProvider('deepseek'))
+  vi.mocked(fetchFireworksRateLimits).mockResolvedValue(unavailableProvider('fireworks'))
   vi.mocked(fetchGrokRateLimits).mockResolvedValue({
     provider: 'grok',
     session: null,
@@ -107,6 +138,8 @@ export function resetRateLimitProviderMocks(): void {
     status: 'unavailable'
   })
   vi.mocked(hasMiniMaxSessionCookie).mockReturnValue(false)
+  vi.mocked(hasDeepSeekApiKey).mockReturnValue(false)
+  vi.mocked(hasFireworksCredentials).mockReturnValue(false)
   vi.mocked(readGrokAuthSession).mockReturnValue({ status: 'missing' })
 }
 
