@@ -150,7 +150,11 @@
         "resourceUsageToggleDescription": "Show the Resource Manager. Click it for CPU, memory, sessions, daemon controls, and workspace disk scans.",
         "portsToggleDescription": "Show live workspace ports. Click it for workspace-scoped ports and external listeners.",
         "antigravityToggleDescription": "Show Antigravity subscription usage for the active workspace.",
-        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI."
+        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI.",
+        "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
+        "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar.",
+        "deepseekLabel": "DeepSeek Balance",
+        "fireworksLabel": "Fireworks.ai Spend"
       },
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
@@ -160,6 +164,19 @@
           "statusItem": "status item",
           "activity": "activity"
         }
+      },
+      "search": {
+        "deepseekTitle": "DeepSeek Balance",
+        "deepseekDescription": "Show your DeepSeek account balance in the status bar.",
+        "deepseekKeyword": "deepseek",
+        "balanceKeyword": "balance",
+        "creditsKeyword": "credits",
+        "cnyKeyword": "cny",
+        "fireworksTitle": "Fireworks.ai Spend",
+        "fireworksDescription": "Show your Fireworks.ai rated spend in the status bar.",
+        "fireworksKeyword": "fireworks",
+        "fireworksAiKeyword": "fireworks.ai",
+        "spendKeyword": "spend"
       }
     },
     "browser": {
@@ -1124,7 +1141,7 @@
         "cd50cec5d7": "Coordinate multiple coding agents through Orca.",
         "58a868e8e4": "Orchestration",
         "7c79d3b7bf": "Optional",
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, and Grok.",
+        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, and Fireworks.ai.",
         "f70ac54d38": "AI Provider Accounts",
         "4121f7a0a2": "Manage AI agents, set a default, and customize commands.",
         "b49abbd2f7": "Agents",
@@ -3979,7 +3996,8 @@
                 "apiKey": "MiniMax API key expired. Replace it in Settings.",
                 "cookie": "MiniMax session cookie expired. Replace it in Settings."
               }
-            }
+            },
+            "df60b41813": "Balance cannot fund further calls"
           },
           "SshTargetStatusRow": {
             "sshHost": "SSH Host"
@@ -4070,6 +4088,19 @@
             "ariaLabelOne": "1 chat available to resume",
             "ariaLabel": "{{value0}} chats available to resume",
             "tooltip": "Open interrupted chats available to resume"
+          },
+          "providerCredits": {
+            "period": {
+              "currentMonth": "this month",
+              "last30Days": "in the last 30 days"
+            },
+            "item": {
+              "granted": "Granted",
+              "toppedUp": "Topped up"
+            },
+            "balance": "{{value0}} available",
+            "spend": "{{value0}} spent",
+            "spendPeriod": "{{value0}} spent {{value1}}"
           }
         }
       },
@@ -9001,7 +9032,74 @@
             "b2c4e7f1a8": "endpoint",
             "3a9b6d2c4e": "api key",
             "5d8f1a3b7c": "china",
-            "7e2a4b8c1d": "overseas"
+            "7e2a4b8c1d": "overseas",
+            "0bbd8d1b24": "DeepSeek Usage",
+            "d9d1e324dc": "Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.",
+            "249878a2e7": "deepseek",
+            "54714130c4": "api key",
+            "c0a759aceb": "balance",
+            "ca8cf669e2": "usage",
+            "aef1562679": "credits",
+            "f23a201868": "Fireworks.ai Usage",
+            "d3b18e19e2": "Configure Fireworks.ai usage tracking with an API key and an optional account ID override.",
+            "6d465bfd03": "fireworks",
+            "5636d2d71b": "spend",
+            "01a85f426c": "account id"
+          },
+          "pane": {
+            "deepseek": {
+              "actions": {
+                "312f213d4f": "DeepSeek API key is required.",
+                "e77c0b006a": "DeepSeek API key saved.",
+                "82ad607eeb": "DeepSeek credential update failed."
+              },
+              "section": {
+                "28c8b91c5d": "DeepSeek",
+                "53ce175669": "Configure DeepSeek usage tracking for your account.",
+                "47e631f32d": "Open console",
+                "16fb212002": "Stored locally",
+                "c62df1a6cd": "Credentials not set",
+                "e60b2e635a": "Stored locally in the Orca encrypted credential store and sent to DeepSeek only to refresh your balance.",
+                "59d9d40b95": "DeepSeek API key",
+                "0c4385003d": "Paste the API key from your DeepSeek platform account for local balance fetching.",
+                "f5d5cdde38": "Saved",
+                "d47451b104": "Not saved",
+                "71ec71b74d": "Paste your DeepSeek API key",
+                "64da8edf4b": "Replace",
+                "21f2625976": "Save",
+                "bc10d6273f": "Forget key",
+                "27efc84bc7": "Create a key in your DeepSeek platform account and paste it here. The DeepSeek API exposes only the current balance — there is no usage or cost history to show — and the balance may be denominated in CNY or USD depending on the account."
+              }
+            },
+            "fireworks": {
+              "actions": {
+                "ee4388904a": "Fireworks API key is required.",
+                "f2c3ea1168": "Fireworks credentials saved.",
+                "54af23897c": "Fireworks credential update failed."
+              },
+              "section": {
+                "51bcc16ae3": "Fireworks.ai",
+                "5f31aaba69": "Configure Fireworks.ai usage tracking for your account.",
+                "d8c675f9f0": "Open console",
+                "fb3c265f9d": "Stored locally",
+                "084f43d064": "Credentials not set",
+                "56669b1597": "Stored locally in the Orca encrypted credential store and sent to Fireworks.ai only to refresh your rated spend.",
+                "1fd991909e": "Fireworks API key",
+                "5e8948033a": "Paste the API key from your Fireworks.ai account for local spend fetching.",
+                "d2eb5b59e0": "Saved",
+                "077467c5d6": "Not saved",
+                "1b29aa7268": "Paste your Fireworks API key",
+                "2ccc2fea25": "Replace",
+                "b98b4449d5": "Save",
+                "545da4ee6c": "Forget key",
+                "fd8437b974": "Create a key in your Fireworks.ai account and paste it here. Orca refreshes rated spend for the current billing period, in US dollars.",
+                "2cea3b33f9": "Fireworks account ID",
+                "c1c89f3dac": "Optional account ID override for keys that can see more than one Fireworks.ai account.",
+                "797cd4833e": "Account ID (optional)",
+                "c9bd728853": "Auto-detected from the API key",
+                "d74a913846": "Orca discovers the account ID from your API key. Set an override only when the key can see multiple accounts; leave it blank to keep auto-detection. Saving with the API key field blank keeps your stored key, and Forget key clears the account ID as well."
+              }
+            }
           }
         },
         "advanced": {
