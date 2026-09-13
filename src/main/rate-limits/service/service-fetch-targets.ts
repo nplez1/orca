@@ -6,6 +6,8 @@ import {
   type ClaudeRuntimeAuthPreparation,
   type CodexAccountSelectionTarget,
   type MiniMaxResolvedConfig,
+  type DeepSeekResolvedConfig,
+  type FireworksResolvedConfig,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
   type ProviderRateLimits,
@@ -217,6 +219,25 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
         },
         error: toErrorMessage(error)
       }
+    }
+  }
+
+  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+    try {
+      return { config: this.deepSeekConfigResolver?.() ?? { apiKey: '' }, error: null }
+    } catch (error) {
+      return { config: { apiKey: '' }, error: toErrorMessage(error) }
+    }
+  }
+
+  protected resolveFireworksConfig(): FireworksResolvedConfig {
+    try {
+      return {
+        config: this.fireworksConfigResolver?.() ?? { apiKey: '', accountIdOverride: null },
+        error: null
+      }
+    } catch (error) {
+      return { config: { apiKey: '', accountIdOverride: null }, error: toErrorMessage(error) }
     }
   }
 }
