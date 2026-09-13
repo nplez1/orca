@@ -34,6 +34,8 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       previous?.weekly ||
       previous?.fableWeekly ||
       previous?.monthly ||
+      // Why: a balance/spend provider has no window to test, so omitting this drops its snapshot on the first transient failure.
+      previous?.credits ||
       (previous?.buckets && previous.buckets.length > 0)
     )
 

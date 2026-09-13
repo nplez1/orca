@@ -578,6 +578,52 @@ describe('AppearancePane', () => {
     expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('antigravity')
   })
 
+  it('records DeepSeek and Fireworks.ai status bar toggles as usage tracking interactions', async () => {
+    mocks.state.availableStatusBarToggles = [
+      {
+        id: 'deepseek',
+        title: 'DeepSeek Balance',
+        description: 'Show your DeepSeek account balance in the status bar.',
+        toggleDescription: 'Show DeepSeek account balance in the status bar.',
+        keywords: ['status bar', 'deepseek', 'balance']
+      },
+      {
+        id: 'fireworks',
+        title: 'Fireworks.ai Spend',
+        description: 'Show your Fireworks.ai rated spend in the status bar.',
+        toggleDescription: 'Show Fireworks.ai rated spend in the status bar.',
+        keywords: ['status bar', 'fireworks', 'spend']
+      }
+    ]
+    mocks.state.settingsSearchQuery = 'deepseek'
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+    const deepSeekSwitch = container.querySelector<HTMLButtonElement>(
+      'button[role="switch"][aria-label="DeepSeek Balance"]'
+    )
+
+    expect(deepSeekSwitch).not.toBeNull()
+    await act(async () => {
+      deepSeekSwitch?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(mocks.state.recordFeatureInteraction).toHaveBeenCalledWith('usage-tracking')
+    expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('deepseek')
+
+    mocks.state.settingsSearchQuery = 'fireworks'
+    const fireworksContainer = await renderAppearancePane(getDefaultSettings('/tmp'))
+    const fireworksSwitch = fireworksContainer.querySelector<HTMLButtonElement>(
+      'button[role="switch"][aria-label="Fireworks.ai Spend"]'
+    )
+
+    expect(fireworksSwitch).not.toBeNull()
+    await act(async () => {
+      fireworksSwitch?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(mocks.state.recordFeatureInteraction).toHaveBeenCalledWith('usage-tracking')
+    expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('fireworks')
+  })
+
   it('expands Interface, Terminal, and Window & Sidebar by default', async () => {
     mocks.state.settingsSearchQuery = ''
     const container = await renderAppearancePane(getDefaultSettings('/tmp'))

@@ -176,4 +176,19 @@ describe('AccountsPane', () => {
     expect(markup).toContain('auth cookie still covers workspace discovery')
     expect(markup).not.toContain('Fe26.2**… token or auth=Fe26.2**… header')
   })
+
+  it('renders the API-key credential sections for DeepSeek and Fireworks', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).toContain('id="accounts-deepseek"')
+    expect(markup).toContain('id="accounts-fireworks"')
+    expect(markup).toContain('DeepSeek API key')
+    expect(markup).toContain('Fireworks API key')
+    // Fireworks carries the optional account-ID override in the same form.
+    expect(markup).toContain('Auto-detected from the API key')
+    // DeepSeek exposes no usage history, only a CNY- or USD-denominated balance.
+    expect(markup).toContain('the balance may be denominated in CNY or USD')
+    expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-deepseek'))
+    expect(markup.indexOf('accounts-deepseek')).toBeLessThan(markup.indexOf('accounts-fireworks'))
+  })
 })
