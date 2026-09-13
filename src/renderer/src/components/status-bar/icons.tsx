@@ -1,4 +1,5 @@
 import React from 'react'
+import { Flame, Waves } from 'lucide-react'
 import minimaxIconUrl from '../../../../../resources/minimax-icon.svg?url'
 
 export function OpenAIIcon({ size = 14 }: { size?: number }): React.JSX.Element {
@@ -32,6 +33,16 @@ export function MiniMaxIcon({ size = 14 }: { size?: number }): React.JSX.Element
       style={{ width: size, height: size }}
     />
   )
+}
+
+// Why: no DeepSeek brand asset is bundled yet; a neutral mark beats the wrong-brand fallback.
+export function DeepSeekIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return <Waves size={size} aria-hidden="true" />
+}
+
+// Why: no Fireworks.ai brand asset is bundled yet; a neutral mark beats the wrong-brand fallback.
+export function FireworksIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return <Flame size={size} aria-hidden="true" />
 }
 
 // Why: each instance needs unique filter/mask IDs — reusing the same ID across
