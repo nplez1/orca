@@ -3,6 +3,8 @@ import type { StatsSummary } from '../../../shared/process-stats-types'
 import { createWebE2EApi } from './preload-api/web-e2e-api'
 import {
   createAccountsApi,
+  createDeepSeekCredentialsApi,
+  createFireworksCredentialsApi,
   createGrokAccountsApi,
   createMiniMaxCredentialsApi
 } from './preload-api/web-agent-accounts-api'
@@ -105,6 +107,8 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     notifications: createNotificationsApi(),
     rateLimits: createRateLimitsApi(),
     minimaxCredentials: createMiniMaxCredentialsApi(),
+    deepseekCredentials: createDeepSeekCredentialsApi(),
+    fireworksCredentials: createFireworksCredentialsApi(),
     grokAccounts: createGrokAccountsApi(),
     codexAccounts: createAccountsApi(),
     claudeAccounts: createAccountsApi(),

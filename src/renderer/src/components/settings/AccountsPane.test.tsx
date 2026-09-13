@@ -167,4 +167,19 @@ describe('AccountsPane', () => {
       markup.slice(markup.lastIndexOf('<button', addAccountIndex), addAccountIndex)
     ).not.toContain('disabled=""')
   })
+
+  it('renders the API-key credential sections for DeepSeek and Fireworks', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).toContain('id="accounts-deepseek"')
+    expect(markup).toContain('id="accounts-fireworks"')
+    expect(markup).toContain('DeepSeek API key')
+    expect(markup).toContain('Fireworks API key')
+    // Fireworks carries the optional account-ID override in the same form.
+    expect(markup).toContain('Auto-detected from the API key')
+    // DeepSeek exposes no usage history, only a CNY- or USD-denominated balance.
+    expect(markup).toContain('the balance may be denominated in CNY or USD')
+    expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-deepseek'))
+    expect(markup.indexOf('accounts-deepseek')).toBeLessThan(markup.indexOf('accounts-fireworks'))
+  })
 })

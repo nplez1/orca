@@ -39,7 +39,9 @@ export const ProviderRateLimitsSchema = z
       'kimi',
       'minimax',
       'grok',
-      'antigravity'
+      'antigravity',
+      'deepseek',
+      'fireworks'
     ]),
     session: RateLimitWindowSchema.nullable(),
     weekly: RateLimitWindowSchema.nullable(),
