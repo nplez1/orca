@@ -8,6 +8,8 @@ describe('getUsageProviderAccountsSectionId', () => {
     expect(getUsageProviderAccountsSectionId('gemini')).toBe('accounts-gemini')
     expect(getUsageProviderAccountsSectionId('opencode-go')).toBe('accounts-opencode-go')
     expect(getUsageProviderAccountsSectionId('minimax')).toBe('accounts-minimax')
+    expect(getUsageProviderAccountsSectionId('deepseek')).toBe('accounts-deepseek')
+    expect(getUsageProviderAccountsSectionId('fireworks')).toBe('accounts-fireworks')
     expect(getUsageProviderAccountsSectionId('grok')).toBe('accounts-grok')
     expect(getUsageProviderAccountsSectionId('cursor')).toBe('accounts-cursor')
     expect(getUsageProviderAccountsSectionId('zcode')).toBe('accounts-zcode')

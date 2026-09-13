@@ -63,6 +63,8 @@ export type StatusBarItem =
   | 'opencode-go'
   | 'kimi'
   | 'minimax'
+  | 'deepseek'
+  | 'fireworks'
   | 'grok'
   | 'cursor'
   | 'zcode'

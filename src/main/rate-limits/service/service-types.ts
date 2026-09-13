@@ -79,6 +79,26 @@ export type ZcodePlanResolvedConfig = {
   error: string | null
 }
 
+export type DeepSeekRateLimitConfig = {
+  apiKey: string
+}
+
+export type DeepSeekResolvedConfig = {
+  config: DeepSeekRateLimitConfig
+  error: string | null
+}
+
+export type FireworksRateLimitConfig = {
+  apiKey: string
+  /** User-supplied account ID; when set it wins over Fireworks' own discovery. */
+  accountIdOverride: string | null
+}
+
+export type FireworksResolvedConfig = {
+  config: FireworksRateLimitConfig
+  error: string | null
+}
+
 export type GeminiCliOAuthEnabledResolver = () => boolean
 
 /** Whether the user is actually showing Antigravity usage, so the `agy` probe is worth spawning. */
@@ -132,6 +152,8 @@ export type InternalRateLimitState = {
   grok: ProviderRateLimits | null
   cursor: ProviderRateLimits | null
   zcode: ProviderRateLimits | null
+  deepseek: ProviderRateLimits | null
+  fireworks: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

@@ -21,6 +21,8 @@ import {
   readOpenCodeGoApiKey,
   saveOpenCodeGoApiKey
 } from '../opencode/opencode-go-api-key-store'
+import { readDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
+import { readFireworksCredentials } from '../fireworks/fireworks-credentials-store'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
@@ -163,6 +165,16 @@ export function initializeMainProcessAccountServices(): void {
     site: store.getSettings().zcodePlanSite ?? 'zai',
     apiKey: readZcodePlanApiKey() ?? ''
   }))
+  state.rateLimits.setDeepSeekConfigResolver(() => ({ apiKey: readDeepSeekApiKey() ?? '' }))
+  // Why: readFireworksCredentials throws on an undecryptable file, and letting it
+  // throw records a Fireworks-only credential error instead of a silent keyless poll.
+  state.rateLimits.setFireworksConfigResolver(() => {
+    const credentials = readFireworksCredentials()
+    return {
+      apiKey: credentials?.apiKey ?? '',
+      accountIdOverride: credentials?.accountIdOverride ?? null
+    }
+  })
   state.rateLimits.setGeminiCliOAuthEnabledResolver(() => store.getSettings().geminiCliOAuthEnabled)
   // Reuse the meter switch so hidden Antigravity usage does not spawn agy.
   state.rateLimits.setAntigravityUsageEnabledResolver(() =>

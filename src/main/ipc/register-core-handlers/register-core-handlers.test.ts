@@ -38,6 +38,8 @@ const {
   registerOpenCodeGoCredentialsHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
   registerZcodePlanCredentialsHandlersMock,
+  registerDeepSeekCredentialsHandlersMock,
+  registerFireworksCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
   registerCursorAccountHandlersMock,
   registerClipboardHandlersMock,
@@ -107,6 +109,8 @@ const {
   registerOpenCodeGoCredentialsHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
   registerZcodePlanCredentialsHandlersMock: vi.fn(),
+  registerDeepSeekCredentialsHandlersMock: vi.fn(),
+  registerFireworksCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
   registerCursorAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
@@ -348,6 +352,14 @@ vi.mock('../zcode-plan-credentials', () => ({
   registerZcodePlanCredentialsHandlers: registerZcodePlanCredentialsHandlersMock
 }))
 
+vi.mock('../deepseek-credentials', () => ({
+  registerDeepSeekCredentialsHandlers: registerDeepSeekCredentialsHandlersMock
+}))
+
+vi.mock('../fireworks-credentials', () => ({
+  registerFireworksCredentialsHandlers: registerFireworksCredentialsHandlersMock
+}))
+
 vi.mock('../grok-accounts', () => ({
   registerGrokAccountHandlers: registerGrokAccountHandlersMock
 }))
@@ -455,6 +467,8 @@ describe('registerCoreHandlers', () => {
     registerOpenCodeGoCredentialsHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
     registerZcodePlanCredentialsHandlersMock.mockReset()
+    registerDeepSeekCredentialsHandlersMock.mockReset()
+    registerFireworksCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
     setTrustedClipboardRendererWebContentsIdMock.mockReset()
     registerUpdaterHandlersMock.mockReset()
@@ -556,6 +570,8 @@ describe('registerCoreHandlers', () => {
     expect(registerOpenCodeGoCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerZcodePlanCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerDeepSeekCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerFireworksCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerCursorAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)

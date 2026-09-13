@@ -16,6 +16,8 @@ import {
   getProviderDisplayName,
   getProviderUsageStatusLabel
 } from './tooltip'
+import { describeCredits, formatCreditsAmount, hasCreditsData } from './provider-credits-format'
+import type { ProviderCredits } from '../../../../shared/provider-credits'
 import { getTightestUsageSection, getUsageHeadlineSection } from './UsageRosterPanel'
 import { formatRateLimitWindowChipLabel } from '@/lib/window-label-formatter'
 import { formatUsagePercentageLabel } from './usage-percentage-label'
@@ -65,7 +67,7 @@ function WindowLabel({
 // the roster trigger and ProviderDetailsMenu so the dot's has-data condition
 // and markup can't drift between the two.
 export function ProviderLetterBadge({ p }: { p: ProviderRateLimits }): React.JSX.Element {
-  const hasData = Boolean(p.session || p.weekly || p.fableWeekly || p.monthly || p.buckets?.length)
+  const hasData = hasUsageData(p)
   return (
     <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span
@@ -157,7 +159,33 @@ function getProviderLetter(provider: ProviderRateLimits['provider']): string {
       return 'Z'
     case 'codex':
       return 'X'
+    case 'deepseek':
+      return 'D'
+    case 'fireworks':
+      return 'F'
   }
+}
+
+// Why: ProviderLetterBadge's dot needs the same "has data" answer as the segment,
+// and credits are data even when every window is null.
+function hasUsageData(p: ProviderRateLimits): boolean {
+  return Boolean(
+    p.session || p.weekly || p.fableWeekly || p.monthly || p.buckets?.length || hasCreditsData(p)
+  )
+}
+
+function CreditsSummary({
+  credits,
+  compact
+}: {
+  credits: ProviderCredits
+  compact: boolean
+}): React.JSX.Element {
+  return (
+    <span data-provider-credits className="tabular-nums text-muted-foreground">
+      {compact ? formatCreditsAmount(credits.amount) : describeCredits(credits)}
+    </span>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -326,9 +354,11 @@ export function ProviderSegment({
   }
 
   const tightest = mode === 'compact' ? getUsageHeadlineSection(p) : getTightestUsageSection(p)
+  const credits = p.credits ?? null
+  const hasCredits = credits !== null
 
   // Fetching with no prior data
-  if (p.status === 'fetching' && !tightest) {
+  if (p.status === 'fetching' && !tightest && !hasCredits) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <ProviderIcon provider={provider} />
@@ -347,7 +377,7 @@ export function ProviderSegment({
   }
 
   // Error with no data
-  if (p.status === 'error' && !tightest) {
+  if (p.status === 'error' && !tightest && !hasCredits) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <ProviderIcon provider={provider} />
@@ -369,7 +399,11 @@ export function ProviderSegment({
           {tightest && !compact ? (
             <MiniBar usedPct={clampUsedPercent(tightest.window.usedPercent)} display={display} />
           ) : null}
-          <VerboseProviderUsage p={p} display={display} />
+          {tightest ? (
+            <VerboseProviderUsage p={p} display={display} />
+          ) : credits ? (
+            <CreditsSummary credits={credits} compact={compact} />
+          ) : null}
         </>
       ) : tightest ? (
         <WindowLabel
@@ -378,6 +412,8 @@ export function ProviderSegment({
           display={display}
           showLabel={!compact}
         />
+      ) : credits ? (
+        <CreditsSummary credits={credits} compact={compact} />
       ) : null}
       {showBalance && p.extraUsage ? (
         <>

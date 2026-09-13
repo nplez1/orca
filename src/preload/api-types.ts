@@ -3,6 +3,8 @@ import type {
   CodexAccountsApi,
   CodexConfigSyncApi,
   CursorAccountsApi,
+  DeepSeekCredentialsApi,
+  FireworksCredentialsApi,
   GrokAccountsApi,
   MinimaxCredentialsApi,
   ZcodePlanCredentialsApi
@@ -149,6 +151,8 @@ export type PreloadApi = {
   }
   minimaxCredentials: MinimaxCredentialsApi
   zcodePlanCredentials: ZcodePlanCredentialsApi
+  deepseekCredentials: DeepSeekCredentialsApi
+  fireworksCredentials: FireworksCredentialsApi
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi

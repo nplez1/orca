@@ -8,6 +8,8 @@ import {
   type MiniMaxResolvedConfig,
   type ZcodePlanResolvedConfig,
   type OpenCodeGoResolvedConfig,
+  type DeepSeekResolvedConfig,
+  type FireworksResolvedConfig,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
   type ProviderRateLimits,
@@ -254,6 +256,25 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     } catch (error) {
       // Why: an undecryptable saved key must not abort every provider's refresh; surface it as ZCode-only state instead.
       return { config: { site: 'zai', apiKey: '' }, error: toErrorMessage(error) }
+    }
+  }
+
+  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+    try {
+      return { config: this.deepSeekConfigResolver?.() ?? { apiKey: '' }, error: null }
+    } catch (error) {
+      return { config: { apiKey: '' }, error: toErrorMessage(error) }
+    }
+  }
+
+  protected resolveFireworksConfig(): FireworksResolvedConfig {
+    try {
+      return {
+        config: this.fireworksConfigResolver?.() ?? { apiKey: '', accountIdOverride: null },
+        error: null
+      }
+    } catch (error) {
+      return { config: { apiKey: '', accountIdOverride: null }, error: toErrorMessage(error) }
     }
   }
 }

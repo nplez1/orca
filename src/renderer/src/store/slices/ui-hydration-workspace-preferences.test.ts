@@ -140,6 +140,8 @@ describe('createUISlice hydratePersistedUI', () => {
       'minimax',
       'antigravity',
       'grok',
+      'deepseek',
+      'fireworks',
       'cursor',
       'zcode'
     ])
@@ -152,6 +154,8 @@ describe('createUISlice hydratePersistedUI', () => {
         'minimax',
         'antigravity',
         'grok',
+        'deepseek',
+        'fireworks',
         'cursor',
         'zcode'
       ],
@@ -160,6 +164,8 @@ describe('createUISlice hydratePersistedUI', () => {
       _minimaxStatusBarDefaultAdded: true,
       _antigravityStatusBarDefaultAdded: true,
       _grokStatusBarDefaultAdded: true,
+      _deepseekStatusBarDefaultAdded: true,
+      _fireworksStatusBarDefaultAdded: true,
       _cursorStatusBarDefaultAdded: true,
       _zcodeStatusBarDefaultAdded: true
     })
@@ -178,6 +184,8 @@ describe('createUISlice hydratePersistedUI', () => {
         _minimaxStatusBarDefaultAdded: true,
         _antigravityStatusBarDefaultAdded: true,
         _grokStatusBarDefaultAdded: true,
+        _deepseekStatusBarDefaultAdded: true,
+        _fireworksStatusBarDefaultAdded: true,
         _cursorStatusBarDefaultAdded: true,
         _zcodeStatusBarDefaultAdded: true
       })

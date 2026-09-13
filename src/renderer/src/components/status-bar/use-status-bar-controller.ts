@@ -92,8 +92,20 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     return null
   }
 
-  const { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode } =
-    rateLimits
+  const {
+    claude,
+    codex,
+    gemini,
+    opencodeGo,
+    kimi,
+    antigravity,
+    minimax,
+    grok,
+    cursor,
+    zcode,
+    deepseek,
+    fireworks
+  } = rateLimits
 
   // Why: a bar is earned by a live snapshot or durable Settings setup; detection-gating hides per-CLI bars when the agent isn't on PATH.
   // Why: Antigravity has no persisted credential, so a checked status item + detected CLI is the durable "show its slot" signal.
@@ -109,7 +121,9 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     opencodeGoApiKeyConfigured: rateLimits.opencodeGoApiKeyConfigured,
     grokAuthConfigured: rateLimits.grokAuthConfigured,
     cursorAuthConfigured: rateLimits.cursorAuthConfigured,
-    zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured
+    zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured,
+    deepseekApiKeyConfigured: rateLimits.deepseekApiKeyConfigured,
+    fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
@@ -142,6 +156,12 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // Why: MiniMax is cookie-auth, not a CLI on PATH, so detection-gating doesn't apply.
   const showMiniMax = visibleMiniMax !== null && statusBarItems.includes('minimax')
+  // Why: DeepSeek and Fireworks are API-key providers, not installed agent CLIs; a
+  // PATH detection gate would hide them forever.
+  const visibleDeepSeek = getVisibleUsageProvider('deepseek', deepseek, usageSettings)
+  const visibleFireworks = getVisibleUsageProvider('fireworks', fireworks, usageSettings)
+  const showDeepSeek = visibleDeepSeek !== null && statusBarItems.includes('deepseek')
+  const showFireworks = visibleFireworks !== null && statusBarItems.includes('fireworks')
   const showGrok =
     visibleGrok !== null &&
     statusBarItems.includes('grok') &&
@@ -174,11 +194,26 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showMiniMax ||
     showGrok ||
     showCursor ||
-    showZcode
+    showZcode ||
+    showDeepSeek ||
+    showFireworks
   const anyVisible = hasVisibleUsageMeters || showResourceUsage
   // Why: include Settings so durable managed accounts count — a configured user isn't shown the empty state while snapshots hydrate.
   const isEmptyUsageState = isUsageEmptyState(
-    { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode },
+    {
+      claude,
+      codex,
+      gemini,
+      opencodeGo,
+      kimi,
+      antigravity,
+      minimax,
+      grok,
+      cursor,
+      zcode,
+      deepseek,
+      fireworks
+    },
     usageSettings
   )
   // Why: one-time nudge — once dismissed, stays hidden even if providers reconnect later.
@@ -193,7 +228,9 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     minimax?.status === 'fetching' ||
     grok?.status === 'fetching' ||
     cursor?.status === 'fetching' ||
-    zcode?.status === 'fetching'
+    zcode?.status === 'fetching' ||
+    deepseek?.status === 'fetching' ||
+    fireworks?.status === 'fetching'
 
   const floatingTerminalActionLabel = floatingTerminalOpen
     ? 'Minimize Floating Workspace'
@@ -212,7 +249,9 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showMiniMax ? visibleMiniMax : null,
     showGrok ? visibleGrok : null,
     showCursor ? visibleCursor : null,
-    showZcode ? visibleZcode : null
+    showZcode ? visibleZcode : null,
+    showDeepSeek ? visibleDeepSeek : null,
+    showFireworks ? visibleFireworks : null
   ].filter((p): p is ProviderRateLimits => p !== null)
 
   const handleManageAccounts = (): void => {
