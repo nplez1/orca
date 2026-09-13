@@ -62,10 +62,11 @@ import {
   clampPetSize
 } from './ui-slice-hydration-sanitizers'
 import { hydrateAgentReadState, sanitizeTaskResumeState } from './ui-slice-hydration-values'
-import { hydrateStatusBarItems } from './ui-slice-hydration-status-bar-items'
+import { hydrateStatusBarItems } from './status-bar-default-on-migrations'
 
 const MAX_LEFT_SIDEBAR_WIDTH = 500
 const MAX_RIGHT_SIDEBAR_WIDTH = 4000
+
 export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Partial<UISlice> {
   return {
     hydratePersistedUI: (ui, source = 'sync') =>
@@ -85,7 +86,7 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
         const petId = ui.petId ?? ui.sidekickId
         // Migration: one-shot old-'recent'→'smart' runs in main (_sortBySmartMigrated), not here, so a deliberate 'recent' choice survives restart.
         const sortBy = ui.sortBy
-        const statusBarItemsWithGrok = hydrateStatusBarItems(ui)
+        const statusBarItemsWithDefaults = hydrateStatusBarItems(ui)
         const rightSidebarRoute = normalizeRightSidebarRoute(
           ui.rightSidebarTab,
           ui.rightSidebarExplorerView
@@ -170,7 +171,7 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           workspaceBoardOpacity: clampWorkspaceBoardOpacity(ui.workspaceBoardOpacity),
           workspaceBoardColumnWidth: clampWorkspaceBoardColumnWidth(ui.workspaceBoardColumnWidth),
           syncTaskStatusFromWorkspaceBoard: ui.syncTaskStatusFromWorkspaceBoard === true,
-          statusBarItems: statusBarItemsWithGrok,
+          statusBarItems: statusBarItemsWithDefaults,
           statusBarVisible: ui.statusBarVisible ?? true,
           usagePercentageDisplay: normalizeUsagePercentageDisplay(ui.usagePercentageDisplay),
           statusBarUsageMode: normalizeStatusBarUsageMode(ui.statusBarUsageMode),

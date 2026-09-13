@@ -61,6 +61,26 @@ export type MiniMaxResolvedConfig = {
   error: string | null
 }
 
+export type DeepSeekRateLimitConfig = {
+  apiKey: string
+}
+
+export type DeepSeekResolvedConfig = {
+  config: DeepSeekRateLimitConfig
+  error: string | null
+}
+
+export type FireworksRateLimitConfig = {
+  apiKey: string
+  /** User-supplied account ID; when set it wins over Fireworks' own discovery. */
+  accountIdOverride: string | null
+}
+
+export type FireworksResolvedConfig = {
+  config: FireworksRateLimitConfig
+  error: string | null
+}
+
 export type GeminiCliOAuthEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
@@ -110,6 +130,8 @@ export type InternalRateLimitState = {
   minimax: ProviderRateLimits | null
   grok: ProviderRateLimits | null
   cursor: ProviderRateLimits | null
+  deepseek: ProviderRateLimits | null
+  fireworks: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

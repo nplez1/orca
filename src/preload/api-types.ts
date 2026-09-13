@@ -3,6 +3,8 @@ import type {
   CodexAccountsApi,
   CodexConfigSyncApi,
   CursorAccountsApi,
+  DeepSeekCredentialsApi,
+  FireworksCredentialsApi,
   GrokAccountsApi,
   MinimaxCredentialsApi
 } from './api/agent-account-api'
@@ -143,6 +145,8 @@ export type PreloadApi = {
   runtimeEnvironments: RuntimeApi['runtimeEnvironments']
   rateLimits: RateLimitsApi
   minimaxCredentials: MinimaxCredentialsApi
+  deepseekCredentials: DeepSeekCredentialsApi
+  fireworksCredentials: FireworksCredentialsApi
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi
