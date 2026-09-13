@@ -73,6 +73,29 @@ export type MinimaxCredentialsApi = {
   clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>
 }
 
+export type DeepSeekCredentialsApi = {
+  // Why: the key lives in main's encrypted store, so the renderer only ever
+  // learns whether one is present.
+  getStatus: () => Promise<{ configured: boolean; apiKeyConfigured: boolean }>
+  saveApiKey: (key: string) => Promise<{ apiKeyConfigured: boolean }>
+  clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>
+}
+
+export type FireworksCredentialsApi = {
+  // Why: the API key and the optional account-ID override share one encrypted
+  // file, so a single status call seeds both form fields.
+  getStatus: () => Promise<{
+    configured: boolean
+    apiKeyConfigured: boolean
+    accountIdOverride: string | null
+  }>
+  save: (
+    apiKey: string,
+    accountIdOverride: string | null
+  ) => Promise<{ apiKeyConfigured: boolean; accountIdOverride: string | null }>
+  clear: () => Promise<{ apiKeyConfigured: boolean }>
+}
+
 export type CodexConfigSyncApi = {
   status: () => Promise<CodexConfigSyncStatus>
 }
