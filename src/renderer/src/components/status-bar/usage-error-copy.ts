@@ -29,6 +29,10 @@ export function getProviderDisplayName(provider: ProviderRateLimits['provider'])
   if (provider === 'fireworks') {
     return 'Fireworks.ai'
   }
+  if (provider === 'copilot') {
+    // Why: registered as a never-translate brand in the locale policy.
+    return 'GitHub Copilot'
+  }
   if (provider === 'grok') {
     return 'Grok'
   }

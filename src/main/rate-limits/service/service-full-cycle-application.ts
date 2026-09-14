@@ -31,6 +31,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       deepSeekGeneration,
       fireworksConfigChanged,
       fireworksGeneration,
+      copilotConfigChanged,
+      copilotGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -40,7 +42,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         kimiResult,
         miniMaxResult,
         deepSeekResult,
-        fireworksResult
+        fireworksResult,
+        copilotResult
       ],
       grokResultPromise,
       cursorResultPromise,
@@ -163,6 +166,21 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
             status: 'error'
           } satisfies ProviderRateLimits)
 
+    const copilot =
+      copilotResult.status === 'fulfilled'
+        ? copilotResult.value
+        : ({
+            provider: 'copilot',
+            session: null,
+            weekly: null,
+            updatedAt: Date.now(),
+            error:
+              copilotResult.reason instanceof Error
+                ? copilotResult.reason.message
+                : 'Unknown error',
+            status: 'error'
+          } satisfies ProviderRateLimits)
+
     const latestCodexHome = this.resolveCodexHome(codexTarget)
     const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
     if (signal.aborted) {
@@ -189,6 +207,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     // Why: a credential paste between cycles must discard the in-flight result, or the old key's snapshot overwrites the new one.
     const shouldApplyDeepSeek = deepSeekGeneration === this.deepseekFetchGeneration
     const shouldApplyFireworks = fireworksGeneration === this.fireworksFetchGeneration
+    const shouldApplyCopilot = copilotGeneration === this.copilotFetchGeneration
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', claude)
@@ -209,6 +228,9 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     }
     if (shouldApplyFireworks) {
       this.trackActiveFailureStreak('fireworks', fireworks)
+    }
+    if (shouldApplyCopilot) {
+      this.trackActiveFailureStreak('copilot', copilot)
     }
 
     // Why: apply a Codex result only when provenance and generation still match, else a raced in-flight fetch overwrites the new account.
@@ -243,7 +265,12 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         ? fireworksConfigChanged
           ? fireworks
           : this.applyStalePolicy(fireworks, previousState.fireworks)
-        : this.state.fireworks
+        : this.state.fireworks,
+      copilot: shouldApplyCopilot
+        ? copilotConfigChanged
+          ? copilot
+          : this.applyStalePolicy(copilot, previousState.copilot)
+        : this.state.copilot
     })
 
     const [grokSettled, cursorSettled, zcodeSettled, antigravitySettled] = await Promise.all([

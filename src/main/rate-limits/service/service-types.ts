@@ -99,6 +99,16 @@ export type FireworksResolvedConfig = {
   error: string | null
 }
 
+export type CopilotRateLimitConfig = {
+  token: string
+  enterpriseSlug: string
+}
+
+export type CopilotResolvedConfig = {
+  config: CopilotRateLimitConfig
+  error: string | null
+}
+
 export type GeminiCliOAuthEnabledResolver = () => boolean
 
 /** Whether the user is actually showing Antigravity usage, so the `agy` probe is worth spawning. */
@@ -154,6 +164,7 @@ export type InternalRateLimitState = {
   zcode: ProviderRateLimits | null
   deepseek: ProviderRateLimits | null
   fireworks: ProviderRateLimits | null
+  copilot: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

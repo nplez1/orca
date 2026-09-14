@@ -58,6 +58,7 @@ describe('web preload API composition', () => {
       'zcodePlanCredentials',
       'deepseekCredentials',
       'fireworksCredentials',
+      'copilotCredentials',
       'grokAccounts',
       'cursorAccounts',
       'codexAccounts',

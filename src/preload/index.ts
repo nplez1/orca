@@ -80,6 +80,7 @@ import { minimaxCredentialsApi } from './api/minimax-credentials-bridge'
 import { zcodePlanCredentialsApi } from './api/zcode-plan-credentials-bridge'
 import { deepseekCredentialsApi } from './api/deepseek-credentials-bridge'
 import { fireworksCredentialsApi } from './api/fireworks-credentials-bridge'
+import { copilotCredentialsApi } from './api/copilot-credentials-bridge'
 import { grokAccountsApi } from './api/grok-accounts-bridge'
 import { cursorAccountsApi } from './api/cursor-accounts-bridge'
 import { sshApi } from './api/ssh-bridge'
@@ -183,6 +184,7 @@ const api = {
   zcodePlanCredentials: zcodePlanCredentialsApi,
   deepseekCredentials: deepseekCredentialsApi,
   fireworksCredentials: fireworksCredentialsApi,
+  copilotCredentials: copilotCredentialsApi,
   grokAccounts: grokAccountsApi,
   cursorAccounts: cursorAccountsApi,
   ssh: sshApi,

@@ -40,6 +40,7 @@ const {
   registerZcodePlanCredentialsHandlersMock,
   registerDeepSeekCredentialsHandlersMock,
   registerFireworksCredentialsHandlersMock,
+  registerCopilotCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
   registerCursorAccountHandlersMock,
   registerClipboardHandlersMock,
@@ -111,6 +112,7 @@ const {
   registerZcodePlanCredentialsHandlersMock: vi.fn(),
   registerDeepSeekCredentialsHandlersMock: vi.fn(),
   registerFireworksCredentialsHandlersMock: vi.fn(),
+  registerCopilotCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
   registerCursorAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
@@ -360,6 +362,10 @@ vi.mock('../fireworks-credentials', () => ({
   registerFireworksCredentialsHandlers: registerFireworksCredentialsHandlersMock
 }))
 
+vi.mock('../copilot-credentials', () => ({
+  registerCopilotCredentialsHandlers: registerCopilotCredentialsHandlersMock
+}))
+
 vi.mock('../grok-accounts', () => ({
   registerGrokAccountHandlers: registerGrokAccountHandlersMock
 }))
@@ -469,6 +475,7 @@ describe('registerCoreHandlers', () => {
     registerZcodePlanCredentialsHandlersMock.mockReset()
     registerDeepSeekCredentialsHandlersMock.mockReset()
     registerFireworksCredentialsHandlersMock.mockReset()
+    registerCopilotCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
     setTrustedClipboardRendererWebContentsIdMock.mockReset()
     registerUpdaterHandlersMock.mockReset()
@@ -572,6 +579,7 @@ describe('registerCoreHandlers', () => {
     expect(registerZcodePlanCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerDeepSeekCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerFireworksCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerCopilotCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerCursorAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)
