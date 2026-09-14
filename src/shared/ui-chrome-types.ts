@@ -61,6 +61,7 @@ export type StatusBarItem =
   | 'opencode-go'
   | 'kimi'
   | 'minimax'
+  | 'fireworks'
   | 'grok'
   | 'ssh'
   | 'resource-usage'

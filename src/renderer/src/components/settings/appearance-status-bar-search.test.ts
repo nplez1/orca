@@ -43,4 +43,17 @@ describe('getStatusBarToggles', () => {
       expect.arrayContaining(['status bar', 'minimax', 'usage', 'subscription', 'cookie'])
     )
   })
+
+  it('includes Fireworks.ai spend so Appearance can toggle the default-on status item', () => {
+    const fireworksToggle = getStatusBarToggles().find((entry) => entry.id === 'fireworks')
+
+    expect(fireworksToggle).toMatchObject({
+      title: 'Fireworks.ai Spend',
+      description: 'Show your Fireworks.ai rated spend in the status bar.',
+      toggleDescription: 'Show Fireworks.ai rated spend in the status bar.'
+    })
+    expect(fireworksToggle?.keywords).toEqual(
+      expect.arrayContaining(['status bar', 'fireworks', 'fireworks.ai', 'usage', 'spend', 'cost'])
+    )
+  })
 })

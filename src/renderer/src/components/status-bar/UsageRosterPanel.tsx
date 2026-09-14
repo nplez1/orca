@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronRight, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ChevronRight, RefreshCw } from 'lucide-react'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { SettingsSegmentedControl } from '@/components/settings/SettingsFormControls'
 import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
@@ -12,6 +12,7 @@ import {
   type UsagePercentageDisplay
 } from '../../../../shared/usage-percentage-display'
 import { barColor, formatResetCountdown, getWindowSections, ProviderIcon } from './tooltip'
+import { describeCredits } from './provider-credits-format'
 import { getProviderDisplayName } from './usage-error-copy'
 import { formatPlanLabel, usageTextColorClass } from './usage-roster-formatting'
 import { getUsageRosterRowState, type UsageRosterRowState } from './usage-roster-row-state'
@@ -127,6 +128,7 @@ export function UsageRow({
 }): React.JSX.Element {
   const sections = usedSections(p)
   const hasUsage = sections.length > 0
+  const credits = p.credits ?? null
   const name = getProviderDisplayName(p.provider)
   const plan = formatPlanLabel(p.planType)
   const reset = hasUsage ? soonestResetLabel(sections, now) : null
@@ -145,8 +147,17 @@ export function UsageRow({
         {!hasUsage ? (
           <>
             <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-              {state.statusLabel}
+              {/* Why: credits providers have no window, so the status label is
+                  "No usage data" for data the row can actually show — but a failed
+                  refresh must stay visible rather than hide behind a cached amount. */}
+              {credits ? describeCredits(credits) : state.statusLabel}
             </span>
+            {credits && state.kind === 'error' ? (
+              <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                <AlertTriangle size={11} className="text-muted-foreground/80" />
+                {state.statusLabel}
+              </span>
+            ) : null}
             {showSignInAction ? (
               <span className="ml-auto shrink-0 rounded-md border border-border bg-secondary px-2.5 py-0.5 text-xs text-foreground">
                 {translate('auto.components.status.bar.StatusBar.c35af53b73', 'Sign in')}
@@ -223,7 +234,8 @@ export function UsageRosterPanel({
       usedSections(provider).map((section) => section.window.resetsAt)
     )
   )
-  // Worst-first so the agent nearest a limit sits on top.
+  // Worst-first so the agent nearest a limit sits on top. A credits-only provider
+  // (Fireworks) has no percentage and computes 0 here, so it sorts last.
   const sorted = [...providers].sort(
     (a, b) => providerMaxUsed(usedSections(b)) - providerMaxUsed(usedSections(a))
   )

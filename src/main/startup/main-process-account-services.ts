@@ -15,6 +15,7 @@ import { getInitialClaudeRateLimitTarget } from '../rate-limits/claude-rate-limi
 import { getKimiRuntimeTarget, resolveKimiHome } from '../kimi/kimi-runtime-home'
 import { readMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { readMiniMaxApiKey } from '../minimax/minimax-api-key-store'
+import { readFireworksCredentials } from '../fireworks/fireworks-credentials-store'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
@@ -125,6 +126,15 @@ export function initializeMainProcessAccountServices(): void {
       models: settings.minimaxUsageModels,
       endpoint: settings.minimaxEndpoint,
       apiKey
+    }
+  })
+  // Why: readFireworksCredentials throws on an undecryptable file, and letting it
+  // throw records a Fireworks-only credential error instead of a silent keyless poll.
+  state.rateLimits.setFireworksConfigResolver(() => {
+    const credentials = readFireworksCredentials()
+    return {
+      apiKey: credentials?.apiKey ?? '',
+      accountIdOverride: credentials?.accountIdOverride ?? null
     }
   })
   state.rateLimits.setGeminiCliOAuthEnabledResolver(() => store.getSettings().geminiCliOAuthEnabled)

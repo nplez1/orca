@@ -25,6 +25,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       opencodeGeneration,
       miniMaxConfigChanged,
       miniMaxGeneration,
+      fireworksConfigChanged,
+      fireworksGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -32,7 +34,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult
+        miniMaxResult,
+        fireworksResult
       ],
       grokResultPromise
     } = prepared
@@ -125,6 +128,21 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
             status: 'error'
           } satisfies ProviderRateLimits)
 
+    const fireworks =
+      fireworksResult.status === 'fulfilled'
+        ? fireworksResult.value
+        : ({
+            provider: 'fireworks',
+            session: null,
+            weekly: null,
+            updatedAt: Date.now(),
+            error:
+              fireworksResult.reason instanceof Error
+                ? fireworksResult.reason.message
+                : 'Unknown error',
+            status: 'error'
+          } satisfies ProviderRateLimits)
+
     const latestCodexHome = this.resolveCodexHome(codexTarget)
     const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
     if (signal.aborted) {
@@ -148,6 +166,8 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       this.isSameClaudeTarget(claudeTarget, this.claudeFetchTarget)
     const shouldApplyOpencode = opencodeGeneration === this.opencodeFetchGeneration
     const shouldApplyMiniMax = miniMaxGeneration === this.minimaxFetchGeneration
+    // Why: a credential paste between cycles must discard the in-flight result, or the old key's snapshot overwrites the new one.
+    const shouldApplyFireworks = fireworksGeneration === this.fireworksFetchGeneration
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', claude)
@@ -163,6 +183,9 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     this.trackActiveFailureStreak('kimi', kimi)
     if (shouldApplyMiniMax) {
       this.trackActiveFailureStreak('minimax', miniMax)
+    }
+    if (shouldApplyFireworks) {
+      this.trackActiveFailureStreak('fireworks', fireworks)
     }
 
     // Why: apply a Codex result only when provenance and generation still match, else a raced in-flight fetch overwrites the new account.
@@ -188,7 +211,12 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         ? miniMaxConfigChanged
           ? miniMax
           : this.applyStalePolicy(miniMax, previousState.minimax)
-        : this.state.minimax
+        : this.state.minimax,
+      fireworks: shouldApplyFireworks
+        ? fireworksConfigChanged
+          ? fireworks
+          : this.applyStalePolicy(fireworks, previousState.fireworks)
+        : this.state.fireworks
     })
 
     const grokResult = await grokResultPromise

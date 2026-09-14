@@ -53,6 +53,7 @@ function recordStatusBarToggleInteraction(
     id === 'kimi' ||
     id === 'antigravity' ||
     id === 'minimax' ||
+    id === 'fireworks' ||
     id === 'grok'
   ) {
     recordFeatureInteraction('usage-tracking')

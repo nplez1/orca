@@ -578,6 +578,31 @@ describe('AppearancePane', () => {
     expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('antigravity')
   })
 
+  it('records the Fireworks.ai status bar toggle as a usage tracking interaction', async () => {
+    mocks.state.availableStatusBarToggles = [
+      {
+        id: 'fireworks',
+        title: 'Fireworks.ai Spend',
+        description: 'Show your Fireworks.ai rated spend in the status bar.',
+        toggleDescription: 'Show Fireworks.ai rated spend in the status bar.',
+        keywords: ['status bar', 'fireworks', 'spend']
+      }
+    ]
+    mocks.state.settingsSearchQuery = 'fireworks'
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+    const fireworksSwitch = container.querySelector<HTMLButtonElement>(
+      'button[role="switch"][aria-label="Fireworks.ai Spend"]'
+    )
+
+    expect(fireworksSwitch).not.toBeNull()
+    await act(async () => {
+      fireworksSwitch?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(mocks.state.recordFeatureInteraction).toHaveBeenCalledWith('usage-tracking')
+    expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('fireworks')
+  })
+
   it('expands Interface, Terminal, and Window & Sidebar by default', async () => {
     mocks.state.settingsSearchQuery = ''
     const container = await renderAppearancePane(getDefaultSettings('/tmp'))
