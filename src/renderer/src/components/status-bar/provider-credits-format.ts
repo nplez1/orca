@@ -9,7 +9,8 @@ import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 
 // Why: tests replace the i18n module with a translate-only stub, so the locale
 // read is best-effort — a missing accessor falls back to the runtime locale.
-function activeLocale(): string | undefined {
+// Shared with provider-allowance-format so both formatters degrade identically.
+export function activeLocale(): string | undefined {
   try {
     return getIntlLocale()
   } catch {
