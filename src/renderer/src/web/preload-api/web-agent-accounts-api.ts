@@ -49,7 +49,12 @@ export function createFireworksCredentialsApi(): NonNullable<
 export function createCopilotCredentialsApi(): NonNullable<
   Partial<PreloadApi>['copilotCredentials']
 > {
-  const notConfigured = { configured: false, enterpriseSlug: null }
+  const notConfigured = {
+    configured: false,
+    enterpriseSlug: null,
+    source: 'none' as const,
+    ghSetupHint: null
+  }
   const unsupportedError = new Error(
     'GitHub Copilot credentials storage is only available in the desktop app.'
   )
