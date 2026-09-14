@@ -11,6 +11,7 @@ describe('getUsageProviderAccountsSectionId', () => {
     expect(getUsageProviderAccountsSectionId('minimax')).toBe('accounts-minimax')
     expect(getUsageProviderAccountsSectionId('deepseek')).toBe('accounts-deepseek')
     expect(getUsageProviderAccountsSectionId('fireworks')).toBe('accounts-fireworks')
+    expect(getUsageProviderAccountsSectionId('copilot')).toBe('accounts-copilot')
     expect(getUsageProviderAccountsSectionId('grok')).toBe('accounts-grok')
   })
 

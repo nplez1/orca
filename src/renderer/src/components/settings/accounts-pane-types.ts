@@ -141,6 +141,18 @@ export type FireworksCredentialSectionModel = {
   clearFireworksCredentials: () => Promise<void>
 }
 
+export type CopilotCredentialSectionModel = {
+  copilotTokenDraft: string
+  setCopilotTokenDraft: Dispatch<SetStateAction<string>>
+  copilotEnterpriseSlugDraft: string
+  setCopilotEnterpriseSlugDraft: Dispatch<SetStateAction<string>>
+  copilotConfigured: boolean
+  copilotCredentialBusy: boolean
+  saveCopilotCredentials: () => Promise<void>
+  clearCopilotCredentials: () => Promise<void>
+}
+
 export type AccountsPaneCredentialSectionModel = MiniMaxCredentialSectionModel &
   DeepSeekCredentialSectionModel &
-  FireworksCredentialSectionModel
+  FireworksCredentialSectionModel &
+  CopilotCredentialSectionModel

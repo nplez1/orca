@@ -56,6 +56,7 @@ describe('web preload API composition', () => {
       'minimaxCredentials',
       'deepseekCredentials',
       'fireworksCredentials',
+      'copilotCredentials',
       'grokAccounts',
       'cursorAccounts',
       'codexAccounts',

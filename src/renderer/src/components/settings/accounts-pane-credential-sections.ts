@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
 import type {
+  CopilotCredentialSectionModel,
   DeepSeekCredentialSectionModel,
   FireworksCredentialSectionModel,
   MiniMaxCredentialSectionModel
 } from './accounts-pane-types'
+import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 import { createDeepSeekCredentialActions } from './accounts-pane-deepseek-actions'
 import { createFireworksCredentialActions } from './accounts-pane-fireworks-actions'
 import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
@@ -13,6 +15,7 @@ export type AccountsPaneCredentialSections = {
   miniMax: MiniMaxCredentialSectionModel
   deepSeek: DeepSeekCredentialSectionModel
   fireworks: FireworksCredentialSectionModel
+  copilot: CopilotCredentialSectionModel
 }
 
 type RecordFeatureInteraction = (featureId: FeatureInteractionId) => void
@@ -27,7 +30,8 @@ export function useAccountsPaneCredentialSections(
   const miniMax = useMiniMaxCredentials(recordFeatureInteraction)
   const deepSeek = useDeepSeekCredentials(recordFeatureInteraction)
   const fireworks = useFireworksCredentials(recordFeatureInteraction)
-  return { miniMax, deepSeek, fireworks }
+  const copilot = useCopilotCredentials(recordFeatureInteraction)
+  return { miniMax, deepSeek, fireworks, copilot }
 }
 
 function useMiniMaxCredentials(
@@ -156,5 +160,50 @@ function useFireworksCredentials(
     fireworksCredentialBusy,
     saveFireworksCredentials,
     clearFireworksCredentials
+  }
+}
+
+function useCopilotCredentials(
+  recordFeatureInteraction: RecordFeatureInteraction
+): CopilotCredentialSectionModel {
+  const [copilotTokenDraft, setCopilotTokenDraft] = useState('')
+  const [copilotEnterpriseSlugDraft, setCopilotEnterpriseSlugDraft] = useState('')
+  const [copilotConfigured, setCopilotConfigured] = useState(false)
+  const [copilotCredentialBusy, setCopilotCredentialBusy] = useState(false)
+  const { saveCopilotCredentials, clearCopilotCredentials } = createCopilotCredentialActions({
+    copilotTokenDraft,
+    copilotConfigured,
+    setCopilotTokenDraft,
+    copilotEnterpriseSlugDraft,
+    setCopilotEnterpriseSlugDraft,
+    setCopilotConfigured,
+    setCopilotCredentialBusy,
+    recordFeatureInteraction
+  })
+
+  useEffect(() => {
+    const refresh = async (): Promise<void> => {
+      try {
+        const status = await window.api.copilotCredentials.getStatus()
+        setCopilotConfigured(status.configured)
+        // Why: the token and the slug share one stored file, so the status seeds
+        // the slug field too; the token itself is never rendered.
+        setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
+      } catch (error) {
+        console.error('Failed to load GitHub Copilot credential status:', error)
+      }
+    }
+    void refresh()
+  }, [])
+
+  return {
+    copilotTokenDraft,
+    setCopilotTokenDraft,
+    copilotEnterpriseSlugDraft,
+    setCopilotEnterpriseSlugDraft,
+    copilotConfigured,
+    copilotCredentialBusy,
+    saveCopilotCredentials,
+    clearCopilotCredentials
   }
 }

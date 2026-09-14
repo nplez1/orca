@@ -65,6 +65,7 @@ import { registerClaudeAccountHandlers } from '../claude-accounts'
 import { registerMiniMaxCredentialsHandlers } from '../minimax-credentials'
 import { registerDeepSeekCredentialsHandlers } from '../deepseek-credentials'
 import { registerFireworksCredentialsHandlers } from '../fireworks-credentials'
+import { registerCopilotCredentialsHandlers } from '../copilot-credentials'
 import { registerGrokAccountHandlers } from '../grok-accounts'
 import { registerCursorAccountHandlers } from '../cursor-accounts'
 import { registerUpdaterHandlers } from '../../window/attach-main-window-services'
@@ -156,6 +157,7 @@ export function registerCoreHandlers(
   registerMiniMaxCredentialsHandlers(rateLimits)
   registerDeepSeekCredentialsHandlers(rateLimits)
   registerFireworksCredentialsHandlers(rateLimits)
+  registerCopilotCredentialsHandlers(rateLimits)
   registerGrokAccountHandlers()
   registerCursorAccountHandlers()
   registerRateLimitHandlers(rateLimits, codexAccounts)

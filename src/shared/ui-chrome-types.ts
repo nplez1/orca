@@ -63,6 +63,7 @@ export type StatusBarItem =
   | 'minimax'
   | 'deepseek'
   | 'fireworks'
+  | 'copilot'
   | 'grok'
   | 'cursor'
   | 'zcode'
