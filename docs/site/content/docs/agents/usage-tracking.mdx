@@ -10,6 +10,7 @@ Orca tracks usage for Claude Code, Codex, Gemini, OpenCode, Kimi Code, MiniMax, 
 - Time to reset for 5-hour, daily, weekly, and Claude Fable weekly windows (where applicable).
 - A warning chip when you cross 80% of a limit.
 - A money amount rather than a percentage for DeepSeek and Fireworks.ai, which publish no percentage quota.
+- A monthly allowance bar for enterprise and usage-billed plans, which report a spending ceiling instead of 5-hour and 7-day windows.
 
 ## How it works
 
@@ -44,6 +45,15 @@ DeepSeek and Fireworks.ai are configured with an API key in [Settings → Accoun
 - **Fireworks.ai** — your **remaining credit balance**, with the current billing period's rated spend broken out beneath it. Orca discovers the account ID from the API key, with an optional manual override. Fireworks rates spend at the account level, and it can differ from the final invoice once credits or adjustments are applied.
 
   The balance comes from Fireworks' control-plane gateway rather than a published API — they expose credit only in their dashboard. If that call cannot be reached, the row falls back to showing the period's spend on its own, so the readout never goes blank.
+
+## Enterprise and usage-billed plans
+
+Some plans report a spending ceiling rather than 5-hour and 7-day quota windows. When the active account reports no such window, Orca shows the ceiling's own percentage as a monthly bar, and the detail panel shows the amounts consumed against it.
+
+- **Claude** — the monthly spend cap, e.g. `$192.68 of $8,000.00`. Claude does not report when this cap resets, so that row shows a percentage without a countdown.
+- **Codex** — the account's spend control, e.g. `10,048 of 52,000 credits`, with the reset date reported by the provider.
+
+The percentage is always the figure the provider itself reports, so it matches what their console shows; Orca does not compute it from the amounts.
 
 ## Estimated cost (Stats)
 

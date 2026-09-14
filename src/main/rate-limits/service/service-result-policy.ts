@@ -36,6 +36,8 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       previous?.monthly ||
       // Why: a balance/spend provider has no window to test, so omitting this drops its snapshot on the first transient failure.
       previous?.credits ||
+      // Why: same for an allowance-only plan held through a transient failure.
+      previous?.allowance ||
       (previous?.buckets && previous.buckets.length > 0)
     )
 
