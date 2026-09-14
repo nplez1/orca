@@ -75,6 +75,7 @@ describe('formatCreditsPeriod / formatCreditsItemLabel', () => {
   it('maps item tokens to labels', () => {
     expect(formatCreditsItemLabel('granted')).toBe('Granted')
     expect(formatCreditsItemLabel('topped-up')).toBe('Topped up')
+    expect(formatCreditsItemLabel('spent-this-month')).toBe('Spent this month')
   })
 
   it('degrades tokens this build does not know instead of rendering blank', () => {

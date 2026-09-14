@@ -41,7 +41,9 @@ On the companion app, open the host **Accounts** screen for the same switcher/us
 DeepSeek and Fireworks.ai are configured with an API key in [Settings → Accounts](/docs/settings). Neither takes a CLI install or a sign-in, and neither publishes a percentage quota, so their rows read as a money amount rather than a bar.
 
 - **DeepSeek** — your account **balance**, with granted and topped-up amounts broken out. DeepSeek publishes no historical usage or cost API, so there is no usage-over-time view, no token counts, and no percentage of quota. The balance may be denominated in CNY or USD depending on the account.
-- **Fireworks.ai** — **rated spend for the current billing period**, in US dollars. Orca discovers the account ID from the API key, with an optional manual override. Fireworks rates these costs at the account level, and they can differ from the final invoice once credits or adjustments are applied.
+- **Fireworks.ai** — your **remaining credit balance**, with the current billing period's rated spend broken out beneath it. Orca discovers the account ID from the API key, with an optional manual override. Fireworks rates spend at the account level, and it can differ from the final invoice once credits or adjustments are applied.
+
+  The balance comes from Fireworks' control-plane gateway rather than a published API — they expose credit only in their dashboard. If that call cannot be reached, the row falls back to showing the period's spend on its own, so the readout never goes blank.
 
 ## Estimated cost (Stats)
 

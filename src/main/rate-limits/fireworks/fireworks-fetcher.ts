@@ -8,6 +8,7 @@ import {
   makeFireworksUnavailable
 } from './fireworks-fetcher-data'
 import { parseFireworksAccountId, parseFireworksBillingSummary } from './fireworks-fetcher-parse'
+import { fetchFireworksBalance } from './fireworks-balance-client'
 
 // Why: metered usage (`GET /v1/accounts/{id}/billingUsage`) is deliberately not
 // called — it caps each request at 31 days and only yields a token breakdown that
@@ -172,10 +173,15 @@ export async function fetchFireworksRateLimits(
     if (resolved.status === 'error') {
       return resolved.rateLimits
     }
-    const result = await getFireworksJson({
-      path: makeBillingSummaryPath(resolved.accountId, Date.now()),
-      apiKey
-    })
+    const summaryPath = makeBillingSummaryPath(resolved.accountId, Date.now())
+    // Why in parallel: the gateway balance is an extra round trip, and neither call
+    // depends on the other's result, so serialising them would just add latency.
+    const [result, balance] = await Promise.all([
+      getFireworksJson({ path: summaryPath, apiKey }),
+      // Why the catch: the balance readout is best-effort bonus data from an
+      // internal API, so it must never be able to fail the whole provider.
+      fetchFireworksBalance({ apiKey, accountId: resolved.accountId }).catch(() => null)
+    ])
     if (result.status !== 'ok') {
       // Why: a cached id can go stale if the account is renamed or removed; drop
       // it so the next cycle rediscovers instead of failing forever.
@@ -191,7 +197,7 @@ export async function fetchFireworksRateLimits(
         'parse'
       )
     }
-    return makeFireworksSuccess(spend.amount)
+    return makeFireworksSuccess(spend.amount, balance)
   } catch (error) {
     return makeFireworksError(readErrorMessage(error), 'unknown')
   }
