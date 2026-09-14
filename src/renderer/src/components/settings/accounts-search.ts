@@ -229,6 +229,23 @@ export const getAccountsFireworksSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsCopilotSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('settings.accounts.search.copilotTitle', 'GitHub Copilot Usage'),
+    description: translate(
+      'settings.accounts.search.copilotDescription',
+      'Configure GitHub Copilot usage tracking with a GitHub token that can read enterprise billing and the enterprise slug it belongs to.'
+    ),
+    keywords: [
+      translate('settings.accounts.search.copilotKeyword', 'copilot'),
+      translate('settings.accounts.search.githubKeyword', 'github'),
+      translate('settings.accounts.search.aiCreditsKeyword', 'ai credits'),
+      translate('auto.components.settings.accounts.search.ca8cf669e2', 'usage'),
+      translate('settings.accounts.search.tokenKeyword', 'token')
+    ]
+  }
+])
+
 export const getAccountsGrokSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.f4a8c2e1b7', 'Grok (xAI) Usage'),
@@ -259,5 +276,6 @@ export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsS
   ...getAccountsMiniMaxSearchEntries(),
   ...getAccountsDeepSeekSearchEntries(),
   ...getAccountsFireworksSearchEntries(),
+  ...getAccountsCopilotSearchEntries(),
   ...getAccountsGrokSearchEntries()
 ])

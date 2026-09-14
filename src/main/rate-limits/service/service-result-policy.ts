@@ -98,6 +98,7 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       | 'antigravity'
       | 'deepseek'
       | 'fireworks'
+      | 'copilot'
   ): ProviderRateLimits {
     if (!current) {
       return {
