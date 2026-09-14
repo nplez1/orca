@@ -1,5 +1,4 @@
 import React from 'react'
-import { Flame } from 'lucide-react'
 import minimaxIconUrl from '../../../../../resources/minimax-icon.svg?url'
 
 export function OpenAIIcon({ size = 14 }: { size?: number }): React.JSX.Element {
@@ -59,9 +58,34 @@ export function DeepSeekIcon({ size = 14 }: { size?: number }): React.JSX.Elemen
   )
 }
 
-// Why: no Fireworks.ai brand asset is bundled yet; a neutral mark beats the wrong-brand fallback.
+// Why: the official Fireworks mark, taken verbatim from the SVG icon fireworks.ai
+// serves as its favicon (three paths on a 32x32 grid, all brand purple). Inlined
+// like the Claude/Gemini marks rather than shipped as a resources/ asset, because a
+// single fixed fill colour needs no separate file.
 export function FireworksIcon({ size = 14 }: { size?: number }): React.JSX.Element {
-  return <Flame size={size} aria-hidden="true" />
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M15.9851 19.1274C15.0969 19.1274 14.2999 18.6001 13.96 17.7838L9.86258 8H12.2608L15.9991 16.9499L19.7339 8H22.1321L18.0102 17.7873C17.6686 18.6001 16.8733 19.1274 15.9851 19.1274Z"
+        fill="#6720FF"
+      />
+      <path
+        d="M21.3316 23.8029C20.4469 23.8029 19.6533 23.2792 19.31 22.4698C18.9649 21.6535 19.1436 20.7215 19.7672 20.0891L27.2299 12.5302L28.1618 14.7287L21.3298 21.636L31.068 21.5817L32 23.7802L21.3333 23.8065L21.3298 23.8029H21.3316Z"
+        fill="#6720FF"
+      />
+      <path
+        d="M0 23.7766L0.931955 21.5781L10.6702 21.6324L3.83993 14.7234L4.77189 12.5249L12.2345 20.0838C12.8582 20.7145 13.0386 21.65 12.6918 22.4645C12.3484 23.2756 11.5513 23.7977 10.6702 23.7977L0.00350359 23.7731L0 23.7766Z"
+        fill="#6720FF"
+      />
+    </svg>
+  )
 }
 
 // Why: each instance needs unique filter/mask IDs — reusing the same ID across
