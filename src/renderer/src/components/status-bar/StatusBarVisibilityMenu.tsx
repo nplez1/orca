@@ -9,6 +9,7 @@ import {
 import { AgentIcon } from '@/lib/agent-catalog'
 import {
   ClaudeIcon,
+  CopilotIcon,
   DeepSeekIcon,
   FireworksIcon,
   GeminiIcon,
@@ -148,6 +149,16 @@ export function StatusBarVisibilityMenu({
         >
           <FireworksIcon size={14} />
           {translate('settings.appearance.statusBar.fireworksLabel', 'Fireworks.ai Spend')}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={statusBarItems.includes('copilot')}
+          onCheckedChange={() => {
+            recordFeatureInteraction('usage-tracking')
+            toggleStatusBarItem('copilot')
+          }}
+        >
+          <CopilotIcon size={14} />
+          {translate('settings.appearance.statusBar.copilotLabel', 'GitHub Copilot Usage')}
         </DropdownMenuCheckboxItem>
         {isStatusBarItemAvailable('grok', detectedAgentIds) && (
           <DropdownMenuCheckboxItem

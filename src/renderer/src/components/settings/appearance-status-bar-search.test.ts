@@ -69,4 +69,17 @@ describe('getStatusBarToggles', () => {
       expect.arrayContaining(['status bar', 'fireworks', 'fireworks.ai', 'usage', 'spend', 'cost'])
     )
   })
+
+  it('includes GitHub Copilot so Appearance can toggle the default-on status item', () => {
+    const copilotToggle = getStatusBarToggles().find((entry) => entry.id === 'copilot')
+
+    expect(copilotToggle).toMatchObject({
+      title: 'GitHub Copilot Usage',
+      description: 'Show your GitHub Copilot AI credit usage in the status bar.',
+      toggleDescription: 'Show GitHub Copilot AI credit usage in the status bar.'
+    })
+    expect(copilotToggle?.keywords).toEqual(
+      expect.arrayContaining(['status bar', 'copilot', 'github', 'usage', 'ai credits', 'token'])
+    )
+  })
 })

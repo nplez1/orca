@@ -10,6 +10,7 @@ export const DEFAULT_STATUS_BAR_ITEMS: StatusBarItem[] = [
   'minimax',
   'deepseek',
   'fireworks',
+  'copilot',
   'grok',
   'cursor',
   'ssh',

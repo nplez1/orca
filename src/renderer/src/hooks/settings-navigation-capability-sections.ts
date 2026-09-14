@@ -54,7 +54,7 @@ export function buildCapabilitySettingsSections({
       ),
       description: translate(
         'auto.hooks.useSettingsNavigationMetadata.b1c2f8b0ac',
-        'Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, and Fireworks.ai.'
+        'Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, DeepSeek, Fireworks.ai, and GitHub Copilot.'
       ),
       icon: UserCog,
       searchEntries: getAccountsPaneSearchEntries(),

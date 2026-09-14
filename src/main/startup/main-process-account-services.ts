@@ -17,6 +17,7 @@ import { readMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { readMiniMaxApiKey } from '../minimax/minimax-api-key-store'
 import { readDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
 import { readFireworksCredentials } from '../fireworks/fireworks-credentials-store'
+import { readCopilotCredentials } from '../copilot-credentials/copilot-credentials-store'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
@@ -144,6 +145,15 @@ export function initializeMainProcessAccountServices(): void {
     return {
       apiKey: credentials?.apiKey ?? '',
       accountIdOverride: credentials?.accountIdOverride ?? null
+    }
+  })
+  // Why: readCopilotCredentials throws on an undecryptable payload, and letting it
+  // throw records a Copilot-only credential error instead of a silent keyless poll.
+  state.rateLimits.setCopilotConfigResolver(() => {
+    const credentials = readCopilotCredentials()
+    return {
+      token: credentials?.token ?? '',
+      enterpriseSlug: credentials?.enterpriseSlug ?? ''
     }
   })
   state.rateLimits.setGeminiCliOAuthEnabledResolver(() => store.getSettings().geminiCliOAuthEnabled)

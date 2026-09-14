@@ -19,11 +19,13 @@ describe('RateLimitState', () => {
       cursor: null,
       deepseek: null,
       fireworks: null,
+      copilot: null,
       minimaxCookieConfigured: false,
       minimaxApiKeyConfigured: false,
       opencodeGoApiKeyConfigured: false,
       deepseekApiKeyConfigured: false,
       fireworksApiKeyConfigured: false,
+      copilotTokenConfigured: false,
       grokAuthConfigured: false,
       cursorAuthConfigured: false,
       claudeTarget: { runtime: 'host', wslDistro: null },
@@ -42,5 +44,7 @@ describe('RateLimitState', () => {
     expect(state.fireworks).toBeNull()
     expect(state.deepseekApiKeyConfigured).toBe(false)
     expect(state.fireworksApiKeyConfigured).toBe(false)
+    expect(state.copilot).toBeNull()
+    expect(state.copilotTokenConfigured).toBe(false)
   })
 })

@@ -142,7 +142,8 @@ describe('createUISlice hydratePersistedUI', () => {
       'grok',
       'deepseek',
       'fireworks',
-      'cursor'
+      'cursor',
+      'copilot'
     ])
     expect(setUI).toHaveBeenCalledWith({
       statusBarItems: [
@@ -155,7 +156,8 @@ describe('createUISlice hydratePersistedUI', () => {
         'grok',
         'deepseek',
         'fireworks',
-        'cursor'
+        'cursor',
+        'copilot'
       ],
       _portsStatusBarDefaultAdded: true,
       _kimiStatusBarDefaultAdded: true,
@@ -164,7 +166,8 @@ describe('createUISlice hydratePersistedUI', () => {
       _grokStatusBarDefaultAdded: true,
       _deepseekStatusBarDefaultAdded: true,
       _fireworksStatusBarDefaultAdded: true,
-      _cursorStatusBarDefaultAdded: true
+      _cursorStatusBarDefaultAdded: true,
+      _copilotStatusBarDefaultAdded: true
     })
   })
 
@@ -183,7 +186,8 @@ describe('createUISlice hydratePersistedUI', () => {
         _grokStatusBarDefaultAdded: true,
         _deepseekStatusBarDefaultAdded: true,
         _fireworksStatusBarDefaultAdded: true,
-        _cursorStatusBarDefaultAdded: true
+        _cursorStatusBarDefaultAdded: true,
+        _copilotStatusBarDefaultAdded: true
       })
     )
 

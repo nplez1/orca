@@ -596,7 +596,7 @@ describe('ProviderIcon', () => {
     expect(markup).toMatch(/src="[^"]+"/)
   })
 
-  it.each(['deepseek', 'fireworks'])(
+  it.each(['deepseek', 'fireworks', 'copilot'])(
     'renders a provider glyph for %s, not the Claude fallback',
     (id) => {
       // Why: the unknown-provider branch silently drew the Claude mark; the glyph

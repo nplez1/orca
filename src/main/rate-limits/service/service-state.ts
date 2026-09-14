@@ -15,6 +15,7 @@ import {
   type MiniMaxRateLimitConfig,
   type DeepSeekRateLimitConfig,
   type FireworksRateLimitConfig,
+  type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
@@ -36,7 +37,8 @@ export abstract class RateLimitServiceState {
     grok: null,
     cursor: null,
     deepseek: null,
-    fireworks: null
+    fireworks: null,
+    copilot: null
   }
   protected grokAuthConfigured = readGrokAuthSession().status === 'ok'
   // Why: the Cursor probe reads the macOS Keychain, so it cannot run synchronously
@@ -58,7 +60,8 @@ export abstract class RateLimitServiceState {
     antigravity: 0,
     cursor: 0,
     deepseek: 0,
-    fireworks: 0
+    fireworks: 0,
+    copilot: 0
   }
   // Why: consecutive failures drive exponential backoff of the fast activation-retry lane; reset on any success/unavailable result.
   protected activeFailureStreakByProvider: Record<ActiveRateLimitProvider, number> = {
@@ -72,7 +75,8 @@ export abstract class RateLimitServiceState {
     antigravity: 0,
     cursor: 0,
     deepseek: 0,
-    fireworks: 0
+    fireworks: 0,
+    copilot: 0
   }
   protected mainWindow: BrowserWindow | null = null
   protected detachWindowListeners: (() => void) | null = null
@@ -91,11 +95,13 @@ export abstract class RateLimitServiceState {
   protected minimaxFetchGeneration = 0
   protected deepseekFetchGeneration = 0
   protected fireworksFetchGeneration = 0
+  protected copilotFetchGeneration = 0
   protected lastOpencodeConfigHash = ''
   protected lastMiniMaxConfigHash = ''
   // Why: API keys live on disk, not in settings, so a paste is only observable as a config-hash change between cycles.
   protected lastDeepSeekConfigHash = ''
   protected lastFireworksConfigHash = ''
+  protected lastCopilotConfigHash = ''
   protected codexHomePathResolver: CodexHomePathResolver | null = null
   protected codexFetchTarget: NormalizedCodexAccountSelectionTarget = {
     runtime: 'host',
@@ -112,6 +118,7 @@ export abstract class RateLimitServiceState {
   protected miniMaxConfigResolver: (() => MiniMaxRateLimitConfig) | null = null
   protected deepSeekConfigResolver: (() => DeepSeekRateLimitConfig) | null = null
   protected fireworksConfigResolver: (() => FireworksRateLimitConfig) | null = null
+  protected copilotConfigResolver: (() => CopilotRateLimitConfig) | null = null
   protected geminiCliOAuthEnabledResolver: GeminiCliOAuthEnabledResolver | null = null
   protected inactiveClaudeAccountsResolver: (() => InactiveClaudeAccountInfo[]) | null = null
   protected inactiveCodexAccountsResolver: (() => InactiveCodexAccountInfo[]) | null = null

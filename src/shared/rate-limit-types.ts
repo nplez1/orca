@@ -63,6 +63,7 @@ export type ProviderRateLimits = {
     | 'cursor'
     | 'deepseek'
     | 'fireworks'
+    | 'copilot'
   /** 5-hour session window, null if not available. */
   session: RateLimitWindow | null
   /** 7-day weekly window, null if not available. */
@@ -156,6 +157,7 @@ export type RateLimitState = {
   cursor: ProviderRateLimits | null
   deepseek: ProviderRateLimits | null
   fireworks: ProviderRateLimits | null
+  copilot: ProviderRateLimits | null
   /**
    * True when a MiniMax session cookie is persisted on disk. The cookie lives
    * outside GlobalSettings, so this flag is the durable signal that the
@@ -185,6 +187,12 @@ export type RateLimitState = {
   deepseekApiKeyConfigured: boolean
   /** True when Fireworks credentials (API key, optional account ID) are persisted on disk. */
   fireworksApiKeyConfigured: boolean
+  /**
+   * True when a GitHub token plus enterprise slug are persisted on disk. Copilot
+   * usage comes from GitHub's billing API, which needs a token with enterprise
+   * billing read — the `gh` CLI token Orca otherwise uses cannot read it.
+   */
+  copilotTokenConfigured: boolean
   /** True when main finds a Grok CLI session file (~/.grok/auth.json or GROK_HOME). */
   grokAuthConfigured: boolean
   /**
