@@ -4123,7 +4123,8 @@
             },
             "item": {
               "granted": "Granted",
-              "toppedUp": "Topped up"
+              "toppedUp": "Topped up",
+              "spentThisMonth": "Spent this month"
             },
             "balance": "{{value0}} available",
             "spend": "{{value0}} spent",
