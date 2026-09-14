@@ -9,6 +9,7 @@ Orca reads local usage state for Claude Code, Codex, Gemini, OpenCode, Kimi Code
 - Current usage against the active account's plan.
 - Time to reset for 5-hour, daily, weekly, and Claude Fable weekly windows (where applicable).
 - A warning chip when you cross 80% of a limit.
+- A monthly allowance bar for enterprise and usage-billed plans, which report a spending ceiling instead of 5-hour and 7-day windows.
 
 ## How it works
 
@@ -32,6 +33,15 @@ Rows without live numbers show a short status instead: **Loading usage…**, **n
 ### Mobile
 
 On the companion app, open the host **Accounts** screen for the same switcher/usage readout. When Codex has earned **rate-limit reset** credits, spend one from that screen (see [Mobile companion](/docs/mobile)).
+
+## Enterprise and usage-billed plans
+
+Some plans report a spending ceiling rather than 5-hour and 7-day quota windows. When the active account reports no such window, Orca shows the ceiling's own percentage as a monthly bar, and the detail panel shows the amounts consumed against it.
+
+- **Claude** — the monthly spend cap, e.g. `$192.68 of $8,000.00`. Claude does not report when this cap resets, so that row shows a percentage without a countdown.
+- **Codex** — the account's spend control, e.g. `10,048 of 52,000 credits`, with the reset date reported by the provider.
+
+The percentage is always the figure the provider itself reports, so it matches what their console shows rather than being computed by Orca from the amounts.
 
 ## Estimated cost (Stats)
 

@@ -4028,6 +4028,13 @@
             "contact_note": "The host may still be running; only the Orca connection is unavailable.",
             "last_connected": "Last connected {{value0}}",
             "reconnect_attempt": "Attempt {{value0}}"
+          },
+          "providerAllowance": {
+            "unit": {
+              "credit": "credits"
+            },
+            "usedOfLimit": "{{value0}} of {{value1}}",
+            "usedOfLimitUnit": "{{value0}} of {{value1}} {{value2}}"
           }
         }
       },

@@ -39,7 +39,10 @@ function hasUsageData(provider: ProviderRateLimits): boolean {
     provider.weekly ||
     provider.fableWeekly ||
     provider.monthly ||
-    (provider.buckets && provider.buckets.length > 0)
+    (provider.buckets && provider.buckets.length > 0) ||
+    // Why: an allowance-only plan (no percentage window) must still count as data, or
+    // a configured enterprise account reads as "No usage data" again.
+    provider.allowance
   )
 }
 

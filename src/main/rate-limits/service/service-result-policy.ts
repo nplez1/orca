@@ -34,6 +34,8 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       previous?.weekly ||
       previous?.fableWeekly ||
       previous?.monthly ||
+      // Why: same for an allowance-only plan held through a transient failure.
+      previous?.allowance ||
       (previous?.buckets && previous.buckets.length > 0)
     )
 
