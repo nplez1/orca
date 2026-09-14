@@ -235,7 +235,7 @@
     "accounts": {
       "search": {
         "copilotTitle": "GitHub Copilot Usage",
-        "copilotDescription": "Configure GitHub Copilot usage tracking with a GitHub token that can read enterprise billing and the enterprise slug it belongs to.",
+        "copilotDescription": "Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.",
         "copilotKeyword": "copilot",
         "githubKeyword": "github",
         "aiCreditsKeyword": "ai credits",
@@ -9221,7 +9221,17 @@
                 "886fc8ca30": "Stored locally",
                 "f8bb20c24c": "Open console",
                 "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
-                "dc3eaf8d70": "GitHub Copilot"
+                "dc3eaf8d70": "GitHub Copilot",
+                "6a27446bd3": "Using your GitHub CLI sign-in",
+                "233569347b": "Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.",
+                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for Copilot billing:",
+                "6a327922f7": "Copied",
+                "9e59104270": "Copy command",
+                "ae9c8d3fd2": "Optional override",
+                "022c7c89d5": "Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.",
+                "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
+                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it."
               }
             }
           }
