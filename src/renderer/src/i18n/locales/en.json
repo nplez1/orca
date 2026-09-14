@@ -4040,6 +4040,13 @@
             "balance": "{{value0}} available",
             "spend": "{{value0}} spent",
             "spendPeriod": "{{value0}} spent {{value1}}"
+          },
+          "providerAllowance": {
+            "unit": {
+              "credit": "credits"
+            },
+            "usedOfLimit": "{{value0}} of {{value1}}",
+            "usedOfLimitUnit": "{{value0}} of {{value1}} {{value2}}"
           }
         }
       },
