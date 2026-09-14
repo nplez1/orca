@@ -195,6 +195,23 @@ export const getAccountsMiniMaxSearchEntries = createLocalizedCatalog(() => [
   }
 ])
 
+export const getAccountsDeepSeekSearchEntries = createLocalizedCatalog(() => [
+  {
+    title: translate('auto.components.settings.accounts.search.0bbd8d1b24', 'DeepSeek Usage'),
+    description: translate(
+      'auto.components.settings.accounts.search.d9d1e324dc',
+      'Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.'
+    ),
+    keywords: [
+      translate('auto.components.settings.accounts.search.249878a2e7', 'deepseek'),
+      translate('auto.components.settings.accounts.search.54714130c4', 'api key'),
+      translate('auto.components.settings.accounts.search.c0a759aceb', 'balance'),
+      translate('auto.components.settings.accounts.search.ca8cf669e2', 'usage'),
+      translate('auto.components.settings.accounts.search.aef1562679', 'credits')
+    ]
+  }
+])
+
 export const getAccountsGrokSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.accounts.search.f4a8c2e1b7', 'Grok (xAI) Usage'),
@@ -223,5 +240,6 @@ export const getAccountsPaneSearchEntries = createLocalizedCatalog((): SettingsS
   ...getAccountsGeminiSearchEntries(),
   ...getAccountsOpencodeSearchEntries(),
   ...getAccountsMiniMaxSearchEntries(),
+  ...getAccountsDeepSeekSearchEntries(),
   ...getAccountsGrokSearchEntries()
 ])

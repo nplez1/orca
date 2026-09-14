@@ -59,6 +59,15 @@ export type MiniMaxResolvedConfig = {
   error: string | null
 }
 
+export type DeepSeekRateLimitConfig = {
+  apiKey: string
+}
+
+export type DeepSeekResolvedConfig = {
+  config: DeepSeekRateLimitConfig
+  error: string | null
+}
+
 export type GeminiCliOAuthEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
@@ -107,6 +116,7 @@ export type InternalRateLimitState = {
   antigravity: ProviderRateLimits | null
   minimax: ProviderRateLimits | null
   grok: ProviderRateLimits | null
+  deepseek: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

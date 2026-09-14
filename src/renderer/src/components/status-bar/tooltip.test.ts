@@ -594,4 +594,78 @@ describe('ProviderIcon', () => {
     expect(markup).toContain('aria-hidden="true"')
     expect(markup).toMatch(/src="[^"]+"/)
   })
+
+  it('renders a DeepSeek glyph, not the Claude fallback', () => {
+    // Why: the unknown-provider branch silently drew the Claude mark; the glyph
+    // itself is owned by icons.tsx, so pin the contract, not its implementation.
+    const markup = renderToStaticMarkup(ProviderIcon({ provider: 'deepseek' }))
+    expect(markup).not.toBe(renderToStaticMarkup(ProviderIcon({ provider: 'claude' })))
+    expect(markup).toMatch(/^<(svg|img)/)
+  })
+})
+
+describe('ProviderPanel credits', () => {
+  function creditsProvider(overrides: Partial<ProviderRateLimits> = {}): ProviderRateLimits {
+    return provider({
+      provider: 'deepseek',
+      status: 'ok',
+      credits: {
+        kind: 'balance',
+        amount: { currencyCode: 'USD', units: '42', nanos: 100_000_000 },
+        items: [
+          { key: 'granted', amount: { currencyCode: 'USD', units: '10', nanos: 0 } },
+          { key: 'topped-up', amount: { currencyCode: 'USD', units: '32', nanos: 100_000_000 } }
+        ]
+      },
+      ...overrides
+    })
+  }
+
+  it('renders the balance headline and the granted / topped-up breakdown', () => {
+    const markup = renderToStaticMarkup(createElement(ProviderPanel, { p: creditsProvider() }))
+
+    expect(markup).toContain('data-provider-credits')
+    expect(markup).toContain('42.10 available')
+    expect(markup).toContain('Granted')
+    expect(markup).toContain('Topped up')
+    expect(markup).not.toContain('Balance cannot fund further calls')
+  })
+
+  it('warns inline when the balance cannot fund further calls', () => {
+    // `available: false` never folds into status, so this row is the only place
+    // an exhausted-but-configured account learns why its calls fail.
+    const markup = renderToStaticMarkup(
+      createElement(ProviderPanel, {
+        p: creditsProvider({
+          credits: {
+            kind: 'balance',
+            amount: { currencyCode: 'USD', units: '0', nanos: 0 },
+            available: false
+          }
+        })
+      })
+    )
+
+    expect(markup).toContain('Balance cannot fund further calls')
+    expect(markup).toContain('text-destructive')
+  })
+
+  it('keeps spend copy and treats credits as data an error is staling', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProviderPanel, {
+        p: creditsProvider({
+          status: 'error',
+          error: 'Network error while refreshing usage',
+          credits: {
+            kind: 'spend',
+            amount: { currencyCode: 'USD', units: '18', nanos: 440_000_000 },
+            period: 'current-month'
+          }
+        })
+      })
+    )
+
+    expect(markup).toContain('18.44 spent this month')
+    expect(markup).toContain('Refresh failed — showing cached data')
+  })
 })

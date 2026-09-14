@@ -14,6 +14,20 @@ export function createMiniMaxCredentialsApi(): NonNullable<
   }
 }
 
+export function createDeepSeekCredentialsApi(): NonNullable<
+  Partial<PreloadApi>['deepseekCredentials']
+> {
+  const notConfigured = { configured: false, apiKeyConfigured: false }
+  const unsupportedError = new Error(
+    'DeepSeek API key storage is only available in the desktop app.'
+  )
+  return {
+    getStatus: () => Promise.resolve(notConfigured),
+    saveApiKey: () => Promise.reject(unsupportedError),
+    clearApiKey: () => Promise.resolve(notConfigured)
+  }
+}
+
 export function createGrokAccountsApi(): NonNullable<Partial<PreloadApi>['grokAccounts']> {
   const unsigned = {
     signedIn: false,

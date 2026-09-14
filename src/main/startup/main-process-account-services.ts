@@ -15,6 +15,7 @@ import { getInitialClaudeRateLimitTarget } from '../rate-limits/claude-rate-limi
 import { getKimiRuntimeTarget, resolveKimiHome } from '../kimi/kimi-runtime-home'
 import { readMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { readMiniMaxApiKey } from '../minimax/minimax-api-key-store'
+import { readDeepSeekApiKey } from '../deepseek/deepseek-api-key-store'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
@@ -127,6 +128,7 @@ export function initializeMainProcessAccountServices(): void {
       apiKey
     }
   })
+  state.rateLimits.setDeepSeekConfigResolver(() => ({ apiKey: readDeepSeekApiKey() ?? '' }))
   state.rateLimits.setGeminiCliOAuthEnabledResolver(() => store.getSettings().geminiCliOAuthEnabled)
   state.rateLimits.setNetworkProxySettingsResolver(() => store.getSettings())
   state.keybindings = new KeybindingService({

@@ -578,6 +578,31 @@ describe('AppearancePane', () => {
     expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('antigravity')
   })
 
+  it('records the DeepSeek status bar toggle as a usage tracking interaction', async () => {
+    mocks.state.availableStatusBarToggles = [
+      {
+        id: 'deepseek',
+        title: 'DeepSeek Balance',
+        description: 'Show your DeepSeek account balance in the status bar.',
+        toggleDescription: 'Show DeepSeek account balance in the status bar.',
+        keywords: ['status bar', 'deepseek', 'balance']
+      }
+    ]
+    mocks.state.settingsSearchQuery = 'deepseek'
+    const container = await renderAppearancePane(getDefaultSettings('/tmp'))
+    const deepSeekSwitch = container.querySelector<HTMLButtonElement>(
+      'button[role="switch"][aria-label="DeepSeek Balance"]'
+    )
+
+    expect(deepSeekSwitch).not.toBeNull()
+    await act(async () => {
+      deepSeekSwitch?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(mocks.state.recordFeatureInteraction).toHaveBeenCalledWith('usage-tracking')
+    expect(mocks.state.toggleStatusBarItem).toHaveBeenCalledWith('deepseek')
+  })
+
   it('expands Interface, Terminal, and Window & Sidebar by default', async () => {
     mocks.state.settingsSearchQuery = ''
     const container = await renderAppearancePane(getDefaultSettings('/tmp'))

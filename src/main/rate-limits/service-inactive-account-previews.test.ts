@@ -43,6 +43,14 @@ vi.mock('./minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
+vi.mock('./deepseek/deepseek-fetcher', () => ({
+  fetchDeepSeekRateLimits: vi.fn()
+}))
+
+vi.mock('../deepseek/deepseek-api-key-store', () => ({
+  hasDeepSeekApiKey: vi.fn(() => false)
+}))
+
 vi.mock('./grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))

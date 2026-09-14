@@ -15,6 +15,10 @@ describe('getProviderDisplayName', () => {
     expect(getProviderDisplayName('minimax')).toBe('MiniMax')
   })
 
+  it('returns the DeepSeek brand name', () => {
+    expect(getProviderDisplayName('deepseek')).toBe('DeepSeek')
+  })
+
   it('returns the existing provider brand names', () => {
     expect(getProviderDisplayName('claude')).toBe('Claude')
     expect(getProviderDisplayName('codex')).toBe('Codex')

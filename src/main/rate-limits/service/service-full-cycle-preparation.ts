@@ -1,5 +1,6 @@
 import { fetchClaudeRateLimits } from '../claude-fetcher'
 import { fetchCodexRateLimits } from '../codex-fetcher'
+import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -29,8 +30,11 @@ export type FetchAllCyclePrepared = {
   opencodeGeneration: number
   miniMaxConfigChanged: boolean
   miniMaxGeneration: number
+  deepSeekConfigChanged: boolean
+  deepSeekGeneration: number
   claudeFetchGated: boolean
   results: [
+    PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
@@ -82,6 +86,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
+    const deepSeekConfigResult = this.resolveDeepSeekConfig()
+    const deepSeekApiKey = deepSeekConfigResult.config.apiKey
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -104,6 +110,14 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
+    const currentDeepSeekConfigHash = `${deepSeekApiKey}|${deepSeekConfigResult.error ?? ''}`
+    const deepSeekConfigChanged = currentDeepSeekConfigHash !== this.lastDeepSeekConfigHash
+    if (deepSeekConfigChanged) {
+      this.lastDeepSeekConfigHash = currentDeepSeekConfigHash
+      this.deepseekFetchGeneration += 1
+    }
+    const deepSeekGeneration = this.deepseekFetchGeneration
+
     // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
     this.updateState({
       ...previousState,
@@ -121,6 +135,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       minimax: miniMaxConfigChanged
         ? this.withFetchingStatus(null, 'minimax')
         : this.withFetchingStatus(previousState.minimax, 'minimax'),
+      deepseek: deepSeekConfigChanged
+        ? this.withFetchingStatus(null, 'deepseek')
+        : this.withFetchingStatus(previousState.deepseek, 'deepseek'),
       grok: this.withFetchingStatus(previousState.grok, 'grok')
     })
 
@@ -138,42 +155,52 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const claudeFetchGated =
       !options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude)
 
-    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
-      await Promise.allSettled([
-        claudeFetchGated
-          ? Promise.resolve(previousState.claude as ProviderRateLimits)
-          : fetchClaudeRateLimits({
-              authPreparation: claudeAuthPreparation,
-              allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-              allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-              networkProxySettings: this.networkProxySettingsResolver?.(),
-              signal
-            }),
-        codexFetchGated
-          ? Promise.resolve(previousState.codex as ProviderRateLimits)
-          : (missingWslCodexHome ??
-            fetchCodexRateLimits({
-              codexHomePath,
-              allowPtyFallback: this.shouldAllowCodexPtyFallback(),
-              signal
-            })),
-        fetchGeminiRateLimits(geminiCliOAuthEnabled),
-        fetchOpenCodeGoRateLimits(
-          cookie,
-          workspaceIdOverride || undefined,
-          this.networkProxySettingsResolver?.()
-        ),
-        this.fetchKimiWithResolvedHome(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels,
-              endpointMode: miniMaxEndpoint,
-              apiKey: miniMaxApiKey
-            })
-      ])
+    const [
+      claudeResult,
+      codexResult,
+      geminiResult,
+      opencodeGoResult,
+      kimiResult,
+      miniMaxResult,
+      deepSeekResult
+    ] = await Promise.allSettled([
+      claudeFetchGated
+        ? Promise.resolve(previousState.claude as ProviderRateLimits)
+        : fetchClaudeRateLimits({
+            authPreparation: claudeAuthPreparation,
+            allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
+            allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+            networkProxySettings: this.networkProxySettingsResolver?.(),
+            signal
+          }),
+      codexFetchGated
+        ? Promise.resolve(previousState.codex as ProviderRateLimits)
+        : (missingWslCodexHome ??
+          fetchCodexRateLimits({
+            codexHomePath,
+            allowPtyFallback: this.shouldAllowCodexPtyFallback(),
+            signal
+          })),
+      fetchGeminiRateLimits(geminiCliOAuthEnabled),
+      fetchOpenCodeGoRateLimits(
+        cookie,
+        workspaceIdOverride || undefined,
+        this.networkProxySettingsResolver?.()
+      ),
+      this.fetchKimiWithResolvedHome(),
+      miniMaxConfigResult.error
+        ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+        : fetchMiniMaxRateLimits({
+            cookie: miniMaxCookie,
+            groupId: miniMaxGroupId,
+            models: miniMaxModels,
+            endpointMode: miniMaxEndpoint,
+            apiKey: miniMaxApiKey
+          }),
+      deepSeekConfigResult.error
+        ? Promise.resolve(this.getApiKeyCredentialError('deepseek', deepSeekConfigResult.error))
+        : fetchDeepSeekRateLimits({ apiKey: deepSeekApiKey })
+    ])
 
     if (signal.aborted) {
       return null
@@ -193,6 +220,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       opencodeGeneration,
       miniMaxConfigChanged,
       miniMaxGeneration,
+      deepSeekConfigChanged,
+      deepSeekGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -200,7 +229,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult
+        miniMaxResult,
+        deepSeekResult
       ],
       grokResultPromise
     }
