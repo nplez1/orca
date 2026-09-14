@@ -122,6 +122,8 @@ export type PersistedUIState = {
   _deepseekStatusBarDefaultAdded?: boolean
   /** One-shot migration flag for adding the default-on Fireworks.ai status item. */
   _fireworksStatusBarDefaultAdded?: boolean
+  /** One-shot migration flag for adding the default-on GitHub Copilot status item. */
+  _copilotStatusBarDefaultAdded?: boolean
   statusBarItems: StatusBarItem[]
   statusBarVisible: boolean
   /** Why: this is client-side presentation, not a provider/account or execution-host setting. */

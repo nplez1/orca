@@ -90,6 +90,8 @@ function getProviderLetter(provider: ProviderRateLimits['provider']): string {
       return 'D'
     case 'fireworks':
       return 'F'
+    case 'copilot':
+      return 'P'
   }
 }
 

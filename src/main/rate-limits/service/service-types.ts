@@ -79,6 +79,16 @@ export type FireworksResolvedConfig = {
   error: string | null
 }
 
+export type CopilotRateLimitConfig = {
+  token: string
+  enterpriseSlug: string
+}
+
+export type CopilotResolvedConfig = {
+  config: CopilotRateLimitConfig
+  error: string | null
+}
+
 export type GeminiCliOAuthEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
@@ -129,6 +139,7 @@ export type InternalRateLimitState = {
   grok: ProviderRateLimits | null
   deepseek: ProviderRateLimits | null
   fireworks: ProviderRateLimits | null
+  copilot: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

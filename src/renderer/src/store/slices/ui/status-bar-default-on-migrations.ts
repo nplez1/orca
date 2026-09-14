@@ -9,6 +9,7 @@ const DEFAULT_ON_ANTIGRAVITY_STATUS_BAR_ITEM: StatusBarItem = 'antigravity'
 const DEFAULT_ON_GROK_STATUS_BAR_ITEM: StatusBarItem = 'grok'
 const DEFAULT_ON_DEEPSEEK_STATUS_BAR_ITEM: StatusBarItem = 'deepseek'
 const DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM: StatusBarItem = 'fireworks'
+const DEFAULT_ON_COPILOT_STATUS_BAR_ITEM: StatusBarItem = 'copilot'
 
 // Why: default-on status items ship as one-shot migrations so an existing
 // profile gains the new item instead of only fresh installs seeing it.
@@ -19,7 +20,8 @@ const DEFAULT_ON_STATUS_BAR_MIGRATIONS = [
   ['_antigravityStatusBarDefaultAdded', DEFAULT_ON_ANTIGRAVITY_STATUS_BAR_ITEM],
   ['_grokStatusBarDefaultAdded', DEFAULT_ON_GROK_STATUS_BAR_ITEM],
   ['_deepseekStatusBarDefaultAdded', DEFAULT_ON_DEEPSEEK_STATUS_BAR_ITEM],
-  ['_fireworksStatusBarDefaultAdded', DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM]
+  ['_fireworksStatusBarDefaultAdded', DEFAULT_ON_FIREWORKS_STATUS_BAR_ITEM],
+  ['_copilotStatusBarDefaultAdded', DEFAULT_ON_COPILOT_STATUS_BAR_ITEM]
 ] as const
 
 export function hydrateStatusBarItems(ui: PersistedUIState): StatusBarItem[] {
