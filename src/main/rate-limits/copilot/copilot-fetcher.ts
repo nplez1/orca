@@ -1,5 +1,7 @@
-import { net } from 'electron'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
+import { extractExecError } from '../../git/exec-error'
+import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
+import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
 import {
   buildCopilotSnapshot,
   buildCopilotTotals,
@@ -14,86 +16,101 @@ import {
  * Reads the enterprise's monthly Copilot AI-credit budget and the credits consumed so
  * far this month. Two endpoints are needed because GitHub keeps the ceiling on the
  * budget and the consumption on the usage report.
+ *
+ * Why through `gh` rather than `net.fetch`: every authenticated GitHub call in Orca
+ * goes through the CLI, and going direct would be the only exception — losing GitHub
+ * Enterprise Server host resolution and bypassing the gh rate-limit breaker. It also
+ * means this provider never holds a token of its own: an explicit credential is only
+ * ever passed to gh as `GH_TOKEN`.
  */
-const GITHUB_API_BASE = 'https://api.github.com'
-// Why: the billing endpoints are version-gated; earlier versions do not expose them.
+// Why: these billing endpoints are version-gated; earlier versions do not expose them.
 const GITHUB_API_VERSION = '2026-03-10'
-const REQUEST_TIMEOUT_MS = 10_000
+const HTTP_STATUS_IN_GH_ERROR = /\(HTTP (\d{3})\)/
 // Why bounded: an enterprise holds few budgets, so this only covers a pathological
 // list rather than paging forever inside a poll cycle.
 const MAX_BUDGET_PAGES = 5
 
 export type FetchCopilotRateLimitsOptions = {
+  /** Explicit credential from Settings, passed to gh as `GH_TOKEN`. Blank uses gh's own sign-in. */
   token: string
   enterpriseSlug: string
 }
 
-type GitHubJsonResult =
+type GhApiResult =
   | { status: 'ok'; payload: unknown }
   | { status: 'http-error'; httpStatus: number }
   | { status: 'parse-error' }
-  | { status: 'network-error'; message: string }
+  | { status: 'cli-missing' }
+  | { status: 'cli-error'; message: string }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-async function getGitHubJson(path: string, token: string): Promise<GitHubJsonResult> {
+async function ghApiJson(path: string, token: string): Promise<GhApiResult> {
   try {
-    const response = await net.fetch(`${GITHUB_API_BASE}${path}`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'X-GitHub-Api-Version': GITHUB_API_VERSION
-      },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-    })
-    if (!response.ok) {
-      return { status: 'http-error', httpStatus: response.status }
-    }
+    const { stdout } = await ghExecFileAsync(
+      ['api', path, '-H', `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`],
+      token ? { env: { ...process.env, GH_TOKEN: token } } : {}
+    )
     try {
-      return { status: 'ok', payload: await response.json() }
+      return { status: 'ok', payload: JSON.parse(stdout) }
     } catch {
       return { status: 'parse-error' }
     }
   } catch (error) {
-    return {
-      status: 'network-error',
-      message: error instanceof Error ? error.message : String(error)
+    if (isHostCommandMissing(error, 'gh')) {
+      return { status: 'cli-missing' }
     }
+    // gh reports the API status inside its error text, e.g. "gh: Not Found (HTTP 404)".
+    const { stderr } = extractExecError(error)
+    const statusMatch = HTTP_STATUS_IN_GH_ERROR.exec(stderr)
+    return statusMatch
+      ? { status: 'http-error', httpStatus: Number(statusMatch[1]) }
+      : { status: 'cli-error', message: stderr.trim() }
   }
 }
 
 /**
- * Maps an HTTP status onto the shared failure vocabulary so the renderer's existing
- * error copy explains the cause instead of showing a bare "Usage unavailable".
+ * Maps a gh failure onto the shared failure vocabulary so the renderer's existing error
+ * copy explains the cause instead of showing a bare "Usage unavailable".
  */
-function makeCopilotHttpError(what: string, failure: GitHubJsonResult): ProviderRateLimits {
-  if (failure.status === 'http-error') {
-    if (failure.httpStatus === 401) {
-      return makeCopilotError(`GitHub rejected the token while reading ${what}`, 'stale-token')
-    }
-    if (failure.httpStatus === 403) {
-      return makeCopilotError(
-        `The token cannot read ${what} — it needs the "Enterprise billing" read permission`,
-        'missing-scope'
-      )
-    }
-    if (failure.httpStatus === 404) {
-      return makeCopilotError(
-        `GitHub did not find ${what} — check the enterprise slug, and that the enhanced billing platform is enabled`,
-        'usage-unavailable'
-      )
-    }
-    if (failure.httpStatus >= 500) {
-      return makeCopilotError(`GitHub server error while reading ${what}`, 'server')
-    }
-    return makeCopilotError(`GitHub returned ${failure.httpStatus} for ${what}`)
+function makeCopilotFailure(what: string, failure: GhApiResult): ProviderRateLimits {
+  if (failure.status === 'ok') {
+    // Unreachable: callers only route failures here.
+    return makeCopilotError(`Unexpected success while reading ${what}`)
   }
-  if (failure.status === 'network-error') {
-    return makeCopilotError(`Could not reach GitHub: ${failure.message}`, 'network')
+  if (failure.status === 'cli-error') {
+    return makeCopilotError(`Could not read ${what} through the GitHub CLI: ${failure.message}`)
   }
-  return makeCopilotError(`GitHub returned unreadable JSON for ${what}`, 'parse')
+  if (failure.status === 'parse-error') {
+    return makeCopilotError(`GitHub returned unreadable JSON for ${what}`, 'parse')
+  }
+  if (failure.status === 'cli-missing') {
+    return makeCopilotError(
+      `Reading ${what} needs the GitHub CLI — install gh and run gh auth login`,
+      'cli-unavailable'
+    )
+  }
+  if (failure.httpStatus === 401) {
+    return makeCopilotError(`GitHub rejected the token while reading ${what}`, 'stale-token')
+  }
+  if (failure.httpStatus === 403) {
+    return makeCopilotError(
+      `The token cannot read ${what} — it needs the enterprise billing permissions`,
+      'missing-scope'
+    )
+  }
+  if (failure.httpStatus === 404) {
+    return makeCopilotError(
+      `GitHub did not find ${what} — check the enterprise slug, that the token can see the enterprise, and that the enhanced billing platform is enabled`,
+      'usage-unavailable'
+    )
+  }
+  if (failure.httpStatus >= 500) {
+    return makeCopilotError(`GitHub server error while reading ${what}`, 'server')
+  }
+  return makeCopilotError(`GitHub returned ${failure.httpStatus} for ${what}`)
 }
 
 function budgetEntries(payload: unknown): CopilotBudget[] {
@@ -116,16 +133,15 @@ async function findAiCreditBudget(
 ): Promise<ProviderRateLimits | { budget: CopilotBudget }> {
   const collected: CopilotBudget[] = []
   for (let page = 1; page <= MAX_BUDGET_PAGES; page += 1) {
-    const result = await getGitHubJson(
+    const result = await ghApiJson(
       `/enterprises/${encodeURIComponent(enterpriseSlug)}/settings/billing/budgets?per_page=100&page=${page}`,
       token
     )
     if (result.status !== 'ok') {
-      return makeCopilotHttpError('the AI-credit budget', result)
+      return makeCopilotFailure('the AI-credit budget', result)
     }
     collected.push(...budgetEntries(result.payload))
-    const hasNextPage = isRecord(result.payload) && result.payload.has_next_page === true
-    if (!hasNextPage) {
+    if (!(isRecord(result.payload) && result.payload.has_next_page === true)) {
       break
     }
   }
@@ -145,8 +161,13 @@ export async function fetchCopilotRateLimits(
   try {
     const token = options.token?.trim() ?? ''
     const enterpriseSlug = options.enterpriseSlug?.trim() ?? ''
-    if (!token || !enterpriseSlug) {
-      return makeCopilotUnavailable('GitHub Copilot credentials not configured')
+    if (!token && !enterpriseSlug) {
+      return makeCopilotUnavailable(
+        'GitHub Copilot credentials not configured — sign in with the GitHub CLI or add a token'
+      )
+    }
+    if (!enterpriseSlug) {
+      return makeCopilotUnavailable('No GitHub enterprise selected for Copilot usage')
     }
 
     const budgetResult = await findAiCreditBudget(enterpriseSlug, token)
@@ -161,12 +182,12 @@ export async function fetchCopilotRateLimits(
     }
 
     const now = new Date()
-    const usage = await getGitHubJson(
+    const usage = await ghApiJson(
       `/enterprises/${encodeURIComponent(enterpriseSlug)}/settings/billing/ai_credit/usage?year=${now.getUTCFullYear()}&month=${now.getUTCMonth() + 1}`,
       token
     )
     if (usage.status !== 'ok') {
-      return makeCopilotHttpError('this month’s AI-credit usage', usage)
+      return makeCopilotFailure('this month’s AI-credit usage', usage)
     }
 
     const totals = buildCopilotTotals(
