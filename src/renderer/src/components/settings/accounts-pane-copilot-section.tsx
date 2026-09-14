@@ -1,4 +1,4 @@
-import { ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopilotIcon } from '../status-bar/icons'
 import { Badge } from '../ui/badge'
@@ -18,11 +18,19 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
     setCopilotTokenDraft,
     copilotEnterpriseSlugDraft,
     setCopilotEnterpriseSlugDraft,
-    copilotConfigured,
+    copilotCredentialSource,
+    copilotGhSetupHint,
+    copilotGhSetupHintCopied,
+    copyCopilotGhSetupHint,
     copilotCredentialBusy,
     saveCopilotCredentials,
     clearCopilotCredentials
   } = model
+  // Why: a credential sourced from the GitHub CLI has nothing stored to replace or
+  // forget, so every stored-token affordance keys off the source, not `configured`.
+  const tokenStored = copilotCredentialSource === 'stored'
+  const usingGithubCli = copilotCredentialSource === 'github-cli'
+  const credentialMissing = copilotCredentialSource === 'none'
   return (
     <section key="copilot" id="accounts-copilot" className="space-y-4 scroll-mt-6">
       <div className="flex items-start justify-between gap-3">
@@ -58,33 +66,100 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
-          copilotConfigured ? 'border-border/60' : 'border-border/40'
+          credentialMissing ? 'border-border/40' : 'border-border/60'
         )}
       >
         <ShieldCheck
           className={cn(
             'mt-0.5 size-4 shrink-0',
-            copilotConfigured ? 'text-foreground' : 'text-muted-foreground'
+            credentialMissing ? 'text-muted-foreground' : 'text-foreground'
           )}
         />
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <p className="text-xs font-medium">
-            {copilotConfigured
+            {usingGithubCli
               ? translate(
-                  'auto.components.settings.accounts.pane.copilot.section.886fc8ca30',
-                  'Stored locally'
+                  'auto.components.settings.accounts.pane.copilot.section.6a27446bd3',
+                  'Using your GitHub CLI sign-in'
                 )
-              : translate(
-                  'auto.components.settings.accounts.pane.copilot.section.d5f964d2ec',
-                  'Credentials not set'
-                )}
+              : tokenStored
+                ? translate(
+                    'auto.components.settings.accounts.pane.copilot.section.886fc8ca30',
+                    'Stored locally'
+                  )
+                : translate(
+                    'auto.components.settings.accounts.pane.copilot.section.d5f964d2ec',
+                    'Credentials not set'
+                  )}
           </p>
           <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.259e2dff8e',
-              'Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.'
-            )}
+            {usingGithubCli
+              ? translate(
+                  'auto.components.settings.accounts.pane.copilot.section.233569347b',
+                  'Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.'
+                )
+              : translate(
+                  'auto.components.settings.accounts.pane.copilot.section.259e2dff8e',
+                  'Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.'
+                )}
           </p>
+          {usingGithubCli ? (
+            <p className="text-xs text-muted-foreground">
+              {translate(
+                'auto.components.settings.accounts.pane.copilot.section.467c761749',
+                'Enterprise slug'
+              )}
+              {': '}
+              <span className="font-mono text-xs text-foreground">
+                {copilotEnterpriseSlugDraft}
+              </span>
+            </p>
+          ) : null}
+          {copilotGhSetupHint ? (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.accounts.pane.copilot.section.f1c1fd4ffb',
+                  'Run this to finish setting up the GitHub CLI for Copilot billing:'
+                )}
+              </p>
+              <div className="flex items-start gap-2 rounded-md border border-border/60 bg-background/50 px-3 py-2">
+                <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                  {copilotGhSetupHint}
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0 gap-1.5"
+                  aria-label={
+                    copilotGhSetupHintCopied
+                      ? translate(
+                          'auto.components.settings.accounts.pane.copilot.section.6a327922f7',
+                          'Copied'
+                        )
+                      : translate(
+                          'auto.components.settings.accounts.pane.copilot.section.9e59104270',
+                          'Copy command'
+                        )
+                  }
+                  onClick={() => void copyCopilotGhSetupHint()}
+                >
+                  {copilotGhSetupHintCopied ? (
+                    <>
+                      <Check className="size-3" />
+                      {translate(
+                        'auto.components.settings.accounts.pane.copilot.section.6a327922f7',
+                        'Copied'
+                      )}
+                    </>
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -108,19 +183,24 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
             )}
           </Label>
           <Badge
-            variant={copilotConfigured ? 'secondary' : 'outline'}
+            variant={tokenStored ? 'secondary' : 'outline'}
             className="h-5 gap-1 rounded-full px-2 text-[10px] font-medium text-muted-foreground"
           >
-            {copilotConfigured ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
-            {copilotConfigured
+            {tokenStored ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
+            {tokenStored
               ? translate(
                   'auto.components.settings.accounts.pane.copilot.section.2976a89a84',
                   'Saved'
                 )
-              : translate(
-                  'auto.components.settings.accounts.pane.copilot.section.13ae4d0b21',
-                  'Not saved'
-                )}
+              : usingGithubCli
+                ? translate(
+                    'auto.components.settings.accounts.pane.copilot.section.ae9c8d3fd2',
+                    'Optional override'
+                  )
+                : translate(
+                    'auto.components.settings.accounts.pane.copilot.section.13ae4d0b21',
+                    'Not saved'
+                  )}
           </Badge>
         </div>
         <div className="flex gap-2">
@@ -140,11 +220,11 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
           <Button
             size="xs"
             onClick={() => void saveCopilotCredentials()}
-            disabled={copilotCredentialBusy || (!copilotTokenDraft.trim() && !copilotConfigured)}
+            disabled={copilotCredentialBusy || (!copilotTokenDraft.trim() && !tokenStored)}
             className="h-7 shrink-0 text-xs"
           >
             {copilotCredentialBusy ? <Loader2 className="size-3 animate-spin" /> : null}
-            {copilotConfigured
+            {tokenStored
               ? translate(
                   'auto.components.settings.accounts.pane.copilot.section.ef36dc11a9',
                   'Replace'
@@ -154,7 +234,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
                   'Save'
                 )}
           </Button>
-          {copilotConfigured ? (
+          {tokenStored ? (
             <Button
               variant="ghost"
               size="xs"
@@ -171,8 +251,8 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         </div>
         <p className="text-xs text-muted-foreground">
           {translate(
-            'auto.components.settings.accounts.pane.copilot.section.d0f786b0e5',
-            'The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month.'
+            'auto.components.settings.accounts.pane.copilot.section.022c7c89d5',
+            'Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.'
           )}
         </p>
       </SearchableSetting>
@@ -210,9 +290,23 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         />
         <p className="text-xs text-muted-foreground">
           {translate(
-            'auto.components.settings.accounts.pane.copilot.section.5a193f1da9',
-            'The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.'
+            'auto.components.settings.accounts.pane.copilot.section.1006eed696',
+            'The slug is the <slug> in github.com/enterprises/<slug>.'
           )}
+          {tokenStored || usingGithubCli ? (
+            <>
+              {' '}
+              {tokenStored
+                ? translate(
+                    'auto.components.settings.accounts.pane.copilot.section.3c8314c1de',
+                    'Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.'
+                  )
+                : translate(
+                    'auto.components.settings.accounts.pane.copilot.section.06fb320a51',
+                    'Detected from your GitHub CLI sign-in. Paste a token to override it.'
+                  )}
+            </>
+          ) : null}
         </p>
       </SearchableSetting>
     </section>
