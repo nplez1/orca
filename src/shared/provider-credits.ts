@@ -11,7 +11,7 @@ export type ProviderCreditsKind = 'balance' | 'spend'
 export type ProviderCreditsPeriod = 'current-month' | 'last-30-days'
 
 /** Breakdown bucket. A key rather than a label so the renderer owns wording. */
-export type ProviderCreditsItemKey = 'granted' | 'topped-up'
+export type ProviderCreditsItemKey = 'granted' | 'topped-up' | 'spent-this-month'
 
 export type ProviderCreditsItem = {
   key: ProviderCreditsItemKey
