@@ -97,7 +97,14 @@ function getProviderLetter(provider: ProviderRateLimits['provider']): string {
 // and credits are data even when every window is null.
 function hasUsageData(p: ProviderRateLimits): boolean {
   return Boolean(
-    p.session || p.weekly || p.fableWeekly || p.monthly || p.buckets?.length || hasCreditsData(p)
+    p.session ||
+    p.weekly ||
+    p.fableWeekly ||
+    p.monthly ||
+    p.buckets?.length ||
+    // Why: an allowance-only plan has no window, so its readout rides this term.
+    p.allowance ||
+    hasCreditsData(p)
   )
 }
 

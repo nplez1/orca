@@ -1,3 +1,4 @@
+import type { ProviderAllowance } from './provider-allowance'
 import type { ProviderCredits } from './provider-credits'
 
 export type RateLimitWindow = {
@@ -72,6 +73,11 @@ export type ProviderRateLimits = {
    * window at all (DeepSeek balance, Fireworks rated spend).
    */
   credits?: ProviderCredits | null
+  /**
+   * Consumed-against-ceiling readout for enterprise and usage-billed plans that report
+   * no percentage quota window: Claude's monthly spend cap, Codex's spend control.
+   */
+  allowance?: ProviderAllowance | null
   /** Named per-model buckets (Gemini only). */
   buckets?: RateLimitBucket[]
   /** Available earned Codex rate-limit reset credits, if reported. */
