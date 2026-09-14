@@ -234,7 +234,7 @@ export const getAccountsCopilotSearchEntries = createLocalizedCatalog(() => [
     title: translate('settings.accounts.search.copilotTitle', 'GitHub Copilot Usage'),
     description: translate(
       'settings.accounts.search.copilotDescription',
-      'Configure GitHub Copilot usage tracking with a GitHub token that can read enterprise billing and the enterprise slug it belongs to.'
+      'Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.'
     ),
     keywords: [
       translate('settings.accounts.search.copilotKeyword', 'copilot'),

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
 import type {
   CopilotCredentialSectionModel,
+  CopilotCredentialSource,
   DeepSeekCredentialSectionModel,
   FireworksCredentialSectionModel,
   MiniMaxCredentialSectionModel
@@ -168,24 +169,58 @@ function useCopilotCredentials(
 ): CopilotCredentialSectionModel {
   const [copilotTokenDraft, setCopilotTokenDraft] = useState('')
   const [copilotEnterpriseSlugDraft, setCopilotEnterpriseSlugDraft] = useState('')
-  const [copilotConfigured, setCopilotConfigured] = useState(false)
+  const [copilotCredentialSource, setCopilotCredentialSource] =
+    useState<CopilotCredentialSource>('none')
+  const [copilotGhSetupHint, setCopilotGhSetupHint] = useState<string | null>(null)
+  const [copilotGhSetupHintCopied, setCopilotGhSetupHintCopied] = useState(false)
   const [copilotCredentialBusy, setCopilotCredentialBusy] = useState(false)
+  const copyResetTimerRef = useRef<number | null>(null)
   const { saveCopilotCredentials, clearCopilotCredentials } = createCopilotCredentialActions({
     copilotTokenDraft,
-    copilotConfigured,
+    copilotCredentialSource,
     setCopilotTokenDraft,
     copilotEnterpriseSlugDraft,
     setCopilotEnterpriseSlugDraft,
-    setCopilotConfigured,
+    setCopilotCredentialSource,
+    setCopilotGhSetupHint,
     setCopilotCredentialBusy,
     recordFeatureInteraction
   })
 
   useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current)
+      }
+    }
+  }, [])
+
+  const copyCopilotGhSetupHint = async (): Promise<void> => {
+    if (!copilotGhSetupHint) {
+      return
+    }
+    try {
+      await window.api.ui.writeClipboardText(copilotGhSetupHint)
+      setCopilotGhSetupHintCopied(true)
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current)
+      }
+      // Why: match the app's other inline copy buttons — swap the icon, then reset.
+      copyResetTimerRef.current = window.setTimeout(() => {
+        copyResetTimerRef.current = null
+        setCopilotGhSetupHintCopied(false)
+      }, 1500)
+    } catch (error) {
+      console.error('Failed to copy the GitHub CLI setup command:', error)
+    }
+  }
+
+  useEffect(() => {
     const refresh = async (): Promise<void> => {
       try {
         const status = await window.api.copilotCredentials.getStatus()
-        setCopilotConfigured(status.configured)
+        setCopilotCredentialSource(status.source)
+        setCopilotGhSetupHint(status.ghSetupHint)
         // Why: the token and the slug share one stored file, so the status seeds
         // the slug field too; the token itself is never rendered.
         setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
@@ -201,7 +236,10 @@ function useCopilotCredentials(
     setCopilotTokenDraft,
     copilotEnterpriseSlugDraft,
     setCopilotEnterpriseSlugDraft,
-    copilotConfigured,
+    copilotCredentialSource,
+    copilotGhSetupHint,
+    copilotGhSetupHintCopied,
+    copyCopilotGhSetupHint,
     copilotCredentialBusy,
     saveCopilotCredentials,
     clearCopilotCredentials
