@@ -14,6 +14,7 @@ import {
   OpenCodeGoIcon
 } from './icons'
 import { creditsItemRows, describeCredits } from './provider-credits-format'
+import { describeAllowance } from './provider-allowance-format'
 import { translate } from '@/i18n/i18n'
 import {
   getProviderDisplayName,
@@ -302,13 +303,16 @@ export function ProviderPanel({
     )
   }
 
+  // Why: an allowance-only plan has no window and no credits, and still has a
+  // cached readout worth showing instead of the empty-error branch.
   if (
     p.status === 'error' &&
     !p.session &&
     !p.weekly &&
     !p.fableWeekly &&
     !p.monthly &&
-    !p.credits
+    !p.credits &&
+    !p.allowance
   ) {
     return (
       <div className={`text-xs ${className ?? 'w-full'}`}>
@@ -339,6 +343,16 @@ export function ProviderPanel({
   const credits = p.credits ?? null
   const creditItems = credits ? creditsItemRows(credits) : []
   const hasWindowRows = windowSections.some((section) => section.window)
+  // Why: an allowance-only plan's readout must survive a refresh failure the way
+  // a credits-only one does, or a stale error drops it instead of marking it stale.
+  const hasCachedData = !!(
+    p.session ||
+    p.weekly ||
+    p.fableWeekly ||
+    p.monthly ||
+    credits ||
+    p.allowance
+  )
 
   return (
     <div className={`${className ?? 'w-full'} space-y-3 text-xs`}>
@@ -377,6 +391,11 @@ export function ProviderPanel({
             ))}
           </div>
         ) : null}
+        {p.allowance ? (
+          <div data-provider-allowance className={`tabular-nums ${mutedClass}`}>
+            {describeAllowance(p.allowance)}
+          </div>
+        ) : null}
         {credits?.available === false ? (
           // Why: an exhausted-but-configured balance must stay visible and say
           // why calls fail; status stays 'ok' by design for exactly this case.
@@ -405,11 +424,7 @@ export function ProviderPanel({
       ))}
 
       {p.error ? (
-        <ErrorMessage
-          message={p.error}
-          stale={!!(p.session || p.weekly || p.fableWeekly || p.monthly || credits)}
-          inverted={inverted}
-        />
+        <ErrorMessage message={p.error} stale={hasCachedData} inverted={inverted} />
       ) : null}
     </div>
   )
