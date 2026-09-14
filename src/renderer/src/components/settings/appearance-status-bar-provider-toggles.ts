@@ -248,6 +248,29 @@ export function getProviderUsageStatusBarToggleEntries(): StatusBarToggleSearchE
         'Show Fireworks.ai rated spend in the status bar.'
       )
     },
+    {
+      id: 'copilot',
+      title: translate('settings.appearance.search.copilotTitle', 'GitHub Copilot Usage'),
+      description: translate(
+        'settings.appearance.search.copilotDescription',
+        'Show your GitHub Copilot AI credit usage in the status bar.'
+      ),
+      keywords: [
+        ...translateSearchKeyword(
+          'auto.components.settings.appearance.search.896eb53fd4',
+          'status bar'
+        ),
+        ...translateSearchKeyword('settings.appearance.search.copilotKeyword', 'copilot'),
+        ...translateSearchKeyword('settings.appearance.search.githubKeyword', 'github'),
+        ...translateSearchKeyword('auto.components.settings.appearance.search.00a028f25f', 'usage'),
+        ...translateSearchKeyword('settings.appearance.search.aiCreditsKeyword', 'ai credits'),
+        ...translateSearchKeyword('settings.appearance.search.tokenKeyword', 'token')
+      ],
+      toggleDescription: translate(
+        'settings.appearance.statusBar.copilotToggleDescription',
+        'Show GitHub Copilot AI credit usage in the status bar.'
+      )
+    },
     getGrokStatusBarToggleSearchEntry()
   ]
 }

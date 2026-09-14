@@ -17,6 +17,7 @@ import {
 import {
   getAccountsClaudeSearchEntries,
   getAccountsCodexSearchEntries,
+  getAccountsCopilotSearchEntries,
   getAccountsDeepSeekSearchEntries,
   getAccountsFireworksSearchEntries,
   getAccountsGeminiSearchEntries,
@@ -61,6 +62,7 @@ import {
 import { renderMiniMaxAccountsSection } from './accounts-pane-minimax-section'
 import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
 import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
+import { renderCopilotAccountsSection } from './accounts-pane-copilot-section'
 import { useAccountsPaneCredentialSections } from './accounts-pane-credential-sections'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 
@@ -320,7 +322,8 @@ export function AccountsPane({
     miniMaxRateLimits,
     ...credentialSections.miniMax,
     ...credentialSections.deepSeek,
-    ...credentialSections.fireworks
+    ...credentialSections.fireworks,
+    ...credentialSections.copilot
   }
   const visibleSections = [
     wslSupportedPlatform &&
@@ -348,6 +351,9 @@ export function AccountsPane({
       : null,
     matchesSettingsSearch(searchQuery, getAccountsFireworksSearchEntries())
       ? renderFireworksAccountsSection(model)
+      : null,
+    matchesSettingsSearch(searchQuery, getAccountsCopilotSearchEntries())
+      ? renderCopilotAccountsSection(model)
       : null,
     matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries()) ? (
       <GrokAccountsSection key="grok" />

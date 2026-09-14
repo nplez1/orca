@@ -55,6 +55,7 @@ function recordStatusBarToggleInteraction(
     id === 'minimax' ||
     id === 'deepseek' ||
     id === 'fireworks' ||
+    id === 'copilot' ||
     id === 'grok'
   ) {
     recordFeatureInteraction('usage-tracking')
