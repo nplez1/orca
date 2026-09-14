@@ -147,7 +147,9 @@
         "resourceUsageToggleDescription": "Show the Resource Manager. Click it for CPU, memory, sessions, daemon controls, and workspace disk scans.",
         "portsToggleDescription": "Show live workspace ports. Click it for workspace-scoped ports and external listeners.",
         "antigravityToggleDescription": "Show Antigravity subscription usage for the active workspace.",
-        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI."
+        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI.",
+        "copilotLabel": "GitHub Copilot Usage",
+        "copilotToggleDescription": "Show GitHub Copilot AI credit usage in the status bar."
       },
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
@@ -157,6 +159,14 @@
           "statusItem": "status item",
           "activity": "activity"
         }
+      },
+      "search": {
+        "aiCreditsKeyword": "ai credits",
+        "copilotDescription": "Show your GitHub Copilot AI credit usage in the status bar.",
+        "copilotKeyword": "copilot",
+        "copilotTitle": "GitHub Copilot Usage",
+        "githubKeyword": "github",
+        "tokenKeyword": "token"
       }
     },
     "browser": {
@@ -202,6 +212,16 @@
         "optionNativeTooltip": "Keeps Electron's built-in identity for sites that reject the cleaned identity. Google sign-in is unavailable in Native mode.",
         "restartRequired": "Restart required",
         "unavailable": "Browser identity is unavailable."
+      }
+    },
+    "accounts": {
+      "search": {
+        "aiCreditsKeyword": "ai credits",
+        "copilotDescription": "Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.",
+        "copilotKeyword": "copilot",
+        "copilotTitle": "GitHub Copilot Usage",
+        "githubKeyword": "github",
+        "tokenKeyword": "token"
       }
     }
   },
@@ -1118,7 +1138,7 @@
         "cd50cec5d7": "Coordinate multiple coding agents through Orca.",
         "58a868e8e4": "Orchestration",
         "7c79d3b7bf": "Optional",
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, and Grok.",
+        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, and GitHub Copilot.",
         "f70ac54d38": "AI Provider Accounts",
         "4121f7a0a2": "Manage AI agents, set a default, and customize commands.",
         "b49abbd2f7": "Agents",
@@ -4028,6 +4048,13 @@
             "contact_note": "The host may still be running; only the Orca connection is unavailable.",
             "last_connected": "Last connected {{value0}}",
             "reconnect_attempt": "Attempt {{value0}}"
+          },
+          "providerAllowance": {
+            "unit": {
+              "credit": "credits"
+            },
+            "usedOfLimit": "{{value0}} of {{value1}}",
+            "usedOfLimitUnit": "{{value0}} of {{value1}} {{value2}}"
           }
         }
       },
@@ -8908,7 +8935,46 @@
             "b2c4e7f1a8": "endpoint",
             "3a9b6d2c4e": "api key",
             "5d8f1a3b7c": "china",
-            "7e2a4b8c1d": "overseas"
+            "7e2a4b8c1d": "overseas",
+            "ca8cf669e2": "usage"
+          },
+          "pane": {
+            "copilot": {
+              "actions": {
+                "1d08d465f5": "GitHub Copilot credentials saved.",
+                "41c1907a73": "GitHub Copilot credential update failed.",
+                "70efb28dee": "GitHub token is required."
+              },
+              "section": {
+                "022c7c89d5": "Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.",
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
+                "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
+                "13ae4d0b21": "Not saved",
+                "233569347b": "Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.",
+                "259e2dff8e": "Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.",
+                "2976a89a84": "Saved",
+                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "467c761749": "Enterprise slug",
+                "4cf256a883": "Forget token",
+                "4d5c01e15c": "Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
+                "6a27446bd3": "Using your GitHub CLI sign-in",
+                "6a327922f7": "Copied",
+                "74858f3994": "Paste your GitHub token",
+                "7e6b3de4ea": "GitHub token",
+                "886fc8ca30": "Stored locally",
+                "9e59104270": "Copy command",
+                "ae9c8d3fd2": "Optional override",
+                "b03cd42103": "Save",
+                "d5f964d2ec": "Credentials not set",
+                "d7c06dead5": "your-enterprise",
+                "dc3eaf8d70": "GitHub Copilot",
+                "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
+                "ef36dc11a9": "Replace",
+                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for Copilot billing:",
+                "f8bb20c24c": "Open console",
+                "fa8def1ab4": "Required. The slug selects which enterprise Orca reads GitHub Copilot usage from."
+              }
+            }
           }
         },
         "advanced": {

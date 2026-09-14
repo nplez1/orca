@@ -1,5 +1,7 @@
 import { fetchClaudeRateLimits } from '../claude-fetcher'
 import { fetchCodexRateLimits } from '../codex-fetcher'
+import { fetchCopilotRateLimits } from '../copilot/copilot-fetcher'
+import { readCopilotGhCredentialsForCycle } from '../copilot/copilot-gh-credentials'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -29,8 +31,11 @@ export type FetchAllCyclePrepared = {
   opencodeGeneration: number
   miniMaxConfigChanged: boolean
   miniMaxGeneration: number
+  copilotConfigChanged: boolean
+  copilotGeneration: number
   claudeFetchGated: boolean
   results: [
+    PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
@@ -82,6 +87,28 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
+    const copilotConfigResult = this.resolveCopilotConfig()
+    // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
+    // on the fetch critical path where its latency would stall every other provider.
+    const copilotGhResult = readCopilotGhCredentialsForCycle()
+    const copilotStoredCredentials =
+      copilotConfigResult.config.token && copilotConfigResult.config.enterpriseSlug
+        ? {
+            token: copilotConfigResult.config.token,
+            enterpriseSlug: copilotConfigResult.config.enterpriseSlug
+          }
+        : null
+    // Why stored wins: it is the deliberate override, and the paste form exists for
+    // accounts gh cannot serve at all.
+    const copilotCredentials =
+      copilotStoredCredentials ??
+      // Why no token here: gh supplies its own sign-in; the stored token is only ever an
+      // explicit override passed to gh as GH_TOKEN.
+      (copilotGhResult?.status === 'ok'
+        ? { token: '', enterpriseSlug: copilotGhResult.enterpriseSlug }
+        : { token: '', enterpriseSlug: '' })
+    const copilotToken = copilotCredentials.token
+    const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -104,6 +131,14 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
+    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotConfigResult.error ?? ''}`
+    const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
+    if (copilotConfigChanged) {
+      this.lastCopilotConfigHash = currentCopilotConfigHash
+      this.copilotFetchGeneration += 1
+    }
+    const copilotGeneration = this.copilotFetchGeneration
+
     // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
     this.updateState({
       ...previousState,
@@ -121,6 +156,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       minimax: miniMaxConfigChanged
         ? this.withFetchingStatus(null, 'minimax')
         : this.withFetchingStatus(previousState.minimax, 'minimax'),
+      copilot: copilotConfigChanged
+        ? this.withFetchingStatus(null, 'copilot')
+        : this.withFetchingStatus(previousState.copilot, 'copilot'),
       grok: this.withFetchingStatus(previousState.grok, 'grok')
     })
 
@@ -138,42 +176,52 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const claudeFetchGated =
       !options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude)
 
-    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
-      await Promise.allSettled([
-        claudeFetchGated
-          ? Promise.resolve(previousState.claude as ProviderRateLimits)
-          : fetchClaudeRateLimits({
-              authPreparation: claudeAuthPreparation,
-              allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-              allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-              networkProxySettings: this.networkProxySettingsResolver?.(),
-              signal
-            }),
-        codexFetchGated
-          ? Promise.resolve(previousState.codex as ProviderRateLimits)
-          : (missingWslCodexHome ??
-            fetchCodexRateLimits({
-              codexHomePath,
-              allowPtyFallback: this.shouldAllowCodexPtyFallback(),
-              signal
-            })),
-        fetchGeminiRateLimits(geminiCliOAuthEnabled),
-        fetchOpenCodeGoRateLimits(
-          cookie,
-          workspaceIdOverride || undefined,
-          this.networkProxySettingsResolver?.()
-        ),
-        this.fetchKimiWithResolvedHome(),
-        miniMaxConfigResult.error
-          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-          : fetchMiniMaxRateLimits({
-              cookie: miniMaxCookie,
-              groupId: miniMaxGroupId,
-              models: miniMaxModels,
-              endpointMode: miniMaxEndpoint,
-              apiKey: miniMaxApiKey
-            })
-      ])
+    const [
+      claudeResult,
+      codexResult,
+      geminiResult,
+      opencodeGoResult,
+      kimiResult,
+      miniMaxResult,
+      copilotResult
+    ] = await Promise.allSettled([
+      claudeFetchGated
+        ? Promise.resolve(previousState.claude as ProviderRateLimits)
+        : fetchClaudeRateLimits({
+            authPreparation: claudeAuthPreparation,
+            allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
+            allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+            networkProxySettings: this.networkProxySettingsResolver?.(),
+            signal
+          }),
+      codexFetchGated
+        ? Promise.resolve(previousState.codex as ProviderRateLimits)
+        : (missingWslCodexHome ??
+          fetchCodexRateLimits({
+            codexHomePath,
+            allowPtyFallback: this.shouldAllowCodexPtyFallback(),
+            signal
+          })),
+      fetchGeminiRateLimits(geminiCliOAuthEnabled),
+      fetchOpenCodeGoRateLimits(
+        cookie,
+        workspaceIdOverride || undefined,
+        this.networkProxySettingsResolver?.()
+      ),
+      this.fetchKimiWithResolvedHome(),
+      miniMaxConfigResult.error
+        ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+        : fetchMiniMaxRateLimits({
+            cookie: miniMaxCookie,
+            groupId: miniMaxGroupId,
+            models: miniMaxModels,
+            endpointMode: miniMaxEndpoint,
+            apiKey: miniMaxApiKey
+          }),
+      copilotConfigResult.error
+        ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
+        : fetchCopilotRateLimits({ token: copilotToken, enterpriseSlug: copilotEnterpriseSlug })
+    ])
 
     if (signal.aborted) {
       return null
@@ -193,6 +241,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       opencodeGeneration,
       miniMaxConfigChanged,
       miniMaxGeneration,
+      copilotConfigChanged,
+      copilotGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -200,7 +250,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult
+        miniMaxResult,
+        copilotResult
       ],
       grokResultPromise
     }

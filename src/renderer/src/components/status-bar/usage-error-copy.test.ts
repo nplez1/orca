@@ -15,6 +15,10 @@ describe('getProviderDisplayName', () => {
     expect(getProviderDisplayName('minimax')).toBe('MiniMax')
   })
 
+  it('returns the GitHub Copilot brand name', () => {
+    expect(getProviderDisplayName('copilot')).toBe('GitHub Copilot')
+  })
+
   it('returns the existing provider brand names', () => {
     expect(getProviderDisplayName('claude')).toBe('Claude')
     expect(getProviderDisplayName('codex')).toBe('Codex')
