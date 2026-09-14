@@ -4,6 +4,7 @@ import { hasMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
 import { hasDeepSeekApiKey } from '../../deepseek/deepseek-api-key-store'
 import { hasFireworksCredentials } from '../../fireworks/fireworks-credentials-store'
 import { hasCopilotCredentials } from '../../copilot-credentials/copilot-credentials-store'
+import { getCachedCopilotGhCredentials } from '../copilot/copilot-gh-credentials'
 import { RateLimitServiceAccountRefresh } from './service-account-refresh'
 import {
   type CodexAccountSelectionTarget,
@@ -146,7 +147,8 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
       // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
       deepseekApiKeyConfigured: hasDeepSeekApiKey(),
       fireworksApiKeyConfigured: hasFireworksCredentials(),
-      copilotTokenConfigured: hasCopilotCredentials(),
+      copilotTokenConfigured:
+        hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
       grokAuthConfigured: this.grokAuthConfigured,
       claudeTarget: this.claudeFetchTarget,
       codexTarget: this.codexFetchTarget,

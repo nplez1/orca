@@ -198,11 +198,16 @@ describe('AccountsPane', () => {
     expect(markup).toContain('id="copilot-enterprise-slug" placeholder="your-enterprise"')
     expect(markup).toContain('Enterprise slug')
     expect(markup).toContain('The slug is the &lt;slug&gt; in github.com/enterprises/')
-    // The gh CLI token Orca otherwise uses cannot read the enterprise billing endpoints.
+    // Orca reads the gh sign-in itself, so the token is an override; the only
+    // real blocker is a gh sign-in without the enterprise billing scopes.
+    expect(markup).toContain('Orca prefers your GitHub CLI sign-in')
+    expect(markup).toContain('read:enterprise and manage_billing:enterprise scopes')
+    expect(markup).toContain('Paste a token only for accounts that sign-in cannot serve')
     expect(markup).toContain('The token needs the “Enterprise billing” read permission')
-    expect(markup).toContain('cannot read these billing endpoints')
-    // Nothing is stored in this render, so the section offers Save and hides the
-    // Forget control (which the slug help copy still names).
+    expect(markup).not.toContain('cannot read these billing endpoints')
+    // Nothing is stored in this render, so the section offers Save and hides both
+    // the Forget control and the GitHub CLI setup hint (the mount-time status read
+    // never runs under SSR).
     expect(markup).toContain('Not saved')
     expect(markup).toContain('Credentials not set')
     expect(markup).not.toMatch(/<button[^>]*>Forget token/)

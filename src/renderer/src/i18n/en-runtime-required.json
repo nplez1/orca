@@ -92,7 +92,13 @@
         "setupHostExistingFolderPlaceholder": "/path/to/project/on/host",
         "setupHostExistingFolderTitle": "Set up {{value0}}",
         "setupKindFolder": "Folder",
-        "setupKindGit": "Git repo"
+        "setupKindGit": "Git repo",
+        "test": {
+          "fixture": {
+            "2e2c474573": "Local Mac",
+            "95a5e6b3bb": "Devbox"
+          }
+        }
       },
       "PullRequestPage": {
         "3450247584": "Comment",
@@ -195,7 +201,12 @@
         "ActivityPrototypePage": {
           "770d458144": "Group by",
           "a472a14700": "More options",
-          "beb2c19173": "Unread"
+          "beb2c19173": "Unread",
+          "test": {
+            "fixtures": {
+              "43a827f6a7": "Claude"
+            }
+          }
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} hidden"
@@ -285,6 +296,19 @@
         "HermesCronOutputView": {
           "88d48157fc": "default"
         },
+        "automations": {
+          "page": {
+            "fixtures": {
+              "104f70edd9": "Hermes",
+              "c1e6f01a35": "Nightly #1"
+            },
+            "test": {
+              "harness": {
+                "90edd9c380": "Refresh automations"
+              }
+            }
+          }
+        },
         "createDestination": {
           "stale": "{host} changed while this form was open. Choose it again before saving.",
           "unavailable": "That host cannot hold a new automation yet. Choose another host to create this one on."
@@ -323,6 +347,23 @@
           },
           "BrowserToolbarMenu": {
             "6aa42813e4": "Imported {{value0}} cookies from {{value1}}{{value2}}."
+          },
+          "stream": {
+            "remote": {
+              "remote": {
+                "browser": {
+                  "stream": {
+                    "lifecycle": {
+                      "test": {
+                        "harness": {
+                          "471387f8f8": "Example"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -505,6 +546,17 @@
           },
           "FloatingTerminalWindowControls": {
             "1e502f1284": "Open"
+          },
+          "floating": {
+            "terminal": {
+              "panel": {
+                "test": {
+                  "fixtures": {
+                    "00cde6717e": "Mobile Emulator"
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -633,6 +685,34 @@
         "slides": {
           "WorktreeListSlide": {
             "c5ad56786d": "spinner"
+          }
+        }
+      },
+      "native": {
+        "chat": {
+          "NativeChatStructuredSession": {
+            "test": {
+              "harness": {
+                "8a29ec95fe": "Model",
+                "a236d7b879": "GPT Live"
+              }
+            }
+          },
+          "native": {
+            "chat": {
+              "structured": {
+                "question": {
+                  "test": {
+                    "fixtures": {
+                      "0de196d6c4": "Mobile",
+                      "49a161ae99": "Web",
+                      "b1fb14581e": "Vue",
+                      "fb81060d8f": "React"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -1528,6 +1608,16 @@
           "7c3bb36706": "remove",
           "e2b0ee267f": "stale"
         },
+        "accounts": {
+          "pane": {
+            "copilot": {
+              "section": {
+                "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month."
+              }
+            }
+          }
+        },
         "agent-awake-copy": {
           "95d3031db2": "Keeps this computer and display awake while agents are working. Lid-close behavior follows this device's power settings.",
           "a42f6fbdd8": "Keeps this computer and display awake while agents are working. Orca also asks this device to stay awake when the lid is closed, subject to its power policy.",
@@ -1586,6 +1676,16 @@
             "f2932bf22b": "detected",
             "f412abbba5": "claude",
             "ff8de8a2ad": "display"
+          }
+        },
+        "appearance": {
+          "search": {
+            "0b03f507c2": "언어",
+            "2fbe0c981b": "Langue",
+            "3a0e3a9fdc": "Idioma",
+            "5f4779d525": "言語",
+            "ab96f8a4b9": "語言",
+            "b6035a3def": "语言"
           }
         },
         "artifacts": {
@@ -1744,6 +1844,22 @@
           }
         },
         "terminal": {
+          "advanced": {
+            "platform": {
+              "search": {
+                "77faf8be39": "Ghostty",
+                "7d383cc610": "ghostty"
+              }
+            }
+          },
+          "pane": {
+            "appearance": {
+              "search": {
+                "1f4decdd74": "ghostty",
+                "e0cc1b7b47": "Ghostty"
+              }
+            }
+          },
           "windows": {
             "search": {
               "02c772582a": "linux",
@@ -1975,6 +2091,15 @@
                 "cea24c2b7d_other": "{{count}} workspaces removed",
                 "d42f1f14e0_one": "Retry {{count}} Branch",
                 "d42f1f14e0_other": "Retry {{count}} Branches"
+              }
+            }
+          }
+        },
+        "worktree": {
+          "card": {
+            "meta": {
+              "row": {
+                "5c970dfb3b": "sidebar"
               }
             }
           }
@@ -2444,6 +2569,19 @@
             "connectButton": "Connect",
             "connectingButton": "Connecting..."
           },
+          "remote": {
+            "runtime": {
+              "pty": {
+                "transport": {
+                  "test": {
+                    "harness": {
+                      "34e5ecd501": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "terminal": {
             "drop": {
               "handler": {
@@ -2535,6 +2673,19 @@
       }
     },
     "hooks": {
+      "ipc": {
+        "events": {
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {
+                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
+                }
+              }
+            }
+          }
+        }
+      },
       "useIpcEvents": {
         "60428567b4": "Local terminal reveal is unavailable while a remote runtime is active",
         "f6300deb8b": "New Browser Tab"
@@ -2545,11 +2696,41 @@
       }
     },
     "lib": {
+      "agent": {
+        "background": {
+          "session": {
+            "test": {
+              "state": {
+                "d9fa6e0979": "Terminal 1"
+              }
+            }
+          }
+        },
+        "hibernation": {
+          "coordinator": {
+            "test": {
+              "fixture": {
+                "4499e360c7": "Agent"
+              }
+            }
+          }
+        }
+      },
       "browser": {
         "cookie": {
           "import": {
             "toast": {
               "googleCookiesSkipped": "Google cookies were not imported. Open a browser in Orca on {{value0}} with this profile, then sign into Google."
+            }
+          }
+        }
+      },
+      "cmd": {
+        "j": {
+          "evaluation": {
+            "fixture": {
+              "6347cd6e36": "Reconnect drops after host sleep",
+              "699e9ef186": "Rank palette results by evidence"
             }
           }
         }
@@ -2575,12 +2756,49 @@
       }
     },
     "runtime": {
+      "fixtures": {
+        "web": {
+          "session": {
+            "terminal": {
+              "orphan": {
+                "recovery": {
+                  "regression": {
+                    "fixtures": {
+                      "f1eb7ee8e3": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "githubCheckDetailsTimeout": {
         "timedOut": "Timed out loading check details."
+      },
+      "host": {
+        "session": {
+          "mirror": {
+            "frame": {
+              "fixtures": {
+                "17e758e12c": "Codex"
+              }
+            }
+          }
+        }
       }
     },
     "store": {
       "slices": {
+        "github": {
+          "slice": {
+            "test": {
+              "harness": {
+                "28fd2d1802": "Test PR"
+              }
+            }
+          }
+        },
         "settings": {
           "faa8fb83dd": "Save or close unsaved editor tabs before switching servers."
         },
@@ -2593,7 +2811,27 @@
           "889487d8bb": "Dismiss",
           "d1d78a7baa": "Git could not safely delete branch \"{{value0}}\"{{value1}}, so Orca kept it to avoid losing local commits.",
           "f4503ca505": "Open Settings > Git and try again.",
-          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits."
+          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits.",
+          "slice": {
+            "test": {
+              "fixtures": {
+                "e851268bd6": "Terminal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "web": {
+      "web": {
+        "preload": {
+          "api": {
+            "test": {
+              "harness": {
+                "225db77b97": "WebSocket"
+              }
+            }
+          }
         }
       }
     }
