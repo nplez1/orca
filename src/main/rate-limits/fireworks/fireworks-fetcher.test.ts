@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const netFetchMock = vi.hoisted(() => vi.fn())
+const balanceMock = vi.hoisted(() => vi.fn())
 
 // Why: net.fetch on the default session is what the proxy guard covers, so the
 // mock only needs that one surface.
 vi.mock('electron', () => ({ net: { fetch: netFetchMock } }))
+
+// Why: the balance readout goes over node:http2 to the control-plane gateway, which
+// the net.fetch mock cannot intercept — without this the suite would dial the real
+// gateway on every case.
+vi.mock('./fireworks-balance-client', () => ({ fetchFireworksBalance: balanceMock }))
 
 import { fetchFireworksRateLimits } from './fireworks-fetcher'
 
@@ -44,6 +50,9 @@ describe('fetchFireworksRateLimits', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(FROZEN_NOW))
     netFetchMock.mockReset()
+    balanceMock.mockReset()
+    // Default: the internal gateway is unavailable, so the readout is spend-only.
+    balanceMock.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -125,6 +134,55 @@ describe('fetchFireworksRateLimits', () => {
     })
     expect(netFetchMock).toHaveBeenCalledTimes(1)
     expect(callUrl(0).pathname).toBe('/v1/accounts/acct-manual/billing/summary')
+  })
+
+  it('leads with the gateway credit balance and keeps the month spend as the breakdown', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(accountsResponse({ name: 'accounts/acct-bal' }))
+      .mockResolvedValueOnce(jsonResponse({ lineItems: [lineItem('0', 370_000_000)] }))
+    balanceMock.mockResolvedValue({ currencyCode: 'USD', units: '20', nanos: 634_637_210 })
+
+    const result = await fetchFireworksRateLimits({ apiKey: 'fw-key-balance-headline' })
+
+    expect(result.status).toBe('ok')
+    expect(result.credits).toEqual({
+      kind: 'balance',
+      amount: { currencyCode: 'USD', units: '20', nanos: 634_637_210 },
+      items: [
+        { key: 'spent-this-month', amount: { currencyCode: 'USD', units: '0', nanos: 370_000_000 } }
+      ]
+    })
+  })
+
+  it('falls back to the spend headline when the gateway balance is unavailable', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(accountsResponse({ name: 'accounts/acct-fallback' }))
+      .mockResolvedValueOnce(jsonResponse({ lineItems: [lineItem('2', 500_000_000)] }))
+    balanceMock.mockResolvedValue(null)
+
+    const result = await fetchFireworksRateLimits({ apiKey: 'fw-key-spend-fallback' })
+
+    expect(result.status).toBe('ok')
+    expect(result.credits).toEqual({
+      kind: 'spend',
+      amount: { currencyCode: 'USD', units: '2', nanos: 500_000_000 },
+      period: 'current-month'
+    })
+  })
+
+  it('still reports spend when the balance lookup throws', async () => {
+    // Why: the balance comes from an internal API with no contract, so a broken
+    // client must degrade the readout rather than fail the whole provider.
+    netFetchMock
+      .mockResolvedValueOnce(accountsResponse({ name: 'accounts/acct-throw' }))
+      .mockResolvedValueOnce(jsonResponse({ lineItems: [lineItem('1', 0)] }))
+    balanceMock.mockRejectedValue(new Error('gateway exploded'))
+
+    const result = await fetchFireworksRateLimits({ apiKey: 'fw-key-balance-throw' })
+
+    expect(result.status).toBe('ok')
+    expect(result.credits?.kind).toBe('spend')
+    expect(result.credits?.amount).toEqual({ currencyCode: 'USD', units: '1', nanos: 0 })
   })
 
   it('treats a blank accountIdOverride as absent and still discovers', async () => {

@@ -62,6 +62,12 @@ export function formatCreditsItemLabel(key: ProviderCreditsItemKey): string {
   if (key === 'topped-up') {
     return translate('auto.components.status.bar.providerCredits.item.toppedUp', 'Topped up')
   }
+  if (key === 'spent-this-month') {
+    return translate(
+      'auto.components.status.bar.providerCredits.item.spentThisMonth',
+      'Spent this month'
+    )
+  }
   // Why: an unknown token from a newer main must not render as a blank row.
   return key
 }
