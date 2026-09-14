@@ -1,15 +1,17 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
+import type { CopilotCredentialSource } from './accounts-pane-types'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 
 type CopilotCredentialActionContext = {
   copilotTokenDraft: string
-  copilotConfigured: boolean
+  copilotCredentialSource: CopilotCredentialSource
   setCopilotTokenDraft: Dispatch<SetStateAction<string>>
   copilotEnterpriseSlugDraft: string
   setCopilotEnterpriseSlugDraft: Dispatch<SetStateAction<string>>
-  setCopilotConfigured: Dispatch<SetStateAction<boolean>>
+  setCopilotCredentialSource: Dispatch<SetStateAction<CopilotCredentialSource>>
+  setCopilotGhSetupHint: Dispatch<SetStateAction<string | null>>
   setCopilotCredentialBusy: Dispatch<SetStateAction<boolean>>
   recordFeatureInteraction: (featureId: FeatureInteractionId) => void
 }
@@ -20,20 +22,22 @@ export function createCopilotCredentialActions(context: CopilotCredentialActionC
 } {
   const {
     copilotTokenDraft,
-    copilotConfigured,
+    copilotCredentialSource,
     setCopilotTokenDraft,
     copilotEnterpriseSlugDraft,
     setCopilotEnterpriseSlugDraft,
-    setCopilotConfigured,
+    setCopilotCredentialSource,
+    setCopilotGhSetupHint,
     setCopilotCredentialBusy,
     recordFeatureInteraction
   } = context
 
   const saveCopilotCredentials = async (): Promise<void> => {
     const token = copilotTokenDraft.trim()
-    // Why: a blank token is only an error when there is nothing stored to keep —
-    // otherwise it is how the enterprise slug gets edited on its own.
-    if (!token && !copilotConfigured) {
+    // Why: a blank token is only an error when there is no stored token to keep —
+    // otherwise it is how the enterprise slug gets edited on its own. A credential
+    // sourced from the GitHub CLI is not a stored one, so main cannot keep it.
+    if (!token && copilotCredentialSource !== 'stored') {
       toast.error(
         translate(
           'auto.components.settings.accounts.pane.copilot.actions.70efb28dee',
@@ -52,7 +56,8 @@ export function createCopilotCredentialActions(context: CopilotCredentialActionC
       if (!status.configured) {
         throw new Error('GitHub Copilot credentials were not saved.')
       }
-      setCopilotConfigured(status.configured)
+      setCopilotCredentialSource(status.source)
+      setCopilotGhSetupHint(status.ghSetupHint)
       setCopilotTokenDraft('')
       // Why: echo main's normalized slug (trimmed) back into the field.
       setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
@@ -82,9 +87,12 @@ export function createCopilotCredentialActions(context: CopilotCredentialActionC
     setCopilotCredentialBusy(true)
     try {
       const status = await window.api.copilotCredentials.clear()
-      setCopilotConfigured(status.configured)
+      setCopilotCredentialSource(status.source)
+      setCopilotGhSetupHint(status.ghSetupHint)
       setCopilotTokenDraft('')
-      setCopilotEnterpriseSlugDraft('')
+      // Why: forgetting the pasted token can leave the GitHub CLI supplying the
+      // slug, so echo main's answer instead of blanking the field outright.
+      setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
       recordFeatureInteraction('usage-tracking')
     } catch (error) {
       toast.error(
