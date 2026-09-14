@@ -96,6 +96,17 @@ export type FireworksCredentialsApi = {
   clear: () => Promise<{ apiKeyConfigured: boolean }>
 }
 
+export type CopilotCredentialsApi = {
+  // Why: the token and the enterprise slug share one encrypted file, so a single
+  // status call seeds the slug field; the token itself never reaches the renderer.
+  getStatus: () => Promise<{ configured: boolean; enterpriseSlug: string | null }>
+  save: (
+    token: string,
+    enterpriseSlug: string
+  ) => Promise<{ configured: boolean; enterpriseSlug: string | null }>
+  clear: () => Promise<{ configured: boolean; enterpriseSlug: string | null }>
+}
+
 export type CodexConfigSyncApi = {
   status: () => Promise<CodexConfigSyncStatus>
 }

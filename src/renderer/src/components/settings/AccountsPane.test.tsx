@@ -182,4 +182,30 @@ describe('AccountsPane', () => {
     expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-deepseek'))
     expect(markup.indexOf('accounts-deepseek')).toBeLessThan(markup.indexOf('accounts-fireworks'))
   })
+
+  it('renders the GitHub Copilot token and enterprise slug form', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    // The status-bar usage readout links straight to this id.
+    expect(markup).toContain('id="accounts-copilot"')
+    expect(markup).toContain('GitHub Copilot')
+    // Why: the renderer only ever learns whether a token is stored, so the token
+    // field must stay masked and must never be seeded with a stored value.
+    expect(markup).toMatch(/type="password"[^>]*id="copilot-token"/)
+    expect(markup).toContain(
+      'id="copilot-token" placeholder="Paste your GitHub token" spellCheck="false" value=""'
+    )
+    expect(markup).toContain('id="copilot-enterprise-slug" placeholder="your-enterprise"')
+    expect(markup).toContain('Enterprise slug')
+    expect(markup).toContain('The slug is the &lt;slug&gt; in github.com/enterprises/')
+    // The gh CLI token Orca otherwise uses cannot read the enterprise billing endpoints.
+    expect(markup).toContain('The token needs the “Enterprise billing” read permission')
+    expect(markup).toContain('cannot read these billing endpoints')
+    // Nothing is stored in this render, so the section offers Save and hides the
+    // Forget control (which the slug help copy still names).
+    expect(markup).toContain('Not saved')
+    expect(markup).toContain('Credentials not set')
+    expect(markup).not.toMatch(/<button[^>]*>Forget token/)
+    expect(markup.indexOf('accounts-fireworks')).toBeLessThan(markup.indexOf('accounts-copilot'))
+  })
 })

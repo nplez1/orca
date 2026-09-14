@@ -26,7 +26,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
 
   // Why: an unreadable API-key file must surface as that provider's own error rather than aborting every other provider's refresh.
   protected getApiKeyCredentialError(
-    provider: 'deepseek' | 'fireworks',
+    provider: 'deepseek' | 'fireworks' | 'copilot',
     message: string
   ): ProviderRateLimits {
     return {

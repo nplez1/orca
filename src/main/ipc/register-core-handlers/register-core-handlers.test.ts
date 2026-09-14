@@ -39,6 +39,7 @@ const {
   registerMiniMaxCredentialsHandlersMock,
   registerDeepSeekCredentialsHandlersMock,
   registerFireworksCredentialsHandlersMock,
+  registerCopilotCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
   registerClipboardHandlersMock,
   setTrustedClipboardRendererWebContentsIdMock,
@@ -108,6 +109,7 @@ const {
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
   registerDeepSeekCredentialsHandlersMock: vi.fn(),
   registerFireworksCredentialsHandlersMock: vi.fn(),
+  registerCopilotCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
   setTrustedClipboardRendererWebContentsIdMock: vi.fn(),
@@ -351,6 +353,10 @@ vi.mock('../fireworks-credentials', () => ({
   registerFireworksCredentialsHandlers: registerFireworksCredentialsHandlersMock
 }))
 
+vi.mock('../copilot-credentials', () => ({
+  registerCopilotCredentialsHandlers: registerCopilotCredentialsHandlersMock
+}))
+
 vi.mock('../grok-accounts', () => ({
   registerGrokAccountHandlers: registerGrokAccountHandlersMock
 }))
@@ -448,6 +454,7 @@ describe('registerCoreHandlers', () => {
     registerMiniMaxCredentialsHandlersMock.mockReset()
     registerDeepSeekCredentialsHandlersMock.mockReset()
     registerFireworksCredentialsHandlersMock.mockReset()
+    registerCopilotCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
     setTrustedClipboardRendererWebContentsIdMock.mockReset()
     registerUpdaterHandlersMock.mockReset()
@@ -538,6 +545,7 @@ describe('registerCoreHandlers', () => {
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerDeepSeekCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerFireworksCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
+    expect(registerCopilotCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)
     expect(registerGitHubHandlersMock).toHaveBeenCalledWith(store, stats)
