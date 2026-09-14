@@ -26,6 +26,8 @@ export type UsageProviderSettings = Pick<
   // main derives these booleans each poll and the renderer never sees the key.
   deepseekApiKeyConfigured: boolean
   fireworksApiKeyConfigured: boolean
+  // Why: the Copilot token and enterprise slug also live outside GlobalSettings.
+  copilotTokenConfigured: boolean
 }
 
 type UsageProviderSnapshots = {
@@ -39,6 +41,7 @@ type UsageProviderSnapshots = {
   grok: ProviderRateLimits | null | undefined
   deepseek: ProviderRateLimits | null | undefined
   fireworks: ProviderRateLimits | null | undefined
+  copilot: ProviderRateLimits | null | undefined
 }
 
 type UsageProviderId = ProviderRateLimits['provider']
@@ -99,7 +102,8 @@ export function hasUsageProviderSettings(
     settings?.minimaxApiKeyConfigured === true ||
     settings?.grokAuthConfigured === true ||
     settings?.deepseekApiKeyConfigured === true ||
-    settings?.fireworksApiKeyConfigured === true
+    settings?.fireworksApiKeyConfigured === true ||
+    settings?.copilotTokenConfigured === true
   )
 }
 
@@ -143,6 +147,9 @@ export function hasUsageProviderSettingsForProvider(
   if (providerId === 'fireworks') {
     return settings.fireworksApiKeyConfigured === true
   }
+  if (providerId === 'copilot') {
+    return settings.copilotTokenConfigured === true
+  }
   return false
 }
 
@@ -155,6 +162,8 @@ function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRat
     ...(providerId === 'gemini' ? { buckets: [] } : {}),
     // Why: DeepSeek/Fireworks have no windows; their readout is the credits field.
     ...(providerId === 'deepseek' || providerId === 'fireworks' ? { credits: null } : {}),
+    // Why: Copilot reports a monthly allowance rather than a quota window.
+    ...(providerId === 'copilot' ? { monthly: null, allowance: null } : {}),
     updatedAt: 0,
     error: null,
     status: 'fetching'
@@ -200,7 +209,8 @@ export function isUsageEmptyState(
     isProviderSnapshotPending(providers.minimax) ||
     isProviderSnapshotPending(providers.grok) ||
     isProviderSnapshotPending(providers.deepseek) ||
-    isProviderSnapshotPending(providers.fireworks)
+    isProviderSnapshotPending(providers.fireworks) ||
+    isProviderSnapshotPending(providers.copilot)
   ) {
     return false
   }
@@ -215,6 +225,7 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.minimax) &&
     !isProviderConfigured(providers.grok) &&
     !isProviderConfigured(providers.deepseek) &&
-    !isProviderConfigured(providers.fireworks)
+    !isProviderConfigured(providers.fireworks) &&
+    !isProviderConfigured(providers.copilot)
   )
 }

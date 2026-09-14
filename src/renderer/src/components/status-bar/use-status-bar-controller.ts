@@ -109,7 +109,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     minimax,
     grok,
     deepseek,
-    fireworks
+    fireworks,
+    copilot
   } = rateLimits
 
   // Why: a bar is earned by a live snapshot or durable Settings setup; detection-gating hides per-CLI bars when the agent isn't on PATH.
@@ -127,7 +128,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     opencodeGoApiKeyConfigured: rateLimits.opencodeGoApiKeyConfigured,
     grokAuthConfigured: rateLimits.grokAuthConfigured,
     deepseekApiKeyConfigured: rateLimits.deepseekApiKeyConfigured,
-    fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured
+    fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured,
+    copilotTokenConfigured: rateLimits.copilotTokenConfigured
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
@@ -162,8 +164,11 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   // PATH detection gate would hide them forever.
   const visibleDeepSeek = getVisibleUsageProvider('deepseek', deepseek, usageSettings)
   const visibleFireworks = getVisibleUsageProvider('fireworks', fireworks, usageSettings)
+  // Why: Copilot is a token provider too — no CLI on PATH, so no detection gate.
+  const visibleCopilot = getVisibleUsageProvider('copilot', copilot, usageSettings)
   const showDeepSeek = visibleDeepSeek !== null && statusBarItems.includes('deepseek')
   const showFireworks = visibleFireworks !== null && statusBarItems.includes('fireworks')
+  const showCopilot = visibleCopilot !== null && statusBarItems.includes('copilot')
   const showGrok =
     visibleGrok !== null &&
     statusBarItems.includes('grok') &&
@@ -187,11 +192,24 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showMiniMax ||
     showGrok ||
     showDeepSeek ||
-    showFireworks
+    showFireworks ||
+    showCopilot
   const anyVisible = hasVisibleUsageMeters || showResourceUsage
   // Why: include Settings so durable managed accounts count — a configured user isn't shown the empty state while snapshots hydrate.
   const isEmptyUsageState = isUsageEmptyState(
-    { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, deepseek, fireworks },
+    {
+      claude,
+      codex,
+      gemini,
+      opencodeGo,
+      kimi,
+      antigravity,
+      minimax,
+      grok,
+      deepseek,
+      fireworks,
+      copilot
+    },
     usageSettings
   )
   // Why: one-time nudge — once dismissed, stays hidden even if providers reconnect later.
@@ -206,7 +224,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     minimax?.status === 'fetching' ||
     grok?.status === 'fetching' ||
     deepseek?.status === 'fetching' ||
-    fireworks?.status === 'fetching'
+    fireworks?.status === 'fetching' ||
+    copilot?.status === 'fetching'
 
   const compact = containerWidth < 900
   const iconOnly = containerWidth < 500
@@ -227,7 +246,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showMiniMax ? visibleMiniMax : null,
     showGrok ? visibleGrok : null,
     showDeepSeek ? visibleDeepSeek : null,
-    showFireworks ? visibleFireworks : null
+    showFireworks ? visibleFireworks : null,
+    showCopilot ? visibleCopilot : null
   ].filter((p): p is ProviderRateLimits => p !== null)
 
   const handleManageAccounts = (): void => {

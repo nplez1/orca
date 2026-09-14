@@ -2,6 +2,7 @@ import { fetchClaudeRateLimits } from '../claude-fetcher'
 import { fetchCodexRateLimits } from '../codex-fetcher'
 import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from '../fireworks/fireworks-fetcher'
+import { fetchCopilotRateLimits } from '../copilot/copilot-fetcher'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -36,8 +37,11 @@ export type FetchAllCyclePrepared = {
   deepSeekGeneration: number
   fireworksConfigChanged: boolean
   fireworksGeneration: number
+  copilotConfigChanged: boolean
+  copilotGeneration: number
   claudeFetchGated: boolean
   results: [
+    PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
@@ -97,6 +101,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const fireworksConfigResult = this.resolveFireworksConfig()
     const fireworksApiKey = fireworksConfigResult.config.apiKey
     const fireworksAccountIdOverride = fireworksConfigResult.config.accountIdOverride
+    const copilotConfigResult = this.resolveCopilotConfig()
+    const copilotToken = copilotConfigResult.config.token
+    const copilotEnterpriseSlug = copilotConfigResult.config.enterpriseSlug
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -139,6 +146,14 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const fireworksGeneration = this.fireworksFetchGeneration
 
+    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotConfigResult.error ?? ''}`
+    const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
+    if (copilotConfigChanged) {
+      this.lastCopilotConfigHash = currentCopilotConfigHash
+      this.copilotFetchGeneration += 1
+    }
+    const copilotGeneration = this.copilotFetchGeneration
+
     // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
     this.updateState({
       ...previousState,
@@ -162,6 +177,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       fireworks: fireworksConfigChanged
         ? this.withFetchingStatus(null, 'fireworks')
         : this.withFetchingStatus(previousState.fireworks, 'fireworks'),
+      copilot: copilotConfigChanged
+        ? this.withFetchingStatus(null, 'copilot')
+        : this.withFetchingStatus(previousState.copilot, 'copilot'),
       grok: this.withFetchingStatus(previousState.grok, 'grok')
     })
 
@@ -187,7 +205,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       kimiResult,
       miniMaxResult,
       deepSeekResult,
-      fireworksResult
+      fireworksResult,
+      copilotResult
     ] = await Promise.allSettled([
       claudeFetchGated
         ? Promise.resolve(previousState.claude as ProviderRateLimits)
@@ -237,7 +256,10 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         : fetchFireworksRateLimits({
             apiKey: fireworksApiKey,
             accountIdOverride: fireworksAccountIdOverride
-          })
+          }),
+      copilotConfigResult.error
+        ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
+        : fetchCopilotRateLimits({ token: copilotToken, enterpriseSlug: copilotEnterpriseSlug })
     ])
 
     if (signal.aborted) {
@@ -262,6 +284,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       deepSeekGeneration,
       fireworksConfigChanged,
       fireworksGeneration,
+      copilotConfigChanged,
+      copilotGeneration,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -271,7 +295,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         kimiResult,
         miniMaxResult,
         deepSeekResult,
-        fireworksResult
+        fireworksResult,
+        copilotResult
       ],
       grokResultPromise
     }

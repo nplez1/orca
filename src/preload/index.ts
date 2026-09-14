@@ -79,6 +79,7 @@ import { rateLimitsApi } from './api/rate-limits-bridge'
 import { minimaxCredentialsApi } from './api/minimax-credentials-bridge'
 import { deepseekCredentialsApi } from './api/deepseek-credentials-bridge'
 import { fireworksCredentialsApi } from './api/fireworks-credentials-bridge'
+import { copilotCredentialsApi } from './api/copilot-credentials-bridge'
 import { grokAccountsApi } from './api/grok-accounts-bridge'
 import { sshApi } from './api/ssh-bridge'
 import { automationsApi } from './api/automations-bridge'
@@ -180,6 +181,7 @@ const api = {
   minimaxCredentials: minimaxCredentialsApi,
   deepseekCredentials: deepseekCredentialsApi,
   fireworksCredentials: fireworksCredentialsApi,
+  copilotCredentials: copilotCredentialsApi,
   grokAccounts: grokAccountsApi,
   ssh: sshApi,
   automations: automationsApi,

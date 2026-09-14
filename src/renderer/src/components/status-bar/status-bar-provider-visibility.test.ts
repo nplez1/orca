@@ -79,6 +79,7 @@ function usageSettings(overrides: Partial<UsageProviderSettings> = {}): UsagePro
     grokAuthConfigured: false,
     deepseekApiKeyConfigured: false,
     fireworksApiKeyConfigured: false,
+    copilotTokenConfigured: false,
     ...overrides
   }
 }
@@ -146,6 +147,7 @@ describe('hasUsageProviderSettings', () => {
     expect(hasUsageProviderSettings(usageSettings({ grokAuthConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ deepseekApiKeyConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ fireworksApiKeyConfigured: true }))).toBe(true)
+    expect(hasUsageProviderSettings(usageSettings({ copilotTokenConfigured: true }))).toBe(true)
   })
 
   it('does not treat empty or unloaded settings as configured', () => {
@@ -255,6 +257,13 @@ describe('hasUsageProviderSettingsForProvider', () => {
     ).toBe(true)
     expect(hasUsageProviderSettingsForProvider('deepseek', usageSettings())).toBe(false)
     expect(hasUsageProviderSettingsForProvider('fireworks', usageSettings())).toBe(false)
+    expect(
+      hasUsageProviderSettingsForProvider(
+        'copilot',
+        usageSettings({ copilotTokenConfigured: true })
+      )
+    ).toBe(true)
+    expect(hasUsageProviderSettingsForProvider('copilot', usageSettings())).toBe(false)
     expect(hasUsageProviderSettingsForProvider('deepseek', null)).toBe(false)
   })
 })
@@ -289,6 +298,20 @@ describe('credits-only providers', () => {
     ).toMatchObject({ provider: 'fireworks', status: 'fetching', credits: null })
   })
 
+  it('shows a pending Copilot row from its durable credential flag alone', () => {
+    // Why: Copilot is a token provider with no CLI on PATH, so the stored token is the
+    // only durable signal before its first fetch lands.
+    expect(
+      getVisibleUsageProvider('copilot', null, usageSettings({ copilotTokenConfigured: true }))
+    ).toMatchObject({
+      provider: 'copilot',
+      status: 'fetching',
+      monthly: null,
+      allowance: null
+    })
+    expect(getVisibleUsageProvider('copilot', null, usageSettings())).toBeNull()
+  })
+
   it('does not show the setup CTA when a live credits readout exists', () => {
     expect(
       isUsageEmptyState(
@@ -302,7 +325,8 @@ describe('credits-only providers', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           deepseek: provider('ok', { provider: 'deepseek', credits: deepseekCredits }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
       )
@@ -484,7 +508,8 @@ describe('isUsageEmptyState', () => {
           minimax: undefined,
           grok: undefined,
           deepseek: undefined,
-          fireworks: undefined
+          fireworks: undefined,
+          copilot: undefined
         },
         usageSettings()
       )
@@ -504,7 +529,8 @@ describe('isUsageEmptyState', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
       )
@@ -524,7 +550,8 @@ describe('isUsageEmptyState', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings({
           codexManagedAccounts: [
@@ -559,7 +586,8 @@ describe('isUsageEmptyState', () => {
           minimax: provider('unavailable', { provider: 'minimax' }),
           grok: provider('unavailable', { provider: 'grok' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings()
       )
@@ -579,7 +607,8 @@ describe('isUsageEmptyState', () => {
           grok: provider('unavailable', { provider: 'grok' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings({ antigravityUsageConfigured: true, geminiCliOAuthEnabled: true })
       )
@@ -601,7 +630,8 @@ describe('isUsageEmptyState', () => {
           grok: provider('unavailable', { provider: 'grok' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
           deepseek: provider('unavailable', { provider: 'deepseek' }),
-          fireworks: provider('unavailable', { provider: 'fireworks' })
+          fireworks: provider('unavailable', { provider: 'fireworks' }),
+          copilot: provider('unavailable', { provider: 'copilot' })
         },
         usageSettings({ antigravityUsageConfigured: true })
       )
