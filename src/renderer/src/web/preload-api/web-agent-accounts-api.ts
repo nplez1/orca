@@ -46,6 +46,20 @@ export function createFireworksCredentialsApi(): NonNullable<
   }
 }
 
+export function createCopilotCredentialsApi(): NonNullable<
+  Partial<PreloadApi>['copilotCredentials']
+> {
+  const notConfigured = { configured: false, enterpriseSlug: null }
+  const unsupportedError = new Error(
+    'GitHub Copilot credentials storage is only available in the desktop app.'
+  )
+  return {
+    getStatus: () => Promise.resolve(notConfigured),
+    save: () => Promise.reject(unsupportedError),
+    clear: () => Promise.resolve(notConfigured)
+  }
+}
+
 export function createGrokAccountsApi(): NonNullable<Partial<PreloadApi>['grokAccounts']> {
   const unsigned = {
     signedIn: false,

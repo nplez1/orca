@@ -6,6 +6,7 @@ import {
 import { AgentIcon } from '@/lib/agent-catalog'
 import {
   ClaudeIcon,
+  CopilotIcon,
   DeepSeekIcon,
   FireworksIcon,
   GeminiIcon,
@@ -112,6 +113,9 @@ export function ProviderIcon({ provider }: { provider: string }): React.JSX.Elem
   }
   if (provider === 'fireworks') {
     return <FireworksIcon size={13} />
+  }
+  if (provider === 'copilot') {
+    return <CopilotIcon size={13} />
   }
   return <ClaudeIcon size={13} />
 }
