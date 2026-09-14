@@ -24,6 +24,19 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     }
   }
 
+  // Why: an unreadable API-key file must surface as that provider's own error rather than aborting every other provider's refresh.
+  protected getApiKeyCredentialError(provider: 'fireworks', message: string): ProviderRateLimits {
+    return {
+      provider,
+      session: null,
+      weekly: null,
+      updatedAt: Date.now(),
+      error: message,
+      status: 'error',
+      usageMetadata: { failureKind: 'keychain-unavailable', source: 'web' }
+    }
+  }
+
   // Why: hitting a usage endpoint before its Retry-After expires burns the budget for nothing and keeps the 429 window alive.
   protected isRetryAfterActive(limits: ProviderRateLimits | null): boolean {
     return Boolean(

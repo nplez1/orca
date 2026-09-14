@@ -15,6 +15,10 @@ describe('getProviderDisplayName', () => {
     expect(getProviderDisplayName('minimax')).toBe('MiniMax')
   })
 
+  it('returns the Fireworks.ai brand name', () => {
+    expect(getProviderDisplayName('fireworks')).toBe('Fireworks.ai')
+  })
+
   it('returns the existing provider brand names', () => {
     expect(getProviderDisplayName('claude')).toBe('Claude')
     expect(getProviderDisplayName('codex')).toBe('Codex')

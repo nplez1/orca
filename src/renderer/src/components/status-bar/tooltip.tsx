@@ -4,7 +4,15 @@ import {
   formatResetDuration
 } from '../../../../shared/rate-limit-reset-format'
 import { AgentIcon } from '@/lib/agent-catalog'
-import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import {
+  ClaudeIcon,
+  FireworksIcon,
+  GeminiIcon,
+  MiniMaxIcon,
+  OpenAIIcon,
+  OpenCodeGoIcon
+} from './icons'
+import { creditsItemRows, describeCredits } from './provider-credits-format'
 import { translate } from '@/i18n/i18n'
 import {
   getProviderDisplayName,
@@ -96,6 +104,9 @@ export function ProviderIcon({ provider }: { provider: string }): React.JSX.Elem
   }
   if (provider === 'grok') {
     return <AgentIcon agent="grok" size={13} />
+  }
+  if (provider === 'fireworks') {
+    return <FireworksIcon size={13} />
   }
   return <ClaudeIcon size={13} />
 }
@@ -258,6 +269,8 @@ export function ProviderPanel({
   const textClass = inverted ? 'text-background' : 'text-foreground'
   const mutedClass = inverted ? 'text-background/60' : 'text-muted-foreground'
   const faintClass = inverted ? 'text-background/50' : 'text-muted-foreground/80'
+  // Why: keep the exhausted-balance warning legible on an inverted surface, like the error path above.
+  const warningClass = inverted ? 'text-background/80' : 'text-destructive'
   const dividerClass = inverted ? 'border-background/15' : 'border-border/70'
   const emptyBarClass = inverted ? 'bg-background/20' : 'bg-muted'
 
@@ -285,7 +298,16 @@ export function ProviderPanel({
     )
   }
 
-  if (p.status === 'error' && !p.session && !p.weekly && !p.fableWeekly && !p.monthly) {
+  // Why: an exhausted-balance warning must read as such, so the branch below is
+  // skipped for any provider that still has a cached readout to show.
+  if (
+    p.status === 'error' &&
+    !p.session &&
+    !p.weekly &&
+    !p.fableWeekly &&
+    !p.monthly &&
+    !p.credits
+  ) {
     return (
       <div className={`text-xs ${className ?? 'w-full'}`}>
         <div className={`flex items-center gap-1.5 font-medium ${textClass}`}>
@@ -312,6 +334,12 @@ export function ProviderPanel({
     resetCreditCount != null
       ? formatResetCreditExpiry(p.rateLimitResetCredits?.nextExpiresAt, resetCreditCount)
       : null
+  const credits = p.credits ?? null
+  const creditItems = credits ? creditsItemRows(credits) : []
+  const hasWindowRows = windowSections.some((section) => section.window)
+  // Why: a credits-only provider's readout must survive a refresh failure, or a
+  // stale error drops it instead of marking it stale.
+  const hasCachedData = !!(p.session || p.weekly || p.fableWeekly || p.monthly || credits)
 
   return (
     <div className={`${className ?? 'w-full'} space-y-3 text-xs`}>
@@ -336,9 +364,33 @@ export function ProviderPanel({
           </div>
         ) : null}
         {resetCreditExpiry ? <div className={faintClass}>{resetCreditExpiry}</div> : null}
+        {credits ? (
+          <div data-provider-credits className={`tabular-nums ${mutedClass}`}>
+            {describeCredits(credits)}
+          </div>
+        ) : null}
+        {creditItems.length > 0 ? (
+          <div className={`flex flex-wrap gap-x-2.5 ${faintClass}`}>
+            {creditItems.map((row) => (
+              <span key={row.key} className="tabular-nums">
+                {row.label} {row.amount}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {credits?.available === false ? (
+          // Why: an exhausted-but-configured balance must stay visible and say
+          // why calls fail; status stays 'ok' by design for exactly this case.
+          <div className={`text-[11px] font-medium ${warningClass}`}>
+            {translate(
+              'auto.components.status.bar.tooltip.df60b41813',
+              'Balance cannot fund further calls'
+            )}
+          </div>
+        ) : null}
       </div>
 
-      <div className={`border-t ${dividerClass}`} />
+      {hasWindowRows || p.error ? <div className={`border-t ${dividerClass}`} /> : null}
 
       {windowSections.map((s) => (
         <ProviderRateLimitWindowSection
@@ -354,11 +406,7 @@ export function ProviderPanel({
       ))}
 
       {p.error ? (
-        <ErrorMessage
-          message={p.error}
-          stale={!!(p.session || p.weekly || p.fableWeekly || p.monthly)}
-          inverted={inverted}
-        />
+        <ErrorMessage message={p.error} stale={hasCachedData} inverted={inverted} />
       ) : null}
     </div>
   )

@@ -44,6 +44,14 @@ vi.mock('./minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
+vi.mock('./fireworks/fireworks-fetcher', () => ({
+  fetchFireworksRateLimits: vi.fn()
+}))
+
+vi.mock('../fireworks/fireworks-credentials-store', () => ({
+  hasFireworksCredentials: vi.fn(() => false)
+}))
+
 vi.mock('./grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))

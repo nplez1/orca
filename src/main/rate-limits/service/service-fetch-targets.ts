@@ -6,6 +6,7 @@ import {
   type ClaudeRuntimeAuthPreparation,
   type CodexAccountSelectionTarget,
   type MiniMaxResolvedConfig,
+  type FireworksResolvedConfig,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
   type ProviderRateLimits,
@@ -170,6 +171,17 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
         },
         error: toErrorMessage(error)
       }
+    }
+  }
+
+  protected resolveFireworksConfig(): FireworksResolvedConfig {
+    try {
+      return {
+        config: this.fireworksConfigResolver?.() ?? { apiKey: '', accountIdOverride: null },
+        error: null
+      }
+    } catch (error) {
+      return { config: { apiKey: '', accountIdOverride: null }, error: toErrorMessage(error) }
     }
   }
 }

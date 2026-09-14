@@ -167,4 +167,14 @@ describe('AccountsPane', () => {
       markup.slice(markup.lastIndexOf('<button', addAccountIndex), addAccountIndex)
     ).not.toContain('disabled=""')
   })
+
+  it('renders the Fireworks API-key credential section', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).toContain('id="accounts-fireworks"')
+    expect(markup).toContain('Fireworks API key')
+    // Fireworks carries the optional account-ID override in the same form.
+    expect(markup).toContain('Auto-detected from the API key')
+    expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-fireworks'))
+  })
 })

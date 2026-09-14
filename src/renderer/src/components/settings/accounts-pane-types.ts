@@ -105,6 +105,9 @@ export type AccountsPaneSectionModel = {
   runCodexAccountAction: CodexAccountActionRunner
   recordOpenCodeSettingEdit: (field: 'cookie' | 'workspaceId') => void
   miniMaxRateLimits: ProviderRateLimits | null
+} & AccountsPaneCredentialSectionModel
+
+export type MiniMaxCredentialSectionModel = {
   miniMaxApiKeyDraft: string
   setMiniMaxApiKeyDraft: Dispatch<SetStateAction<string>>
   miniMaxApiKeyConfigured: boolean
@@ -117,3 +120,17 @@ export type AccountsPaneSectionModel = {
   saveMiniMaxCookie: () => Promise<void>
   clearMiniMaxCookie: () => Promise<void>
 }
+
+export type FireworksCredentialSectionModel = {
+  fireworksApiKeyDraft: string
+  setFireworksApiKeyDraft: Dispatch<SetStateAction<string>>
+  fireworksAccountIdDraft: string
+  setFireworksAccountIdDraft: Dispatch<SetStateAction<string>>
+  fireworksApiKeyConfigured: boolean
+  fireworksCredentialBusy: boolean
+  saveFireworksCredentials: () => Promise<void>
+  clearFireworksCredentials: () => Promise<void>
+}
+
+export type AccountsPaneCredentialSectionModel = MiniMaxCredentialSectionModel &
+  FireworksCredentialSectionModel

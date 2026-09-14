@@ -38,6 +38,15 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     })
   }
 
+  invalidateFireworksCredentialState(): void {
+    this.fireworksFetchGeneration += 1
+    // Why: a saved/cleared key can race an in-flight fetch; drop the visible snapshot before any old-key result returns.
+    this.updateState({
+      ...this.state,
+      fireworks: this.withFetchingStatus(null, 'fireworks')
+    })
+  }
+
   async refreshForCodexAccountChange(
     outgoingAccountId?: string | null,
     target?: CodexAccountSelectionTarget

@@ -12,7 +12,16 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  getIntlLocale: () => 'en-US',
+  // Why: credits copy carries the amount as {{value0}}, so a fallback-only stub
+  // would assert against the raw template instead of the rendered string.
+  translate: (_key: string, fallback: string, values?: Record<string, string>) => {
+    let result = fallback
+    for (const [name, value] of Object.entries(values ?? {})) {
+      result = result.replace(`{{${name}}}`, value)
+    }
+    return result
+  }
 }))
 vi.mock('@/lib/agent-catalog', () => ({
   AgentIcon: ({ agent }: { agent: string }) => <span data-agent-icon={agent} />
@@ -40,6 +49,20 @@ const signedOutCodex: ProviderRateLimits = {
   status: 'error'
 }
 
+const fireworksBalance: ProviderRateLimits = {
+  provider: 'fireworks',
+  session: null,
+  weekly: null,
+  credits: {
+    kind: 'balance',
+    amount: { currencyCode: 'USD', units: '42', nanos: 100_000_000 },
+    available: true
+  },
+  updatedAt: 0,
+  error: null,
+  status: 'ok'
+}
+
 describe('UsageRow', () => {
   beforeEach(() => {
     mocks.useResetCountdownClock.mockClear()
@@ -59,6 +82,39 @@ describe('UsageRow', () => {
     expect(markup).toContain('not signed in')
     expect(markup).toContain('Sign in')
     expect(markup).not.toContain('<button')
+  })
+
+  it('renders a credits-only provider as its money readout, not the empty-state label', () => {
+    const markup = renderToStaticMarkup(
+      <UsageRow
+        p={fireworksBalance}
+        display="used"
+        state={{ kind: 'empty', statusLabel: 'No usage data' }}
+        showSignInAction={false}
+        now={mocks.now}
+      />
+    )
+
+    expect(markup).toContain('$42.10')
+    expect(markup).toContain('available')
+    expect(markup).not.toContain('No usage data')
+  })
+
+  it('keeps a failed refresh visible on a credits row instead of hiding it', () => {
+    // Why: the credits amount replaces the status label, so without this the row
+    // would show a confident stale number with no staleness marker at all.
+    const markup = renderToStaticMarkup(
+      <UsageRow
+        p={{ ...fireworksBalance, status: 'error', error: 'Network issue' }}
+        display="used"
+        state={{ kind: 'error', statusLabel: 'Refresh failed' }}
+        showSignInAction={false}
+        now={mocks.now}
+      />
+    )
+
+    expect(markup).toContain('$42.10')
+    expect(markup).toContain('Refresh failed')
   })
 
   it('keeps the bar fill consistent with the remaining percentage label', () => {
