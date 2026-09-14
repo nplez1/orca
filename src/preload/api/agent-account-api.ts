@@ -73,6 +73,35 @@ export type MinimaxCredentialsApi = {
   clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>
 }
 
+export type CopilotCredentialsApi = {
+  // Why: the token and the enterprise slug share one encrypted file, so a single
+  // status call seeds the slug field; the token itself never reaches the renderer.
+  // `source` reports whether those credentials came from the store or from the
+  // user's GitHub CLI sign-in, and `ghSetupHint` carries the command that would make
+  // the CLI usable when that is the blocker.
+  getStatus: () => Promise<{
+    configured: boolean
+    enterpriseSlug: string | null
+    source: 'stored' | 'github-cli' | 'none'
+    ghSetupHint: string | null
+  }>
+  save: (
+    token: string,
+    enterpriseSlug: string
+  ) => Promise<{
+    configured: boolean
+    enterpriseSlug: string | null
+    source: 'stored' | 'github-cli' | 'none'
+    ghSetupHint: string | null
+  }>
+  clear: () => Promise<{
+    configured: boolean
+    enterpriseSlug: string | null
+    source: 'stored' | 'github-cli' | 'none'
+    ghSetupHint: string | null
+  }>
+}
+
 export type CodexConfigSyncApi = {
   status: () => Promise<CodexConfigSyncStatus>
 }

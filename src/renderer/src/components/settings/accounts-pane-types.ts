@@ -105,6 +105,9 @@ export type AccountsPaneSectionModel = {
   runCodexAccountAction: CodexAccountActionRunner
   recordOpenCodeSettingEdit: (field: 'cookie' | 'workspaceId') => void
   miniMaxRateLimits: ProviderRateLimits | null
+} & AccountsPaneCredentialSectionModel
+
+export type MiniMaxCredentialSectionModel = {
   miniMaxApiKeyDraft: string
   setMiniMaxApiKeyDraft: Dispatch<SetStateAction<string>>
   miniMaxApiKeyConfigured: boolean
@@ -117,3 +120,26 @@ export type AccountsPaneSectionModel = {
   saveMiniMaxCookie: () => Promise<void>
   clearMiniMaxCookie: () => Promise<void>
 }
+
+// Why: main resolves the credential itself and reports where it found it, so the
+// pane can present the GitHub CLI sign-in as a first-class source instead of
+// inferring one from `configured`.
+export type CopilotCredentialSource = 'stored' | 'github-cli' | 'none'
+
+export type CopilotCredentialSectionModel = {
+  copilotTokenDraft: string
+  setCopilotTokenDraft: Dispatch<SetStateAction<string>>
+  copilotEnterpriseSlugDraft: string
+  setCopilotEnterpriseSlugDraft: Dispatch<SetStateAction<string>>
+  copilotCredentialSource: CopilotCredentialSource
+  /** The `gh` command that would unblock the CLI source, when main knows one. */
+  copilotGhSetupHint: string | null
+  copilotGhSetupHintCopied: boolean
+  copyCopilotGhSetupHint: () => Promise<void>
+  copilotCredentialBusy: boolean
+  saveCopilotCredentials: () => Promise<void>
+  clearCopilotCredentials: () => Promise<void>
+}
+
+export type AccountsPaneCredentialSectionModel = MiniMaxCredentialSectionModel &
+  CopilotCredentialSectionModel

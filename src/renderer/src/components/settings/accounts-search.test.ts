@@ -15,7 +15,11 @@ vi.mock('./settings-search-keywords', () => ({
   translateSearchKeyword: (_key: string, fallback: string) => [fallback]
 }))
 
-import { getAccountsMiniMaxSearchEntries, getAccountsPaneSearchEntries } from './accounts-search'
+import {
+  getAccountsCopilotSearchEntries,
+  getAccountsMiniMaxSearchEntries,
+  getAccountsPaneSearchEntries
+} from './accounts-search'
 
 describe('getAccountsMiniMaxSearchEntries', () => {
   it('returns a single entry that targets the MiniMax session cookie flow', () => {
@@ -40,5 +44,37 @@ describe('getAccountsMiniMaxSearchEntries', () => {
     const allEntries = getAccountsPaneSearchEntries()
     const titles = allEntries.map((entry) => entry.title)
     expect(titles).toContain('MiniMax Usage')
+  })
+})
+
+describe('getAccountsCopilotSearchEntries', () => {
+  it('returns a single entry for the GitHub Copilot credit flow', () => {
+    const entries = getAccountsCopilotSearchEntries()
+    expect(entries).toHaveLength(1)
+    const [entry] = entries
+    expect(entry.title).toBe('GitHub Copilot Usage')
+    expect(entry.description.toLowerCase()).toContain('github token')
+    expect(entry.description.toLowerCase()).toContain('enterprise')
+  })
+
+  it('exposes the keywords that drive the Settings search index', () => {
+    const [entry] = getAccountsCopilotSearchEntries()
+    expect(entry.keywords).toEqual(
+      expect.arrayContaining(['copilot', 'github', 'ai credits', 'usage', 'token'])
+    )
+  })
+
+  it('names the enterprise slug and the billing permission the section asks for', () => {
+    const [entry] = getAccountsCopilotSearchEntries()
+    // Why: the entry has to surface the section for the two fields the user must
+    // fill in — the GitHub token and the enterprise slug — not just the provider.
+    expect(entry.description.toLowerCase()).toContain('enterprise')
+    expect(entry.description.toLowerCase()).toContain('slug')
+    expect(entry.description.toLowerCase()).toContain('billing')
+  })
+
+  it('is included in the rolled-up pane search entries', () => {
+    const titles = getAccountsPaneSearchEntries().map((entry) => entry.title)
+    expect(titles).toContain('GitHub Copilot Usage')
   })
 })

@@ -38,6 +38,14 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     })
   }
 
+  invalidateCopilotCredentialState(): void {
+    this.copilotFetchGeneration += 1
+    this.updateState({
+      ...this.state,
+      copilot: this.withFetchingStatus(null, 'copilot')
+    })
+  }
+
   async refreshForCodexAccountChange(
     outgoingAccountId?: string | null,
     target?: CodexAccountSelectionTarget

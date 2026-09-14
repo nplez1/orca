@@ -6,6 +6,7 @@ import { fetchCodexRateLimits } from './codex-fetcher'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
 import { fetchKimiRateLimits } from './kimi-fetcher'
 import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
+import { fetchCopilotRateLimits } from './copilot/copilot-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchOpenCodeGoRateLimits } from './opencode-go-usage-fetcher'
@@ -88,6 +89,7 @@ export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchOpenCodeGoRateLimits).mockImplementation(async () => okProvider('opencode-go', 0))
   vi.mocked(fetchKimiRateLimits).mockImplementation(async () => okProvider('kimi', 0))
   vi.mocked(fetchMiniMaxRateLimits).mockImplementation(async () => okProvider('minimax', 0))
+  vi.mocked(fetchCopilotRateLimits).mockImplementation(async () => unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockImplementation(async () => unavailableProvider('grok'))
 }
 
@@ -98,6 +100,7 @@ export function resetRateLimitProviderMocks(): void {
   vi.mocked(fetchOpenCodeGoRateLimits).mockResolvedValue(okProvider('opencode-go', 0, Date.now()))
   vi.mocked(fetchKimiRateLimits).mockResolvedValue(okProvider('kimi', 0, Date.now()))
   vi.mocked(fetchMiniMaxRateLimits).mockResolvedValue(okProvider('minimax', 0, Date.now()))
+  vi.mocked(fetchCopilotRateLimits).mockResolvedValue(unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockResolvedValue({
     provider: 'grok',
     session: null,

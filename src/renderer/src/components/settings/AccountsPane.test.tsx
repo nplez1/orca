@@ -167,4 +167,35 @@ describe('AccountsPane', () => {
       markup.slice(markup.lastIndexOf('<button', addAccountIndex), addAccountIndex)
     ).not.toContain('disabled=""')
   })
+
+  it('renders the GitHub Copilot token and enterprise slug form', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    // The status-bar usage readout links straight to this id.
+    expect(markup).toContain('id="accounts-copilot"')
+    expect(markup).toContain('GitHub Copilot')
+    // Why: the renderer only ever learns whether a token is stored, so the token
+    // field must stay masked and must never be seeded with a stored value.
+    expect(markup).toMatch(/type="password"[^>]*id="copilot-token"/)
+    expect(markup).toContain(
+      'id="copilot-token" placeholder="Paste your GitHub token" spellCheck="false" value=""'
+    )
+    expect(markup).toContain('id="copilot-enterprise-slug" placeholder="your-enterprise"')
+    expect(markup).toContain('Enterprise slug')
+    expect(markup).toContain('The slug is the &lt;slug&gt; in github.com/enterprises/')
+    // Orca reads the gh sign-in itself, so the token is an override; the only
+    // real blocker is a gh sign-in without the enterprise billing scopes.
+    expect(markup).toContain('Orca prefers your GitHub CLI sign-in')
+    expect(markup).toContain('read:enterprise and manage_billing:enterprise scopes')
+    expect(markup).toContain('Paste a token only for accounts that sign-in cannot serve')
+    expect(markup).toContain('The token needs the “Enterprise billing” read permission')
+    expect(markup).not.toContain('cannot read these billing endpoints')
+    // Nothing is stored in this render, so the section offers Save and hides both
+    // the Forget control and the GitHub CLI setup hint (the mount-time status read
+    // never runs under SSR).
+    expect(markup).toContain('Not saved')
+    expect(markup).toContain('Credentials not set')
+    expect(markup).not.toMatch(/<button[^>]*>Forget token/)
+    expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-copilot'))
+  })
 })

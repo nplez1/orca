@@ -55,7 +55,7 @@ function WindowLabel({
 // the roster trigger and ProviderDetailsMenu so the dot's has-data condition
 // and markup can't drift between the two.
 export function ProviderLetterBadge({ p }: { p: ProviderRateLimits }): React.JSX.Element {
-  const hasData = Boolean(p.session || p.weekly || p.fableWeekly || p.monthly || p.buckets?.length)
+  const hasData = hasUsageData(p)
   return (
     <span className="inline-flex items-center gap-1 text-muted-foreground">
       <span
@@ -84,7 +84,22 @@ function getProviderLetter(provider: ProviderRateLimits['provider']): string {
       return 'R'
     case 'codex':
       return 'X'
+    case 'copilot':
+      return 'P'
   }
+}
+
+// Why: ProviderLetterBadge's dot needs the same "has data" answer as the segment.
+function hasUsageData(p: ProviderRateLimits): boolean {
+  return Boolean(
+    p.session ||
+    p.weekly ||
+    p.fableWeekly ||
+    p.monthly ||
+    p.buckets?.length ||
+    // Why: an allowance-only plan has no window, so its readout rides this term.
+    p.allowance
+  )
 }
 
 // ---------------------------------------------------------------------------

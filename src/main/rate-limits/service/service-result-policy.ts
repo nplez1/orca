@@ -34,6 +34,8 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       previous?.weekly ||
       previous?.fableWeekly ||
       previous?.monthly ||
+      // Why: an allowance-only plan has no window to test, so omitting this drops its snapshot on the first transient failure.
+      previous?.allowance ||
       (previous?.buckets && previous.buckets.length > 0)
     )
 
@@ -92,6 +94,7 @@ export abstract class RateLimitServiceResultPolicy extends RateLimitServiceFetch
       | 'minimax'
       | 'grok'
       | 'antigravity'
+      | 'copilot'
   ): ProviderRateLimits {
     if (!current) {
       return {

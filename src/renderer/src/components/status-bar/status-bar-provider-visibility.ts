@@ -18,6 +18,9 @@ export type UsageProviderSettings = Pick<
   minimaxCookieConfigured: boolean
   minimaxApiKeyConfigured: boolean
   grokAuthConfigured: boolean
+  // Why: the Copilot token and enterprise slug live outside GlobalSettings, so
+  // main derives this boolean each poll and the renderer never sees the token.
+  copilotTokenConfigured: boolean
 }
 
 type UsageProviderSnapshots = {
@@ -29,17 +32,21 @@ type UsageProviderSnapshots = {
   antigravity: ProviderRateLimits | null | undefined
   minimax: ProviderRateLimits | null | undefined
   grok: ProviderRateLimits | null | undefined
+  copilot: ProviderRateLimits | null | undefined
 }
 
 type UsageProviderId = ProviderRateLimits['provider']
 
+// Why: an allowance-only plan (no percentage window) must still count as data, or
+// a configured enterprise account reads as "No usage data" again.
 function hasUsageData(provider: ProviderRateLimits): boolean {
   return Boolean(
     provider.session ||
     provider.weekly ||
     provider.fableWeekly ||
     provider.monthly ||
-    (provider.buckets && provider.buckets.length > 0)
+    (provider.buckets && provider.buckets.length > 0) ||
+    provider.allowance
   )
 }
 
@@ -79,7 +86,8 @@ export function hasUsageProviderSettings(
     // already covered by the gemini term above.
     settings?.minimaxCookieConfigured === true ||
     settings?.minimaxApiKeyConfigured === true ||
-    settings?.grokAuthConfigured === true
+    settings?.grokAuthConfigured === true ||
+    settings?.copilotTokenConfigured === true
   )
 }
 
@@ -114,6 +122,9 @@ export function hasUsageProviderSettingsForProvider(
   if (providerId === 'grok') {
     return settings.grokAuthConfigured === true
   }
+  if (providerId === 'copilot') {
+    return settings.copilotTokenConfigured === true
+  }
   return false
 }
 
@@ -124,6 +135,8 @@ function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRat
     weekly: null,
     ...(providerId === 'opencode-go' ? { monthly: null } : {}),
     ...(providerId === 'gemini' ? { buckets: [] } : {}),
+    // Why: Copilot reports a monthly allowance rather than a quota window.
+    ...(providerId === 'copilot' ? { monthly: null, allowance: null } : {}),
     updatedAt: 0,
     error: null,
     status: 'fetching'
@@ -167,7 +180,8 @@ export function isUsageEmptyState(
     isProviderSnapshotPending(providers.kimi) ||
     antigravitySnapshotPending ||
     isProviderSnapshotPending(providers.minimax) ||
-    isProviderSnapshotPending(providers.grok)
+    isProviderSnapshotPending(providers.grok) ||
+    isProviderSnapshotPending(providers.copilot)
   ) {
     return false
   }
@@ -180,6 +194,7 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.kimi) &&
     !isProviderConfigured(providers.antigravity) &&
     !isProviderConfigured(providers.minimax) &&
-    !isProviderConfigured(providers.grok)
+    !isProviderConfigured(providers.grok) &&
+    !isProviderConfigured(providers.copilot)
   )
 }
