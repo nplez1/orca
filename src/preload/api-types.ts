@@ -2,6 +2,7 @@ import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
   CodexConfigSyncApi,
+  CopilotCredentialsApi,
   CursorAccountsApi,
   DeepSeekCredentialsApi,
   FireworksCredentialsApi,
@@ -146,6 +147,7 @@ export type PreloadApi = {
   minimaxCredentials: MinimaxCredentialsApi
   deepseekCredentials: DeepSeekCredentialsApi
   fireworksCredentials: FireworksCredentialsApi
+  copilotCredentials: CopilotCredentialsApi
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi

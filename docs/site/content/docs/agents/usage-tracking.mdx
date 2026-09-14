@@ -52,8 +52,9 @@ Some plans report a spending ceiling rather than 5-hour and 7-day quota windows.
 
 - **Claude** — the monthly spend cap, e.g. `$192.68 of $8,000.00`. Claude does not report when this cap resets, so that row shows a percentage without a countdown.
 - **Codex** — the account's spend control, e.g. `10,048 of 52,000 credits`, with the reset date reported by the provider.
+- **GitHub Copilot** — the credits consumed this month against the enterprise's monthly AI-credit budget, e.g. `412,300 of 1,000,000 AI credits`. GitHub's budget API reports that ceiling in dollars, so Orca displays it in AI credits using the price from the usage report; reading both needs a token with the "Enterprise billing" read permission plus the enterprise slug, set in **Settings → Accounts**.
 
-The percentage is always the figure the provider itself reports, so it matches what their console shows; Orca does not compute it from the amounts.
+The percentage is always the figure the provider itself reports, so it matches what their console shows; Orca does not compute it from the amounts. GitHub Copilot is the exception — it reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those.
 
 ## Estimated cost (Stats)
 
