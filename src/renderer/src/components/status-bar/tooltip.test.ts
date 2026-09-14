@@ -13,6 +13,7 @@ vi.mock('@/lib/agent-catalog', async () => {
 })
 
 vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en-US',
   translate: (_key: string, fallback: string, values?: Record<string, string>) => {
     let result = fallback
     for (const [key, value] of Object.entries(values ?? {})) {
@@ -593,5 +594,69 @@ describe('ProviderIcon', () => {
     expect(markup.startsWith('<img')).toBe(true)
     expect(markup).toContain('aria-hidden="true"')
     expect(markup).toMatch(/src="[^"]+"/)
+  })
+})
+
+describe('ProviderPanel allowance', () => {
+  function allowanceProvider(overrides: Partial<ProviderRateLimits> = {}): ProviderRateLimits {
+    return provider({
+      provider: 'claude',
+      status: 'ok',
+      allowance: {
+        unit: { kind: 'money', currencyCode: 'USD' },
+        used: 192.68,
+        limit: 8000,
+        resetsAt: null
+      },
+      ...overrides
+    })
+  }
+
+  it('renders the money readout next to the credits rows', () => {
+    const markup = renderToStaticMarkup(createElement(ProviderPanel, { p: allowanceProvider() }))
+
+    expect(markup).toContain('data-provider-allowance')
+    expect(markup).toContain('$192.68 of $8,000.00')
+  })
+
+  it('renders a count readout with the provider’s unit', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProviderPanel, {
+        p: allowanceProvider({
+          allowance: {
+            unit: { kind: 'count', label: 'credit' },
+            used: 10048.95,
+            limit: 52_000,
+            resetsAt: 1_800_000_000_000
+          }
+        })
+      })
+    )
+
+    expect(markup).toContain('10,049 of 52,000 credits')
+  })
+
+  it('omits the row entirely when the provider reports no allowance', () => {
+    const markup = renderToStaticMarkup(createElement(ProviderPanel, { p: allowanceProvider() }))
+
+    expect(markup).toContain('data-provider-allowance')
+    expect(
+      renderToStaticMarkup(
+        createElement(ProviderPanel, { p: allowanceProvider({ allowance: null }) })
+      )
+    ).not.toContain('data-provider-allowance')
+  })
+
+  it('treats an allowance as data an error is staling, window and credits absent', () => {
+    // Why: an allowance-only plan would otherwise fall into the empty-error branch,
+    // which drops the cached readout on a transient refresh failure.
+    const markup = renderToStaticMarkup(
+      createElement(ProviderPanel, {
+        p: allowanceProvider({ status: 'error', error: 'Network error while refreshing usage' })
+      })
+    )
+
+    expect(markup).toContain('$192.68 of $8,000.00')
+    expect(markup).toContain('Refresh failed — showing cached data')
   })
 })

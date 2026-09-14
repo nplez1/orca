@@ -1,3 +1,5 @@
+import type { ProviderAllowance } from './provider-allowance'
+
 export type RateLimitWindow = {
   /** Percentage of the window consumed (0–100). */
   usedPercent: number
@@ -63,6 +65,11 @@ export type ProviderRateLimits = {
   fableWeekly?: RateLimitWindow | null
   /** 30-day monthly window (OpenCode Go, Grok unified billing), null if not available. */
   monthly?: RateLimitWindow | null
+  /**
+   * Consumed-against-ceiling readout for enterprise and usage-billed plans that report
+   * no percentage quota window: Claude's monthly spend cap, Codex's spend control.
+   */
+  allowance?: ProviderAllowance | null
   /** Named per-model buckets (Gemini only). */
   buckets?: RateLimitBucket[]
   /** Available earned Codex rate-limit reset credits, if reported. */
