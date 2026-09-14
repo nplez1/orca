@@ -147,7 +147,9 @@
         "resourceUsageToggleDescription": "Show the Resource Manager. Click it for CPU, memory, sessions, daemon controls, and workspace disk scans.",
         "portsToggleDescription": "Show live workspace ports. Click it for workspace-scoped ports and external listeners.",
         "antigravityToggleDescription": "Show Antigravity subscription usage for the active workspace.",
-        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI."
+        "grokToggleDescription": "Show Grok subscription credit usage when signed in via Grok CLI.",
+        "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
+        "deepseekLabel": "DeepSeek Balance"
       },
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
@@ -157,6 +159,14 @@
           "statusItem": "status item",
           "activity": "activity"
         }
+      },
+      "search": {
+        "deepseekTitle": "DeepSeek Balance",
+        "deepseekDescription": "Show your DeepSeek account balance in the status bar.",
+        "deepseekKeyword": "deepseek",
+        "balanceKeyword": "balance",
+        "creditsKeyword": "credits",
+        "cnyKeyword": "cny"
       }
     },
     "browser": {
@@ -1118,7 +1128,7 @@
         "cd50cec5d7": "Coordinate multiple coding agents through Orca.",
         "58a868e8e4": "Orchestration",
         "7c79d3b7bf": "Optional",
-        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, and Grok.",
+        "b1c2f8b0ac": "Optional account switching and usage setup for Claude, Codex, Gemini, OpenCode Go, MiniMax, Grok, and DeepSeek.",
         "f70ac54d38": "AI Provider Accounts",
         "4121f7a0a2": "Manage AI agents, set a default, and customize commands.",
         "b49abbd2f7": "Agents",
@@ -3944,7 +3954,8 @@
                 "apiKey": "MiniMax API key expired. Replace it in Settings.",
                 "cookie": "MiniMax session cookie expired. Replace it in Settings."
               }
-            }
+            },
+            "df60b41813": "Balance cannot fund further calls"
           },
           "SshTargetStatusRow": {
             "sshHost": "SSH Host"
@@ -4028,6 +4039,20 @@
             "contact_note": "The host may still be running; only the Orca connection is unavailable.",
             "last_connected": "Last connected {{value0}}",
             "reconnect_attempt": "Attempt {{value0}}"
+          },
+          "providerCredits": {
+            "period": {
+              "currentMonth": "this month",
+              "last30Days": "in the last 30 days"
+            },
+            "item": {
+              "granted": "Granted",
+              "toppedUp": "Topped up",
+              "spentThisMonth": "Spent this month"
+            },
+            "balance": "{{value0}} available",
+            "spend": "{{value0}} spent",
+            "spendPeriod": "{{value0}} spent {{value1}}"
           }
         }
       },
@@ -8908,7 +8933,40 @@
             "b2c4e7f1a8": "endpoint",
             "3a9b6d2c4e": "api key",
             "5d8f1a3b7c": "china",
-            "7e2a4b8c1d": "overseas"
+            "7e2a4b8c1d": "overseas",
+            "0bbd8d1b24": "DeepSeek Usage",
+            "d9d1e324dc": "Configure DeepSeek usage tracking with an API key. DeepSeek publishes only the account balance, not usage or cost history.",
+            "249878a2e7": "deepseek",
+            "54714130c4": "api key",
+            "c0a759aceb": "balance",
+            "ca8cf669e2": "usage",
+            "aef1562679": "credits"
+          },
+          "pane": {
+            "deepseek": {
+              "actions": {
+                "312f213d4f": "DeepSeek API key is required.",
+                "e77c0b006a": "DeepSeek API key saved.",
+                "82ad607eeb": "DeepSeek credential update failed."
+              },
+              "section": {
+                "28c8b91c5d": "DeepSeek",
+                "53ce175669": "Configure DeepSeek usage tracking for your account.",
+                "47e631f32d": "Open console",
+                "16fb212002": "Stored locally",
+                "c62df1a6cd": "Credentials not set",
+                "e60b2e635a": "Stored locally in the Orca encrypted credential store and sent to DeepSeek only to refresh your balance.",
+                "59d9d40b95": "DeepSeek API key",
+                "0c4385003d": "Paste the API key from your DeepSeek platform account for local balance fetching.",
+                "f5d5cdde38": "Saved",
+                "d47451b104": "Not saved",
+                "71ec71b74d": "Paste your DeepSeek API key",
+                "64da8edf4b": "Replace",
+                "21f2625976": "Save",
+                "bc10d6273f": "Forget key",
+                "27efc84bc7": "Create a key in your DeepSeek platform account and paste it here. The DeepSeek API exposes only the current balance — there is no usage or cost history to show — and the balance may be denominated in CNY or USD depending on the account."
+              }
+            }
           }
         },
         "advanced": {

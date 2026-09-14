@@ -76,6 +76,7 @@ function usageSettings(overrides: Partial<UsageProviderSettings> = {}): UsagePro
     minimaxCookieConfigured: false,
     minimaxApiKeyConfigured: false,
     grokAuthConfigured: false,
+    deepseekApiKeyConfigured: false,
     ...overrides
   }
 }
@@ -131,6 +132,7 @@ describe('hasUsageProviderSettings', () => {
     expect(hasUsageProviderSettings(usageSettings({ minimaxCookieConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ minimaxApiKeyConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ grokAuthConfigured: true }))).toBe(true)
+    expect(hasUsageProviderSettings(usageSettings({ deepseekApiKeyConfigured: true }))).toBe(true)
   })
 
   it('does not treat empty or unloaded settings as configured', () => {
@@ -223,6 +225,64 @@ describe('hasUsageProviderSettingsForProvider', () => {
     ).toBe(true)
     expect(hasUsageProviderSettingsForProvider('grok', usageSettings())).toBe(false)
     expect(hasUsageProviderSettingsForProvider('grok', null)).toBe(false)
+  })
+
+  it('treats the persisted API key as the durable signal for DeepSeek', () => {
+    expect(
+      hasUsageProviderSettingsForProvider(
+        'deepseek',
+        usageSettings({ deepseekApiKeyConfigured: true })
+      )
+    ).toBe(true)
+    expect(hasUsageProviderSettingsForProvider('deepseek', usageSettings())).toBe(false)
+    expect(hasUsageProviderSettingsForProvider('deepseek', null)).toBe(false)
+  })
+})
+
+describe('credits-only providers', () => {
+  const deepseekCredits = {
+    kind: 'balance' as const,
+    amount: { currencyCode: 'USD', units: '42', nanos: 0 }
+  }
+
+  it('counts a credits readout as usage data', () => {
+    // Why: the whole render path is window-shaped; without the credits term a
+    // funded DeepSeek account reads as "no data" and stays hidden.
+    expect(
+      isProviderConfigured(provider('ok', { provider: 'deepseek', credits: deepseekCredits }))
+    ).toBe(true)
+    expect(
+      isProviderConfigured(provider('fetching', { provider: 'deepseek', credits: deepseekCredits }))
+    ).toBe(true)
+    // One fetch in flight with no credits yet is still not proof of configuration.
+    expect(
+      isProviderConfigured(provider('fetching', { provider: 'deepseek', credits: null }))
+    ).toBe(false)
+  })
+
+  it('keeps a configured credits provider visible while its snapshot is pending', () => {
+    expect(
+      getVisibleUsageProvider('deepseek', null, usageSettings({ deepseekApiKeyConfigured: true }))
+    ).toMatchObject({ provider: 'deepseek', status: 'fetching', credits: null })
+  })
+
+  it('does not show the setup CTA when a live credits readout exists', () => {
+    expect(
+      isUsageEmptyState(
+        {
+          claude: provider('unavailable', { provider: 'claude' }),
+          codex: provider('unavailable', { provider: 'codex' }),
+          gemini: provider('unavailable'),
+          opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
+          kimi: provider('unavailable', { provider: 'kimi' }),
+          antigravity: provider('unavailable', { provider: 'antigravity' }),
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          grok: provider('unavailable', { provider: 'grok' }),
+          deepseek: provider('ok', { provider: 'deepseek', credits: deepseekCredits })
+        },
+        usageSettings()
+      )
+    ).toBe(false)
   })
 })
 
@@ -398,7 +458,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: undefined,
           minimax: undefined,
-          grok: undefined
+          grok: undefined,
+          deepseek: undefined
         },
         usageSettings()
       )
@@ -416,7 +477,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: provider('unavailable', { provider: 'antigravity' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
-          grok: provider('unavailable', { provider: 'grok' })
+          grok: provider('unavailable', { provider: 'grok' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' })
         },
         usageSettings()
       )
@@ -434,7 +496,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: provider('unavailable', { provider: 'antigravity' }),
           minimax: provider('unavailable', { provider: 'minimax' }),
-          grok: provider('unavailable', { provider: 'grok' })
+          grok: provider('unavailable', { provider: 'grok' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' })
         },
         usageSettings({
           codexManagedAccounts: [
@@ -467,7 +530,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: null,
           minimax: provider('unavailable', { provider: 'minimax' }),
-          grok: provider('unavailable', { provider: 'grok' })
+          grok: provider('unavailable', { provider: 'grok' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' })
         },
         usageSettings()
       )
@@ -485,7 +549,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: null,
           grok: provider('unavailable', { provider: 'grok' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' })
         },
         usageSettings({ antigravityUsageConfigured: true, geminiCliOAuthEnabled: true })
       )
@@ -505,7 +570,8 @@ describe('isUsageEmptyState', () => {
           kimi: provider('unavailable', { provider: 'kimi' }),
           antigravity: null,
           grok: provider('unavailable', { provider: 'grok' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          deepseek: provider('unavailable', { provider: 'deepseek' })
         },
         usageSettings({ antigravityUsageConfigured: true })
       )

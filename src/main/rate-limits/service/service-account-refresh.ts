@@ -38,6 +38,15 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     })
   }
 
+  invalidateDeepSeekCredentialState(): void {
+    this.deepseekFetchGeneration += 1
+    // Why: a saved/cleared key can race an in-flight fetch; drop the visible snapshot before any old-key result returns.
+    this.updateState({
+      ...this.state,
+      deepseek: this.withFetchingStatus(null, 'deepseek')
+    })
+  }
+
   async refreshForCodexAccountChange(
     outgoingAccountId?: string | null,
     target?: CodexAccountSelectionTarget

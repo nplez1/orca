@@ -167,4 +167,14 @@ describe('AccountsPane', () => {
       markup.slice(markup.lastIndexOf('<button', addAccountIndex), addAccountIndex)
     ).not.toContain('disabled=""')
   })
+
+  it('renders the API-key credential section for DeepSeek', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).toContain('id="accounts-deepseek"')
+    expect(markup).toContain('DeepSeek API key')
+    // DeepSeek exposes no usage history, only a CNY- or USD-denominated balance.
+    expect(markup).toContain('the balance may be denominated in CNY or USD')
+    expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-deepseek'))
+  })
 })

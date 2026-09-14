@@ -1,3 +1,5 @@
+import type { ProviderCredits } from './provider-credits'
+
 export type RateLimitWindow = {
   /** Percentage of the window consumed (0–100). */
   usedPercent: number
@@ -55,6 +57,7 @@ export type ProviderRateLimits = {
     | 'minimax'
     | 'grok'
     | 'antigravity'
+    | 'deepseek'
   /** 5-hour session window, null if not available. */
   session: RateLimitWindow | null
   /** 7-day weekly window, null if not available. */
@@ -63,6 +66,11 @@ export type ProviderRateLimits = {
   fableWeekly?: RateLimitWindow | null
   /** 30-day monthly window (OpenCode Go, Grok unified billing), null if not available. */
   monthly?: RateLimitWindow | null
+  /**
+   * Money-denominated readout for API-key providers that publish no quota
+   * window at all (DeepSeek balance).
+   */
+  credits?: ProviderCredits | null
   /** Named per-model buckets (Gemini only). */
   buckets?: RateLimitBucket[]
   /** Available earned Codex rate-limit reset credits, if reported. */
@@ -124,6 +132,7 @@ export type RateLimitState = {
   antigravity: ProviderRateLimits | null
   minimax: ProviderRateLimits | null
   grok: ProviderRateLimits | null
+  deepseek: ProviderRateLimits | null
   /**
    * True when a MiniMax session cookie is persisted on disk. The cookie lives
    * outside GlobalSettings, so this flag is the durable signal that the
@@ -138,6 +147,12 @@ export type RateLimitState = {
    * visible across reloads.
    */
   minimaxApiKeyConfigured: boolean
+  /**
+   * True when a DeepSeek API key is persisted on disk. Like the MiniMax flags
+   * this is main-derived, so it is the durable signal that keeps an
+   * API-key-only provider visible before its first fetch lands.
+   */
+  deepseekApiKeyConfigured: boolean
   /** True when main finds a Grok CLI session file (~/.grok/auth.json or GROK_HOME). */
   grokAuthConfigured: boolean
   claudeTarget: RateLimitRuntimeTarget

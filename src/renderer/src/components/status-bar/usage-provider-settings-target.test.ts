@@ -9,6 +9,7 @@ describe('getUsageProviderAccountsSectionId', () => {
     expect(getUsageProviderAccountsSectionId('antigravity')).toBe('accounts-gemini')
     expect(getUsageProviderAccountsSectionId('opencode-go')).toBe('accounts-opencode-go')
     expect(getUsageProviderAccountsSectionId('minimax')).toBe('accounts-minimax')
+    expect(getUsageProviderAccountsSectionId('deepseek')).toBe('accounts-deepseek')
     expect(getUsageProviderAccountsSectionId('grok')).toBe('accounts-grok')
   })
 

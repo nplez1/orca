@@ -105,6 +105,9 @@ export type AccountsPaneSectionModel = {
   runCodexAccountAction: CodexAccountActionRunner
   recordOpenCodeSettingEdit: (field: 'cookie' | 'workspaceId') => void
   miniMaxRateLimits: ProviderRateLimits | null
+} & AccountsPaneCredentialSectionModel
+
+export type MiniMaxCredentialSectionModel = {
   miniMaxApiKeyDraft: string
   setMiniMaxApiKeyDraft: Dispatch<SetStateAction<string>>
   miniMaxApiKeyConfigured: boolean
@@ -117,3 +120,15 @@ export type AccountsPaneSectionModel = {
   saveMiniMaxCookie: () => Promise<void>
   clearMiniMaxCookie: () => Promise<void>
 }
+
+export type DeepSeekCredentialSectionModel = {
+  deepSeekApiKeyDraft: string
+  setDeepSeekApiKeyDraft: Dispatch<SetStateAction<string>>
+  deepSeekApiKeyConfigured: boolean
+  deepSeekCredentialBusy: boolean
+  saveDeepSeekApiKey: () => Promise<void>
+  clearDeepSeekApiKey: () => Promise<void>
+}
+
+export type AccountsPaneCredentialSectionModel = MiniMaxCredentialSectionModel &
+  DeepSeekCredentialSectionModel

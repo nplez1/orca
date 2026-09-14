@@ -73,6 +73,14 @@ export type MinimaxCredentialsApi = {
   clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>
 }
 
+export type DeepSeekCredentialsApi = {
+  // Why: the key lives in main's encrypted store, so the renderer only ever
+  // learns whether one is present.
+  getStatus: () => Promise<{ configured: boolean; apiKeyConfigured: boolean }>
+  saveApiKey: (key: string) => Promise<{ apiKeyConfigured: boolean }>
+  clearApiKey: () => Promise<{ apiKeyConfigured: boolean }>
+}
+
 export type CodexConfigSyncApi = {
   status: () => Promise<CodexConfigSyncStatus>
 }

@@ -7,7 +7,14 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/lib/agent-catalog'
-import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import {
+  ClaudeIcon,
+  DeepSeekIcon,
+  GeminiIcon,
+  MiniMaxIcon,
+  OpenAIIcon,
+  OpenCodeGoIcon
+} from './icons'
 import { translate } from '@/i18n/i18n'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'
@@ -120,6 +127,16 @@ export function StatusBarVisibilityMenu({
         >
           <MiniMaxIcon size={14} />
           {translate('auto.components.status.bar.StatusBar.3bbf140864', 'MiniMax Usage')}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={statusBarItems.includes('deepseek')}
+          onCheckedChange={() => {
+            recordFeatureInteraction('usage-tracking')
+            toggleStatusBarItem('deepseek')
+          }}
+        >
+          <DeepSeekIcon size={14} />
+          {translate('settings.appearance.statusBar.deepseekLabel', 'DeepSeek Balance')}
         </DropdownMenuCheckboxItem>
         {isStatusBarItemAvailable('grok', detectedAgentIds) && (
           <DropdownMenuCheckboxItem
