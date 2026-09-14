@@ -4,6 +4,7 @@ import {
   sumMoneyByCurrency,
   type MoneyAmount
 } from '../../../shared/money-amount'
+import type { ProviderCredits } from '../../../shared/provider-credits'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 
 // Why: pure data-shape helpers for the Fireworks billing API. Kept out of
@@ -26,12 +27,36 @@ export function makeFireworksZeroSpend(): MoneyAmount {
 
 // Why: Fireworks rates costs from usage at the account level; the final invoice
 // can differ once credits and adjustments are applied.
-export function makeFireworksSuccess(amount: MoneyAmount): ProviderRateLimits {
+//
+// Why the balance leads: a prepaid account's remaining credit is the number that
+// decides whether calls still work, and Fireworks exposes it only over the internal
+// gateway (see fireworks-balance-client.ts). The month's spend rides along as the
+// breakdown, and stays the headline when the gateway is unreachable.
+export function buildFireworksCredits(
+  spend: MoneyAmount,
+  balance: MoneyAmount | null
+): ProviderCredits {
+  if (!balance) {
+    return { kind: 'spend', amount: spend, period: 'current-month' }
+  }
+  // Why no `available` flag: a zero balance does not by itself mean calls fail —
+  // Auto Reload can top the account up — so claiming exhaustion would overclaim.
+  return {
+    kind: 'balance',
+    amount: balance,
+    items: [{ key: 'spent-this-month', amount: spend }]
+  }
+}
+
+export function makeFireworksSuccess(
+  spend: MoneyAmount,
+  balance: MoneyAmount | null
+): ProviderRateLimits {
   return {
     provider: 'fireworks',
     session: null,
     weekly: null,
-    credits: { kind: 'spend', amount, period: 'current-month' },
+    credits: buildFireworksCredits(spend, balance),
     updatedAt: Date.now(),
     error: null,
     status: 'ok',
