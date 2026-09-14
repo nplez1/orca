@@ -3,6 +3,7 @@ import { fetchCodexRateLimits } from '../codex-fetcher'
 import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from '../fireworks/fireworks-fetcher'
 import { fetchCopilotRateLimits } from '../copilot/copilot-fetcher'
+import { readCopilotGhCredentialsForCycle } from '../copilot/copilot-gh-credentials'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -102,8 +103,27 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const fireworksApiKey = fireworksConfigResult.config.apiKey
     const fireworksAccountIdOverride = fireworksConfigResult.config.accountIdOverride
     const copilotConfigResult = this.resolveCopilotConfig()
-    const copilotToken = copilotConfigResult.config.token
-    const copilotEnterpriseSlug = copilotConfigResult.config.enterpriseSlug
+    // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
+    // on the fetch critical path where its latency would stall every other provider.
+    const copilotGhResult = readCopilotGhCredentialsForCycle()
+    const copilotStoredCredentials =
+      copilotConfigResult.config.token && copilotConfigResult.config.enterpriseSlug
+        ? {
+            token: copilotConfigResult.config.token,
+            enterpriseSlug: copilotConfigResult.config.enterpriseSlug
+          }
+        : null
+    // Why stored wins: it is the deliberate override, and the paste form exists for
+    // accounts gh cannot serve at all.
+    const copilotCredentials =
+      copilotStoredCredentials ??
+      // Why no token here: gh supplies its own sign-in; the stored token is only ever an
+      // explicit override passed to gh as GH_TOKEN.
+      (copilotGhResult?.status === 'ok'
+        ? { token: '', enterpriseSlug: copilotGhResult.enterpriseSlug }
+        : { token: '', enterpriseSlug: '' })
+    const copilotToken = copilotCredentials.token
+    const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()

@@ -8,6 +8,7 @@ import { fetchKimiRateLimits } from './kimi-fetcher'
 import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
 import { fetchDeepSeekRateLimits } from './deepseek/deepseek-fetcher'
 import { fetchFireworksRateLimits } from './fireworks/fireworks-fetcher'
+import { fetchCopilotRateLimits } from './copilot/copilot-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { readGrokAuthSession } from './grok-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
@@ -116,6 +117,7 @@ export function mockFreshBackgroundProviderFetches(): void {
   vi.mocked(fetchFireworksRateLimits).mockImplementation(async () =>
     unavailableProvider('fireworks')
   )
+  vi.mocked(fetchCopilotRateLimits).mockImplementation(async () => unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockImplementation(async () => unavailableProvider('grok'))
 }
 
@@ -129,6 +131,7 @@ export function resetRateLimitProviderMocks(): void {
   // Why: no API key is configured in these suites, so the credential flags must read false or the new providers report a spurious "configured" state.
   vi.mocked(fetchDeepSeekRateLimits).mockResolvedValue(unavailableProvider('deepseek'))
   vi.mocked(fetchFireworksRateLimits).mockResolvedValue(unavailableProvider('fireworks'))
+  vi.mocked(fetchCopilotRateLimits).mockResolvedValue(unavailableProvider('copilot'))
   vi.mocked(fetchGrokRateLimits).mockResolvedValue({
     provider: 'grok',
     session: null,
