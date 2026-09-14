@@ -154,7 +154,9 @@
         "deepseekToggleDescription": "Show DeepSeek account balance in the status bar.",
         "fireworksToggleDescription": "Show Fireworks.ai rated spend in the status bar.",
         "deepseekLabel": "DeepSeek Balance",
-        "fireworksLabel": "Fireworks.ai Spend"
+        "fireworksLabel": "Fireworks.ai Spend",
+        "copilotToggleDescription": "Show GitHub Copilot AI credit usage in the status bar.",
+        "copilotLabel": "GitHub Copilot Usage"
       },
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
@@ -176,7 +178,13 @@
         "fireworksDescription": "Show your Fireworks.ai rated spend in the status bar.",
         "fireworksKeyword": "fireworks",
         "fireworksAiKeyword": "fireworks.ai",
-        "spendKeyword": "spend"
+        "spendKeyword": "spend",
+        "copilotTitle": "GitHub Copilot Usage",
+        "copilotDescription": "Show your GitHub Copilot AI credit usage in the status bar.",
+        "copilotKeyword": "copilot",
+        "githubKeyword": "github",
+        "aiCreditsKeyword": "ai credits",
+        "tokenKeyword": "token"
       }
     },
     "browser": {
@@ -222,6 +230,16 @@
         "optionNativeTooltip": "Keeps Electron's built-in identity for sites that reject the cleaned identity. Google sign-in is unavailable in Native mode.",
         "restartRequired": "Restart required",
         "unavailable": "Browser identity is unavailable."
+      }
+    },
+    "accounts": {
+      "search": {
+        "copilotTitle": "GitHub Copilot Usage",
+        "copilotDescription": "Configure GitHub Copilot usage tracking with a GitHub token that can read enterprise billing and the enterprise slug it belongs to.",
+        "copilotKeyword": "copilot",
+        "githubKeyword": "github",
+        "aiCreditsKeyword": "ai credits",
+        "tokenKeyword": "token"
       }
     }
   },
@@ -403,7 +421,12 @@
             "36761d9604": "Unknown keybinding action \"{{value0}}\" was ignored.",
             "d2e43e426a": "{{value0}} must be an object.",
             "fb290366b2": "Unavailable on web.",
-            "76122208ca": "Shortcut for \"{{value0}}\" was ignored: {{value1}}"
+            "76122208ca": "Shortcut for \"{{value0}}\" was ignored: {{value1}}",
+            "test": {
+              "harness": {
+                "225db77b97": "WebSocket"
+              }
+            }
           }
         },
         "runtime": {
@@ -436,7 +459,14 @@
           "f963485d37": "Row not found",
           "a967f23983": "Project view not loaded",
           "87020f6605": "Row has no owner/repo/number — cannot patch underlying item",
-          "d49ef4b944": "Failed to save issue-source preference"
+          "d49ef4b944": "Failed to save issue-source preference",
+          "slice": {
+            "test": {
+              "harness": {
+                "28fd2d1802": "Test PR"
+              }
+            }
+          }
         },
         "sparse": {
           "presets": {
@@ -516,7 +546,14 @@
           },
           "createdWithoutParentNesting": "Created without nesting under \"{{value0}}\"",
           "createdWithoutParentNestingUnnamed": "Created without nesting under the selected parent",
-          "createdWithoutParentNestingDetail": "The parent workspace was no longer available. You can set it from the workspace menu."
+          "createdWithoutParentNestingDetail": "The parent workspace was no longer available. You can set it from the workspace menu.",
+          "slice": {
+            "test": {
+              "fixtures": {
+                "e851268bd6": "Terminal"
+              }
+            }
+          }
         },
         "repos": {
           "2975400634": "Update Orca server to open non-Git folders on this runtime.",
@@ -638,6 +675,24 @@
               "15cbedc3e3": "Install the Orca CLI before running agent skill setup.",
               "windowsPathUnknown": "Orca could not check your Windows user PATH",
               "refreshCliRegistration": "Refresh CLI registration status and try again."
+            }
+          }
+        },
+        "background": {
+          "session": {
+            "test": {
+              "state": {
+                "d9fa6e0979": "Terminal 1"
+              }
+            }
+          }
+        },
+        "hibernation": {
+          "coordinator": {
+            "test": {
+              "fixture": {
+                "4499e360c7": "Agent"
+              }
             }
           }
         }
@@ -1203,6 +1258,15 @@
                 }
               }
             }
+          },
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {
+                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
+                }
+              }
+            }
           }
         }
       }
@@ -1754,7 +1818,13 @@
         "addSshHostHint": "Use an existing machine over SSH",
         "addRemoteOrcaServer": "Add Remote Orca Server",
         "addRemoteOrcaServerHint": "Pair another Orca runtime",
-        "hostConnectionFailed": "Connection failed"
+        "hostConnectionFailed": "Connection failed",
+        "test": {
+          "fixture": {
+            "95a5e6b3bb": "Devbox",
+            "2e2c474573": "Local Mac"
+          }
+        }
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
@@ -3403,6 +3473,19 @@
           "TerminalQuickCommandsSubmenu": {
             "3ccc7981bb": "Host unavailable",
             "54f29b7c0d": "Loading host…"
+          },
+          "remote": {
+            "runtime": {
+              "pty": {
+                "transport": {
+                  "test": {
+                    "harness": {
+                      "34e5ecd501": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -6023,6 +6106,11 @@
                 "a128d7006b": "{{value0}} {{value1}} child {{value2}}",
                 "289a1d2ca7": "Expand {{value0}}. {{value1}}",
                 "0c1debfe84": "Collapse {{value0}}"
+              }
+            },
+            "meta": {
+              "row": {
+                "5c970dfb3b": "sidebar"
               }
             }
           },
@@ -9085,6 +9173,34 @@
                 "c9bd728853": "Auto-detected from the API key",
                 "d74a913846": "Orca discovers the account ID from your API key. Set an override only when the key can see multiple accounts; leave it blank to keep auto-detection. Saving with the API key field blank keeps your stored key, and Forget key clears the account ID as well."
               }
+            },
+            "copilot": {
+              "actions": {
+                "41c1907a73": "GitHub Copilot credential update failed.",
+                "1d08d465f5": "GitHub Copilot credentials saved.",
+                "70efb28dee": "GitHub token is required."
+              },
+              "section": {
+                "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "d7c06dead5": "your-enterprise",
+                "467c761749": "Enterprise slug",
+                "fa8def1ab4": "Required. The slug selects which enterprise Orca reads GitHub Copilot usage from.",
+                "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month.",
+                "4cf256a883": "Forget token",
+                "b03cd42103": "Save",
+                "ef36dc11a9": "Replace",
+                "74858f3994": "Paste your GitHub token",
+                "13ae4d0b21": "Not saved",
+                "2976a89a84": "Saved",
+                "7e6b3de4ea": "GitHub token",
+                "4d5c01e15c": "Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
+                "259e2dff8e": "Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.",
+                "d5f964d2ec": "Credentials not set",
+                "886fc8ca30": "Stored locally",
+                "f8bb20c24c": "Open console",
+                "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
+                "dc3eaf8d70": "GitHub Copilot"
+              }
             }
           }
         },
@@ -9341,7 +9457,13 @@
               "close": "close",
               "notification": "notification area",
               "background": "background"
-            }
+            },
+            "2fbe0c981b": "Langue",
+            "3a0e3a9fdc": "Idioma",
+            "5f4779d525": "言語",
+            "0b03f507c2": "언어",
+            "ab96f8a4b9": "語言",
+            "b6035a3def": "语言"
           }
         },
         "auto": {
@@ -10781,6 +10903,22 @@
               "7c7056940a": "shell",
               "713c4a2f92": "Choose the default shell for new terminal panes on Windows.",
               "13715f9d23": "Default Shell"
+            }
+          },
+          "advanced": {
+            "platform": {
+              "search": {
+                "7d383cc610": "ghostty",
+                "77faf8be39": "Ghostty"
+              }
+            }
+          },
+          "pane": {
+            "appearance": {
+              "search": {
+                "1f4decdd74": "ghostty",
+                "e0cc1b7b47": "Ghostty"
+              }
             }
           }
         },
@@ -14250,6 +14388,17 @@
             "109870e023": "Maximize",
             "b5686fee1e": "Restore",
             "1e502f1284": "Open"
+          },
+          "floating": {
+            "terminal": {
+              "panel": {
+                "test": {
+                  "fixtures": {
+                    "00cde6717e": "Mobile Emulator"
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -15945,6 +16094,23 @@
                 }
               }
             }
+          },
+          "stream": {
+            "remote": {
+              "remote": {
+                "browser": {
+                  "stream": {
+                    "lifecycle": {
+                      "test": {
+                        "harness": {
+                          "471387f8f8": "Example"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "profile": {
@@ -16503,6 +16669,19 @@
         "AutomationsPageBreadcrumb": {
           "ariaLabel": "Automations breadcrumb",
           "runDetails": "Run details"
+        },
+        "automations": {
+          "page": {
+            "fixtures": {
+              "104f70edd9": "Hermes",
+              "c1e6f01a35": "Nightly #1"
+            },
+            "test": {
+              "harness": {
+                "90edd9c380": "Refresh automations"
+              }
+            }
+          }
         }
       },
       "agent": {
@@ -16568,7 +16747,12 @@
             "permission": "Needs attention"
           },
           "filtersSection": "Filters",
-          "viewSection": "View"
+          "viewSection": "View",
+          "test": {
+            "fixtures": {
+              "43a827f6a7": "Claude"
+            }
+          }
         },
         "clearCompleted": {
           "clearedOne": "Cleared 1 completed agent",
@@ -17247,6 +17431,34 @@
       },
       "gitlabIpcTimeout": {
         "timedOut": "Timed out talking to GitLab."
+      },
+      "host": {
+        "session": {
+          "mirror": {
+            "frame": {
+              "fixtures": {
+                "17e758e12c": "Codex"
+              }
+            }
+          }
+        }
+      },
+      "fixtures": {
+        "web": {
+          "session": {
+            "terminal": {
+              "orphan": {
+                "recovery": {
+                  "regression": {
+                    "fixtures": {
+                      "f1eb7ee8e3": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "ssh": {
