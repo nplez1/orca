@@ -62,12 +62,19 @@ export function DeepSeekIcon({ size = 14 }: { size?: number }): React.JSX.Elemen
 // serves as its favicon (three paths on a 32x32 grid, all brand purple). Inlined
 // like the Claude/Gemini marks rather than shipped as a resources/ asset, because a
 // single fixed fill colour needs no separate file.
+//
+// The viewBox is cropped from the source's 32x32 to the mark's own bounds (y 8-23.8)
+// and the width is scaled past `size`: their icon grid carries ~25% vertical padding
+// and the mark itself is 2:1, so at the same width as the whale it rendered ~35%
+// shorter and read as a smaller icon than its neighbours.
 export function FireworksIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  const width = Math.round(size * 1.25)
+  const height = Math.round((width * 15.8065) / 32)
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
+      width={width}
+      height={height}
+      viewBox="0 8 32 15.8065"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
