@@ -53,8 +53,8 @@ describe('getAccountsCopilotSearchEntries', () => {
     expect(entries).toHaveLength(1)
     const [entry] = entries
     expect(entry.title).toBe('GitHub Copilot Usage')
-    expect(entry.description.toLowerCase()).toContain('github token')
-    expect(entry.description.toLowerCase()).toContain('enterprise')
+    expect(entry.description.toLowerCase()).toContain('github copilot ai credits')
+    expect(entry.description.toLowerCase()).toContain('github cli sign-in')
   })
 
   it('exposes the keywords that drive the Settings search index', () => {
@@ -64,13 +64,15 @@ describe('getAccountsCopilotSearchEntries', () => {
     )
   })
 
-  it('names the enterprise slug and the billing permission the section asks for', () => {
+  it('describes the flow the section configures, not a credential form it no longer has', () => {
     const [entry] = getAccountsCopilotSearchEntries()
-    // Why: the entry has to surface the section for the two fields the user must
-    // fill in — the GitHub token and the enterprise slug — not just the provider.
-    expect(entry.description.toLowerCase()).toContain('enterprise')
-    expect(entry.description.toLowerCase()).toContain('slug')
-    expect(entry.description.toLowerCase()).toContain('billing')
+    const description = entry.description.toLowerCase()
+
+    expect(description).toContain('github cli sign-in')
+    // The token and enterprise slug fields are gone, so the entry must not promise them.
+    expect(description).not.toContain('enterprise')
+    expect(description).not.toContain('slug')
+    expect(description).not.toContain('billing')
   })
 
   it('is included in the rolled-up pane search entries', () => {

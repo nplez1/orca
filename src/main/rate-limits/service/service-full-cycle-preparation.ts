@@ -87,30 +87,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
-    const copilotConfigResult = this.resolveCopilotConfig()
     // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
     // on the fetch critical path where its latency would stall every other provider.
-    const copilotGhResult = readCopilotGhCredentialsForCycle()
-    const copilotStoredCredentials =
-      copilotConfigResult.config.token && copilotConfigResult.config.enterpriseSlug
-        ? {
-            token: copilotConfigResult.config.token,
-            enterpriseSlug: copilotConfigResult.config.enterpriseSlug
-          }
-        : null
-    // Why stored wins: it is the deliberate override, and the paste form exists for
-    // accounts gh cannot serve at all.
-    const copilotCredentials =
-      copilotStoredCredentials ??
-      // Why no token here: gh supplies its own sign-in; the stored token is only ever an
-      // explicit override passed to gh as GH_TOKEN.
-      (copilotGhResult?.status === 'ok'
-        ? { token: '', enterpriseSlug: '', source: 'user-entitlement' as const }
-        : { token: '', enterpriseSlug: '', source: 'enterprise-billing' as const })
-    const copilotToken = copilotCredentials.token
-    const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
-    const copilotSource =
-      'source' in copilotCredentials ? copilotCredentials.source : 'enterprise-billing'
+    const copilotGhStatus = readCopilotGhCredentialsForCycle()?.status ?? 'unknown'
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -133,7 +112,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
-    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotSource}|${copilotConfigResult.error ?? ''}`
+    // Why the gh probe is the whole config: the CLI's own sign-in is this provider's only
+    // credential, so a scope the user just granted is what has to drop the stale snapshot.
+    const currentCopilotConfigHash = copilotGhStatus
     const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
     if (copilotConfigChanged) {
       this.lastCopilotConfigHash = currentCopilotConfigHash
@@ -220,13 +201,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
             endpointMode: miniMaxEndpoint,
             apiKey: miniMaxApiKey
           }),
-      copilotConfigResult.error
-        ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
-        : fetchCopilotRateLimits({
-            token: copilotToken,
-            enterpriseSlug: copilotEnterpriseSlug,
-            source: copilotSource
-          })
+      fetchCopilotRateLimits()
     ])
 
     if (signal.aborted) {

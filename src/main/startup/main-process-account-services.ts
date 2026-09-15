@@ -15,7 +15,6 @@ import { getInitialClaudeRateLimitTarget } from '../rate-limits/claude-rate-limi
 import { getKimiRuntimeTarget, resolveKimiHome } from '../kimi/kimi-runtime-home'
 import { readMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { readMiniMaxApiKey } from '../minimax/minimax-api-key-store'
-import { readCopilotCredentials } from '../copilot-credentials/copilot-credentials-store'
 import { refreshCopilotGhCredentials } from '../rate-limits/copilot/copilot-gh-credentials'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
@@ -127,15 +126,6 @@ export function initializeMainProcessAccountServices(): void {
       models: settings.minimaxUsageModels,
       endpoint: settings.minimaxEndpoint,
       apiKey
-    }
-  })
-  // Why: readCopilotCredentials throws on an undecryptable payload, and letting it
-  // throw records a Copilot-only credential error instead of a silent keyless poll.
-  state.rateLimits.setCopilotConfigResolver(() => {
-    const credentials = readCopilotCredentials()
-    return {
-      token: credentials?.token ?? '',
-      enterpriseSlug: credentials?.enterpriseSlug ?? ''
     }
   })
   // Why warmed at startup: the fetch cycle reads the probe synchronously, so kicking it

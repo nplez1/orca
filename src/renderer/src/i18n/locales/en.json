@@ -217,7 +217,7 @@
     "accounts": {
       "search": {
         "aiCreditsKeyword": "ai credits",
-        "copilotDescription": "Track GitHub Copilot AI credit usage for your enterprise through your GitHub CLI sign-in, or a GitHub token with enterprise billing read. The enterprise slug is detected for you.",
+        "copilotDescription": "Track the GitHub Copilot AI credits you have used this month through your GitHub CLI sign-in.",
         "copilotKeyword": "copilot",
         "copilotTitle": "GitHub Copilot Usage",
         "githubKeyword": "github",
@@ -8940,39 +8940,32 @@
           },
           "pane": {
             "copilot": {
-              "actions": {
-                "1d08d465f5": "GitHub Copilot credentials saved.",
-                "41c1907a73": "GitHub Copilot credential update failed.",
-                "70efb28dee": "GitHub token is required."
-              },
+              "actions": {},
               "section": {
-                "022c7c89d5": "Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.",
-                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
-                "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
-                "13ae4d0b21": "Not saved",
                 "233569347b": "Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.",
-                "259e2dff8e": "Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.",
-                "2976a89a84": "Saved",
-                "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
-                "467c761749": "Enterprise slug",
-                "4cf256a883": "Forget token",
-                "4d5c01e15c": "Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
-                "6a27446bd3": "Using your GitHub CLI sign-in",
-                "6a327922f7": "Copied",
-                "74858f3994": "Paste your GitHub token",
-                "7e6b3de4ea": "GitHub token",
-                "886fc8ca30": "Stored locally",
                 "9e59104270": "Copy command",
-                "ae9c8d3fd2": "Optional override",
-                "b03cd42103": "Save",
-                "d5f964d2ec": "Credentials not set",
-                "d7c06dead5": "your-enterprise",
                 "dc3eaf8d70": "GitHub Copilot",
                 "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
-                "ef36dc11a9": "Replace",
-                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for your Copilot entitlement:",
-                "f8bb20c24c": "Open console",
-                "fa8def1ab4": "Optional. Required only when using an enterprise billing token override."
+                "536b94b44d": "Checking...",
+                "ac2637c174": "Signed in with the GitHub CLI",
+                "8ffce46573": "GitHub CLI not found",
+                "6a85980a72": "GitHub CLI sign-in needs the user scope",
+                "4fea97e088": "Not signed in to GitHub",
+                "d4a78cff5b": "Reading the GitHub CLI status from this computer.",
+                "641d6ef0f2": "Copilot usage is read through the GitHub CLI. Install gh, then sign in.",
+                "00ab515605": "Sign in to the GitHub CLI and Orca will start tracking your Copilot usage.",
+                "6a15e5c762": "Set Copilot usage up from Orca on the computer where you use the GitHub CLI.",
+                "67798c2fff": "Run setup command",
+                "91af911b56": "Re-check",
+                "7874c1fb7a": "GitHub CLI setup",
+                "a76d95b5f4": "Press Enter to run the command.",
+                "3eff016cff": "GitHub CLI setup terminal",
+                "fa73ee648f": "Grant the missing scope and Orca will start tracking your Copilot usage."
+              }
+            },
+            "credential": {
+              "sections": {
+                "2fa282378a": "Copied command."
               }
             }
           }

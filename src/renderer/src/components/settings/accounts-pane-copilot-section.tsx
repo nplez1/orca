@@ -1,297 +1,206 @@
-import { Check, Copy, ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
+import { Copy, Loader2, RefreshCw, ShieldCheck, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopilotIcon } from '../status-bar/icons'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { SearchableSetting } from './SearchableSetting'
+import { OnboardingInlineCommandTerminal } from '../onboarding/OnboardingInlineCommandTerminal'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { translate } from '@/i18n/i18n'
 
-// Why: enterprise billing is a fine-grained permission, so the classic-token page cannot mint one.
-const GITHUB_FINE_GRAINED_TOKENS_URL = 'https://github.com/settings/tokens?type=beta'
+const COPILOT_TERMINAL_HEIGHT_PX = 240
 
 export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {
   const {
-    copilotTokenDraft,
-    setCopilotTokenDraft,
-    copilotEnterpriseSlugDraft,
-    setCopilotEnterpriseSlugDraft,
-    copilotCredentialSource,
+    copilotGhStatus,
     copilotGhSetupHint,
-    copilotGhSetupHintCopied,
-    copyCopilotGhSetupHint,
     copilotCredentialBusy,
-    saveCopilotCredentials,
-    clearCopilotCredentials
+    copilotTerminalOpen,
+    openCopilotTerminal,
+    closeCopilotTerminal,
+    recheckCopilotCredentials,
+    copyCopilotGhSetupHint
   } = model
-  // Why: a credential sourced from the GitHub CLI has nothing stored to replace or
-  // forget, so every stored-token affordance keys off the source, not `configured`.
-  const tokenStored = copilotCredentialSource === 'stored'
-  const usingGithubCli = copilotCredentialSource === 'github-cli'
-  const credentialMissing = copilotCredentialSource === 'none'
+  const configured = copilotGhStatus === 'ok'
+  // Why: the inline terminal needs a PTY on the machine that runs Orca, and the web
+  // client's floating-terminal cwd resolves empty — there it would never finish starting.
+  const isWebClient = isWebClientLocation()
+  const hasSetupCommand = copilotGhSetupHint !== null
+  const canRunSetupCommand = hasSetupCommand && !isWebClient
+
   return (
     <section key="copilot" id="accounts-copilot" className="space-y-4 scroll-mt-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <CopilotIcon size={16} />
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
-              'GitHub Copilot'
-            )}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.ed307672cd',
-              'Configure GitHub Copilot usage tracking for your account.'
-            )}
-          </p>
-        </div>
-        <a
-          href={GITHUB_FINE_GRAINED_TOKENS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
+      <div className="space-y-1">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <CopilotIcon size={16} />
           {translate(
-            'auto.components.settings.accounts.pane.copilot.section.f8bb20c24c',
-            'Open console'
+            'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
+            'GitHub Copilot'
           )}
-          <ExternalLink className="size-3" />
-        </a>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'auto.components.settings.accounts.pane.copilot.section.ed307672cd',
+            'Configure GitHub Copilot usage tracking for your account.'
+          )}
+        </p>
       </div>
 
       <div
         className={cn(
           'flex items-start gap-3 rounded-lg border bg-muted/20 p-3',
-          credentialMissing ? 'border-border/40' : 'border-border/60'
+          configured ? 'border-border/60' : 'border-border/40'
         )}
       >
         <ShieldCheck
           className={cn(
             'mt-0.5 size-4 shrink-0',
-            credentialMissing ? 'text-muted-foreground' : 'text-foreground'
+            configured ? 'text-foreground' : 'text-muted-foreground'
           )}
         />
-        <div className="space-y-1">
-          <p className="text-xs font-medium">
-            {usingGithubCli
-              ? translate(
-                  'auto.components.settings.accounts.pane.copilot.section.6a27446bd3',
-                  'Using your GitHub CLI sign-in'
-                )
-              : tokenStored
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-xs font-medium">
+              {copilotGhStatus === null
                 ? translate(
-                    'auto.components.settings.accounts.pane.copilot.section.886fc8ca30',
-                    'Stored locally'
+                    'auto.components.settings.accounts.pane.copilot.section.536b94b44d',
+                    'Checking...'
                   )
-                : translate(
-                    'auto.components.settings.accounts.pane.copilot.section.d5f964d2ec',
-                    'Credentials not set'
-                  )}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {usingGithubCli
-              ? translate(
-                  'auto.components.settings.accounts.pane.copilot.section.233569347b',
-                  'Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.'
-                )
-              : translate(
-                  'auto.components.settings.accounts.pane.copilot.section.259e2dff8e',
-                  'Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.'
-                )}
-          </p>
-          {copilotGhSetupHint ? (
-            <div className="space-y-1.5 pt-1">
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.settings.accounts.pane.copilot.section.f1c1fd4ffb',
-                  'Run this to finish setting up the GitHub CLI for your Copilot entitlement:'
-                )}
-              </p>
-              <div className="flex items-start gap-2 rounded-md border border-border/60 bg-background/50 px-3 py-2">
-                <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
-                  {copilotGhSetupHint}
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  className="shrink-0 gap-1.5"
-                  aria-label={
-                    copilotGhSetupHintCopied
+                : copilotGhStatus === 'ok'
+                  ? translate(
+                      'auto.components.settings.accounts.pane.copilot.section.ac2637c174',
+                      'Signed in with the GitHub CLI'
+                    )
+                  : copilotGhStatus === 'gh-missing'
+                    ? translate(
+                        'auto.components.settings.accounts.pane.copilot.section.8ffce46573',
+                        'GitHub CLI not found'
+                      )
+                    : copilotGhStatus === 'missing-scope'
                       ? translate(
-                          'auto.components.settings.accounts.pane.copilot.section.6a327922f7',
-                          'Copied'
+                          'auto.components.settings.accounts.pane.copilot.section.6a85980a72',
+                          'GitHub CLI sign-in needs the user scope'
                         )
                       : translate(
-                          'auto.components.settings.accounts.pane.copilot.section.9e59104270',
-                          'Copy command'
-                        )
-                  }
-                  onClick={() => void copyCopilotGhSetupHint()}
-                >
-                  {copilotGhSetupHintCopied ? (
-                    <>
-                      <Check className="size-3" />
-                      {translate(
-                        'auto.components.settings.accounts.pane.copilot.section.6a327922f7',
-                        'Copied'
+                          'auto.components.settings.accounts.pane.copilot.section.4fea97e088',
+                          'Not signed in to GitHub'
+                        )}
+            </p>
+            {copilotGhStatus === null ? (
+              <Loader2 className="size-3 animate-spin text-muted-foreground" />
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {copilotGhStatus === null
+              ? translate(
+                  'auto.components.settings.accounts.pane.copilot.section.d4a78cff5b',
+                  'Reading the GitHub CLI status from this computer.'
+                )
+              : copilotGhStatus === 'ok'
+                ? translate(
+                    'auto.components.settings.accounts.pane.copilot.section.233569347b',
+                    'Orca reads Copilot usage with your GitHub CLI sign-in. Nothing is saved in Orca.'
+                  )
+                : copilotGhStatus === 'gh-missing'
+                  ? translate(
+                      'auto.components.settings.accounts.pane.copilot.section.641d6ef0f2',
+                      'Copilot usage is read through the GitHub CLI. Install gh, then sign in.'
+                    )
+                  : copilotGhStatus === 'missing-scope'
+                    ? translate(
+                        'auto.components.settings.accounts.pane.copilot.section.fa73ee648f',
+                        'Grant the missing scope and Orca will start tracking your Copilot usage.'
+                      )
+                    : translate(
+                        'auto.components.settings.accounts.pane.copilot.section.00ab515605',
+                        'Sign in to the GitHub CLI and Orca will start tracking your Copilot usage.'
                       )}
-                    </>
-                  ) : (
-                    <Copy className="size-3" />
-                  )}
-                </Button>
-              </div>
+          </p>
+          {hasSetupCommand ? (
+            <div className="flex items-start gap-2 rounded-md border border-border/60 bg-background/50 px-3 py-2">
+              <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                {copilotGhSetupHint}
+              </code>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                aria-label={translate(
+                  'auto.components.settings.accounts.pane.copilot.section.9e59104270',
+                  'Copy command'
+                )}
+                onClick={() => void copyCopilotGhSetupHint()}
+              >
+                <Copy className="size-4" />
+              </Button>
             </div>
           ) : null}
         </div>
       </div>
 
-      <SearchableSetting
-        title={translate(
-          'auto.components.settings.accounts.pane.copilot.section.7e6b3de4ea',
-          'GitHub token'
-        )}
-        description={translate(
-          'auto.components.settings.accounts.pane.copilot.section.4d5c01e15c',
-          'Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.'
-        )}
-        keywords={['copilot', 'github', 'token', 'enterprise billing', 'ai credits', 'usage']}
-        className="space-y-2"
-      >
-        <div className="flex items-center gap-2">
-          <Label htmlFor="copilot-token">
-            {translate(
-              'auto.components.settings.accounts.pane.copilot.section.7e6b3de4ea',
-              'GitHub token'
-            )}
-          </Label>
-          <Badge
-            variant={tokenStored ? 'secondary' : 'outline'}
-            className="h-5 gap-1 rounded-full px-2 text-[10px] font-medium text-muted-foreground"
-          >
-            {tokenStored ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
-            {tokenStored
-              ? translate(
-                  'auto.components.settings.accounts.pane.copilot.section.2976a89a84',
-                  'Saved'
-                )
-              : usingGithubCli
-                ? translate(
-                    'auto.components.settings.accounts.pane.copilot.section.ae9c8d3fd2',
-                    'Optional override'
-                  )
-                : translate(
-                    'auto.components.settings.accounts.pane.copilot.section.13ae4d0b21',
-                    'Not saved'
-                  )}
-          </Badge>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            id="copilot-token"
-            type="password"
-            disabled={copilotCredentialBusy}
-            value={copilotTokenDraft}
-            onChange={(e) => setCopilotTokenDraft(e.target.value)}
-            placeholder={translate(
-              'auto.components.settings.accounts.pane.copilot.section.74858f3994',
-              'Paste your GitHub token'
-            )}
-            spellCheck={false}
-            className="flex-1 text-xs"
-          />
-          <Button
-            size="xs"
-            onClick={() => void saveCopilotCredentials()}
-            disabled={copilotCredentialBusy || (!copilotTokenDraft.trim() && !tokenStored)}
-            className="h-7 shrink-0 text-xs"
-          >
-            {copilotCredentialBusy ? <Loader2 className="size-3 animate-spin" /> : null}
-            {tokenStored
-              ? translate(
-                  'auto.components.settings.accounts.pane.copilot.section.ef36dc11a9',
-                  'Replace'
-                )
-              : translate(
-                  'auto.components.settings.accounts.pane.copilot.section.b03cd42103',
-                  'Save'
-                )}
-          </Button>
-          {tokenStored ? (
+      {isWebClient ? (
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'auto.components.settings.accounts.pane.copilot.section.6a15e5c762',
+            'Set Copilot usage up from Orca on the computer where you use the GitHub CLI.'
+          )}
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {canRunSetupCommand ? (
             <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => void clearCopilotCredentials()}
-              disabled={copilotCredentialBusy}
-              className="h-7 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openCopilotTerminal}
+              disabled={copilotTerminalOpen || copilotCredentialBusy}
             >
+              <Terminal className="size-3.5" />
               {translate(
-                'auto.components.settings.accounts.pane.copilot.section.4cf256a883',
-                'Forget token'
+                'auto.components.settings.accounts.pane.copilot.section.67798c2fff',
+                'Run setup command'
               )}
             </Button>
           ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => void recheckCopilotCredentials()}
+            disabled={copilotCredentialBusy}
+          >
+            <RefreshCw className={cn('size-3.5', copilotCredentialBusy && 'animate-spin')} />
+            {translate(
+              'auto.components.settings.accounts.pane.copilot.section.91af911b56',
+              'Re-check'
+            )}
+          </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.accounts.pane.copilot.section.022c7c89d5',
-            'Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.'
-          )}
-        </p>
-      </SearchableSetting>
+      )}
 
-      <SearchableSetting
-        title={translate(
-          'auto.components.settings.accounts.pane.copilot.section.467c761749',
-          'Enterprise slug'
-        )}
-        description={translate(
-          'auto.components.settings.accounts.pane.copilot.section.fa8def1ab4',
-          'Optional. Required only when using an enterprise billing token override.'
-        )}
-        keywords={['copilot', 'github', 'enterprise', 'slug', 'billing']}
-        className="space-y-2"
-      >
-        <Label htmlFor="copilot-enterprise-slug">
-          {translate(
-            'auto.components.settings.accounts.pane.copilot.section.467c761749',
-            'Enterprise slug'
+      {canRunSetupCommand && copilotTerminalOpen ? (
+        <OnboardingInlineCommandTerminal
+          command={copilotGhSetupHint}
+          title={translate(
+            'auto.components.settings.accounts.pane.copilot.section.7874c1fb7a',
+            'GitHub CLI setup'
           )}
-        </Label>
-        <Input
-          id="copilot-enterprise-slug"
-          type="text"
-          disabled={copilotCredentialBusy}
-          value={copilotEnterpriseSlugDraft}
-          onChange={(e) => setCopilotEnterpriseSlugDraft(e.target.value)}
-          placeholder={translate(
-            'auto.components.settings.accounts.pane.copilot.section.d7c06dead5',
-            'your-enterprise'
+          description={translate(
+            'auto.components.settings.accounts.pane.copilot.section.a76d95b5f4',
+            'Press Enter to run the command.'
           )}
-          spellCheck={false}
-          className="text-xs"
+          ariaLabel={translate(
+            'auto.components.settings.accounts.pane.copilot.section.3eff016cff',
+            'GitHub CLI setup terminal'
+          )}
+          terminalHeightPx={COPILOT_TERMINAL_HEIGHT_PX}
+          terminalTopMarginPx={8}
+          autoScrollIntoView={false}
+          onCommandFinished={() => void recheckCopilotCredentials()}
+          onTerminalExit={closeCopilotTerminal}
         />
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.accounts.pane.copilot.section.1006eed696',
-            'The slug is the <slug> in github.com/enterprises/<slug>.'
-          )}
-          {tokenStored ? (
-            <>
-              {' '}
-              {translate(
-                'auto.components.settings.accounts.pane.copilot.section.3c8314c1de',
-                'Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.'
-              )}
-            </>
-          ) : null}
-        </p>
-      </SearchableSetting>
+      ) : null}
     </section>
   )
 }

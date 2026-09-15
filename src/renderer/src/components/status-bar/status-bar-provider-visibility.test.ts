@@ -76,7 +76,7 @@ function usageSettings(overrides: Partial<UsageProviderSettings> = {}): UsagePro
     minimaxCookieConfigured: false,
     minimaxApiKeyConfigured: false,
     grokAuthConfigured: false,
-    copilotTokenConfigured: false,
+    copilotConfigured: false,
     ...overrides
   }
 }
@@ -132,7 +132,7 @@ describe('hasUsageProviderSettings', () => {
     expect(hasUsageProviderSettings(usageSettings({ minimaxCookieConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ minimaxApiKeyConfigured: true }))).toBe(true)
     expect(hasUsageProviderSettings(usageSettings({ grokAuthConfigured: true }))).toBe(true)
-    expect(hasUsageProviderSettings(usageSettings({ copilotTokenConfigured: true }))).toBe(true)
+    expect(hasUsageProviderSettings(usageSettings({ copilotConfigured: true }))).toBe(true)
   })
 
   it('does not treat empty or unloaded settings as configured', () => {
@@ -229,10 +229,7 @@ describe('hasUsageProviderSettingsForProvider', () => {
 
   it('treats the persisted token as the durable signal for GitHub Copilot', () => {
     expect(
-      hasUsageProviderSettingsForProvider(
-        'copilot',
-        usageSettings({ copilotTokenConfigured: true })
-      )
+      hasUsageProviderSettingsForProvider('copilot', usageSettings({ copilotConfigured: true }))
     ).toBe(true)
     expect(hasUsageProviderSettingsForProvider('copilot', usageSettings())).toBe(false)
     expect(hasUsageProviderSettingsForProvider('copilot', null)).toBe(false)
@@ -244,7 +241,7 @@ describe('allowance-only providers', () => {
     // Why: Copilot is a token provider with no CLI on PATH, so the stored token is the
     // only durable signal before its first fetch lands.
     expect(
-      getVisibleUsageProvider('copilot', null, usageSettings({ copilotTokenConfigured: true }))
+      getVisibleUsageProvider('copilot', null, usageSettings({ copilotConfigured: true }))
     ).toMatchObject({
       provider: 'copilot',
       status: 'fetching',

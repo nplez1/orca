@@ -59,16 +59,6 @@ export type MiniMaxResolvedConfig = {
   error: string | null
 }
 
-export type CopilotRateLimitConfig = {
-  token: string
-  enterpriseSlug: string
-}
-
-export type CopilotResolvedConfig = {
-  config: CopilotRateLimitConfig
-  error: string | null
-}
-
 export type GeminiCliOAuthEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {

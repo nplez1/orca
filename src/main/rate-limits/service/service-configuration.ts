@@ -1,7 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { hasMiniMaxSessionCookie } from '../../minimax/minimax-cookie-store'
 import { hasMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
-import { hasCopilotCredentials } from '../../copilot-credentials/copilot-credentials-store'
 import { getCachedCopilotGhCredentials } from '../copilot/copilot-gh-credentials'
 import { RateLimitServiceAccountRefresh } from './service-account-refresh'
 import {
@@ -12,7 +11,6 @@ import {
   type ClaudeAuthPreparationResolver,
   type OpenCodeGoRateLimitConfig,
   type MiniMaxRateLimitConfig,
-  type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
   type InactiveCodexAccountInfo,
   type InactiveClaudeAccountInfo,
@@ -49,10 +47,6 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
 
   setMiniMaxConfigResolver(resolver: () => MiniMaxRateLimitConfig): void {
     this.miniMaxConfigResolver = resolver
-  }
-
-  setCopilotConfigResolver(resolver: () => CopilotRateLimitConfig): void {
-    this.copilotConfigResolver = resolver
   }
 
   setGeminiCliOAuthEnabledResolver(resolver: GeminiCliOAuthEnabledResolver): void {
@@ -132,9 +126,8 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
       // Why: the cookie lives on the filesystem, not GlobalSettings; surface its presence so the renderer keeps the MiniMax bar across reloads.
       minimaxCookieConfigured: hasMiniMaxSessionCookie(),
       minimaxApiKeyConfigured: hasMiniMaxApiKey(),
-      // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
-      copilotTokenConfigured:
-        hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
+      // Why: main owns the gh probe, so it is the only place that can tell the renderer a provider is set up before its first fetch lands.
+      copilotConfigured: getCachedCopilotGhCredentials()?.status === 'ok',
       grokAuthConfigured: this.grokAuthConfigured,
       claudeTarget: this.claudeFetchTarget,
       codexTarget: this.codexFetchTarget,

@@ -19,7 +19,7 @@ describe('RateLimitState', () => {
       copilot: null,
       minimaxCookieConfigured: false,
       minimaxApiKeyConfigured: false,
-      copilotTokenConfigured: false,
+      copilotConfigured: false,
       grokAuthConfigured: false,
       claudeTarget: { runtime: 'host', wslDistro: null },
       codexTarget: { runtime: 'host', wslDistro: null },
@@ -32,6 +32,6 @@ describe('RateLimitState', () => {
     expect(state.minimaxCookieConfigured).toBe(false)
     expect(state.minimaxApiKeyConfigured).toBe(false)
     expect(state.copilot).toBeNull()
-    expect(state.copilotTokenConfigured).toBe(false)
+    expect(state.copilotConfigured).toBe(false)
   })
 })
