@@ -37,6 +37,8 @@ export type HookListenerState = {
   codexLeadStateByPaneKey: Map<string, CodexLeadTurnState>
   /** Newest Grok turn per pane, used to reject end reports that arrive after a replacement prompt. */
   grokActiveTurnByPaneKey: Map<string, GrokActiveTurn>
+  /** Copilot background work that can outlive the foreground turn. */
+  copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
 }
 
 export type GrokActiveTurn = {
@@ -62,6 +64,14 @@ export type CodexLeadTurnState = {
   model?: string
 }
 
+export type CopilotBackgroundWorkState = {
+  pendingShellCount: number
+  /** Agent tool starts not yet associated with a SubagentStart lifecycle hook. */
+  pendingUnidentifiedSubagentCount: number
+  pendingSubagentLifecycleCount: number
+  leadStopped: boolean
+}
+
 export function createHookListenerState(): HookListenerState {
   return {
     warnedVersions: new Set(),
@@ -81,7 +91,8 @@ export function createHookListenerState(): HookListenerState {
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
     codexLeadStateByPaneKey: new Map(),
-    grokActiveTurnByPaneKey: new Map()
+    grokActiveTurnByPaneKey: new Map(),
+    copilotBackgroundWorkByPaneKey: new Map()
   }
 }
 
@@ -102,6 +113,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
   state.codexLeadStateByPaneKey.delete(paneKey)
   state.grokActiveTurnByPaneKey.delete(paneKey)
+  state.copilotBackgroundWorkByPaneKey.delete(paneKey)
 }
 
 /** Does this pane still hold anything that can ASSERT a state — a stored row, or a Claude latch that
@@ -120,7 +132,8 @@ export function paneHasStateClaims(state: HookListenerState, paneKey: string): b
     state.claudeActiveSessionCronPaneKeys.has(paneKey) ||
     state.claudeSessionOwnerByPaneKey.has(paneKey) ||
     state.codexSubagentRosterByPaneKey.has(paneKey) ||
-    state.codexLeadStateByPaneKey.has(paneKey)
+    state.codexLeadStateByPaneKey.has(paneKey) ||
+    state.copilotBackgroundWorkByPaneKey.has(paneKey)
   )
 }
 
@@ -176,6 +189,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.grokActiveTurnByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
 }
 
 export function clearPaneTurnCacheState(state: HookListenerState, paneKey: string): void {
@@ -225,4 +239,5 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.codexSubagentTranscriptByPaneKey.clear()
   state.codexLeadStateByPaneKey.clear()
   state.grokActiveTurnByPaneKey.clear()
+  state.copilotBackgroundWorkByPaneKey.clear()
 }
