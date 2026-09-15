@@ -3,14 +3,105 @@ import {
   type ParsedAgentStatusPayload
 } from '../../agent-status-types'
 import { readFirstString } from '../interactive-tool'
-import type { HookListenerState } from '../listener-state'
+import type { CopilotBackgroundWorkState, HookListenerState } from '../listener-state'
 import { resolvePrompt, resolveToolState } from '../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../provider-event-routing'
 import {
   isAskUserTool,
   normalizeCopilotEventName,
+  readCopilotToolCall,
   resolveCopilotEventName
 } from './copilot-tool-fields'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function readCopilotToolInput(hookPayload: Record<string, unknown>): unknown {
+  const toolCall = readCopilotToolCall(hookPayload)
+  return (
+    hookPayload.tool_input ??
+    hookPayload.toolInput ??
+    hookPayload.toolArgs ??
+    hookPayload.input ??
+    hookPayload.arguments ??
+    toolCall.toolInputSource
+  )
+}
+
+function readCopilotToolName(hookPayload: Record<string, unknown>): string | undefined {
+  const toolCall = readCopilotToolCall(hookPayload)
+  return readFirstString(hookPayload, ['tool_name', 'toolName', 'name']) ?? toolCall.toolName
+}
+
+function isCopilotBackgroundShellStart(
+  normalizedEventName: unknown,
+  hookPayload: Record<string, unknown>
+): boolean {
+  if (normalizedEventName !== 'PreToolUse') {
+    return false
+  }
+  const toolName = readCopilotToolName(hookPayload)
+  if (toolName?.toLowerCase() !== 'bash' && toolName?.toLowerCase() !== 'powershell') {
+    return false
+  }
+  const toolInput = readCopilotToolInput(hookPayload)
+  if (!isRecord(toolInput)) {
+    return false
+  }
+  return (
+    toolInput.background === true ||
+    toolInput.runInBackground === true ||
+    toolInput.run_in_background === true
+  )
+}
+
+function isCopilotSubagentToolStart(
+  normalizedEventName: unknown,
+  hookPayload: Record<string, unknown>
+): boolean {
+  if (normalizedEventName !== 'PreToolUse') {
+    return false
+  }
+  const toolName = readCopilotToolName(hookPayload)?.toLowerCase()
+  return toolName === 'agent' || toolName === 'task'
+}
+
+function isCopilotBackgroundWorkCompletionNotification(
+  normalizedEventName: unknown,
+  notificationType: string | undefined
+): 'shell' | 'unidentified-subagent' | undefined {
+  if (normalizedEventName !== 'Notification') {
+    return undefined
+  }
+  if (notificationType === 'shell_completed' || notificationType === 'shell_detached_completed') {
+    return 'shell'
+  }
+  if (notificationType === 'agent_completed') {
+    return 'unidentified-subagent'
+  }
+  return undefined
+}
+
+/** Zero is the only value that lets a Stop this work held open settle the pane to done. */
+function pendingCopilotBackgroundWork(work: CopilotBackgroundWorkState): number {
+  return (
+    work.pendingShellCount +
+    work.pendingUnidentifiedSubagentCount +
+    work.pendingSubagentLifecycleCount
+  )
+}
+
+function isCopilotStopHookActive(hookPayload: Record<string, unknown>): boolean {
+  return hookPayload.stop_hook_active === true || hookPayload.stopHookActive === true
+}
+
+function getCopilotBackgroundWorkState(
+  state: HookListenerState,
+  paneKey: string
+): CopilotBackgroundWorkState | undefined {
+  return state.copilotBackgroundWorkByPaneKey.get(paneKey)
+}
 
 // Why: Copilot PermissionRequest fires before allow/ask/deny (stays working); ask_user and notification prompts are the real blocked signals.
 export function normalizeCopilotEvent(
@@ -28,9 +119,115 @@ export function normalizeCopilotEvent(
     normalizedEventName === 'Notification' &&
     (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog')
   const toolSnapshot = extractToolFields('copilot', normalizedEventName, hookPayload)
+  const backgroundShellStarted = isCopilotBackgroundShellStart(normalizedEventName, hookPayload)
+  const subagentToolStarted = isCopilotSubagentToolStart(normalizedEventName, hookPayload)
+  const backgroundWorkCompletion = isCopilotBackgroundWorkCompletionNotification(
+    normalizedEventName,
+    notificationType
+  )
+  const stopHookActive = isCopilotStopHookActive(hookPayload)
+  // Why: Copilot's Stop hook fires when the foreground turn ends, but background shells and
+  // subagents outlive it, so the pane stays `working` until the last of them settles.
+  let backgroundWorkState = getCopilotBackgroundWorkState(state, paneKey)
+  if (normalizedEventName === 'SessionStart') {
+    state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+    backgroundWorkState = undefined
+  } else if (backgroundShellStarted) {
+    backgroundWorkState = {
+      pendingShellCount: (backgroundWorkState?.pendingShellCount ?? 0) + 1,
+      pendingUnidentifiedSubagentCount: backgroundWorkState?.pendingUnidentifiedSubagentCount ?? 0,
+      pendingSubagentLifecycleCount: backgroundWorkState?.pendingSubagentLifecycleCount ?? 0,
+      leadStopped: false
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+  } else if (subagentToolStarted) {
+    backgroundWorkState = {
+      pendingShellCount: backgroundWorkState?.pendingShellCount ?? 0,
+      pendingUnidentifiedSubagentCount:
+        (backgroundWorkState?.pendingUnidentifiedSubagentCount ?? 0) + 1,
+      pendingSubagentLifecycleCount: backgroundWorkState?.pendingSubagentLifecycleCount ?? 0,
+      leadStopped: false
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+  } else if (normalizedEventName === 'SubagentStart') {
+    // Why: the tool start already counted this subagent, so the hook moves the count, not adds one.
+    backgroundWorkState = {
+      pendingShellCount: backgroundWorkState?.pendingShellCount ?? 0,
+      pendingUnidentifiedSubagentCount: Math.max(
+        0,
+        (backgroundWorkState?.pendingUnidentifiedSubagentCount ?? 0) - 1
+      ),
+      pendingSubagentLifecycleCount: (backgroundWorkState?.pendingSubagentLifecycleCount ?? 0) + 1,
+      leadStopped: backgroundWorkState?.leadStopped ?? false
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+  } else if (
+    backgroundWorkState &&
+    (normalizedEventName === 'UserPromptSubmit' ||
+      normalizedEventName === 'PreToolUse' ||
+      normalizedEventName === 'PostToolUse' ||
+      normalizedEventName === 'PostToolUseFailure' ||
+      normalizedEventName === 'PermissionRequest')
+  ) {
+    backgroundWorkState = {
+      ...backgroundWorkState,
+      leadStopped: false
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+  } else if (backgroundWorkCompletion && backgroundWorkState) {
+    backgroundWorkState = {
+      ...backgroundWorkState,
+      pendingShellCount:
+        backgroundWorkCompletion === 'shell'
+          ? Math.max(0, backgroundWorkState.pendingShellCount - 1)
+          : backgroundWorkState.pendingShellCount,
+      pendingUnidentifiedSubagentCount:
+        backgroundWorkCompletion === 'unidentified-subagent'
+          ? Math.max(0, backgroundWorkState.pendingUnidentifiedSubagentCount - 1)
+          : backgroundWorkState.pendingUnidentifiedSubagentCount
+    }
+    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
+      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+    } else {
+      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+    }
+  } else if (normalizedEventName === 'SubagentStop' && backgroundWorkState) {
+    backgroundWorkState = {
+      ...backgroundWorkState,
+      pendingSubagentLifecycleCount: Math.max(
+        0,
+        backgroundWorkState.pendingSubagentLifecycleCount - 1
+      )
+    }
+    if (pendingCopilotBackgroundWork(backgroundWorkState) === 0) {
+      state.copilotBackgroundWorkByPaneKey.delete(paneKey)
+    } else {
+      state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+    }
+  }
   const isAskUserPrompt =
     (normalizedEventName === 'PreToolUse' || normalizedEventName === 'PermissionRequest') &&
     isAskUserTool(toolSnapshot.toolName)
+  // Why `stop_hook_active` is excluded: the CLI already says it is continuing, so the stateName
+  // branch below keeps it working without waiting.
+  const stopWaitsForBackgroundWork =
+    normalizedEventName === 'Stop' &&
+    !stopHookActive &&
+    backgroundWorkState !== undefined &&
+    pendingCopilotBackgroundWork(backgroundWorkState) > 0
+  if (normalizedEventName === 'Stop' && backgroundWorkState) {
+    backgroundWorkState = {
+      ...backgroundWorkState,
+      leadStopped: stopWaitsForBackgroundWork
+    }
+    state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
+  }
+  // Why: only a Stop this work held open may settle the pane, and only with nothing left pending.
+  const completedLastBackgroundWork =
+    (backgroundWorkCompletion !== undefined || normalizedEventName === 'SubagentStop') &&
+    backgroundWorkState !== undefined &&
+    pendingCopilotBackgroundWork(backgroundWorkState) === 0 &&
+    backgroundWorkState.leadStopped
   const stateName =
     normalizedEventName === 'SessionStart' ||
     normalizedEventName === 'UserPromptSubmit' ||
@@ -41,13 +238,17 @@ export function normalizeCopilotEvent(
         ? 'blocked'
         : normalizedEventName === 'PreToolUse' || normalizedEventName === 'PermissionRequest'
           ? 'working'
-          : normalizedEventName === 'Stop' || normalizedEventName === 'SessionEnd'
-            ? 'done'
-            : normalizedEventName === 'ErrorOccurred'
-              ? hookPayload.recoverable === true
-                ? 'working'
-                : 'done'
-              : null
+          : stopWaitsForBackgroundWork || (normalizedEventName === 'Stop' && stopHookActive)
+            ? 'working'
+            : completedLastBackgroundWork ||
+                normalizedEventName === 'Stop' ||
+                normalizedEventName === 'SessionEnd'
+              ? 'done'
+              : normalizedEventName === 'ErrorOccurred'
+                ? hookPayload.recoverable === true
+                  ? 'working'
+                  : 'done'
+                : null
 
   if (!stateName) {
     return null
@@ -69,6 +270,7 @@ export function normalizeCopilotEvent(
     toolInput: snapshot.toolInput,
     interactivePrompt: snapshot.interactivePrompt,
     lastAssistantMessage: snapshot.lastAssistantMessage,
-    lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput
+    lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
+    ...(stopWaitsForBackgroundWork ? { workingMode: 'monitoring' as const } : {})
   })
 }
