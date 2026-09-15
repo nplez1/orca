@@ -71,6 +71,8 @@ export type HookListenerState = {
   opencodeSessionPaneBySessionId: Map<string, OpenCodeSessionBinding>
   /** Last launch token seen per pane; a rewritten shared-server post needs the bound pane's live token to pass its fence. */
   lastLaunchTokenByPaneKey: Map<string, string>
+  /** Copilot background work that can outlive the foreground turn. */
+  copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
 }
 
 export type MusePaneState = {
@@ -84,6 +86,14 @@ export type MusePaneState = {
 export type GrokActiveTurn = {
   promptId?: string
   sessionId?: string
+}
+
+export type CopilotBackgroundWorkState = {
+  pendingShellCount: number
+  /** Agent tool starts not yet associated with a SubagentStart lifecycle hook. */
+  pendingUnidentifiedSubagentCount: number
+  pendingSubagentLifecycleCount: number
+  leadStopped: boolean
 }
 
 const legacyStatusAdapterByState = new WeakMap<HookListenerState, AgentStatusLegacyAdapter>()
@@ -123,7 +133,8 @@ export function createHookListenerState(
     grokMainAgentStatusByPaneKey: new Map(),
     musePaneStateByPaneKey: new Map(),
     opencodeSessionPaneBySessionId: new Map(),
-    lastLaunchTokenByPaneKey: new Map()
+    lastLaunchTokenByPaneKey: new Map(),
+    copilotBackgroundWorkByPaneKey: new Map()
   }
   legacyStatusAdapterByState.set(state, adapter)
   return state
@@ -215,6 +226,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.musePaneStateByPaneKey.delete(paneKey)
   unbindOpenCodeSessionsOfPane(state, paneKey)
   deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
+  state.copilotBackgroundWorkByPaneKey.delete(paneKey)
 }
 
 /** Does this pane still hold anything that can ASSERT a state — a stored row, or a Claude latch that
@@ -233,7 +245,8 @@ export function paneHasStateClaims(state: HookListenerState, paneKey: string): b
     state.claudeActiveSessionCronPaneKeys.has(paneKey) ||
     state.claudeSessionOwnerByPaneKey.has(paneKey) ||
     state.codexSubagentRosterByPaneKey.has(paneKey) ||
-    state.codexLeadStateByPaneKey.has(paneKey)
+    state.codexLeadStateByPaneKey.has(paneKey) ||
+    state.copilotBackgroundWorkByPaneKey.has(paneKey)
   )
 }
 
@@ -294,6 +307,7 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.musePaneStateByPaneKey, fromPaneKey, toPaneKey)
   moveOpenCodeSessionBindings(state, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.lastLaunchTokenByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.copilotBackgroundWorkByPaneKey, fromPaneKey, toPaneKey)
 }
 
 export function clearPaneTurnCacheState(state: HookListenerState, paneKey: string): void {
@@ -349,4 +363,5 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.grokMainAgentStatusByPaneKey.clear()
   state.opencodeSessionPaneBySessionId.clear()
   state.lastLaunchTokenByPaneKey.clear()
+  state.copilotBackgroundWorkByPaneKey.clear()
 }
