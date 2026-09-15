@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lstat, mkdir, readFile, readlink, rename, rmdir } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { CliInstallStatus } from '../../shared/cli-install-types'
-import { isMissingError } from './cli-install-errors'
+import { isMissingError, isPermissionError } from './cli-install-errors'
 import { quoteShell } from './cli-install-path-format'
 
 export type EntryIdentity = {
@@ -96,8 +96,13 @@ export async function inspectStableCommand(
       } else if (afterInspection && status.state !== 'conflict') {
         fileSha256 = await hashCommandFile(commandPath)
       }
-    } catch {
-      continue
+    } catch (error) {
+      // Why not a retry: an unreadable managed entry is not an unstable one. A 0700 shim written by
+      // an older build cannot be read by this process, so retrying only exhausts the attempts and
+      // throws. Report it without target evidence so callers can still replace it.
+      if (!isPermissionError(error)) {
+        continue
+      }
     }
     const afterEvidence = await readEntrySnapshot(commandPath)
     if (hasSameSnapshot(afterInspection, afterEvidence)) {
