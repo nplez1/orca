@@ -200,7 +200,9 @@ export function buildMacPrivilegedSymlinkTransaction(
     `if [ "$captured" -eq 1 ]; then ${restoreOrPreserve}; else /bin/rmdir ${quoteShell(transactionDirectory)}; fi; exit 73`
   return (
     `${capture}if /bin/mkdir ${quoteShell(publishDirectory)} && ` +
-    `/bin/ln -s ${quoteShell(args.launcherPath)} ${quoteShell(publishPath)} && ` +
+    // Why a subshell: the shim must stay traversable for other users under a restrictive umask,
+    // and scoping it here keeps that umask out of the rest of the transaction.
+    `(umask 022; /bin/ln -s ${quoteShell(args.launcherPath)} ${quoteShell(publishPath)}) && ` +
     `/bin/ln -P ${quoteShell(publishPath)} ${quoteShell(commandDirectory)}; then ` +
     `/bin/rm ${quoteShell(publishPath)}; /bin/rmdir ${quoteShell(publishDirectory)}; ` +
     `if [ "$captured" -eq 1 ]; then /bin/rm ${quoteShell(heldPath)}; fi; ` +
