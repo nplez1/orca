@@ -103,24 +103,12 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
                   'Stored locally in the Orca encrypted credential store and sent to GitHub only to refresh your Copilot AI-credit usage.'
                 )}
           </p>
-          {usingGithubCli ? (
-            <p className="text-xs text-muted-foreground">
-              {translate(
-                'auto.components.settings.accounts.pane.copilot.section.467c761749',
-                'Enterprise slug'
-              )}
-              {': '}
-              <span className="font-mono text-xs text-foreground">
-                {copilotEnterpriseSlugDraft}
-              </span>
-            </p>
-          ) : null}
           {copilotGhSetupHint ? (
             <div className="space-y-1.5 pt-1">
               <p className="text-xs text-muted-foreground">
                 {translate(
                   'auto.components.settings.accounts.pane.copilot.section.f1c1fd4ffb',
-                  'Run this to finish setting up the GitHub CLI for Copilot billing:'
+                  'Run this to finish setting up the GitHub CLI for your Copilot entitlement:'
                 )}
               </p>
               <div className="flex items-start gap-2 rounded-md border border-border/60 bg-background/50 px-3 py-2">
@@ -170,7 +158,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         )}
         description={translate(
           'auto.components.settings.accounts.pane.copilot.section.4d5c01e15c',
-          'Paste a GitHub token that can read enterprise billing and the slug it belongs to.'
+          'Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.'
         )}
         keywords={['copilot', 'github', 'token', 'enterprise billing', 'ai credits', 'usage']}
         className="space-y-2"
@@ -252,7 +240,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         <p className="text-xs text-muted-foreground">
           {translate(
             'auto.components.settings.accounts.pane.copilot.section.022c7c89d5',
-            'Orca prefers your GitHub CLI sign-in, which needs the manage_billing:enterprise scope to discover an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.'
+            'Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.'
           )}
         </p>
       </SearchableSetting>
@@ -264,7 +252,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         )}
         description={translate(
           'auto.components.settings.accounts.pane.copilot.section.fa8def1ab4',
-          'Required. The slug selects which enterprise Orca reads GitHub Copilot usage from.'
+          'Optional. Required only when using an enterprise billing token override.'
         )}
         keywords={['copilot', 'github', 'enterprise', 'slug', 'billing']}
         className="space-y-2"
@@ -293,18 +281,13 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
             'auto.components.settings.accounts.pane.copilot.section.1006eed696',
             'The slug is the <slug> in github.com/enterprises/<slug>.'
           )}
-          {tokenStored || usingGithubCli ? (
+          {tokenStored ? (
             <>
               {' '}
-              {tokenStored
-                ? translate(
-                    'auto.components.settings.accounts.pane.copilot.section.3c8314c1de',
-                    'Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.'
-                  )
-                : translate(
-                    'auto.components.settings.accounts.pane.copilot.section.06fb320a51',
-                    'Detected from your GitHub CLI sign-in. Paste a token to override it.'
-                  )}
+              {translate(
+                'auto.components.settings.accounts.pane.copilot.section.3c8314c1de',
+                'Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.'
+              )}
             </>
           ) : null}
         </p>
