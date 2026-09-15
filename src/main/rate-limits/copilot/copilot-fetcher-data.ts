@@ -60,6 +60,10 @@ export function makeCopilotError(
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function readFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
@@ -185,4 +189,38 @@ export function buildCopilotSnapshot(totals: {
     status: 'ok',
     usageMetadata: { source: 'web' }
   }
+}
+
+export function buildCopilotEntitlementSnapshot(payload: unknown): ProviderRateLimits | null {
+  if (!isRecord(payload) || !isRecord(payload.quota_snapshots)) {
+    return null
+  }
+  const quota = payload.quota_snapshots.premium_interactions
+  if (!isRecord(quota)) {
+    return null
+  }
+  const used = readFiniteNumber(quota.credits_used)
+  const limit = readFiniteNumber(quota.entitlement)
+  if (used === null || limit === null || limit <= 0) {
+    return null
+  }
+  const parsedReset =
+    typeof payload.quota_reset_date_utc === 'string'
+      ? Date.parse(payload.quota_reset_date_utc)
+      : Number.NaN
+  const resetsAt = Number.isFinite(parsedReset) ? parsedReset : readNextMonthStartUtc()
+  return buildCopilotSnapshot({
+    allowance: {
+      unit: { kind: 'count', label: 'AI credits' },
+      used,
+      limit,
+      resetsAt
+    },
+    window: {
+      usedPercent: Math.min(100, Math.max(0, (used / limit) * 100)),
+      windowMinutes: COPILOT_MONTHLY_WINDOW_MINUTES,
+      resetsAt,
+      resetDescription: null
+    }
+  })
 }
