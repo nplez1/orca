@@ -252,7 +252,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
         <p className="text-xs text-muted-foreground">
           {translate(
             'auto.components.settings.accounts.pane.copilot.section.022c7c89d5',
-            'Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.'
+            'Orca prefers your GitHub CLI sign-in, which needs the manage_billing:enterprise scope to discover an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.'
           )}
         </p>
       </SearchableSetting>
