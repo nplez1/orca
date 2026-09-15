@@ -3,31 +3,21 @@ import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-f
 import { parseAuthStatus } from '../../github/auth-diagnose'
 
 /**
- * Resolves the enterprise slug for Copilot billing from the user's existing `gh`
- * sign-in, so an enterprise user does not have to mint and paste a token.
+ * Verifies that the GitHub CLI sign-in can read the user's Copilot entitlement.
  *
- * Why scopes are checked: GitHub exposes an enterprise's slug through the GraphQL
- * `viewer.enterprises` field, which needs `read:enterprise`, and its billing data needs
- * `manage_billing:enterprise`; `admin:enterprise` implies both. Verified against the
- * live API: without `read:enterprise` the query fails with INSUFFICIENT_SCOPES rather
- * than returning an empty list, so the two cases are distinguishable.
+ * Why scopes are checked: GitHub's per-user Copilot entitlement endpoint requires
+ * the ordinary `user` scope, not enterprise billing or administration.
  */
-const SLUG_SCOPES = ['read:enterprise', 'admin:enterprise']
-const BILLING_SCOPES = ['manage_billing:enterprise', 'admin:enterprise']
-const ENTERPRISE_SLUG_QUERY = '{ viewer { enterprises(first: 10) { nodes { slug } } } }'
+const COPILOT_USER_SCOPE = 'user'
 
 export type CopilotGhCredentialsResult =
-  | { status: 'ok'; enterpriseSlug: string }
-  /** gh is not on PATH — the paste form is the only route. */
+  | { status: 'ok' }
+  /** gh is not on PATH — the stored-token override is the only route. */
   | { status: 'gh-missing' }
   | { status: 'unauthenticated' }
-  /** Signed in, but without the scopes the billing endpoints need. */
+  /** Signed in, but without the scope the entitlement endpoint needs. */
   | { status: 'missing-scope'; missing: string[] }
-  | { status: 'no-enterprise' }
 
-// Why cached: discovery costs a subprocess per poll cycle and the slug only changes if
-// the user's enterprise membership does.
-let cachedEnterpriseSlug: string | null = null
 // Why a module-level cache rather than service state: `getState()` is synchronous and
 // called on every renderer push, so it cannot await a subprocess. The cycle reads this
 // snapshot, and the probe is refreshed out of band — never on the fetch critical path,
@@ -55,41 +45,6 @@ async function readActiveAccountScopes(): Promise<string[] | null> {
   return active ? active.scopes : []
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function readFirstSlug(payload: unknown): string | null {
-  const viewer = isRecord(payload) && isRecord(payload.data) ? payload.data.viewer : null
-  const enterprises = isRecord(viewer) ? viewer.enterprises : null
-  const nodes = isRecord(enterprises) && Array.isArray(enterprises.nodes) ? enterprises.nodes : []
-  for (const node of nodes) {
-    const slug = isRecord(node) && typeof node.slug === 'string' ? node.slug.trim() : ''
-    if (slug) {
-      return slug
-    }
-  }
-  return null
-}
-
-async function discoverEnterpriseSlug(): Promise<string | null> {
-  if (cachedEnterpriseSlug) {
-    return cachedEnterpriseSlug
-  }
-  try {
-    const { stdout } = await ghExecFileAsync([
-      'api',
-      'graphql',
-      '-f',
-      `query=${ENTERPRISE_SLUG_QUERY}`
-    ])
-    cachedEnterpriseSlug = readFirstSlug(JSON.parse(stdout))
-    return cachedEnterpriseSlug
-  } catch {
-    return null
-  }
-}
-
 export async function resolveGhCopilotCredentials(): Promise<CopilotGhCredentialsResult> {
   const scopes = await readActiveAccountScopes()
   // null means gh itself is missing, which the caller reports distinctly from
@@ -102,23 +57,16 @@ export async function resolveGhCopilotCredentials(): Promise<CopilotGhCredential
   }
 
   const missing: string[] = []
-  if (!SLUG_SCOPES.some((scope) => scopes.includes(scope))) {
-    missing.push('read:enterprise')
-  }
-  if (!BILLING_SCOPES.some((scope) => scopes.includes(scope))) {
-    missing.push('manage_billing:enterprise')
+  if (!scopes.includes(COPILOT_USER_SCOPE)) {
+    missing.push(COPILOT_USER_SCOPE)
   }
   // Why fail closed: the provider item is default-on, so treating a scope-less gh as a
-  // source would show a permanent error bar to every enterprise user who never asked
-  // for Copilot usage. Falling back to the paste form keeps it quiet instead.
+  // source would show a permanent error bar to every user who never asked for Copilot
+  // usage. Falling back to the stored-token override keeps it quiet instead.
   if (missing.length > 0) {
     return { status: 'missing-scope', missing }
   }
-
-  const enterpriseSlug = await discoverEnterpriseSlug()
-  // Why not a scope error: the scopes above were present, so an empty list means the
-  // signed-in login simply belongs to no enterprise.
-  return enterpriseSlug ? { status: 'ok', enterpriseSlug } : { status: 'no-enterprise' }
+  return { status: 'ok' }
 }
 
 /** Synchronous view for `getState()` and the fetch cycle. Null until the first probe lands. */
@@ -167,7 +115,6 @@ export function readCopilotGhCredentialsForCycle(): CopilotGhCredentialsResult |
 
 /** Test seam: discovery is memoised, so suites that change the payload must reset it. */
 export function __resetCopilotGhCredentialsCache(): void {
-  cachedEnterpriseSlug = null
   cachedResult = null
   cachedAtMs = 0
   refreshInFlight = null

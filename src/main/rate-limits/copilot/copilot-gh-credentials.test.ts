@@ -6,7 +6,7 @@ const { ghExecFileAsyncMock } = vi.hoisted(() => ({
   ghExecFileAsyncMock: vi.fn<(args: string[], options?: unknown) => Promise<GhResult>>()
 }))
 
-// Why: discovery shells out to `gh` twice; mocking that module keeps the suite off
+// Why: credential discovery shells out to `gh`; mocking that module keeps the suite off
 // the real CLI while leaving the real `gh auth status` parser in play.
 vi.mock('../../git/command-runner/gh-exec-file', () => ({
   ghExecFileAsync: ghExecFileAsyncMock
@@ -17,8 +17,7 @@ import {
   resolveGhCopilotCredentials
 } from './copilot-gh-credentials'
 
-const SLUG_QUERY = '{ viewer { enterprises(first: 10) { nodes { slug } } } }'
-const ENTERPRISE_SCOPES = ['read:enterprise', 'manage_billing:enterprise']
+const COPILOT_USER_SCOPE = 'user'
 
 type AccountFixture = { account: string; active?: boolean; scopes?: string[] }
 
@@ -39,26 +38,14 @@ function signedIn(scopes: string[]): GhResult {
   return authStatusText([{ account: 'octocat', active: true, scopes }])
 }
 
-function graphqlNodes(nodes: unknown[]): GhResult {
-  return { stdout: JSON.stringify({ data: { viewer: { enterprises: { nodes } } } }), stderr: '' }
-}
-
 function ghEnoent(): Error & { code: string } {
   return Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' })
-}
-
-function grapqlCallCount(): number {
-  return ghExecFileAsyncMock.mock.calls.filter(([args]) => args.includes('graphql')).length
-}
-
-function discover(slugs: unknown[]): void {
-  ghExecFileAsyncMock.mockResolvedValueOnce(graphqlNodes(slugs))
 }
 
 describe('resolveGhCopilotCredentials', () => {
   beforeEach(() => {
     ghExecFileAsyncMock.mockReset()
-    // Discovery is memoised across calls; each case starts from a cold cache.
+    // The status probe is cached separately from direct credential resolution.
     __resetCopilotGhCredentialsCache()
   })
 
@@ -78,8 +65,6 @@ describe('resolveGhCopilotCredentials', () => {
     })
 
     await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'unauthenticated' })
-
-    expect(grapqlCallCount()).toBe(0)
   })
 
   it('reports unauthenticated when gh auth status exits non-zero', async () => {
@@ -88,8 +73,6 @@ describe('resolveGhCopilotCredentials', () => {
     )
 
     await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'unauthenticated' })
-
-    expect(grapqlCallCount()).toBe(0)
   })
 
   it('reports unauthenticated when gh names an account but prints no scopes', async () => {
@@ -101,18 +84,13 @@ describe('resolveGhCopilotCredentials', () => {
   })
 
   const MISSING_SCOPE_CASES: [string, string[], string[]][] = [
+    ['no user scope', ['repo', 'gist'], [COPILOT_USER_SCOPE]],
     [
-      'no enterprise scopes at all',
-      ['repo', 'gist'],
-      ['read:enterprise', 'manage_billing:enterprise']
+      'enterprise scopes without the user scope',
+      ['read:enterprise', 'manage_billing:enterprise'],
+      [COPILOT_USER_SCOPE]
     ],
-    ['read:enterprise but no billing scope', ['read:enterprise'], ['manage_billing:enterprise']],
-    ['billing scope but no read:enterprise', ['manage_billing:enterprise'], ['read:enterprise']],
-    [
-      'a lookalike scope name',
-      ['read:enterprise:extra', 'manage_billing:enterprise:extra'],
-      ['read:enterprise', 'manage_billing:enterprise']
-    ]
+    ['a lookalike scope name', ['user:extra'], [COPILOT_USER_SCOPE]]
   ]
 
   it.each(MISSING_SCOPE_CASES)(
@@ -124,151 +102,40 @@ describe('resolveGhCopilotCredentials', () => {
         status: 'missing-scope',
         missing
       })
-
-      // Why: discovery would fail with INSUFFICIENT_SCOPES, so it is not attempted.
-      expect(grapqlCallCount()).toBe(0)
     }
   )
 
-  it('accepts admin:enterprise as implying both enterprise scopes', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(['repo', 'admin:enterprise']))
-    discover([{ slug: 'acme-corp' }])
+  it('accepts a token holding the user scope', async () => {
+    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(['repo', COPILOT_USER_SCOPE]))
 
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
-
-    expect(ghExecFileAsyncMock.mock.calls[1]?.[0]).toEqual([
-      'api',
-      'graphql',
-      '-f',
-      `query=${SLUG_QUERY}`
-    ])
-  })
-
-  it('accepts a token holding both documented scopes', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(['repo', ...ENTERPRISE_SCOPES]))
-    discover([{ slug: 'acme-corp' }])
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
+    await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'ok' })
+    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(1)
   })
 
   it('reads the scopes of the active account when several are signed in', async () => {
     ghExecFileAsyncMock.mockResolvedValueOnce(
       authStatusText([
-        { account: 'old-user', active: false, scopes: ['repo'] },
-        { account: 'new-user', active: true, scopes: ['admin:enterprise'] }
+        { account: 'old-user', active: false, scopes: [COPILOT_USER_SCOPE] },
+        { account: 'new-user', active: true, scopes: ['repo'] }
       ])
     )
-    discover([{ slug: 'acme-corp' }])
 
     await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
+      status: 'missing-scope',
+      missing: [COPILOT_USER_SCOPE]
     })
   })
 
-  it('takes the first enterprise slug from the GraphQL payload', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    discover([{ slug: 'acme-corp' }, { slug: 'second-corp' }])
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
-  })
-
-  it('trims the discovered slug', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    discover([{ slug: '  acme-corp  ' }])
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
-  })
-
-  it('skips nodes without a usable slug', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    discover([null, 7, {}, { slug: '' }, { slug: 'acme-corp' }])
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
-  })
-
-  it('reports no-enterprise when the signed-in login belongs to none', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    discover([])
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'no-enterprise' })
-  })
-
-  it('reports no-enterprise when the payload carries no enterprises field', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    ghExecFileAsyncMock.mockResolvedValueOnce({ stdout: '{}', stderr: '' })
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'no-enterprise' })
-  })
-
-  it('reports no-enterprise rather than a scope error when the query itself fails', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    ghExecFileAsyncMock.mockRejectedValueOnce(
-      Object.assign(new Error('gh: INSUFFICIENT_SCOPES (HTTP 200)'), {
-        stderr: 'INSUFFICIENT_SCOPES'
-      })
-    )
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'no-enterprise' })
-  })
-
-  it('reports no-enterprise when the GraphQL payload is unreadable JSON', async () => {
-    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-    ghExecFileAsyncMock.mockResolvedValueOnce({ stdout: '<html>not json</html>', stderr: '' })
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({ status: 'no-enterprise' })
-  })
-
-  it('reuses the discovered slug on a second call instead of re-running discovery', async () => {
+  it('checks the active GitHub CLI account each time credentials are resolved', async () => {
     ghExecFileAsyncMock
-      .mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-      .mockResolvedValueOnce(graphqlNodes([{ slug: 'acme-corp' }]))
-      .mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
+      .mockResolvedValueOnce(signedIn([COPILOT_USER_SCOPE]))
+      .mockResolvedValueOnce(signedIn([COPILOT_USER_SCOPE]))
 
     const first = await resolveGhCopilotCredentials()
     const second = await resolveGhCopilotCredentials()
 
-    expect(first).toEqual({ status: 'ok', enterpriseSlug: 'acme-corp' })
-    expect(second).toEqual({ status: 'ok', enterpriseSlug: 'acme-corp' })
-    expect(grapqlCallCount()).toBe(1)
-    // Only the auth check repeats: two calls, one graphql.
-    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(3)
-  })
-
-  it('re-runs discovery once the cache is reset', async () => {
-    ghExecFileAsyncMock
-      .mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-      .mockResolvedValueOnce(graphqlNodes([{ slug: 'acme-corp' }]))
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'acme-corp'
-    })
-
-    __resetCopilotGhCredentialsCache()
-    ghExecFileAsyncMock
-      .mockResolvedValueOnce(signedIn(ENTERPRISE_SCOPES))
-      .mockResolvedValueOnce(graphqlNodes([{ slug: 'other-corp' }]))
-
-    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
-      status: 'ok',
-      enterpriseSlug: 'other-corp'
-    })
-    expect(grapqlCallCount()).toBe(2)
+    expect(first).toEqual({ status: 'ok' })
+    expect(second).toEqual({ status: 'ok' })
+    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
   })
 })

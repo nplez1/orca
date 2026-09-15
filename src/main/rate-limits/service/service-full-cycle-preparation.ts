@@ -105,10 +105,12 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       // Why no token here: gh supplies its own sign-in; the stored token is only ever an
       // explicit override passed to gh as GH_TOKEN.
       (copilotGhResult?.status === 'ok'
-        ? { token: '', enterpriseSlug: copilotGhResult.enterpriseSlug }
-        : { token: '', enterpriseSlug: '' })
+        ? { token: '', enterpriseSlug: '', source: 'user-entitlement' as const }
+        : { token: '', enterpriseSlug: '', source: 'enterprise-billing' as const })
     const copilotToken = copilotCredentials.token
     const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
+    const copilotSource =
+      'source' in copilotCredentials ? copilotCredentials.source : 'enterprise-billing'
     const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
     const grokAuthReadResult = readGrokAuthSession()
@@ -131,7 +133,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
-    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotConfigResult.error ?? ''}`
+    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotSource}|${copilotConfigResult.error ?? ''}`
     const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
     if (copilotConfigChanged) {
       this.lastCopilotConfigHash = currentCopilotConfigHash
@@ -220,7 +222,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           }),
       copilotConfigResult.error
         ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
-        : fetchCopilotRateLimits({ token: copilotToken, enterpriseSlug: copilotEnterpriseSlug })
+        : fetchCopilotRateLimits({
+            token: copilotToken,
+            enterpriseSlug: copilotEnterpriseSlug,
+            source: copilotSource
+          })
     ])
 
     if (signal.aborted) {

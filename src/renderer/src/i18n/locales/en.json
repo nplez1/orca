@@ -8946,7 +8946,7 @@
                 "70efb28dee": "GitHub token is required."
               },
               "section": {
-                "022c7c89d5": "Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.",
+                "022c7c89d5": "Orca reads your Copilot AI-credit entitlement through your GitHub CLI sign-in, which needs the user scope. Paste a token only for an enterprise billing override. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits available to you each month.",
                 "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
                 "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
                 "13ae4d0b21": "Not saved",
@@ -8956,7 +8956,7 @@
                 "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
                 "467c761749": "Enterprise slug",
                 "4cf256a883": "Forget token",
-                "4d5c01e15c": "Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
+                "4d5c01e15c": "Optional. Paste a GitHub token that can read enterprise billing and the slug it belongs to.",
                 "6a27446bd3": "Using your GitHub CLI sign-in",
                 "6a327922f7": "Copied",
                 "74858f3994": "Paste your GitHub token",
@@ -8970,9 +8970,9 @@
                 "dc3eaf8d70": "GitHub Copilot",
                 "ed307672cd": "Configure GitHub Copilot usage tracking for your account.",
                 "ef36dc11a9": "Replace",
-                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for Copilot billing:",
+                "f1c1fd4ffb": "Run this to finish setting up the GitHub CLI for your Copilot entitlement:",
                 "f8bb20c24c": "Open console",
-                "fa8def1ab4": "Required. The slug selects which enterprise Orca reads GitHub Copilot usage from."
+                "fa8def1ab4": "Optional. Required only when using an enterprise billing token override."
               }
             }
           }
