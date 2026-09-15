@@ -85,10 +85,8 @@ export class CliCommandInspection extends CliInstallLocation {
           detail: `Register ${commandPath} to use Orca from the terminal.`
         })
       }
-      // Why not a throw: lstat succeeded above, so this entry's own mode is what denied the read —
-      // macOS enforces a symlink's permission bits on readlink, and a shim written by an older
-      // build is 0700/root-owned. Reporting it as stale lets Settings load and re-registration
-      // replace it, instead of the EACCES crashing the whole status call.
+      // Why not a throw: lstat succeeded, so the entry's own mode denied the read — macOS enforces a
+      // symlink's mode on readlink, and an older shim is 0700. Stale lets Settings recover.
       if (isPermissionError(error)) {
         return this.buildStatus({
           commandPath,

@@ -97,9 +97,8 @@ export async function inspectStableCommand(
         fileSha256 = await hashCommandFile(commandPath)
       }
     } catch (error) {
-      // Why not a retry: an unreadable managed entry is not an unstable one. A 0700 shim written by
-      // an older build cannot be read by this process, so retrying only exhausts the attempts and
-      // throws. Report it without target evidence so callers can still replace it.
+      // Why not a retry: an unreadable entry is not an unstable one, so retrying only exhausts the
+      // attempts and throws. Return it without target evidence so callers can still replace it.
       if (!isPermissionError(error)) {
         continue
       }
@@ -205,8 +204,7 @@ export function buildMacPrivilegedSymlinkTransaction(
     `if [ "$captured" -eq 1 ]; then ${restoreOrPreserve}; else /bin/rmdir ${quoteShell(transactionDirectory)}; fi; exit 73`
   return (
     `${capture}if /bin/mkdir ${quoteShell(publishDirectory)} && ` +
-    // Why a subshell: the shim must stay traversable for other users under a restrictive umask,
-    // and scoping it here keeps that umask out of the rest of the transaction.
+    // Why a subshell: the link must be traversable while the script's own `umask 077` stays intact.
     `(umask 022; /bin/ln -s ${quoteShell(args.launcherPath)} ${quoteShell(publishPath)}) && ` +
     `/bin/ln -P ${quoteShell(publishPath)} ${quoteShell(commandDirectory)}; then ` +
     `/bin/rm ${quoteShell(publishPath)}; /bin/rmdir ${quoteShell(publishDirectory)}; ` +
