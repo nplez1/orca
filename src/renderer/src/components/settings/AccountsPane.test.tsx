@@ -198,11 +198,10 @@ describe('AccountsPane', () => {
     expect(markup).toContain('id="copilot-enterprise-slug" placeholder="your-enterprise"')
     expect(markup).toContain('Enterprise slug')
     expect(markup).toContain('The slug is the &lt;slug&gt; in github.com/enterprises/')
-    // Orca reads the gh sign-in itself, so the token is an override; the only
-    // real blocker is a gh sign-in without the enterprise billing scopes.
-    expect(markup).toContain('Orca prefers your GitHub CLI sign-in')
-    expect(markup).toContain('manage_billing:enterprise scope')
-    expect(markup).toContain('Paste a token only for accounts that sign-in cannot serve')
+    // Orca reads the gh sign-in itself; the token is only an enterprise-billing override.
+    expect(markup).toContain('Orca reads your Copilot AI-credit entitlement')
+    expect(markup).toContain('user scope')
+    expect(markup).toContain('Paste a token only for an enterprise billing override')
     expect(markup).toContain('The token needs the “Enterprise billing” read permission')
     expect(markup).not.toContain('cannot read these billing endpoints')
     // Nothing is stored in this render, so the section offers Save and hides both
