@@ -1,7 +1,20 @@
 import type { AppState } from '../types'
+import { getEnvironmentSshStateGeneration } from '../slices/runtime-environment-ssh'
+import { getRuntimeEnvironmentConnectionGeneration } from '../slices/runtime-status'
+
 export type LocalRepoCatalogFetchOutcome =
   | { status: 'fulfilled' }
   | { status: 'rejected'; reason: unknown }
+
+/**
+ * Why two generations: a reconnect or a replaced SSH state can land while a catalog fetch is in
+ * flight, and a catalog fetched on the old connection must not overwrite the new one's.
+ */
+export type RuntimeRepoCatalogConnectionFence = {
+  environmentId: string
+  sshStateGeneration: number
+  runtimeConnectionGeneration: number
+}
 
 export const latestLocalRepoCatalogFetchByStore = new WeakMap<
   () => AppState,
@@ -14,6 +27,26 @@ export const latestRepoCatalogGenerationByHostByStore = new WeakMap<
 >()
 
 export const latestAllHostRepoCatalogGenerationByStore = new WeakMap<() => AppState, number>()
+
+export function captureRuntimeRepoCatalogConnectionFence(
+  environmentId: string
+): RuntimeRepoCatalogConnectionFence {
+  return {
+    environmentId,
+    sshStateGeneration: getEnvironmentSshStateGeneration(environmentId),
+    runtimeConnectionGeneration: getRuntimeEnvironmentConnectionGeneration(environmentId)
+  }
+}
+
+export function isRuntimeRepoCatalogConnectionFenceCurrent(
+  fence: RuntimeRepoCatalogConnectionFence
+): boolean {
+  return (
+    getEnvironmentSshStateGeneration(fence.environmentId) === fence.sshStateGeneration &&
+    getRuntimeEnvironmentConnectionGeneration(fence.environmentId) ===
+      fence.runtimeConnectionGeneration
+  )
+}
 
 export function startLocalRepoCatalogFetch(
   get: () => AppState
