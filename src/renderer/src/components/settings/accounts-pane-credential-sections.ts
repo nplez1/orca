@@ -221,8 +221,8 @@ function useCopilotCredentials(
         const status = await window.api.copilotCredentials.getStatus()
         setCopilotCredentialSource(status.source)
         setCopilotGhSetupHint(status.ghSetupHint)
-        // Why: the token and the slug share one stored file, so the status seeds
-        // the slug field too; the token itself is never rendered.
+        // Why: the stored enterprise override keeps its token and slug together; the token
+        // itself is never rendered.
         setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
       } catch (error) {
         console.error('Failed to load GitHub Copilot credential status:', error)
