@@ -50,7 +50,7 @@ async function getCopilotCredentialsStatus(): Promise<CopilotCredentialsStatus> 
   if (gh.status === 'ok') {
     return {
       configured: true,
-      enterpriseSlug: gh.enterpriseSlug,
+      enterpriseSlug: null,
       source: 'github-cli',
       ghSetupHint: null
     }

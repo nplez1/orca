@@ -105,7 +105,7 @@ describe('AccountsPane GitHub Copilot credentials', () => {
   it('presents the GitHub CLI sign-in as a source rather than an unconfigured state', async () => {
     mocks.copilotGetStatus.mockResolvedValue({
       configured: true,
-      enterpriseSlug: 'acme',
+      enterpriseSlug: null,
       source: 'github-cli',
       ghSetupHint: null
     })
@@ -120,11 +120,7 @@ describe('AccountsPane GitHub Copilot credentials', () => {
     expect(copilot.queryByText('Stored locally')).toBeNull()
     expect(copilot.queryByText('Saved')).toBeNull()
     expect(copilot.getByText('Optional override')).toBeTruthy()
-    expect(copilot.getByText('acme')).toBeTruthy()
-    expect(copilot.getByDisplayValue('acme')).toBeTruthy()
-    expect(
-      copilot.getByText(/Detected from your GitHub CLI sign-in\. Paste a token to override it\./)
-    ).toBeTruthy()
+    expect(copilot.getByPlaceholderText('your-enterprise').getAttribute('value')).toBe('')
     expect(copilot.getByRole('button', { name: 'Save' })).toBeTruthy()
     // Nothing is stored, so there is nothing to forget.
     expect(copilot.queryByRole('button', { name: 'Forget token' })).toBeNull()
@@ -132,7 +128,7 @@ describe('AccountsPane GitHub Copilot credentials', () => {
   })
 
   it('surfaces the GitHub CLI setup hint as a copyable command', async () => {
-    const hint = 'gh auth refresh -s read:enterprise -s manage_billing:enterprise'
+    const hint = 'gh auth refresh -s user'
     mocks.copilotGetStatus.mockResolvedValue({
       configured: false,
       enterpriseSlug: null,
@@ -170,7 +166,7 @@ describe('AccountsPane GitHub Copilot credentials', () => {
   it('lets a pasted token override the GitHub CLI source', async () => {
     mocks.copilotGetStatus.mockResolvedValue({
       configured: true,
-      enterpriseSlug: 'acme',
+      enterpriseSlug: null,
       source: 'github-cli',
       ghSetupHint: null
     })
@@ -191,6 +187,9 @@ describe('AccountsPane GitHub Copilot credentials', () => {
 
     fireEvent.change(copilot.getByPlaceholderText('Paste your GitHub token'), {
       target: { value: 'ghp_token' }
+    })
+    fireEvent.change(copilot.getByPlaceholderText('your-enterprise'), {
+      target: { value: 'acme' }
     })
     fireEvent.click(copilot.getByRole('button', { name: 'Save' }))
 
