@@ -6,7 +6,6 @@ import {
   type ClaudeRuntimeAuthPreparation,
   type CodexAccountSelectionTarget,
   type MiniMaxResolvedConfig,
-  type CopilotResolvedConfig,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
   type ProviderRateLimits,
@@ -171,17 +170,6 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
         },
         error: toErrorMessage(error)
       }
-    }
-  }
-
-  protected resolveCopilotConfig(): CopilotResolvedConfig {
-    try {
-      return {
-        config: this.copilotConfigResolver?.() ?? { token: '', enterpriseSlug: '' },
-        error: null
-      }
-    } catch (error) {
-      return { config: { token: '', enterpriseSlug: '' }, error: toErrorMessage(error) }
     }
   }
 }

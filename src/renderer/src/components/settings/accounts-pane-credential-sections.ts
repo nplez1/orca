@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
 import type {
   CopilotCredentialSectionModel,
-  CopilotCredentialSource,
+  CopilotGhStatus,
   MiniMaxCredentialSectionModel
 } from './accounts-pane-types'
-import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
+import { useAppStore } from '../../store'
+import { useMountedRef } from '@/hooks/useMountedRef'
+import { translate } from '@/i18n/i18n'
 
 export type AccountsPaneCredentialSections = {
   miniMax: MiniMaxCredentialSectionModel
@@ -78,33 +81,46 @@ function useMiniMaxCredentials(
 function useCopilotCredentials(
   recordFeatureInteraction: RecordFeatureInteraction
 ): CopilotCredentialSectionModel {
-  const [copilotTokenDraft, setCopilotTokenDraft] = useState('')
-  const [copilotEnterpriseSlugDraft, setCopilotEnterpriseSlugDraft] = useState('')
-  const [copilotCredentialSource, setCopilotCredentialSource] =
-    useState<CopilotCredentialSource>('none')
+  const [copilotGhStatus, setCopilotGhStatus] = useState<CopilotGhStatus | null>(null)
   const [copilotGhSetupHint, setCopilotGhSetupHint] = useState<string | null>(null)
-  const [copilotGhSetupHintCopied, setCopilotGhSetupHintCopied] = useState(false)
   const [copilotCredentialBusy, setCopilotCredentialBusy] = useState(false)
-  const copyResetTimerRef = useRef<number | null>(null)
-  const { saveCopilotCredentials, clearCopilotCredentials } = createCopilotCredentialActions({
-    copilotTokenDraft,
-    copilotCredentialSource,
-    setCopilotTokenDraft,
-    copilotEnterpriseSlugDraft,
-    setCopilotEnterpriseSlugDraft,
-    setCopilotCredentialSource,
-    setCopilotGhSetupHint,
-    setCopilotCredentialBusy,
-    recordFeatureInteraction
-  })
+  const [copilotTerminalOpen, setCopilotTerminalOpen] = useState(false)
+  const refreshRateLimits = useAppStore((s) => s.refreshRateLimits)
+  const mountedRef = useMountedRef()
 
   useEffect(() => {
-    return () => {
-      if (copyResetTimerRef.current !== null) {
-        window.clearTimeout(copyResetTimerRef.current)
+    const readStatus = async (): Promise<void> => {
+      const status = await window.api.copilotCredentials.getStatus()
+      if (mountedRef.current) {
+        setCopilotGhStatus(status.ghStatus)
+        setCopilotGhSetupHint(status.ghSetupHint)
       }
     }
-  }, [])
+    readStatus().catch((error: unknown) => {
+      console.error('Failed to load the GitHub Copilot status:', error)
+    })
+  }, [mountedRef])
+
+  // Why the full refresh: main re-probes gh for this read, and the provider only becomes
+  // visible once a fetch cycle picks that probe up from its cache.
+  const recheckCopilotCredentials = async (): Promise<void> => {
+    setCopilotCredentialBusy(true)
+    try {
+      const status = await window.api.copilotCredentials.getStatus()
+      if (mountedRef.current) {
+        setCopilotGhStatus(status.ghStatus)
+        setCopilotGhSetupHint(status.ghSetupHint)
+      }
+      await refreshRateLimits()
+      recordFeatureInteraction('usage-tracking')
+    } catch (error) {
+      console.error('Failed to re-check the GitHub Copilot status:', error)
+    } finally {
+      if (mountedRef.current) {
+        setCopilotCredentialBusy(false)
+      }
+    }
+  }
 
   const copyCopilotGhSetupHint = async (): Promise<void> => {
     if (!copilotGhSetupHint) {
@@ -112,47 +128,25 @@ function useCopilotCredentials(
     }
     try {
       await window.api.ui.writeClipboardText(copilotGhSetupHint)
-      setCopilotGhSetupHintCopied(true)
-      if (copyResetTimerRef.current !== null) {
-        window.clearTimeout(copyResetTimerRef.current)
-      }
-      // Why: match the app's other inline copy buttons — swap the icon, then reset.
-      copyResetTimerRef.current = window.setTimeout(() => {
-        copyResetTimerRef.current = null
-        setCopilotGhSetupHintCopied(false)
-      }, 1500)
+      toast.success(
+        translate(
+          'auto.components.settings.accounts.pane.credential.sections.2fa282378a',
+          'Copied command.'
+        )
+      )
     } catch (error) {
       console.error('Failed to copy the GitHub CLI setup command:', error)
     }
   }
 
-  useEffect(() => {
-    const refresh = async (): Promise<void> => {
-      try {
-        const status = await window.api.copilotCredentials.getStatus()
-        setCopilotCredentialSource(status.source)
-        setCopilotGhSetupHint(status.ghSetupHint)
-        // Why: the stored enterprise override keeps its token and slug together; the token
-        // itself is never rendered.
-        setCopilotEnterpriseSlugDraft(status.enterpriseSlug ?? '')
-      } catch (error) {
-        console.error('Failed to load GitHub Copilot credential status:', error)
-      }
-    }
-    void refresh()
-  }, [])
-
   return {
-    copilotTokenDraft,
-    setCopilotTokenDraft,
-    copilotEnterpriseSlugDraft,
-    setCopilotEnterpriseSlugDraft,
-    copilotCredentialSource,
+    copilotGhStatus,
     copilotGhSetupHint,
-    copilotGhSetupHintCopied,
-    copyCopilotGhSetupHint,
     copilotCredentialBusy,
-    saveCopilotCredentials,
-    clearCopilotCredentials
+    copilotTerminalOpen,
+    openCopilotTerminal: () => setCopilotTerminalOpen(true),
+    closeCopilotTerminal: () => setCopilotTerminalOpen(false),
+    recheckCopilotCredentials,
+    copyCopilotGhSetupHint
   }
 }

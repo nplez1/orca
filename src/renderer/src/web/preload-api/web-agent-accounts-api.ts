@@ -17,19 +17,16 @@ export function createMiniMaxCredentialsApi(): NonNullable<
 export function createCopilotCredentialsApi(): NonNullable<
   Partial<PreloadApi>['copilotCredentials']
 > {
-  const notConfigured = {
+  // Why not configured rather than unsupported: the GitHub CLI sign-in belongs to the
+  // machine running Orca, and a browser client cannot probe it. Reporting the unknown
+  // sign-in state is what keeps the pane from claiming a setup it cannot verify.
+  const unavailable = {
     configured: false,
-    enterpriseSlug: null,
-    source: 'none' as const,
+    ghStatus: 'unauthenticated' as const,
     ghSetupHint: null
   }
-  const unsupportedError = new Error(
-    'GitHub Copilot credentials storage is only available in the desktop app.'
-  )
   return {
-    getStatus: () => Promise.resolve(notConfigured),
-    save: () => Promise.reject(unsupportedError),
-    clear: () => Promise.resolve(notConfigured)
+    getStatus: () => Promise.resolve(unavailable)
   }
 }
 

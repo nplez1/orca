@@ -18,9 +18,9 @@ export type UsageProviderSettings = Pick<
   minimaxCookieConfigured: boolean
   minimaxApiKeyConfigured: boolean
   grokAuthConfigured: boolean
-  // Why: the Copilot token and enterprise slug live outside GlobalSettings, so
-  // main derives this boolean each poll and the renderer never sees the token.
-  copilotTokenConfigured: boolean
+  // Why: the GitHub CLI's sign-in lives outside GlobalSettings, so main probes it
+  // and reports the result each poll rather than the renderer guessing.
+  copilotConfigured: boolean
 }
 
 type UsageProviderSnapshots = {
@@ -87,7 +87,7 @@ export function hasUsageProviderSettings(
     settings?.minimaxCookieConfigured === true ||
     settings?.minimaxApiKeyConfigured === true ||
     settings?.grokAuthConfigured === true ||
-    settings?.copilotTokenConfigured === true
+    settings?.copilotConfigured === true
   )
 }
 
@@ -123,7 +123,7 @@ export function hasUsageProviderSettingsForProvider(
     return settings.grokAuthConfigured === true
   }
   if (providerId === 'copilot') {
-    return settings.copilotTokenConfigured === true
+    return settings.copilotConfigured === true
   }
   return false
 }

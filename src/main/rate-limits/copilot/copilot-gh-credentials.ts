@@ -12,7 +12,7 @@ const COPILOT_USER_SCOPE = 'user'
 
 export type CopilotGhCredentialsResult =
   | { status: 'ok' }
-  /** gh is not on PATH — the stored-token override is the only route. */
+  /** gh is not on PATH — nothing can read the entitlement, so Copilot reports not configured. */
   | { status: 'gh-missing' }
   | { status: 'unauthenticated' }
   /** Signed in, but without the scope the entitlement endpoint needs. */
@@ -62,7 +62,7 @@ export async function resolveGhCopilotCredentials(): Promise<CopilotGhCredential
   }
   // Why fail closed: the provider item is default-on, so treating a scope-less gh as a
   // source would show a permanent error bar to every user who never asked for Copilot
-  // usage. Falling back to the stored-token override keeps it quiet instead.
+  // usage. Reporting "not configured" keeps it quiet until the sign-in can serve it.
   if (missing.length > 0) {
     return { status: 'missing-scope', missing }
   }
@@ -76,7 +76,7 @@ export function getCachedCopilotGhCredentials(): CopilotGhCredentialsResult | nu
 
 /**
  * Runs the probe and updates the cache. Concurrent callers share one run, so a cycle
- * and a credential change cannot spawn two `gh` processes.
+ * and a status read cannot spawn two `gh` processes.
  */
 export function refreshCopilotGhCredentials(): Promise<CopilotGhCredentialsResult> {
   if (refreshInFlight) {

@@ -148,11 +148,11 @@ export type RateLimitState = {
    */
   minimaxApiKeyConfigured: boolean
   /**
-   * True when a GitHub token plus enterprise slug are persisted on disk. Copilot
-   * usage comes from GitHub's billing API, which needs a token with enterprise
-   * billing read — the `gh` CLI token Orca otherwise uses cannot read it.
+   * True when the GitHub CLI sign-in can read the user's Copilot entitlement, which
+   * needs the ordinary `user` scope. Nothing is stored on disk: the CLI's own
+   * sign-in is the credential, so this is a probe result rather than a file check.
    */
-  copilotTokenConfigured: boolean
+  copilotConfigured: boolean
   /** True when main finds a Grok CLI session file (~/.grok/auth.json or GROK_HOME). */
   grokAuthConfigured: boolean
   claudeTarget: RateLimitRuntimeTarget

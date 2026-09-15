@@ -2,6 +2,8 @@
 title: Usage & rate-limit tracking
 ---
 
+import { Callout } from '@/components/docs/prose'
+
 Orca reads local usage state for Claude Code, Codex, Gemini, OpenCode, Kimi Code, and MiniMax and surfaces it in the status bar, so you know how close you are to a rate limit before an agent stalls.
 
 ## What's shown
@@ -15,7 +17,14 @@ Orca reads local usage state for Claude Code, Codex, Gemini, OpenCode, Kimi Code
 
 Orca reads the local usage state each agent maintains on disk (under `~/.claude`, `~/.codex`, and the Gemini/OpenCode equivalents). No API calls, no extra auth. This means the readout is only as fresh as the agent's own bookkeeping — numbers update when the agent writes, not in real time.
 
-GitHub Copilot is the exception, because Copilot is not a CLI agent on disk. Its usage comes from GitHub's enterprise billing API, read through the GitHub CLI sign-in you already have; **Settings → Accounts** also accepts a token and enterprise slug for accounts that sign-in cannot serve.
+GitHub Copilot is the exception, because Copilot is not a CLI agent on disk. Orca reads the Copilot entitlement GitHub tracks for you through the **GitHub CLI** sign-in you already have, so no separate token is involved. **Settings → Accounts** runs the exact `gh` command inline when that sign-in cannot serve the read.
+
+<Callout title="GitHub Copilot sign-in">
+  The entitlement read needs the ordinary `user` scope. **Settings → Accounts** reports the state of
+  that sign-in and runs the command that fixes it: `gh auth refresh -s user` for a missing scope,
+  `gh auth login` when nothing is signed in. When `gh` is not installed there is no command to run,
+  so that section shows install guidance instead.
+</Callout>
 
 ## Multi-account accounting
 
@@ -40,11 +49,11 @@ On the companion app, open the host **Accounts** screen for the same switcher/us
 
 Some plans report a spending ceiling rather than 5-hour and 7-day quota windows. When the active account reports no such window, Orca shows the ceiling's own percentage as a monthly bar, and the detail panel shows the amounts consumed against it.
 
-- **GitHub Copilot** — the credits consumed this month against the enterprise's monthly AI-credit budget, e.g. `412,300 of 1,000,000 AI credits`. GitHub's budget API reports that ceiling in dollars, so Orca displays it in AI credits using the price from the usage report.
+- **GitHub Copilot** — the premium-interaction credits consumed this month against your Copilot entitlement, e.g. `412,300 of 1,000,000 AI credits`. GitHub reports that entitlement per user, so the readout follows whichever account your **GitHub CLI** is signed in to. Nothing is stored in Orca: the CLI's own sign-in is the credential.
 
-  Orca reads this through the **GitHub CLI** you are already signed in to, which supplies both the credential and the enterprise slug. The scopes matter: `read:enterprise` is what exposes an enterprise's slug and `manage_billing:enterprise` is what reads its billing data, so a `gh` sign-in without them cannot serve this provider — Settings → Accounts shows the exact `gh auth refresh` command when that is the case. For accounts the CLI cannot serve, that section also accepts a token and enterprise slug directly, which is the override and takes precedence.
+  When the sign-in cannot serve the read, **Settings → Accounts** shows the exact command to fix it — `gh auth login` when `gh` is installed but signed out, or `gh auth refresh -s user` when the sign-in is missing the scope — and runs it in an inline terminal. When `gh` is not installed at all, that section says so and leaves the terminal out.
 
-GitHub Copilot is also the exception to how the percentage is read: Orca normally shows the figure the provider itself reports, but GitHub reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those.
+GitHub Copilot is also the exception to how the percentage is read: Orca normally shows the figure the provider itself reports, but GitHub reports only the credits consumed and the entitlement they count against, so Orca derives the percentage from those.
 
 ## Estimated cost (Stats)
 

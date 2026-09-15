@@ -115,7 +115,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     minimaxCookieConfigured: rateLimits.minimaxCookieConfigured,
     minimaxApiKeyConfigured: rateLimits.minimaxApiKeyConfigured,
     grokAuthConfigured: rateLimits.grokAuthConfigured,
-    copilotTokenConfigured: rateLimits.copilotTokenConfigured
+    copilotConfigured: rateLimits.copilotConfigured
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)

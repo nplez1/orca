@@ -168,33 +168,26 @@ describe('AccountsPane', () => {
     ).not.toContain('disabled=""')
   })
 
-  it('renders the GitHub Copilot token and enterprise slug form', () => {
+  it('renders the GitHub Copilot GitHub CLI setup section without any credential form', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 
     // The status-bar usage readout links straight to this id.
     expect(markup).toContain('id="accounts-copilot"')
     expect(markup).toContain('GitHub Copilot')
-    // Why: the renderer only ever learns whether a token is stored, so the token
-    // field must stay masked and must never be seeded with a stored value.
-    expect(markup).toMatch(/type="password"[^>]*id="copilot-token"/)
-    expect(markup).toContain(
-      'id="copilot-token" placeholder="Paste your GitHub token" spellCheck="false" value=""'
-    )
-    expect(markup).toContain('id="copilot-enterprise-slug" placeholder="your-enterprise"')
-    expect(markup).toContain('Enterprise slug')
-    expect(markup).toContain('The slug is the &lt;slug&gt; in github.com/enterprises/')
-    // Orca reads the gh sign-in itself; the token is only an enterprise-billing override.
-    expect(markup).toContain('Orca reads your Copilot AI-credit entitlement')
-    expect(markup).toContain('user scope')
-    expect(markup).toContain('Paste a token only for an enterprise billing override')
-    expect(markup).toContain('The token needs the “Enterprise billing” read permission')
-    expect(markup).not.toContain('cannot read these billing endpoints')
-    // Nothing is stored in this render, so the section offers Save and hides both
-    // the Forget control and the GitHub CLI setup hint (the mount-time status read
-    // never runs under SSR).
-    expect(markup).toContain('Not saved')
-    expect(markup).toContain('Credentials not set')
-    expect(markup).not.toMatch(/<button[^>]*>Forget token/)
+    // Why: the GitHub CLI's own sign-in is the credential, so there is nothing to
+    // paste and no stored secret to mask or seed.
+    expect(markup).not.toContain('id="copilot-token"')
+    expect(markup).not.toContain('id="copilot-enterprise-slug"')
+    expect(markup).not.toContain('Enterprise slug')
+    expect(markup).not.toContain('enterprise billing')
+    // The mount-time status read never runs under SSR, so the section shows its
+    // checking state and offers only the re-check control.
+    expect(markup).toContain('Checking...')
+    expect(markup).toContain('Reading the GitHub CLI status from this computer.')
+    expect(markup).toContain('Re-check')
+    // Nothing is actionable until main reports a `gh` command to run.
+    expect(markup).not.toContain('Run setup command')
+    expect(markup).not.toContain('Copy command')
     expect(markup.indexOf('accounts-minimax')).toBeLessThan(markup.indexOf('accounts-copilot'))
   })
 })
