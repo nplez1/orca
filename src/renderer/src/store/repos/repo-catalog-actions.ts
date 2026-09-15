@@ -18,8 +18,10 @@ import type { RepoSlice } from './repo-state'
 import { arrayElementsUnchanged } from '../catalog-identity'
 import {
   awaitLatestLocalRepoCatalogFetch,
+  captureRuntimeRepoCatalogConnectionFence,
   claimRepoCatalogGeneration,
   isLatestRepoCatalogGeneration,
+  isRuntimeRepoCatalogConnectionFenceCurrent,
   startLocalRepoCatalogFetch
 } from './repo-catalog-fencing'
 import {
@@ -103,17 +105,29 @@ export function createRepoCatalogActions(
         return { reposFetchGeneration: generation }
       })
       const targetHostId = getRuntimeTargetHostId(target)
+      const connectionFence =
+        target.kind === 'environment'
+          ? captureRuntimeRepoCatalogConnectionFence(target.environmentId)
+          : undefined
       claimRepoCatalogGeneration(get, targetHostId, generation)
       try {
         const catalog = await fetchRepoCatalogForTarget(target)
         // A newer same-host fetch superseded us while we awaited — drop this stale result.
-        if (!isLatestRepoCatalogGeneration(get, targetHostId, generation)) {
+        if (
+          !isLatestRepoCatalogGeneration(get, targetHostId, generation) ||
+          (connectionFence !== undefined &&
+            !isRuntimeRepoCatalogConnectionFenceCurrent(connectionFence))
+        ) {
           return
         }
         let finalizedHostRepos: Repo[] = []
         set((s) => {
           // Why: an in-flight fetch for a just-removed env would re-add purged repos and stick; skip only when the env was tombstoned, not merely unhydrated (#8881).
-          if (isRemovedRuntimeHostId(catalog.hostId, s.removedRuntimeEnvironmentIds)) {
+          if (
+            isRemovedRuntimeHostId(catalog.hostId, s.removedRuntimeEnvironmentIds) ||
+            (connectionFence !== undefined &&
+              !isRuntimeRepoCatalogConnectionFenceCurrent(connectionFence))
+          ) {
             return s
           }
           // Why: re-adoption leaves a stale row on the old SSH target id (a ghost that fails "SSH target not found"); drop rows a live-host sibling supersedes.
