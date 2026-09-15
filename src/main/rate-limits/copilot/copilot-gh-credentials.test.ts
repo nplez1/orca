@@ -107,7 +107,6 @@ describe('resolveGhCopilotCredentials', () => {
       ['read:enterprise', 'manage_billing:enterprise']
     ],
     ['read:enterprise but no billing scope', ['read:enterprise'], ['manage_billing:enterprise']],
-    ['billing scope but no read:enterprise', ['manage_billing:enterprise'], ['read:enterprise']],
     [
       'a lookalike scope name',
       ['read:enterprise:extra', 'manage_billing:enterprise:extra'],
@@ -149,6 +148,16 @@ describe('resolveGhCopilotCredentials', () => {
 
   it('accepts a token holding both documented scopes', async () => {
     ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(['repo', ...ENTERPRISE_SCOPES]))
+    discover([{ slug: 'acme-corp' }])
+
+    await expect(resolveGhCopilotCredentials()).resolves.toEqual({
+      status: 'ok',
+      enterpriseSlug: 'acme-corp'
+    })
+  })
+
+  it('accepts the billing scope for enterprise discovery', async () => {
+    ghExecFileAsyncMock.mockResolvedValueOnce(signedIn(['repo', 'manage_billing:enterprise']))
     discover([{ slug: 'acme-corp' }])
 
     await expect(resolveGhCopilotCredentials()).resolves.toEqual({
