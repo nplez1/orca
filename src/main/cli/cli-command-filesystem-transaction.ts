@@ -90,16 +90,18 @@ export async function inspectStableCommand(
     }
     let fileSha256: string | null = null
     let rawSymlinkTarget: string | null = null
+    const isSymlinkEntry = afterInspection?.isSymbolicLink === true
     try {
-      if (afterInspection?.isSymbolicLink) {
+      if (isSymlinkEntry) {
         rawSymlinkTarget = await readlink(commandPath)
       } else if (afterInspection && status.state !== 'conflict') {
         fileSha256 = await hashCommandFile(commandPath)
       }
     } catch (error) {
-      // Why not a retry: an unreadable entry is not an unstable one, so retrying only exhausts the
-      // attempts and throws. Return it without target evidence so callers can still replace it.
-      if (!isPermissionError(error)) {
+      // Why only the symlink branch: an unreadable link is not an unstable one, so retrying only
+      // exhausts the attempts and throws. An unreadable file must still retry and fail rather than
+      // be replaced on hash evidence we never gathered.
+      if (!(isSymlinkEntry && isPermissionError(error))) {
         continue
       }
     }
