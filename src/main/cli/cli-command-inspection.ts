@@ -20,9 +20,12 @@ export class CliCommandInspection extends CliInstallLocation {
     commandPath: string,
     launcherPath: string
   ): Promise<CliInstallStatus> {
+    // Why tracked: the catch below must only recover a readlink of a confirmed symlink.
+    let confirmedSymlink = false
     try {
       const stats = await lstat(commandPath)
-      if (!stats.isSymbolicLink()) {
+      confirmedSymlink = stats.isSymbolicLink()
+      if (!confirmedSymlink) {
         if (stats.isFile()) {
           const currentContent = await readFile(commandPath, 'utf8')
           const managedTarget =
@@ -87,7 +90,7 @@ export class CliCommandInspection extends CliInstallLocation {
       }
       // Why not a throw: lstat succeeded, so the entry's own mode denied the read — macOS enforces a
       // symlink's mode on readlink, and an older shim is 0700. Stale lets Settings recover.
-      if (isPermissionError(error)) {
+      if (confirmedSymlink && isPermissionError(error)) {
         return this.buildStatus({
           commandPath,
           launcherPath,
