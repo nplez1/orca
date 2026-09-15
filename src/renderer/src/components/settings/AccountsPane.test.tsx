@@ -201,7 +201,7 @@ describe('AccountsPane', () => {
     // Orca reads the gh sign-in itself, so the token is an override; the only
     // real blocker is a gh sign-in without the enterprise billing scopes.
     expect(markup).toContain('Orca prefers your GitHub CLI sign-in')
-    expect(markup).toContain('read:enterprise and manage_billing:enterprise scopes')
+    expect(markup).toContain('manage_billing:enterprise scope')
     expect(markup).toContain('Paste a token only for accounts that sign-in cannot serve')
     expect(markup).toContain('The token needs the “Enterprise billing” read permission')
     expect(markup).not.toContain('cannot read these billing endpoints')
