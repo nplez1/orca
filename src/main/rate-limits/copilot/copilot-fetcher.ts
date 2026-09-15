@@ -3,6 +3,7 @@ import { extractExecError } from '../../git/exec-error'
 import { ghExecFileAsync } from '../../git/command-runner/gh-exec-file'
 import { isHostCommandMissing } from '../../git/command-runner/github-cli-host-fallback'
 import {
+  buildCopilotEntitlementSnapshot,
   buildCopilotSnapshot,
   buildCopilotTotals,
   findCopilotAiCreditBudget,
@@ -34,6 +35,7 @@ export type FetchCopilotRateLimitsOptions = {
   /** Explicit credential from Settings, passed to gh as `GH_TOKEN`. Blank uses gh's own sign-in. */
   token: string
   enterpriseSlug: string
+  source?: 'enterprise-billing' | 'user-entitlement'
 }
 
 type GhApiResult =
@@ -75,7 +77,11 @@ async function ghApiJson(path: string, token: string): Promise<GhApiResult> {
  * Maps a gh failure onto the shared failure vocabulary so the renderer's existing error
  * copy explains the cause instead of showing a bare "Usage unavailable".
  */
-function makeCopilotFailure(what: string, failure: GhApiResult): ProviderRateLimits {
+function makeCopilotFailure(
+  what: string,
+  failure: GhApiResult,
+  source: FetchCopilotRateLimitsOptions['source'] = 'enterprise-billing'
+): ProviderRateLimits {
   if (failure.status === 'ok') {
     // Unreachable: callers only route failures here.
     return makeCopilotError(`Unexpected success while reading ${what}`)
@@ -97,13 +103,17 @@ function makeCopilotFailure(what: string, failure: GhApiResult): ProviderRateLim
   }
   if (failure.httpStatus === 403) {
     return makeCopilotError(
-      `The token cannot read ${what} — it needs the enterprise billing permissions`,
+      source === 'user-entitlement'
+        ? `The token cannot read ${what} — refresh the GitHub CLI with the user scope`
+        : `The token cannot read ${what} — it needs the enterprise billing permissions`,
       'missing-scope'
     )
   }
   if (failure.httpStatus === 404) {
     return makeCopilotError(
-      `GitHub did not find ${what} — check the enterprise slug, that the token can see the enterprise, and that the enhanced billing platform is enabled`,
+      source === 'user-entitlement'
+        ? 'GitHub did not expose a Copilot entitlement for this account'
+        : `GitHub did not find ${what} — check the enterprise slug, that the token can see the enterprise, and that the enhanced billing platform is enabled`,
       'usage-unavailable'
     )
   }
@@ -111,6 +121,18 @@ function makeCopilotFailure(what: string, failure: GhApiResult): ProviderRateLim
     return makeCopilotError(`GitHub server error while reading ${what}`, 'server')
   }
   return makeCopilotError(`GitHub returned ${failure.httpStatus} for ${what}`)
+}
+
+async function fetchCopilotUserEntitlement(token: string): Promise<ProviderRateLimits> {
+  const result = await ghApiJson('/copilot_internal/user', token)
+  if (result.status !== 'ok') {
+    return makeCopilotFailure('your Copilot entitlement', result, 'user-entitlement')
+  }
+  const snapshot = buildCopilotEntitlementSnapshot(result.payload)
+  return (
+    snapshot ??
+    makeCopilotError('GitHub returned no usable premium-interaction entitlement', 'parse')
+  )
 }
 
 function budgetEntries(payload: unknown): CopilotBudget[] {
@@ -161,6 +183,9 @@ export async function fetchCopilotRateLimits(
   try {
     const token = options.token?.trim() ?? ''
     const enterpriseSlug = options.enterpriseSlug?.trim() ?? ''
+    if (options.source === 'user-entitlement') {
+      return await fetchCopilotUserEntitlement(token)
+    }
     if (!token && !enterpriseSlug) {
       return makeCopilotUnavailable(
         'GitHub Copilot credentials not configured — sign in with the GitHub CLI or add a token'
