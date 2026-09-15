@@ -5,7 +5,7 @@ import type { CliInstallMethod, CliInstallStatus } from '../../shared/cli-instal
 import { isAppImageExtractedLauncherPath } from './appimage-extracted-root'
 import { DEV_COMMAND_NAME, DEV_LAUNCHER_DIR } from './cli-install-constants'
 import { buildWindowsForwarder, extractManagedUnixLauncherTarget } from './cli-dev-launcher'
-import { isMissingError } from './cli-install-errors'
+import { isMissingError, isPermissionError } from './cli-install-errors'
 import { CliInstallLocation } from './cli-install-location'
 import { isPathInsideOrEqual, samePathEntry } from './cli-install-path-format'
 import { extractLegacyAppImageCliWrapperTarget } from './legacy-appimage-cli-wrapper'
@@ -83,6 +83,21 @@ export class CliCommandInspection extends CliInstallLocation {
           state: 'not_installed',
           currentTarget: null,
           detail: `Register ${commandPath} to use Orca from the terminal.`
+        })
+      }
+      // Why not a throw: lstat succeeded above, so this entry's own mode is what denied the read —
+      // macOS enforces a symlink's permission bits on readlink, and a shim written by an older
+      // build is 0700/root-owned. Reporting it as stale lets Settings load and re-registration
+      // replace it, instead of the EACCES crashing the whole status call.
+      if (isPermissionError(error)) {
+        return this.buildStatus({
+          commandPath,
+          launcherPath,
+          installMethod: 'symlink',
+          supported: true,
+          state: 'stale',
+          currentTarget: null,
+          detail: `${commandPath} exists but cannot be read. Re-register to replace it.`
         })
       }
       throw error
