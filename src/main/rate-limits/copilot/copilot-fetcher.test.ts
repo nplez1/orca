@@ -95,6 +95,19 @@ function usagePage(items: unknown[]): unknown {
   }
 }
 
+function userEntitlement(overrides: Record<string, unknown> = {}): unknown {
+  return {
+    quota_reset_date_utc: '2026-08-01T00:00:00.000Z',
+    quota_snapshots: {
+      premium_interactions: {
+        credits_used: 264_518,
+        entitlement: 1_000_000
+      }
+    },
+    ...overrides
+  }
+}
+
 function primeOk(budgets: unknown[], items: unknown[]): void {
   ghExecFileAsyncMock
     .mockResolvedValueOnce(ghOk(budgetPage(budgets)))
@@ -207,6 +220,59 @@ describe('fetchCopilotRateLimits', () => {
     expect(result.status).toBe('ok')
     expect(callOptions(0)).toEqual({})
     expect(callOptions(1)).toEqual({})
+  })
+
+  it('reads the GitHub CLI user entitlement without enterprise administration', async () => {
+    ghExecFileAsyncMock.mockResolvedValueOnce(ghOk(userEntitlement()))
+
+    const result = await fetchCopilotRateLimits({
+      token: '',
+      enterpriseSlug: '',
+      source: 'user-entitlement'
+    })
+
+    expect(result).toEqual({
+      provider: 'copilot',
+      session: null,
+      weekly: null,
+      monthly: {
+        usedPercent: 26.4518,
+        windowMinutes: 43_200,
+        resetsAt: Date.UTC(2026, 7, 1),
+        resetDescription: null
+      },
+      allowance: {
+        unit: { kind: 'count', label: 'AI credits' },
+        used: 264_518,
+        limit: 1_000_000,
+        resetsAt: Date.UTC(2026, 7, 1)
+      },
+      updatedAt: FROZEN_NOW,
+      error: null,
+      status: 'ok',
+      usageMetadata: { source: 'web' }
+    })
+    expect(callArgs(0)).toEqual([
+      'api',
+      '/copilot_internal/user',
+      '-H',
+      `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`
+    ])
+    expect(callOptions(0)).toEqual({})
+  })
+
+  it('reports an unreadable user entitlement instead of inventing a quota', async () => {
+    ghExecFileAsyncMock.mockResolvedValueOnce(ghOk({ quota_snapshots: {} }))
+
+    const result = await fetchCopilotRateLimits({
+      token: '',
+      enterpriseSlug: '',
+      source: 'user-entitlement'
+    })
+
+    expect(result.status).toBe('error')
+    expect(result.usageMetadata).toEqual({ failureKind: 'parse', source: 'web' })
+    expect(result.error).toMatch(/no usable premium-interaction entitlement/i)
   })
 
   it('encodes the enterprise slug into the API path', async () => {
