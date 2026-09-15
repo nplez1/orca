@@ -6,13 +6,11 @@ import { parseAuthStatus } from '../../github/auth-diagnose'
  * Resolves the enterprise slug for Copilot billing from the user's existing `gh`
  * sign-in, so an enterprise user does not have to mint and paste a token.
  *
- * Why scopes are checked: GitHub exposes an enterprise's slug through the GraphQL
- * `viewer.enterprises` field, which needs `read:enterprise`, and its billing data needs
- * `manage_billing:enterprise`; `admin:enterprise` implies both. Verified against the
- * live API: without `read:enterprise` the query fails with INSUFFICIENT_SCOPES rather
- * than returning an empty list, so the two cases are distinguishable.
+ * Why scopes are checked: GitHub's enterprise billing scope can discover the enterprise
+ * slug through GraphQL and read its billing data. `read:enterprise` can discover the slug
+ * but still needs `manage_billing:enterprise` for billing; `admin:enterprise` implies both.
  */
-const SLUG_SCOPES = ['read:enterprise', 'admin:enterprise']
+const SLUG_SCOPES = ['read:enterprise', 'manage_billing:enterprise', 'admin:enterprise']
 const BILLING_SCOPES = ['manage_billing:enterprise', 'admin:enterprise']
 const ENTERPRISE_SLUG_QUERY = '{ viewer { enterprises(first: 10) { nodes { slug } } } }'
 

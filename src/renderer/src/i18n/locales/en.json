@@ -9112,7 +9112,7 @@
                 "6a327922f7": "Copied",
                 "9e59104270": "Copy command",
                 "ae9c8d3fd2": "Optional override",
-                "022c7c89d5": "Orca prefers your GitHub CLI sign-in, which needs the read:enterprise and manage_billing:enterprise scopes to expose an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.",
+                "022c7c89d5": "Orca prefers your GitHub CLI sign-in, which needs the manage_billing:enterprise scope to discover an enterprise and read its billing data. Paste a token only for accounts that sign-in cannot serve. The token needs the “Enterprise billing” read permission. Orca then refreshes the AI credits your enterprise consumes each month.",
                 "1006eed696": "The slug is the <slug> in github.com/enterprises/<slug>.",
                 "3c8314c1de": "Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
                 "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it."
