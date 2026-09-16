@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+# LOCAL(nplez1): fork-only changes must never land on a PR branch.
+#
+# PR branches are cut from origin/main, so a fork-only file committed to one would be reviewed
+# upstream — which is the whole reason LOCAL-PATCHES.md exists. This guard is here because the
+# mistake was made twice in one session: a `local(...)` commit authored on the wrong branch.
+#
+# Every `local(...)` commit belongs on nplez1/main and nowhere else.
+
+branch="$(git branch --show-current)"
+subject="$(head -1 "$1")"
+
+case "$subject" in
+  local\(*)
+    if [ "$branch" != "nplez1/main" ]; then
+      echo "" >&2
+      echo "commit-msg: refusing a fork-only commit on '$branch'." >&2
+      echo "  '$subject' belongs on nplez1/main." >&2
+      echo "  Fork-only changes on a PR branch would be reviewed upstream." >&2
+      echo "  Switch with: git checkout nplez1/main" >&2
+      echo "" >&2
+      exit 1
+    fi
+    ;;
+esac
