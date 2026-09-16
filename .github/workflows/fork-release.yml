@@ -117,6 +117,32 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # Why create the release up front, as a draft: electron-builder's publisher would otherwise
+      # have two artifact legs race to create it, and the loser aborts the whole job with
+      # 422 "Published releases must have a valid tag" even though the winner succeeded — which is
+      # exactly what killed runs 35071546550's successor.
+      #
+      # Why a draft: until the manifest check below passes, the release has assets a user can
+      # download but no `latest-mac.yml`, so no installed build can update from it. A draft is
+      # hidden from the releases list, so a run that dies in that window leaves nothing visible.
+      # It goes live at the end of the windows job, once every platform's manifest is up.
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" >/dev/null 2>&1; then
+            echo "$tag already exists; uploading into it"
+          else
+            gh release create "$tag" \
+              --repo "$PUBLISH_OWNER/orca" \
+              --target "$GITHUB_SHA" \
+              --draft \
+              --notes "Fork build of Orca, published from nplez1/orca. These are the artifacts this fork's updater reads."
+            echo "created draft $tag"
+          fi
+
       # Why --config.publish.owner: the checked-in config names stablyai/orca. Overriding here
       # rather than patching the config keeps that a runtime concern instead of a fork patch,
       # so upstream edits to the publish block still apply cleanly.
@@ -146,14 +172,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Why not `gh release view v${RELEASE_VERSION}`: the tag name is electron-builder's
-          # choice, so match the version inside whatever tags exist rather than assuming a prefix.
+          # Why the explicit tag: the release is created as a draft, and `gh release list` hides
+          # drafts, so discovering it by version would never find it.
+          tag="v$RELEASE_VERSION"
           for attempt in 1 2 3 4 5; do
-            tag="$(gh release list --repo "$PUBLISH_OWNER/orca" --limit 30 --json tagName \
-              --jq '.[].tagName' | grep -F "$RELEASE_VERSION" | head -1 || true)"
-            if [[ -n "$tag" ]] && gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
+            if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
               --jq '.assets[].name' | grep -qx 'latest-mac.yml'; then
-              echo "latest-mac.yml is published under $tag"
+              echo "latest-mac.yml is present on $tag"
               exit 0
             fi
             echo "waiting for latest-mac.yml (attempt $attempt)"
@@ -231,12 +256,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Why the explicit tag: the release is a draft until this job finishes, and
+          # `gh release list` hides drafts.
+          tag="v$RELEASE_VERSION"
           for attempt in 1 2 3 4 5; do
-            tag="$(gh release list --repo "$PUBLISH_OWNER/orca" --limit 30 --json tagName \
-              --jq '.[].tagName' | grep -F "$RELEASE_VERSION" | head -1 || true)"
-            if [[ -n "$tag" ]] && gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
+            if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
               --jq '.assets[].name' | grep -qx 'latest.yml'; then
-              echo "latest.yml is published under $tag"
+              echo "latest.yml is present on $tag"
               exit 0
             fi
             echo "waiting for latest.yml (attempt $attempt)"
@@ -244,3 +270,15 @@ jobs:
           done
           echo "::error::latest.yml never appeared; an installed build will not see this release."
           exit 1
+
+      # Why here and not in the macos job: both platforms upload into one release, and a release
+      # that goes live before the last platform's manifest exists offers downloads that no
+      # installed build can update from. Flipping it last makes "published" mean "complete".
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release edit "v$RELEASE_VERSION" --repo "$PUBLISH_OWNER/orca" --draft=false
+          echo "published v$RELEASE_VERSION"
