@@ -426,10 +426,13 @@ module.exports = {
     // are unset, so local and dev builds are unaffected. publisherName stays on
     // its existing channel split above.
     signtoolOptions: {
-      sign: signWindowsUninstallerViaSignPath,
-      ...(isWinDevChannel ? {} : { publisherName: 'SignPath Foundation' })
+      sign: signWindowsUninstallerViaSignPath
+      // LOCAL(nplez1): deliberately no publisherName. This fork ships unsigned, and
+      // electron-updater Authenticode-verifies every installer against the name in the
+      // installed app-update.yml, rejecting its own channel's next build when it mismatches.
     },
-    ...(isWinDevChannel ? { verifyUpdateCodeSignature: false } : {}),
+    // LOCAL(nplez1): accept our own unsigned installers.
+    verifyUpdateCodeSignature: false,
     extraResources: [
       ...commonExtraResources,
       ...windowsRuntimeResources,
