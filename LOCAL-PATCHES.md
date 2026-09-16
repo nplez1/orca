@@ -82,7 +82,8 @@ upstream release workflow is a no-op in a fork (they guard on
 It builds on GitHub-hosted runners (`macos-15`, `windows-2022`) rather than upstream's Blacksmith
 labels, which belong to stablyai's account. Signing is conditional on `MAC_CERTS` being set, so the
 pipeline is usable before a certificate exists and switches to the signed, notarized path by itself
-once it does.
+once it does. The release body comes from `.github/fork-release-notes.md`, rendered per release with
+the version, commit, date, and a signing paragraph that follows the signing mode.
 
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
 empty: an unset secret still *defines* them as empty strings, electron-builder reads a defined
