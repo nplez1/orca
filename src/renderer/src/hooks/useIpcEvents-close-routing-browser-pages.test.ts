@@ -45,6 +45,7 @@ describe('useIpcEvents browser tab close routing', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           setUpdateStatus: vi.fn(),
           fetchRepos: vi.fn(),
           fetchWorktrees: vi.fn(),
@@ -270,6 +271,7 @@ describe('useIpcEvents browser tab close routing', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           setUpdateStatus: vi.fn(),
           fetchRepos: vi.fn(),
           fetchWorktrees: vi.fn(),
@@ -494,6 +496,7 @@ describe('useIpcEvents browser tab close routing', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           setUpdateStatus: vi.fn(),
           fetchRepos: vi.fn(),
           fetchWorktrees: vi.fn(),

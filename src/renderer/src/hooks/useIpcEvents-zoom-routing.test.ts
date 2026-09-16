@@ -122,6 +122,7 @@ describe('useIpcEvents zoom routing', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           activeView: 'terminal',
           activeTabType: 'browser',
           activeWorktreeId: 'wt-1',
@@ -278,6 +279,7 @@ describe('useIpcEvents zoom routing', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           activeView: 'terminal',
           activeTabType: 'terminal',
           activeWorktreeId: 'wt-1',

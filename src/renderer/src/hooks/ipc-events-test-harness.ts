@@ -178,6 +178,7 @@ export async function loadIpcEventsHarness(
             return () => {}
           }
         }),
+        agentStatus: createApiNamespaceStub({ getSnapshot: () => Promise.resolve([]) }),
         rateLimits: {
           get: () => Promise.resolve({ limits: {}, lastUpdatedAt: 0 }),
           onUpdate: () => () => {}

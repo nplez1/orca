@@ -33,6 +33,7 @@ describe('useIpcEvents updater integration', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           setUpdateStatus,
           fetchRepos: vi.fn(),
           fetchWorktrees: vi.fn(),
@@ -242,6 +243,7 @@ describe('useIpcEvents updater integration', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           openSettingsPage,
           fetchRepos: vi.fn(),
           fetchWorktrees: vi.fn(),

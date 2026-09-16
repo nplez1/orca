@@ -31,6 +31,7 @@ import type {
   PendingAgentStatusEvent
 } from './agent-status-bridge-types'
 import { normalizeAgentStatusEvent } from './normalize-agent-status-event'
+import { isAgentStatusRoutingReady } from './agent-status-routing-readiness'
 
 export function createAgentStatusEventApplicator(args: {
   pendingAgentStatusEvents: PendingAgentStatusEvent[]
@@ -47,7 +48,7 @@ export function createAgentStatusEventApplicator(args: {
     options?: AgentStatusApplyOptions
   ): AgentStatusApplyResult => {
     const store = options?.batch?.transaction.getState() ?? useAppStore.getState()
-    if (!store.workspaceSessionReady) {
+    if (!isAgentStatusRoutingReady(store)) {
       return 'dropped'
     }
     if (isAgentStatusForRecentlyClosedTab(store, data.paneKey)) {

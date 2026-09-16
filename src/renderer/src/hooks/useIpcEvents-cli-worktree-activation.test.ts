@@ -45,6 +45,7 @@ describe('useIpcEvents CLI-created worktree activation', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           fetchRepos: vi.fn(),
           fetchWorktrees,
           setUpdateStatus: vi.fn(),
@@ -306,6 +307,7 @@ describe('useIpcEvents CLI-created worktree activation', () => {
       useAppStore: {
         subscribe: vi.fn(() => () => {}),
         getState: () => ({
+          tabsByWorktree: {},
           fetchRepos: vi.fn(),
           fetchRuntimeEnvironmentRepos: vi.fn(),
           fetchProjectGroups: vi.fn(),

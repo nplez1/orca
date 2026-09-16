@@ -73,6 +73,7 @@ export async function useIpcEventsForCloseRouting({
     useAppStore: {
       subscribe: vi.fn(() => () => {}),
       getState: () => ({
+        tabsByWorktree: {},
         getActiveTab: () => null,
         closeUnifiedTab: vi.fn(),
         reconcileWorktreeTabModel: () => ({ renderableTabCount: 1 }),
