@@ -45,6 +45,7 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
       }
     },
     listDetected: async ({ repoId }) => callRuntimeDetectedWorktrees(repoId),
+    listCached: async () => [],
     listAll: () => listAllRuntimeWorktrees(),
     create: async (args) => {
       invalidateRuntimeWorktreeCaches()

@@ -25,7 +25,10 @@ import {
   resolveAgentWorkspaceExecutionHostId,
   sweepRestoredSubagentsWithoutLiveAgent
 } from '../agent-hooks/restored-subagent-liveness-sweep'
-import { startFirstWindowStartupServices } from './first-window-startup-services'
+import {
+  startFirstWindowStartupServices,
+  type AgentHookServerStartup
+} from './first-window-startup-services'
 import { logStartupMilestone } from './startup-diagnostics'
 import type { WindowsDesktopStartupServices } from './windows-desktop-shell-path-startup'
 import type { RuntimeWorktreeLifecycleEvent } from '../runtime/orca-runtime'
@@ -161,10 +164,13 @@ export function startTerminalRuntimeStartupServices(): WindowsDesktopStartupServ
       logStartupMilestone('startup-service-done', { service: 'daemon-pty-provider' })
     },
     // Why: PTY spawn env reads ORCA_AGENT_HOOK_* from live server state, so the renderer awaits this before restored terminals reconnect.
-    startAgentHookServer: async () => {
+    startAgentHookServer: (): AgentHookServerStartup => {
       const settings = state.store?.getSettings()
       if (!isAgentStatusHooksEnabled(settings)) {
-        return
+        return {
+          ready: Promise.resolve(),
+          statusCacheHydrationReady: Promise.resolve()
+        }
       }
       logStartupMilestone('startup-service-start', { service: 'agent-hook-server' })
       // Why (#11217): the hook listener fails open on every request error, so an IDS resetting
@@ -173,13 +179,20 @@ export function startTerminalRuntimeStartupServices(): WindowsDesktopStartupServ
       agentHookServer.setTransportInterferenceListener((report) => {
         track('agent_hook_transport_blocked', { count: report.count })
       })
-      await agentHookServer.start({
-        env: app.isPackaged ? 'production' : 'development',
-        // Why: hooks source this endpoint file at invocation time so old PTY env reaches the current process after restart; dev namespaces it (worktrees share `orca-dev`).
-        userDataPath: app.getPath('userData'),
-        endpointNamespace: state.devAgentHookEndpointNamespace
-      })
-      logStartupMilestone('startup-service-done', { service: 'agent-hook-server' })
+      const ready = agentHookServer
+        .start({
+          env: app.isPackaged ? 'production' : 'development',
+          // Why: hooks source this endpoint file at invocation time so old PTY env reaches the current process after restart; dev namespaces it (worktrees share `orca-dev`).
+          userDataPath: app.getPath('userData'),
+          endpointNamespace: state.devAgentHookEndpointNamespace
+        })
+        .then(() => {
+          logStartupMilestone('startup-service-done', { service: 'agent-hook-server' })
+        })
+      return {
+        ready,
+        statusCacheHydrationReady: agentHookServer.getStatusCacheHydrationReady()
+      }
     },
     onDaemonError: (error) => {
       // Why: daemon failure silently falls back to non-persistent local PTYs; log + telemetry so a fleet-wide outage is observable (was invisible in v1.4.129-rc.1).
@@ -212,4 +225,12 @@ export function bindTerminalRuntimeStartupServices(
   state.firstWindowStartupServicesReady = services.then((value) => value.firstWindowReady)
   state.localPtyStartupReady = services.then((value) => value.localPtyReady)
   state.localPtyProviderStartupReady = services.then((value) => value.localPtyProviderReady)
+  state.agentHookStatusCacheHydrationReady = services
+    .then((value) => value.agentHookStatusCacheHydrationReady)
+    .catch((error) => {
+      console.warn(
+        '[agent-hooks] status-cache hydration readiness failed; continuing without the hydrated cache:',
+        error
+      )
+    })
 }

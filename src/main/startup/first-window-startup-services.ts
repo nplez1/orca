@@ -1,19 +1,28 @@
 type FirstWindowStartupServices = {
   startDaemonPtyProvider: (signal: AbortSignal) => Promise<void>
-  startAgentHookServer: (signal: AbortSignal) => Promise<void>
+  startAgentHookServer: (signal: AbortSignal) => Promise<void> | AgentHookServerStartup
   onDaemonError: (error: unknown) => void
   onAgentHookServerError: (error: unknown) => void
 }
 
+export type AgentHookServerStartup = {
+  ready: Promise<void>
+  statusCacheHydrationReady: Promise<void>
+}
+
 type StartupService = {
   ready: Promise<void>
+  earlyReady: Promise<void>
   reportTimeout: () => void
 }
+
+type StartupServiceStart = Promise<void> | AgentHookServerStartup
 
 type FirstWindowStartupServicesResult = {
   firstWindowReady: Promise<void>
   localPtyReady: Promise<void>
   localPtyProviderReady: Promise<void>
+  agentHookStatusCacheHydrationReady: Promise<void>
 }
 
 export const FIRST_WINDOW_STARTUP_SERVICE_TIMEOUT_MS = 12_000
@@ -26,33 +35,73 @@ export const LOCAL_PTY_STARTUP_FAIL_OPEN_TIMEOUT_MS = 60_000
 
 function startService(
   label: string,
-  start: (signal: AbortSignal) => Promise<void>,
+  start: (signal: AbortSignal) => StartupServiceStart,
   onError: (error: unknown) => void
 ): StartupService {
   const abortController = new AbortController()
   let settled = false
   let reportedTimeout = false
+  let resolveEarlyReady!: () => void
+  let resolveFailOpen!: () => void
+  const earlyReady = new Promise<void>((resolve) => {
+    resolveEarlyReady = resolve
+  })
+  const failOpen = new Promise<void>((resolve) => {
+    resolveFailOpen = resolve
+  })
+  const reportError = (error: unknown): void => {
+    try {
+      onError(error)
+    } catch (reportingError) {
+      console.error(`[${label}] startup error reporter failed:`, reportingError)
+    }
+  }
   const ready = Promise.resolve()
-    .then(() => start(abortController.signal))
+    .then<StartupServiceStart>(() => start(abortController.signal))
+    .then((startup) => {
+      if (isAgentHookServerStartup(startup)) {
+        void startup.statusCacheHydrationReady.then(resolveEarlyReady, resolveEarlyReady)
+        return startup.ready
+      }
+      return startup
+    })
     .catch((error) => {
       if (!reportedTimeout) {
-        onError(error)
+        reportError(error)
       }
+      resolveEarlyReady()
     })
     .finally(() => {
+      resolveEarlyReady()
+    })
+  const settledReady = Promise.race([ready, failOpen])
+    .finally(() => {
       settled = true
+      resolveEarlyReady()
     })
 
   return {
-    ready,
+    ready: settledReady,
+    earlyReady,
     reportTimeout: () => {
-      if (settled) {
+      if (settled || reportedTimeout) {
         return
       }
       reportedTimeout = true
       abortController.abort()
-      onError(new Error(`${label} startup timed out`))
+      reportError(new Error(`${label} startup timed out`))
+      resolveFailOpen()
     }
+  }
+
+  function isAgentHookServerStartup(
+    startup: StartupServiceStart
+  ): startup is AgentHookServerStartup {
+    return (
+      typeof startup === 'object' &&
+      startup !== null &&
+      'statusCacheHydrationReady' in startup
+    )
   }
 }
 
@@ -75,6 +124,9 @@ export function startFirstWindowStartupServices({
   const daemon = startService('daemon PTY provider', startDaemonPtyProvider, onDaemonError)
   const hooks = startService('agent hook server', startAgentHookServer, onAgentHookServerError)
   const allServicesReady = Promise.all([daemon.ready, hooks.ready]).then(() => undefined)
+  // Why separate: snapshot replay only needs the hook server's durable cache
+  // phase; listener binding must not inherit daemon or first-window readiness.
+  const agentHookStatusCacheHydrationReady = hooks.earlyReady
   let windowTimeout: ReturnType<typeof setTimeout> | null = null
   let failOpenTimeout: ReturnType<typeof setTimeout> | null = null
   const servicesSettled = allServicesReady.finally(() => {
@@ -103,5 +155,10 @@ export function startFirstWindowStartupServices({
   // hook server must not hold terminal close for the full fail-open window.
   const localPtyProviderReady = Promise.race([daemon.ready, failOpenReady])
 
-  return { firstWindowReady, localPtyReady, localPtyProviderReady }
+  return {
+    firstWindowReady,
+    localPtyReady,
+    localPtyProviderReady,
+    agentHookStatusCacheHydrationReady
+  }
 }
