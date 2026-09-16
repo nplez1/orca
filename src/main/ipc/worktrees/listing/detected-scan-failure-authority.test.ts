@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { DetectedWorktreeListResult } from '../../../../shared/worktree/types'
@@ -43,7 +45,8 @@ function createStore() {
     getAllWorktreeLineage: () => ({}),
     getAllWorkspaceLineage: () => ({}),
     removeWorktreeLineage,
-    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined
+    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined,
+    getProfileStorageDirectory: () => join(tmpdir(), 'orca-scan-cache-test')
   } as never
 }
 
