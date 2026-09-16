@@ -36,7 +36,7 @@ afterEach(() => {
 })
 
 const configPath = (): string => join(home, '.kimi-code', 'config.toml')
-const scriptPath = (): string => join(home, '.orca', 'agent-hooks', 'kimi-hook.sh')
+const scriptPath = (): string => join(home, '.orca-np', 'agent-hooks', 'kimi-hook.sh')
 
 describe('KimiHookService', () => {
   it('reports not_installed before install', () => {

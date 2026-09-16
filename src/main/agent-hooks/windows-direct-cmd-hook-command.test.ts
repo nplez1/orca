@@ -12,12 +12,12 @@ import { WINDOWS_CMD_SAFE_PATH } from './installer-utils'
 import { wrapWindowsDirectCmdHookCommand } from './windows-direct-cmd-hook-command'
 import { findGitBash } from './windows-git-bash-path.test-fixture'
 
-const SAFE_PATH = 'C:\\Users\\alice\\.orca\\agent-hooks\\claude-hook.cmd'
+const SAFE_PATH = 'C:\\Users\\alice\\.orca-np\\agent-hooks\\claude-hook.cmd'
 
 describe('wrapWindowsDirectCmdHookCommand', () => {
   it('emits the script path with forward slashes and a neutral-JSON fallback', () => {
     expect(wrapWindowsDirectCmdHookCommand(SAFE_PATH)).toBe(
-      'C:/Users/alice/.orca/agent-hooks/claude-hook.cmd || echo {}'
+      'C:/Users/alice/.orca-np/agent-hooks/claude-hook.cmd || echo {}'
     )
   })
 
@@ -43,7 +43,7 @@ describe('wrapWindowsDirectCmdHookCommand', () => {
       'C:\\Users\\a&b\\.orca\\agent-hooks\\claude-hook.cmd',
       'C:\\Users\\a(b)\\.orca\\agent-hooks\\claude-hook.cmd',
       'C:\\Users\\rené\\.orca\\agent-hooks\\claude-hook.cmd',
-      '/home/alice/.orca/agent-hooks/claude-hook.sh',
+      '/home/alice/.orca-np/agent-hooks/claude-hook.sh',
       // Why: WINDOWS_CMD_SAFE_PATH admits a UNC profile, but `//server/share/...` is not a
       // command cmd.exe reliably starts — keep those on the encoded launcher.
       '\\\\server\\share\\alice\\.orca\\agent-hooks\\claude-hook.cmd'
