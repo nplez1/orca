@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 describe('packaged Windows CLI launcher asset', () => {
   it('keeps the batch compatibility shim behind the newline-safe native launcher', () => {
-    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca.cmd')
+    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca-np.cmd')
     const launcher = readFileSync(launcherPath, 'utf8')
 
-    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca.exe"')
-    expect(launcher).toContain('orca.cmd cannot safely forward orchestration message bodies')
+    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca-np.exe"')
+    expect(launcher).toContain('orca-np.cmd cannot safely forward orchestration message bodies')
     expect(launcher).not.toContain('"%ELECTRON%" "%CLI%" %*')
   })
 
@@ -24,7 +24,9 @@ describe('packaged Windows CLI launcher asset', () => {
     expect(source).toContain(
       'string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");'
     )
-    expect(source).toContain('requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"')
+    expect(source).toContain(
+      'requestedCliCommand == "orca-ide" ? "orca-ide" : requestedCliCommand == "orca-np" ? "orca-np" : "orca"'
+    )
     expect(source).toContain('child.WaitForExit();')
     expect(source).toContain('return child.ExitCode;')
   })
