@@ -248,7 +248,7 @@ describe('useIpcEvents agent status snapshot integration', () => {
     expect(setDriverForBrowserPage).not.toHaveBeenCalled()
   })
 
-  it('ignores early push events but applies the main-process snapshot after readiness', async () => {
+  it('ignores early pushes but applies the snapshot once tab routing is hydrated', async () => {
     const setAgentStatus = vi.fn()
     const getSnapshot = vi.fn(() =>
       Promise.resolve([
@@ -321,7 +321,6 @@ describe('useIpcEvents agent status snapshot integration', () => {
     expect(getSnapshot).not.toHaveBeenCalled()
 
     const previousStoreState = { ...storeState }
-    storeState.workspaceSessionReady = true
     storeState.tabsByWorktree = {
       'wt-1': [{ id: 'tab-future', ptyId: 'pty-1', worktreeId: 'wt-1', title: 'Future Tab' }]
     }

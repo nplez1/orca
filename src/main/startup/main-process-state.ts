@@ -102,6 +102,8 @@ export const mainProcessState = {
   // Electron with no error. Only the renderer's own pull proves the listener is live.
   markdownFileOpenListenerReady: false,
   firstWindowStartupServicesReady: Promise.resolve(),
+  // Why separate: snapshot replay waits only for hook-cache hydration, not daemon or window readiness.
+  agentHookStatusCacheHydrationReady: Promise.resolve(),
   // Why published: the default-session proxy must be applied before the first app-owned fetcher,
   // but window creation has no reason to queue behind it (the request guard already fences it).
   initialProxyApplicationReady: Promise.resolve(),
