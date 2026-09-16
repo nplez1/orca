@@ -1621,6 +1621,7 @@
           "pane": {
             "copilot": {
               "section": {
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
                 "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
                 "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month."
               }
