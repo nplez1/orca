@@ -83,7 +83,6 @@ function isCopilotBackgroundWorkCompletionNotification(
   return undefined
 }
 
-/** Zero is the only value that lets a Stop this work held open settle the pane to done. */
 function pendingCopilotBackgroundWork(work: CopilotBackgroundWorkState): number {
   return (
     work.pendingShellCount +
@@ -103,7 +102,7 @@ function getCopilotBackgroundWorkState(
   return state.copilotBackgroundWorkByPaneKey.get(paneKey)
 }
 
-// Why: Copilot PermissionRequest fires before allow/ask/deny (stays working); ask_user and notification prompts are the real blocked signals.
+// Why: Copilot permission hooks fire before auto-approval resolves; only ask_user and elicitation dialogs are real blocked signals.
 export function normalizeCopilotEvent(
   state: HookListenerState,
   eventName: unknown,
@@ -116,8 +115,7 @@ export function normalizeCopilotEvent(
   )
   const notificationType = readFirstString(hookPayload, ['notification_type', 'notificationType'])
   const isBlockingNotification =
-    normalizedEventName === 'Notification' &&
-    (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog')
+    normalizedEventName === 'Notification' && notificationType === 'elicitation_dialog'
   const toolSnapshot = extractToolFields('copilot', normalizedEventName, hookPayload)
   const backgroundShellStarted = isCopilotBackgroundShellStart(normalizedEventName, hookPayload)
   const subagentToolStarted = isCopilotSubagentToolStart(normalizedEventName, hookPayload)
@@ -126,8 +124,6 @@ export function normalizeCopilotEvent(
     notificationType
   )
   const stopHookActive = isCopilotStopHookActive(hookPayload)
-  // Why: Copilot's Stop hook fires when the foreground turn ends, but background shells and
-  // subagents outlive it, so the pane stays `working` until the last of them settles.
   let backgroundWorkState = getCopilotBackgroundWorkState(state, paneKey)
   if (normalizedEventName === 'SessionStart') {
     state.copilotBackgroundWorkByPaneKey.delete(paneKey)
@@ -150,7 +146,6 @@ export function normalizeCopilotEvent(
     }
     state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   } else if (normalizedEventName === 'SubagentStart') {
-    // Why: the tool start already counted this subagent, so the hook moves the count, not adds one.
     backgroundWorkState = {
       pendingShellCount: backgroundWorkState?.pendingShellCount ?? 0,
       pendingUnidentifiedSubagentCount: Math.max(
@@ -208,8 +203,6 @@ export function normalizeCopilotEvent(
   const isAskUserPrompt =
     (normalizedEventName === 'PreToolUse' || normalizedEventName === 'PermissionRequest') &&
     isAskUserTool(toolSnapshot.toolName)
-  // Why `stop_hook_active` is excluded: the CLI already says it is continuing, so the stateName
-  // branch below keeps it working without waiting.
   const stopWaitsForBackgroundWork =
     normalizedEventName === 'Stop' &&
     !stopHookActive &&
@@ -222,7 +215,6 @@ export function normalizeCopilotEvent(
     }
     state.copilotBackgroundWorkByPaneKey.set(paneKey, backgroundWorkState)
   }
-  // Why: only a Stop this work held open may settle the pane, and only with nothing left pending.
   const completedLastBackgroundWork =
     (backgroundWorkCompletion !== undefined || normalizedEventName === 'SubagentStop') &&
     backgroundWorkState !== undefined &&
