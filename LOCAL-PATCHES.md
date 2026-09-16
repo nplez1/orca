@@ -70,3 +70,20 @@ Then check the update path still points at this fork:
 ```bash
 grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/updater-*.ts src/shared/release-channel.ts
 ```
+
+### `local(ci)`: release workflow
+
+`.github/workflows/fork-release.yml` builds macOS and Windows artifacts and publishes them as a
+release on this fork — which is the feed the patched updater points at. It exists because every
+upstream release workflow is a no-op in a fork (they guard on
+`github.repository == 'stablyai/orca'`) and publishes to stablyai's separate channel repos. It is
+`workflow_dispatch` only, so it never runs on its own.
+
+It builds on GitHub-hosted runners (`macos-15`, `windows-2022`) rather than upstream's Blacksmith
+labels, which belong to stablyai's account. Signing is conditional on `MAC_CERTS` being set, so the
+pipeline is usable before a certificate exists and switches to the signed, notarized path by itself
+once it does.
+
+Fork-only helper scripts live in `local/`:
+
+- `local/branch-status.mjs` — live status of every branch (SHAs, fork presence, own delta, PR).
