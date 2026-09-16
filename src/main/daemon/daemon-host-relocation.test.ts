@@ -294,7 +294,7 @@ describe('materializeRelocatedDaemonHost', () => {
     // Any one of them missing means require() cannot reach the addon, and a host
     // that cannot load it runs anyway -- forking a shell per snapshot (#16905).
     materializeRelocatedDaemonHost()
-    const dest = join(localAppDataDir, 'Orca', 'daemon-host', '9.9.9')
+    const dest = join(localAppDataDir, 'orca-np', 'daemon-host', '9.9.9')
     expect(getRelocatedDaemonHost()).not.toBeNull()
 
     rmSync(join(dest, relativePath))
@@ -304,7 +304,7 @@ describe('materializeRelocatedDaemonHost', () => {
 
   it('rematerializes a host whose copied addon went missing', () => {
     materializeRelocatedDaemonHost()
-    const dest = join(localAppDataDir, 'Orca', 'daemon-host', '9.9.9')
+    const dest = join(localAppDataDir, 'orca-np', 'daemon-host', '9.9.9')
     const relocatedAddon = join(dest, PROCESS_TREE_ADDON_REL)
 
     rmSync(relocatedAddon)
@@ -323,7 +323,7 @@ describe('materializeRelocatedDaemonHost', () => {
     // upgrade changes the version keying this directory, which already forces a
     // rebuild, and nothing else in the mirror is source-verified either.
     materializeRelocatedDaemonHost()
-    const dest = join(localAppDataDir, 'Orca', 'daemon-host', '9.9.9')
+    const dest = join(localAppDataDir, 'orca-np', 'daemon-host', '9.9.9')
     const sentinel = join(dest, 'sentinel.txt')
     writeFileSync(sentinel, 'keep')
 
@@ -348,7 +348,7 @@ describe('materializeRelocatedDaemonHost', () => {
 
     expect(materializeRelocatedDaemonHost()).toBeNull()
     // Not even the host root: the source is checked before any directory is made.
-    expect(existsSync(join(localAppDataDir, 'Orca', 'daemon-host'))).toBe(false)
+    expect(existsSync(join(localAppDataDir, 'orca-np', 'daemon-host'))).toBe(false)
   })
 
   it('is idempotent: a valid marker short-circuits without recopying', () => {

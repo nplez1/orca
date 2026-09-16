@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 describe('packaged Windows CLI launcher asset', () => {
   it('keeps the batch compatibility shim behind the newline-safe native launcher', () => {
-    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca.cmd')
+    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca-np.cmd')
     const launcher = readFileSync(launcherPath, 'utf8')
 
-    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca.exe"')
-    expect(launcher).toContain('orca.cmd cannot safely forward orchestration message bodies')
+    expect(launcher).toContain('set "LAUNCHER=%SCRIPT_DIR%orca-np.exe"')
+    expect(launcher).toContain('orca-np.cmd cannot safely forward orchestration message bodies')
     expect(launcher).not.toContain('"%ELECTRON%" "%CLI%" %*')
   })
 
@@ -21,7 +21,8 @@ describe('packaged Windows CLI launcher asset', () => {
     expect(source).toContain('env::set_var("ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER", "1")')
     expect(source).toContain('env::var("ORCA_CLI_COMMAND")')
     expect(source).toContain('if requested_command == "orca-ide"')
+    // Why: this fork's CLI is `orca-np`; upstream's whitelist would relabel it `orca`.
+    expect(source).toContain('else if requested_command == "orca-np"')
     expect(source).toContain('command.status()')
-    expect(source).toContain('exit(status.code().unwrap_or(1))')
-  })
+    expect(source).toContain('exit(status.code().unwrap_or(1))')  })
 })
