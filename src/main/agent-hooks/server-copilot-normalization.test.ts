@@ -361,7 +361,7 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.toolInput).toBe('/repo/src/app.ts')
   })
 
-  it('Notification(permission_prompt) maps to blocked and surfaces message text', () => {
+  it('ignores Notification(permission_prompt) because approval may be automatic', () => {
     const result = _internals.normalizeHookPayload(
       'copilot',
       buildBody({
@@ -372,8 +372,7 @@ describe('Copilot hook normalization', () => {
       }),
       'production'
     )
-    expect(result?.payload.state).toBe('blocked')
-    expect(result?.payload.lastAssistantMessage).toBe('Allow Bash to run?')
+    expect(result).toBeNull()
   })
 
   it('Notification(elicitation_dialog) preserves the cached prompt', () => {
@@ -490,7 +489,7 @@ describe('Copilot hook normalization', () => {
           'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
-          buildBody({ hook_event_name: 'Notification', notificationType: 'permission_prompt' })
+          buildBody({ hook_event_name: 'Notification', notificationType: 'elicitation_dialog' })
         )
       })
 
