@@ -97,3 +97,31 @@ reviewed upstream — which is precisely what happened twice before this guard e
 and `pre-commit` cannot see it.
 
 If a commit is wrongly refused, the fix is to switch branches, not to bypass the hook.
+
+### `local(vm)`: an ephemeral machine per worktree
+
+`environmentRecipes` in `orca.yaml` plus `local/orca-vm/{create,destroy,suspend,resume}.sh`: allocate a
+machine from the team provisioning system when a worktree is created, and release it when that
+worktree is deleted.
+
+Inert until wired — each script names the provider verbs it needs at the top; until then it fails
+loudly rather than silently allocating nothing. **Nothing in this flow is provider-specific in
+Orca:** the recipe scripts run on the laptop, from the repo root, and Orca only consumes the one JSON
+object they print on stdout. Confirm with:
+
+```bash
+orca vm recipe doctor team-machine --provision --json   # passes only with no fail and no warn
+```
+
+The contract details worth not rediscovering:
+
+- stdout must be **exactly one JSON object**. The result is parsed with a strict schema that rejects
+  unknown keys, so a stray progress line lands as "Recipe stdout must be one JSON object."
+- Orca imposes **no timeout** on `create`. The script's own bounded SSH wait is what stops a bad
+  allocation from hanging the worktree, and it releases the machine before failing.
+- `relayGracePeriodSeconds` lives inside `target`; 0 means "keep terminals alive until reset", which
+  is wrong for a disposable host, so this uses one hour.
+- `create` gets an empty stdin; `suspend`/`resume`/`destroy` get a payload with `recipeResult` on
+  stdin, which is where the `userData.resourceId` handle comes back.
+- Agent credentials are **not** pushed to the guest. The image must already have the agent CLIs
+  installed and logged in, or every machine needs a manual login.
