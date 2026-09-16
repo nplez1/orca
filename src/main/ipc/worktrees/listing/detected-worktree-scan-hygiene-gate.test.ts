@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { GitWorktreeInfo } from '../../../../shared/worktree/types'
@@ -44,7 +46,11 @@ function worktreeAt(path: string): GitWorktreeInfo {
 }
 
 const captureExpectation = vi.fn(() => ({ repo: { id: repo.id }, metadata: [] }))
-const store = { captureNativeLocalWorktreeMetadataScanExpectation: captureExpectation } as never
+const store = {
+  captureNativeLocalWorktreeMetadataScanExpectation: captureExpectation,
+  // Why: the real store always provides this; a fake that omits it trips cache persistence.
+  getProfileStorageDirectory: () => join(tmpdir(), 'orca-scan-cache-test')
+} as never
 
 /** Each listing must miss the TTL cache, the way a renderer poll past the window does. */
 function advancePastListingTtl(): void {
