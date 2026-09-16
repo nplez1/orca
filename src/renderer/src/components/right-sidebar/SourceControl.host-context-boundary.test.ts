@@ -91,7 +91,7 @@ describe('SourceControl host-context boundaries', () => {
       '  return defaultBaseRef'
     )
     expect(baseRefSection).toContain(
-      'getRuntimeRepoBaseRefDefault(\n      { activeRuntimeEnvironmentId: activeRepoRuntimeEnvironmentId },\n      activeRepoId'
+      'void getRuntimeRepoBaseRefDefault(\n        { activeRuntimeEnvironmentId: activeRepoRuntimeEnvironmentId },\n        activeRepoId,'
     )
     const dependencyBlock = sourceBetween(baseRefSection, '  }, [', '  ])')
     const dependencyEntries = dependencyBlock

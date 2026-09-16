@@ -152,6 +152,11 @@ export async function loadIpcEventsHarness(
         runtimeEnvironments: createApiNamespaceStub({
           getStatusSnapshots: () => Promise.resolve([])
         }),
+        // Why: the agent-status bridge requests a snapshot as soon as routing is ready and chains
+        // .then on it, so a non-promise stub makes every test that installs the bridge throw.
+        agentStatus: createApiNamespaceStub({
+          getSnapshot: () => Promise.resolve([])
+        }),
         ui: createApiNamespaceStub({
           getZoomLevel: () => 0,
           consumePendingOpenSettings: () => Promise.resolve(false),
