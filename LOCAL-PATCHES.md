@@ -160,3 +160,51 @@ Two layers, so a rebake is rare:
 Gate a candidate image with `local/orca-vm/verify-guest-image.sh`, run on the guest: it exits
 non-zero until node/npm/git, the toolchain, a *complete* baked native-deps entry with both addons,
 and at least one agent CLI are present.
+
+### `local(identity)`: ship as "Orca NP" beside an official Orca
+
+This fork must coexist with an official Orca install on the same machine, so every name either
+install owns is changed here. Nothing in this section is a PR candidate.
+
+| Piece | Value |
+|---|---|
+| appId / `BASE_APP_USER_MODEL_ID` | `com.nplez1.orca` |
+| product name | `Orca NP` |
+| installed CLI command | `orca-np` (Windows `orca-np.cmd`) |
+| dev CLI | `orca-np-dev` |
+| packaged userData | `appData/orca-np` |
+| home directory | `~/.orca-np` |
+| URL scheme | **unchanged**: `orca://` |
+
+Why the scheme stays: `orca://pair` is what the official mobile app and official clients consume,
+and `orca://skills/share/...` is how share links open this app. A fork-only scheme would make its own
+pairing links unopenable by everything else. Sharing it costs one ambiguity — on a machine with both
+installs, macOS routes `orca://` to only one of them.
+
+Why `~/.orca-np` rather than sharing: it holds keybindings, provider credentials and the agent-hook
+scripts, so sharing would let either install overwrite the other's hooks.
+
+Three couplings this rename depends on. Each fails silently, so change them together:
+
+1. **The macOS launcher shim hardcodes the in-bundle executable path**
+   (`resources/darwin/bin/orca` → `Contents/MacOS/Orca NP`). The executable is named after
+   `productName`, so changing one without the other installs a CLI that fails on every invocation.
+2. **The Windows launcher ships as `resources/bin/orca-np.exe` + `orca-np.cmd`**, with
+   `getBundledLauncherPath` and the `extraResources` mapping following. Windows resolves the CLI to
+   the packaged launcher rather than to a PATH directory, so all three move as a unit.
+3. **The SSH relay shim is a different identity.** A remote execution host runs the relay's own shim,
+   deployed under a fixed name (plain `orca` / `orca.cmd`) that must NOT follow the local rename —
+   see `getRelayCliCommandNameForPlatform` and `launchCmdByRemotePlatform`. Conflating the two makes
+   every remote launch invoke a command the remote PATH never had. This is the coupling that hides:
+   upstream's local and remote names coincided, so a test asserting the wrong one still looks
+   plausible.
+
+Deliberately NOT renamed: the Linux deb/rpm names and `executableName: 'orca-ide'` (this fork builds
+only macOS and Windows, and renaming puts a space in the `/opt` install path that `after-install.sh`
+resolves unquoted); the bundled launcher FILE names; and the per-repo `.orca/` directory convention,
+which is a repo directory rather than the home directory.
+
+Consequences to expect on first run of a renamed build: it cannot read an official install's data,
+Keychain items or E2EE pairing files, and macOS re-prompts for TCC once per permission because
+grants anchor on bundle id + team id. The official install keeps working — its `~/.orca`, its CLI
+shim and its `orca://` handling are untouched.

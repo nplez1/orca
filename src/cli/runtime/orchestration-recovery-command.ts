@@ -1,15 +1,15 @@
 export function resolveOrchestrationCliExecutable(
   env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform
+  _platform: NodeJS.Platform = process.platform
 ): string {
   const configured = env.ORCA_CLI_COMMAND?.trim()
   if (configured) {
     return configured
   }
   if (env.ORCA_DEV_REPO_ROOT) {
-    return 'orca-dev'
+    return 'orca-np-dev'
   }
-  return platform === 'linux' ? 'orca-ide' : 'orca'
+  return 'orca-np'
 }
 
 export function buildOrchestrationRecoveryCommand(

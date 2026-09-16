@@ -94,7 +94,7 @@ describe('CliInstaller', () => {
     'creates a linux symlink under the requested path and warns when PATH is missing',
     async () => {
       const fixture = await makeFixture()
-      const installPath = join(fixture.root, '.local', 'bin', 'orca-ide')
+      const installPath = join(fixture.root, '.local', 'bin', 'orca-np')
       const installer = new CliInstaller({
         platform: 'linux',
         isPackaged: false,
@@ -107,7 +107,7 @@ describe('CliInstaller', () => {
 
       const installed = await installer.install()
       expect(installed.state).toBe('installed')
-      expect(installed.commandName).toBe('orca-ide')
+      expect(installed.commandName).toBe('orca-np')
       expect(installed.pathConfigured).toBe(false)
       expect(installed.detail).toContain('.local')
 
@@ -140,9 +140,9 @@ describe('CliInstaller', () => {
 
       const installed = await installer.install()
       expect(installed.state).toBe('installed')
-      expect(installed.commandName).toBe('orca-dev')
-      expect(installed.commandPath).toBe(join(commandDir, 'orca-dev'))
-      expect(installed.launcherPath).toBe(join(fixture.userDataPath, 'cli', 'bin', 'orca-dev'))
+      expect(installed.commandName).toBe('orca-np-dev')
+      expect(installed.commandPath).toBe(join(commandDir, 'orca-np-dev'))
+      expect(installed.launcherPath).toBe(join(fixture.userDataPath, 'cli', 'bin', 'orca-np-dev'))
       await expect(readlink(installed.commandPath as string)).resolves.toBe(installed.launcherPath)
       await expect(
         readFile(join(fixture.userDataPath, 'cli', 'bin', 'orca'), 'utf8')
@@ -159,7 +159,7 @@ describe('CliInstaller', () => {
     async () => {
       const fixture = await makeFixture()
       const commandDir = join(fixture.root, '.local', 'bin')
-      const installPath = join(commandDir, 'orca-ide')
+      const installPath = join(commandDir, 'orca-np')
       const appImagePath = join(fixture.root, 'Orca.AppImage')
       const cacheRootPath = join(fixture.root, 'cache')
       await writeFile(appImagePath, '#!/usr/bin/env bash\n', {
@@ -185,7 +185,7 @@ describe('CliInstaller', () => {
       const installed = await installer.install()
       expect(installed).toMatchObject({
         state: 'installed',
-        commandName: 'orca-ide',
+        commandName: 'orca-np',
         installMethod: 'symlink',
         pathConfigured: true
       })
@@ -304,7 +304,7 @@ describe('CliInstaller', () => {
   // Why: Linux renamed the public command to avoid shadowing GNOME Orca, so
   // upgrading must clean up only the old symlink owned by prior Orca installs.
   it.skipIf(process.platform === 'win32')(
-    'removes the old managed linux orca symlink when installing orca-ide',
+    'removes the old managed linux orca symlink when installing orca-np',
     async () => {
       const fixture = await makeFixture()
       const homePath = join(fixture.root, 'home')
@@ -330,7 +330,7 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'orca-ide'))
+      expect(installed.commandPath).toBe(join(commandDir, 'orca-np'))
       await expect(lstat(legacyCommandPath)).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
@@ -365,7 +365,7 @@ describe('CliInstaller', () => {
       })
 
       const installed = await installer.install()
-      expect(installed.commandPath).toBe(join(commandDir, 'orca-ide'))
+      expect(installed.commandPath).toBe(join(commandDir, 'orca-np'))
       await expect(lstat(legacyCommandPath)).rejects.toMatchObject({ code: 'ENOENT' })
     }
   )
