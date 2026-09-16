@@ -5,6 +5,7 @@ import type { ChecksPanelControllerState } from './use-checks-panel-controller-s
 import type { ChecksPanelContextState } from './use-checks-panel-context-state'
 import type { ChecksPanelReviewState } from './use-checks-panel-review-state'
 import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
+import { scheduleAfterWorktreeActivationInputQuiet } from '@/store/slices/worktrees/session/activation-deferred-work'
 
 type ChecksPanelForegroundEffectsInput = Pick<
   ChecksPanelControllerState,
@@ -70,37 +71,40 @@ export function useChecksPanelForegroundEffects(model: ChecksPanelForegroundEffe
       foregroundedUnrenderedReviewKeyRef.current = null
     }
     if (isPanelVisible && repo && !isFolder && branch) {
-      void fetchHostedReviewForBranch(repo.path, branch, {
-        repoId: repo.id,
-        linkedGitHubPR: linkedPR,
-        fallbackGitHubPR: fallbackGitHubPRNumber,
-        currentHeadOid: activeWorktree?.head ?? null,
-        linkedGitLabMR,
-        linkedBitbucketPR,
-        linkedAzureDevOpsPR,
-        linkedGiteaPR,
-        staleWhileRevalidate: true,
-        // Why: this panel only ever renders the selected worktree, so it earns
-        // the host's fast re-check tier (#11532).
-        active: true
-      })
-      // Why: the gh-based refresh coordinator is GitHub-only; running it elsewhere gave a spurious gh_unavailable error hiding a valid composer.
-      if (activeWorktreeId && isGitHubReviewContext) {
-        const refreshRequest = resolveChecksPanelPRRefreshRequest({
-          cachedHasPR: prCachedHasPR,
-          cachedFetchedAt: prFetchedAt ?? null,
-          panelVisibleSince: panelVisibleSinceRef.current,
-          hasUnrenderedReviewEvidence: foregroundReviewEvidenceKey !== null,
-          hasRequestedForegroundRefresh:
-            foregroundReviewEvidenceKey !== null &&
-            foregroundedUnrenderedReviewKeyRef.current === foregroundReviewEvidenceKey
+      return scheduleAfterWorktreeActivationInputQuiet(() => {
+        void fetchHostedReviewForBranch(repo.path, branch, {
+          repoId: repo.id,
+          linkedGitHubPR: linkedPR,
+          fallbackGitHubPR: fallbackGitHubPRNumber,
+          currentHeadOid: activeWorktree?.head ?? null,
+          linkedGitLabMR,
+          linkedBitbucketPR,
+          linkedAzureDevOpsPR,
+          linkedGiteaPR,
+          staleWhileRevalidate: true,
+          // Why: this panel only ever renders the selected worktree, so it earns
+          // the host's fast re-check tier (#11532).
+          active: true
         })
-        if (refreshRequest.reason === 'active' && foregroundReviewEvidenceKey !== null) {
-          foregroundedUnrenderedReviewKeyRef.current = foregroundReviewEvidenceKey
+        // Why: the gh-based refresh coordinator is GitHub-only; running it elsewhere gave a spurious gh_unavailable error hiding a valid composer.
+        if (activeWorktreeId && isGitHubReviewContext) {
+          const refreshRequest = resolveChecksPanelPRRefreshRequest({
+            cachedHasPR: prCachedHasPR,
+            cachedFetchedAt: prFetchedAt ?? null,
+            panelVisibleSince: panelVisibleSinceRef.current,
+            hasUnrenderedReviewEvidence: foregroundReviewEvidenceKey !== null,
+            hasRequestedForegroundRefresh:
+              foregroundReviewEvidenceKey !== null &&
+              foregroundedUnrenderedReviewKeyRef.current === foregroundReviewEvidenceKey
+          })
+          if (refreshRequest.reason === 'active' && foregroundReviewEvidenceKey !== null) {
+            foregroundedUnrenderedReviewKeyRef.current = foregroundReviewEvidenceKey
+          }
+          enqueueGitHubPRRefresh(activeWorktreeId, refreshRequest.reason, refreshRequest.priority)
         }
-        enqueueGitHubPRRefresh(activeWorktreeId, refreshRequest.reason, refreshRequest.priority)
-      }
+      })
     }
+    return undefined
   }, [
     activeWorktreeId,
     branch,

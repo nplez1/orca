@@ -8,6 +8,8 @@ export type StartupActions = Pick<
   | 'fetchFolderWorkspacesForAllHosts'
   | 'fetchAllWorktrees'
   | 'fetchWorktrees'
+  | 'hydrateCachedWorktrees'
+  | 'publishPersistedTerminalHints'
   | 'fetchWorktreeLineage'
   | 'fetchOrcaProfiles'
   | 'fetchSettings'
@@ -44,6 +46,8 @@ export function selectStartupActions(state: StartupActions): StartupActions {
       state.fetchFolderWorkspacesForAllHosts &&
     cachedStartupActions.fetchAllWorktrees === state.fetchAllWorktrees &&
     cachedStartupActions.fetchWorktrees === state.fetchWorktrees &&
+    cachedStartupActions.hydrateCachedWorktrees === state.hydrateCachedWorktrees &&
+    cachedStartupActions.publishPersistedTerminalHints === state.publishPersistedTerminalHints &&
     cachedStartupActions.fetchWorktreeLineage === state.fetchWorktreeLineage &&
     cachedStartupActions.fetchOrcaProfiles === state.fetchOrcaProfiles &&
     cachedStartupActions.fetchSettings === state.fetchSettings &&
@@ -79,6 +83,8 @@ export function selectStartupActions(state: StartupActions): StartupActions {
     fetchFolderWorkspacesForAllHosts: state.fetchFolderWorkspacesForAllHosts,
     fetchAllWorktrees: state.fetchAllWorktrees,
     fetchWorktrees: state.fetchWorktrees,
+    hydrateCachedWorktrees: state.hydrateCachedWorktrees,
+    publishPersistedTerminalHints: state.publishPersistedTerminalHints,
     fetchWorktreeLineage: state.fetchWorktreeLineage,
     fetchOrcaProfiles: state.fetchOrcaProfiles,
     fetchSettings: state.fetchSettings,

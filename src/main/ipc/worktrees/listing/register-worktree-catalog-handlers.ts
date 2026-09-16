@@ -1,6 +1,11 @@
 import { ipcMain } from 'electron'
 import { isFolderRepo } from '../../../../shared/repo-kind'
-import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
+  type ExecutionHostId
+} from '../../../../shared/execution-host'
+import type { DetectedWorktreeListResult } from '../../../../shared/worktree/types'
 import { getSshGitProvider } from '../../../providers/ssh-git-dispatch'
 import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../../shared/worktree/retired-name-registry'
 import { getRetiredNameRegistryForRepo } from '../../../worktree-name-retirement'
@@ -28,6 +33,8 @@ import {
   readAllWorktreeMetaForRepo
 } from '../../../persistence/host-qualified-worktree-meta'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
+import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
+import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
 
 const WORKTREE_LIST_ALL_CONCURRENCY = 8
 
@@ -157,6 +164,44 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
     })
 
     return results.flat()
+  })
+
+  ipcMain.handle('worktrees:listCached', async (): Promise<DetectedWorktreeListResult[]> => {
+    const cached = await readPersistedWorktreeScanCache(store.getProfileStorageDirectory())
+    const localMetadata =
+      typeof store.getAllWorktreeMetaForHost === 'function'
+        ? store.getAllWorktreeMetaForHost(LOCAL_EXECUTION_HOST_ID)
+        : readAllWorktreeMetaForHost(store, LOCAL_EXECUTION_HOST_ID)
+    const results: DetectedWorktreeListResult[] = []
+    for (const entry of cached) {
+      const repo = store.getRepo(entry.repoId)
+      if (
+        !repo ||
+        repo.connectionId ||
+        isFolderRepo(repo) ||
+        getRepoExecutionHostId(repo) !== LOCAL_EXECUTION_HOST_ID ||
+        repo.path !== entry.repoPath
+      ) {
+        continue
+      }
+      let currentWslDistro: string | null
+      try {
+        currentWslDistro = getLocalProjectWorktreeGitOptions(store, repo).wslDistro ?? null
+      } catch (error) {
+        console.debug(`[worktrees] skipping cached listing for ${repo.id}:`, error)
+        continue
+      }
+      if (currentWslDistro !== entry.wslDistro) {
+        continue
+      }
+      results.push({
+        repoId: repo.id,
+        authoritative: false,
+        source: 'cache',
+        worktrees: buildDetectedGitWorktrees(store, repo, entry.worktrees, localMetadata)
+      })
+    }
+    return results
   })
 
   ipcMain.handle('worktrees:listRetiredNames', async (_event, args: { repoId: string }) => {
