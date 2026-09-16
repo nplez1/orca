@@ -1,3 +1,4 @@
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getSecretStore } from '../../shared/secret-store'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -11,7 +12,7 @@ const OPENAI_SPEECH_TOKEN_FILE = 'openai-speech-token.enc'
 let cachedOpenAiSpeechApiKey: string | null = null
 
 function getOrcaDir(): string {
-  return join(homedir(), '.orca')
+  return join(homedir(), HOME_DIRECTORY_NAME)
 }
 
 function ensureOrcaDir(): void {

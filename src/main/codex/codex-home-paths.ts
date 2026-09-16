@@ -10,6 +10,7 @@ import {
   symlinkSync,
   unlinkSync
 } from 'node:fs'
+import { APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -58,12 +59,15 @@ export function getOrcaUserDataPath(): string {
   // Why: CLI hook commands import this module outside Electron. Mirror the CLI
   // runtime metadata path so offline hook status/on/off uses the same userData.
   if (process.platform === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'orca')
+    return join(homedir(), 'Library', 'Application Support', APP_DATA_DIRECTORY_NAME)
   }
   if (process.platform === 'win32') {
-    return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'orca')
+    return join(
+      process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'),
+      APP_DATA_DIRECTORY_NAME
+    )
   }
-  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'orca')
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), APP_DATA_DIRECTORY_NAME)
 }
 
 // Why: each managed home (the shared runtime mirror, or a per-account

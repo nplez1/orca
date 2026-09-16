@@ -91,7 +91,7 @@ describe('orchestration timeout flag validation', () => {
       all: undefined,
       types: undefined,
       format: undefined,
-      compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
+      compatibilityCliCommand: expect.stringMatching(/^orca-np$/),
       run: undefined,
       ack: undefined,
       wait: true,
@@ -206,7 +206,7 @@ describe('orchestration timeout flag validation', () => {
         options: undefined,
         timeoutMs: 123,
         from: 'term_worker',
-        compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
+        compatibilityCliCommand: expect.stringMatching(/^orca-np$/),
         compatibilityWindowsCommand: undefined
       },
       { timeoutMs: 5_123, orchestrationCapability: undefined }
@@ -235,7 +235,7 @@ describe('orchestration timeout flag validation', () => {
         options: undefined,
         timeoutMs: undefined,
         from: 'term_worker',
-        compatibilityCliCommand: expect.stringMatching(/^orca(?:-ide)?$/),
+        compatibilityCliCommand: expect.stringMatching(/^orca-np$/),
         compatibilityWindowsCommand: undefined
       },
       { timeoutMs: 605_000, orchestrationCapability: undefined }
@@ -244,7 +244,7 @@ describe('orchestration timeout flag validation', () => {
 
   it('prints the pending message ID and exact capability-bound resume command on timeout', async () => {
     process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
-    process.env.ORCA_CLI_COMMAND = 'orca-dev'
+    process.env.ORCA_CLI_COMMAND = 'orca-np-dev'
     callMock.mockResolvedValue({
       result: {
         answer: null,
@@ -267,7 +267,7 @@ describe('orchestration timeout flag validation', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       'ask timeout after 30000ms; question is still pending (messageId: msg_question). ' +
         'Resume waiting; do not ask again:\n' +
-        'orca-dev orchestration ask --from term_worker --dispatch-capability dcap_secret ' +
+        'orca-np-dev orchestration ask --from term_worker --dispatch-capability dcap_secret ' +
         '--resume msg_question --timeout-ms 30000'
     )
     expect(process.exitCode).toBe(1)

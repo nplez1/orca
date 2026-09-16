@@ -24,9 +24,9 @@ describe('keybinding-file', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('resolves the user-facing keybindings path under ~/.orca', () => {
+  it('resolves the user-facing keybindings path under ~/.orca-np', () => {
     expect(getUserKeybindingsPath('/home/test')).toBe(
-      join('/home/test', '.orca', 'keybindings.json')
+      join('/home/test', '.orca-np', 'keybindings.json')
     )
   })
 

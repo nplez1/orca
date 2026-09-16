@@ -48,7 +48,10 @@ const settings = {
   terminalWindowsShell: null
 } as never
 
-/** The launched CLI name is the whole decision: `orca` is the relay shim, `orca-ide` is local. */
+/**
+ * The launched CLI name is the whole decision: a remote host runs the SSH relay's own shim (plain
+ * `orca`), while a local host runs this fork's installed `orca-np`.
+ */
 function launchCliNameFor(repo: Repo): string {
   return buildWorktreeStartupForAgent({
     repo,
@@ -62,25 +65,25 @@ function launchCliNameFor(repo: Repo): string {
 describe('buildWorktreeStartupForAgent host resolution', () => {
   // Why two hosts: one SSH fixture passes even when the launch shape is resolved off another
   // host's row, which is the shape of the `ssh:m4air` -> openclaw leak.
-  it('drops the Linux-only rename for both spellings of SSH ownership on two hosts', () => {
+  it('drops the local CLI rename for both spellings of SSH ownership on two hosts', () => {
     expect(launchCliNameFor(makeRepo({ connectionId: 'm4air' }))).toBe('orca')
     expect(launchCliNameFor(makeRepo({ executionHostId: 'ssh:openclaw' }))).toBe('orca')
   })
 
-  it('keeps the Linux rename for a local row carrying a stale connection', () => {
+  it('keeps the local CLI rename for a local row carrying a stale connection', () => {
     expect(launchCliNameFor(makeRepo({ connectionId: 'm4air', executionHostId: 'local' }))).toBe(
-      'orca-ide'
+      'orca-np'
     )
   })
 
-  it('drops the rename for a runtime host reaching a nested SSH target', () => {
+  it('drops the local CLI rename for a runtime host reaching a nested SSH target', () => {
     expect(
       launchCliNameFor(makeRepo({ connectionId: 'nested', executionHostId: 'runtime:vm-1' }))
     ).toBe('orca')
   })
 
-  it('keeps the rename for a runtime host with no nested SSH target', () => {
-    expect(launchCliNameFor(makeRepo({ executionHostId: 'runtime:vm-1' }))).toBe('orca-ide')
+  it('keeps the local CLI rename for a runtime host with no nested SSH target', () => {
+    expect(launchCliNameFor(makeRepo({ executionHostId: 'runtime:vm-1' }))).toBe('orca-np')
   })
 
   it('uses per-launch arguments and preserves launch telemetry', () => {

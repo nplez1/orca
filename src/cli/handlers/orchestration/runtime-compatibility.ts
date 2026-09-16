@@ -1,20 +1,30 @@
 import { RuntimeClientError } from '../../runtime-client'
 
-export function resolveCompatibilityCliCommand(): 'orca' | 'orca-ide' | 'orca-dev' {
+type CompatibilityCliCommand = 'orca' | 'orca-ide' | 'orca-dev' | 'orca-np' | 'orca-np-dev'
+
+const COMPATIBILITY_CLI_COMMANDS: readonly string[] = [
+  'orca',
+  'orca-ide',
+  'orca-dev',
+  'orca-np',
+  'orca-np-dev'
+]
+
+export function resolveCompatibilityCliCommand(): CompatibilityCliCommand {
   const configured = process.env.ORCA_CLI_COMMAND
-  if (configured === 'orca' || configured === 'orca-ide' || configured === 'orca-dev') {
-    return configured
+  if (configured && COMPATIBILITY_CLI_COMMANDS.includes(configured)) {
+    return configured as CompatibilityCliCommand
   }
-  return process.platform === 'linux' ? 'orca-ide' : 'orca'
+  return 'orca-np'
 }
 
-export function resolvePackagedWindowsCompatibilityCommand(): 'orca' | 'orca-ide' | undefined {
+export function resolvePackagedWindowsCompatibilityCommand(): CompatibilityCliCommand | undefined {
   if (process.env.ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER !== '1') {
     return undefined
   }
   const command = process.env.ORCA_CLI_COMMAND
-  if (command === 'orca' || command === 'orca-ide') {
-    return command
+  if (command && COMPATIBILITY_CLI_COMMANDS.includes(command)) {
+    return command as CompatibilityCliCommand
   }
   throw new RuntimeClientError(
     'invalid_argument',
@@ -37,6 +47,6 @@ export async function flushOrchestrationStdout(): Promise<void> {
 export function isDevCliInvocation(): boolean {
   return (
     process.env.ORCA_DEV_CLI_INVOCATION === '1' ||
-    (process.env.ORCA_USER_DATA_PATH?.includes('orca-dev') ?? false)
+    (process.env.ORCA_USER_DATA_PATH?.includes('orca-np-dev') ?? false)
   )
 }
