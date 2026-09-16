@@ -84,6 +84,11 @@ labels, which belong to stablyai's account. Signing is conditional on `MAC_CERTS
 pipeline is usable before a certificate exists and switches to the signed, notarized path by itself
 once it does.
 
+Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
+empty: an unset secret still *defines* them as empty strings, electron-builder reads a defined
+`CSC_LINK` as a certificate path, and `resolveCscLinkPath('', cwd)` resolves to the repository root —
+so packaging dies with `<repo> not a file`. An empty secret and an absent one are not the same thing.
+
 Fork-only helper scripts live in `local/`:
 
 - `local/branch-status.mjs` — live status of every branch (SHAs, fork presence, own delta, PR).
