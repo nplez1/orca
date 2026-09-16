@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { dirname, join, posix as pathPosix } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { SFTPWrapper } from 'ssh2'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import {
   createManagedCommandMatcher,
@@ -228,7 +229,7 @@ export class KimiHookService {
     const remoteConfigPath = pathPosix.join(remoteHome, '.kimi-code', 'config.toml')
     const remoteScriptPath = pathPosix.join(
       remoteHome,
-      '.orca',
+      HOME_DIRECTORY_NAME,
       'agent-hooks',
       MANAGED_SCRIPT_FILE_NAME
     )
