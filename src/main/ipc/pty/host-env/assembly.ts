@@ -285,8 +285,8 @@ export function buildPtyHostEnv(
   // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so `orca` targets the live dev instance.
   if (opts.isWsl) {
     baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
-    // Why: managed WSL registration uses `orca-ide`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
-    baseEnv.ORCA_CLI_COMMAND = getWslCliCommandName(opts.isPackaged)
+    // Why: managed WSL registration uses `orca-np`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
+    baseEnv.ORCA_CLI_COMMAND = opts.isPackaged ? 'orca-np' : 'orca-np-dev'
     const managedCliDir = getManagedWslCliDir(opts)
     if (managedCliDir) {
       baseEnv.ORCA_WSL_CLI_DIR = managedCliDir

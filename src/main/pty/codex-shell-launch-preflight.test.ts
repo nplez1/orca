@@ -426,7 +426,7 @@ describe('Codex shell launch preflight command', () => {
   it.each([
     { platform: 'darwin' as const, bundled: 'orca' },
     { platform: 'linux' as const, bundled: 'orca-ide' },
-    { platform: 'win32' as const, bundled: 'orca.exe' }
+    { platform: 'win32' as const, bundled: 'orca-np.exe' }
   ])('carries the verified bundled $platform launcher as an absolute path', (config) => {
     const { userDataPath, resourcesPath } = makeCliRoot()
     const launcherPath = join(resourcesPath, 'bin', config.bundled)
@@ -463,7 +463,7 @@ describe('Codex shell launch preflight command', () => {
 
   it('carries the packaged Windows launcher for WSLENV path translation', () => {
     const { userDataPath, resourcesPath } = makeCliRoot()
-    const launcherPath = join(resourcesPath, 'bin', 'orca.exe')
+    const launcherPath = join(resourcesPath, 'bin', 'orca-np.exe')
     writeExecutable(launcherPath, '#!/bin/sh\nexit 0\n')
 
     expect(
