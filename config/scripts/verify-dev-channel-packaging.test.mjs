@@ -34,11 +34,14 @@ afterEach(() => {
 })
 
 describe('electron-builder dev-channel identity', () => {
-  it('keeps the SignPath publisherName on stable Windows builds', () => {
+  // LOCAL(nplez1): this fork drops publisherName on EVERY channel and disables the updater's
+  // Authenticode check (see LOCAL-PATCHES.md § local(build)), because it ships unsigned — an unsigned
+  // build that advertised a publisher would reject every installer it downloaded, including its own.
+  it('drops the SignPath publisherName on stable Windows builds too', () => {
     const config = loadConfigWithEnv({})
 
-    expect(config.win.signtoolOptions.publisherName).toBe('SignPath Foundation')
-    expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
+    expect(config.win.signtoolOptions.publisherName).toBeUndefined()
+    expect(config.win.verifyUpdateCodeSignature).toBe(false)
     expect(config.publish.repo).toBe('orca')
     expect(config.publish.releaseType).toBe('release')
   })
@@ -62,7 +65,7 @@ describe('electron-builder dev-channel identity', () => {
       const config = loadConfigWithEnv(env)
       expect(typeof config.win.signtoolOptions.sign).toBe('function')
     }
-    expect(loadConfigWithEnv({}).win.signtoolOptions.publisherName).toBe('SignPath Foundation')
+    expect(loadConfigWithEnv({}).win.signtoolOptions.publisherName).toBeUndefined()
     expect(loadConfigWithEnv(WIN_ADHOC_ENV).win.signtoolOptions.publisherName).toBeUndefined()
   })
 
