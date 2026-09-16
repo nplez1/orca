@@ -99,7 +99,7 @@ function bundledLauncherPath(): string | null {
     return join(process.resourcesPath, 'bin', 'orca-ide')
   }
   if (process.platform === 'win32') {
-    return join(process.resourcesPath, 'bin', 'orca.exe')
+    return join(process.resourcesPath, 'bin', 'orca-np.exe')
   }
   return null
 }

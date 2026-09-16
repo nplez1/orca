@@ -65,10 +65,13 @@ fn main() {
     env::set_var("ELECTRON_RUN_AS_NODE", "1");
     env::set_var("ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER", "1");
     let requested_command = env::var("ORCA_CLI_COMMAND").unwrap_or_default();
+    // Why: this fork installs its CLI as `orca-np`, so normalizing it to `orca` relabels it.
     env::set_var(
         "ORCA_CLI_COMMAND",
         if requested_command == "orca-ide" {
             "orca-ide"
+        } else if requested_command == "orca-np" {
+            "orca-np"
         } else {
             "orca"
         },
