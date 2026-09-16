@@ -688,34 +688,6 @@
           }
         }
       },
-      "native": {
-        "chat": {
-          "NativeChatStructuredSession": {
-            "test": {
-              "harness": {
-                "8a29ec95fe": "Model",
-                "a236d7b879": "GPT Live"
-              }
-            }
-          },
-          "native": {
-            "chat": {
-              "structured": {
-                "question": {
-                  "test": {
-                    "fixtures": {
-                      "0de196d6c4": "Mobile",
-                      "49a161ae99": "Web",
-                      "b1fb14581e": "Vue",
-                      "fb81060d8f": "React"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
       "new": {
         "workspace": {
           "SmartWorkspaceNameField": {
@@ -1612,6 +1584,7 @@
           "pane": {
             "copilot": {
               "section": {
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
                 "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
                 "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month."
               }
@@ -2673,6 +2646,19 @@
       }
     },
     "hooks": {
+      "ipc": {
+        "events": {
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {
+                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
+                }
+              }
+            }
+          }
+        }
+      },
       "useComposerState": {
         "attachSkipMissing": "No longer at its original path.",
         "attachSkipPermissionDenied": "Permission denied.",
@@ -2716,16 +2702,6 @@
           "import": {
             "toast": {
               "googleCookiesSkipped": "Google cookies were not imported. Open a browser in Orca on {{value0}} with this profile, then sign into Google."
-            }
-          }
-        }
-      },
-      "cmd": {
-        "j": {
-          "evaluation": {
-            "fixture": {
-              "6347cd6e36": "Reconnect drops after host sleep",
-              "699e9ef186": "Rank palette results by evidence"
             }
           }
         }
