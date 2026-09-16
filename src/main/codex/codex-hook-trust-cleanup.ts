@@ -1,4 +1,5 @@
 import { win32 as pathWin32 } from 'node:path'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { MANAGED_HOOK_TIMEOUT_SECONDS, type HookDefinition } from '../agent-hooks/installer-utils'
 import {
   codexHookSourcePathsEqual,
@@ -166,7 +167,9 @@ export function removeStaleWslRuntimeManagedHookTrustEntries(
     managedEventLabels: CODEX_MANAGED_EVENT_LABELS,
     timeoutSec: MANAGED_HOOK_TIMEOUT_SECONDS,
     buildManagedCommand: (linuxRuntimeHome) =>
-      wrapReadablePosixHookCommand(`${linuxRuntimeHome}/.orca/agent-hooks/codex-hook.sh`),
+      wrapReadablePosixHookCommand(
+        `${linuxRuntimeHome}/${HOME_DIRECTORY_NAME}/agent-hooks/codex-hook.sh`
+      ),
     priorLedgerHomes
   })
 }

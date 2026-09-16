@@ -10,6 +10,7 @@
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
+import { APP_DATA_DIRECTORY_NAME, HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import type { AppPathName } from '../../shared/app-environment'
 
 /** Empty is unset: a supervisor that exports `APPDATA=` has configured nothing. */
@@ -25,7 +26,7 @@ export function resolveUserDataPath(): string {
     return explicit
   }
   const xdg = env('XDG_DATA_HOME')
-  return xdg ? join(xdg, 'Orca') : join(homedir(), '.orca')
+  return xdg ? join(xdg, APP_DATA_DIRECTORY_NAME) : join(homedir(), HOME_DIRECTORY_NAME)
 }
 
 /** Electron's `'appData'` definition, computed without Electron. */
