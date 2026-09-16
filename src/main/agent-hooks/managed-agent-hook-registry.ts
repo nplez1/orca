@@ -55,7 +55,7 @@ export const MANAGED_AGENT_HOOK_INSTALLERS: readonly ManagedAgentHookInstaller[]
   ['muse', () => museHookService.install()]
 ]
 
-// Why: covers the shared launcher/statusline scripts under ~/.orca/agent-hooks — the files a
+// Why: covers the shared launcher/statusline scripts under ~/.orca-np/agent-hooks — the files a
 // user-wide agent config keeps invoking after the CLI falls off PATH. Amp and Hermes write
 // provider-native plugin code into their own config dirs with their own install lifecycles,
 // not shared launchers, so they are deliberately absent. Enforced by the coverage test in
