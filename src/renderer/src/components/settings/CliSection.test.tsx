@@ -155,14 +155,14 @@ describe('CliSection project runtime defaults', () => {
     const getInstallStatus = vi.fn().mockResolvedValue({
       platform: 'win32',
       commandName: 'orca',
-      commandPath: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+      commandPath: 'C:\\Program Files\\Orca\\resources\\bin\\orca-np.exe',
       pathDirectory: 'C:\\Program Files\\Orca\\resources\\bin',
       pathConfigured: null,
-      launcherPath: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+      launcherPath: 'C:\\Program Files\\Orca\\resources\\bin\\orca-np.exe',
       installMethod: 'wrapper',
       supported: true,
       state: 'installed',
-      currentTarget: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+      currentTarget: 'C:\\Program Files\\Orca\\resources\\bin\\orca-np.exe',
       unsupportedReason: null,
       detail: 'Orca could not read the Windows user PATH registry value.'
     })
