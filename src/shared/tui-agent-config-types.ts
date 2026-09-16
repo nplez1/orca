@@ -27,6 +27,11 @@ export type TuiAgentConfig = {
   launchCmd: string
   /** Platform-specific launch command when the public binary name differs. */
   launchCmdByPlatform?: Partial<Record<NodeJS.Platform, string>>
+  /**
+   * Launch command for a REMOTE execution host, where the SSH relay's own shim runs under a fixed
+   * name. Distinct from `launchCmdByPlatform` so a local rename cannot leak into a remote launch.
+   */
+  launchCmdByRemotePlatform?: Partial<Record<NodeJS.Platform, string>>
   expectedProcess: string
   promptInjectionMode: AgentPromptInjectionMode
   /** Option terminator required before positional prompts that may look like CLI syntax. */
