@@ -25,6 +25,7 @@ export const worktreesApi = {
   cancelListDetected: (args) => ipcRenderer.invoke('worktrees:cancelListDetected', args),
 
   listAll: () => ipcRenderer.invoke('worktrees:listAll'),
+  listCached: () => ipcRenderer.invoke('worktrees:listCached'),
 
   create: (args) => ipcRenderer.invoke('worktrees:create', args),
 
