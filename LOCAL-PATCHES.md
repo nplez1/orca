@@ -28,8 +28,11 @@ Anchors to re-point (`stablyai/orca` → `nplez1/orca`):
 - `src/main/updater/updater-release-feed.ts` — the `latest/download` fallback.
 - `src/shared/release-channel.ts` — `MAIN_RELEASE_REPO`.
 
-`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` deliberately still name upstream's channel repos: those release
-channels are unused here, and re-pointing them would only invite confusion.
+`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still name upstream's channel repos. This fork builds only the
+stable channel, so it never publishes to them — but the release-channel picker still OFFERS hourly,
+daily and adhoc, and selecting one points the updater at stablyai's feed, which would replace this
+build with an official Orca. Hide those channels here or re-point them at this fork; do not leave the
+picker offering a channel that installs a different product.
 
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
 
@@ -70,6 +73,30 @@ Then check the update path still points at this fork:
 ```bash
 grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/updater-*.ts src/shared/release-channel.ts
 ```
+
+Confirm the series came through unchanged — `range-diff` prints `=` per patch that is byte-identical:
+
+```bash
+git range-diff --no-patch <old-base>..<old-tip> <new-base>..nplez1/main
+```
+
+After resolving any conflict in `src/renderer/src/i18n/en-runtime-required.json`, regenerate it rather
+than merging by hand — it is derived:
+
+```bash
+pnpm run sync:localization-runtime-catalog
+```
+
+### Sync log
+
+- **2026-09-16** — onto upstream `291b4ddd6f` (131 commits). Three of the 29 local commits needed
+  resolution: two i18n locale files (took upstream's side; the derived catalog was then regenerated,
+  which removed exactly the stale fixture keys the local side carried) and
+  `src/shared/agent-hook-listener/listener-state.ts`, where upstream wrapped the state factory in a
+  legacy-adapter layer — kept that scaffolding *and* the `CopilotBackgroundWorkState` type. Verified:
+  26 of 29 patches byte-identical by `range-diff`, all three typecheck projects clean, 161 test files
+  green. Also removed an unused import in an upstream `native-chat` test that upstream's CI does not
+  gate on but this repo's typecheck does.
 
 ### `local(ci)`: release workflow
 
