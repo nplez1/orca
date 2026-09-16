@@ -17,6 +17,7 @@ import type { WorktreeRuntimeStub } from './worktrees-test-runtime-stub'
 
 const WORKTREE_HANDLER_CHANNELS = [
   'worktrees:listAll',
+  'worktrees:listCached',
   'worktrees:list',
   'worktrees:listRetiredNames',
   'worktrees:listDetected',

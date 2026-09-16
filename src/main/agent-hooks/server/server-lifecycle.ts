@@ -17,6 +17,10 @@ import { trackEmptyPaneKeyHook } from './server-transport-rules'
 import { AgentHookServerRuntimeEnv } from './server-runtime-env'
 
 export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv {
+  getStatusCacheHydrationReady(): Promise<void> {
+    return this.statusCacheHydrationReady
+  }
+
   /** Start the loopback listener after hydration and spool replay have settled. */
   async start(options?: {
     env?: string
@@ -38,29 +42,34 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv
     this.endpointFileWritten = false
     this.lastWrittenJson = null
     if (!this.ownerStateInitialized) {
-      // Why: hydrate before binding the listener so an early hook POST runs against a populated map.
-      if (this.lastStatusFilePath) {
-        this.hydrateLastStatusFromDisk()
-      }
-      this.captureHydratedAuthorityCommitments()
-      // Drain before binding the listener so replay cannot race a live hook during startup.
-      if (this.endpointDir) {
-        const replayedPaneKeys = new Set<string>()
-        drainAgentHookSpool({
-          endpointDir: this.endpointDir,
-          getPersistedLaunchTokenHash: (paneKey) =>
-            this.hydratedLaunchTokenHashByPaneKey.get(this.resolvePaneKeyAlias(paneKey)),
-          ingest: (record: SpoolRecord) => {
-            this.ingestSpoolRecord(record)
-            replayedPaneKeys.add(this.resolvePaneKeyAlias(record.paneKey))
-          }
-        })
-        // Why: the owner may have died while Orca was down; check each replayed pane once.
-        for (const paneKey of replayedPaneKeys) {
-          void this.checkAgentPresence(paneKey)
+      // Why: publish this phase separately so snapshot readers can proceed as
+      // soon as durable state is ready, without waiting for listener binding.
+      this.statusCacheHydrationReady = Promise.resolve().then(() => {
+        // Why: hydrate before binding the listener so an early hook POST runs against a populated map.
+        if (this.lastStatusFilePath) {
+          this.hydrateLastStatusFromDisk()
         }
-      }
-      this.ownerStateInitialized = true
+        this.captureHydratedAuthorityCommitments()
+        // Drain before binding the listener so replay cannot race a live hook during startup.
+        if (this.endpointDir) {
+          const replayedPaneKeys = new Set<string>()
+          drainAgentHookSpool({
+            endpointDir: this.endpointDir,
+            getPersistedLaunchTokenHash: (paneKey) =>
+              this.hydratedLaunchTokenHashByPaneKey.get(this.resolvePaneKeyAlias(paneKey)),
+            ingest: (record: SpoolRecord) => {
+              this.ingestSpoolRecord(record)
+              replayedPaneKeys.add(this.resolvePaneKeyAlias(record.paneKey))
+            }
+          })
+          // Why: the owner may have died while Orca was down; check each replayed pane once.
+          for (const paneKey of replayedPaneKeys) {
+            void this.checkAgentPresence(paneKey)
+          }
+        }
+        this.ownerStateInitialized = true
+      })
+      await this.statusCacheHydrationReady
     }
     const handleRequest = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       if (req.method !== 'POST') {
@@ -217,6 +226,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv
     this.endpointDir = null
     this.endpointFilePathCache = null
     this.endpointFileWritten = false
+    this.statusCacheHydrationReady = Promise.resolve()
     this.lastStatusFilePath = null
     this.lastWrittenJson = null
     this.runtimeObservedStatusPaneKeys.clear()

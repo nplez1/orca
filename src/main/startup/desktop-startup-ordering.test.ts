@@ -63,4 +63,22 @@ describe('startup ordering', () => {
     expect(signalHandlers).toBeGreaterThan(serveStart)
     expect(signalHandlers).toBeLessThan(serveReady)
   })
+
+  // Why: this fork publishes hook status-cache hydration as its own readiness phase, so
+  // snapshot readers proceed without waiting for listener binding. Upstream has no
+  // equivalent phase, so nothing else can reach this wiring.
+  it('publishes hook status-cache hydration as its own readiness phase', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/main/startup/main-process-pty-startup.ts'),
+      'utf8'
+    )
+    const ipcSource = readFileSync(join(process.cwd(), 'src/main/ipc/agent-hooks.ts'), 'utf8')
+
+    expect(source).toContain('agentHookStatusCacheHydrationReady = services')
+    expect(source).toContain(
+      'statusCacheHydrationReady: agentHookServer.getStatusCacheHydrationReady()'
+    )
+    expect(ipcSource).toContain('state.agentHookStatusCacheHydrationReady')
+    expect(ipcSource).not.toContain('state.firstWindowStartupServicesReady')
+  })
 })
