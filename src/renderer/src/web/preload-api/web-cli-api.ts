@@ -1,10 +1,11 @@
 import type { PreloadApi } from '../../../../preload/api-types'
+import { getOrcaCliCommandNameForPlatform } from '../../../../shared/orca-cli-command-name'
 import { getBrowserPlatform } from './web-storage'
 
 export function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
   const status = {
     platform: getBrowserPlatform(),
-    commandName: getBrowserPlatform() === 'linux' ? 'orca-ide' : 'orca',
+    commandName: getOrcaCliCommandNameForPlatform(getBrowserPlatform()),
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,

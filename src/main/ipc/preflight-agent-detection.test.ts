@@ -178,11 +178,11 @@ describe('preflight', () => {
       if (command !== 'which') {
         throw new Error(`unexpected command ${String(command)}`)
       }
-      if (String(args[0]) === 'orca') {
+      if (String(args[0]) === 'orca-np') {
         return {
           environmentResolved: true,
           code: 0,
-          stdout: '/Applications/Orca.app/Contents/MacOS/orca\n',
+          stdout: '/Applications/Orca NP.app/Contents/MacOS/orca-np\n',
           stderr: '',
           timedOut: false
         }
@@ -207,11 +207,11 @@ describe('preflight', () => {
           timedOut: false
         }
       }
-      if (String(args[0]) === 'orca') {
+      if (String(args[0]) === 'orca-np') {
         return {
           environmentResolved: true,
           code: 0,
-          stdout: '/Applications/Orca.app/Contents/MacOS/orca\n',
+          stdout: '/Applications/Orca NP.app/Contents/MacOS/orca-np\n',
           stderr: '',
           timedOut: false
         }
@@ -240,11 +240,11 @@ describe('preflight', () => {
           timedOut: false
         }
       }
-      if (String(args[0]) === 'orca') {
+      if (String(args[0]) === 'orca-np') {
         return {
           environmentResolved: true,
           code: 0,
-          stdout: '/mock/windows/programs/orca.cmd\n',
+          stdout: '/mock/windows/programs/orca-np.cmd\n',
           stderr: '',
           timedOut: false
         }
@@ -429,8 +429,8 @@ describe('preflight', () => {
       value: 'win32'
     })
     runWslProcessMock.mockImplementation(async ({ script }: { script: string }) => {
-      expect(script).not.toContain("'orca'")
-      expect(script).not.toContain("'orca-dev'")
+      expect(script).not.toContain("'orca-np'")
+      expect(script).not.toContain("'orca-np-dev'")
       expect(script).not.toContain("'orca-ide'")
       if (script.includes("'claude'")) {
         return {

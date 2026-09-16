@@ -133,10 +133,10 @@ describe('launchAgentInNewTab execution host resolution', () => {
 
     await launchOnLinux()
 
-    expect(queuedCommand()).toBe("orca-ide claude-teams '--dangerously-skip-permissions'")
+    expect(queuedCommand()).toBe("orca-np claude-teams '--dangerously-skip-permissions'")
   })
 
-  it('keeps a worktree on one SSH host remote while a rival row names another', async () => {
+  it('uses the relay shim name for a worktree on an SSH host while a rival row names another', async () => {
     store.repos = [
       { id: 'repo-1', connectionId: 'openclaw', path: '/srv/openclaw' },
       { id: 'repo-1', connectionId: null, executionHostId: 'ssh:m4air', path: '/srv/m4air' }
@@ -167,6 +167,6 @@ describe('launchAgentInNewTab execution host resolution', () => {
 
     await launchOnLinux()
 
-    expect(queuedCommand()).toBe("orca-ide claude-teams '--dangerously-skip-permissions'")
+    expect(queuedCommand()).toBe("orca-np claude-teams '--dangerously-skip-permissions'")
   })
 })

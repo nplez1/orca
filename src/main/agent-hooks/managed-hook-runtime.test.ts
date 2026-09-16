@@ -155,6 +155,12 @@ describe.runIf(process.platform !== 'win32')('installManagedHooks', () => {
       errors: 0
     })
 
-    expect((await readdir(home)).sort()).toEqual(['.claude', '.orca', SHELL_NAME, SHELL_RUNS_NAME])
+    expect((await readdir(home)).sort()).toEqual([
+      '.claude',
+      '.orca',
+      '.orca-np',
+      SHELL_NAME,
+      SHELL_RUNS_NAME
+    ])
   })
 })
