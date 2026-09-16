@@ -125,3 +125,33 @@ The contract details worth not rediscovering:
   stdin, which is where the `userData.resourceId` handle comes back.
 - Agent credentials are **not** pushed to the guest. The image must already have the agent CLIs
   installed and logged in, or every machine needs a manual login.
+
+#### Baking an image (what actually makes a fresh machine fast)
+
+Bake the **shared native-deps cache**, not the relay bundle. A relay install dir is keyed on the JS
+bundle hash, so it moves on every commit to `src/relay/`; the compiled dependencies are deliberately
+keyed on something stabler — `~/.orca-remote/native/<relayPlatform>-<depsHash>/node_modules`, keyed on
+the pinned dep versions plus patch bytes, symlinked into every relay dir, immutable once
+`.deps-complete` is written last after a probe on that host loaded both addons.
+
+That is the artifact worth baking, and it survives Orca updates. `node-pty@1.1.0` ships no Linux
+prebuild, so without it a fresh guest pays a `node-gyp` source build on first connect — the dominant
+first-connect cost (#1693, #18009). Windows is excluded from the shared cache by design (win32
+prebuilts exist and the console-list patch mutates in place).
+
+Produce it by connecting once from Orca to a golden machine and snapshotting: the `.deps-complete`
+marker is only written after a probe on that host, so a `node_modules` copied from elsewhere cannot
+be passed off as complete. Never snapshot an entry without the marker — linking is gated on it, and
+the cache GC reclaims markerless entries.
+
+Two layers, so a rebake is rare:
+
+1. **Base** (rebake only when the native dep versions or patch bytes move): node 18+, npm, git, the
+   Linux C/C++ toolchain, a warm npm cache, a repo mirror, and a complete
+   `~/.orca-remote/native/<key>/`.
+2. **Agent auth** (rebake when credentials rotate): the agent CLIs and their logins — the one step
+   that cannot be automated.
+
+Gate a candidate image with `local/orca-vm/verify-guest-image.sh`, run on the guest: it exits
+non-zero until node/npm/git, the toolchain, a *complete* baked native-deps entry with both addons,
+and at least one agent CLI are present.
