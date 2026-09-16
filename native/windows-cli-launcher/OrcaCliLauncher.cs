@@ -51,7 +51,7 @@ internal static class OrcaCliLauncher
             string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");
             Environment.SetEnvironmentVariable(
                 "ORCA_CLI_COMMAND",
-                requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"
+                requestedCliCommand == "orca-ide" ? "orca-ide" : requestedCliCommand == "orca-np" ? "orca-np" : "orca"
             );
 
             using (Process child = Process.Start(startInfo))
