@@ -44,7 +44,10 @@ function worktreeAt(path: string): GitWorktreeInfo {
 }
 
 const captureExpectation = vi.fn(() => ({ repo: { id: repo.id }, metadata: [] }))
-const store = { captureNativeLocalWorktreeMetadataScanExpectation: captureExpectation } as never
+const store = {
+  captureNativeLocalWorktreeMetadataScanExpectation: captureExpectation,
+  getProfileStorageDirectory: () => '/profile-a'
+} as never
 
 /** Each listing must miss the TTL cache, the way a renderer poll past the window does. */
 function advancePastListingTtl(): void {

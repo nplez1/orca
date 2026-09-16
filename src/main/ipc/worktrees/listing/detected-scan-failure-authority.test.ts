@@ -43,7 +43,8 @@ function createStore() {
     getAllWorktreeLineage: () => ({}),
     getAllWorkspaceLineage: () => ({}),
     removeWorktreeLineage,
-    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined
+    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined,
+    getProfileStorageDirectory: () => '/profile-a'
   } as never
 }
 
