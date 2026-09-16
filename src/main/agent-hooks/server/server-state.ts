@@ -61,6 +61,8 @@ export abstract class AgentHookServerState {
   protected statusRowMutationListeners = new Set<StatusRowMutationListener>()
   // Hydration and spool replay belong to the owner lifetime, not each transport bind attempt.
   protected ownerStateInitialized = false
+  // Resolves after durable status hydration and spool replay, before listener binding.
+  protected statusCacheHydrationReady: Promise<void> = Promise.resolve()
   // Runtime terminal handles are stable across pane remints, unlike tab/leaf keys. This index is
   // deliberately in-memory only and contains no rows of its own.
   protected paneKeyByTerminalHandle = new Map<string, string>()

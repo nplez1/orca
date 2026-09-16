@@ -5,11 +5,100 @@ import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
 import { isCurrentDirectSshAuthority } from './terminal-pty-identities'
 
+export type PersistedTerminalHints = {
+  tabsByWorktree: Record<string, TerminalTab[]> | null
+  ptyIdsByTabId: Record<string, string[]> | null
+}
+
+export function buildPersistedTerminalHints({
+  ids,
+  pendingReconnectTabByWorktree,
+  pendingReconnectPtyIdByTabId,
+  terminalLayoutsByTabId,
+  tabsByWorktree,
+  ptyIdsByTabId,
+  directSshTargetId
+}: {
+  ids: readonly string[]
+  pendingReconnectTabByWorktree: Record<string, string[]>
+  pendingReconnectPtyIdByTabId: Record<string, string>
+  terminalLayoutsByTabId: TerminalSlice['terminalLayoutsByTabId']
+  tabsByWorktree: Record<string, TerminalTab[]>
+  ptyIdsByTabId: Record<string, string[]>
+  directSshTargetId?: string
+}): PersistedTerminalHints {
+  let nextTabsByWorktree: Record<string, TerminalTab[]> | null = null
+  let nextPtyIdsByTabId: Record<string, string[]> | null = null
+  for (const worktreeId of ids) {
+    const tabs = tabsByWorktree[worktreeId] ?? []
+    const targetTabIds = pendingReconnectTabByWorktree[worktreeId] ?? []
+    const tabById = targetTabIds.length > 1 ? buildByIdIndex(tabs) : null
+    const tabsToReconnect: TerminalTab[] =
+      targetTabIds.length > 0
+        ? targetTabIds
+            .map((id) => (tabById ? tabById.get(id) : tabs.find((t) => t.id === id)))
+            .filter((t): t is TerminalTab => t != null)
+        : tabs.slice(0, 1)
+    if (tabsToReconnect.length === 0) {
+      continue
+    }
+    for (const tab of tabsToReconnect) {
+      const tabId = tab.id
+      const leafPtyMap = terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId ?? {}
+      const pendingPtyId = pendingReconnectPtyIdByTabId[tabId]
+      const tabLevelPtyId =
+        directSshTargetId !== undefined &&
+        parseAppSshPtyId(pendingPtyId ?? '')?.connectionId !== directSshTargetId
+          ? undefined
+          : pendingPtyId
+      const allPtyIds =
+        Object.keys(leafPtyMap).length > 0
+          ? (Object.values(leafPtyMap).filter(Boolean) as string[])
+          : tabLevelPtyId
+            ? [tabLevelPtyId]
+            : []
+      if (allPtyIds.length > 0) {
+        nextPtyIdsByTabId ??= { ...ptyIdsByTabId }
+        nextPtyIdsByTabId[tabId] = allPtyIds
+      }
+      if (tabLevelPtyId) {
+        nextTabsByWorktree ??= { ...tabsByWorktree }
+        const nextTabs = nextTabsByWorktree[worktreeId]
+        if (!nextTabs) {
+          continue
+        }
+        nextTabsByWorktree[worktreeId] = nextTabs.map((candidate) =>
+          candidate.id === tabId ? { ...candidate, ptyId: tabLevelPtyId } : candidate
+        )
+      }
+    }
+  }
+  return { tabsByWorktree: nextTabsByWorktree, ptyIdsByTabId: nextPtyIdsByTabId }
+}
+
 export function createWorkspaceTerminalReconnectActions(
   set: TerminalStoreSet,
   get: TerminalStoreGet
-): Pick<TerminalSlice, 'reconnectPersistedTerminals'> {
+): Pick<TerminalSlice, 'publishPersistedTerminalHints' | 'reconnectPersistedTerminals'> {
   return {
+    publishPersistedTerminalHints: () => {
+      const state = get()
+      const hints = buildPersistedTerminalHints({
+        ids: state.pendingReconnectWorktreeIds,
+        pendingReconnectTabByWorktree: state.pendingReconnectTabByWorktree,
+        pendingReconnectPtyIdByTabId: state.pendingReconnectPtyIdByTabId,
+        terminalLayoutsByTabId: state.terminalLayoutsByTabId,
+        tabsByWorktree: state.tabsByWorktree,
+        ptyIdsByTabId: state.ptyIdsByTabId
+      })
+      if (!hints.tabsByWorktree && !hints.ptyIdsByTabId) {
+        return
+      }
+      set({
+        ...(hints.tabsByWorktree ? { tabsByWorktree: hints.tabsByWorktree } : {}),
+        ...(hints.ptyIdsByTabId ? { ptyIdsByTabId: hints.ptyIdsByTabId } : {})
+      })
+    },
     reconnectPersistedTerminals: async (signal, options) => {
       if (
         signal?.aborted ||
@@ -42,62 +131,20 @@ export function createWorkspaceTerminalReconnectActions(
         return
       }
       // Why: defer daemon attachment for real dimensions; eager 80×24 flushes garble output.
-      let reconnectedTabsByWorktree: Record<string, TerminalTab[]> | null = null
-      let reconnectedPtyIdsByTabId: Record<string, string[]> | null = null
+      const { tabsByWorktree: reconnectedTabsByWorktree, ptyIdsByTabId: reconnectedPtyIdsByTabId } =
+        buildPersistedTerminalHints({
+          ids,
+          pendingReconnectTabByWorktree,
+          pendingReconnectPtyIdByTabId,
+          terminalLayoutsByTabId,
+          tabsByWorktree,
+          ptyIdsByTabId,
+          ...(options ? { directSshTargetId: options.directSshAuthority.targetId } : {})
+        })
       // Why indexed: the loop neither sets state nor awaits, so one index over the
       // whole store snapshot serves every iteration.
       const worktreeById = buildWorktreeByIdIndex(get().worktreesByRepo)
       const repoById = buildByIdIndex(get().repos)
-      for (const worktreeId of ids) {
-        const tabs = tabsByWorktree[worktreeId] ?? []
-        const targetTabIds = pendingReconnectTabByWorktree[worktreeId] ?? []
-        const tabById = targetTabIds.length > 1 ? buildByIdIndex(tabs) : null
-        const tabsToReconnect: TerminalTab[] =
-          targetTabIds.length > 0
-            ? targetTabIds
-                .map((id) => (tabById ? tabById.get(id) : tabs.find((t) => t.id === id)))
-                .filter((t): t is TerminalTab => t != null)
-            : tabs.slice(0, 1)
-        if (tabsToReconnect.length === 0) {
-          continue
-        }
-        for (const tab of tabsToReconnect) {
-          const tabId = tab.id
-          const layout = terminalLayoutsByTabId[tabId]
-          const leafPtyMap = layout?.ptyIdsByLeafId ?? {}
-          const pendingPtyId = pendingReconnectPtyIdByTabId[tabId]
-          const tabLevelPtyId =
-            options &&
-            parseAppSshPtyId(pendingPtyId ?? '')?.connectionId !==
-              options.directSshAuthority.targetId
-              ? undefined
-              : pendingPtyId
-          const hasLeafMappings = Object.keys(leafPtyMap).length > 0
-          // Why: publish live PTY hints before mount (pty-connection reattaches later) so the
-          // sessions status segment maps daemon IDs to tabs; otherwise all sessions look like orphans until the pane mounts.
-          // A row whose tab.ptyId went to the canonical row has no tab-level id left, but its own leaf PTYs still need advertising.
-          const allPtyIds = hasLeafMappings
-            ? (Object.values(leafPtyMap).filter(Boolean) as string[])
-            : tabLevelPtyId
-              ? [tabLevelPtyId]
-              : []
-          if (allPtyIds.length > 0) {
-            // Why: hide-sleeping reads ptyIdsByTabId for liveness; restored daemon sessions run before their pane remounts, so advertise them.
-            reconnectedPtyIdsByTabId ??= { ...ptyIdsByTabId }
-            reconnectedPtyIdsByTabId[tabId] = allPtyIds
-          }
-          if (tabLevelPtyId) {
-            reconnectedTabsByWorktree ??= { ...tabsByWorktree }
-            const nextTabs = reconnectedTabsByWorktree[worktreeId]
-            if (!nextTabs) {
-              continue
-            }
-            reconnectedTabsByWorktree[worktreeId] = nextTabs.map((t) =>
-              t.id === tabId ? { ...t, ptyId: tabLevelPtyId } : t
-            )
-          }
-        }
-      }
       // Why: keep deferred SSH session IDs for post-cleanup reconnect.
       const scopedTabIds = new Set(
         [...(scopedWorkspaceKeys ?? ids)].flatMap((workspaceKey) =>

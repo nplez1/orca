@@ -29,6 +29,7 @@ import {
   pendingActivationTerminalPrepCancels,
   shouldDeferActivationTerminalPrep
 } from './activation-terminal-prep'
+import { refreshGitHubAfterWorktreeActivation } from './activation-github-refresh'
 
 export function createSetActiveWorktree(
   set: WorktreeSliceSet,
@@ -261,9 +262,10 @@ export function createSetActiveWorktree(
       }
     }
 
-    // Why: activation is explicit enough to revalidate PR state now; the coordinator still coalesces and rate-guards.
+    // Why: activation is explicit enough to revalidate PR state, but provider IPC must not compete with
+    // the selected agent's first input turn.
     if (worktreeId) {
-      get().refreshGitHubForWorktreeIfStale(worktreeId)
+      refreshGitHubAfterWorktreeActivation(get, worktreeId)
     }
 
     if (!worktreeId || !get().getKnownWorktreeById(worktreeId, executionHostId)) {

@@ -24,6 +24,7 @@ import {
   requireLocalWorktreeMetadataPrune
 } from '../../../local-worktree-metadata-prune-gate'
 import { pruneMetadataMissingFromAuthoritativeLocalScan } from './authoritative-local-worktree-metadata-pruning'
+import { persistWorktreeScanCacheEntry } from './persisted-worktree-scan-cache'
 
 // Why: absorb renderer polling bursts while bounding external worktree-change lag to one short refresh window.
 export const DETECTED_WORKTREE_SCAN_CACHE_TTL_MS = 5_000
@@ -173,6 +174,11 @@ export async function listDetectedGitWorktrees(
       detectedWorktreeScanCache.set(cacheKey, {
         worktrees: gitWorktrees,
         expiresAt: Date.now() + DETECTED_WORKTREE_SCAN_CACHE_TTL_MS
+      })
+      persistWorktreeScanCacheEntry(store.getProfileStorageDirectory(), repo.id, {
+        repoPath: repo.path,
+        wslDistro: localWorktreeGitOptions.wslDistro ?? null,
+        worktrees: gitWorktrees
       })
     }
     const fresh = !scan.invalidated && routingUnchanged && generationCurrent

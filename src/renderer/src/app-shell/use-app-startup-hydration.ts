@@ -4,13 +4,9 @@ import { installCodexDetachedPaneRestartExecutor } from '@/components/terminal-p
 import { useAppStore } from '../store'
 import { reconcileHydratedWorkspaceTabModels } from './reconcile-hydrated-workspace-tab-models'
 import { useStartupActions } from './use-app-startup-actions'
-import { WORKTREE_REFRESH_CONCURRENCY } from '../store/slices/worktrees'
 import { sweepRestoredCodexPanesForStaleAccounts } from '../lib/codex-stale-pane-sweep'
 import { fetchWorkspaceSessionWithRuntimeHostOwners } from '../lib/workspace-session-host-hydration'
-import {
-  collectFolderWorkspaceKeysFromSession,
-  collectWorktreeHydrationRepoIdsFromSession
-} from '../lib/workspace-session-hydration-keys'
+import { collectFolderWorkspaceKeysFromSession } from '../lib/workspace-session-hydration-keys'
 import { hydratePersistedUIAfterStartupRead } from '../lib/startup-ui-hydration'
 import {
   logRendererStartupDiagnostic,
@@ -27,16 +23,24 @@ import {
   refreshTerminalProviderSnapshotCapabilities
 } from '../components/terminal/terminal-provider-snapshot-capability'
 import {
-  getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,
-  parseExecutionHostId,
   toRuntimeExecutionHostId,
   type ExecutionHostId
 } from '../../../shared/execution-host'
-import { mapWithConcurrency } from '../../../shared/map-with-concurrency'
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
 import { restoreLocalStructuredSessionTabsOnce } from '../runtime/local-structured-session-tabs-sync'
 import { ensureLocalRuntimeCapabilities } from '../runtime/local-runtime-capabilities'
+import {
+  hydrateStartupWorktreeCache,
+  startStartupWorktreeCacheRead
+} from '../startup/startup-worktree-cache'
+import { selectStartupHydrationRepos } from '../startup/startup-worktree-selection'
+import { publishStartupTerminalHints } from '../startup/startup-terminal-hints'
+import {
+  startDeferredLocalWorktreeRefresh,
+  startLocalCatalogHydration
+} from '../startup/startup-local-catalog'
+import { hydrateStartupWorktrees } from '../startup/startup-worktree-refresh'
 
 async function listRuntimeSessionHostIdsForStartup(): Promise<ExecutionHostId[]> {
   try {
@@ -97,7 +101,8 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           useAppStore.getState().settings,
           getSystemPrefersDark()
         )
-        // Why: start keybindings + onboarding now so their IPC overlaps the local catalog scans; await them at their original spots. The .catch marks rejections handled if an earlier await throws first.
+        // Why: start keybindings + onboarding now so their IPC overlaps the local catalog scans.
+        // The .catch marks keybinding rejections handled until the background join below.
         // Why: browser session profiles are NOT started early — on a remote runtime the RPC may be unconnected and a failed fetch clears the list.
         const keybindingsPromise = timeRendererStartupStep('fetch-keybindings', () =>
           actions.fetchKeybindings()
@@ -107,6 +112,7 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           window.api.onboarding.get()
         )
         onboardingPromise.catch(() => {})
+        const cachedWorktreesPromise = startStartupWorktreeCacheRead()
         // Why: await ui.get() (not overlap) so persisted view settings hydrate before the local catalog/session steps and first paint reflects them.
         const persistedUI = await timeRendererStartupStep('ui-get', () => window.api.ui.get())
         uiHydrated = timeRendererStartupSyncStep('hydrate-persisted-ui', () =>
@@ -116,31 +122,34 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             hydratePersistedUI: actions.hydratePersistedUI
           })
         )
-        // Why: list-runtime-session-hosts reads no repo state, so overlap it with the repo scan
-        // instead of paying its IPC round-trip serially before repos. .catch marks rejections handled
-        // if an earlier await throws first; the value is awaited below and surfaces any error there.
         const runtimeHostsPromise = timeRendererStartupStep(
           'list-runtime-session-hosts',
           listRuntimeSessionHostIdsForStartup
         )
         runtimeHostsPromise.catch(() => {})
-        // Why: saved remote runtimes can spend the full connect timeout; load only the local catalog for first paint and refresh remotes after hydration.
         await timeRendererStartupStep('fetch-repos-local', () =>
           actions.fetchReposForAllHosts({ remoteHosts: 'skip' })
         )
         await timeRendererStartupStep('repo-catalog-settlement', () =>
           actions.awaitLocalRepoCatalogSettlement()
         )
-        // Why: folder workspaces merge against projectGroups (repos.ts fetchFolderWorkspacesForAllHosts),
-        // so keep this chain ordered while overlapping it with session-scoped hydration.
-        const localCatalogChain = (async () => {
-          await timeRendererStartupStep('fetch-project-groups-local', () =>
-            actions.fetchProjectGroupsForAllHosts({ remoteHosts: 'skip' })
-          )
-          await timeRendererStartupStep('fetch-folder-workspaces-local', () =>
-            actions.fetchFolderWorkspacesForAllHosts({ remoteHosts: 'skip' })
-          )
-        })()
+        const cachedWorktreeRepoIds = await hydrateStartupWorktreeCache(
+          actions,
+          cachedWorktreesPromise
+        )
+        const localCatalogChain = startLocalCatalogHydration(actions)
+        const startupBackgroundChain = Promise.allSettled([
+          keybindingsPromise,
+          localCatalogChain
+        ]).then(([keybindingsOutcome, catalogOutcome]) => {
+          if (keybindingsOutcome.status === 'rejected') {
+            throw keybindingsOutcome.reason
+          }
+          if (catalogOutcome.status === 'rejected') {
+            throw catalogOutcome.reason
+          }
+        })
+        startupBackgroundChain.catch(() => {})
         const sessionReadPromise = runtimeHostsPromise.then((startupRuntimeHostIds) =>
           // Why: include saved runtime host ids so per-host worktree session slices restore from local settings without waiting on network reachability; unreadable partitions skip.
           timeRendererStartupStep('session-get', () =>
@@ -152,44 +161,16 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           )
         )
         const hydrationSessionChain = sessionReadPromise.then(async (sessionRead) => {
-          const hydrationRepoIds = collectWorktreeHydrationRepoIdsFromSession(
+          const hydrationRepos = selectStartupHydrationRepos(
+            useAppStore.getState().repos,
             sessionRead.session,
-            sessionRead.runtimeHostIdByWorkspaceSessionKey
+            sessionRead.runtimeHostIdByWorkspaceSessionKey,
+            cachedWorktreeRepoIds
           )
-          const hydrationRepoIdSet = new Set(hydrationRepoIds)
-          const hydrationRepos = useAppStore.getState().repos.filter(
-            (repo) =>
-              hydrationRepoIdSet.has(repo.id) &&
-              // Why: disconnected SSH repos hydrate from local metadata; only runtime-owned repos use placeholders.
-              parseExecutionHostId(getRepoExecutionHostId(repo))?.kind !== 'runtime'
-          )
-          // Why this barrier and not the first-window one: worktree refresh can spawn host Git,
-          // which needs the shell-PATH generation and the managed WSL CLI registration. It never
-          // needs the daemon PTY provider or the hook-server bind, and `prepare-terminal-startup-restoration`
-          // below still fences those before any terminal is restored.
-          await timeRendererStartupStep('git-environment-barrier-await', () =>
-            window.api.app.awaitGitEnvironmentStartupBarrier()
-          )
-          await timeRendererStartupStep('fetch-hydration-worktrees', () =>
-            mapWithConcurrency(hydrationRepos, WORKTREE_REFRESH_CONCURRENCY, (repo) =>
-              actions.fetchWorktrees(repo.id, { executionHostId: getRepoExecutionHostId(repo) })
-            )
-          )
+          await hydrateStartupWorktrees(actions, hydrationRepos)
           return sessionRead
         })
-        // Why: wait for both writers to settle before recovery so neither can mutate hydrated state afterward.
-        const [sessionOutcome, catalogOutcome] = await Promise.allSettled([
-          hydrationSessionChain,
-          localCatalogChain
-        ])
-        if (sessionOutcome.status === 'rejected') {
-          throw sessionOutcome.reason
-        }
-        if (catalogOutcome.status === 'rejected') {
-          throw catalogOutcome.reason
-        }
-        const sessionRead = sessionOutcome.value
-        await keybindingsPromise
+        const sessionRead = await hydrationSessionChain
         await timeRendererStartupStep('repo-catalog-final-settlement', () =>
           actions.awaitLocalRepoCatalogSettlement()
         )
@@ -212,6 +193,9 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
               useAppStore.getState().reconcileWorktreeTabModels
             )
           })
+          publishStartupTerminalHints(actions)
+          // Why: hints must paint before background startup failures can enter degraded recovery.
+          await startupBackgroundChain
           await timeRendererStartupStep('prepare-terminal-startup-restoration', () =>
             window.api.app.prepareTerminalStartupRestoration()
           )
@@ -309,6 +293,7 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
           logRendererStartupDiagnostic('startup-hydration-done', {
             durationMs: Math.round(performance.now() - startupStartedAt)
           })
+          startDeferredLocalWorktreeRefresh(actions)
           void (async () => {
             try {
               try {
