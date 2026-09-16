@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
 import {
+  collectActiveWorktreeHydrationRepoIdsFromSession,
   collectFolderWorkspaceKeysFromSession,
   collectWorktreeHydrationRepoIdsFromSession
 } from './workspace-session-hydration-keys'
@@ -204,5 +205,36 @@ describe('collectWorktreeHydrationRepoIdsFromSession', () => {
       'repo-browser',
       'repo-editor'
     ])
+  })
+})
+
+describe('collectActiveWorktreeHydrationRepoIdsFromSession', () => {
+  it('limits the warm-start scan to the active worktree repo', () => {
+    const session = {
+      activeRepoId: 'repo-active',
+      activeWorktreeId: 'repo-active::/active',
+      activeWorkspaceKey: 'worktree:repo-active::/active',
+      tabsByWorktree: {
+        'repo-active::/active': [{ ptyId: 'pty-a' }],
+        'repo-idle::/idle': [{ ptyId: 'pty-b' }]
+      }
+    } as unknown as WorkspaceSessionState
+
+    expect(collectActiveWorktreeHydrationRepoIdsFromSession(session)).toEqual(['repo-active'])
+  })
+
+  it('does not schedule a Git scan for an active folder or runtime workspace', () => {
+    const session = {
+      activeRepoId: 'repo-remote',
+      activeWorktreeId: 'repo-remote::/workspace',
+      activeWorkspaceKey: 'worktree:repo-remote::/workspace',
+      tabsByWorktree: {}
+    } as unknown as WorkspaceSessionState
+
+    expect(
+      collectActiveWorktreeHydrationRepoIdsFromSession(session, {
+        'repo-remote::/workspace': 'runtime:env-1'
+      })
+    ).toEqual([])
   })
 })

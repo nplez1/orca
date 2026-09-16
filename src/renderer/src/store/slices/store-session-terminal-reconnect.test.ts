@@ -114,6 +114,38 @@ describe('reconnectPersistedTerminals', () => {
     expect((mockApi.pty as Record<string, unknown>).spawn).not.toHaveBeenCalled()
   })
 
+  it('publishes persisted terminal hints before the workspace-ready gate opens', () => {
+    const store = createDaemonEnabledStore()
+    const worktreeId = 'repo1::/path/wt1'
+
+    store.setState({
+      repos: [
+        { id: 'repo1', path: '/repo1', displayName: 'Repo 1', badgeColor: '#000', addedAt: 0 }
+      ],
+      worktreesByRepo: {
+        repo1: [makeWorktree({ id: worktreeId, repoId: 'repo1', path: '/path/wt1' })]
+      }
+    })
+    store.getState().hydrateWorkspaceSession({
+      activeRepoId: 'repo1',
+      activeWorktreeId: worktreeId,
+      activeTabId: 'tab1',
+      tabsByWorktree: {
+        [worktreeId]: [makeTab({ id: 'tab1', worktreeId, ptyId: 'old-pty-1' })]
+      },
+      terminalLayoutsByTabId: { tab1: makeLayout() },
+      activeWorktreeIdsOnShutdown: [worktreeId]
+    })
+
+    store.getState().publishPersistedTerminalHints()
+
+    const state = store.getState()
+    expect(state.workspaceSessionReady).toBe(false)
+    expect(state.tabsByWorktree[worktreeId][0].ptyId).toBe('old-pty-1')
+    expect(state.ptyIdsByTabId.tab1).toEqual(['old-pty-1'])
+    expect(state.pendingReconnectWorktreeIds).toEqual([worktreeId])
+  })
+
   it('does not restore old pty ids onto remote tabs during reconnect preparation', async () => {
     const store = createTestStore()
     const wt1 = 'repo1::/remote/wt1'
