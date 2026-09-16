@@ -1,6 +1,6 @@
 # Branch tracker
 
-Last updated **2026-09-16** (nplez1/main @ `3ca09b5075`, origin/main @ `615b1370fb`).
+Last updated **2026-09-16** (nplez1/main @ `53cf5be816`, upstream main @ `291b4ddd6f`).
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
