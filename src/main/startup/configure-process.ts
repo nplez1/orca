@@ -2,6 +2,10 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import {
+  APP_DATA_DIRECTORY_NAME,
+  DEV_APP_DATA_DIRECTORY_NAME
+} from '../../shared/app-directory-names'
 import { getVersionManagerBinPaths } from '../codex-cli/command'
 import { getMainE2EConfig } from '../e2e-config'
 import { DISABLED_CHROMIUM_FEATURES } from './disabled-chromium-features'
@@ -209,6 +213,9 @@ export function configureDevUserDataPath(isDev: boolean): void {
   }
 
   if (!isDev) {
+    // Why (fork): pinned instead of left to Electron's default, which derives from package.json's
+    // `name`. Pinning is what separates this build's state from a coexisting official Orca's.
+    app.setPath('userData', join(app.getPath('appData'), APP_DATA_DIRECTORY_NAME))
     return
   }
   const overrideUserDataPath = process.env.ORCA_DEV_USER_DATA_PATH
@@ -218,7 +225,7 @@ export function configureDevUserDataPath(isDev: boolean): void {
     return
   }
   // Why: without a dev-only path, pnpm dev overwrites the packaged app's runtime pointer under userData and breaks the orca CLI.
-  app.setPath('userData', join(app.getPath('appData'), 'orca-dev'))
+  app.setPath('userData', join(app.getPath('appData'), DEV_APP_DATA_DIRECTORY_NAME))
 }
 
 function areSameE2EHomePath(left: string, right: string): boolean {
