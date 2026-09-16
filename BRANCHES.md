@@ -137,7 +137,8 @@ dependency, so the three want to land in that order.
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only
 branch that carries the release tooling. See [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch
-series and `.github/workflows/fork-release.yml` for the release pipeline.
+series, `.github/workflows/fork-release.yml` for the release pipeline, and
+[RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md) for the certificate-day deployment steps.
 
 ## Open threads
 
