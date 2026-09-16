@@ -33,6 +33,7 @@ import {
   normalizeAgentStatusEvent,
   normalizeAgentStatusMetadata
 } from './normalize-agent-status-event'
+import { isAgentStatusRoutingReady } from './agent-status-routing-readiness'
 
 export function createAgentStatusEventApplicator(args: {
   pendingAgentStatusEvents: PendingAgentStatusEvent[]
@@ -49,7 +50,7 @@ export function createAgentStatusEventApplicator(args: {
     options?: AgentStatusApplyOptions
   ): AgentStatusApplyResult => {
     const store = options?.batch?.transaction.getState() ?? useAppStore.getState()
-    if (!store.workspaceSessionReady) {
+    if (!isAgentStatusRoutingReady(store)) {
       return 'dropped'
     }
     const authorityRestartId =

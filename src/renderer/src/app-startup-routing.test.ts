@@ -44,8 +44,12 @@ describe('renderer startup runtime routing', () => {
 
   it('hydrates persisted UI before local catalog and worktree hydration', () => {
     const source = readSource(STARTUP_HYDRATION_PATH)
+    const cacheSource = readSource('src/renderer/src/startup/startup-worktree-cache.ts')
+    const selectionSource = readSource('src/renderer/src/startup/startup-worktree-selection.ts')
+    const localCatalogSource = readSource('src/renderer/src/startup/startup-local-catalog.ts')
+    const worktreeRefreshSource = readSource('src/renderer/src/startup/startup-worktree-refresh.ts')
     const startupBlockStart = source.indexOf('void (async () => {')
-    // Why: concurrent startup branches all settle before hydrate-session-stores.
+    // Why: the session hydration chain and repo identity settlement gate session stores.
     const startupBlockEnd = source.indexOf("timeRendererStartupSyncStep('hydrate-session-stores'")
     const startupBlock = source.slice(startupBlockStart, startupBlockEnd)
 
@@ -58,6 +62,10 @@ describe('renderer startup runtime routing', () => {
     )
     const uiGetIndex = indexInStartupBlock("timeRendererStartupStep('ui-get'")
     const hydrateUiIndex = indexInStartupBlock("timeRendererStartupSyncStep('hydrate-persisted-ui'")
+    const cacheReadIndex = source.indexOf('startStartupWorktreeCacheRead()')
+    const cacheHydrateIndex = source.indexOf(
+      'const cachedWorktreeRepoIds = await hydrateStartupWorktreeCache('
+    )
     const localReposIndex = indexInStartupBlock(
       "actions.fetchReposForAllHosts({ remoteHosts: 'skip' })"
     )
@@ -67,22 +75,30 @@ describe('renderer startup runtime routing', () => {
     const finalRepoCatalogSettlementIndex = indexInStartupBlock(
       "timeRendererStartupStep('repo-catalog-final-settlement'"
     )
-    const localGroupsIndex = indexInStartupBlock(
-      "actions.fetchProjectGroupsForAllHosts({ remoteHosts: 'skip' })"
+    const hydrateSessionStoresIndex = source.indexOf(
+      "timeRendererStartupSyncStep('hydrate-session-stores'"
     )
-    const localFoldersIndex = indexInStartupBlock(
-      "actions.fetchFolderWorkspacesForAllHosts({ remoteHosts: 'skip' })"
+    const folderWorkspaceKeysIndex = source.indexOf(
+      'collectFolderWorkspaceKeysFromSession(sessionRead.session)'
     )
+    const startupHintsIndex = source.indexOf('publishStartupTerminalHints(actions)')
+    const backgroundJoinIndex = source.indexOf(
+      'const startupBackgroundChain = Promise.allSettled(['
+    )
+    const backgroundAwaitIndex = source.indexOf('await startupBackgroundChain')
+    const prepareTerminalIndex = source.indexOf(
+      "timeRendererStartupStep('prepare-terminal-startup-restoration'"
+    )
+    const hydrationSuccessIndex = source.indexOf('actions.setHydrationSucceeded(true)')
     const sessionIndex = indexInStartupBlock("timeRendererStartupStep('session-get'")
-    const hydrationWorktreesIndex = source.indexOf(
+    const hydrationWorktreesIndex = worktreeRefreshSource.indexOf(
       "timeRendererStartupStep('fetch-hydration-worktrees'"
     )
     // Why this barrier: worktree hydration can spawn host Git, so it must sit behind the
     // shell-PATH + managed-WSL fence. On packaged Windows the window opens before
     // shellPathReady resolves, so this really is the fence, not a formality.
-    const gitEnvironmentBarrierIndex = source.indexOf(
-      "timeRendererStartupStep('git-environment-barrier-await'",
-      sessionIndex
+    const gitEnvironmentBarrierIndex = worktreeRefreshSource.indexOf(
+      "timeRendererStartupStep('git-environment-barrier-await'"
     )
     const fullWorktreesIndex = source.indexOf('await actions.fetchAllWorktrees()')
     const lineageIndex = startupBlock.indexOf('actions.fetchWorktreeLineage()')
@@ -93,37 +109,48 @@ describe('renderer startup runtime routing', () => {
     expect(settingsIndex).toBeLessThan(uiGetIndex)
     expect(uiGetIndex).toBeLessThan(hydrateUiIndex)
     expect(hydrateUiIndex).toBeLessThan(localReposIndex)
+    expect(cacheReadIndex).toBeGreaterThanOrEqual(0)
+    expect(cacheSource).toContain("timeRendererStartupStep('worktree-cache-get'")
     expect(localReposIndex).toBeLessThan(repoCatalogSettlementIndex)
+    expect(cacheHydrateIndex).toBeGreaterThan(repoCatalogSettlementIndex)
     expect(repoCatalogSettlementIndex).toBeLessThan(sessionIndex)
     expect(sessionIndex).toBeLessThan(finalRepoCatalogSettlementIndex)
-    expect(finalRepoCatalogSettlementIndex).toBeLessThan(startupBlockEnd)
-    // The local catalog chain stays internally ordered (folders merge against project groups).
-    expect(localReposIndex).toBeLessThan(localGroupsIndex)
-    expect(localGroupsIndex).toBeLessThan(localFoldersIndex)
-    expect(localReposIndex).toBeLessThan(sessionIndex)
-    expect(sessionIndex).toBeLessThan(gitEnvironmentBarrierIndex)
-    expect(gitEnvironmentBarrierIndex).toBeLessThan(hydrationWorktreesIndex)
-    expect(source.slice(gitEnvironmentBarrierIndex, hydrationWorktreesIndex)).toContain(
-      'window.api.app.awaitGitEnvironmentStartupBarrier()'
+    expect(finalRepoCatalogSettlementIndex).toBeLessThan(hydrateSessionStoresIndex)
+    expect(folderWorkspaceKeysIndex).toBeGreaterThan(finalRepoCatalogSettlementIndex)
+    expect(folderWorkspaceKeysIndex).toBeLessThan(hydrateSessionStoresIndex)
+    expect(hydrateSessionStoresIndex).toBeLessThan(startupHintsIndex)
+    expect(startupHintsIndex).toBeLessThan(backgroundAwaitIndex)
+    expect(backgroundAwaitIndex).toBeLessThan(prepareTerminalIndex)
+    expect(backgroundJoinIndex).toBeGreaterThan(cacheHydrateIndex)
+    expect(backgroundAwaitIndex).toBeGreaterThan(backgroundJoinIndex)
+    expect(backgroundAwaitIndex).toBeLessThan(hydrationSuccessIndex)
+    expect(localCatalogSource).toContain(
+      "actions.fetchProjectGroupsForAllHosts({ remoteHosts: 'skip' })"
     )
-    const hydrationWorktreeBlock = source.slice(
+    expect(localCatalogSource).toContain(
+      "actions.fetchFolderWorkspacesForAllHosts({ remoteHosts: 'skip' })"
+    )
+    expect(localReposIndex).toBeLessThan(sessionIndex)
+    expect(gitEnvironmentBarrierIndex).toBeGreaterThanOrEqual(0)
+    expect(hydrationWorktreesIndex).toBeGreaterThan(gitEnvironmentBarrierIndex)
+    expect(
+      worktreeRefreshSource.slice(gitEnvironmentBarrierIndex, hydrationWorktreesIndex)
+    ).toContain('window.api.app.awaitGitEnvironmentStartupBarrier()')
+    expect(worktreeRefreshSource).toContain('if (repos.length === 0)')
+    const hydrationWorktreeBlock = worktreeRefreshSource.slice(
       hydrationWorktreesIndex,
-      source.indexOf('await keybindingsPromise')
+      worktreeRefreshSource.length
     )
     expect(hydrationWorktreeBlock).toContain(
-      'mapWithConcurrency(hydrationRepos, WORKTREE_REFRESH_CONCURRENCY'
+      'mapWithConcurrency(repos, WORKTREE_REFRESH_CONCURRENCY'
     )
     expect(hydrationWorktreeBlock).toContain('executionHostId: getRepoExecutionHostId(repo)')
     // Why: the pre-hydration fetch must include SSH repos (only runtime-owned repos are
     // excluded); gating on local-only drops SSH tab/editor/browser chrome at hydration.
-    const hydrationFilterBlock = source.slice(
-      source.indexOf('const hydrationRepos'),
-      hydrationWorktreesIndex
-    )
-    expect(hydrationFilterBlock).toContain(
+    expect(selectionSource).toContain(
       "parseExecutionHostId(getRepoExecutionHostId(repo))?.kind !== 'runtime'"
     )
-    expect(hydrationFilterBlock).not.toContain('=== LOCAL_EXECUTION_HOST_ID')
+    expect(selectionSource).not.toContain('=== LOCAL_EXECUTION_HOST_ID')
     expect(fullWorktreesIndex).toBeGreaterThan(
       source.indexOf("logRendererStartupDiagnostic('startup-hydration-done'")
     )
@@ -142,15 +169,24 @@ describe('renderer startup runtime routing', () => {
     ).toBeGreaterThan(fullWorktreesIndex)
     expect(lineageIndex).toBe(-1)
 
-    // The catalog and selective hydration chains overlap, but both settle before recovery or hydration.
-    const joinStart = indexInStartupBlock('await Promise.allSettled([')
-    expect(joinStart).toBeGreaterThan(hydrateUiIndex)
-    expect(joinStart).toBeLessThan(finalRepoCatalogSettlementIndex)
-    const joinBlock = source.slice(joinStart, startupBlockEnd)
-    expect(joinBlock).toContain('hydrationSessionChain')
-    expect(joinBlock).toContain('localCatalogChain')
-    expect(startupBlock).not.toContain('await Promise.all([')
+    // The catalog and keybinding branches overlap session hydration and settle after PTY hints.
+    expect(source.slice(backgroundJoinIndex, backgroundAwaitIndex)).toContain('keybindingsPromise')
+    expect(source.slice(backgroundJoinIndex, backgroundAwaitIndex)).toContain('localCatalogChain')
+    expect(source).not.toContain('await keybindingsPromise')
+    expect(startupBlock).not.toContain('await Promise.allSettled([')
     expect(startupBlock).not.toContain("actions.fetchAllWorktrees({ hydrationPurge: 'defer' })")
+  })
+
+  it('routes deferred startup branch failures through degraded recovery before success', () => {
+    const source = readSource(STARTUP_HYDRATION_PATH)
+    const backgroundAwaitIndex = source.indexOf('await startupBackgroundChain')
+    const hydrationSuccessIndex = source.indexOf('actions.setHydrationSucceeded(true)')
+    const recoveryCatchIndex = source.indexOf('} catch (error) {')
+
+    expect(backgroundAwaitIndex).toBeGreaterThanOrEqual(0)
+    expect(backgroundAwaitIndex).toBeLessThan(hydrationSuccessIndex)
+    expect(recoveryCatchIndex).toBeGreaterThan(backgroundAwaitIndex)
+    expect(source.slice(recoveryCatchIndex)).toContain('recoverFromDegradedStartup({')
   })
 
   it('refreshes remote catalogs after startup hydration succeeds', () => {
@@ -195,6 +231,7 @@ describe('renderer startup runtime routing', () => {
 
   it('waits for first-window startup services before terminal reconnect', () => {
     const source = readSource(STARTUP_HYDRATION_PATH)
+    const terminalHintsSource = readSource('src/renderer/src/startup/startup-terminal-hints.ts')
     // Why this step: `app:prepareTerminalStartupRestoration` awaits
     // firstWindowStartupServicesReady + managedWslCliStartupBarrierReady in main before it
     // does anything else, so it is the renderer-side position of that fence.
@@ -202,6 +239,7 @@ describe('renderer startup runtime routing', () => {
     const servicesIndex = source.indexOf(
       "timeRendererStartupStep('prepare-terminal-startup-restoration'"
     )
+    const startupHintsIndex = source.indexOf('publishStartupTerminalHints(actions)')
     const preReconnectRecoveryIndex = source.indexOf(
       "timeRendererStartupStep('recover-legacy-worker-terminals-pre-reconnect'"
     )
@@ -214,6 +252,11 @@ describe('renderer startup runtime routing', () => {
     )
 
     expect(servicesIndex).toBeGreaterThanOrEqual(0)
+    expect(startupHintsIndex).toBeGreaterThanOrEqual(0)
+    expect(startupHintsIndex).toBeLessThan(servicesIndex)
+    expect(terminalHintsSource).toContain(
+      "timeRendererStartupSyncStep('publish-terminal-startup-hints'"
+    )
     expect(source.slice(servicesIndex)).toContain(
       'window.api.app.prepareTerminalStartupRestoration()'
     )

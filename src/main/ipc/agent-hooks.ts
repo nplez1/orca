@@ -10,6 +10,7 @@ import { getMigrationUnsupportedPtySnapshot } from '../agent-hooks/migration-uns
 import { registerAgentPaneAuthorityIpcHandlers } from './agent-pane-authority-ipc'
 import { registerAgentStatusRowTeardownIpcHandlers } from './agent-status-row-teardown-ipc'
 import { createAgentPaneAuthorityOwnership } from './agent-pane-authority-ownership'
+import { mainProcessState as state } from '../startup/main-process-state'
 import {
   enrichAgentStatusIpcPayload,
   type AgentStatusRuntimeEnrichment
@@ -45,18 +46,27 @@ export function registerAgentHookHandlers(
         runtime?.getAgentStatusTerminalHandleForPaneKey(paneKey)
     })
   })
-  ipcMain.handle('agentStatus:getSnapshot', (): AgentStatusIpcPayload[] => {
-    // Why: the renderer pulls this after workspace hydration, so startup cannot
-    // lose replayed statuses while its local store is still empty. Match the
-    // live push enrichment in main/index.ts so parent/child rows survive replay.
-    return (
-      agentHookServer
-        .getStatusSnapshot()
-        // Same rule as the live push: the renderer's feed bridge owns structured rows for now.
-        .filter((entry) => entry.structuredHost === undefined)
-        .map((entry) => enrichAgentStatusIpcPayload(entry, runtime))
-    )
-  })
+  ipcMain.handle(
+    'agentStatus:getSnapshot',
+    async (): Promise<AgentStatusIpcPayload[]> => {
+      await state.agentHookStatusCacheHydrationReady.catch((error) => {
+        console.warn(
+          '[agent-hooks] status-cache hydration failed; returning the current in-memory snapshot:',
+          error
+        )
+      })
+      // Why: the renderer pulls this after workspace hydration, so startup cannot
+      // lose replayed statuses while its local store is still empty. Match the
+      // live push enrichment in main/index.ts so parent/child rows survive replay.
+      return (
+        agentHookServer
+          .getStatusSnapshot()
+          // Same rule as the live push: the renderer's feed bridge owns structured rows for now.
+          .filter((entry) => entry.structuredHost === undefined)
+          .map((entry) => enrichAgentStatusIpcPayload(entry, runtime))
+      )
+    }
+  )
   ipcMain.handle('agentStatus:inferInterrupt', (_event, request: unknown): boolean => {
     if (typeof request !== 'object' || request === null) {
       return false

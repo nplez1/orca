@@ -16,6 +16,8 @@ function makeActions(): StartupActions {
     fetchFolderWorkspacesForAllHosts: vi.fn(),
     fetchAllWorktrees: vi.fn(),
     fetchWorktrees: vi.fn(),
+    hydrateCachedWorktrees: vi.fn(),
+    publishPersistedTerminalHints: vi.fn(),
     fetchWorktreeLineage: vi.fn(),
     fetchOrcaProfiles: vi.fn(),
     fetchSettings: vi.fn(),
