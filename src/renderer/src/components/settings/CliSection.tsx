@@ -57,19 +57,19 @@ function getRevealLabel(platform: string): string {
 
 function getInstallDescription(platform: string): string {
   if (platform === 'darwin') {
-    return 'Register `orca` in /usr/local/bin.'
+    return 'Register `orca-np` in /usr/local/bin.'
   }
   if (platform === 'linux') {
-    return 'Register `orca-ide` in ~/.local/bin.'
+    return 'Register `orca-np` in ~/.local/bin.'
   }
   if (platform === 'win32') {
-    return 'Register `orca` in your user PATH.'
+    return 'Register `orca-np` in your user PATH.'
   }
   return 'CLI registration is not yet available on this platform.'
 }
 
-function getFallbackCommandName(platform: string): string {
-  return platform === 'linux' ? 'orca-ide' : 'orca'
+function getFallbackCommandName(): string {
+  return 'orca-np'
 }
 
 export function CliSection({
@@ -133,7 +133,7 @@ export function CliSection({
   )
 
   const closeDialog = useCallback((): void => setDialogOpen(false), [])
-  const commandName = status?.commandName ?? getFallbackCommandName(currentPlatform)
+  const commandName = status?.commandName ?? getFallbackCommandName()
   const { busyAction, installFailure, clearInstallFailure, install, remove } =
     useCliRegistrationActions({
       commandName,
