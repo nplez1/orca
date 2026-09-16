@@ -87,3 +87,13 @@ once it does.
 Fork-only helper scripts live in `local/`:
 
 - `local/branch-status.mjs` — live status of every branch (SHAs, fork presence, own delta, PR).
+
+### `local(hooks)`: refuse fork-only commits on a PR branch
+
+`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
+`nplez1/main`. PR branches are cut from `origin/main`, so a fork-only file committed to one would be
+reviewed upstream — which is precisely what happened twice before this guard existed. It is
+`commit-msg` rather than `pre-commit` because the message is what identifies the commit as fork-only,
+and `pre-commit` cannot see it.
+
+If a commit is wrongly refused, the fix is to switch branches, not to bypass the hook.
