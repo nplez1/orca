@@ -62,6 +62,7 @@ export type WorktreeApi = {
   ) => Promise<ForgetRemovedWorktreesForExecutionHostResult>
   cancelListDetected?: (args: { providerRequestId: ProviderRequestId }) => Promise<void>
   listAll: () => Promise<Worktree[]>
+  listCached: () => Promise<DetectedWorktreeListResult[]>
   create: (args: CreateWorktreeArgs) => Promise<CreateWorktreeResult>
   adoptProvisionedRoot: (args: AdoptProvisionedRootArgs) => Promise<CreateWorktreeResult>
   /** Two-phase progress for a background `create`, correlated by `creationId`. The remote/runtime

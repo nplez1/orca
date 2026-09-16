@@ -30,6 +30,7 @@ let disposeSparseCheckoutCacheInvalidation: (() => void) | undefined
 
 const WORKTREE_HANDLER_CHANNELS = [
   'worktrees:listAll',
+  'worktrees:listCached',
   'worktrees:list',
   'worktrees:listRetiredNames',
   'worktrees:listDetected',

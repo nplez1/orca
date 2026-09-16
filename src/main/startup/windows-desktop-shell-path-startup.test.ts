@@ -22,7 +22,8 @@ describe('Windows desktop shell PATH startup', () => {
       startServices: vi.fn(() => ({
         firstWindowReady: Promise.resolve(),
         localPtyReady: Promise.resolve(),
-        localPtyProviderReady: Promise.resolve()
+        localPtyProviderReady: Promise.resolve(),
+        agentHookStatusCacheHydrationReady: Promise.resolve()
       }))
     }
 
@@ -40,7 +41,8 @@ describe('Windows desktop shell PATH startup', () => {
     const startServices = vi.fn(() => ({
       firstWindowReady: Promise.resolve(),
       localPtyReady: Promise.resolve(),
-      localPtyProviderReady: Promise.resolve()
+      localPtyProviderReady: Promise.resolve(),
+      agentHookStatusCacheHydrationReady: Promise.resolve()
     }))
 
     const startup = startWindowsDesktopBeforeShellPathReady({

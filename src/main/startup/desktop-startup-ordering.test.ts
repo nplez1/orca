@@ -12,6 +12,7 @@ describe('startup ordering', () => {
       join(process.cwd(), 'src/main/startup/main-process-pty-startup.ts'),
       'utf8'
     )
+    const ipcSource = readFileSync(join(process.cwd(), 'src/main/ipc/agent-hooks.ts'), 'utf8')
     const coreSource = readFileSync(
       join(process.cwd(), 'src/main/startup/main-window-core-services.ts'),
       'utf8'
@@ -54,6 +55,12 @@ describe('startup ordering', () => {
     expect(startupSource).toContain(
       'localPtyStartupReady = services.then((value) => value.localPtyReady)'
     )
+    expect(startupSource).toContain('agentHookStatusCacheHydrationReady = services')
+    expect(startupSource).toContain(
+      'statusCacheHydrationReady: agentHookServer.getStatusCacheHydrationReady()'
+    )
+    expect(ipcSource).toContain('state.agentHookStatusCacheHydrationReady')
+    expect(ipcSource).not.toContain('state.firstWindowStartupServicesReady')
 
     const windowIndex = desktopStartup.indexOf('Promise.resolve(desktopWindow ?? openMainWindow())')
     const rpcStartIndex = desktopStartup.indexOf('desktopRuntimeRpc.start()')

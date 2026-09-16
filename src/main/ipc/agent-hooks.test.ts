@@ -2,6 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as AgentHookServerModule from '../agent-hooks/server'
 import { makePaneKey } from '../../shared/stable-pane-id'
+import { startFirstWindowStartupServices } from '../startup/first-window-startup-services'
+
+const { mainProcessState } = vi.hoisted(() => ({
+  mainProcessState: {
+    agentHookStatusCacheHydrationReady: Promise.resolve()
+  }
+}))
 
 // Why: cover the agentStatus:drop IPC handler — it must propagate the
 // renderer dismissal to dropStatusEntry so the on-disk last-status file
@@ -37,6 +44,8 @@ vi.mock('electron', () => ({
     removeAllListeners
   }
 }))
+
+vi.mock('../startup/main-process-state', () => ({ mainProcessState }))
 
 vi.mock('../agent-hooks/server', async () => {
   // Why: import the real isValidPaneKey so this test stays in sync with any
@@ -125,9 +134,11 @@ beforeEach(() => {
   handleHandlers.clear()
   removeHandler.mockReset()
   removeAllListeners.mockReset()
+  mainProcessState.agentHookStatusCacheHydrationReady = Promise.resolve()
 })
 
 afterEach(() => {
+  mainProcessState.agentHookStatusCacheHydrationReady = Promise.resolve()
   vi.resetModules()
 })
 
@@ -149,7 +160,7 @@ describe('agentStatus:getSnapshot IPC', () => {
 
     const handler = handleHandlers.get('agentStatus:getSnapshot')
     expect(handler).toBeDefined()
-    expect(handler!({})).toEqual(snapshot)
+    await expect(handler!({})).resolves.toEqual(snapshot)
   })
 
   // The half-migration seam: until PR 2 retires the renderer's own feed bridge, main must not
@@ -179,7 +190,9 @@ describe('agentStatus:getSnapshot IPC', () => {
     const { registerAgentHookHandlers } = await import('./agent-hooks')
     registerAgentHookHandlers()
 
-    const rows = handleHandlers.get('agentStatus:getSnapshot')!({}) as { paneKey: string }[]
+    const rows = (await handleHandlers.get('agentStatus:getSnapshot')!({})) as {
+      paneKey: string
+    }[]
     expect(rows.map((row) => row.paneKey)).toEqual([PANE_KEY])
   })
 
@@ -227,7 +240,7 @@ describe('agentStatus:getSnapshot IPC', () => {
 
     const handler = handleHandlers.get('agentStatus:getSnapshot')
     expect(handler).toBeDefined()
-    expect(handler!({})).toEqual([
+    await expect(handler!({})).resolves.toEqual([
       {
         ...snapshot[0],
         terminalHandle: 'term-parent'
@@ -244,6 +257,77 @@ describe('agentStatus:getSnapshot IPC', () => {
         }
       }
     ])
+  })
+
+  it('waits for hook cache hydration before reading the snapshot', async () => {
+    let resolveHydration!: () => void
+    let resolveHookService!: () => void
+    const started = startFirstWindowStartupServices({
+      startDaemonPtyProvider: () => Promise.resolve(),
+      startAgentHookServer: () => {
+        const statusCacheHydrationReady = new Promise<void>((resolve) => {
+          resolveHydration = resolve
+        })
+        const ready = new Promise<void>((resolve) => {
+          resolveHookService = resolve
+        })
+        return { ready, statusCacheHydrationReady }
+      },
+      onDaemonError: vi.fn(),
+      onAgentHookServerError: vi.fn()
+    })
+    await Promise.resolve()
+    mainProcessState.agentHookStatusCacheHydrationReady = started.agentHookStatusCacheHydrationReady
+    let firstWindowReady = false
+    void started.firstWindowReady.then(() => {
+      firstWindowReady = true
+    })
+    const snapshot = [
+      {
+        paneKey: PANE_KEY,
+        state: 'done',
+        prompt: 'hydrated',
+        agentType: 'claude',
+        receivedAt: 1_700_000_000_000,
+        stateStartedAt: 1_699_999_999_000
+      }
+    ]
+    getStatusSnapshot.mockReturnValue(snapshot)
+    const { registerAgentHookHandlers } = await import('./agent-hooks')
+    registerAgentHookHandlers()
+
+    const read = handleHandlers.get('agentStatus:getSnapshot')!({})
+    await Promise.resolve()
+    expect(getStatusSnapshot).not.toHaveBeenCalled()
+
+    resolveHydration()
+    await expect(read).resolves.toEqual(snapshot)
+    expect(getStatusSnapshot).toHaveBeenCalledOnce()
+    expect(firstWindowReady).toBe(false)
+
+    resolveHookService()
+    await started.firstWindowReady
+  })
+
+  it('fails open when hook cache hydration rejects', async () => {
+    mainProcessState.agentHookStatusCacheHydrationReady = Promise.reject(
+      new Error('hook startup failed')
+    )
+    const snapshot = [
+      {
+        paneKey: PANE_KEY,
+        state: 'done',
+        prompt: 'available in memory',
+        agentType: 'claude',
+        receivedAt: 1_700_000_000_000,
+        stateStartedAt: 1_699_999_999_000
+      }
+    ]
+    getStatusSnapshot.mockReturnValue(snapshot)
+    const { registerAgentHookHandlers } = await import('./agent-hooks')
+    registerAgentHookHandlers()
+
+    await expect(handleHandlers.get('agentStatus:getSnapshot')!({})).resolves.toEqual(snapshot)
   })
 })
 

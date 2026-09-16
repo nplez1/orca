@@ -206,7 +206,7 @@ export type GitHubPrStartPoint = {
 
 export type WorktreeOwnership = 'orca-managed' | 'external' | 'unknown-legacy' | 'agent-scratch'
 
-export type DetectedWorktreeListSource = 'git' | 'metadata-fallback' | 'session-fallback'
+export type DetectedWorktreeListSource = 'git' | 'metadata-fallback' | 'session-fallback' | 'cache'
 
 export type DetectedWorktree = Worktree & {
   ownership: WorktreeOwnership
