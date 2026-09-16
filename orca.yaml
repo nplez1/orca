@@ -2,3 +2,14 @@ scripts:
   setup: |
     node config/scripts/run-internal-dev-setup.mjs
     pnpm install
+
+# LOCAL(nplez1): fork-only. Allocates an ephemeral machine per worktree from the team provisioning
+# system. Inert until the verbs in local/orca-vm/*.sh are wired. See LOCAL-PATCHES.md.
+environmentRecipes:
+  - id: team-machine
+    name: Team machine
+    description: Ephemeral dev machine allocated on demand for this worktree
+    create: ./local/orca-vm/create.sh
+    suspend: ./local/orca-vm/suspend.sh
+    resume: ./local/orca-vm/resume.sh
+    destroy: ./local/orca-vm/destroy.sh
