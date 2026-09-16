@@ -1,0 +1,240 @@
+name: Fork release
+
+# Builds distributable macOS and Windows artifacts from this fork and publishes them as a
+# GitHub release here. That release is the update feed this fork's builds point at (see
+# LOCAL-PATCHES.md), so publishing here is what makes an installed build update itself.
+#
+# Every upstream release workflow is a no-op in a fork — they all guard on
+# `github.repository == 'stablyai/orca'` — and they publish to stablyai's separate
+# orca-hourly/orca-daily/orca-adhoc repos. This one publishes to the fork itself, which
+# is why it needs no GitHub App token: the workflow's own GITHUB_TOKEN can create
+# releases in its own repository.
+#
+# Tests and lint are deliberately not run here. They are the gate for a PR, not for a
+# build you intend to hand to someone; run `pnpm test` yourself when it matters.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: 'Suffix appended to package.json version (default: np.<run number>)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+# Why the same version for both jobs: the mac and windows artifacts of one release must agree,
+# and the updater compares the version baked into each manifest. github.run_number is identical
+# across jobs in a run, so deriving from it keeps them in step without passing state around.
+env:
+  PUBLISH_OWNER: nplez1
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-builder-mac-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-mac-
+
+      # Why both CPUs: the mac config packages x64 and arm64 from this arm64 runner, so the
+      # install must carry both variants of the native optional deps or beforePack refuses.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --cpu=current,x64,arm64
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why conditional: the signed path needs a Developer ID certificate and notarization
+      # credentials, but the update mechanism itself works on an unsigned build — Squirrel
+      # only requires that every build carry the same signature identity, and one that is
+      # absent is consistently absent. So this pipeline is usable before the certificate
+      # exists, and switches to the signed path by itself once MAC_CERTS is set.
+      - name: Resolve signing mode
+        id: signing
+        shell: bash
+        env:
+          MAC_CERTS: ${{ secrets.MAC_CERTS }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$MAC_CERTS" ]]; then
+            echo "ORCA_MAC_RELEASE=1" >>"$GITHUB_ENV"
+            echo "signed=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >>"$GITHUB_OUTPUT"
+            echo "::warning title=Unsigned build::No MAC_CERTS secret, so this build is unsigned. It can still update itself, but macOS treats every build as a new app — Gatekeeper needs a manual override on first launch and privacy grants do not survive an update."
+          fi
+
+      - name: Verify macOS signing environment
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: node config/scripts/verify-macos-release-env.mjs
+
+      # Why stamp the version: upstream's numbering is not a stream this fork can ride — two
+      # builds of the same package.json version compare equal and the updater then reports
+      # "no newer version" forever. Appending the run number gives each release a version
+      # strictly greater than the last, and the -np. pre-release suffix keeps it clearly
+      # distinct from anything upstream publishes.
+      - name: Stamp the release version
+        shell: bash
+        env:
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
+          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
+          echo "Releasing $version"
+
+      - name: Build app
+        run: pnpm build:release
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why --config.publish.owner: the checked-in config names stablyai/orca. Overriding here
+      # rather than patching the config keeps that a runtime concern instead of a fork patch,
+      # so upstream edits to the publish block still apply cleanly.
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --mac \
+            --publish always \
+            --config.publish.owner=${{ env.PUBLISH_OWNER }} \
+            --config.publish.repo=orca
+
+      - name: Confirm the mac update manifest published
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Why not `gh release view v${RELEASE_VERSION}`: the tag name is electron-builder's
+          # choice, so match the version inside whatever tags exist rather than assuming a prefix.
+          for attempt in 1 2 3 4 5; do
+            tag="$(gh release list --repo "$PUBLISH_OWNER/orca" --limit 30 --json tagName \
+              --jq '.[].tagName' | grep -F "$RELEASE_VERSION" | head -1 || true)"
+            if [[ -n "$tag" ]] && gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
+              --jq '.assets[].name' | grep -qx 'latest-mac.yml'; then
+              echo "latest-mac.yml is published under $tag"
+              exit 0
+            fi
+            echo "waiting for latest-mac.yml (attempt $attempt)"
+            sleep 15
+          done
+          echo "::error::latest-mac.yml never appeared; an installed build will not see this release."
+          exit 1
+
+  # Why serialized behind macos: both jobs publish into the same release, and electron-builder
+  # decides whether to create or append at upload time. Running them at once races that decision.
+  windows:
+    needs: macos
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-builder-win-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-win-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Stamp the release version
+        shell: bash
+        env:
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
+          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
+          echo "Releasing $version"
+
+      - name: Build app
+        run: pnpm build:release
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why no signing env: this fork ships Windows unsigned (see LOCAL-PATCHES.md), and the
+      # config drops publisherName so electron-updater does not reject its own next build.
+      # SmartScreen warns once per installer; that is the accepted cost.
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win `
+            --publish always `
+            --config.publish.owner=${{ env.PUBLISH_OWNER }} `
+            --config.publish.repo=orca
+
+      - name: Confirm the Windows update manifest published
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            tag="$(gh release list --repo "$PUBLISH_OWNER/orca" --limit 30 --json tagName \
+              --jq '.[].tagName' | grep -F "$RELEASE_VERSION" | head -1 || true)"
+            if [[ -n "$tag" ]] && gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
+              --jq '.assets[].name' | grep -qx 'latest.yml'; then
+              echo "latest.yml is published under $tag"
+              exit 0
+            fi
+            echo "waiting for latest.yml (attempt $attempt)"
+            sleep 15
+          done
+          echo "::error::latest.yml never appeared; an installed build will not see this release."
+          exit 1
