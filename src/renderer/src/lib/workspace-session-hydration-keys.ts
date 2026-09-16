@@ -161,6 +161,53 @@ export function collectWorktreeHydrationRepoIdsFromSession(
   return [...repoIds].filter(Boolean).sort()
 }
 
+/**
+ * Returns only the repo that owns the currently selected workspace. Warm startup
+ * can scan this repo before reconnecting the active session and leave the rest
+ * to the cached catalog plus the background refresh.
+ */
+export function collectActiveWorktreeHydrationRepoIdsFromSession(
+  session: WorkspaceSessionState,
+  runtimeHostIdByWorkspaceSessionKey?: Record<string, ExecutionHostId>
+): string[] {
+  const repoIds = new Set<string>()
+  const addWorktreeRepoId = (value: unknown): void => {
+    if (typeof value !== 'string') {
+      return
+    }
+    const scope = parseWorkspaceKey(value)
+    if (scope?.type === 'folder') {
+      return
+    }
+    const rawWorktreeId = scope?.type === 'worktree' ? scope.worktreeId : value
+    const isRuntimeOwned = [value, rawWorktreeId].some(
+      (key) => parseExecutionHostId(runtimeHostIdByWorkspaceSessionKey?.[key])?.kind === 'runtime'
+    )
+    if (!isRuntimeOwned) {
+      repoIds.add(getRepoIdFromWorktreeId(rawWorktreeId))
+    }
+  }
+
+  const activeWorkspaceValues = [session.activeWorkspaceKey, session.activeWorktreeId].filter(
+    (value): value is string => typeof value === 'string'
+  )
+  const activeWorkspaceIsRuntimeOwned = activeWorkspaceValues.some((key) => {
+    const scope = parseWorkspaceKey(key)
+    const rawWorktreeId = scope?.type === 'worktree' ? scope.worktreeId : key
+    return [key, rawWorktreeId].some(
+      (candidate) =>
+        parseExecutionHostId(runtimeHostIdByWorkspaceSessionKey?.[candidate])?.kind === 'runtime'
+    )
+  })
+  for (const value of activeWorkspaceValues) {
+    addWorktreeRepoId(value)
+  }
+  if (!activeWorkspaceIsRuntimeOwned) {
+    addWorktreeRepoId(session.activeRepoId)
+  }
+  return [...repoIds].filter(Boolean).sort()
+}
+
 export function addAdditionalValidWorkspaceKeys(
   validWorkspaceIds: Set<string>,
   options?: WorkspaceSessionHydrationOptions

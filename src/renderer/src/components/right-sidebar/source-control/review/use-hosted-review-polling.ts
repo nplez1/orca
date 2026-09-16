@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 import type { SourceControlLinkedReviews } from './use-linked-reviews'
+import { scheduleAfterWorktreeActivationInputQuiet } from '@/store/slices/worktrees/session/activation-deferred-work'
 
 /**
  * Keeps the hosted review for the visible branch fresh: resolves the review's push target when the
@@ -50,7 +51,9 @@ export function useSourceControlHostedReviewPolling({
     if (!hasResolvableReviewPushTargetLink) {
       return
     }
-    void ensureHostedReviewPushTarget(activeWorktreeId)
+    return scheduleAfterWorktreeActivationInputQuiet(() => {
+      void ensureHostedReviewPushTarget(activeWorktreeId)
+    })
   }, [
     activeWorktree?.pushTarget,
     activeWorktreeId,
@@ -71,22 +74,24 @@ export function useSourceControlHostedReviewPolling({
     ) {
       return
     }
-    // Why: fetch review immediately on branch change; carry a known PR number because branch lookup is lossy for fork/deleted-head PRs.
-    void fetchHostedReviewForBranch(activeRepo.path, branchName, {
-      repoId: activeRepo.id,
-      linkedGitHubPR,
-      fallbackGitHubPR: fallbackGitHubPRNumber,
-      linkedGitLabMR,
-      linkedBitbucketPR,
-      linkedAzureDevOpsPR,
-      linkedGiteaPR,
-      staleWhileRevalidate: true,
-      // Why: scoped to the active worktree, so it earns the host's fast
-      // re-check tier instead of the O(N) card pacing (#11532).
-      active: true
+    return scheduleAfterWorktreeActivationInputQuiet(() => {
+      // Why: branch lookup is lossy for fork/deleted-head PRs; carry a known PR number.
+      void fetchHostedReviewForBranch(activeRepo.path, branchName, {
+        repoId: activeRepo.id,
+        linkedGitHubPR,
+        fallbackGitHubPR: fallbackGitHubPRNumber,
+        linkedGitLabMR,
+        linkedBitbucketPR,
+        linkedAzureDevOpsPR,
+        linkedGiteaPR,
+        staleWhileRevalidate: true,
+        // Why: scoped to the active worktree, so it earns the host's fast
+        // re-check tier instead of the O(N) card pacing (#11532).
+        active: true
+      })
+      // Why: keep the GitHub cache refresh behind the coordinator so Source Control doesn't bypass pacing.
+      enqueueGitHubPRRefresh(activeWorktreeId, 'swr', 30)
     })
-    // Why: keep the GitHub cache refresh behind the coordinator so Source Control doesn't bypass pacing.
-    enqueueGitHubPRRefresh(activeWorktreeId, 'swr', 30)
   }, [
     activeRepo,
     activeWorktreeId,

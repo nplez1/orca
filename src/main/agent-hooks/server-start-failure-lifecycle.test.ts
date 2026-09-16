@@ -164,4 +164,42 @@ describe('AgentHookServer startup failure lifecycle', () => {
       rmSync(userDataPath, { recursive: true, force: true })
     }
   })
+
+  it('resolves cache hydration before a delayed listener bind', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-hook-hydration-ready-'))
+    let onListening: (() => void) | undefined
+    const delayedServer = {
+      once: vi.fn(() => delayedServer),
+      off: vi.fn(() => delayedServer),
+      on: vi.fn(() => delayedServer),
+      listen: vi.fn((_port: number, _host: string, callback: () => void) => {
+        onListening = callback
+        return delayedServer
+      }),
+      address: vi.fn(() => ({ port: 4321 })),
+      close: vi.fn(() => delayedServer)
+    }
+    createServerMock.mockImplementationOnce(() => delayedServer)
+    const server = new AgentHookServer()
+
+    try {
+      let startSettled = false
+      const start = server
+        .start({ env: 'production', userDataPath })
+        .then(() => {
+          startSettled = true
+        })
+
+      await expect(server.getStatusCacheHydrationReady()).resolves.toBeUndefined()
+      expect(startSettled).toBe(false)
+      expect(delayedServer.listen).toHaveBeenCalledOnce()
+
+      onListening?.()
+      await start
+      expect(startSettled).toBe(true)
+    } finally {
+      server.stop()
+      rmSync(userDataPath, { recursive: true, force: true })
+    }
+  })
 })

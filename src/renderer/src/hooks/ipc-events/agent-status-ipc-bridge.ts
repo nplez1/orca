@@ -14,6 +14,7 @@ import type {
   PendingAgentStatusEvent
 } from './agent-status-bridge-types'
 import { shouldRetryPendingAgentStatusesAfterStoreUpdate } from './agent-status-pending-retry-gate'
+import { isAgentStatusRoutingReady } from './agent-status-routing-readiness'
 
 import { registerAgentStatusStartupSnapshot } from './agent-status-startup-snapshot'
 
@@ -111,7 +112,7 @@ export function registerAgentStatusIpcBridge(unsubs: (() => void)[]): AgentStatu
   let snapshotRequestId = 0
   const requestAgentStatusSnapshotIfReady = (): void => {
     const store = useAppStore.getState()
-    if (!store.workspaceSessionReady) {
+    if (!isAgentStatusRoutingReady(store)) {
       if (snapshotRequestedForReadyWindow) {
         startupSnapshot.reset()
       }
@@ -134,7 +135,7 @@ export function registerAgentStatusIpcBridge(unsubs: (() => void)[]): AgentStatu
           return
         }
         const current = useAppStore.getState()
-        if (!current.workspaceSessionReady) {
+        if (!isAgentStatusRoutingReady(current)) {
           return
         }
         applyAgentStatusBatch(entries.map((data) => ({ data, replay: true })))
@@ -149,7 +150,7 @@ export function registerAgentStatusIpcBridge(unsubs: (() => void)[]): AgentStatu
             return
           }
           const unsupportedStore = useAppStore.getState()
-          if (!unsupportedStore.workspaceSessionReady) {
+          if (!isAgentStatusRoutingReady(unsupportedStore)) {
             return
           }
           const unsupportedRoutingIndex = createAgentStatusPaneRoutingIndex(unsupportedStore)

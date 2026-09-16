@@ -10,6 +10,7 @@ import {
 import { useAppStore } from '../../store'
 import { resolvePaneKey } from './agent-status-routing'
 import type { PendingAgentStatusEvent } from './agent-status-bridge-types'
+import { isAgentStatusRoutingReady } from './agent-status-routing-readiness'
 
 export function registerAgentStatusListeners(args: {
   unsubs: (() => void)[]
@@ -97,7 +98,7 @@ export function registerAgentStatusListeners(args: {
   const unsubscribeMigrationUnsupported = window.api.agentStatus.onMigrationUnsupported?.(
     (entry) => {
       const store = useAppStore.getState()
-      if (!store.workspaceSessionReady) {
+      if (!isAgentStatusRoutingReady(store)) {
         return
       }
       if (entry.paneKey && resolvePaneKey(store, entry.paneKey).exists) {

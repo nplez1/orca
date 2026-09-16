@@ -5,6 +5,7 @@ import { worktreeSliceInitialState } from './worktrees/session/worktree-slice-in
 import { createFetchDetectedWorktrees } from './worktrees/listing/fetch-detected-worktrees'
 import { createFetchWorktrees } from './worktrees/listing/fetch-worktrees'
 import { createFetchAllWorktrees } from './worktrees/listing/fetch-all-worktrees'
+import { createHydrateCachedWorktrees } from './worktrees/listing/hydrate-cached-worktrees'
 import {
   createAssignWorktreeParent,
   createFetchWorktreeLineage,
@@ -79,6 +80,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   fetchDetectedWorktrees: createFetchDetectedWorktrees(set, get),
   fetchWorktrees: createFetchWorktrees(set, get),
   fetchAllWorktrees: createFetchAllWorktrees(set, get),
+  ...createHydrateCachedWorktrees(set, get),
   fetchWorktreeLineage: createFetchWorktreeLineage(set, get),
   updateWorktreeLineage: createUpdateWorktreeLineage(set, get),
   assignWorktreeParent: createAssignWorktreeParent(set, get),

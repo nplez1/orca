@@ -17,6 +17,10 @@ import { AgentHookServerStatusHookLifecycle } from './server-status-hook-lifecyc
 import { OPENCODE_STARTUP_PROMPT_CLAIM_PATH } from '../../../shared/opencode-startup-prompt'
 
 export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHookLifecycle {
+  getStatusCacheHydrationReady(): Promise<void> {
+    return this.statusCacheHydrationReady
+  }
+
   /** Start the loopback listener after hydration and spool replay have settled. */
   async start(options?: {
     env?: string
@@ -44,6 +48,8 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.lastWrittenJson = null
     if (this.statusHooksEnabled) {
       this.initializeStatusHookOwner()
+      // Why: the listener must not bind before durable state is readable.
+      await this.statusCacheHydrationReady
     }
     const handleRequest = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       if (req.method !== 'POST') {
@@ -239,6 +245,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.endpointDir = null
     this.endpointFilePathCache = null
     this.endpointFileWritten = false
+    this.statusCacheHydrationReady = Promise.resolve()
     this.lastStatusFilePath = null
     this.lastWrittenJson = null
     this.runtimeObservedStatusPaneKeys.clear()

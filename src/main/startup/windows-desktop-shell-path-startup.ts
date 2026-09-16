@@ -2,6 +2,7 @@ export type WindowsDesktopStartupServices = {
   firstWindowReady: Promise<void>
   localPtyReady: Promise<void>
   localPtyProviderReady: Promise<void>
+  agentHookStatusCacheHydrationReady: Promise<void>
 }
 
 type WindowsDesktopShellPathStartupOptions<TWindow> = {

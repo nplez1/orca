@@ -23,7 +23,12 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
   }
 
   protected initializeStatusHookOwner(): void {
-    if (!this.ownerStateInitialized) {
+    if (this.ownerStateInitialized) {
+      return
+    }
+    // Why: publish this phase separately so snapshot readers can proceed as
+    // soon as durable state is ready, without waiting for listener binding.
+    this.statusCacheHydrationReady = Promise.resolve().then(() => {
       // Why: hydrate before binding the listener so an early hook POST runs against a populated map.
       if (this.lastStatusFilePath) {
         this.hydrateLastStatusFromDisk()
@@ -47,6 +52,6 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
         }
       }
       this.ownerStateInitialized = true
-    }
+    })
   }
 }

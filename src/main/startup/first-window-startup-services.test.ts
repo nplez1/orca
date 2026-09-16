@@ -69,9 +69,32 @@ describe('startFirstWindowStartupServices', () => {
     resolveDaemon()
     await expect(started.localPtyProviderReady).resolves.toBeUndefined()
     expect(allServicesReady).toBe(false)
+    let hookCacheReady = false
+    void started.agentHookStatusCacheHydrationReady.then(() => {
+      hookCacheReady = true
+    })
+    await Promise.resolve()
+    expect(hookCacheReady).toBe(false)
 
     resolveHooks()
     await started.localPtyReady
+    await expect(started.agentHookStatusCacheHydrationReady).resolves.toBeUndefined()
+    expect(hookCacheReady).toBe(true)
+  })
+
+  it('resolves hook cache readiness immediately when hooks are disabled', async () => {
+    // The real startup callback returns immediately when agentStatusHooksEnabled is false.
+    const startAgentHookServer = vi.fn(() => Promise.resolve())
+    const started = startFirstWindowStartupServices({
+      startDaemonPtyProvider: () => Promise.resolve(),
+      startAgentHookServer,
+      onDaemonError: vi.fn(),
+      onAgentHookServerError: vi.fn()
+    })
+
+    await expect(started.agentHookStatusCacheHydrationReady).resolves.toBeUndefined()
+    await expect(started.firstWindowReady).resolves.toBeUndefined()
+    expect(startAgentHookServer).toHaveBeenCalledOnce()
   })
 
   it('logs each service failure and still resolves the startup barrier', async () => {
@@ -88,6 +111,7 @@ describe('startFirstWindowStartupServices', () => {
     await expect(started.firstWindowReady).resolves.toBeUndefined()
     await expect(started.localPtyReady).resolves.toBeUndefined()
     await expect(started.localPtyProviderReady).resolves.toBeUndefined()
+    await expect(started.agentHookStatusCacheHydrationReady).resolves.toBeUndefined()
 
     expect(onDaemonError).toHaveBeenCalledWith(expect.any(Error))
     expect(onAgentHookServerError).toHaveBeenCalledWith(expect.any(Error))
@@ -111,6 +135,7 @@ describe('startFirstWindowStartupServices', () => {
     await expect(started.firstWindowReady).resolves.toBeUndefined()
     await expect(started.localPtyReady).resolves.toBeUndefined()
     await expect(started.localPtyProviderReady).resolves.toBeUndefined()
+    await expect(started.agentHookStatusCacheHydrationReady).resolves.toBeUndefined()
 
     expect(onDaemonError).toHaveBeenCalledWith(expect.any(Error))
     expect(onAgentHookServerError).toHaveBeenCalledWith(expect.any(Error))
@@ -185,6 +210,32 @@ describe('startFirstWindowStartupServices', () => {
       expect(onDaemonError).toHaveBeenCalledWith(expect.any(Error))
       expect(onAgentHookServerError).not.toHaveBeenCalled()
       expect(daemonSignal?.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fails open hook cache hydration at the hard cap when hook startup hangs', async () => {
+    vi.useFakeTimers()
+    const onAgentHookServerError = vi.fn()
+
+    try {
+      const started = startFirstWindowStartupServices({
+        startDaemonPtyProvider: () => Promise.resolve(),
+        startAgentHookServer: () => new Promise<void>(() => {}),
+        onDaemonError: vi.fn(),
+        onAgentHookServerError
+      })
+
+      await Promise.resolve()
+      const hydrationReady = started.agentHookStatusCacheHydrationReady
+      await vi.advanceTimersByTimeAsync(LOCAL_PTY_STARTUP_FAIL_OPEN_TIMEOUT_MS)
+
+      await expect(hydrationReady).resolves.toBeUndefined()
+      await expect(started.firstWindowReady).resolves.toBeUndefined()
+      await expect(started.localPtyReady).resolves.toBeUndefined()
+      await expect(started.localPtyProviderReady).resolves.toBeUndefined()
+      expect(onAgentHookServerError).toHaveBeenCalledWith(expect.any(Error))
     } finally {
       vi.useRealTimers()
     }
