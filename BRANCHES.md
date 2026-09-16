@@ -16,6 +16,8 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
 
 - PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is what makes it
   impossible for a fork-only patch to leak into a PR.
+- A `local(...)` commit is refused on every branch except `nplez1/main` (`.husky/commit-msg`). If it
+  fires, switch branches — do not bypass it.
 - A fork-only patch may only touch files that no PR branch owns. `package.json` and the
   rebuild-and-relaunch script are the current examples; see [LOCAL-PATCHES.md](./LOCAL-PATCHES.md).
 - One commit per topic on a PR branch, message in the repo's conventional style, and the branch must
