@@ -1,4 +1,5 @@
 import { Notification } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import type { Store } from '../persistence'
 import { activeNotifications, logNativeNotificationFailure } from './native-notification-lifecycle'
 import { recordNotificationDeliveryOutcome } from './notification-permission-probe'
@@ -21,7 +22,7 @@ export function triggerStartupNotificationRegistration(store: Store): void {
   store.updateUI({ notificationPermissionRequested: true })
 
   const notification = new Notification({
-    title: 'Orca is ready to notify you',
+    title: `${APP_DISPLAY_NAME} is ready to notify you`,
     body: 'Allow notifications so Orca can alert you when agents finish or terminals need attention.'
   })
 

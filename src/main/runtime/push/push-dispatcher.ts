@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../../shared/app-display-name'
 import { reserveNotificationCooldown } from '../../../shared/notification-burst-cooldown'
 // Why: the out-of-band leg of the mobile notification fan-out. Every event that
 // already went to connected sockets is offered to the push gateway so a phone
@@ -138,7 +139,7 @@ export class PushDispatcher {
           notificationEpoch: event.notificationEpoch,
           source: 'agent-task-complete',
           agentState: null,
-          title: 'Orca',
+          title: APP_DISPLAY_NAME,
           body: '',
           sound: false
         }
