@@ -1,6 +1,6 @@
 # Branch tracker
 
-Last updated **2026-09-16** (nplez1/main @ `53cf5be816`, upstream main @ `291b4ddd6f`).
+Last updated **2026-09-16** (nplez1/main @ `bea2250ba6`, upstream main @ `560c42e1d1`).
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
@@ -47,6 +47,27 @@ The three-deep chain is real, not cosmetic: `startup-worktree-hydration` needs t
 `WorktreeApi.listCached` method that `worktree-scan-cache-persistence` adds **and** a store action
 that `terminal-session-reconnect` adds. Splitting it further would mean duplicating code to hide the
 dependency, so the three want to land in that order.
+
+## Base drift — recorded, not fixed
+
+After the 2026-09-16 upstream sync, `nplez1/main` and the **seven PR-bound branches** sit on the
+current base (0 commits behind). `git range-diff` confirmed every patch was unchanged except the
+three deliberate resolutions during the integration rebase; `fix/copilot-background-work` needed the
+same `listener-state.ts` resolution there.
+
+**Five branches were deliberately left on the pre-sync base**, all unopened:
+
+- `feat/worktree-scan-cache-persistence` → rebase onto `origin/main`
+- `fix/terminal-session-reconnect` → rebase onto `feat/worktree-scan-cache-persistence`
+- `feat/startup-worktree-hydration` → rebase onto `fix/terminal-session-reconnect`
+- `feat/startup-service-ordering` and `fix/agent-status-routing-readiness` → independent, rebase onto `origin/main`
+
+**The trap:** the three chained branches must be rebased **parent first**. Each child's diff is
+measured against its parent, so rebasing a child onto `main` would attribute the parent's files to it
+and corrupt both the diff and the PR.
+
+This is not urgent — none of the five is open, and the plan is not to open them until #20813 lands.
+Run `node local/branch-status.mjs` for the current numbers rather than trusting a SHA written here.
 
 ## Branches
 
@@ -142,14 +163,18 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
 
 ## Open threads
 
-- **PR #20813 awaits a human.** Everything on our side is done; the next action is a maintainer's.
-  If nothing moves after a few days, one short comment on the PR, or their Discord
-  (https://discord.gg/fzjDKHxv8Q), is the proportionate nudge.
+- **PR #20813 awaits a human.** Rebased onto the current base on 2026-09-16 (4 commits, all
+  `range-diff`-identical), so it is mergeable and no longer stale. The next action is still a
+  maintainer's; the bots have been the only reviewers. If nothing moves after a few days, one short
+  comment on the PR, or their Discord (https://discord.gg/fzjDKHxv8Q), is the proportionate nudge.
 - **Do not open the other PRs yet.** A first-time contributor filing eight PRs into a queue that is
-  not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move.
-- **Apple Developer Program enrollment is pending.** Until it is approved the release workflow builds
-  unsigned, which still updates (Squirrel only needs a *consistent* identity) but needs a Gatekeeper
-  override per machine and does not keep privacy grants across an update.
-- **Two decisions still open:** whether fork builds coexist with an official Orca install
-  (a distinct identity needs ~6 patches, including the CLI shim shell script) and how release
-  versions are numbered (the workflow derives `<package.json version>-np.<run number>`).
+  not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move. The six
+  PR-bound branches are already current, so opening them later costs nothing.
+- **The release line works end to end.** Apple Developer Program is approved; `v1.4.197-np.6` was the
+  first build signed with a Developer ID, notarized and stapled (`spctl` reports
+  *accepted, source=Notarized Developer ID*). What remains unproven is **self-update**: one release
+  cannot demonstrate it, so publish a second trivial one and watch a machine move on its own.
+- **Resolved since this file was written:** the identity question (shipped as **Orca NP** — its own
+  bundle id, data directory, home directory and CLI; see LOCAL-PATCHES.md § local(identity)), version
+  numbering (`<package.json version>-np.<run number>`, already what the workflow derives), and the
+  dev-channel leak (one update stream; see LOCAL-PATCHES.md § local(updater)).
