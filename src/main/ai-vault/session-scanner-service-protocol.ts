@@ -67,7 +67,23 @@ export type AiVaultServiceInit = {
 }
 
 export type AiVaultServiceRequestBody =
-  | { type: 'request'; operation: 'scan'; options: AiVaultWorkerScanOptions }
+  | {
+      type: 'request'
+      operation: 'scan'
+      options: AiVaultWorkerScanOptions
+      /**
+       * The caller asked for fresh rows (a new session, the refresh control).
+       * Once the list is served from the index this is what that means: run a
+       * bounded recent pass before reading, rather than rescanning the world.
+       */
+      refresh?: boolean
+      /**
+       * Plain-text filter the host applies to the listing, so the panel's search
+       * covers the whole corpus. Already reduced by `aiVaultHostListQuery`, so an
+       * empty value means "no host filter" rather than "match nothing".
+       */
+      query?: string
+    }
   | {
       type: 'request'
       operation: 'titles'

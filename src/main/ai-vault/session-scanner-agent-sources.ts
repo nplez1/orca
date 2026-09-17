@@ -142,7 +142,11 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
         '.copilot',
         'session-state'
       ]),
-    extensions: ['.jsonl']
+    extensions: ['.jsonl'],
+    // Why: a session dir holds events.jsonl beside checkpoints/, rewind-snapshots/,
+    // files/ and research/. Descending would readdir every session's artifact
+    // trees and list a stray .jsonl artifact as its own session.
+    directoryPredicate: (_name, depth) => depth === 0
   },
   cursor: {
     rootDirs: (options, wslHomeDirs) =>

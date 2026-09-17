@@ -160,6 +160,90 @@ describe('parseAiVaultListResult', () => {
   })
 })
 
+// Rolling upgrades are the normal state: a released host may answer this build
+// with a row it produced before the index-backed list, and a newer host may add
+// fields this build's schema has never heard of. Either one must degrade the row,
+// never the whole list — see docs/reference/remote-wire-compatibility.md.
+describe('parseAiVaultListResult cross-version skew', () => {
+  it('accepts a pre-change host row and keeps every field the client reads', () => {
+    const row = preChangeSession()
+    const parsed = parseAiVaultListResult({
+      sessions: [row],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z'
+    })
+
+    expect(parsed.sessions).toHaveLength(1)
+    expect(parsed.sessions[0]).toMatchObject({
+      id: row.id,
+      executionHostId: 'local',
+      agent: 'codex',
+      sessionId: 'session-1',
+      title: 'Session one',
+      cwd: '/repo',
+      branch: null,
+      model: null,
+      filePath: '/tmp/session-1.jsonl',
+      codexHome: null,
+      createdAt: null,
+      updatedAt: null,
+      modifiedAt: '2026-07-27T00:00:00.000Z',
+      messageCount: 1,
+      totalTokens: 0,
+      previewMessages: [],
+      queuedMessageCount: 0,
+      subagentTranscriptCount: 0,
+      resumeCommand: 'codex resume session-1',
+      subagent: null
+    })
+  })
+
+  it('ignores row and envelope fields a newer host added instead of rejecting them', () => {
+    // `generation` and `cancelled` stand in for any future additive field: a zod
+    // object strips unknown keys, so the known projection survives untouched.
+    const parsed = parseAiVaultListResult({
+      sessions: [{ ...validSession(), generation: 7 }],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      cancelled: true,
+      generation: 7
+    })
+
+    expect(parsed.sessions).toHaveLength(1)
+    expect(parsed.sessions[0]).not.toHaveProperty('generation')
+    expect(parsed).not.toHaveProperty('generation')
+    expect(parsed.issues).toEqual([])
+  })
+})
+
+function preChangeSession(): Record<string, unknown> {
+  // The pre-change row shape. `executionHostId` is required by every released
+  // validator this worktree can pair against (v1.4.184 onward), so an old host
+  // always stamps it.
+  return {
+    id: 'local:codex:session-1:/tmp/session-1.jsonl',
+    executionHostId: 'local',
+    agent: 'codex',
+    sessionId: 'session-1',
+    title: 'Session one',
+    cwd: '/repo',
+    branch: null,
+    model: null,
+    filePath: '/tmp/session-1.jsonl',
+    codexHome: null,
+    createdAt: null,
+    updatedAt: null,
+    modifiedAt: '2026-07-27T00:00:00.000Z',
+    messageCount: 1,
+    totalTokens: 0,
+    previewMessages: [],
+    queuedMessageCount: 0,
+    subagentTranscriptCount: 0,
+    resumeCommand: 'codex resume session-1',
+    subagent: null
+  }
+}
+
 function validSession(sessionId = 'session-1'): Record<string, unknown> {
   return {
     id: `local:codex:${sessionId}:/tmp/${sessionId}.jsonl`,

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AiVaultSearchHostStatusSchema,
   AiVaultSearchRequestSchema,
   AiVaultSearchResponseSchema,
   AiVaultSearchStatusSchema
 } from './ai-vault-search-contract'
 import { searchHit, searchResults } from './ai-vault-search-test-fixture'
 import { redactForTransport, redactStatusForTransport } from './ai-vault-search-transport'
-import { unavailableSessionSearchStatus } from './ai-vault-search-client'
+import { createSessionSearchClient, unavailableSessionSearchStatus } from './ai-vault-search-client'
 
 describe('session search public contract', () => {
   it('drops legacy fields without letting them override scope or freshness', () => {
@@ -117,5 +118,98 @@ describe('session search public contract', () => {
     expect(JSON.stringify(result)).not.toContain('/host/private/path')
     expect(JSON.stringify(result)).not.toContain('private')
     expect(redactStatusForTransport(status, 'runtime')).toEqual(status)
+  })
+})
+
+// Clients and hosts update independently, and the two directions fail
+// differently: an old host omits the additive merged-page fields, while a newer
+// host may add fields this build cannot name. Neither may fail the decode — see
+// docs/reference/remote-wire-compatibility.md.
+describe('session search cross-version skew', () => {
+  it('accepts an old host answer that predates the merged-page fields', () => {
+    const legacy = searchResults()
+    const parsed = AiVaultSearchResponseSchema.parse(legacy)
+    expect(parsed).toEqual(legacy)
+    expect(parsed).not.toHaveProperty('hosts')
+
+    // A host that predates the metadata/content split reports no consent either.
+    const status = unavailableSessionSearchStatus()
+    const parsedStatus = AiVaultSearchStatusSchema.parse(status)
+    expect(parsedStatus).toEqual(status)
+    expect(parsedStatus).not.toHaveProperty('contentEnabled')
+  })
+
+  it('strips additive and unknown fields from a newer host instead of rejecting them', () => {
+    const response = {
+      ...searchResults(),
+      hosts: [{ executionHostId: 'runtime:box', outcome: 'contributed' }],
+      futureField: { nested: true }
+    }
+    const parsed = AiVaultSearchResponseSchema.parse(response)
+    expect(parsed).not.toHaveProperty('futureField')
+    expect(parsed.kind === 'results' && parsed.hosts).toEqual([
+      { executionHostId: 'runtime:box', outcome: 'contributed' }
+    ])
+
+    const status = { ...unavailableSessionSearchStatus(), contentEnabled: true, futureField: 1 }
+    const parsedStatus = AiVaultSearchStatusSchema.parse(status)
+    expect(parsedStatus).not.toHaveProperty('futureField')
+    expect(parsedStatus.contentEnabled).toBe(true)
+  })
+
+  it('records a per-host outcome with no reason as not reported, never an invented one', () => {
+    const hosts = [
+      { executionHostId: 'runtime:box', outcome: 'contributed' },
+      { executionHostId: 'ssh:box', outcome: 'unavailable', reason: 'timeout' }
+    ]
+    const parsed = AiVaultSearchResponseSchema.parse({ ...searchResults(), hosts })
+    expect(parsed.kind === 'results' && parsed.hosts).toEqual(hosts)
+    expect(
+      AiVaultSearchResponseSchema.safeParse({
+        ...searchResults(),
+        hosts: [{ executionHostId: 'runtime:box', outcome: 'invented' }]
+      }).success
+    ).toBe(false)
+    expect(
+      AiVaultSearchHostStatusSchema.safeParse({ executionHostId: '', outcome: 'contributed' })
+        .success
+    ).toBe(false)
+  })
+
+  it('keeps truncated.freshness required, as every released host has sent it', () => {
+    // Why: freshness shipped with the contract's first commit, so no host in the
+    // rolling-upgrade window omits it; defaulting it would invent freshness.
+    expect(
+      AiVaultSearchResponseSchema.safeParse({
+        ...searchResults(),
+        truncated: { candidates: false, snippets: 0, query: false }
+      }).success
+    ).toBe(false)
+  })
+
+  it('passes a newer host per-host report through relay redaction without depending on it', async () => {
+    const response = {
+      ...searchResults(),
+      hosts: [{ executionHostId: 'runtime:box', outcome: 'unavailable', reason: 'timeout' }]
+    }
+    const client = createSessionSearchClient(async () => response, 'relay')
+    const result = await client.searchSessions({ query: 'needle' })
+    if (result.kind !== 'results') {
+      throw new Error('expected a results page')
+    }
+    expect(result.hosts).toEqual(response.hosts)
+    expect(result.hits[0]).not.toHaveProperty('resumeCommand')
+    expect(result.hits[0]?.source).toEqual({ presence: 'present' })
+  })
+
+  it('does not invent a per-host report for an old host answer or a status without consent', async () => {
+    const client = createSessionSearchClient(
+      async (method) =>
+        method === 'aiVault.searchStatus' ? unavailableSessionSearchStatus() : searchResults(),
+      'ipc'
+    )
+    const result = await client.searchSessions({ query: 'needle' })
+    expect(result).not.toHaveProperty('hosts')
+    expect(await client.searchStatus()).not.toHaveProperty('contentEnabled')
   })
 })

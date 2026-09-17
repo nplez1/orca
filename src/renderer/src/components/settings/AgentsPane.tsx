@@ -8,6 +8,7 @@ import { useAppStore } from '@/store'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
 import { AgentCacheTimerSection } from './AgentCacheTimerSection'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
+import { AgentSessionSearchSection } from './AgentSessionSearchSection'
 import { buildCodexSessionSourceHomeControl } from './codex-session-source-home-control'
 import {
   getAgentGeneratedTabTitlesDescription,
@@ -260,6 +261,7 @@ export function AgentsPane({
         <AgentAwakeSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
+      <AgentSessionSearchSection settings={settings} updateSettings={updateSettings} />
       <AgentPermissionsSetting
         mode={resolveAgentPermissionModeSummary({ agentDefaultArgs, agentDefaultEnv })}
         onChange={(mode) =>

@@ -40,6 +40,13 @@ export type SessionSearchIndexerOptions = {
   resolveRoots?: (signal: AbortSignal) => Promise<SessionSearchScanRoots>
   /** null = all history; otherwise only transcripts modified within this many days. */
   historyDays: number | null
+  /**
+   * Content tier: store message bodies and index their text.
+   *
+   * Optional only because tests construct an indexer directly; the consent
+   * decision belongs to `SessionSearchInstance`, which always passes it.
+   */
+  contentEnabled?: boolean
   clock?: SessionSearchClock
   reconcileIntervalMs?: number
   recentPerAgent?: number
