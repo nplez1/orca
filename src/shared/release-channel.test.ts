@@ -36,15 +36,15 @@ describe('release channel', () => {
     expect(getVersionChannel('not-a-version')).toBeNull()
   })
 
-  // Why: hourly tags must never resolve to the main repo — the releases atom feed
-  // exposes only 10 entries, so 24 hourly tags a day would evict every stable/RC
-  // entry and leave real users with nothing to update to.
-  it('keeps dev builds out of the main release repo, and apart from each other', () => {
-    expect(getReleaseRepoForChannel('hourly')).toBe('stablyai/orca-hourly')
-    expect(getReleaseRepoForChannel('daily')).toBe('stablyai/orca-daily')
-    // Why adhoc gets its own repo rather than sharing hourly's: an unlanded
-    // branch build must never surface to someone who only meant to ride main.
-    expect(getReleaseRepoForChannel('adhoc')).toBe('stablyai/orca-adhoc')
+  // Upstream keeps hourly tags out of the main repo because its releases atom feed exposes only the
+  // 10 newest entries, so 24 hourly tags a day would evict every stable/RC entry.
+  // LOCAL(nplez1): this fork publishes a single stream, so the dev channels resolve to it too. They
+  // are not offered in the picker, but a channel persisted by an older build still resolves here —
+  // and pointing it at upstream's repo would replace this build with an official Orca.
+  it('resolves every channel to this fork, which publishes one stream', () => {
+    expect(getReleaseRepoForChannel('hourly')).toBe('nplez1/orca')
+    expect(getReleaseRepoForChannel('daily')).toBe('nplez1/orca')
+    expect(getReleaseRepoForChannel('adhoc')).toBe('nplez1/orca')
     expect(getReleaseRepoForChannel('stable')).toBe('nplez1/orca')
     expect(getReleaseRepoForChannel('rc')).toBe('nplez1/orca')
   })
@@ -61,10 +61,10 @@ describe('release channel', () => {
   // in the hourly repo.
   it('builds release-notes links against the repo that published the version', () => {
     expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBe(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
+      'https://github.com/nplez1/orca/releases/tag/v1.4.160-hourly.202607281400'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160-daily.202607281300')).toBe(
-      'https://github.com/stablyai/orca-daily/releases/tag/v1.4.160-daily.202607281300'
+      'https://github.com/nplez1/orca/releases/tag/v1.4.160-daily.202607281300'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160')).toBe(
       'https://github.com/nplez1/orca/releases/tag/v1.4.160'
@@ -73,7 +73,7 @@ describe('release channel', () => {
       'https://github.com/nplez1/orca/releases/tag/v1.4.160-rc.3'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160-adhoc.20260728140533')).toBe(
-      'https://github.com/stablyai/orca-adhoc/releases/tag/v1.4.160-adhoc.20260728140533'
+      'https://github.com/nplez1/orca/releases/tag/v1.4.160-adhoc.20260728140533'
     )
     expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/nplez1/orca/releases')
   })
@@ -264,7 +264,7 @@ describe('release channel', () => {
       channel: 'hourly',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-hourly/releases/tag/v${version}`,
+      releaseUrl: `https://github.com/nplez1/orca/releases/tag/v${version}`,
       installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
@@ -310,7 +310,7 @@ describe('release channel', () => {
       channel: 'adhoc',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-adhoc/releases/tag/v${version}`,
+      releaseUrl: `https://github.com/nplez1/orca/releases/tag/v${version}`,
       installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
