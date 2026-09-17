@@ -13,7 +13,7 @@ import {
   type AgentStatusState,
   type ParsedAgentStatusPayload
 } from '../agent-status-types'
-import type { DescendantEventFacts } from './descendant-events'
+import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
 import type { HookListenerState } from './listener-state'
 
 function getOrCreateDescendantRoster(
@@ -94,6 +94,19 @@ function descendantMonitoring(
   return effectiveState === 'working' && leadState !== 'working'
     ? { workingMode: 'monitoring' }
     : {}
+}
+
+/** Fold the live child set an event carried into the pane's roster. Returns nothing: the
+ *  event's own payload is still normalized and gated as usual, so this only updates what that
+ *  gate reads — which is how an add the transport coalesced away is repaired by the next event. */
+export function applyDescendantLiveSet(
+  state: HookListenerState,
+  paneKey: string,
+  children: readonly DescendantEntry[],
+  now = Date.now()
+): void {
+  replaceAgentDescendants(getOrCreateDescendantRoster(state, paneKey), children, now)
+  dropEmptyDescendantRoster(state, paneKey, now)
 }
 
 /** The pane is idle only when its lead session is idle AND no descendant is live.

@@ -353,4 +353,26 @@ describe('descendant lifecycle never settles the pane', () => {
       ).toBe(1)
     })
   })
+
+  describe('the pi live child set riding every post (STA-6378)', () => {
+    const CHILD = { id: 'run-1', agent_type: 'researcher', description: 'trace the writer' }
+
+    it('holds the pane for a child only a later event carried', () => {
+      // Why: the add a background spawn emits is coalesced away by the tool burst that ends that
+      // same spawn — the set riding the next ordinary event is what repairs the swallowed one.
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('working')
+    })
+
+    it('settles once a later event carries the set back empty', () => {
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [CHILD] })
+      publish('pi', { hook_event_name: 'tool_execution_end', subagent_runs: [] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+    })
+
+    it('ignores an absent set, so a pane without the plugin keeps its own verdict', () => {
+      publish('pi', { hook_event_name: 'tool_execution_end' })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('done')
+    })
+  })
 })

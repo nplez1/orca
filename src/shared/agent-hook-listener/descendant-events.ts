@@ -93,6 +93,22 @@ function readPiDescendantEvent(
   if (normalizeHookEventName(eventName) !== 'subagent_async_state') {
     return null
   }
+  const children = readPiDescendantLiveSet(hookPayload)
+  return children ? { kind: 'live-set', children } : null
+}
+
+/** The live child set a pi pane rides on EVERY post, not only the dedicated event. pi's
+ *  transport keeps one latest-only slot, so the add a background spawn emits is routinely
+ *  overwritten before delivery by the tool burst that ends that same spawn — reading the field
+ *  off whichever event does arrive is what repairs the swallowed one. */
+export function readPiDescendantLiveSetField(
+  source: AgentHookSource,
+  hookPayload: Record<string, unknown>
+): readonly DescendantEntry[] | null {
+  return source === 'pi' ? readPiDescendantLiveSet(hookPayload) : null
+}
+
+function readPiDescendantLiveSet(hookPayload: Record<string, unknown>): DescendantEntry[] | null {
   const runs = hookPayload['subagent_runs']
   if (!Array.isArray(runs)) {
     return null
@@ -112,7 +128,7 @@ function readPiDescendantEvent(
       })
     }
   }
-  return { kind: 'live-set', children }
+  return children
 }
 
 /** Grok's own turn cancel. An interrupted turn skips the stop gate entirely, so a child
