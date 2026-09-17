@@ -36,12 +36,9 @@ export type AgentStatusExtensionHarness = {
   handlers: Record<string, HookHandler>
   processEnv: Record<string, string | undefined>
   callHook: (name: string, event?: unknown, context?: HookContext) => Promise<void>
-  /** Emit on the extension event bus (`pi.events`) pi-subagents publishes async child runs on. */
+  /** Emit on the extension event bus (`pi.events`) the subagent plugins publish child runs on. */
   emitPiEvent: (name: string, payload?: unknown) => void
-  /** Emit on the process event bus, the channel the shipped branch bound. */
-  emitProcessBus: (name: string, payload?: unknown) => void
   piEventListenerCount: (name: string) => number
-  processBusListenerCount: (name: string) => number
   // Re-invoke the extension factory in the same process (as Pi does on an
   // in-process extension reload), swapping in the freshly registered handlers.
   reload: () => void
@@ -126,12 +123,8 @@ export function createAgentStatusExtensionHarness(args: {
   })
 
   const killMock = vi.fn(args.killImpl ?? (() => undefined))
-  const processBusListeners: Record<string, ((payload: unknown) => void)[]> = {}
   const processMock = {
     kill: killMock,
-    on(name: string, listener: (payload: unknown) => void) {
-      ;(processBusListeners[name] ??= []).push(listener)
-    },
     env: {
       ...BASE_ENV,
       ...(args.kind === 'prime-agent' ? { PRIME_AGENT_INTERNAL_DAEMON_WORKER: '1' } : {}),
@@ -208,13 +201,7 @@ export function createAgentStatusExtensionHarness(args: {
         listener(payload)
       }
     },
-    emitProcessBus: (name, payload) => {
-      for (const listener of processBusListeners[name] ?? []) {
-        listener(payload)
-      }
-    },
     piEventListenerCount: (name) => (piEventListeners[name] ?? []).length,
-    processBusListenerCount: (name) => (processBusListeners[name] ?? []).length,
     reload: () => {
       for (const key of Object.keys(handlers)) {
         delete handlers[key]

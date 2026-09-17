@@ -13,6 +13,18 @@ import {
 
 const HOOK_ENV = { ORCA_PANE_KEY: PANE_KEY, ORCA_AGENT_HOOK_ENV: 'production' }
 
+// Why: the channel names the two installed subagent plugins publish on. `pi-subagents`
+// (tintinweb, the local fork — see its README's event-bus table) uses the `subagents:*` family;
+// `@earendil-works/pi-subagents` uses `subagent:async-*`. Both ride `pi.events`.
+const FORK_CREATED = 'subagents:created'
+const FORK_STARTED = 'subagents:started'
+const FORK_COMPLETED = 'subagents:completed'
+const FORK_FAILED = 'subagents:failed'
+const EW_STARTED = 'subagent:async-started'
+const EW_COMPLETE = 'subagent:async-complete'
+const START_CHANNELS = [FORK_CREATED, FORK_STARTED, EW_STARTED]
+const END_CHANNELS = [FORK_COMPLETED, FORK_FAILED, EW_COMPLETE]
+
 /** Drives the REAL generated extension source into the REAL listener entry, so the pane state
  *  asserted here is the one a pi pane would actually show. */
 function createHarness(kind: 'pi' | 'omp' | 'prime-agent' = 'pi') {
@@ -86,12 +98,64 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'delegate the sweep' })
     await drive(harness, 'agent_start')
-    await emit(harness, 'subagent:async-started', { runId: 'run-1', agentType: 'researcher' })
+    await emit(harness, FORK_STARTED, {
+      id: 'run-1',
+      type: 'researcher',
+      description: 'trace the writer'
+    })
+
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+    // Why: the plugin's `type` is the child's agent type and its `description` is the row's label,
+    // so the pane can name what it is still waiting on.
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({
+        id: 'run-1',
+        agentType: 'researcher',
+        description: 'trace the writer'
+      })
+    ])
+
+    await emit(harness, FORK_COMPLETED, { id: 'run-1', description: 'trace the writer' })
+    expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('counts a background spawn the plugin announces before it starts running', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'fan out' })
+    await drive(harness, 'agent_start')
+    // Why: `subagents:created` is the background-spawn signal, which can precede the running
+    // transition while the child queues — the pane must already hold for it.
+    await emit(harness, FORK_CREATED, { id: 'run-1', type: 'worker', isBackground: true })
 
     await drive(harness, 'agent_end', {})
     expect(harness.states.at(-1)).toBe('working')
 
-    await emit(harness, 'subagent:async-complete', { runId: 'run-1' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
+    expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('retires a child the plugin reports as failed or stopped', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'fan out' })
+    await drive(harness, 'agent_start')
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+
+    await emit(harness, FORK_FAILED, { id: 'run-1', status: 'aborted' })
+    expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('holds through the @earendil-works plugin channel names as well', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'fan out' })
+    await drive(harness, 'agent_start')
+    await emit(harness, EW_STARTED, { runId: 'run-9', agentType: 'scout' })
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+
+    await emit(harness, EW_COMPLETE, { runId: 'run-9' })
     expect(harness.states.at(-1)).toBe('done')
   })
 
@@ -99,14 +163,14 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'fan out' })
     await drive(harness, 'agent_start')
-    await emit(harness, 'subagent:async-started', { runId: 'run-1' })
-    await emit(harness, 'subagent:async-started', { runId: 'run-2' })
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
+    await emit(harness, FORK_STARTED, { id: 'run-2' })
 
     await drive(harness, 'agent_end', {})
-    await emit(harness, 'subagent:async-complete', { runId: 'run-1' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
     expect(harness.states.at(-1)).toBe('working')
 
-    await emit(harness, 'subagent:async-complete', { runId: 'run-2' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-2' })
     expect(harness.states.at(-1)).toBe('done')
 
     // The final child woke the parent for another turn; the pane must not stay settled.
@@ -125,9 +189,9 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     // Why: the starts are delivered one at a time on purpose. Coalescing them too would drop
     // the start that pairs with a dropped completion, and the two losses would cancel out —
     // the pane would settle for the wrong reason and the test would prove nothing.
-    await emit(harness, 'subagent:async-started', { runId: 'run-1' })
-    await emit(harness, 'subagent:async-started', { runId: 'run-2' })
-    await emit(harness, 'subagent:async-started', { runId: 'run-3' })
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
+    await emit(harness, FORK_STARTED, { id: 'run-2' })
+    await emit(harness, FORK_STARTED, { id: 'run-3' })
     await drive(harness, 'agent_end', {})
     expect(harness.states.at(-1)).toBe('working')
 
@@ -135,9 +199,9 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     // is ever delivered. It carries the whole live set, so the pane still settles; a
     // start/complete delta would strand run-1 and run-2 and pin the pane working forever.
     await emitWithoutFlush(harness, [
-      { name: 'subagent:async-complete', payload: { runId: 'run-1' } },
-      { name: 'subagent:async-complete', payload: { runId: 'run-2' } },
-      { name: 'subagent:async-complete', payload: { runId: 'run-3' } }
+      { name: FORK_COMPLETED, payload: { id: 'run-1' } },
+      { name: FORK_COMPLETED, payload: { id: 'run-2' } },
+      { name: FORK_COMPLETED, payload: { id: 'run-3' } }
     ])
     expect(harness.states.at(-1)).toBe('done')
   })
@@ -146,16 +210,14 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'partial' })
     await drive(harness, 'agent_start')
-    await emit(harness, 'subagent:async-started', { runId: 'run-1' })
-    await emit(harness, 'subagent:async-started', { runId: 'run-2' })
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
+    await emit(harness, FORK_STARTED, { id: 'run-2' })
     await drive(harness, 'agent_end', {})
 
-    await emitWithoutFlush(harness, [
-      { name: 'subagent:async-complete', payload: { runId: 'run-1' } }
-    ])
+    await emitWithoutFlush(harness, [{ name: FORK_COMPLETED, payload: { id: 'run-1' } }])
     expect(harness.states.at(-1)).toBe('working')
 
-    await emit(harness, 'subagent:async-complete', { runId: 'run-2' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-2' })
     expect(harness.states.at(-1)).toBe('done')
   })
 
@@ -163,7 +225,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'reload me' })
     await drive(harness, 'agent_start')
-    await emit(harness, 'subagent:async-started', { runId: 'run-1' })
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
 
     // Why: the posted set is authoritative, so a reload that rebuilt it empty would tell the
     // receiver the child had finished. The set lives at module scope for exactly this reason.
@@ -171,7 +233,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     await drive(harness, 'agent_end', {})
     expect(harness.states.at(-1)).toBe('working')
 
-    await emit(harness, 'subagent:async-complete', { runId: 'run-1' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
     expect(harness.states.at(-1)).toBe('done')
   })
 
@@ -179,7 +241,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'delegate the sweep' })
     await drive(harness, 'agent_start')
-    await emit(harness, 'subagent:async-started', { runId: 'run-1' })
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
     // Why: the lead's own turn is running, so the pane is working for its own reasons.
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
 
@@ -189,42 +251,43 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
       workingMode: 'monitoring'
     })
 
-    await emit(harness, 'subagent:async-complete', { runId: 'run-1' })
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
     expect(harness.accepted.at(-1)?.state).toBe('done')
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
   })
 
-  it('ignores a bus payload with no run id rather than inventing a child', async () => {
+  it('ignores a bus payload with no child id rather than inventing a child', async () => {
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'go' })
     await drive(harness, 'agent_start')
     const before = harness.states.length
 
-    await emit(harness, 'subagent:async-started', { note: 'no id here' })
+    await emit(harness, FORK_STARTED, { description: 'no id here' })
     expect(harness.states).toHaveLength(before)
 
     await drive(harness, 'agent_end', {})
     expect(harness.states.at(-1)).toBe('done')
   })
 
-  it('binds each async-subagent bus once across an in-process extension reload', () => {
+  it('binds each lifecycle channel once across an in-process extension reload', () => {
     const harness = createHarness()
-    // Why: pi-subagents emits on the extension bus (pi.events), not on `process`; both stay
-    // bound so a host build that publishes on either channel reports the same children.
-    expect(harness.piEventListenerCount('subagent:async-started')).toBe(1)
-    expect(harness.processBusListenerCount('subagent:async-started')).toBe(1)
+    for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {
+      expect(harness.piEventListenerCount(channel)).toBe(1)
+    }
     harness.reload()
     // Why: pi replaces pi.on handlers on reload but not bus listeners; a second
-    // registration would post every async child event twice.
-    expect(harness.piEventListenerCount('subagent:async-started')).toBe(1)
-    expect(harness.processBusListenerCount('subagent:async-started')).toBe(1)
+    // registration would post every child lifecycle event twice.
+    for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {
+      expect(harness.piEventListenerCount(channel)).toBe(1)
+    }
   })
 
   it('does not register the pi subagent bus for omp or prime-agent', () => {
     for (const kind of ['omp', 'prime-agent'] as const) {
       const harness = createHarness(kind)
-      expect(harness.piEventListenerCount('subagent:async-started')).toBe(0)
-      expect(harness.processBusListenerCount('subagent:async-started')).toBe(0)
+      for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {
+        expect(harness.piEventListenerCount(channel)).toBe(0)
+      }
     }
   })
 })
