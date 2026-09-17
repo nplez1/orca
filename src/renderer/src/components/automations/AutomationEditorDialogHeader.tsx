@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { AutomationCreateTarget } from './AutomationEditorDialog'
 import type { AutomationTemplate } from './automation-templates'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-display-name'
 import { translate } from '@/i18n/i18n'
 
 type AutomationEditorDialogHeaderProps = {
@@ -105,10 +106,7 @@ export function AutomationEditorDialogHeader({
             className={segmentedGroupClassName}
           >
             <ToggleGroupItem value="orca" className={segmentedItemClassName}>
-              {translate(
-                'auto.components.automations.AutomationEditorDialogHeader.6f309eef8d',
-                'Orca'
-              )}
+              {APP_DISPLAY_NAME}
             </ToggleGroupItem>
             <ToggleGroupItem value="hermes" className={segmentedItemClassName}>
               {translate(

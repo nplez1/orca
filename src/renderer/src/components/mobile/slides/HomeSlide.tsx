@@ -1,5 +1,6 @@
 import { ClaudeIcon, OpenAIIcon } from '../../status-bar/icons'
 import { cn } from '../../../lib/utils'
+import { APP_DISPLAY_NAME } from '../../../../../shared/app-display-name'
 import { translate } from '@/i18n/i18n'
 
 export function HomeSlide({ tapping }: { tapping: boolean }): React.JSX.Element {
@@ -8,9 +9,7 @@ export function HomeSlide({ tapping }: { tapping: boolean }): React.JSX.Element 
       <div className="mp-app-topbar">
         <div className="mp-app-brand">
           <OrcaLogo />
-          <span className="mp-app-brand-name">
-            {translate('auto.components.mobile.slides.HomeSlide.5d94e8ddcc', 'Orca')}
-          </span>
+          <span className="mp-app-brand-name">{APP_DISPLAY_NAME}</span>
         </div>
         <button
           type="button"
