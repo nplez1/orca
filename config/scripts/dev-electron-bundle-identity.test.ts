@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_DEV_DISPLAY_NAME } from '../../src/shared/app-display-name'
 import { getDevInstanceIdentity } from '../../src/main/startup/dev-instance-identity'
 import {
   DEV_BUNDLE_DISPLAY_NAME,
@@ -66,9 +67,10 @@ describe('dev-electron-bundle-identity', () => {
   })
 
   it('keeps the bundle display name in step with the name safeStorage keys off', () => {
-    // Two independently hardcoded 'Orca Dev' strings: this one names the bundle (notifications,
+    // Two independently hardcoded dev names: this one names the bundle (notifications,
     // System Settings), and getDevInstanceIdentity().appName drives app.setName, which decides the
     // Keychain service name. Drift would split the two without anything else failing.
+    expect(DEV_BUNDLE_DISPLAY_NAME).toBe(APP_DEV_DISPLAY_NAME)
     expect(DEV_BUNDLE_DISPLAY_NAME).toBe(getDevInstanceIdentity(true, {}).appName)
   })
 
