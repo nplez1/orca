@@ -36,6 +36,12 @@ export type AgentStatusExtensionHarness = {
   handlers: Record<string, HookHandler>
   processEnv: Record<string, string | undefined>
   callHook: (name: string, event?: unknown, context?: HookContext) => Promise<void>
+  /** Emit on the extension event bus (`pi.events`) pi-subagents publishes async child runs on. */
+  emitPiEvent: (name: string, payload?: unknown) => void
+  /** Emit on the process event bus, the channel the shipped branch bound. */
+  emitProcessBus: (name: string, payload?: unknown) => void
+  piEventListenerCount: (name: string) => number
+  processBusListenerCount: (name: string) => number
   // Re-invoke the extension factory in the same process (as Pi does on an
   // in-process extension reload), swapping in the freshly registered handlers.
   reload: () => void
@@ -104,9 +110,11 @@ export function createAgentStatusExtensionHarness(args: {
     )
   }
 
-  const module = {
-    exports: {} as { default?: (pi: { on: (name: string, handler: HookHandler) => void }) => void }
-  }
+  type AgentStatusExtensionFactory = (pi: {
+    on: (name: string, handler: HookHandler) => void
+    events: { on: (name: string, listener: (payload: unknown) => void) => void }
+  }) => void
+  const module: { exports: { default?: AgentStatusExtensionFactory } } = { exports: {} }
   const requireMock = vi.fn((specifier: string) => {
     if (specifier === 'fs') {
       return fsMock
@@ -118,8 +126,12 @@ export function createAgentStatusExtensionHarness(args: {
   })
 
   const killMock = vi.fn(args.killImpl ?? (() => undefined))
+  const processBusListeners: Record<string, ((payload: unknown) => void)[]> = {}
   const processMock = {
     kill: killMock,
+    on(name: string, listener: (payload: unknown) => void) {
+      ;(processBusListeners[name] ??= []).push(listener)
+    },
     env: {
       ...BASE_ENV,
       ...(args.kind === 'prime-agent' ? { PRIME_AGENT_INTERNAL_DAEMON_WORKER: '1' } : {}),
@@ -165,10 +177,16 @@ export function createAgentStatusExtensionHarness(args: {
   }
 
   const handlers: Record<string, HookHandler> = {}
+  const piEventListeners: Record<string, ((payload: unknown) => void)[]> = {}
   const registerInto = (target: Record<string, HookHandler>): void => {
     register({
       on(name: string, handler: HookHandler) {
         target[name] = handler
+      },
+      events: {
+        on(name: string, listener: (payload: unknown) => void) {
+          ;(piEventListeners[name] ??= []).push(listener)
+        }
       }
     })
   }
@@ -185,6 +203,18 @@ export function createAgentStatusExtensionHarness(args: {
     callHook: async (name, event, hookContext) => {
       await handlers[name]?.(event, hookContext)
     },
+    emitPiEvent: (name, payload) => {
+      for (const listener of piEventListeners[name] ?? []) {
+        listener(payload)
+      }
+    },
+    emitProcessBus: (name, payload) => {
+      for (const listener of processBusListeners[name] ?? []) {
+        listener(payload)
+      }
+    },
+    piEventListenerCount: (name) => (piEventListeners[name] ?? []).length,
+    processBusListenerCount: (name) => (processBusListeners[name] ?? []).length,
     reload: () => {
       for (const key of Object.keys(handlers)) {
         delete handlers[key]

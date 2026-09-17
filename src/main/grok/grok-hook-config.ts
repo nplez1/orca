@@ -12,6 +12,8 @@ export const GROK_EVENTS = [
   { eventName: 'SessionStart', definition: { hooks: [{ type: 'command', command: '' }] } },
   { eventName: 'UserPromptSubmit', definition: { hooks: [{ type: 'command', command: '' }] } },
   { eventName: 'Stop', definition: { hooks: [{ type: 'command', command: '' }] } },
+  // Why: an interrupted turn skips Stop and reports StopCancelled, so without this a cancelled
+  // turn's pane keeps its pre-cancel row — and any child it spawned — until something else ends.
   { eventName: 'StopCancelled', definition: { hooks: [{ type: 'command', command: '' }] } },
   { eventName: 'StopFailure', definition: { hooks: [{ type: 'command', command: '' }] } },
   { eventName: 'SessionEnd', definition: { hooks: [{ type: 'command', command: '' }] } },
@@ -29,7 +31,13 @@ export const GROK_EVENTS = [
     eventName: 'PostToolUseFailure',
     definition: { matcher: GROK_TOOL_EVENT_MATCHER, hooks: [{ type: 'command', command: '' }] }
   },
-  { eventName: 'Notification', definition: { hooks: [{ type: 'command', command: '' }] } }
+  { eventName: 'Notification', definition: { hooks: [{ type: 'command', command: '' }] } },
+  // Why: nested subagents inherit the parent pane's ORCA_PANE_KEY, so without these the pane only
+  // ever hears a child through events that look like the session's own. These name the child, which
+  // is what lets Orca show its row and keep the pane working while a background child outlives the
+  // parent turn. Older grok builds ignore unregistered event names (the StopFailure precedent).
+  { eventName: 'SubagentStart', definition: { hooks: [{ type: 'command', command: '' }] } },
+  { eventName: 'SubagentStop', definition: { hooks: [{ type: 'command', command: '' }] } }
 ] as const
 
 export function buildInstalledGrokConfig(
