@@ -29,9 +29,11 @@ export function clearAiVaultBackgroundRestartCircuit(): void {
 
 export function scanAiVaultSessionsInBackground(
   options: AiVaultServiceScanOptions,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Forwarded to the service, which reconciles and filters before listing. */
+  request: { refresh?: boolean; query?: string } = {}
 ): Promise<AiVaultListResult> {
-  return scanAiVaultSessionsInService(options, signal)
+  return scanAiVaultSessionsInService(options, signal, request)
 }
 
 export function resolveAiVaultSessionTitlesInBackground(

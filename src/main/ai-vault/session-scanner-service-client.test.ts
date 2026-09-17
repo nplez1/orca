@@ -10,7 +10,7 @@ import {
 
 const SESSION_SEARCH_ON: AiVaultSessionSearchInit = {
   databasePath: '/data/ai-vault/session-search.sqlite',
-  settings: { enabled: true, historyDays: null },
+  settings: { contentEnabled: true, historyDays: null },
   roots: {}
 }
 
@@ -417,12 +417,12 @@ describe('AiVaultScannerServiceClient', () => {
   // The child holds the index while the setting is on, and its reconcile loop is
   // invisible from here: retiring it would stop indexing until the next scan
   // happened to respawn one, which is not a guarantee anyone stated.
-  it('spawns a child for the index and never retires it while the index is on', async () => {
+  it('keeps the child while the index runs, including without content consent', async () => {
     vi.useFakeTimers()
     const { child, client } = setup(100)
     const on = {
       databasePath: '/data/ai-vault/session-search.sqlite',
-      settings: { enabled: true, historyDays: null },
+      settings: { contentEnabled: true, historyDays: null },
       roots: {}
     }
 
@@ -436,21 +436,23 @@ describe('AiVaultScannerServiceClient', () => {
     expect(child.sent).not.toContainEqual({ type: 'shutdown' })
 
     // A live child hears the change directly rather than waiting for a respawn.
-    const narrowed = { ...on, settings: { enabled: true, historyDays: 30 } }
+    const narrowed = { ...on, settings: { contentEnabled: true, historyDays: 30 } }
     client.updateSessionSearch(narrowed)
     expect(child.sent).toContainEqual({ type: 'sessionSearch', init: narrowed })
     vi.advanceTimersByTime(10_000)
     expect(child.sent).not.toContainEqual({ type: 'shutdown' })
 
-    client.updateSessionSearch({ ...on, settings: { enabled: false, historyDays: null } })
-    vi.advanceTimersByTime(100)
-    expect(child.sent).toContainEqual({ type: 'shutdown' })
+    // Withdrawing content consent does not stop the metadata index, so the child
+    // it keeps alive is not retired either: only disposing the client releases it.
+    client.updateSessionSearch({ ...on, settings: { contentEnabled: false, historyDays: null } })
+    vi.advanceTimersByTime(600_000)
+    expect(child.sent).not.toContainEqual({ type: 'shutdown' })
     client.dispose()
   })
 
   it('re-reads the init frame on every spawn so a respawn sees current consent', async () => {
     const children: AiVaultServiceTestChild[] = []
-    let enabled = false
+    let contentEnabled = false
     const client = new AiVaultScannerServiceClient({
       processFactory: () => {
         const child = new AiVaultServiceTestChild(12_345 + children.length)
@@ -461,7 +463,7 @@ describe('AiVaultScannerServiceClient', () => {
         sessionParseCache: null,
         sessionSearch: {
           databasePath: '/data/ai-vault/session-search.sqlite',
-          settings: { enabled, historyDays: null },
+          settings: { contentEnabled, historyDays: null },
           roots: {}
         }
       })
@@ -470,15 +472,19 @@ describe('AiVaultScannerServiceClient', () => {
     const first = client.request({ type: 'request', operation: 'titles', requests: [] })
     readyAiVaultServiceChild(children[0]!)
     await Promise.resolve()
-    expect(children[0]!.sent[0]).toMatchObject({ sessionSearch: { settings: { enabled: false } } })
+    expect(children[0]!.sent[0]).toMatchObject({
+      sessionSearch: { settings: { contentEnabled: false } }
+    })
 
-    enabled = true
+    contentEnabled = true
     children[0]!.emit('error', new Error('crashed'))
     await expect(first).rejects.toThrow('crashed')
     void client.request({ type: 'request', operation: 'titles', requests: [] }).catch(() => {})
     await vi.waitFor(() => expect(children.length).toBeGreaterThan(1))
     for (const respawned of children.slice(1)) {
-      expect(respawned.sent[0]).toMatchObject({ sessionSearch: { settings: { enabled: true } } })
+      expect(respawned.sent[0]).toMatchObject({
+        sessionSearch: { settings: { contentEnabled: true } }
+      })
     }
     client.dispose()
   })
@@ -501,7 +507,7 @@ describe('AiVaultScannerServiceClient', () => {
     expect(children).toHaveLength(2)
     expect(children[1]!.sent[0]).toMatchObject({
       type: 'init',
-      sessionSearch: { settings: { enabled: true } }
+      sessionSearch: { settings: { contentEnabled: true } }
     })
     client.dispose()
   })

@@ -34,6 +34,37 @@ export function searchResults(): Extract<AiVaultSearchResponse, { kind: 'results
   }
 }
 
+/** Wire-shaped hit with overridable fields, for cross-host merge tests. */
+export function aiVaultSearchHit(overrides: Partial<AiVaultSearchHit> = {}): AiVaultSearchHit {
+  const base = searchHit()
+  const presence = overrides.source?.presence ?? base.source.presence
+  return {
+    ...base,
+    // The wire schema refuses a resume command on a non-present source.
+    ...(presence === 'present' ? {} : { resumeCommand: undefined }),
+    ...overrides
+  }
+}
+
+export function aiVaultSearchResults(
+  args: {
+    hits?: AiVaultSearchHit[]
+    generation?: number
+    hasMore?: boolean
+    truncated?: Partial<Extract<AiVaultSearchResponse, { kind: 'results' }>['truncated']>
+  } = {}
+): Extract<AiVaultSearchResponse, { kind: 'results' }> {
+  const base = searchResults()
+  return {
+    kind: 'results',
+    hits: args.hits ?? base.hits,
+    page: { cursor: null, hasMore: args.hasMore ?? false },
+    generation: args.generation ?? base.generation,
+    truncated: { ...base.truncated, ...args.truncated },
+    durationMs: base.durationMs
+  }
+}
+
 export function fakeSearchService() {
   return {
     search: vi.fn(

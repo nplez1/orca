@@ -66,6 +66,7 @@ export class SessionSearchFileRecords {
         identity.updatedAt,
         rowId
       )
+    this.refreshSessionFts(rowId)
   }
 
   contentHash(rowId: number): SessionContentHash {
@@ -88,6 +89,11 @@ export class SessionSearchFileRecords {
       session.createdAt,
       session.updatedAt,
       session.messageCount,
+      session.totalTokens,
+      session.queuedMessageCount,
+      session.subagentTranscriptCount,
+      session.model,
+      session.modifiedAt,
       session.resumeCommand,
       contentHash.hash,
       contentHash.count
@@ -95,10 +101,35 @@ export class SessionSearchFileRecords {
     this.db
       .prepare(
         `UPDATE sessions SET agent = ?, session_id = ?, file_path = ?, codex_home = ?, title = ?,
-        cwd = ?, cwd_key = ?, branch = ?, created_at = ?, updated_at = ?, message_count = ?, resume_command = ?,
-        content_hash = ?, content_hash_count = ? WHERE id = ?`
+        cwd = ?, cwd_key = ?, branch = ?, created_at = ?, updated_at = ?, message_count = ?,
+        total_tokens = ?, queued_message_count = ?, subagent_transcript_count = ?, model = ?,
+        modified_at = ?, resume_command = ?, content_hash = ?, content_hash_count = ? WHERE id = ?`
       )
       .run(...values, rowId)
+    this.refreshSessionFts(rowId)
+  }
+
+  /**
+   * Mirror a session row into the metadata tier's FTS table.
+   *
+   * It re-reads the row it names instead of taking the values again, so the two
+   * tables cannot disagree about what a session is called no matter which
+   * caller last wrote it. Delete-then-insert because the rowid is the session's
+   * own id: a re-read of one transcript must replace its text, not stack a
+   * second row under that id.
+   */
+  refreshSessionFts(rowId: number): void {
+    this.deleteSessionFts(rowId)
+    this.db
+      .prepare(
+        `INSERT INTO sessions_fts(rowid, title, cwd, branch, agent)
+         SELECT id, title, cwd, branch, agent FROM sessions WHERE id = ?`
+      )
+      .run(rowId)
+  }
+
+  deleteSessionFts(rowId: number): void {
+    this.db.prepare('DELETE FROM sessions_fts WHERE rowid = ?').run(rowId)
   }
 
   upsertFile(

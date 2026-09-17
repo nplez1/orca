@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { resetSessionParseCacheForTests } from '../ai-vault/session-scanner-parse-cache'
 import { resetTranscriptConsumersForTests } from '../ai-vault/session-transcript-consumers'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import SyncDatabase from '../sqlite/sync-database'
 import { SessionSearchInstance } from './session-search-instance'
 import {
   openSessionSearchIndexerHarness,
@@ -47,6 +49,26 @@ function transcriptPath(sessionId: string): string {
   return join(harness.claudeProjectDir, `${sessionId}.jsonl`)
 }
 
+/** Row counts read from the index itself: what the tier is allowed to have kept. */
+function tableRowCount(table: 'messages' | 'sessions_fts'): number {
+  const db = new SyncDatabase(harness.databasePath)
+  try {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: COUNT(*) always returns one row with one numeric column.
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }
+    return row.count
+  } finally {
+    db.close()
+  }
+}
+
+function messageRowCount(): number {
+  return tableRowCount('messages')
+}
+
+function sessionFtsRowCount(): number {
+  return tableRowCount('sessions_fts')
+}
+
 async function searchFor(query: string): Promise<string[]> {
   const response = await instance!.search({ query })
   if (response.kind !== 'results') {
@@ -55,23 +77,40 @@ async function searchFor(query: string): Promise<string[]> {
   return response.hits.map((hit) => hit.sessionId).sort()
 }
 
-it('constructs nothing and touches no disk while the setting is off', async () => {
+it('indexes the history list but keeps no conversation text while content is off', async () => {
   await writeClaudeTranscript(
     transcriptPath(RECENT_SESSION_ID),
     ['a conversation'],
     RECENT_SESSION_ID
   )
   const subject = newInstance()
-  subject.apply({ enabled: false, historyDays: null })
+  subject.apply({ contentEnabled: false, historyDays: null })
   await subject.settled()
 
-  expect(subject.running).toBe(false)
-  expect(existsSync(harness.databasePath)).toBe(false)
-  expect(await subject.search({ query: 'conversation' })).toEqual({
-    kind: 'unavailable',
-    reason: 'disabled'
+  // The metadata tier is the history list's own rows, and it runs without a
+  // consent decision. Content is what needs one.
+  expect(subject.running).toBe(true)
+  expect(existsSync(harness.databasePath)).toBe(true)
+  expect(subject.status()).toMatchObject({ enabled: true, contentEnabled: false })
+  const listed = subject.listSessions({
+    limit: 50,
+    scopePaths: [],
+    executionHostId: LOCAL_EXECUTION_HOST_ID
   })
-  expect(subject.status()).toMatchObject({ enabled: false, phase: 'idle', generation: 0 })
+  expect(listed?.sessions.map((session) => session.sessionId)).toEqual([RECENT_SESSION_ID])
+  // Nothing was read for content, so nothing about it is on disk — while the
+  // metadata search surface still knows the session exists.
+  expect(messageRowCount()).toBe(0)
+  expect(sessionFtsRowCount()).toBe(1)
+
+  // Search answers from that same surface: the consent that keeps message bodies
+  // out is what routes a query to titles and paths, so it must not come back empty.
+  const hits = await subject.search({ query: 'conversation' })
+  expect(hits.kind).toBe('results')
+  if (hits.kind === 'results') {
+    expect(hits.hits.map((hit) => hit.sessionId)).toEqual([RECENT_SESSION_ID])
+    expect(hits.hits[0]?.evidence).toBeNull()
+  }
   expect(errors).toEqual([])
 })
 
@@ -82,12 +121,13 @@ it('indexes and answers once the setting is on', async () => {
     RECENT_SESSION_ID
   )
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
 
   expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
   const status = subject.status()
   expect(status.enabled).toBe(true)
+  expect(status.contentEnabled).toBe(true)
   expect(status.filesIndexed).toBeGreaterThan(0)
   expect(status.generation).toBeGreaterThan(0)
   expect(errors).toEqual([])
@@ -104,53 +144,57 @@ it('closes the live pair and starts a new one on a settings change', async () =>
   await utimes(ancient, longAgo, longAgo)
 
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   expect(await searchFor('ancient')).toEqual([ANCIENT_SESSION_ID])
 
   // Narrowing: the new instance's opening sweep purges what the window no longer covers.
-  subject.apply({ enabled: true, historyDays: 30 })
+  subject.apply({ contentEnabled: true, historyDays: 30 })
   await subject.settled()
   expect(await searchFor('ancient')).toEqual([])
   expect(await searchFor('recent')).toEqual([RECENT_SESSION_ID])
 
   // Widening: the same recipe the other way, admitting files no read ever saw.
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   expect(await searchFor('ancient')).toEqual([ANCIENT_SESSION_ID])
   expect(errors).toEqual([])
 })
 
-it('leaves nothing running and no live claim when the setting goes off', async () => {
+// Closing must release the writer's claim on the path, or nothing can reopen it:
+// the second instance would fail to stake it and report no index at all.
+it('releases the writer claim when closed so a new instance can open it', async () => {
   await writeClaudeTranscript(
     transcriptPath(RECENT_SESSION_ID),
     ['a conversation'],
     RECENT_SESSION_ID
   )
-  const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
-  await subject.settled()
-  expect(subject.running).toBe(true)
+  const first = newInstance()
+  first.apply({ contentEnabled: true, historyDays: null })
+  await first.settled()
+  expect(first.running).toBe(true)
 
-  subject.apply({ enabled: false, historyDays: null })
-  expect(subject.running).toBe(false)
-  // The index is left on disk: disabling is not a deletion, and the claim the
-  // closed indexer staked on the path has to be released or nothing can reopen it.
+  first.close()
+  expect(first.running).toBe(false)
+  // The index is left on disk: closing is not a deletion.
   expect(existsSync(harness.databasePath)).toBe(true)
-  subject.apply({ enabled: true, historyDays: null })
-  await subject.settled()
-  expect(subject.running).toBe(true)
+
+  const second = newInstance()
+  second.apply({ contentEnabled: true, historyDays: null })
+  await second.settled()
+  expect(second.running).toBe(true)
+  expect(await searchFor('conversation')).toEqual([RECENT_SESSION_ID])
   expect(errors).toEqual([])
 })
 
-it('removes the database on clear and rebuilds only while consent stands', async () => {
+it('removes the database on clear and rebuilds it', async () => {
   await writeClaudeTranscript(
     transcriptPath(RECENT_SESSION_ID),
     ['a distinctive conversation'],
     RECENT_SESSION_ID
   )
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
 
@@ -159,11 +203,6 @@ it('removes the database on clear and rebuilds only while consent stands', async
   expect(existsSync(harness.databasePath)).toBe(true)
   await subject.settled()
   expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
-
-  subject.apply({ enabled: false, historyDays: null })
-  subject.clear()
-  expect(subject.running).toBe(false)
-  expect(existsSync(harness.databasePath)).toBe(false)
   expect(errors).toEqual([])
 })
 
@@ -193,7 +232,7 @@ it('keeps pagination stable when the clock crosses retention before a purge', as
     await writeClaudeTranscript(transcriptPath(id), [`distinctive conversation ${id}`], id)
   }
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: 30 })
+  subject.apply({ contentEnabled: true, historyDays: 30 })
   await subject.settled()
   const first = await subject.search({ query: 'distinctive', limit: 1 })
   if (first.kind !== 'results') {

@@ -80,11 +80,16 @@ export class SessionSearchStore {
       console.warn(
         '[ai-vault-search] index write failed:',
         error instanceof Error ? error.name : 'IndexError'
-      )
+      ),
+    /** The content tier; see SessionSearchIndexWriter's constructor for why it defaults on. */
+    storeContent = true
   ) {
     this.db = openSessionSearchDatabase(path)
-    this.writer = new SessionSearchIndexWriter(this.db, SESSION_SEARCH_COMMIT_CHARS, () =>
-      this.scheduleOrphanDrain()
+    this.writer = new SessionSearchIndexWriter(
+      this.db,
+      SESSION_SEARCH_COMMIT_CHARS,
+      () => this.scheduleOrphanDrain(),
+      storeContent
     )
   }
 

@@ -856,12 +856,36 @@ describe('registerSettingsHandlers', () => {
     })
 
     expect(store.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ aiVaultSearch: { enabled: true, historyDays: 30 } }),
+      expect.objectContaining({ aiVaultSearch: { contentEnabled: true, historyDays: 30 } }),
       expect.anything()
     )
     expect(applySessionSearchSettingsChangeMock).toHaveBeenCalledWith(
       before,
-      expect.objectContaining({ aiVaultSearch: { enabled: true, historyDays: 30 } })
+      expect.objectContaining({ aiVaultSearch: { contentEnabled: true, historyDays: 30 } })
+    )
+  })
+
+  // The flag was named `enabled` before the metadata tier existed and named the
+  // same consent, so a write from a client that still spells it that way must not
+  // silently drop the user's opt-in.
+  it('carries a pre-tier session-search opt-in over to the content flag', async () => {
+    const before = { aiVaultSearch: { contentEnabled: false, historyDays: null } }
+    store.getSettings.mockReturnValue(before)
+    store.updateSettings.mockImplementation((args: Partial<GlobalSettings>) => ({
+      ...before,
+      ...args
+    }))
+    registerSettingsHandlers(store as never)
+    const handler = handleMock.mock.calls.find((call) => call[0] === 'settings:set')?.[1] as (
+      event: typeof settingsInvokeEvent,
+      args: unknown
+    ) => Promise<unknown>
+
+    await handler(settingsInvokeEvent, { aiVaultSearch: { enabled: true, historyDays: null } })
+
+    expect(store.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ aiVaultSearch: { contentEnabled: true, historyDays: null } }),
+      expect.anything()
     )
   })
 

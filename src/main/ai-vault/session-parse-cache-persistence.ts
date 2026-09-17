@@ -23,7 +23,6 @@ import {
 import type { SessionSidecarObservation } from './session-sidecar-stat'
 
 // Bump when the persisted entry layout or cached session semantics change; a
-// mismatched file is discarded whole.
 const SCHEMA_VERSION = SESSION_PARSE_CACHE_SCHEMA_VERSION
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500
