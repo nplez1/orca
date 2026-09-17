@@ -67,6 +67,9 @@ export function DeepSeekIcon({ size = 14 }: { size?: number }): React.JSX.Elemen
 // and the width is scaled past `size`: their icon grid carries ~25% vertical padding
 // and the mark itself is 2:1, so at the same width as the whale it rendered ~35%
 // shorter and read as a smaller icon than its neighbours.
+// Why the swatch is hardcoded: the purple is part of the official mark, the same way the Claude
+// orange (#D97757) and the Gemini mark are baked in below. currentColor would inherit the
+// surrounding text colour and lose the identity the mark exists to carry.
 export function FireworksIcon({ size = 14 }: { size?: number }): React.JSX.Element {
   const width = Math.round(size * 1.25)
   const height = Math.round((width * 15.8065) / 32)

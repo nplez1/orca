@@ -147,7 +147,7 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
               fireworksCredentialBusy ||
               (!fireworksApiKeyDraft.trim() && !fireworksApiKeyConfigured)
             }
-            className="h-7 shrink-0 text-xs"
+            className="h-7 shrink-0"
           >
             {fireworksCredentialBusy ? <Loader2 className="size-3 animate-spin" /> : null}
             {fireworksApiKeyConfigured
@@ -166,7 +166,7 @@ export function renderFireworksAccountsSection(model: AccountsPaneSectionModel):
               size="xs"
               onClick={() => void clearFireworksCredentials()}
               disabled={fireworksCredentialBusy}
-              className="h-7 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
             >
               {translate(
                 'auto.components.settings.accounts.pane.fireworks.section.545da4ee6c',
