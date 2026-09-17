@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
@@ -19,6 +20,13 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.appId).toBe(
       require('../../src/shared/local-build-compatibility-contract.json').appId
     )
+  })
+
+  it('drives the packaged product name from the shared display name', () => {
+    // The config is CommonJS and cannot import the TypeScript constant, so this is what keeps the
+    // bundle name (macOS app menu, Dock, install path) from drifting away from what the running app
+    // shows in its own window.
+    expect(electronBuilderConfig.productName).toBe(APP_DISPLAY_NAME)
   })
 
   it('excludes repo-only source trees from app.asar', () => {
