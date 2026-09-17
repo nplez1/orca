@@ -6,10 +6,12 @@ import { readFirstString } from './interactive-tool'
 import {
   isDescendantScopeResetEvent,
   providerOwnsDescendantLifecycle,
-  readDescendantEventFacts
+  readDescendantEventFacts,
+  readPiDescendantLiveSetField
 } from './descendant-events'
 import {
   applyDescendantEventToPane,
+  applyDescendantLiveSet,
   clearDescendantScope,
   gatePaneStateOnDescendants
 } from './descendant-pane-state'
@@ -78,6 +80,12 @@ export function normalizeProviderEvent(input: {
         hasTranscriptPromptEvidence: false,
         descendantScoped: true
       }
+    }
+    // Why: a pi pane rides its live child set on every post, so an add the transport coalesced
+    // away is repaired by the next event instead of leaving the pane blind to its own child.
+    const liveSet = readPiDescendantLiveSetField(source, hookPayload)
+    if (liveSet) {
+      applyDescendantLiveSet(state, paneKey, liveSet)
     }
   }
 
