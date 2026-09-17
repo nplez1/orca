@@ -6,6 +6,10 @@ import {
 } from '../../shared/ai-vault-types'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import {
+  aiVaultHostListQuery,
+  aiVaultSessionsMatchingQuery
+} from '../../shared/ai-vault-session-filters'
+import {
   getSshFilesystemProvider,
   SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
 } from '../providers/ssh-filesystem-dispatch'
@@ -59,6 +63,10 @@ async function scanOneSshHost(
   // paths — or skip the truncation notice — than the relay leg would.
   const scopePaths = args?.scopePaths?.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT)
   const scopePathsTruncated = (args?.scopePaths?.length ?? 0) > AI_VAULT_SCOPE_PATHS_MAX_COUNT
+  // Reduced again here, and not only on the client: this leg's rows have never been
+  // through a host that could key an operator query, so an unreduced one must not
+  // leave the machine.
+  const query = aiVaultHostListQuery(args?.query ?? '')
   let relayError: unknown
   const relayTimeoutMs = options.relayTimeoutMs ?? options.timeoutMs
   try {
@@ -67,7 +75,8 @@ async function scanOneSshHost(
       ...(args?.unlimited === true ? { unlimited: true } : {}),
       ...(args?.force === true ? { force: true } : {}),
       scopePaths,
-      ...(scopePathsTruncated ? { scopePathsTruncated: true } : {})
+      ...(scopePathsTruncated ? { scopePathsTruncated: true } : {}),
+      ...(query ? { query } : {})
     }
     const relayResult =
       options.signal || relayTimeoutMs !== undefined
@@ -130,15 +139,21 @@ async function scanOneSshHost(
     : []
   // An empty remote home and "the relay method failed and the crawl found
   // nothing" look identical, so a fallback that recovered nothing still reports
-  // the relay error instead of presenting a broken relay as an empty host.
-  if (!relayError || fallbackResult.sessions.length > 0) {
-    return { ...fallbackResult, issues: [...fallbackResult.issues, ...scopeIssues] }
+  // the relay error instead of presenting a broken relay as an empty host. The
+  // recovered count is the unfiltered one on purpose: a crawl that found sessions
+  // and a query that matched none of them is not a failed relay.
+  const recovered = fallbackResult.sessions.length > 0
+  const narrowedFallback: AiVaultListResult = query
+    ? { ...fallbackResult, sessions: aiVaultSessionsMatchingQuery(fallbackResult.sessions, query) }
+    : fallbackResult
+  if (!relayError || recovered) {
+    return { ...narrowedFallback, issues: [...narrowedFallback.issues, ...scopeIssues] }
   }
   return {
-    ...fallbackResult,
+    ...narrowedFallback,
     issues: [
       ...sshScanIssueResult(executionHostId, targetId, errorMessage(relayError)).issues,
-      ...fallbackResult.issues,
+      ...narrowedFallback.issues,
       ...scopeIssues
     ]
   }
