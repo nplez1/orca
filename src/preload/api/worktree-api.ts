@@ -102,6 +102,8 @@ export type WorktreeApi = {
     // Why (#19334): distinct from `skipArchive` (never runs the hook) and never implied by
     // `force` — this waives a hook that ran and FAILED.
     allowFailedArchiveHook?: boolean
+    /** Opt-in `git push --delete` of the branch's upstream. */
+    deleteRemoteBranch?: boolean
     snapshotPruneBatchId?: string
   }) => Promise<RemoveWorktreeResult>
   // Forget a workspace from Orca only (no remote Git/FS work) — for workspaces pinned to a removed/disconnected SSH host.

@@ -42,6 +42,7 @@ export class OrcaRuntimeWithRemoveManagedWorktree extends OrcaRuntimeWithCreateM
       runHooks = false,
       allowUnverifiedPtyStop = false,
       allowFailedArchiveHook = false,
+      deleteRemoteBranch = false,
       hostId
     } = options
     if (!this.store) {
@@ -54,12 +55,7 @@ export class OrcaRuntimeWithRemoveManagedWorktree extends OrcaRuntimeWithCreateM
       worktreeId: removalTarget.id,
       hostId: cleanupHostId
     })
-    const optionsKey = getRuntimeWorktreeRemovalOptionsKey({
-      force,
-      runHooks,
-      allowUnverifiedPtyStop,
-      allowFailedArchiveHook
-    })
+    const optionsKey = getRuntimeWorktreeRemovalOptionsKey(options)
     const inFlightRemoval = this.removeManagedWorktreeInFlight.get(
       cleanupScopeKey,
       removalTarget.id,
@@ -214,6 +210,7 @@ export class OrcaRuntimeWithRemoveManagedWorktree extends OrcaRuntimeWithCreateM
             force,
             allowUnverifiedPtyStop,
             deleteBranch,
+            deleteRemoteBranch,
             acquireWatcherRemoval: this.acquireFileWatcherRemoval,
             stopPtys: () =>
               this.stopPtysForDestructiveWorktreeRemoval(removalTarget.id, {
@@ -257,6 +254,7 @@ export class OrcaRuntimeWithRemoveManagedWorktree extends OrcaRuntimeWithCreateM
           allowFailedArchiveHook,
           allowUnverifiedPtyStop,
           deleteBranch,
+          deleteRemoteBranch,
           acquireWatcherRemoval: this.acquireFileWatcherRemoval,
           stopPtys: () =>
             this.stopPtysForDestructiveWorktreeRemoval(removalTarget.id, {

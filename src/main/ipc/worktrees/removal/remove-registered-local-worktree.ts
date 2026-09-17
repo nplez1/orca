@@ -61,7 +61,8 @@ export async function removeRegisteredLocalWorktree(
   removedPushTarget: GitPushTarget | undefined,
   localWorktreeGitOptions: LocalProjectWorktreeGitOptions,
   hasLocalWorktreeGitOptions: boolean,
-  deleteBranch: boolean
+  deleteBranch: boolean,
+  deleteRemoteBranch: boolean
 ): Promise<RemoveWorktreeResult> {
   const { mainWindow, store, runtime } = context
   const refreshedWorktrees = hasLocalWorktreeGitOptions
@@ -132,6 +133,7 @@ export async function removeRegisteredLocalWorktree(
     try {
       const removeOptions = {
         ...(!deleteBranch ? { deleteBranch } : {}),
+        ...(deleteRemoteBranch ? { deleteRemoteBranch: true } : {}),
         // Why: reuse the authoritative worktree list already computed here instead of rescanning siblings on the hot delete path.
         knownRemovedWorktree: refreshedRegisteredWorktree,
         ...(hasLocalWorktreeGitOptions ? localWorktreeGitOptions : {})

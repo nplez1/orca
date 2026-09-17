@@ -115,7 +115,7 @@ export async function executeWorktreeRemoval(
     resolveWorktreeRemovalHomeForHost(removalHostId)
   )
   if (!registeredWorktree) {
-    return removeUnregisteredWorktree(
+    const unregisteredResult = await removeUnregisteredWorktree(
       context,
       args,
       repo,
@@ -128,10 +128,19 @@ export async function executeWorktreeRemoval(
       localWorktreeGitOptions,
       provider
     )
+    // Why: this path has no local branch to delete, so the paired remote branch is deliberately
+    // left alone. Say that rather than reporting nothing for a box the user ticked.
+    return args.deleteRemoteBranch === true
+      ? {
+          ...unregisteredResult,
+          remoteBranchCleanup: { status: 'skipped-preserved' as const }
+        }
+      : unregisteredResult
   }
   const canonicalWorktreePath = registeredWorktree.path
 
   const deleteBranch = removedMeta?.preserveBranchOnDelete !== true
+  const deleteRemoteBranch = args.deleteRemoteBranch === true
 
   try {
     assertWorktreeUnlockedForRemoval(registeredWorktree)
@@ -182,7 +191,12 @@ export async function executeWorktreeRemoval(
     )
     invalidateAuthorizedRootsCache()
     notifyWorktreesChanged(mainWindow, repoId)
-    return removalResult ?? {}
+    // Why: this path prunes a registration and never deletes the local branch, so the paired
+    // remote branch is deliberately left alone — say so rather than reporting nothing.
+    const staleResult = removalResult ?? {}
+    return deleteRemoteBranch
+      ? { ...staleResult, remoteBranchCleanup: { status: 'skipped-preserved' as const } }
+      : staleResult
   }
 
   // No connectionId override here, deliberately: this path derives its host from the repo row
@@ -234,7 +248,8 @@ export async function executeWorktreeRemoval(
         registeredWorktree,
         removedPushTarget,
         provider!,
-        deleteBranch
+        deleteBranch,
+        deleteRemoteBranch
       )
     : await removeRegisteredLocalWorktree(
         context,
@@ -246,7 +261,8 @@ export async function executeWorktreeRemoval(
         removedPushTarget,
         localWorktreeGitOptions,
         hasLocalWorktreeGitOptions,
-        deleteBranch
+        deleteBranch,
+        deleteRemoteBranch
       )
   return archiveHookOverride ? { ...result, archiveHookOverride } : result
 }

@@ -24,6 +24,8 @@ export type RemoveWorktreeArgs = {
   /** Explicit waiver for a FAILED archive hook (#19334). Distinct from `skipArchive`, which
    *  never runs the hook at all, and never implied by `force`. */
   allowFailedArchiveHook?: boolean
+  /** Opt-in `git push --delete` of the branch's upstream, cleared only by the delete dialog. */
+  deleteRemoteBranch?: boolean
   snapshotPruneBatchId?: string
 }
 
