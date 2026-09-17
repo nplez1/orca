@@ -73,6 +73,10 @@ function consumeCopilotRecordLine(accumulator: SessionAccumulator, line: string)
     if (sessionId) {
       accumulator.sessionId = sessionId
     }
+    // Why: the session's representative cwd is its START directory (first-wins,
+    // like updateLatestLocation). `context.cwd` is the authoritative field the
+    // CLI records; a folder_trust message is only the legacy stand-in.
+    accumulator.cwd ??= extractString(asRecord(data.context)?.cwd)
     updateTimeline(accumulator, extractString(data.startTime))
     return
   }
@@ -81,7 +85,9 @@ function consumeCopilotRecordLine(accumulator: SessionAccumulator, line: string)
     return
   }
   if (record.type === 'session.info' && data) {
-    accumulator.cwd = extractTrustedFolder(data.message) ?? accumulator.cwd
+    // Why: never let a later trust message move the session to another folder —
+    // that misattributes it to the wrong workspace and drops it from its own.
+    accumulator.cwd ??= extractTrustedFolder(data.message)
     return
   }
   if (record.type === 'user.message' && data) {

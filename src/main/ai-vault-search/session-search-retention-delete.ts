@@ -43,6 +43,11 @@ export async function deleteExpiredSearchFiles(
           .prepare('SELECT session_row_id FROM files WHERE path = ? AND mtime_ms < ?')
           .get(path, cutoffMs) as { session_row_id: number | null } | undefined
         if (file) {
+          // The metadata FTS row names this session by rowid, so it has to go in
+          // the same transaction: `sessions.id` is AUTOINCREMENT and never reused,
+          // so a row left behind could never be reclaimed and would grow the
+          // table with every purge for the life of the profile.
+          db.prepare('DELETE FROM sessions_fts WHERE rowid = ?').run(file.session_row_id)
           db.prepare('DELETE FROM sessions WHERE id = ?').run(file.session_row_id)
           db.prepare('DELETE FROM files WHERE path = ?').run(path)
         }

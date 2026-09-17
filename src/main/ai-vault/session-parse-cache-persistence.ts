@@ -14,7 +14,12 @@ import {
 import type { SessionSidecarObservation } from './session-sidecar-stat'
 
 // Bump when the persisted entry layout or cached session semantics change; a
-// mismatched file is discarded whole.
+// mismatched file is discarded whole. Two lineages reached 3 independently and
+// both mean the same thing to any reader — a row written before it must not be
+// replayed — so one marker covers both: schema 3 moved Copilot's cached `cwd` to
+// the session.start context/first folder_trust (the rows schema 2 wrote carry the
+// wrong workspace), and upstream's Devin parse/sidecar changes made its cached
+// sessions wrong for the same reason.
 const SCHEMA_VERSION = 3
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AiVaultSession } from './ai-vault-types'
 import {
+  AI_VAULT_SESSION_FILTER_QUERY_MAX_BYTES,
   agentLabel,
+  aiVaultHostListQuery,
+  aiVaultSessionsMatchingQuery,
   filterAiVaultSessions,
   folderGroupKey,
   folderLabel,
@@ -198,6 +201,75 @@ describe('/shared ai-vault-session-filters (lifted core)', () => {
 
   it('builds preview search text from conversation turns', () => {
     expect(sessionPreviewSearchText(baseSession)).toContain('scope tabs')
+  })
+})
+
+describe('/shared ai-vault-session-filters (host list query)', () => {
+  it('passes plain text through trimmed', () => {
+    expect(aiVaultHostListQuery('  vault filters  ')).toBe('vault filters')
+  })
+
+  it('returns empty for an empty or whitespace-only query', () => {
+    expect(aiVaultHostListQuery('')).toBe('')
+    expect(aiVaultHostListQuery('   ')).toBe('')
+  })
+
+  it('refuses an operator query, which a host cannot key', () => {
+    expect(aiVaultHostListQuery('path:/repo')).toBe('')
+    expect(aiVaultHostListQuery('repo:owner/name')).toBe('')
+    expect(aiVaultHostListQuery('vault repo:orca')).toBe('')
+  })
+
+  it('leaves an operator-looking token that is not at a token start as plain text', () => {
+    // The operator reader is anchored at a token start, so a URL is not an operator.
+    expect(aiVaultHostListQuery('see https://h/path:x')).toBe('see https://h/path:x')
+  })
+
+  it('refuses a query past the byte bound and keeps one exactly at it', () => {
+    const atBound = 'a'.repeat(AI_VAULT_SESSION_FILTER_QUERY_MAX_BYTES)
+    expect(aiVaultHostListQuery(atBound)).toBe(atBound)
+    expect(aiVaultHostListQuery(`${atBound}a`)).toBe('')
+  })
+})
+
+describe('/shared ai-vault-session-filters (host-side term matching)', () => {
+  const matched = (query: string): string[] =>
+    aiVaultSessionsMatchingQuery([baseSession, otherSession], query).map((session) => session.id)
+
+  it('requires every term, and returns the input when there is none', () => {
+    expect(matched('vault filters')).toEqual(['claude:1'])
+    expect(matched('vault missing')).toEqual([])
+    // No terms is not "match nothing" — the input is returned unchanged.
+    expect(aiVaultSessionsMatchingQuery([baseSession], '   ')).toEqual([baseSession])
+  })
+
+  it('matches title, cwd, branch, agent and file path', () => {
+    expect(matched('implement')).toEqual(['claude:1'])
+    expect(matched('ada/repo/app')).toEqual(['claude:1'])
+    expect(matched('feature/vault')).toEqual(['claude:1'])
+    expect(matched('codex')).toEqual(['codex:2'])
+    expect(matched('session-1.jsonl')).toEqual(['claude:1'])
+  })
+
+  it('is case-insensitive, like the panel filter it mirrors', () => {
+    expect(matched('IMPLEMENT VAULT')).toEqual(['claude:1'])
+  })
+
+  // Reported: this helper delegates to `matchesQuery`, which reads
+  // Preview text is transcript content a metadata answer does not carry, so the
+  // host's filter must ignore it: if it did not, the scanner fallback would match
+  // rows the index path cannot, and which path answered would change what a search
+  // returns.
+  it('does not match text that only appears in preview turns', () => {
+    const previewOnly: AiVaultSession = {
+      ...baseSession,
+      previewMessages: [{ role: 'user', text: 'pomegranate', timestamp: null }]
+    }
+
+    // The text is in the row's previews and nowhere in its metadata, which is
+    // exactly the surface a host answer does not carry.
+    expect(sessionPreviewSearchText(previewOnly)).toContain('pomegranate')
+    expect(aiVaultSessionsMatchingQuery([previewOnly], 'pomegranate')).toEqual([])
   })
 })
 
