@@ -17,6 +17,7 @@
       "332dbfa497": "Workspace uploaded",
       "3443924e91": "automations",
       "4f08ae8311": "tasks",
+      "5096cbbc86": "Orca",
       "62ca9895a7": "space",
       "844eb0f4f4": "activity",
       "9f0152563e": "mobile",
@@ -250,7 +251,8 @@
           "ff5db28639": "existing"
         },
         "AutomationEditorDialogHeader": {
-          "4c8e1a72b9": "A recurring agent task"
+          "4c8e1a72b9": "A recurring agent task",
+          "6f309eef8d": "Orca"
         },
         "AutomationRunHistory": {
           "fdb3caa8fb": "known"
@@ -708,6 +710,9 @@
           }
         },
         "slides": {
+          "HomeSlide": {
+            "5d94e8ddcc": "Orca"
+          },
           "WorktreeListSlide": {
             "c5ad56786d": "spinner"
           }
@@ -737,6 +742,7 @@
         "OnboardingFlow": {
           "35bbaf5ae0": "notifications",
           "984338477a": "theme",
+          "a249f81538": "Orca",
           "a5e5da02f7": "integrations",
           "c47e1bd149": "agent",
           "ff92d15436": "Orca will notify you know when agents are done or need help."
@@ -2333,6 +2339,7 @@
           },
           "ResourceUsageStatusSegment": {
             "1b24a32d3a": "Memory",
+            "288a4dd177": "Orca",
             "4bb076fa89": "Kill",
             "6449a95c78": "How much of this machine's physical RAM the Orca-tracked processes are sitting on.",
             "6d9793d4bc": "Resource Manager - Terminals",
@@ -2996,6 +3003,9 @@
         "title": "Browse through SSH workspace hosts"
       }
     }
+  },
+  "tray": {
+    "activityWaiting": "Orca - activity waiting"
   },
   "worktreeJumpPalette": {
     "filter": {

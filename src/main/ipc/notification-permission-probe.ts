@@ -1,4 +1,5 @@
 import { Notification } from 'electron'
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import type { NotificationDeliveryProbeResult } from '../../shared/notification-settings-types'
 import { activeNotifications } from './native-notification-lifecycle'
 
@@ -44,7 +45,7 @@ export function probeNotificationDelivery(): Promise<NotificationDeliveryProbeRe
   permissionDialogTriggeredThisSession = true
 
   const probe = new Notification({
-    title: 'Orca notifications are on',
+    title: `${APP_DISPLAY_NAME} notifications are on`,
     body: 'Orca will alert you when agents finish or terminals need attention.',
     silent: true
   })

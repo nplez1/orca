@@ -1,4 +1,5 @@
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
+import { APP_DISPLAY_NAME } from '../../../shared/app-display-name'
 import type { WebPairingOffer } from './web-pairing'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { translate } from '@/i18n/i18n'
@@ -75,7 +76,7 @@ export function createStoredWebRuntimeEnvironment(args: {
   const compatibleEnvironmentIds = getCompatibleEnvironmentIds(args.previousEnvironment, args.offer)
   return {
     id,
-    name: args.name.trim() || 'Orca Server',
+    name: args.name.trim() || `${APP_DISPLAY_NAME} Server`,
     createdAt: now,
     updatedAt: now,
     lastUsedAt: null,

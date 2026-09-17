@@ -4,6 +4,7 @@ import { isEditableTarget } from '@/lib/editable-target'
 import { getScreenSubmitModifierLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-display-name'
 import { AgentStep } from './AgentStep'
 import { ThemeStep } from './ThemeStep'
 import { NotificationStep } from './NotificationStep'
@@ -232,9 +233,7 @@ export default function OnboardingFlow({
                 aria-hidden="true"
                 className="h-7 w-auto shrink-0 invert dark:invert-0"
               />
-              <span>
-                {translate('auto.components.onboarding.OnboardingFlow.a249f81538', 'Orca')}
-              </span>
+              <span>{APP_DISPLAY_NAME}</span>
             </div>
 
             <div className="mt-10 flex items-center gap-2 transition-[margin-top] duration-[760ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none">
