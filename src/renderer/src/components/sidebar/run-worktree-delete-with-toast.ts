@@ -5,6 +5,7 @@ import { translate } from '@/i18n/i18n'
 import type { WorktreeRemovalTarget } from '../../../../shared/worktree/removal'
 import { prepareActiveWorktreeFocusAfterDelete } from './active-worktree-focus-after-delete'
 import { showDeleteWorktreeFailureToast } from './delete-worktree-failure-toast'
+import { showRemoteBranchCleanupNotice } from './remote-branch-cleanup-toast'
 import type { WorktreeDeleteWithToastOptions } from './worktree-delete-request'
 import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
 
@@ -36,6 +37,7 @@ export function runWorktreeDeleteWithToast(
 
   const removeOptions = {
     ...(options.suppressPreservedBranchToast ? { suppressPreservedBranchToast: true } : {}),
+    ...(options.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {}),
     ...(options.snapshotPruneBatchId ? { snapshotPruneBatchId: options.snapshotPruneBatchId } : {})
   }
   const showFailureToast = (
@@ -150,6 +152,11 @@ export function runWorktreeDeleteWithToast(
               ? { runtimeEnvironmentId: result.preservedBranch.runtimeEnvironmentId }
               : {})
           })
+        }
+        // Why: only present when the user opted in, so a reported outcome always answers a choice
+        // they made — including the "an older relay never saw it" case.
+        if (result.remoteBranchCleanup) {
+          showRemoteBranchCleanupNotice(worktreeName, result.remoteBranchCleanup)
         }
         if (focusSuccessor) {
           commitFocus()
