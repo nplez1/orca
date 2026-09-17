@@ -18,7 +18,7 @@ import {
   normalizeExecutionHostScope,
   toRuntimeExecutionHostId
 } from '../../../../shared/execution-host'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId, ExecutionHostScope } from '../../../../shared/execution-host'
 import { callRuntimeResult } from './web-runtime-calls'
 import { requireActiveEnvironment } from './web-runtime-session'
 import { noopUnsubscribe } from './web-storage'
@@ -93,7 +93,17 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
 }
 
 // An unparseable id must not normalize into the everything-scope and answer anyway.
-function addressesOwnRuntime(executionHostScope: ExecutionHostId | undefined): boolean {
+/**
+ * Whether a search addresses the one runtime this browser is paired with.
+ *
+ * `all` is false on purpose: the web surface has no merger and cannot reach a
+ * second host, so it answers an all-hosts request the same way it answers a host
+ * it does not own rather than pretending to merge one.
+ */
+function addressesOwnRuntime(executionHostScope: ExecutionHostScope | undefined): boolean {
+  if (executionHostScope === 'all') {
+    return false
+  }
   const ownRuntimeId = toRuntimeExecutionHostId(requireActiveEnvironment().id)
   return (
     executionHostScope === undefined ||

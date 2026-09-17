@@ -68,7 +68,8 @@ describe('web session search preload compatibility', () => {
       })
       expect(await api.searchStatus(scope)).toEqual(unavailableSessionSearchStatus())
     }
-    // @ts-expect-error All-host search is deliberately outside the public API.
+    // All-host search is deliberately outside the web surface: the type now
+    // admits it, so what keeps it out is this answer, not the compiler.
     expect(await api.searchSessions({ query: 'needle' }, 'all')).toEqual({
       kind: 'unavailable',
       reason: 'no-service'

@@ -1,4 +1,6 @@
 import { requestSessionSearchRoots } from './session-scanner-service-root-request'
+import type { AiVaultListResult } from '../../shared/ai-vault-types'
+import { aiVaultSessionsMatchingQuery } from '../../shared/ai-vault-session-filters'
 import type { AiVaultSessionTitle } from '../../shared/ai-vault-session-title'
 import { readAiVaultFirstUserPrompt } from './session-first-user-prompt-read'
 import {
@@ -43,6 +45,17 @@ function send(message: AiVaultServiceChildMessage): void {
 
 function titleKey(request: { agent: string; sessionId: string }): string {
   return `${request.agent}\0${request.sessionId}`
+}
+
+/** A scanner result narrowed by the plain-text query, which the scanner cannot apply. */
+function filteredScanResult(
+  result: AiVaultListResult,
+  query: string | undefined
+): AiVaultListResult {
+  if (!query) {
+    return result
+  }
+  return { ...result, sessions: aiVaultSessionsMatchingQuery(result.sessions, query) }
 }
 
 async function executeRequest(request: AiVaultServiceRequest): Promise<AiVaultServiceResultValue> {
@@ -90,7 +103,24 @@ async function executeRequest(request: AiVaultServiceRequest): Promise<AiVaultSe
       }
     }
     const startedAt = performance.now()
-    const result = await scanAiVaultSessions({ ...request.options, signal: controller.signal })
+    // Index first, scanner second: the index already holds one row per session,
+    // so a list is one indexed read instead of a walk and a parse of every
+    // transcript on the machine. Null means this host cannot answer from it yet
+    // (no SQLite, or no pass has completed), which is the fallback's whole job.
+    const indexed = await sessionSearch.listSessions(
+      request.options,
+      request.refresh === true,
+      request.query
+    )
+    // The scanner has no index to filter with, so the same query is applied to its
+    // rows here: a caller must not have to know which of the two answered, and an
+    // unfiltered answer would read as "everything matches".
+    const result =
+      indexed ??
+      filteredScanResult(
+        await scanAiVaultSessions({ ...request.options, signal: controller.signal }),
+        request.query
+      )
     for (const session of result.sessions) {
       if ((session.agent === 'claude' || session.agent === 'codex') && session.title.trim()) {
         cacheServiceTitle(titleIndex, {
@@ -197,6 +227,9 @@ process.on('message', (raw: AiVaultServiceParentMessage) => {
       invalidatedPaths.add(path)
       invalidateSessionParseCacheEntry(path)
     }
+    // A delete must not leave a ghost row behind until the next pass notices the
+    // file is gone; the caller already expects it out of the list when this returns.
+    sessionSearch.forgetSources(raw.paths)
     while (invalidatedPaths.size > 4_096) {
       const oldest = invalidatedPaths.values().next().value
       if (oldest === undefined) {

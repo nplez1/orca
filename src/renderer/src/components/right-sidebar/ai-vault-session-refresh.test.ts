@@ -73,11 +73,13 @@ function HookProbe(props: {
   scopePaths: readonly string[]
   executionHostScope?: ExecutionHostScope
   sessionLimit?: AiVaultSessionLimit
+  hostQuery?: string
 }): null {
   latest = useAiVaultSessionRefresh(
     props.scopePaths,
     props.executionHostScope ?? 'local',
-    props.sessionLimit ?? DEFAULT_AI_VAULT_SESSION_LIMIT
+    props.sessionLimit ?? DEFAULT_AI_VAULT_SESSION_LIMIT,
+    props.hostQuery ?? ''
   )
   return null
 }
@@ -85,28 +87,34 @@ function HookProbe(props: {
 async function renderHook(
   scopePaths: readonly string[] = [],
   executionHostScope: ExecutionHostScope = 'local',
-  sessionLimit: AiVaultSessionLimit = DEFAULT_AI_VAULT_SESSION_LIMIT
+  sessionLimit: AiVaultSessionLimit = DEFAULT_AI_VAULT_SESSION_LIMIT,
+  hostQuery = ''
 ): Promise<void> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   roots.push(root)
   await act(async () => {
-    root.render(createElement(HookProbe, { scopePaths, executionHostScope, sessionLimit }))
+    root.render(
+      createElement(HookProbe, { scopePaths, executionHostScope, sessionLimit, hostQuery })
+    )
   })
 }
 
 async function rerenderHook(
   scopePaths: readonly string[] = [],
   executionHostScope: ExecutionHostScope = 'local',
-  sessionLimit: AiVaultSessionLimit = DEFAULT_AI_VAULT_SESSION_LIMIT
+  sessionLimit: AiVaultSessionLimit = DEFAULT_AI_VAULT_SESSION_LIMIT,
+  hostQuery = ''
 ): Promise<void> {
   const root = roots.at(-1)
   if (!root) {
     throw new Error('renderHook must be called before rerenderHook')
   }
   await act(async () => {
-    root.render(createElement(HookProbe, { scopePaths, executionHostScope, sessionLimit }))
+    root.render(
+      createElement(HookProbe, { scopePaths, executionHostScope, sessionLimit, hostQuery })
+    )
   })
 }
 
@@ -682,6 +690,48 @@ describe('useAiVaultSessionRefresh refocus behavior', () => {
     await fireWindowFocused()
     expect(listSessionsMock).toHaveBeenCalledTimes(3)
     expect(lastCallArgs()).toMatchObject({ force: false })
+  })
+})
+
+describe('useAiVaultSessionRefresh host query', () => {
+  it('carries the host query to the scan, and omits the key entirely without one', async () => {
+    await renderHook([], 'local', DEFAULT_AI_VAULT_SESSION_LIMIT, 'vault')
+    await flushMicrotasks()
+
+    expect(listSessionsMock).toHaveBeenCalledTimes(1)
+    expect(lastCallArgs()).toMatchObject({ query: 'vault' })
+
+    roots.splice(0).forEach((root) => act(() => root.unmount()))
+    await renderHook()
+    await flushMicrotasks()
+
+    expect(listSessionsMock).toHaveBeenCalledTimes(2)
+    // Omitted rather than empty: an absent filter is not one that matches nothing.
+    expect(lastCallArgs()).not.toHaveProperty('query')
+  })
+
+  it('re-scans when the host query changes instead of serving the cached unfiltered result', async () => {
+    listSessionsMock.mockResolvedValueOnce({
+      ...EMPTY_RESULT,
+      sessions: [makeVaultSession(1)]
+    })
+    await renderHook()
+    await flushMicrotasks()
+    expect(latest?.sessions).toHaveLength(1)
+
+    listSessionsMock.mockResolvedValueOnce({
+      sessions: [makeVaultSession(2)],
+      issues: [],
+      scannedAt: '2026-07-01T00:00:05.000Z'
+    })
+    await rerenderHook([], 'local', DEFAULT_AI_VAULT_SESSION_LIMIT, 'vault')
+    await flushMicrotasks()
+
+    // The query is part of the scan key, so the cached unfiltered result cannot
+    // answer this: a hit would have skipped the second request entirely.
+    expect(listSessionsMock).toHaveBeenCalledTimes(2)
+    expect(lastCallArgs()).toMatchObject({ query: 'vault' })
+    expect(latest?.sessions.map((session) => session.id)).toEqual(['session-2'])
   })
 })
 

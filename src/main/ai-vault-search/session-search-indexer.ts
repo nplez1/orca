@@ -137,7 +137,11 @@ export class SessionSearchIndexer {
     // path owned by an object that does not exist, and every later attempt at
     // it -- including the one that fixes whatever broke the open -- would be
     // refused for the life of the process.
-    this.store = new SessionSearchStore(options.databasePath, onError)
+    this.store = new SessionSearchStore(
+      options.databasePath,
+      onError,
+      options.contentEnabled !== false
+    )
     liveIndexerPaths.add(this.ownershipPath)
     this.store.setRetentionCutoffMs(this.cutoffMs())
     this.unregister = registerSessionSearchIndexConsumer(this.store)
@@ -180,6 +184,24 @@ export class SessionSearchIndexer {
    * which is the point: nothing is counted as it happens, so nothing can drift
    * from what the database actually holds or need a rule about when to reset.
    */
+  /**
+   * Forget sources the caller has proven gone (a session deleted from the panel),
+   * rather than waiting for the next pass to notice a missing file. Removal also
+   * fences any read of that path still in flight, so a concurrent pass cannot
+   * resurrect the row it just dropped.
+   */
+  forgetSources(paths: readonly string[]): void {
+    for (const path of paths) {
+      try {
+        this.store.removeFile(path)
+      } catch (error) {
+        // A failed removal must not abort the caller's delete: the pass will
+        // notice the file is gone and retire the row the ordinary way.
+        this.onError(error)
+      }
+    }
+  }
+
   status(): SessionSearchIndexStatus {
     // A closed indexer reports what it last knew: opening a shut handle to
     // answer a call whose whole job is to describe what happened is how a close

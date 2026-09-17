@@ -61,6 +61,16 @@ export const AiVaultSearchTruncationSchema = z.object({
   query: z.boolean(),
   freshness: z.boolean()
 })
+// Fixed vocabulary for a merged page. Loss of contact is `unavailable`, never a
+// dead/exited verdict, and a raw transport message would carry host paths to a
+// client — see docs/reference/ssh-execution-boundary.md.
+export const AiVaultSearchHostStatusSchema = z.object({
+  executionHostId: z.string().min(1),
+  outcome: z.enum(['contributed', 'unavailable', 'error']),
+  reason: z
+    .enum(['no-service', 'disabled', 'not-ready', 'timeout', 'failed', 'malformed'])
+    .optional()
+})
 const routeSchema = z.enum(['phrase', 'and', 'or', 'typo+phrase', 'typo+and', 'typo+or'])
 export const AiVaultSearchPlannerReportSchema = z.object({
   route: routeSchema,
@@ -80,6 +90,9 @@ export const AiVaultSearchResponseSchema = z.discriminatedUnion('kind', [
     generation: z.number().int().nonnegative(),
     truncated: AiVaultSearchTruncationSchema,
     durationMs: z.number().nonnegative(),
+    // Additive and optional (remote-wire rule 1): only an all-hosts merge fills
+    // it, and a single-host answer or an older host omits it.
+    hosts: z.array(AiVaultSearchHostStatusSchema).optional(),
     debug: AiVaultSearchDebugSchema.optional()
   }),
   z.object({
@@ -96,6 +109,10 @@ export const AiVaultSearchResponseSchema = z.discriminatedUnion('kind', [
 export const AiVaultSearchStatusRequestSchema = z.object({})
 export const AiVaultSearchStatusSchema = z.object({
   enabled: z.boolean(),
+  // Additive and optional: a host that predates the metadata/content split
+  // reports neither, and a client must not fail its status read over that.
+  // Absent means "content search was not consented on that host".
+  contentEnabled: z.boolean().optional(),
   phase: z.enum(['idle', 'indexing', 'current', 'degraded', 'closed']),
   filesIndexed: z.number().int().nonnegative(),
   filesDue: z.number().int().nonnegative(),

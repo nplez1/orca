@@ -8,7 +8,10 @@ import {
   normalizeRuntimePathSeparators
 } from './cross-platform-path'
 import { isClipboardTextByteLengthOverLimit } from './clipboard-text'
-import { splitAiVaultSearchQuery } from './ai-vault-search-query-operators'
+import {
+  hasAiVaultSearchQueryOperators,
+  splitAiVaultSearchQuery
+} from './ai-vault-search-query-operators'
 import { parseWslUncPath } from './wsl-paths'
 import type {
   AiVaultAgent,
@@ -68,6 +71,42 @@ export function isAiVaultSessionFilterQueryTooLarge(
   maxBytes = AI_VAULT_SESSION_FILTER_QUERY_MAX_BYTES
 ): boolean {
   return isClipboardTextByteLengthOverLimit(query, maxBytes)
+}
+
+/**
+ * The query a host may apply to a listing: plain text only, within the byte bound.
+ *
+ * Empty means "the client filters this itself", which is what every operator
+ * query gets. `repo:` needs the client's own project mapping and `path:` reads the
+ * panel's predicate (`matchesAiVaultQueryOperators`), so a host cannot answer
+ * either one and must not silently answer a different question than the one the
+ * panel will show. Both sides call this, so what the client sends and what the
+ * host accepts cannot drift.
+ */
+export function aiVaultHostListQuery(query: string): string {
+  const trimmed = query.trim()
+  if (trimmed.length === 0 || isAiVaultSessionFilterQueryTooLarge(trimmed)) {
+    return ''
+  }
+  return hasAiVaultSearchQueryOperators(splitAiVaultSearchQuery(trimmed)) ? '' : trimmed
+}
+
+/**
+ * The text half of the panel's filter, for a host filtering a listing itself.
+ *
+ * Same rule as `termsMatch` — every term must appear in the row's own text — so a
+ * host-filtered listing and a client-filtered one agree about what "matches" means.
+ * Previews are deliberately absent, for the same reason: they are transcript text a
+ * metadata answer does not carry. Operators are deliberately absent too: `repo:`
+ * needs the client's project mapping and `path:` reads the panel's own predicate, so
+ * a host that guessed at them would answer a question the panel never asked.
+ */
+export function aiVaultSessionsMatchingQuery(
+  sessions: readonly AiVaultSession[],
+  query: string
+): AiVaultSession[] {
+  const parsed = parseVaultQuery(query)
+  return sessions.filter((session) => termsMatch(session, parsed.terms, false))
 }
 
 export function filterAiVaultSessions(
@@ -237,28 +276,45 @@ export function matchesAiVaultQueryOperators(
   return true
 }
 
+/**
+ * The term half of the panel's filter: every term must appear in the row's own text.
+ *
+ * `includePreviews` is false for a caller that filters rows a host produced, because
+ * preview text is transcript content the metadata tier does not carry — including it
+ * here would make the scanner fallback match rows the index path cannot, and which
+ * path answered would then change what a search returns.
+ */
+function termsMatch(
+  session: AiVaultSession,
+  terms: readonly string[],
+  includePreviews: boolean
+): boolean {
+  if (terms.length === 0) {
+    return true
+  }
+  const searchable = [
+    session.title,
+    session.sessionId,
+    session.agent,
+    session.branch,
+    session.model,
+    session.cwd,
+    session.filePath,
+    ...(includePreviews ? [sessionPreviewSearchText(session)] : [])
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return terms.every((term) => searchable.includes(term))
+}
+
 function matchesQuery(
   session: AiVaultSession,
   parsed: ParsedQuery,
   filters: Pick<AiVaultSessionFilterState, 'sessionProjectById' | 'projectLabelByKey'>
 ): boolean {
-  if (parsed.terms.length > 0) {
-    const searchable = [
-      session.title,
-      session.sessionId,
-      session.agent,
-      session.branch,
-      session.model,
-      session.cwd,
-      session.filePath,
-      sessionPreviewSearchText(session)
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    if (parsed.terms.some((term) => !searchable.includes(term))) {
-      return false
-    }
+  if (!termsMatch(session, parsed.terms, true)) {
+    return false
   }
   const sessionProject = filters.sessionProjectById?.get(session.id)
   return matchesAiVaultQueryOperators(

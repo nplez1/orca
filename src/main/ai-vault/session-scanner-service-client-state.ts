@@ -1,6 +1,7 @@
 import type { SessionSearchScanRoots } from '../ai-vault-search/session-search-scan-roots'
 import type { ChildProcess } from 'node:child_process'
 import { createAiVaultScanCancelledError } from './ai-vault-scan-cancellation'
+import { sessionSearchSqliteAvailable } from '../ai-vault-search/session-search-sqlite-support'
 import {
   AI_VAULT_SERVICE_PROTOCOL_VERSION,
   type AiVaultServiceInit,
@@ -301,7 +302,11 @@ export class AiVaultServiceSessionSearchHold {
    * @returns whether a child now has to exist.
    */
   record(init: AiVaultSessionSearchInit, child: ChildProcess | null): boolean {
-    this.enabled = init.settings.enabled
+    // The metadata tier is always on, so a child is needed whenever the search
+    // service is installed; `contentEnabled` only decides what it stores, never
+    // whether it exists. Reading consent here is what used to keep a child from
+    // being spawned at all.
+    this.enabled = sessionSearchSqliteAvailable()
     child?.send({ type: 'sessionSearch', init })
     return this.enabled
   }

@@ -1,4 +1,5 @@
 import { LOCAL_EXECUTION_HOST_ID } from '../shared/execution-host'
+import { aiVaultSessionsMatchingQuery } from '../shared/ai-vault-session-filters'
 import { scanRemoteAiVaultSessions } from '../main/ai-vault/remote-session-scanner'
 import { readAiVaultSessionTitlesFromFiles } from '../main/ai-vault/session-title-file-reader'
 import { createRelayAiVaultFilesystemProvider } from './ai-vault-service-filesystem'
@@ -46,7 +47,7 @@ async function execute(request: RelayAiVaultServiceRequest): Promise<void> {
       send({ type: 'result', id: request.id, operation: 'titles', value })
       return
     }
-    const value = await scanRemoteAiVaultSessions({
+    const scanned = await scanRemoteAiVaultSessions({
       provider,
       executionHostId: LOCAL_EXECUTION_HOST_ID,
       remoteHome: init.remoteHome,
@@ -56,6 +57,16 @@ async function execute(request: RelayAiVaultServiceRequest): Promise<void> {
       scopePaths: request.params.scopePaths,
       signal: controller.signal
     })
+    // This leg has no index — it reads through a filesystem provider — so the
+    // filter narrows the scan it just produced. The desktop must not have to know
+    // which leg answered, and an unfiltered answer would read as "everything
+    // matches".
+    const value = request.params.query
+      ? {
+          ...scanned,
+          sessions: aiVaultSessionsMatchingQuery(scanned.sessions, request.params.query)
+        }
+      : scanned
     send({ type: 'result', id: request.id, operation: 'list', value })
   } catch (error) {
     send({

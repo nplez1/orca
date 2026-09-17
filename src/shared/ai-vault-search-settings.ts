@@ -3,28 +3,36 @@ import { z } from 'zod'
 /**
  * Consent and retention for the agent-session transcript index.
  *
- * Off until the user turns it on: building the index reads every transcript on
- * the machine, so nothing constructs an indexer, opens the database or reads a
- * transcript for it before that choice is recorded.
+ * Two tiers share one database:
+ *
+ * - **Metadata** — one `sessions` row per transcript (agent, session id, path,
+ *   cwd, branch, model, times, counts, title, resume command). Always indexed:
+ *   it is what Agent Session History lists, and the panel already shows every one
+ *   of those values. Its only costs are a stat per transcript and the head of a
+ *   transcript that changed.
+ * - **Content** — message bodies in `messages` and `messages_fts`, which is what
+ *   makes conversations searchable. Off until the user turns it on: this is the
+ *   tier that reads every transcript on the machine end to end.
  *
  * There is no `paused`. The indexer is immutable after construction, so every
  * change here is close-and-construct (see session-search-instance.ts).
  */
 export type AiVaultSearchSettings = {
-  enabled: boolean
+  /** Content tier: index message bodies so conversations are searchable. */
+  contentEnabled: boolean
   /** null = all history; otherwise only transcripts modified within this many days. */
   historyDays: number | null
 }
 
 export const DEFAULT_AI_VAULT_SEARCH_SETTINGS: AiVaultSearchSettings = {
-  enabled: false,
+  contentEnabled: false,
   historyDays: null
 }
 
 const HISTORY_DAYS_MAX = 3_650
 
 export const AiVaultSearchSettingsSchema: z.ZodType<AiVaultSearchSettings> = z.object({
-  enabled: z.boolean(),
+  contentEnabled: z.boolean(),
   historyDays: z.number().int().positive().max(HISTORY_DAYS_MAX).nullable()
 })
 
@@ -43,6 +51,11 @@ export function normalizeAiVaultSearchHistoryDays(value: unknown): number | null
  *
  * The input is `unknown` on purpose: this is the sanitizer, and what it reads is a
  * JSON profile that may predate either field or hold a value no version wrote.
+ *
+ * `enabled` is the pre-tier name of `contentEnabled`: a profile that recorded
+ * consent before the metadata tier existed consented to transcript content, which
+ * is the tier that flag now names, so it carries over rather than resetting. An
+ * absent flag is no consent.
  */
 export function resolveAiVaultSearchSettings(
   settings: { aiVaultSearch?: unknown } | null | undefined
@@ -51,8 +64,13 @@ export function resolveAiVaultSearchSettings(
   if (typeof raw !== 'object' || raw === null) {
     return { ...DEFAULT_AI_VAULT_SEARCH_SETTINGS }
   }
+  // The current field wins over the pre-tier name when a profile somehow holds
+  // both: reading the legacy one first would resurrect a consent the user has
+  // since withdrawn.
+  const contentEnabled =
+    'contentEnabled' in raw ? raw.contentEnabled === true : 'enabled' in raw && raw.enabled === true
   return {
-    enabled: 'enabled' in raw && raw.enabled === true,
+    contentEnabled,
     historyDays: normalizeAiVaultSearchHistoryDays('historyDays' in raw ? raw.historyDays : null)
   }
 }
@@ -61,5 +79,5 @@ export function sameAiVaultSearchSettings(
   a: AiVaultSearchSettings,
   b: AiVaultSearchSettings
 ): boolean {
-  return a.enabled === b.enabled && a.historyDays === b.historyDays
+  return a.contentEnabled === b.contentEnabled && a.historyDays === b.historyDays
 }

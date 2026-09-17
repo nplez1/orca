@@ -13,6 +13,11 @@ import { openSessionSearchDatabase, removeSessionSearchDatabase } from './sessio
 import type { SessionSearchScanRoots } from './session-search-scan-roots'
 import type { SessionSearchIndexerOptions } from './session-search-indexer-options'
 import { createSessionSearchService, type SessionSearchService } from './session-search-service'
+import {
+  listIndexedSessions,
+  type IndexedSessionList,
+  type IndexedSessionListArgs
+} from './session-search-list'
 
 export type SessionSearchInstanceOptions = {
   databasePath: string
@@ -47,7 +52,7 @@ type LiveIndex = {
  */
 export class SessionSearchInstance {
   private live: LiveIndex | null = null
-  private settings: AiVaultSearchSettings = { enabled: false, historyDays: null }
+  private settings: AiVaultSearchSettings = { contentEnabled: false, historyDays: null }
   private readonly onError: (error: unknown) => void
 
   constructor(private readonly options: SessionSearchInstanceOptions) {
@@ -80,7 +85,10 @@ export class SessionSearchInstance {
   async search(request: AiVaultSearchRequest): Promise<AiVaultSearchResponse> {
     const live = this.live
     if (!live) {
-      return { kind: 'unavailable', reason: this.settings.enabled ? 'not-ready' : 'disabled' }
+      // The metadata tier is always on wherever an index can exist, so an absent
+      // instance is a host that cannot hold one or one still constructing —
+      // never a consent decision.
+      return { kind: 'unavailable', reason: 'not-ready' }
     }
     return live.service.search(request)
   }
@@ -88,10 +96,11 @@ export class SessionSearchInstance {
   status(): AiVaultSearchStatus {
     const live = this.live
     if (!live) {
-      return { ...unavailableSessionSearchStatus(), enabled: this.settings.enabled }
+      return { ...unavailableSessionSearchStatus(), enabled: false }
     }
     return {
       enabled: true,
+      contentEnabled: this.settings.contentEnabled,
       ...live.indexer.status(),
       generation: live.engine.generation()
     }
@@ -101,16 +110,39 @@ export class SessionSearchInstance {
     await this.live?.service.reconcile()
   }
 
+  /**
+   * Agent Session History's list, from the metadata tier, or null when this host
+   * cannot answer from it yet.
+   *
+   * Null is the warm-up rule: an index that has never completed a pass must not
+   * render as an empty history, so the caller falls back to the scanner until one
+   * has. The gate is the completed sweep and not `filesIndexed > 0`, because a
+   * host with no sessions never indexes a file and would otherwise be stranded on
+   * the scanner for good.
+   */
+  listSessions(args: IndexedSessionListArgs): IndexedSessionList | null {
+    const live = this.live
+    if (!live || live.indexer.status().lastSweepCompletedAt === null) {
+      return null
+    }
+    return listIndexedSessions(live.db, args)
+  }
+
+  /**
+   * Drop sources the caller has proven gone. A delete must not appear to have
+   * failed until the next pass notices the file is missing.
+   */
+  forgetSources(paths: readonly string[]): void {
+    this.live?.indexer.forgetSources(paths)
+  }
+
   /** Tests only: resolves once the work loop has no pass in flight. */
   settled(): Promise<void> {
     return this.live?.indexer.settled() ?? Promise.resolve()
   }
 
   private construct(): void {
-    if (!this.settings.enabled) {
-      return
-    }
-    const { historyDays } = this.settings
+    const { historyDays, contentEnabled } = this.settings
     let indexer: SessionSearchIndexer | null = null
     let db: SyncDatabase | null = null
     try {
@@ -119,6 +151,7 @@ export class SessionSearchInstance {
         roots: this.options.roots,
         resolveRoots: this.options.resolveRoots,
         historyDays,
+        contentEnabled,
         onError: this.onError,
         ...(this.options.reconcileIntervalMs === undefined
           ? {}
@@ -127,7 +160,11 @@ export class SessionSearchInstance {
       db = openSessionSearchDatabase(this.options.databasePath)
       // Later expiry comes from the indexer purge, which also invalidates page cursors.
       const engineOptions = {
-        retentionCutoffMs: sessionSearchHistoryCutoffMs(historyDays, Date.now())
+        retentionCutoffMs: sessionSearchHistoryCutoffMs(historyDays, Date.now()),
+        // The same consent the indexer writes under: with content off there are no
+        // message rows to search, so the engine must answer from the metadata
+        // surface instead of returning nothing.
+        contentEnabled
       }
       const engine = new SessionSearchEngine(db, engineOptions)
       this.live = {

@@ -42,6 +42,7 @@ import type { AiVaultScope, AiVaultSession } from '../../../../shared/ai-vault-t
 import { translate } from '@/i18n/i18n'
 import { AiVaultPanelHeader } from './AiVaultPanelHeader'
 import { AiVaultSessionVirtualList } from './AiVaultSessionVirtualList'
+import { useAiVaultHostQuery } from './ai-vault-host-query'
 import { useAiVaultSessionRefresh } from './ai-vault-session-refresh'
 import {
   buildAiVaultHostScopeOptions,
@@ -145,10 +146,14 @@ export default function AiVaultPanel(): React.JSX.Element {
       }),
     [activeProjectKey, activeWorktree, allWorktrees, projectHostSetupProjection]
   )
+  // The host searches the whole corpus when it can key the query; the client
+  // filters its own rows meanwhile, and for the queries a host cannot key.
+  const hostQuery = useAiVaultHostQuery(query)
   const { error, loading, refresh, scanResult, sessions } = useAiVaultSessionRefresh(
     scopePaths,
     executionHostScope,
-    sessionLimit
+    sessionLimit,
+    hostQuery
   )
   // Deliberately blind to the active repo/worktree: rebuilding these session
   // maps on every worktree switch is what made switching visibly slow (#10841 era).
@@ -219,7 +224,10 @@ export default function AiVaultPanel(): React.JSX.Element {
   const filteredSessions = useMemo(
     () =>
       filterAiVaultSessions(sessions, {
-        query,
+        // Why empty when the host filtered: its rows already answer this query,
+        // and the client's substring predicate would drop matches the tokenizer
+        // found (a path segment, a branch name) that its own terms do not spell.
+        query: hostQuery ? '' : query,
         agents,
         scope,
         sort,
@@ -234,6 +242,7 @@ export default function AiVaultPanel(): React.JSX.Element {
       activeWorktreePaths,
       agents,
       hideEmptySessions,
+      hostQuery,
       projectLabelByKey,
       query,
       scope,

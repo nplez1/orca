@@ -3,6 +3,7 @@ import type {
   AiVaultSearchRequestSchema,
   AiVaultSearchResponseSchema,
   AiVaultSearchHitSchema,
+  AiVaultSearchHostStatusSchema,
   AiVaultSearchStatusSchema
 } from './ai-vault-search-contract'
 
@@ -19,4 +20,8 @@ export type AiVaultSearchResponse = z.infer<typeof AiVaultSearchResponseSchema>
  * `executionHostId` names the host that owns the transcript; set by the desktop on remote answers.
  */
 export type AiVaultSearchHit = z.infer<typeof AiVaultSearchHitSchema>
+/** One host's contribution to an all-hosts merged page; absent on a single-host answer. */
+export type AiVaultSearchHostStatus = z.infer<typeof AiVaultSearchHostStatusSchema>
+export type AiVaultSearchHostOutcome = AiVaultSearchHostStatus['outcome']
+export type AiVaultSearchHostReason = NonNullable<AiVaultSearchHostStatus['reason']>
 export type AiVaultSearchStatus = z.infer<typeof AiVaultSearchStatusSchema>
