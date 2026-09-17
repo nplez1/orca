@@ -69,7 +69,8 @@ describe('getPiAgentStatusExtensionSource', () => {
     expect(JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body)).payload).toEqual({
       hook_event_name: 'session_start',
       session_id: 'pi-session-1',
-      session_file: '/tmp/pi-session-1.jsonl'
+      session_file: '/tmp/pi-session-1.jsonl',
+      subagent_runs: []
     })
 
     await harness.callHook('before_agent_start', { prompt: 'resume this task' })
@@ -80,7 +81,8 @@ describe('getPiAgentStatusExtensionSource', () => {
       hook_event_name: 'before_agent_start',
       prompt: 'resume this task',
       session_id: 'pi-session-1',
-      session_file: '/tmp/pi-session-1.jsonl'
+      session_file: '/tmp/pi-session-1.jsonl',
+      subagent_runs: []
     })
   })
 
@@ -103,7 +105,8 @@ describe('getPiAgentStatusExtensionSource', () => {
     )
 
     expect(JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body)).payload).toEqual({
-      hook_event_name: 'session_start'
+      hook_event_name: 'session_start',
+      subagent_runs: []
     })
 
     sessionFileExists = true
@@ -113,7 +116,8 @@ describe('getPiAgentStatusExtensionSource', () => {
     expect(JSON.parse(String(harness.fetchMock.mock.calls[1]?.[1]?.body)).payload).toEqual({
       hook_event_name: 'agent_end',
       session_id: 'pi-session-1',
-      session_file: '/tmp/pi-session-1.jsonl'
+      session_file: '/tmp/pi-session-1.jsonl',
+      subagent_runs: []
     })
   })
 
@@ -139,7 +143,8 @@ describe('getPiAgentStatusExtensionSource', () => {
     expect(JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body)).payload).toEqual({
       hook_event_name: 'agent_start',
       session_id: 'pi-reloaded',
-      session_file: '/tmp/pi-reloaded.jsonl'
+      session_file: '/tmp/pi-reloaded.jsonl',
+      subagent_runs: []
     })
   })
 
@@ -157,8 +162,8 @@ describe('getPiAgentStatusExtensionSource', () => {
         ([_event, init]) => JSON.parse(String(init?.body)).payload
       )
       expect(payloads).toEqual([
-        { hook_event_name: 'session_start' },
-        { hook_event_name: 'agent_start' }
+        { hook_event_name: 'session_start', subagent_runs: [] },
+        { hook_event_name: 'agent_start', subagent_runs: [] }
       ])
     }
   })
@@ -325,7 +330,7 @@ describe('getPiAgentStatusExtensionSource', () => {
 
     expect(harness.fetchMock).toHaveBeenCalledTimes(1)
     const body = JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body))
-    expect(body.payload).toEqual({ hook_event_name: 'agent_end' })
+    expect(body.payload).toEqual({ hook_event_name: 'agent_end', subagent_runs: [] })
     expect(harness.processEnv.ORCA_PI_STATUS_OWNED).toBe(String(SELF_PID))
   })
 
@@ -341,7 +346,7 @@ describe('getPiAgentStatusExtensionSource', () => {
 
     expect(harness.fetchMock).toHaveBeenCalledTimes(1)
     const body = JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body))
-    expect(body.payload).toEqual({ hook_event_name: 'agent_end' })
+    expect(body.payload).toEqual({ hook_event_name: 'agent_end', subagent_runs: [] })
   })
 
   it('keeps native fetch as the only path even when the runtime looks like WSL', async () => {
@@ -541,7 +546,7 @@ describe('getPiAgentStatusExtensionSource', () => {
     finishDeliveries[0]?.()
     await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(2))
     const latestBody = JSON.parse(String(harness.fetchMock.mock.calls[1]?.[1]?.body))
-    expect(latestBody.payload).toEqual({ hook_event_name: 'agent_end' })
+    expect(latestBody.payload).toEqual({ hook_event_name: 'agent_end', subagent_runs: [] })
 
     finishDeliveries[1]?.()
   })
@@ -570,7 +575,7 @@ describe('getPiAgentStatusExtensionSource', () => {
       expect(firstSignal.aborted).toBe(true)
       expect(harness.fetchMock).toHaveBeenCalledTimes(2)
       const latestBody = JSON.parse(String(harness.fetchMock.mock.calls[1]?.[1]?.body))
-      expect(latestBody.payload).toEqual({ hook_event_name: 'agent_end' })
+      expect(latestBody.payload).toEqual({ hook_event_name: 'agent_end', subagent_runs: [] })
     } finally {
       vi.useRealTimers()
     }
@@ -593,7 +598,8 @@ describe('getPiAgentStatusExtensionSource', () => {
 
       expect(harness.fetchMock).toHaveBeenCalledTimes(1)
       expect(JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body)).payload).toEqual({
-        hook_event_name: 'agent_end'
+        hook_event_name: 'agent_end',
+        subagent_runs: []
       })
       expect(vi.getTimerCount()).toBe(0)
     } finally {
