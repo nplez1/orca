@@ -46,7 +46,15 @@ CREATE TABLE IF NOT EXISTS sessions(
   resume_command TEXT NOT NULL,
   -- Chained digest of the first N messages; forks of one conversation share it.
   content_hash TEXT,
-  content_hash_count INTEGER NOT NULL DEFAULT 0
+  content_hash_count INTEGER NOT NULL DEFAULT 0,
+  -- The rest of what Agent Session History renders a row from, listed so the panel
+  -- is one indexed read instead of a walk and a parse. The fields the panel only
+  -- needs on demand (preview turns, first prompt, subagent rows) stay out.
+  model TEXT,
+  total_tokens INTEGER NOT NULL DEFAULT 0,
+  queued_message_count INTEGER NOT NULL DEFAULT 0,
+  subagent_transcript_count INTEGER NOT NULL DEFAULT 0,
+  modified_at TEXT
 );
 CREATE INDEX IF NOT EXISTS sessions_agent ON sessions(agent);
 CREATE INDEX IF NOT EXISTS sessions_updated_at ON sessions(updated_at);
@@ -87,6 +95,12 @@ CREATE INDEX IF NOT EXISTS messages_session ON messages(session_row_id);
 -- second table on a 105 MB corpus, under the 2x bar the decision was set at.
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
   user_text, assistant_text, tool_text, identifiers, ${TOKENIZER}, detail=full
+);
+-- The metadata tier's own search surface: titles, paths, branches and agent names
+-- for every session, indexed whether or not transcript content is consented to.
+-- rowid is the sessions row id, so a hit joins back without a second lookup.
+CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+  title, cwd, branch, agent, ${TOKENIZER}, detail=full
 );
 `
 

@@ -20,6 +20,7 @@ import {
   getAgentWorkspaceTrustTitle
 } from './agent-workspace-trust-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
+import { getAgentSessionSearchSearchEntries } from './agent-session-search-search'
 import {
   getCodexTerminalServerIsolationDescription,
   getCodexTerminalServerIsolationSearchKeywords,
@@ -166,7 +167,8 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.agents.search.checks', 'checks')
     ]
   },
-  ...getAgentCacheTimerSearchEntries()
+  ...getAgentCacheTimerSearchEntries(),
+  ...getAgentSessionSearchSearchEntries()
 ])
 
 export function getAgentsPaneSearchEntries({

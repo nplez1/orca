@@ -13,6 +13,7 @@ import {
 import {
   SSH_AI_VAULT_LIST_LIMIT_MAX,
   SSH_AI_VAULT_LIST_SESSIONS_METHOD,
+  SSH_AI_VAULT_QUERY_MAX_LENGTH,
   SSH_AI_VAULT_RESOLVE_SESSION_TITLES_METHOD,
   SSH_AI_VAULT_SCOPE_PATH_MAX_LENGTH,
   type SshAiVaultRelayListParams
@@ -193,12 +194,21 @@ export function normalizeSshAiVaultRelayListParams(
   const scopePathsTruncated =
     params.scopePathsTruncated === true ||
     (Array.isArray(params.scopePaths) && params.scopePaths.length > AI_VAULT_SCOPE_PATHS_MAX_COUNT)
+  // Empty is "no filter", never "match nothing": the desktop only sends a query
+  // it has already reduced, and a blank one would otherwise empty the host's list.
+  const query =
+    typeof params.query === 'string' &&
+    params.query.trim().length > 0 &&
+    params.query.length <= SSH_AI_VAULT_QUERY_MAX_LENGTH
+      ? params.query
+      : undefined
   return {
     ...(unlimited ? { unlimited: true } : {}),
     ...(limit === undefined ? {} : { limit }),
     ...(params.force === true ? { force: true } : {}),
     ...(scopePaths === undefined ? {} : { scopePaths }),
-    ...(scopePathsTruncated ? { scopePathsTruncated: true } : {})
+    ...(scopePathsTruncated ? { scopePathsTruncated: true } : {}),
+    ...(query === undefined ? {} : { query })
   }
 }
 

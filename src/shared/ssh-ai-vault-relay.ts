@@ -4,6 +4,10 @@ export const SSH_AI_VAULT_LIST_SESSIONS_TIMEOUT_MS = 130_000
 export const SSH_AI_VAULT_RESOLVE_SESSION_TITLES_TIMEOUT_MS = 15_000
 export const SSH_AI_VAULT_LIST_LIMIT_MAX = 1000
 export const SSH_AI_VAULT_SCOPE_PATH_MAX_LENGTH = 4096
+// The same bound the panel's own filter puts on a query (`AI_VAULT_SESSION_FILTER_QUERY_MAX_BYTES`),
+// in characters: this leg only caps what it forwards, the client already decided
+// what a host may be asked.
+export const SSH_AI_VAULT_QUERY_MAX_LENGTH = 2048
 
 export type SshAiVaultRelayListParams = {
   limit?: number
@@ -11,6 +15,12 @@ export type SshAiVaultRelayListParams = {
   force?: boolean
   scopePaths?: string[]
   scopePathsTruncated?: boolean
+  /**
+   * Plain-text filter the host applies to its own rows. The remote leg has no
+   * index (it reads through a filesystem provider), so the host narrows the scan
+   * it already produces rather than matching anything server-side.
+   */
+  query?: string
 }
 
 export type SshAiVaultRelayTitleParams = {

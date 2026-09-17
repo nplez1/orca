@@ -42,7 +42,7 @@ afterEach(async () => {
 function init(roots: SessionSearchScanRoots): AiVaultSessionSearchInit {
   return {
     databasePath: harness.databasePath,
-    settings: { enabled: true, historyDays: null },
+    settings: { contentEnabled: true, historyDays: null },
     roots
   }
 }

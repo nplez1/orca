@@ -227,7 +227,8 @@ export function registerCoreHandlers(
   registerEphemeralVmHandlers(store, pluginService)
   registerAiVaultSearchHandlers({
     callRuntimeSearch: (environmentId, method, params) =>
-      callRuntimeSessionSearch(app.getPath('userData'), environmentId, method, params)
+      callRuntimeSessionSearch(app.getPath('userData'), environmentId, method, params),
+    getActiveRuntimeAiVaultHostInfos: () => getSavedRuntimeAiVaultHostInfos(app.getPath('userData'))
   })
   registerAiVaultHandlers({
     // Session history and terminal resume are not chats; a refused host leaves nothing to check.
