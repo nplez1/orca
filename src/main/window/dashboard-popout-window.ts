@@ -6,6 +6,7 @@ import { isBackgroundLaunch, showWindowWithoutStealingFocus } from './foreground
 import { rectHasVisibleAreaOnAnyDisplay } from './window-bounds-validation'
 import { sendToTrustedUIRenderer } from '../ipc/ui'
 import { installPrivilegedWindowNavigationPolicy } from './privileged-window-navigation'
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import { stepUIZoomLevel, type UIZoomDirection } from '../../shared/ui-zoom-level'
 import { nativeZoomCommandMatchesKeybindings } from '../../shared/window-shortcut-policy'
 import {
@@ -157,7 +158,7 @@ export function createOrFocusDashboardPopout(
     ...(savedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    title: 'Orca Agent Dashboard',
+    title: `${APP_DISPLAY_NAME} Agent Dashboard`,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
