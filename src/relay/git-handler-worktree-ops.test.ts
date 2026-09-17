@@ -560,3 +560,126 @@ describe('removeWorktreeOp', () => {
     expect(git).not.toHaveBeenCalledWith(['branch', '-D', '--', 'feature/test'], expect.any(String))
   })
 })
+
+describe('removeWorktreeOp remote branch option', () => {
+  /**
+   * A removal that gets all the way to branch deletion, with `feature/test` tracking
+   * `origin/feature` and (unless overridden) already gone locally.
+   */
+  function makeGit(overrides: {
+    localBranchStillExists?: boolean
+    /** Git refuses the branch delete, as it does for unmerged commits. */
+    branchDeleteFails?: boolean
+    onPush?: () => void
+  }): {
+    git: GitExec
+    calls: string[]
+  } {
+    const calls: string[] = []
+    let listCount = 0
+    const git = vi.fn<GitExec>(async (args, cwd) => {
+      calls.push(`${cwd}$ ${args.join(' ')}`)
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') {
+        return { stdout: '/repo/.git\n', stderr: '' }
+      }
+      if (args[0] === 'rev-parse' && args[1] === '--verify') {
+        return { stdout: 'refs/remotes/origin/feature\n', stderr: '' }
+      }
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        listCount += 1
+        return {
+          stdout:
+            listCount === 1
+              ? worktreeList(
+                  { path: '/repo', branch: 'main' },
+                  { path: '/repo-feature', branch: 'feature/test' }
+                )
+              : worktreeList({ path: '/repo', branch: 'main' }),
+          stderr: ''
+        }
+      }
+      if (args[0] === 'config') {
+        const key = args[2]
+        if (key === 'branch.feature/test.remote') {
+          return { stdout: 'origin\n', stderr: '' }
+        }
+        if (key === 'branch.feature/test.merge') {
+          return { stdout: 'refs/heads/feature\n', stderr: '' }
+        }
+        throw Object.assign(new Error('config key is not set'), { code: 1 })
+      }
+      if (args[0] === 'branch' && args[1] === '-d' && overrides.branchDeleteFails) {
+        throw new Error("error: the branch 'feature/test' is not fully merged")
+      }
+      if (args[0] === 'show-ref') {
+        if (overrides.localBranchStillExists) {
+          return { stdout: '', stderr: '' }
+        }
+        throw Object.assign(new Error('fatal: not a valid ref'), { code: 1 })
+      }
+      if (args[0] === 'push') {
+        overrides.onPush?.()
+        return { stdout: '', stderr: '' }
+      }
+      return { stdout: '', stderr: '' }
+    })
+    return { git, calls }
+  }
+
+  it('deletes the resolved upstream branch and reports it', async () => {
+    const { git, calls } = makeGit({})
+
+    const result = await removeWorktreeWithCapabilityCache(git, {
+      worktreePath: '/repo-feature',
+      deleteRemoteBranch: true
+    })
+
+    expect(result.remoteBranchCleanup).toEqual({
+      status: 'deleted',
+      remoteName: 'origin',
+      branchName: 'feature'
+    })
+    expect(calls).toContain(`${resolvedRepoPath()}$ push --delete origin feature`)
+  })
+
+  it('never pushes when the option is off', async () => {
+    const onPush = vi.fn()
+    const { git } = makeGit({ onPush })
+
+    const result = await removeWorktreeWithCapabilityCache(git, {
+      worktreePath: '/repo-feature'
+    })
+
+    expect(result.remoteBranchCleanup).toBeUndefined()
+    expect(onPush).not.toHaveBeenCalled()
+  })
+
+  // `push --delete` has no merged-commit refusal, so a local branch Git kept must keep its remote.
+  it('leaves the remote alone while the local branch survives', async () => {
+    const onPush = vi.fn()
+    const { git } = makeGit({ branchDeleteFails: true, localBranchStillExists: true, onPush })
+
+    const result = await removeWorktreeWithCapabilityCache(git, {
+      worktreePath: '/repo-feature',
+      deleteRemoteBranch: true
+    })
+
+    expect(result.preservedBranch?.branchName).toBe('feature/test')
+    expect(result.remoteBranchCleanup).toEqual({ status: 'skipped-preserved' })
+    expect(onPush).not.toHaveBeenCalled()
+  })
+
+  it('reports skipped-preserved when the local branch delete is pinned off', async () => {
+    const onPush = vi.fn()
+    const { git } = makeGit({ onPush })
+
+    const result = await removeWorktreeWithCapabilityCache(git, {
+      worktreePath: '/repo-feature',
+      deleteBranch: false,
+      deleteRemoteBranch: true
+    })
+
+    expect(result.remoteBranchCleanup).toEqual({ status: 'skipped-preserved' })
+    expect(onPush).not.toHaveBeenCalled()
+  })
+})

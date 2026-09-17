@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest'
-import { screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -302,7 +302,10 @@ describe('DeleteWorktreeDialog lineage copy', () => {
       ...makeWorktree('Folder workspace', '/projects/folder'),
       repoId: 'folder-repo'
     }
-    mocks.state.modalData = { worktreeId: workspace.id }
+    mocks.state.modalData = {
+      worktreeId: workspace.id,
+      worktreeDeleteIdentities: [{ id: workspace.id, instanceId: workspace.instanceId }]
+    }
     mocks.state.allWorktrees.mockReturnValue([workspace])
     mocks.state.repos = [
       {
@@ -463,5 +466,121 @@ describe('DeleteWorktreeDialog lineage copy', () => {
     expect(mocks.state.closeModal).toHaveBeenCalledOnce()
     expect(runWorktreeDeletesInParallel).not.toHaveBeenCalled()
     expect(mocks.state.removeWorktree).not.toHaveBeenCalled()
+  })
+})
+
+const REMOTE_BRANCH_LABEL = /Also delete the remote branch/
+
+describe('DeleteWorktreeDialog remote branch option', () => {
+  function seedGitWorkspace(): Worktree {
+    const workspace = makeWorktree('Feature workspace', '/workspaces/feature')
+    mocks.state.modalData = {
+      worktreeId: workspace.id,
+      worktreeDeleteIdentities: [{ id: workspace.id, instanceId: workspace.instanceId }]
+    }
+    mocks.state.allWorktrees.mockReturnValue([workspace])
+    return workspace
+  }
+
+  /** Queried by name: the dialog's sibling "Don't ask again" control is also a checkbox. */
+  function remoteBranchCheckbox(): HTMLElement {
+    return screen.getByRole('checkbox', { name: REMOTE_BRANCH_LABEL })
+  }
+
+  /**
+   * Clicks the newest destructive button. The store mock records one entry per render, so the last
+   * one is the closure that saw the checkbox's current state.
+   */
+  function clickLatestDeleteButton(): void {
+    const onClick = mocks.buttonProps.findLast((props) => props.variant === 'destructive')?.onClick
+    if (typeof onClick !== 'function') {
+      throw new Error('Delete button was not rendered')
+    }
+    onClick()
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // The sibling suite leaves its static-markup renders in `document.body`, so unmount before
+    // mounting or a role query matches a previous test's dialog too.
+    cleanup()
+    document.body.innerHTML = ''
+    mocks.state.activeModal = 'delete-worktree'
+    mocks.state.modalData = {}
+    mocks.state.repos = []
+    mocks.state.settings = null
+    mocks.buttonProps = []
+    vi.mocked(runWorktreeDeletesInParallel).mockResolvedValue([])
+  })
+
+  it('offers the option unchecked by default and deletes no remote branch', async () => {
+    seedGitWorkspace()
+    const { default: DeleteWorktreeDialog } = await import('./DeleteWorktreeDialog')
+    const { container } = render(<DeleteWorktreeDialog />)
+
+    const checkbox = remoteBranchCheckbox()
+    expect(checkbox).toHaveAttribute('aria-checked', 'false')
+    expect(container.textContent).toContain('Also delete the remote branch')
+
+    clickLatestDeleteButton()
+
+    expect(runWorktreeDeletesInParallel).toHaveBeenCalledWith([expect.anything()], {
+      force: true,
+      onForceDeleted: expect.any(Function)
+    })
+  })
+
+  it('starts checked when the setting asks for it', async () => {
+    seedGitWorkspace()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the store mock declares `settings` as null; only this one flag is read on the delete-dialog path.
+    mocks.state.settings = { deleteRemoteBranchOnWorkspaceDelete: true } as never
+    const { default: DeleteWorktreeDialog } = await import('./DeleteWorktreeDialog')
+    render(<DeleteWorktreeDialog />)
+
+    expect(remoteBranchCheckbox()).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('carries the user choice into the delete', async () => {
+    seedGitWorkspace()
+    const { default: DeleteWorktreeDialog } = await import('./DeleteWorktreeDialog')
+    render(<DeleteWorktreeDialog />)
+
+    fireEvent.click(remoteBranchCheckbox())
+    expect(remoteBranchCheckbox()).toHaveAttribute('aria-checked', 'true')
+
+    clickLatestDeleteButton()
+
+    expect(runWorktreeDeletesInParallel).toHaveBeenCalledWith(
+      [expect.anything()],
+      expect.objectContaining({ deleteRemoteBranch: true })
+    )
+  })
+
+  it('hides the option for a folder workspace, which has no branch', async () => {
+    const workspace = {
+      ...makeWorktree('Folder workspace', '/projects/folder'),
+      repoId: 'folder-repo'
+    }
+    mocks.state.modalData = {
+      worktreeId: workspace.id,
+      worktreeDeleteIdentities: [{ id: workspace.id, instanceId: workspace.instanceId }]
+    }
+    mocks.state.allWorktrees.mockReturnValue([workspace])
+    mocks.state.repos = [
+      {
+        id: 'folder-repo',
+        path: '/projects/folder',
+        displayName: 'Folder',
+        badgeColor: 'blue',
+        addedAt: 1,
+        kind: 'folder'
+      }
+    ]
+
+    const { default: DeleteWorktreeDialog } = await import('./DeleteWorktreeDialog')
+    const { container } = render(<DeleteWorktreeDialog />)
+
+    expect(screen.queryByRole('checkbox', { name: REMOTE_BRANCH_LABEL })).toBeNull()
+    expect(container.textContent).not.toContain('Also delete the remote branch')
   })
 })

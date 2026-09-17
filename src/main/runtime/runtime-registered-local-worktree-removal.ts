@@ -61,6 +61,8 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
   allowFailedArchiveHook: boolean
   allowUnverifiedPtyStop: boolean
   deleteBranch: boolean
+  /** Opt-in `git push --delete` of the branch's upstream; paired with the local branch delete. */
+  deleteRemoteBranch: boolean
   acquireWatcherRemoval: (path: string) => Promise<{ finish: (removed: boolean) => Promise<void> }>
   stopPtys: () => Promise<void>
   closeWatchers: (path: string) => Promise<void>
@@ -216,6 +218,7 @@ export async function finishRuntimeLocalWorktreeRemoval(
       removalResult = args.preserveBranchHead(
         await removeWorktree(repo.path, canonicalPath, args.force, {
           ...(!args.deleteBranch ? { deleteBranch: args.deleteBranch } : {}),
+          ...(args.deleteRemoteBranch ? { deleteRemoteBranch: true } : {}),
           knownRemovedWorktree: refreshed,
           ...localOptions,
           ...(checkoutDeleteSignal ? { checkoutDeleteSignal } : {})

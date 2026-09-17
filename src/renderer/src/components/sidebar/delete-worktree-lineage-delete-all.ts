@@ -16,6 +16,8 @@ export function runLineageDeleteAll(args: {
     expectedCount: number
   ) => Worktree[] | null
   forceOnConfirm: boolean
+  /** Opt-in `git push --delete` for every target in the lineage. */
+  deleteRemoteBranch?: boolean
   onForceDeleted: (target: WorktreeRemovalTarget) => void
   closeModal: () => void
   onDeleted: ((deleted: WorktreeRemovalTarget[]) => void) | null | undefined
@@ -32,6 +34,7 @@ export function runLineageDeleteAll(args: {
   }
   const deletePromise = runWorktreeDeletesInParallel(currentTargets, {
     force: args.forceOnConfirm,
+    ...(args.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {}),
     onForceDeleted: args.onForceDeleted
   })
   args.closeModal()

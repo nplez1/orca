@@ -9,6 +9,10 @@ import { parseWslPath } from '../wsl'
 import { gitExecFileAsync } from './runner'
 import { runWithGitReadCacheInvalidation } from './status'
 import { deleteBranchAfterWorktreeRemoval } from './worktree-branch-removal'
+import {
+  deleteRemoteBranchAfterLocalBranchRemoval,
+  resolveRemoteBranchTarget
+} from '../../shared/worktree/remote-branch-removal'
 import { invalidateWslLinkedWorktreeGitRouting } from './wsl-linked-worktree-git-routing'
 import type { RemoveWorktreeOptions } from './worktree-operation-options'
 import { getErrorCode, gitExecOptions, normalizeLocalBranchRef } from './worktree-operation-options'
@@ -102,27 +106,38 @@ async function performRemoveWorktree(
     return {}
   }
   if (options.deleteBranch === false) {
-    return {}
+    // Why: the branch was pinned for preservation, so nothing consumed its upstream and there is
+    // no deleted local branch to pair a remote delete with.
+    return options.deleteRemoteBranch === true
+      ? { remoteBranchCleanup: { status: 'skipped-preserved' } }
+      : {}
   }
 
-  return deleteBranchOfRemovedWorktree(repoPath, branchName, branchHead, options)
-}
+  return runKeyedSerializedOperation(branchCleanupQueueByRepo, repoPath, async () => {
+    // Why: `git branch -d` deletes `branch.<name>.remote`/`.merge` along with the branch, so the
+    // upstream has to be read while it still exists — before the branch cleanup below runs.
+    const runGit = (args: string[]): Promise<{ stdout: string }> =>
+      gitExecFileAsync(args, gitExecOptions(repoPath, options))
+    const remoteBranchTarget =
+      options.deleteRemoteBranch === true
+        ? await resolveRemoteBranchTarget(runGit, branchName)
+        : null
 
-function deleteBranchOfRemovedWorktree(
-  repoPath: string,
-  branchName: string,
-  branchHead: string,
-  options: RemoveWorktreeOptions
-): Promise<RemoveWorktreeResult> {
-  // Why its own span: branch cleanup can reach the network (`fetch --prune`), so a stall here reads as
-  // `git worktree remove` being slow unless it is timed separately.
-  // Why serialized per repo: concurrent removals in one repo race `packed-refs.lock` and the
-  // remote-tracking ref locks of `fetch --prune` (#2259); the checkout deletes above need not wait.
-  return runKeyedSerializedOperation(branchCleanupQueueByRepo, repoPath, () =>
-    withSpan('worktree.remove.branch_delete', () =>
+    const branchCleanup = await withSpan('worktree.remove.branch_delete', () =>
       deleteBranchAfterWorktreeRemoval(repoPath, branchName, branchHead, options)
     )
-  )
+    if (remoteBranchTarget === null) {
+      return branchCleanup
+    }
+    return {
+      ...branchCleanup,
+      remoteBranchCleanup: await deleteRemoteBranchAfterLocalBranchRemoval({
+        runGit,
+        branchName,
+        target: remoteBranchTarget
+      })
+    }
+  })
 }
 
 /**

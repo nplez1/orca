@@ -182,6 +182,36 @@ async function resolveEffectiveGitUpstreamForBranch(
   return null
 }
 
+/**
+ * The upstream of an explicit branch, for callers not standing on it. Worktree removal runs
+ * from the repo while the branch belongs to the linked worktree being removed, so the
+ * HEAD-based probe in {@link resolveEffectiveGitUpstream} would read the wrong branch — and by
+ * then the local branch delete has already consumed the config it needs.
+ */
+export async function resolveEffectiveGitUpstreamForBranchName(
+  runGit: GitCommandRunner,
+  branchName: string
+): Promise<EffectiveGitUpstream | null> {
+  const branchRemoteUpstream = await getConfiguredBranchRemoteUpstream(
+    runGit,
+    branchName,
+    (remoteName, upstreamBranchName) =>
+      remoteTrackingRefExists(runGit, remoteName, upstreamBranchName)
+  )
+  if (branchRemoteUpstream) {
+    return branchRemoteUpstream
+  }
+  if (await remoteTrackingRefExists(runGit, 'origin', branchName)) {
+    return {
+      upstreamName: `origin/${branchName}`,
+      remoteName: 'origin',
+      branchName,
+      isConfiguredUpstream: false
+    }
+  }
+  return null
+}
+
 export async function resolveEffectiveGitUpstream(
   runGit: GitCommandRunner
 ): Promise<EffectiveGitUpstream | null> {

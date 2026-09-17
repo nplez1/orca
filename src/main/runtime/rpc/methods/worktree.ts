@@ -252,6 +252,7 @@ export const WORKTREE_METHODS = [
         runHooks: params.runHooks === true,
         allowUnverifiedPtyStop: params.allowUnverifiedPtyStop === true,
         allowFailedArchiveHook: params.allowFailedArchiveHook === true,
+        deleteRemoteBranch: params.deleteRemoteBranch === true,
         ...(resolvedHostId ? { hostId: resolvedHostId } : {}),
         // Why: only a client that shows the `removing` marker can wait out Git's delete; older
         // clients get the acceptance and never see the row again.
