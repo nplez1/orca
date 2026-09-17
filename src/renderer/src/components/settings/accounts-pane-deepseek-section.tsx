@@ -142,7 +142,7 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
             size="xs"
             onClick={() => void saveDeepSeekApiKey()}
             disabled={deepSeekCredentialBusy || !deepSeekApiKeyDraft.trim()}
-            className="h-7 shrink-0 text-xs"
+            className="h-7 shrink-0"
           >
             {deepSeekCredentialBusy ? <Loader2 className="size-3 animate-spin" /> : null}
             {deepSeekApiKeyConfigured
@@ -161,7 +161,7 @@ export function renderDeepSeekAccountsSection(model: AccountsPaneSectionModel): 
               size="xs"
               onClick={() => void clearDeepSeekApiKey()}
               disabled={deepSeekCredentialBusy}
-              className="h-7 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
             >
               {translate(
                 'auto.components.settings.accounts.pane.deepseek.section.bc10d6273f',

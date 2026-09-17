@@ -1,19 +1,28 @@
 import { RuntimeClientError } from '../../runtime-client'
 
-type CompatibilityCliCommand = 'orca' | 'orca-ide' | 'orca-dev' | 'orca-np' | 'orca-np-dev'
-
-const COMPATIBILITY_CLI_COMMANDS: readonly string[] = [
+const COMPATIBILITY_CLI_COMMANDS = [
   'orca',
   'orca-ide',
   'orca-dev',
   'orca-np',
   'orca-np-dev'
-]
+] as const
+
+// Why: derived from the list so the accepted commands and the accepted type cannot drift apart.
+type CompatibilityCliCommand = (typeof COMPATIBILITY_CLI_COMMANDS)[number]
+
+// Why typed as a string set: the membership test then narrows in the guard below instead of
+// forcing each caller to assert the value it just validated.
+const COMPATIBILITY_CLI_COMMAND_SET: ReadonlySet<string> = new Set(COMPATIBILITY_CLI_COMMANDS)
+
+function isCompatibilityCliCommand(value: string): value is CompatibilityCliCommand {
+  return COMPATIBILITY_CLI_COMMAND_SET.has(value)
+}
 
 export function resolveCompatibilityCliCommand(): CompatibilityCliCommand {
   const configured = process.env.ORCA_CLI_COMMAND
-  if (configured && COMPATIBILITY_CLI_COMMANDS.includes(configured)) {
-    return configured as CompatibilityCliCommand
+  if (configured && isCompatibilityCliCommand(configured)) {
+    return configured
   }
   return 'orca-np'
 }
@@ -23,8 +32,8 @@ export function resolvePackagedWindowsCompatibilityCommand(): CompatibilityCliCo
     return undefined
   }
   const command = process.env.ORCA_CLI_COMMAND
-  if (command && COMPATIBILITY_CLI_COMMANDS.includes(command)) {
-    return command as CompatibilityCliCommand
+  if (command && isCompatibilityCliCommand(command)) {
+    return command
   }
   throw new RuntimeClientError(
     'invalid_argument',

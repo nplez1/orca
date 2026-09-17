@@ -209,7 +209,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
             size="xs"
             onClick={() => void saveCopilotCredentials()}
             disabled={copilotCredentialBusy || (!copilotTokenDraft.trim() && !tokenStored)}
-            className="h-7 shrink-0 text-xs"
+            className="h-7 shrink-0"
           >
             {copilotCredentialBusy ? <Loader2 className="size-3 animate-spin" /> : null}
             {tokenStored
@@ -228,7 +228,7 @@ export function renderCopilotAccountsSection(model: AccountsPaneSectionModel): R
               size="xs"
               onClick={() => void clearCopilotCredentials()}
               disabled={copilotCredentialBusy}
-              className="h-7 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+              className="h-7 shrink-0 text-muted-foreground hover:text-foreground"
             >
               {translate(
                 'auto.components.settings.accounts.pane.copilot.section.4cf256a883',
