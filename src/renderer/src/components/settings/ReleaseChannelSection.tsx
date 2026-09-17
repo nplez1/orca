@@ -11,7 +11,7 @@ import { translate } from '@/i18n/i18n'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
 import {
   DEV_CHANNEL_PLATFORM_LABEL,
-  RELEASE_CHANNELS,
+  OFFERED_RELEASE_CHANNELS,
   RELEASE_CHANNEL_LABELS,
   getVersionChannel,
   hasDedicatedReleaseRepo,
@@ -228,7 +228,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
           // Why disabled rather than hidden: a Linux/Windows dev who has heard
           // about a dev channel should see that it exists and why it is
           // unavailable, instead of silently not finding it.
-          options={RELEASE_CHANNELS.map((channel) => {
+          options={OFFERED_RELEASE_CHANNELS.map((channel) => {
             const supported = isChannelSupportedOnPlatform(channel, platform)
             return {
               value: channel,
