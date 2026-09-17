@@ -215,6 +215,18 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '',
     ...getPiAgentStatusRuntimeDetectionSourceLines(kind),
     '',
+    ...(kind === 'pi'
+      ? [
+          "// Why: the descendant roster is pane STATE, not an event, and pi's transport keeps only",
+          '// the newest post — the add a background spawn emits is overwritten by the tool burst that',
+          '// ends that same spawn. Riding every post means whichever post survives carries the truth.',
+          'function piAsyncSubagentField(): Record<string, unknown> {',
+          '  if (!piAsyncSubagentBusBound || isOmpRuntime()) return {}',
+          '  return { subagent_runs: Array.from(piAsyncSubagentRuns.values()) }',
+          '}',
+          ''
+        ]
+      : []),
     'function post(hookEventName: string, extra: Record<string, unknown> = {}): void {',
     '  const ompRuntime = isOmpRuntime()',
     '  cancelPostRetry()',
@@ -228,7 +240,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     "    hookEventName: ompRuntime && hookEventName === 'model_select' && previousCompletion ? 'agent_end' : hookEventName,",
     // Why: every coalesced snapshot must retain an open modal, not just its start event.
     kind === 'pi'
-      ? '    extra: { ...extra, ...(!ompRuntime && piUiPromptDepth > 0 ? { ui_prompt_active: true } : {}) },'
+      ? '    extra: { ...extra, ...(!ompRuntime && piUiPromptDepth > 0 ? { ui_prompt_active: true } : {}), ...piAsyncSubagentField() },'
       : '    extra,',
     '    metadata,',
     '    ompRuntime,',
