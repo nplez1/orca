@@ -35,6 +35,7 @@ import {
   type RetrievalScope,
   type Retrieved
 } from './session-search-retrieval'
+import { SessionSearchMetadataRetrieval } from './session-search-metadata-retrieval'
 import { sessionRowFilter } from './session-search-row-filter'
 import { ensureSessionSearchQuerySchema } from './session-search-query-schema'
 import { EMPTY_SNIPPET, sessionSearchSnippet } from './session-search-snippet'
@@ -66,6 +67,11 @@ export type SessionSearchEngineOptions = {
   sessionCandidateLimit?: number
   /** Oldest transcript mtime a hit may come from; PR 3 derives it from retention. */
   retentionCutoffMs?: number | null
+  /**
+   * Whether transcript content is consented to. False means `messages_fts` was
+   * never filled, so a text query is answered from `sessions_fts` instead.
+   */
+  contentEnabled?: boolean
 }
 
 /**
@@ -75,18 +81,24 @@ export type SessionSearchEngineOptions = {
  */
 export class SessionSearchEngine {
   private readonly retrieval: SessionSearchRetrieval
+  private readonly metadataRetrieval: SessionSearchMetadataRetrieval
   private readonly candidateLimit: number
+  private readonly contentEnabled: boolean
 
   constructor(
     private readonly db: SyncDatabase,
     private readonly options: SessionSearchEngineOptions = {}
   ) {
     this.candidateLimit = options.sessionCandidateLimit ?? SESSION_SEARCH_CANDIDATE_LIMIT_DEFAULT
+    // Default on: an engine that was not told otherwise is the content tier, as
+    // it was before the tier split, so nothing calling it silently changes tier.
+    this.contentEnabled = options.contentEnabled ?? true
     // Installed here and not on the first search, so the generation triggers are
     // watching before anything this engine will be asked to page over is
     // written, and so retrieval below prepares against tables that exist.
     ensureSessionSearchQuerySchema(this.db)
     this.retrieval = new SessionSearchRetrieval(this.db)
+    this.metadataRetrieval = new SessionSearchMetadataRetrieval(this.db)
   }
 
   generation(): number {
@@ -119,10 +131,15 @@ export class SessionSearchEngine {
       : 0
 
     const plan = planSessionSearchQuery(split.text)
-    const { ranked, retrieved, incomplete } =
-      plan.terms.length === 0
-        ? this.operatorOnly(split, retrievalScope)
-        : this.text(plan, retrievalScope, sort)
+    let rankedPage: RankedPage
+    if (plan.terms.length === 0) {
+      rankedPage = this.operatorOnly(split, retrievalScope)
+    } else if (this.contentEnabled) {
+      rankedPage = this.text(plan, retrievalScope, sort)
+    } else {
+      rankedPage = this.metadataText(plan, retrievalScope)
+    }
+    const { ranked, retrieved, incomplete } = rankedPage
 
     const limit = resolveSessionSearchLimit(request.limit)
     const page = ranked.slice(offset, offset + limit)
@@ -187,6 +204,39 @@ export class SessionSearchEngine {
       ranked: rankSessionHits(retrieved.sessions, best, sort),
       retrieved,
       incomplete: retrieved.incomplete
+    }
+  }
+
+  /**
+   * The metadata tier's answer: titles, paths, branches and agent names, with no
+   * transcript text behind them. Reached only when content is not consented to,
+   * where the content ladder would answer every text query with nothing.
+   */
+  private metadataText(
+    plan: ReturnType<typeof planSessionSearchQuery>,
+    scope: RetrievalScope
+  ): RankedPage {
+    const found = this.metadataRetrieval.run(plan, scope)
+    return {
+      // `message: null` is what keeps evidence out of a metadata hit: the hit
+      // builder only reads a row when it has a message to snippet from, so a
+      // metadata snippet is never fabricated here.
+      ranked: found.matches.map((match) => ({
+        session: match.session,
+        message: null,
+        score: match.score,
+        duplicateCount: 1
+      })),
+      // No rows, and the ones the content path would rank by are absent on
+      // purpose: bm25 already ordered this list in SQL.
+      retrieved: {
+        sessions: found.matches.map((match) => match.session),
+        rows: [],
+        incomplete: found.incomplete,
+        route: found.route,
+        plan: found.plan
+      },
+      incomplete: found.incomplete
     }
   }
 

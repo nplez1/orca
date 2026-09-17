@@ -210,6 +210,12 @@ export type AiVaultListArgs = {
   // Active workspace/project paths. The global result is recency-capped, so these
   // guarantee a scoped view still surfaces its own (possibly older) sessions.
   scopePaths?: readonly string[]
+  /**
+   * Plain-text filter over title, cwd, branch and agent, applied by the host so a
+   * search covers the whole corpus rather than the rows already loaded. Operator
+   * queries are the client's own business (`aiVaultHostListQuery` empties them).
+   */
+  query?: string
   executionHostScope?: ExecutionHostScope
   requestToken?: string
 }
