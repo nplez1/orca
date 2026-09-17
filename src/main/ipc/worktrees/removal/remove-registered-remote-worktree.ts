@@ -34,7 +34,8 @@ export async function removeRegisteredRemoteWorktree(
   registeredWorktree: GitWorktreeInfo,
   removedPushTarget: GitPushTarget | undefined,
   provider: SshGitProvider,
-  deleteBranch: boolean
+  deleteBranch: boolean,
+  deleteRemoteBranch: boolean
 ): Promise<RemoveWorktreeResult> {
   const { mainWindow, store, runtime } = context
   if (args.expectedCheckout) {
@@ -57,7 +58,10 @@ export async function removeRegisteredRemoteWorktree(
     }
   }
 
-  const remoteRemoveOptions = !deleteBranch ? { deleteBranch } : {}
+  const remoteRemoveOptions = {
+    ...(!deleteBranch ? { deleteBranch } : {}),
+    ...(deleteRemoteBranch ? { deleteRemoteBranch: true } : {})
+  }
   const removalGate = await withWorktreeRemoveStageSpan('watcher_gate', 'remote', async () =>
     runtime.acquireFileWatcherRemoval(canonicalWorktreePath, remoteConnectionId)
   )

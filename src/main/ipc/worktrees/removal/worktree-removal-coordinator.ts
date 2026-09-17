@@ -16,6 +16,7 @@ export function getWorktreeRemovalOptionsKey(
     | 'allowFailedArchiveHook'
     | 'approvedNestedWorktrees'
     | 'expectedCheckout'
+    | 'deleteRemoteBranch'
   >
 ): string {
   const forceKey = args.force === true ? 'force' : 'normal'
@@ -27,11 +28,14 @@ export function getWorktreeRemovalOptionsKey(
   // onto the in-flight attempt that is about to refuse on it.
   const archiveFailureKey =
     args.allowFailedArchiveHook === true ? 'allow-failed-archive' : 'require-archive'
+  // A retry that now asks for the remote branch to go must not join an attempt that was told to leave it.
+  const remoteBranchKey =
+    args.deleteRemoteBranch === true ? 'delete-remote-branch' : 'keep-remote-branch'
   const checkoutKey =
     args.approvedNestedWorktrees || args.expectedCheckout
       ? `:${JSON.stringify([args.approvedNestedWorktrees, args.expectedCheckout])}`
       : ''
-  return `${forceKey}:${archiveKey}:${ptyKey}:${archiveFailureKey}${checkoutKey}`
+  return `${forceKey}:${archiveKey}:${ptyKey}:${archiveFailureKey}:${remoteBranchKey}${checkoutKey}`
 }
 
 export function getWorktreeRemovalInFlightKey(
