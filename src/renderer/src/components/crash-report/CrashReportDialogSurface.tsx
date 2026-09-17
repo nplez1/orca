@@ -20,6 +20,7 @@ import {
   type CrashReportDiagnosticBundle,
   type CrashReportRecord
 } from '../../../../shared/crash-reporting'
+import { APP_DISPLAY_NAME } from '../../../../shared/app-display-name'
 import type { GitHubViewer } from '../../../../shared/github/pull-request-types'
 import { translate } from '@/i18n/i18n'
 import {
@@ -249,8 +250,7 @@ export function CrashReportDialogSurface({
                 <div className="font-medium text-foreground">{formatSummary(report)}</div>
                 <div className="mt-1 text-muted-foreground">
                   {new Date(report.createdAt).toLocaleString()} · {report.platform} {report.arch} ·
-                  {translate('auto.components.crash.report.CrashReportDialog.835037edc9', 'Orca')}{' '}
-                  {report.appVersion}
+                  {APP_DISPLAY_NAME} {report.appVersion}
                 </div>
               </div>
               <div className="min-w-0 space-y-1.5">

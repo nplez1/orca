@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import { translateMain } from '../i18n/main-i18n'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 
@@ -36,7 +37,7 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
 
   if (args.source === 'test') {
     return {
-      title: 'Orca notifications are on',
+      title: `${APP_DISPLAY_NAME} notifications are on`,
       body: 'This is a test notification from Orca.'
     }
   }

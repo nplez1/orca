@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { getAppIconPath } from '../app-icon'
 import { browserManager } from '../browser/browser-manager'
 import { getBrowserClientHostId } from '../browser/browser-client-host-id'
+import { APP_DISPLAY_NAME } from '../../shared/app-display-name'
 import { formatBrowserClientHostIdArgument } from '../../shared/browser-client-host-id-argument'
 import { markSystemSessionEnding } from '../crash-reporting/expected-teardown-state'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
@@ -102,7 +103,7 @@ export function createMainWindow(
     ...(savedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    title: opts?.title ?? 'Orca',
+    title: opts?.title ?? APP_DISPLAY_NAME,
     show: false,
     // Why: macOS swallows the app-activating click by default, so clicking back into Orca needed a second click (Windows/Linux already deliver it).
     acceptFirstMouse: true,
