@@ -4,6 +4,10 @@ import { isBranchCheckedOutInWorktreeError } from '../shared/git-branch-delete-r
 import { assertWorktreeUnlockedForRemoval } from '../shared/worktree/removal'
 import { isSubmoduleWorktreeRemovalRefusal } from '../shared/worktree/submodule-removal'
 import { deleteAlreadyMergedRelayBranchAfterSafeDeleteFailure } from './git-handler-branch-cleanup'
+import {
+  deleteRemoteBranchAfterLocalBranchRemoval,
+  resolveRemoteBranchTarget
+} from '../shared/worktree/remote-branch-removal'
 import type { GitExec } from './git-handler-ops'
 import type { GitCapabilityCache } from '../shared/git-capability-cache'
 import { readRelayWorktreeList } from './git-handler-worktree-list'
@@ -108,6 +112,7 @@ export async function removeWorktreeOp(
   const worktreePath = params.worktreePath as string
   const force = params.force as boolean | undefined
   const deleteBranch = params.deleteBranch !== false
+  const deleteRemoteBranch = params.deleteRemoteBranch === true
   const forceBranchDelete = params.forceBranchDelete === true
 
   let repoPath = worktreePath
@@ -157,7 +162,27 @@ export async function removeWorktreeOp(
     return {}
   }
   if (!deleteBranch) {
-    return {}
+    return deleteRemoteBranch ? { remoteBranchCleanup: { status: 'skipped-preserved' } } : {}
+  }
+
+  const runGit = (args: string[]) => git(args, repoPath)
+  // Why: the branch delete below consumes `branch.<name>.remote`/`.merge`, so the upstream has to
+  // be read while it still exists — the same order local removal uses.
+  const remoteBranchTarget = deleteRemoteBranch
+    ? await resolveRemoteBranchTarget(runGit, branchName)
+    : null
+  const finish = async (result: RemoveWorktreeResult): Promise<RemoveWorktreeResult> => {
+    if (remoteBranchTarget === null) {
+      return result
+    }
+    return {
+      ...result,
+      remoteBranchCleanup: await deleteRemoteBranchAfterLocalBranchRemoval({
+        runGit,
+        branchName,
+        target: remoteBranchTarget
+      })
+    }
   }
 
   // Why: SSH worktree deletion should mirror local deletion. Dropping the
@@ -165,16 +190,10 @@ export async function removeWorktreeOp(
   // after the last PR review worktree is gone.
   try {
     // Why: use `-d` (not `-D`) to mirror the local removeWorktree fix.
-    const branchDeleteResult = await deleteRelayBranchAfterWorktreeRemoval(
-      git,
-      repoPath,
-      branchName,
-      forceBranchDelete
-    )
-    if (branchDeleteResult === 'checked-out') {
-      return {}
-    }
-    return {}
+    // Why: no branch outcome here needs its own arm. `finish` re-reads the local ref, so a
+    // checked-out branch is detected by observation rather than by trusting this return value.
+    await deleteRelayBranchAfterWorktreeRemoval(git, repoPath, branchName, forceBranchDelete)
+    return await finish({})
   } catch (error) {
     if (!forceBranchDelete && branchHead) {
       try {
@@ -187,7 +206,7 @@ export async function removeWorktreeOp(
             capabilities
           )
         ) {
-          return {}
+          return await finish({})
         }
       } catch (alreadyMergedDeleteError) {
         // Why: worktree is gone; preserve branch recovery on cleanup races.
@@ -202,6 +221,8 @@ export async function removeWorktreeOp(
       `relay removeWorktree: preserved local branch "${branchName}" after removing worktree (not fully merged)`,
       error
     )
-    return { preservedBranch: { branchName, ...(branchHead ? { head: branchHead } : {}) } }
+    return await finish({
+      preservedBranch: { branchName, ...(branchHead ? { head: branchHead } : {}) }
+    })
   }
 }

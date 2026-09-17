@@ -240,6 +240,7 @@ export const WORKTREE_METHODS = [
         runHooks: params.runHooks === true,
         allowUnverifiedPtyStop: params.allowUnverifiedPtyStop === true,
         allowFailedArchiveHook: params.allowFailedArchiveHook === true,
+        deleteRemoteBranch: params.deleteRemoteBranch === true,
         ...(resolvedHostId ? { hostId: resolvedHostId } : {})
       })
       return { removed: true, ...result }

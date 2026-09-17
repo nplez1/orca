@@ -190,6 +190,7 @@ export function buildDefaultSettings(args: {
     devPluginPaths: [],
     claudeAgentTeamsDefaultDisabledMigrated: true,
     skipDeleteWorktreeConfirm: false,
+    deleteRemoteBranchOnWorkspaceDelete: false,
     skipCloseTerminalWithRunningProcessConfirm: false,
     skipDeleteAutomationConfirm: false,
     skipDeleteArtifactConfirm: false,

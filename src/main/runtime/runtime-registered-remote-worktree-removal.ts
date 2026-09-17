@@ -23,6 +23,8 @@ export async function removeRuntimeRegisteredRemoteWorktree(args: {
   force: boolean
   allowUnverifiedPtyStop: boolean
   deleteBranch: boolean
+  /** Opt-in `git push --delete` of the branch's upstream; paired with the local branch delete. */
+  deleteRemoteBranch: boolean
   acquireWatcherRemoval: (
     path: string,
     connectionId: string
@@ -45,7 +47,10 @@ export async function removeRuntimeRegisteredRemoteWorktree(args: {
     runHooks: args.runHooks,
     allowFailedArchiveHook: args.allowFailedArchiveHook
   })
-  const removeOptions = !args.deleteBranch ? { deleteBranch: args.deleteBranch } : {}
+  const removeOptions = {
+    ...(!args.deleteBranch ? { deleteBranch: args.deleteBranch } : {}),
+    ...(args.deleteRemoteBranch ? { deleteRemoteBranch: true } : {})
+  }
   const gate = await args.acquireWatcherRemoval(registeredWorktree.path, connectionId)
   let rawResult: RemoveWorktreeResult | undefined
   let completed = false
