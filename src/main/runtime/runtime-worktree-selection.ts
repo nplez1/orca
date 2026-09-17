@@ -38,13 +38,19 @@ export type RemoveManagedWorktreeOptions = {
   allowUnverifiedPtyStop?: boolean
   /** Waives a FAILED archive hook (#19334). Never implied by `force`, never by `runHooks`. */
   allowFailedArchiveHook?: boolean
+  /** Opt-in `git push --delete` of the branch's upstream. */
+  deleteRemoteBranch?: boolean
   hostId?: string
 }
 
 export function getRuntimeWorktreeRemovalOptionsKey(
   options: Pick<
     RemoveManagedWorktreeOptions,
-    'force' | 'runHooks' | 'allowUnverifiedPtyStop' | 'allowFailedArchiveHook'
+    | 'force'
+    | 'runHooks'
+    | 'allowUnverifiedPtyStop'
+    | 'allowFailedArchiveHook'
+    | 'deleteRemoteBranch'
   >
 ): string {
   // Why: a forced retry must not coalesce onto the in-flight attempt that just
@@ -54,7 +60,8 @@ export function getRuntimeWorktreeRemovalOptionsKey(
   // onto the in-flight attempt that is about to refuse on it.
   const archiveKey = options.allowFailedArchiveHook ? 'allow-failed-archive' : 'require-archive'
   const hooksKey = options.runHooks ? 'run-hooks' : 'skip-hooks'
-  return `${options.force ? 'force' : 'normal'}:${hooksKey}:${ptyKey}:${archiveKey}`
+  const remoteBranchKey = options.deleteRemoteBranch ? 'delete-remote-branch' : 'keep-remote-branch'
+  return `${options.force ? 'force' : 'normal'}:${hooksKey}:${ptyKey}:${archiveKey}:${remoteBranchKey}`
 }
 
 // Null executionHostId means host-unaware: path-only callers match any repo, and the first runtime

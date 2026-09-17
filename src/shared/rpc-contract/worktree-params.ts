@@ -174,7 +174,10 @@ export const WorktreeRemove = WorktreeSelector.extend({
   runHooks: OptionalBoolean,
   // Why (#19334): a failed archive hook blocks removal. This waives that refusal and is recorded
   // in the result; it is NOT `force`, and it does not decide whether the hook runs.
-  allowFailedArchiveHook: OptionalBoolean
+  allowFailedArchiveHook: OptionalBoolean,
+  /** Opt-in `git push --delete` of the branch's upstream. Absent from older clients, and from hosts
+   *  that predate it, so a host must treat absence as "leave the remote branch alone". */
+  deleteRemoteBranch: OptionalBoolean
 })
 
 export const WorktreeForceDeleteBranch = WorktreeSelector.extend({

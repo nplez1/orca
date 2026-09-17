@@ -83,16 +83,34 @@ export class SshGitWorktreeProvider extends SshGitReviewHeadProvider {
   async removeWorktree(
     worktreePath: string,
     force?: boolean,
-    options?: { deleteBranch?: boolean; forceBranchDelete?: boolean }
+    options?: {
+      deleteBranch?: boolean
+      forceBranchDelete?: boolean
+      deleteRemoteBranch?: boolean
+    }
   ): Promise<RemoveWorktreeResult> {
-    return this.runWithGitReadInvalidation(
-      async () =>
-        ((await this.mux.request('git.removeWorktree', {
-          worktreePath,
-          force,
-          ...options
-        })) ?? {}) as RemoveWorktreeResult
-    )
+    return this.runWithGitReadInvalidation(async () => {
+      const response = await this.mux.request('git.removeWorktree', {
+        worktreePath,
+        force,
+        ...options
+      })
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: git.removeWorktree is Orca's own relay method; it answers with a JSON RemoveWorktreeResult, and null only when the handler returned nothing.
+      const result = (response ?? {}) as RemoveWorktreeResult
+      if (options?.deleteRemoteBranch !== true || result.remoteBranchCleanup) {
+        return result
+      }
+      // Why: an old relay drops the unknown param, replies without a cleanup, and the remote branch
+      // is still there — so absence must read as "not deleted", never as "deleted".
+      return {
+        ...result,
+        remoteBranchCleanup: {
+          status: 'failed' as const,
+          message:
+            'This SSH host is running an older Orca relay that cannot delete remote branches. Reconnect to deploy the latest relay, then delete the branch from the host yourself.'
+        }
+      }
+    })
   }
 
   async worktreeIsClean(

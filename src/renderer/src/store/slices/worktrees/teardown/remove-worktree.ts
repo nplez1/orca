@@ -256,7 +256,7 @@ export function createRemoveWorktree(
       })
       // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
       clearSessionCommitDraftForWorktree(worktreeId)
-      const preservedBranch = removalResult?.preservedBranch
+      const { preservedBranch, remoteBranchCleanup } = removalResult ?? {}
       const cleanup = preservedBranch
         ? {
             worktreeId,
@@ -285,9 +285,13 @@ export function createRemoveWorktree(
         })
       }
       pruneHostedReviewLinkMutationGenerations([worktreeId])
+      // Why: this rebuilds the result as a literal, so every field a caller reads has to be named
+      // here — `remoteBranchCleanup` is optional in the type, so omitting it typechecks and then
+      // silently reports nothing about a remote branch the user asked to delete.
       return preservedBranch && cleanup
         ? {
             ok: true as const,
+            ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
             preservedBranch: {
               ...preservedBranch,
               ...(cleanup.hostId ? { hostId: cleanup.hostId } : {}),
@@ -296,7 +300,7 @@ export function createRemoveWorktree(
                 : {})
             }
           }
-        : { ok: true as const }
+        : { ok: true as const, ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}) }
     } catch (err) {
       // Why: git refusing a non-force delete for dirty/untracked files is a handled user decision, not an app error.
       console.warn('Failed to remove worktree:', err)
