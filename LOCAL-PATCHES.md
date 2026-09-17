@@ -28,7 +28,7 @@ Anchors to re-point (`stablyai/orca` → `nplez1/orca`):
 - `src/main/updater/updater-release-feed.ts` — the `latest/download` fallback.
 - `src/shared/release-channel.ts` — `MAIN_RELEASE_REPO`.
 
-`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still *name* upstream's channel repos, but nothing resolves
+`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still _name_ upstream's channel repos, but nothing resolves
 through them any more: this fork publishes one stream, so every channel maps to `MAIN_RELEASE_REPO`
 and the picker offers only stable and rc (`OFFERED_RELEASE_CHANNELS`).
 
@@ -36,7 +36,7 @@ Why both halves: hiding the channels is a UI courtesy, but a channel persisted b
 still reaches `getReleaseRepoForChannel`, and resolving that to upstream's repo would update an Orca
 NP install into an official Orca. The mapping is the part that has to be right; the hiding is what
 stops anyone choosing it in the first place. `hasDedicatedReleaseRepo` still reports the dev
-channels as such, because it feeds the updater's *reporting* path — a legacy value that resolves to
+channels as such, because it feeds the updater's _reporting_ path — a legacy value that resolves to
 this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
@@ -98,7 +98,7 @@ pnpm run sync:localization-runtime-catalog
   resolution: two i18n locale files (took upstream's side; the derived catalog was then regenerated,
   which removed exactly the stale fixture keys the local side carried) and
   `src/shared/agent-hook-listener/listener-state.ts`, where upstream wrapped the state factory in a
-  legacy-adapter layer — kept that scaffolding *and* the `CopilotBackgroundWorkState` type. Verified:
+  legacy-adapter layer — kept that scaffolding _and_ the `CopilotBackgroundWorkState` type. Verified:
   26 of 29 patches byte-identical by `range-diff`, all three typecheck projects clean, 161 test files
   green. Also removed an unused import in an upstream `native-chat` test that upstream's CI does not
   gate on but this repo's typecheck does.
@@ -118,7 +118,7 @@ once it does. The release body comes from `.github/fork-release-notes.md`, rende
 the version, commit, date, and a signing paragraph that follows the signing mode.
 
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
-empty: an unset secret still *defines* them as empty strings, electron-builder reads a defined
+empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
 `CSC_LINK` as a certificate path, and `resolveCscLinkPath('', cwd)` resolves to the repository root —
 so packaging dies with `<repo> not a file`. An empty secret and an absent one are not the same thing.
 
@@ -191,7 +191,7 @@ Two layers, so a rebake is rare:
    that cannot be automated.
 
 Gate a candidate image with `local/orca-vm/verify-guest-image.sh`, run on the guest: it exits
-non-zero until node/npm/git, the toolchain, a *complete* baked native-deps entry with both addons,
+non-zero until node/npm/git, the toolchain, a _complete_ baked native-deps entry with both addons,
 and at least one agent CLI are present.
 
 ### `local(identity)`: ship as "Orca NP" beside an official Orca
@@ -199,15 +199,15 @@ and at least one agent CLI are present.
 This fork must coexist with an official Orca install on the same machine, so every name either
 install owns is changed here. Nothing in this section is a PR candidate.
 
-| Piece | Value |
-|---|---|
-| appId / `BASE_APP_USER_MODEL_ID` | `com.nplez1.orca` |
-| product name | `Orca NP` |
-| installed CLI command | `orca-np` (Windows `orca-np.cmd`) |
-| dev CLI | `orca-np-dev` |
-| packaged userData | `appData/orca-np` |
-| home directory | `~/.orca-np` |
-| URL scheme | **unchanged**: `orca://` |
+| Piece                            | Value                             |
+| -------------------------------- | --------------------------------- |
+| appId / `BASE_APP_USER_MODEL_ID` | `com.nplez1.orca`                 |
+| product name                     | `Orca NP`                         |
+| installed CLI command            | `orca-np` (Windows `orca-np.cmd`) |
+| dev CLI                          | `orca-np-dev`                     |
+| packaged userData                | `appData/orca-np`                 |
+| home directory                   | `~/.orca-np`                      |
+| URL scheme                       | **unchanged**: `orca://`          |
 
 Why the scheme stays: `orca://pair` is what the official mobile app and official clients consume,
 and `orca://skills/share/...` is how share links open this app. A fork-only scheme would make its own
@@ -241,3 +241,46 @@ Consequences to expect on first run of a renamed build: it cannot read an offici
 Keychain items or E2EE pairing files, and macOS re-prompts for TCC once per permission because
 grants anchor on bundle id + team id. The official install keeps working — its `~/.orca`, its CLI
 shim and its `orca://` handling are untouched.
+
+#### The in-app display name comes from one constant
+
+The rename above changed the names an _install_ owns, but the running app still called itself "Orca"
+in its own chrome: the title bar, window title, tray tooltip, notification titles, status bar and
+onboarding header each carried a private `'Orca'` literal, so a renamed build looked like an official
+one in exactly the places a user looks to tell them apart.
+
+`src/shared/app-display-name.ts` is now the single source:
+
+- `APP_DISPLAY_NAME` = `Orca NP` — the packaged name and the base of every dev label.
+- `APP_DEV_DISPLAY_NAME` = `Orca NP Dev` — drives `app.setName`, so it must stay constant across
+  branches or each worktree mints a new macOS safeStorage Keychain item.
+
+TS readers: `src/main/startup/dev-instance-identity.ts`, plus the display slots in `system-tray.ts`,
+`createMainWindow.ts`, `main-window-close-lifecycle.ts`, `dashboard-popout-window.ts`,
+`push-dispatcher.ts` and the three notification builders under `src/main/ipc/`; in the renderer,
+`TitlebarLeftControls.tsx`, `resource-usage-metrics.tsx`, `OnboardingFlow.tsx`,
+`CrashReportDialogSurface.tsx`, `HomeSlide.tsx`, `AutomationEditorDialogHeader.tsx`,
+`AutomationRunDetailsPage.tsx`, `web-app-api.ts` and `web-runtime-environment.ts`.
+
+Two readers cannot import TypeScript and therefore keep a literal: `productName` in
+`config/electron-builder.config.cjs` and `DEV_BUNDLE_DISPLAY_NAME` in
+`config/scripts/dev-electron-bundle-identity.mjs`. Each is pinned to the constant by a test
+(`electron-builder-config.test.mjs`, `dev-electron-bundle-identity.test.ts`), so a rename that misses
+one fails there instead of shipping a build whose window disagrees with its own bundle name.
+
+Deliberately unchanged, and why each is not a copy to collapse:
+
+- **Translated copy.** The i18n keys whose whole value was the bare brand name
+  (`auto.App.5096cbbc86` and its siblings) are no longer referenced — the brand is not translatable,
+  and the repo's brand policy already reverts machine-translated brand names to Latin. Those keys stay
+  in `en.json` and the five locale catalogs as orphans, which `verify:localization-extraction`
+  reports without failing on. Removing them would mean editing five upstream-owned locale files, the
+  exact sync conflict this branch avoids. Prose that merely mentions the product ("Orca's graphics
+  process has crashed") is left alone for the same reason.
+- **Interop and setup identity.** `TERM_PROGRAM`, the Codex `clientInfo.title`, the JIRA user-agent,
+  the SSH relay shim name and every path in `app-directory-names.ts` are what other tools and existing
+  installs match on; renaming them would break pairing, updates or an existing install's data.
+- **Translated tray labels.** `tray.openOrca` / `tray.activityWaiting` are hand-authored i18n keys,
+  so their English is a catalog value rather than an inline literal. The non-dev attention tooltip now
+  reuses the existing `tray.activityWaitingSuffix` key, which drops one `'Orca'` literal without
+  touching a catalog; the remaining "Open Orca" menu label is left to the translations.
