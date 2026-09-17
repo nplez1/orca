@@ -149,9 +149,11 @@ describe('OMP model reporting', () => {
     await harness.callHook('tool_execution_end', { toolName: 'bash' }, { model: MINIMAX })
     await settled(harness.fetchMock, 2)
 
+    // The descendant roster rides every post so the newest one always carries the
+    // truth; with no children that is an empty list, not an absent field.
     expect(postedPayloads(harness.fetchMock)).toEqual([
-      { hook_event_name: 'agent_start' },
-      { hook_event_name: 'tool_execution_end', tool_name: 'bash' }
+      { hook_event_name: 'agent_start', subagent_runs: [] },
+      { hook_event_name: 'tool_execution_end', tool_name: 'bash', subagent_runs: [] }
     ])
   })
 
