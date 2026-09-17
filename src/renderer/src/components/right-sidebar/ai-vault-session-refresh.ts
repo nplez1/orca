@@ -78,7 +78,13 @@ function getAgentSessionIdsKey(
 export function useAiVaultSessionRefresh(
   scopePaths: readonly string[],
   executionHostScope: ExecutionHostScope,
-  sessionLimit: AiVaultSessionLimit
+  sessionLimit: AiVaultSessionLimit,
+  /**
+   * The plain-text filter the host applies, already settled by the panel (see
+   * `useAiVaultHostQuery`). Empty means the client filters, and it is part of the
+   * scan key because a filtered listing is not the unfiltered one.
+   */
+  hostQuery = ''
 ): {
   error: string | null
   loading: boolean
@@ -104,9 +110,11 @@ export function useAiVaultSessionRefresh(
   const mountedRef = useRef(true)
   const publicationGateRef = useRef<AiVaultSessionPublicationGate>(undefined!)
   publicationGateRef.current ??= new AiVaultSessionPublicationGate()
-  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths)}\n${sessionLimit}`
+  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, hostQuery)}\n${sessionLimit}`
   const scopePathsRef = useRef<readonly string[]>(scopePaths)
   scopePathsRef.current = scopePaths
+  const hostQueryRef = useRef(hostQuery)
+  hostQueryRef.current = hostQuery
   const executionHostScopeRef = useRef<ExecutionHostScope>(executionHostScope)
   executionHostScopeRef.current = executionHostScope
   const sessionLimitRef = useRef(sessionLimit)
@@ -118,7 +126,8 @@ export function useAiVaultSessionRefresh(
     () =>
       `${aiVaultSessionResultCacheKey(
         executionHostScopeRef.current,
-        scopePathsRef.current
+        scopePathsRef.current,
+        hostQueryRef.current
       )}\n${sessionLimitRef.current}`,
     []
   )
@@ -126,7 +135,11 @@ export function useAiVaultSessionRefresh(
     async (args: AiVaultRefreshArgs = {}): Promise<void> => {
       const hostScope = executionHostScopeRef.current
       const selectedLimit = sessionLimitRef.current
-      const baseKey = aiVaultSessionResultCacheKey(hostScope, scopePathsRef.current)
+      const baseKey = aiVaultSessionResultCacheKey(
+        hostScope,
+        scopePathsRef.current,
+        hostQueryRef.current
+      )
       const cachedResult =
         args.reuseLoadedDepth === true
           ? readCachedAiVaultSessionResult({
@@ -176,6 +189,9 @@ export function useAiVaultSessionRefresh(
           limit,
           unlimited: selectedLimit === 'unlimited',
           scopePaths: scopePathsRef.current,
+          // Omitted rather than empty: an absent filter is not a filter that
+          // matches nothing.
+          ...(hostQueryRef.current ? { query: hostQueryRef.current } : {}),
           executionHostScope: hostScope,
           force: args.force,
           requestToken: requestTokenRef.current

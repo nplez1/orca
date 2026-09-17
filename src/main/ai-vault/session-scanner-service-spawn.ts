@@ -62,13 +62,28 @@ function getSharedClient(): AiVaultScannerServiceClient {
 
 export function scanAiVaultSessionsInService(
   options: AiVaultWorkerScanOptions,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /**
+   * What the caller wants beyond the scan options: `refresh` asks the host to
+   * reconcile its index before listing, `query` asks it to filter the listing so
+   * a search covers the whole corpus rather than the rows already loaded.
+   */
+  request: { refresh?: boolean; query?: string } = {}
 ): Promise<AiVaultListResult> {
   return withSpan('aiVault.scan.service', async (span) => {
     const value = await getSharedClient().request<{
       result: AiVaultListResult
       durationMs: number
-    }>({ type: 'request', operation: 'scan', options }, signal)
+    }>(
+      {
+        type: 'request',
+        operation: 'scan',
+        options,
+        ...(request.refresh ? { refresh: true } : {}),
+        ...(request.query ? { query: request.query } : {})
+      },
+      signal
+    )
     span.setAttribute('serviceDurationMs', value.durationMs)
     span.setAttribute('sessions', value.result.sessions.length)
     return value.result

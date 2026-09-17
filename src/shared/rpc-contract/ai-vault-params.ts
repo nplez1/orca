@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { parseExecutionHostId } from '../execution-host'
 import { AI_VAULT_AGENTS, AI_VAULT_SCOPE_PATHS_MAX_COUNT } from '../ai-vault-types'
+import { aiVaultHostListQuery } from '../ai-vault-session-filters'
 import { OptionalBoolean } from './rpc-param-primitives'
 import { AI_VAULT_SESSION_TITLE_REQUEST_MAX_COUNT } from '../ai-vault-session-title'
 
@@ -40,6 +41,14 @@ export const AiVaultListSessionsParams = z
       // rejecting would hard-break older/uncapped producers (web client, pre-cap
       // desktop parents) that send more than the bound.
       .transform((paths) => paths.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT))
+      .optional(),
+    // Why a transform and not a rejection, like scopePaths: the client and the
+    // host both reduce this with `aiVaultHostListQuery`, so an operator query or
+    // an oversized one arrives as "no host filter" — the client filters it itself
+    // — rather than failing a listing over a refinement the host cannot express.
+    query: z
+      .string()
+      .transform((value) => aiVaultHostListQuery(value))
       .optional(),
     // Why: desktop/web callers name the runtime host they are addressing; mobile
     // omits it. The scan itself is host-local either way, so the id must never
