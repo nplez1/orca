@@ -105,8 +105,8 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
       ? [
           'let piUiPromptDepth = 0',
           'let piTurnInFlight = false',
-          // Why: pi reloads extensions in-process, which re-runs the factory. Process-bus
-          // listeners are not replaced on reload the way pi.on handlers are, so a second
+          // Why: pi reloads extensions in-process, which re-runs the factory. Bus listeners
+          // are not replaced on reload the way pi.on handlers are, so a second
           // registration would post every async child event twice.
           'let piAsyncSubagentBusBound = false',
           // Why: the live child set lives at module scope so it survives an in-process
