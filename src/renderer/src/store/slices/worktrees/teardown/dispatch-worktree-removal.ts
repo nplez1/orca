@@ -38,13 +38,14 @@ export async function dispatchWorktreeRemoval(args: {
       force,
       allowUnverifiedPtyStop: options?.allowUnverifiedPtyStop === true,
       allowFailedArchiveHook: options?.allowFailedArchiveHook === true,
+      ...(options?.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {}),
       skipArchive,
       ...snapshotPruneBatch
     })
   }
   const effectiveHostId =
     options?.sameIdSurvivingHostId != null ? hostId : qualifyRuntimeCallHost(target, hostId)
-  return callRuntimeRpc<RemoveWorktreeResult>(
+  const result = await callRuntimeRpc<RemoveWorktreeResult>(
     target,
     'worktree.rm',
     {
@@ -55,6 +56,7 @@ export async function dispatchWorktreeRemoval(args: {
       // Why only when set, unlike the IPC branch: this crosses a version boundary, and a host
       // that predates the gate drops unknown params silently. Send it when it means something.
       ...(options?.allowFailedArchiveHook === true ? { allowFailedArchiveHook: true } : {}),
+      ...(options?.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {}),
       runHooks: !skipArchive
     },
     {
@@ -66,6 +68,21 @@ export async function dispatchWorktreeRemoval(args: {
       timeoutMs: skipArchive ? 60_000 : ARCHIVE_HOOK_TIMEOUT_MS + 60_000
     }
   )
+  if (options?.deleteRemoteBranch !== true || result.remoteBranchCleanup) {
+    return result
+  }
+  // Why: a host that never heard of the param drops it and answers without a cleanup, so silence
+  // would leave the user believing the remote branch is gone. Deliberately not "older host": a
+  // current host also omits the field on its unregistered/stale/orphan-folder removal paths, where
+  // no local branch was deleted and the remote branch was correctly left alone.
+  return {
+    ...result,
+    remoteBranchCleanup: {
+      status: 'failed' as const,
+      message:
+        'The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone.'
+    }
+  }
 }
 
 function qualifyRuntimeCallHost(

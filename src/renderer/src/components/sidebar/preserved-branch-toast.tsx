@@ -19,8 +19,8 @@ function preservedBranchToastId(branchName: string, expectedHead: string | undef
 
 function getPreservedBranchTitle(isWorkspace: boolean): string {
   return isWorkspace
-    ? translate('auto.store.slices.worktrees.5366d13eec', 'Workspace deleted, branch kept')
-    : translate('auto.store.slices.worktrees.2e17f825d4', 'Worktree deleted, branch kept')
+    ? translate('auto.store.slices.worktrees.5366d13eec', 'Workspace deleted, local branch kept')
+    : translate('auto.store.slices.worktrees.2e17f825d4', 'Worktree deleted, local branch kept')
 }
 
 function getPreservedBranchDescription(
@@ -31,19 +31,19 @@ function getPreservedBranchDescription(
   if (!targetName) {
     return translate(
       'auto.store.slices.worktrees.78e08cd877',
-      'Git could not safely delete branch "{{value0}}", so Orca kept it to avoid losing local commits.',
+      'Git could not safely delete local branch "{{value0}}", so Orca kept it to avoid losing local commits.',
       { value0: branch }
     )
   }
   return isWorkspace
     ? translate(
         'auto.store.slices.worktrees.3b57982bf6',
-        'Git could not safely delete branch "{{value0}}" after deleting workspace "{{value1}}", so Orca kept it to avoid losing local commits.',
+        'Git could not safely delete local branch "{{value0}}" after deleting workspace "{{value1}}", so Orca kept it to avoid losing local commits.',
         { value0: branch, value1: targetName }
       )
     : translate(
         'auto.store.slices.worktrees.81f13f48d2',
-        'Git could not safely delete branch "{{value0}}" after deleting worktree "{{value1}}", so Orca kept it to avoid losing local commits.',
+        'Git could not safely delete local branch "{{value0}}" after deleting worktree "{{value1}}", so Orca kept it to avoid losing local commits.',
         { value0: branch, value1: targetName }
       )
 }
@@ -94,7 +94,7 @@ export function showPreservedBranchToast(
   const expectedHead = preservedBranch.head
   const toastId = preservedBranchToastId(branch, expectedHead)
   const forceDeleteLabel = expectedHead
-    ? translate('auto.store.slices.worktrees.e50495aae6', 'Force Delete Branch')
+    ? translate('auto.store.slices.worktrees.e50495aae6', 'Force Delete Local Branch')
     : undefined
   const description = getPreservedBranchDescription(branch, targetName, isWorkspace)
   const forceDelete = expectedHead

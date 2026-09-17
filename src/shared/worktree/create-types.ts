@@ -13,6 +13,7 @@ import type {
   WorkspaceStatus,
   Worktree
 } from './types'
+import type { RemoteBranchCleanup } from './remote-branch-removal'
 import type { WorkspaceLineage, WorktreeLineage, WorktreeLineageWarning } from './lineage-types'
 import type {
   WorktreeDefaultTabsLaunch,
@@ -215,6 +216,9 @@ export type RemoveWorktreeResult = {
   preservedBranch?: PreservedWorktreeBranch
   /** Present only when a FAILED archive hook was explicitly waived for this removal (#19334). */
   archiveHookOverride?: ArchiveHookOverride
+  /** Present only when the removal asked to also delete the remote branch. Absent means the
+   *  host never reconciled it — including an older relay that dropped the request. */
+  remoteBranchCleanup?: RemoteBranchCleanup
 }
 
 export type ForceDeleteWorktreeBranchResult = {
