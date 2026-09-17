@@ -28,11 +28,16 @@ Anchors to re-point (`stablyai/orca` → `nplez1/orca`):
 - `src/main/updater/updater-release-feed.ts` — the `latest/download` fallback.
 - `src/shared/release-channel.ts` — `MAIN_RELEASE_REPO`.
 
-`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still name upstream's channel repos. This fork builds only the
-stable channel, so it never publishes to them — but the release-channel picker still OFFERS hourly,
-daily and adhoc, and selecting one points the updater at stablyai's feed, which would replace this
-build with an official Orca. Hide those channels here or re-point them at this fork; do not leave the
-picker offering a channel that installs a different product.
+`HOURLY_/DAILY_/ADHOC_RELEASE_REPO` still *name* upstream's channel repos, but nothing resolves
+through them any more: this fork publishes one stream, so every channel maps to `MAIN_RELEASE_REPO`
+and the picker offers only stable and rc (`OFFERED_RELEASE_CHANNELS`).
+
+Why both halves: hiding the channels is a UI courtesy, but a channel persisted by an older build
+still reaches `getReleaseRepoForChannel`, and resolving that to upstream's repo would update an Orca
+NP install into an official Orca. The mapping is the part that has to be right; the hiding is what
+stops anyone choosing it in the first place. `hasDedicatedReleaseRepo` still reports the dev
+channels as such, because it feeds the updater's *reporting* path — a legacy value that resolves to
+this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
 
