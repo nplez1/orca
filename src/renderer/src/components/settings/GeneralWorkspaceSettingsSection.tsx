@@ -135,6 +135,37 @@ export function GeneralWorkspaceSettingsSection({
         </SearchableSetting>
       </div>
 
+      <div id="general-delete-remote-branch-on-workspace-delete" className="scroll-mt-6">
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDelete',
+            'Delete Remote Branch By Default'
+          )}
+          description={translate(
+            'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDeleteDescription',
+            'Pre-check the remote-branch option in the delete-workspace dialog. The branch is always kept when its local copy is kept.'
+          )}
+          keywords={['delete', 'branch', 'remote', 'origin', 'worktree', 'default']}
+        >
+          <SettingsSwitchRow
+            label={translate(
+              'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDelete',
+              'Delete Remote Branch By Default'
+            )}
+            description={translate(
+              'auto.components.settings.GeneralWorkspaceSettingsSection.deleteRemoteBranchOnWorkspaceDeleteRowDescription',
+              'Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone.'
+            )}
+            checked={settings.deleteRemoteBranchOnWorkspaceDelete}
+            onChange={() =>
+              updateSettings({
+                deleteRemoteBranchOnWorkspaceDelete: !settings.deleteRemoteBranchOnWorkspaceDelete
+              })
+            }
+          />
+        </SearchableSetting>
+      </div>
+
       <div id="general-skip-delete-automation-confirm" className="scroll-mt-6">
         <SearchableSetting
           title={translate(

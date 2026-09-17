@@ -12,6 +12,8 @@ export type RemoveWorktreeOptions = {
   // Why (#19334): waives a FAILED archive hook. Set only by the explicit "Delete anyway" retry
   // after the user has seen the refusal -- never by the ordinary confirmation, never by `force`.
   allowFailedArchiveHook?: boolean
+  /** Opt-in `git push --delete` of the branch's upstream, from the delete dialog's checkbox. */
+  deleteRemoteBranch?: boolean
   snapshotPruneBatchId?: string
   /** Fresh cleanup-scan evidence for a same-id owner not represented in the catalog. */
   sameIdSurvivingHostId?: ExecutionHostId
