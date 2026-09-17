@@ -129,6 +129,10 @@ export const AiVaultSearchStatusRequestSchema = z.object({})
 export const AiVaultSetSearchEnabledParamsSchema = z.object({ enabled: z.boolean() })
 export const AiVaultSearchStatusSchema = z.object({
   enabled: z.boolean(),
+  // Additive and optional: a host that predates the metadata/content split
+  // reports neither, and a client must not fail its status read over that.
+  // Absent means "content search was not consented on that host".
+  contentEnabled: z.boolean().optional(),
   phase: z.enum(['idle', 'indexing', 'current', 'degraded', 'closed']),
   filesIndexed: z.number().int().nonnegative(),
   filesDue: z.number().int().nonnegative(),

@@ -12,6 +12,14 @@ function seed(db: SyncDatabase, id: number, rows: number, mtime: number): void {
     `INSERT INTO sessions(id,agent,session_id,file_path,title,cwd,cwd_key,resume_command)
     VALUES (?, 'claude', ?, ?, 'synthetic retention', '/fixture', '/fixture', '')`
   ).run(id, String(id), String(id))
+  // The metadata tier's search row, which the writer mirrors for every session.
+  db.prepare(`INSERT INTO sessions_fts(rowid,title,cwd,branch,agent) VALUES (?,?,?,?,?)`).run(
+    id,
+    'synthetic retention',
+    '/fixture',
+    null,
+    'claude'
+  )
   db.prepare('INSERT INTO files(path,byte_offset,mtime_ms,session_row_id) VALUES (?,1,?,?)').run(
     String(id),
     mtime,
@@ -48,6 +56,25 @@ function visibleSessionIds(db: SyncDatabase): string[] {
 function count(db: SyncDatabase, table: string): number {
   return (db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n
 }
+
+it('reclaims the metadata FTS row with the session it names', async () => {
+  // A purge that dropped the session but left its FTS row would grow that table
+  // for the life of the profile: `sessions.id` is AUTOINCREMENT, so the rowid the
+  // orphaned row names is never handed to another session for it to be found by.
+  const index = await openSessionSearchIndexFile('ss-retention-metadata')
+  try {
+    seed(index.db, 1, 1, 1)
+    seed(index.db, 2, 1, 10_000)
+    expect(count(index.db, 'sessions_fts')).toBe(2)
+
+    await deleteExpiredSearchFiles(index.db, 5_000, () => false)
+
+    expect(count(index.db, 'sessions_fts')).toBe(1)
+    expect(count(index.db, 'sessions')).toBe(1)
+  } finally {
+    await index.close()
+  }
+})
 
 it('seeks the expiring end of the file list instead of scanning it', async () => {
   const index = await openSessionSearchIndexFile('ss-retention-plan')
