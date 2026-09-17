@@ -10,7 +10,11 @@ export type WorktreeRemovalInFlight = {
 export function getWorktreeRemovalOptionsKey(
   args: Pick<
     RemoveWorktreeArgs,
-    'force' | 'allowUnverifiedPtyStop' | 'skipArchive' | 'allowFailedArchiveHook'
+    | 'force'
+    | 'allowUnverifiedPtyStop'
+    | 'skipArchive'
+    | 'allowFailedArchiveHook'
+    | 'deleteRemoteBranch'
   >
 ): string {
   const forceKey = args.force === true ? 'force' : 'normal'
@@ -22,7 +26,10 @@ export function getWorktreeRemovalOptionsKey(
   // onto the in-flight attempt that is about to refuse on it.
   const archiveFailureKey =
     args.allowFailedArchiveHook === true ? 'allow-failed-archive' : 'require-archive'
-  return `${forceKey}:${archiveKey}:${ptyKey}:${archiveFailureKey}`
+  // A retry that now asks for the remote branch to go must not join an attempt that was told to leave it.
+  const remoteBranchKey =
+    args.deleteRemoteBranch === true ? 'delete-remote-branch' : 'keep-remote-branch'
+  return `${forceKey}:${archiveKey}:${ptyKey}:${archiveFailureKey}:${remoteBranchKey}`
 }
 
 export function getWorktreeRemovalInFlightKey(
