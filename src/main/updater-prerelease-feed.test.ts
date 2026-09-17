@@ -350,7 +350,10 @@ describe('fetchNewerReleaseTag', () => {
     expect(await fetchNewerReleaseTags('1.4.1-rc.1', 2)).toEqual([])
   })
 
-  it('probes a bounded manifest window concurrently', async () => {
+  // Every newer candidate is probed, so a manifest-less entry cannot hide the release behind it:
+  // a fork's feed also carries the parent's release entries, which have no manifest in this repo.
+  // See LOCAL-PATCHES.md.
+  it('probes every newer candidate concurrently', async () => {
     const feedTags = [
       'v1.4.8-rc.0',
       'v1.4.7-rc.0',
@@ -384,15 +387,15 @@ describe('fetchNewerReleaseTag', () => {
     const result = fetchNewerReleaseTags('1.4.0-rc.0', 2)
 
     await vi.waitFor(() => {
-      expect(manifestUrls).toHaveLength(6)
+      expect(manifestUrls).toHaveLength(feedTags.length)
     })
-    expect(manifestResolvers).toHaveLength(6)
+    expect(manifestResolvers).toHaveLength(feedTags.length)
 
     for (const resolveManifest of manifestResolvers) {
       resolveManifest()
     }
 
     await expect(result).resolves.toEqual([])
-    expect(netFetchMock).toHaveBeenCalledTimes(7)
+    expect(netFetchMock).toHaveBeenCalledTimes(feedTags.length + 1)
   })
 })
