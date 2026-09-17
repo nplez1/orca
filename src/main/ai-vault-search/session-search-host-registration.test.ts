@@ -10,7 +10,7 @@ import {
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
 } from './session-search-indexer-test-fixture'
-import { searchSessionService } from './session-search-service-registry'
+import { searchSessionService, sessionSearchServiceStatus } from './session-search-service-registry'
 import { resetSessionSearchPolicyForTests } from './session-search-policy'
 import { resetSessionSearchServiceInitForTests } from './session-search-service-init'
 
@@ -70,7 +70,7 @@ it('registers the desktop service and pushes the stored policy at boot', async (
   const { installChildSessionSearchService } = await import('./session-search-enablement')
   installed = installChildSessionSearchService({
     dataRoot: harness.root,
-    getSettings: () => ({ aiVaultSearch: { enabled: true, historyDays: 30 } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: true, historyDays: 30 } })
   })
 
   expect(await searchSessionService({ query: 'ledger' }, 'ipc')).not.toEqual({
@@ -79,7 +79,7 @@ it('registers the desktop service and pushes the stored policy at boot', async (
   })
   await vi.waitFor(() => expect(updateSessionSearchInService).toHaveBeenCalledTimes(1))
   expect(updateSessionSearchInService.mock.calls[0]?.[0]).toMatchObject({
-    settings: { enabled: true, historyDays: 30 },
+    settings: { contentEnabled: true, historyDays: 30 },
     databasePath: join(harness.root, 'ai-vault', 'session-search.sqlite')
   })
 })
@@ -89,19 +89,19 @@ it('forwards only a real settings change to the child', async () => {
     await import('./session-search-enablement')
   installed = installChildSessionSearchService({
     dataRoot: harness.root,
-    getSettings: () => ({ aiVaultSearch: { enabled: false, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
   })
   await vi.waitFor(() => expect(updateSessionSearchInService).toHaveBeenCalledTimes(1))
 
   applySessionSearchSettingsChange(
-    { aiVaultSearch: { enabled: false, historyDays: null } },
-    { aiVaultSearch: { enabled: false, historyDays: null } }
+    { aiVaultSearch: { contentEnabled: false, historyDays: null } },
+    { aiVaultSearch: { contentEnabled: false, historyDays: null } }
   )
   expect(updateSessionSearchInService).toHaveBeenCalledTimes(1)
 
   applySessionSearchSettingsChange(
-    { aiVaultSearch: { enabled: false, historyDays: null } },
-    { aiVaultSearch: { enabled: true, historyDays: null } }
+    { aiVaultSearch: { contentEnabled: false, historyDays: null } },
+    { aiVaultSearch: { contentEnabled: true, historyDays: null } }
   )
   await vi.waitFor(() => expect(updateSessionSearchInService).toHaveBeenCalledTimes(2))
 })
@@ -111,7 +111,7 @@ it('does not discover roots or arm a timer during registration', async () => {
   const { installChildSessionSearchService } = await import('./session-search-enablement')
   installed = installChildSessionSearchService({
     dataRoot: harness.root,
-    getSettings: () => ({ aiVaultSearch: { enabled: false, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
   })
   expect(updateSessionSearchInService).toHaveBeenCalledTimes(1)
   await vi.advanceTimersByTimeAsync(600_000)
@@ -123,14 +123,19 @@ it('registers an in-process service for a host with no scanner child', async () 
   installed = installInProcessSessionSearchService({
     dataRoot: harness.root,
     roots: harness.roots,
-    settings: { enabled: false, historyDays: null }
+    settings: { contentEnabled: false, historyDays: null }
   })
   expect(installed).not.toBeNull()
 
-  // Off, not absent: the caller can tell consent from a host that lacks the feature.
-  expect(await searchSessionService({ query: 'ledger' }, 'relay')).toEqual({
+  // Content-off, not absent: the caller can tell "this host stores no message
+  // bodies" from "this host has no index at all", which is what no-service means.
+  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+    enabled: true,
+    contentEnabled: false
+  })
+  expect(await searchSessionService({ query: 'ledger' }, 'relay')).not.toEqual({
     kind: 'unavailable',
-    reason: 'disabled'
+    reason: 'no-service'
   })
 
   installed?.dispose()
@@ -164,14 +169,14 @@ it.each([
 it('disables immediately without root discovery', async () => {
   const { installChildSessionSearchService, applySessionSearchSettingsChange } =
     await import('./session-search-enablement')
-  let settings = { aiVaultSearch: { enabled: true, historyDays: null } }
+  let settings = { aiVaultSearch: { contentEnabled: true, historyDays: null } }
   installed = installChildSessionSearchService({
     dataRoot: harness.root,
     getSettings: () => settings
   })
   updateSessionSearchInService.mockClear()
   const before = settings
-  settings = { aiVaultSearch: { enabled: false, historyDays: null } }
+  settings = { aiVaultSearch: { contentEnabled: false, historyDays: null } }
   applySessionSearchSettingsChange(before, settings)
   expect(updateSessionSearchInService).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ settings: settings.aiVaultSearch })
@@ -179,17 +184,19 @@ it('disables immediately without root discovery', async () => {
   expect(localAiVaultScanRoots).not.toHaveBeenCalled()
 })
 
-it('orcad resolves no roots while disabled and discovers late roots when enabled', async () => {
+it('orcad indexes metadata without content consent and discovers a late root', async () => {
   const { installOrcadSessionSearchService } = await import('../orcad/orcad-session-search')
+  // Content consent is not what starts the index any more: the history list's own
+  // rows are indexed regardless, which is why a host reaches for its roots here.
   installed = await installOrcadSessionSearchService({
     userDataPath: harness.root,
-    getSettings: () => ({ aiVaultSearch: { enabled: false, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
   })
-  expect(localAiVaultScanRoots).not.toHaveBeenCalled()
+  await vi.waitFor(() => expect(localAiVaultScanRoots).toHaveBeenCalled())
   installed?.dispose()
   installed = await installOrcadSessionSearchService({
     userDataPath: harness.root,
-    getSettings: () => ({ aiVaultSearch: { enabled: true, historyDays: null } })
+    getSettings: () => ({ aiVaultSearch: { contentEnabled: true, historyDays: null } })
   })
   await searchSessionService({ query: 'latehostroot', freshness: 'wait-until-current' }, 'ipc')
   const late = join(harness.root, 'late-claude')

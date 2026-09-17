@@ -265,6 +265,25 @@ describe('session parse cache persistence', () => {
     expect(stats.reused).toBe(0)
   })
 
+  // Schema 3 changed what Copilot's `cwd` means (session.start context instead
+  // of the last folder_trust); a schema 2 row would replay the wrong workspace.
+  it('rejects the schema 2 cache written before Copilot cwd semantics changed', async () => {
+    const root = await makeTempDir()
+    const cacheFile = join(root, 'session-parse-cache.json')
+    initSessionParseCachePersistence({ filePath: cacheFile, appVersion: APP_VERSION })
+    const transcript = await writeTranscript(root)
+    await parseAndPersist(transcript)
+
+    const persisted = JSON.parse(await readFile(cacheFile, 'utf-8'))
+    persisted.schemaVersion = 2
+    await writeFile(cacheFile, JSON.stringify(persisted))
+
+    simulateRestart(cacheFile)
+    const stats = await coldParseStats(transcript)
+    expect(stats.fullParses).toBe(1)
+    expect(stats.reused).toBe(0)
+  })
+
   it('reuses a schema-compatible cache written by a different app version', async () => {
     const root = await makeTempDir()
     const cacheFile = join(root, 'session-parse-cache.json')

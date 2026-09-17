@@ -7,6 +7,7 @@ import {
 import { getCachedWslDistros, hasCachedWslDistros, listRunningWslHomeDirsAsync } from '../wsl'
 import { filterPathsToRunningWslDistrosAsync } from '../wsl-running-path-filter'
 import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
+import { aiVaultHostListQuery } from '../../shared/ai-vault-session-filters'
 import type { AiVaultScanOptions } from './session-scanner-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { AiVaultScanCoordinator } from './ai-vault-scan-coordinator'
@@ -82,8 +83,13 @@ export async function listAiVaultSessions(
   args?: AiVaultListArgs,
   options: { signal?: AbortSignal } = {}
 ): Promise<AiVaultListResult> {
-  // Scope paths change the result set, so they must be part of the cache key.
-  const key = JSON.stringify({ scopePaths: [...new Set(args?.scopePaths ?? [])].sort() })
+  // Scope paths and the query both change the result set, so both belong in the
+  // key: a filtered listing must never be served for an unfiltered request.
+  const query = aiVaultHostListQuery(args?.query ?? '')
+  const key = JSON.stringify({
+    scopePaths: [...new Set(args?.scopePaths ?? [])].sort(),
+    query
+  })
   const depth = requestedAiVaultSessionDepth(args)
   const scanKey = JSON.stringify({ key, depth })
   const now = Date.now()
@@ -116,7 +122,14 @@ export async function listAiVaultSessions(
           scopePaths: args?.scopePaths,
           ...(await localAiVaultScanRoots())
         },
-        scanSignal
+        scanSignal,
+        {
+          // A forced list is a refresh: the host reconciles its index first so a
+          // session that just started is in the answer, rather than rescanning
+          // every transcript the way this used to.
+          ...(args?.force === true ? { refresh: true } : {}),
+          ...(query ? { query } : {})
+        }
       )
       // A delete (or other invalidation) landed while this scan was running:
       // its result predates the delete, so caching it would resurrect the

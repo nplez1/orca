@@ -1,4 +1,5 @@
 import type { AiVaultListResult, AiVaultSubagentListResult } from '../../shared/ai-vault-types'
+import { aiVaultSessionsMatchingQuery } from '../../shared/ai-vault-session-filters'
 import type {
   AiVaultSessionTitleRequest,
   AiVaultSessionTitlesResult
@@ -46,11 +47,21 @@ export function clearAiVaultBackgroundRestartCircuit(): void {
 
 export function scanAiVaultSessionsInBackground(
   options: AiVaultWorkerScanOptions,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Forwarded to the service, which reconciles and filters before listing. */
+  request: { refresh?: boolean; query?: string } = {}
 ): Promise<AiVaultListResult> {
-  return shouldUseAiVaultServiceProcess()
-    ? scanAiVaultSessionsInService(options, signal)
-    : scanAiVaultSessionsInWorker(options, signal)
+  if (shouldUseAiVaultServiceProcess()) {
+    return scanAiVaultSessionsInService(options, signal, request)
+  }
+  // The worker path has no index at all, so it returns an unfiltered scan and the
+  // query is applied here with the same predicate the child's fallback uses. The
+  // caller must not have to know which of the two answered.
+  return scanAiVaultSessionsInWorker(options, signal).then((result) =>
+    request.query
+      ? { ...result, sessions: aiVaultSessionsMatchingQuery(result.sessions, request.query) }
+      : result
+  )
 }
 
 export function resolveAiVaultSessionTitlesInBackground(

@@ -1,12 +1,18 @@
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
+import type { AiVaultListResult } from '../../shared/ai-vault-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import type { AiVaultSearchResponse, AiVaultSearchStatus } from '../../shared/ai-vault-search-types'
+import { SessionSearchIndexer } from '../ai-vault-search/session-search-indexer'
 import {
   openSessionSearchIndexerHarness,
   writeClaudeTranscript,
   type SessionSearchIndexerHarness
 } from '../ai-vault-search/session-search-indexer-test-fixture'
+import { SessionSearchInstance } from '../ai-vault-search/session-search-instance'
+import { SessionScannerServiceSearch } from './session-scanner-service-search'
+import type { AiVaultWorkerScanOptions } from './session-scanner-worker-protocol'
 import {
   AI_VAULT_SERVICE_PROTOCOL_VERSION,
   type AiVaultServiceChildMessage,
@@ -70,10 +76,10 @@ async function searchSessions(query: string): Promise<AiVaultSearchResponse> {
   return reply.value
 }
 
-function searchInit(enabled: boolean): AiVaultSessionSearchInit {
+function searchInit(contentEnabled: boolean): AiVaultSessionSearchInit {
   return {
     databasePath: harness.databasePath,
-    settings: { enabled, historyDays: null },
+    settings: { contentEnabled, historyDays: null },
     roots: harness.roots
   }
 }
@@ -171,11 +177,228 @@ it('clears the owned index and rebuilds from the transcripts still on disk', asy
   expect(existsSync(harness.databasePath)).toBe(true)
 })
 
-it('answers disabled once consent is withdrawn, without a respawn', async () => {
+it('withdraws content consent without a respawn and keeps answering', async () => {
   emit({ type: 'sessionSearch', init: searchInit(false) })
-  expect(await searchSessions('distinctive')).toEqual({ kind: 'unavailable', reason: 'disabled' })
-  expect(await searchStatus()).toMatchObject({ enabled: false, phase: 'idle' })
+  // The metadata index is not a consent decision, so search still answers — it
+  // matches titles and paths rather than message bodies. What the withdrawal
+  // stops is content being stored at all.
+  expect(await searchStatus()).toMatchObject({ enabled: true, contentEnabled: false })
+  expect((await searchSessions('distinctive')).kind).not.toBe('unavailable')
   // Re-consenting reuses the index that was left on disk rather than rebuilding it.
   emit({ type: 'sessionSearch', init: searchInit(true) })
   expect((await searchSessions('distinctive')).kind).toBe('results')
+})
+
+/**
+ * `SessionScannerServiceSearch.listSessions` on its own index.
+ *
+ * Driven directly rather than over the IPC harness above because one process
+ * allows one live indexer per database path, and the child already owns that
+ * one. What these pin is the fallback contract the entry relies on: null means
+ * "run the scanner", a completed pass means "read the index".
+ */
+
+const LISTED_SESSION_ID = 'cccccccc-dddd-4eee-8fff-111111111111'
+const LATE_SESSION_ID = 'dddddddd-eeee-4fff-8aaa-222222222222'
+const INDEX_ONLY_SESSION_ID = 'eeeeeeee-ffff-4000-8bbb-333333333333'
+
+let listHarness: {
+  harness: SessionSearchIndexerHarness
+  service: SessionScannerServiceSearch
+} | null = null
+
+afterEach(async () => {
+  vi.restoreAllMocks()
+  listHarness?.service.close()
+  await listHarness?.harness.cleanup()
+  listHarness = null
+})
+
+async function openListService(
+  prepare: (harness: SessionSearchIndexerHarness) => Promise<void> = async () => undefined
+): Promise<{ harness: SessionSearchIndexerHarness; service: SessionScannerServiceSearch }> {
+  const harness = await openSessionSearchIndexerHarness('ss-service-list')
+  // Before `apply()`, so the opening sweep cannot miss what the test wrote.
+  await prepare(harness)
+  const service = new SessionScannerServiceSearch()
+  service.apply({
+    databasePath: harness.databasePath,
+    settings: { contentEnabled: true, historyDays: null },
+    roots: harness.roots
+  })
+  listHarness = { harness, service }
+  return listHarness
+}
+
+function listOptions(overrides: Partial<AiVaultWorkerScanOptions> = {}): AiVaultWorkerScanOptions {
+  return { limit: 50, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID, ...overrides }
+}
+
+async function listStatus(service: SessionScannerServiceSearch): Promise<AiVaultSearchStatus> {
+  const reply = await service.execute({ type: 'request', operation: 'searchStatus', id: 0 })
+  if (reply.operation !== 'searchStatus') {
+    throw new Error(`expected searchStatus, got ${reply.operation}`)
+  }
+  return reply.value
+}
+
+async function waitForCompletedSweep(service: SessionScannerServiceSearch): Promise<void> {
+  await vi.waitFor(async () => {
+    expect((await listStatus(service)).lastSweepCompletedAt).not.toBeNull()
+  })
+}
+
+/** A row only SQLite could produce, which is what makes an index answer provable. */
+function seedIndexOnlySession(harness: SessionSearchIndexerHarness, sessionId: string): void {
+  harness.write((db) =>
+    db
+      .prepare(
+        `INSERT INTO sessions(agent,session_id,file_path,title,updated_at,resume_command)
+         VALUES ('claude',?,'','index only','2099-01-01T00:00:00.000Z','')`
+      )
+      .run(sessionId)
+  )
+}
+
+function requireList(listed: AiVaultListResult | null): AiVaultListResult {
+  if (listed === null) {
+    throw new Error('a completed sweep means the list must come from the index')
+  }
+  return listed
+}
+
+function listedSessionIds(listed: AiVaultListResult): string[] {
+  return listed.sessions.map((session) => session.sessionId)
+}
+
+it('answers the list from the index once a pass has completed', async () => {
+  const { harness, service } = await openListService(async (opened) => {
+    await writeClaudeTranscript(
+      join(opened.claudeProjectDir, `${LISTED_SESSION_ID}.jsonl`),
+      ['a listed conversation'],
+      LISTED_SESSION_ID
+    )
+  })
+  await waitForCompletedSweep(service)
+  seedIndexOnlySession(harness, INDEX_ONLY_SESSION_ID)
+
+  const listed = requireList(await service.listSessions(listOptions(), false))
+
+  expect(listed.issues).toEqual([])
+  expect(Number.isFinite(Date.parse(listed.scannedAt))).toBe(true)
+  // The seeded row has no file behind it, so finding it here is the proof this
+  // answer was a read of the index rather than a walk of the filesystem.
+  expect(listedSessionIds(listed)).toContain(INDEX_ONLY_SESSION_ID)
+  expect(listedSessionIds(listed)).toContain(LISTED_SESSION_ID)
+})
+
+it('answers null until a pass has completed, then answers even with no sessions', async () => {
+  const { service } = await openListService()
+
+  // `apply()` queues the first sweep and that sweep reads the filesystem, so
+  // nothing can have completed in this turn.
+  expect(await service.listSessions(listOptions(), false)).toBeNull()
+
+  await waitForCompletedSweep(service)
+  // The gate is a finished pass and not rows: a host with no sessions indexes no
+  // file and would otherwise be stranded on the scanner for good.
+  expect(await service.listSessions(listOptions(), false)).toEqual({
+    sessions: [],
+    issues: [],
+    scannedAt: expect.any(String)
+  })
+})
+
+it('reconciles before listing only when refresh asks it to', async () => {
+  const { harness, service } = await openListService(async (opened) => {
+    await writeClaudeTranscript(
+      join(opened.claudeProjectDir, `${LISTED_SESSION_ID}.jsonl`),
+      ['a listed conversation'],
+      LISTED_SESSION_ID
+    )
+  })
+  await waitForCompletedSweep(service)
+  await writeClaudeTranscript(
+    join(harness.claudeProjectDir, `${LATE_SESSION_ID}.jsonl`),
+    ['written after the sweep'],
+    LATE_SESSION_ID
+  )
+  const reconcile = vi.spyOn(SessionSearchIndexer.prototype, 'reconcile')
+
+  const stale = requireList(await service.listSessions(listOptions(), false))
+  expect(reconcile).not.toHaveBeenCalled()
+  // The transcript is on disk and the index has never seen it, which is what a
+  // filesystem walk would have found and this read did not.
+  expect(listedSessionIds(stale)).not.toContain(LATE_SESSION_ID)
+
+  const refreshed = requireList(await service.listSessions(listOptions(), true))
+  expect(reconcile).toHaveBeenCalledWith({ full: true })
+  expect(listedSessionIds(refreshed)).toContain(LATE_SESSION_ID)
+})
+
+it('maps the scan depth onto the index bound and passes the scope through', async () => {
+  const { service } = await openListService()
+  await waitForCompletedSweep(service)
+  const args = vi.spyOn(SessionSearchInstance.prototype, 'listSessions')
+
+  await service.listSessions(listOptions({ limit: 3, scopePaths: ['/work/app'] }), false)
+  expect(args).toHaveBeenLastCalledWith({
+    limit: 3,
+    scopePaths: ['/work/app'],
+    executionHostId: LOCAL_EXECUTION_HOST_ID
+  })
+
+  // `unlimited` is the panel's own depth, and the index reads it as no bound.
+  await service.listSessions(listOptions({ unlimited: true }), false)
+  expect(args).toHaveBeenLastCalledWith({
+    limit: Number.POSITIVE_INFINITY,
+    scopePaths: [],
+    executionHostId: LOCAL_EXECUTION_HOST_ID
+  })
+})
+
+it('answers null with a query before a pass completes, leaving the filter to the caller', async () => {
+  const { service } = await openListService()
+
+  // Null and not an empty list: the scanner fallback owns the query (the entry's
+  // `filteredScanResult`), and answering empty here would read as "no matches".
+  expect(await service.listSessions(listOptions(), false, 'anything')).toBeNull()
+})
+
+it('forwards the query into the index read only when there is one', async () => {
+  const { service } = await openListService()
+  await waitForCompletedSweep(service)
+  const args = vi.spyOn(SessionSearchInstance.prototype, 'listSessions')
+
+  await service.listSessions(listOptions(), false, 'vault')
+  expect(args).toHaveBeenLastCalledWith({
+    limit: 50,
+    scopePaths: [],
+    executionHostId: LOCAL_EXECUTION_HOST_ID,
+    query: 'vault'
+  })
+
+  // Absent, not empty: there is no filter to apply and the key is not sent at all.
+  await service.listSessions(listOptions(), false)
+  expect(args).toHaveBeenLastCalledWith({
+    limit: 50,
+    scopePaths: [],
+    executionHostId: LOCAL_EXECUTION_HOST_ID
+  })
+})
+
+it('filters the index listing by the query', async () => {
+  const { harness, service } = await openListService(async (opened) => {
+    await writeClaudeTranscript(
+      join(opened.claudeProjectDir, `${LISTED_SESSION_ID}.jsonl`),
+      ['a listed conversation'],
+      LISTED_SESSION_ID
+    )
+  })
+  await waitForCompletedSweep(service)
+  seedIndexOnlySession(harness, INDEX_ONLY_SESSION_ID)
+
+  // The seeded row's title is the only place this text appears.
+  const listed = requireList(await service.listSessions(listOptions(), false, 'index only'))
+  expect(listedSessionIds(listed)).toEqual([INDEX_ONLY_SESSION_ID])
 })

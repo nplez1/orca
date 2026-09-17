@@ -14,8 +14,10 @@ import {
 import type { SessionSidecarObservation } from './session-sidecar-stat'
 
 // Bump when the persisted entry layout or cached session semantics change; a
-// mismatched file is discarded whole.
-const SCHEMA_VERSION = 2
+// mismatched file is discarded whole. Schema 3 moved Copilot's cached `cwd` to
+// the session.start context/first folder_trust, so the rows schema 2 wrote carry
+// the wrong workspace and must not be replayed.
+const SCHEMA_VERSION = 3
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500
 // The payload contains transcript-derived preview text; keep it user-only

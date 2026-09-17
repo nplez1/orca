@@ -11,7 +11,7 @@ import { parseDroidSessionContent } from './session-scanner-droid-parser'
 import { parseMessageGraphSessionContent } from './session-scanner-graph-parsers'
 import { parseClaudeSessionContent } from './session-scanner-primary-parsers'
 import { parseGeminiSessionContent } from './session-scanner-gemini-parsers'
-import { parseCopilotSessionContent } from './session-scanner-copilot-parser'
+import { remoteCopilotSource } from './remote-session-scanner-copilot-source'
 import { parseCursorSessionContent } from './session-scanner-cursor-parser'
 import { parseHermesSessionContent } from './session-scanner-hermes-parser'
 import { partitionSubagentTranscriptPaths } from './session-scanner-subagent-transcripts'
@@ -65,13 +65,7 @@ export function remoteSessionSources(
       ['.json', '.jsonl'],
       parseGeminiSessionContent
     ),
-    jsonlSource(
-      'copilot',
-      remoteHome,
-      hostPlatform,
-      ['.copilot', 'session-state'],
-      parseCopilotSessionContent
-    ),
+    remoteCopilotSource(remoteHome, hostPlatform),
     jsonlSource(
       'cursor',
       remoteHome,

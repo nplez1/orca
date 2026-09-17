@@ -94,7 +94,16 @@ export class SessionSearchIndexWriter {
      * row, so the owner can start the bounded drain that reclaims them.
      * Synchronous work here would put the cost back where it was taken from.
      */
-    private readonly onOrphanedRows: () => void = () => undefined
+    private readonly onOrphanedRows: () => void = () => undefined,
+    /**
+     * The content tier: whether message bodies are stored at all.
+     *
+     * Defaults to indexing them, because this is a primitive that does what it is
+     * told and its direct constructors are tests. The *consent* decision belongs
+     * to `SessionSearchInstance`, which is the only production constructor and
+     * always passes the user's setting.
+     */
+    private readonly storeContent: boolean = true
   ) {
     this.records = new SessionSearchFileRecords(db)
   }
@@ -303,6 +312,10 @@ export class SessionSearchIndexWriter {
             const previous = session
             session = this.records.createSessionRow(candidate)
             if (previous !== null) {
+              // The replacement's metadata row goes with the session row, or a
+              // stale sessions_fts row would keep answering a query for a
+              // session no longer in `sessions`.
+              this.records.deleteSessionFts(previous)
               db.prepare('DELETE FROM sessions WHERE id = ?').run(previous)
               orphaned = true
             }
@@ -348,7 +361,10 @@ export class SessionSearchIndexWriter {
 
     return {
       add: (message) => {
-        if (released || fenced || this.closed) {
+        // The metadata tier needs no message rows: the session row it writes at
+        // the end of the read is the whole of what it stores, and skipping here
+        // also skips the buffering that exists to chunk message rows.
+        if (released || fenced || this.closed || !this.storeContent) {
           discard()
           return
         }
@@ -392,6 +408,7 @@ export class SessionSearchIndexWriter {
       return
     }
     deleteSearchMessages(this.db, sessionRowId)
+    this.records.deleteSessionFts(sessionRowId)
     this.db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionRowId)
   }
 }
