@@ -39,6 +39,10 @@ stops anyone choosing it in the first place. `hasDedicatedReleaseRepo` still rep
 channels as such, because it feeds the updater's _reporting_ path — a legacy value that resolves to
 this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
+Tests that pin the re-pointed URLs and the single-stream mapping: `src/main/updater-release-builds.test.ts`,
+`src/main/updater.check-preflight.test.ts`, and `src/main/updater.prerelease-fallback.test.ts`. They
+assert this fork's repo path, so a sync that restores upstream's expectations turns them red again.
+
 ### `local(updater)`: probe every newer release, not a fixed window
 
 Upstream's resolver probes only the six newest candidates at or above the installed version
