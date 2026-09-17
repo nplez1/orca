@@ -10,6 +10,14 @@ export const RELEASE_CHANNELS: readonly ReleaseChannel[] = [
   'adhoc'
 ]
 
+/**
+ * LOCAL(nplez1): the channels this fork offers. It publishes a single stream, so the dev channels
+ * could only lie (they resolve to the same repo) or — if left pointing at upstream — replace this
+ * build with an official Orca. Hidden rather than deleted, because `ReleaseChannel` still has to
+ * accept a value persisted by an older build.
+ */
+export const OFFERED_RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'rc']
+
 export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = {
   stable: 'Stable',
   rc: 'RC',
@@ -38,9 +46,12 @@ export type DedicatedRepoChannel = (typeof DEDICATED_REPO_CHANNELS)[number]
 const CHANNEL_RELEASE_REPOS: Record<ReleaseChannel, string> = {
   stable: MAIN_RELEASE_REPO,
   rc: MAIN_RELEASE_REPO,
-  hourly: HOURLY_RELEASE_REPO,
-  daily: DAILY_RELEASE_REPO,
-  adhoc: ADHOC_RELEASE_REPO
+  // LOCAL(nplez1): one stream. The dev channels are not offered, but a setting persisted from an
+  // older build still reaches this map — and resolving it to upstream's repo would update an Orca NP
+  // install into an official Orca, which is the one outcome this fork exists to avoid.
+  hourly: MAIN_RELEASE_REPO,
+  daily: MAIN_RELEASE_REPO,
+  adhoc: MAIN_RELEASE_REPO
 }
 
 export function isReleaseChannel(value: unknown): value is ReleaseChannel {
