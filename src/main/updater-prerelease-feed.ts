@@ -5,6 +5,9 @@ import { compareVersions, isPrereleaseVersion, isValidVersion } from './updater-
 const ATOM_FEED_URL = 'https://github.com/nplez1/orca/releases.atom'
 const RELEASES_DOWNLOAD_BASE = 'https://github.com/nplez1/orca/releases/download'
 const FETCH_TIMEOUT_MS = 5000
+// How many newer candidates are probed when the feed holds fewer than this. The tag after the
+// primary is the fallback feed a missing manifest walks back to, so the window must reach past
+// the primary even when nothing newer is left to probe.
 const MAX_MANIFEST_PROBE_CANDIDATES = 6
 
 // Why: GitHub's atom feed lists every release (prerelease or stable) in a
@@ -279,11 +282,18 @@ export async function fetchNewerReleaseTagsWithReadiness(
     return { tags: [], state: 'no-newer' }
   }
 
-  // Why: a cancelled release can leave several feed entries without manifests,
-  // but update checks must not stall on an unbounded run of 5s probes.
+  // Why every newer candidate, and not just the first six: a fork's releases.atom also carries
+  // the parent's release entries, and those tags have no manifest in this repo. Six of them
+  // sorting above this repo's own tag filled a six-wide window completely, which deferred every
+  // check indefinitely and left installed builds with no update offer at all. The window keeps
+  // its original width as a floor, because the tag after the primary is the fallback feed a
+  // missing manifest walks back to. See LOCAL-PATCHES.md.
+  const newerCandidateCount = candidates.filter(
+    ({ version }) => compareVersions(version, currentVersion) > 0
+  ).length
   const probeCandidates = candidates.slice(
     newestNewerIndex,
-    newestNewerIndex + MAX_MANIFEST_PROBE_CANDIDATES
+    newestNewerIndex + Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)
   )
   const manifestResults = await Promise.all(
     probeCandidates.map(async ({ tag, version }) => ({

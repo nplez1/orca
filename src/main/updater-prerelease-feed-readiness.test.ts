@@ -590,4 +590,22 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
       state: 'not-ready'
     })
   })
+
+  // A fork's releases.atom carries the parent's release entries too, and those tags have no
+  // manifest in this repo. Every one of them sorts above this repo's own tag, so a fixed-width
+  // window filled with them deferred the check for good: no last-good tag, so no offer.
+  it("finds this repo's own release behind the parent repo's entries in a fork feed", async () => {
+    respondWithAtom(
+      ['v1.4.202', 'v1.4.201', 'v1.4.200', 'v1.4.199', 'v1.4.198', 'v1.4.197', 'v1.4.197-np.7'],
+      ['v1.4.202', 'v1.4.201', 'v1.4.200', 'v1.4.199', 'v1.4.198', 'v1.4.197']
+    )
+
+    const { fetchNewerReleaseTagsWithReadiness } = await import('./updater-prerelease-feed')
+
+    await expect(fetchNewerReleaseTagsWithReadiness('1.4.197-np.6', 1)).resolves.toEqual({
+      tags: [],
+      state: 'not-ready',
+      lastGoodTag: 'v1.4.197-np.7'
+    })
+  })
 })

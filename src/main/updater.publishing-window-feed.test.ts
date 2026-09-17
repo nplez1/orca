@@ -257,6 +257,50 @@ describe('updater', () => {
     })
   })
 
+  // The fork case: this repo's releases.atom also carries the parent's release entries, and
+  // those tags have no manifest in this repo, so the newest reachable manifest is this repo's
+  // own tag with inherited entries ahead of it. The check must reach a real offer — on a plain
+  // launch, with no click — instead of deferring forever.
+  it("offers this repo's own release when inherited feed entries have no manifest", async () => {
+    appMock.getVersion.mockReturnValue('1.4.197-np.6')
+    fetchNewerReleaseTagsMock.mockResolvedValue({
+      tags: [],
+      state: 'not-ready',
+      lastGoodTag: 'v1.4.197-np.7'
+    })
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      queueMicrotask(() => {
+        autoUpdaterMock.emit('update-available', { version: '1.4.197-np.7' })
+      })
+      return Promise.resolve(undefined)
+    })
+
+    const sendMock = vi.fn()
+    const mainWindow = { webContents: { send: sendMock } }
+
+    const { setupAutoUpdater } = await loadUpdaterModule()
+
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the setup path only reads `webContents.send`, and a real BrowserWindow is not constructible in this harness.
+    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => null })
+
+    await vi.waitFor(() => {
+      expect(fetchNewerReleaseTagsMock).toHaveBeenCalledWith('1.4.197-np.6', 2, {
+        includePrerelease: true
+      })
+      expect(sendMock).toHaveBeenCalledWith('updater:status', {
+        state: 'available',
+        version: '1.4.197-np.7',
+        changelog: null
+      })
+    })
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/nplez1/orca/releases/download/v1.4.197-np.7'
+    })
+    expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps background publishing-window fallback on the short retry cadence', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-24T21:40:00Z'))

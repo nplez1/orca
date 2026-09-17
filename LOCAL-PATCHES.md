@@ -39,6 +39,38 @@ stops anyone choosing it in the first place. `hasDedicatedReleaseRepo` still rep
 channels as such, because it feeds the updater's _reporting_ path — a legacy value that resolves to
 this fork is cosmetically described as a dev build, which is harmless and unreachable from the UI.
 
+### `local(updater)`: probe every newer release, not a fixed window
+
+Upstream's resolver probes only the six newest candidates at or above the installed version
+(`MAX_MANIFEST_PROBE_CANDIDATES`), which is sound upstream because every entry in upstream's atom feed
+is one of its own releases and therefore has a manifest. It is not sound here: `nplez1/orca`'s feed
+also carries the parent repo's release entries (`v1.4.196`–`v1.4.202` at fork time, plus a `pr-…` and a
+`mobile-android-…` tag), and those tags have no manifest in this repo — `releases/download/v1.4.202/latest-mac.yml`
+404s. All seven of them sort above `1.4.197-np.N`, so an installed fork build filled the whole window
+with manifest-less entries and never reached this repo's own tag.
+
+The state that produces is not "no update" — it is `not-ready` with no `lastGoodTag`, which
+`pinDefaultReleaseFeed` turns into a `ReleaseFeedPreflightError`, so the check is re-armed on the
+silent 1h→6h retry cadence and no `available` status is ever sent. Automatic and menu checks both
+fail; the menu one shows "Couldn't reach the update server", which is a misleading cause. Net effect:
+nobody running a build published here ever sees an in-app update offer.
+
+Anchors:
+
+- `src/main/updater-prerelease-feed.ts` — `probeCandidates`, widened from a fixed six-wide
+  `slice(newestNewerIndex, newestNewerIndex + MAX_MANIFEST_PROBE_CANDIDATES)` to
+  `Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)` entries. Keeping six as a *floor* is
+  deliberate: the tag after the primary is the fallback feed a missing manifest walks back to, and
+  widening only when more newer candidates exist leaves upstream-shaped feeds byte-identical.
+- `src/main/updater-prerelease-feed.test.ts` — `probes every newer candidate concurrently`.
+- `src/main/updater-prerelease-feed-readiness.test.ts` — the fork-feed regression case.
+- `src/main/updater.publishing-window-feed.test.ts` — the last-good pin reaching `available`.
+
+Still fork-only, and still incomplete: the resolver only ever sees the tags in a feed that GitHub caps
+at ten entries, so the manifest-less entries ahead of this repo's tag recede by one per release. A
+release published while it sits seventh is skipped by every build already installed; the next one
+lands inside the window. Upstream never needs any of this, so it is not proposed there.
+
 ### `local(build)`: do not bake an updater `publisherName` into Windows builds
 
 This fork ships unsigned. `electron-updater` Authenticode-verifies every installer it downloads
