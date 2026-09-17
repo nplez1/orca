@@ -77,7 +77,9 @@ describe('listReleaseBuilds', () => {
     vi.restoreAllMocks()
   })
 
-  it('lists hourly builds from the dedicated repo, newest first', async () => {
+  // LOCAL(nplez1): this fork publishes one stream, so every channel resolves to this repo — a
+  // dedicated dev repo would either lie or point an Orca NP install at upstream. See LOCAL-PATCHES.md.
+  it('lists hourly builds from this repo, newest first', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
         release('v1.4.160-hourly.202607280900'),
@@ -88,7 +90,7 @@ describe('listReleaseBuilds', () => {
 
     const builds = await listReleaseBuilds('hourly', 'darwin')
 
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-hourly')
+    expect(fetchMock.mock.calls[0][0]).toContain('/repos/nplez1/orca/releases')
     expect(builds.map((build) => build.version)).toEqual([
       '1.4.160-hourly.202607281400',
       '1.4.160-hourly.202607281000',
@@ -96,7 +98,7 @@ describe('listReleaseBuilds', () => {
     ])
   })
 
-  it('lists daily builds from the dedicated repo, newest first', async () => {
+  it('lists daily builds from this repo, newest first', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
         release('v1.4.160-daily.202607271300'),
@@ -107,7 +109,7 @@ describe('listReleaseBuilds', () => {
 
     const builds = await listReleaseBuilds('daily', 'darwin')
 
-    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca-daily')
+    expect(fetchMock.mock.calls[0][0]).toContain('/repos/nplez1/orca/releases')
     expect(builds.map((build) => build.version)).toEqual([
       '1.4.160-daily.202607291300',
       '1.4.160-daily.202607281300',
@@ -223,7 +225,7 @@ describe('listReleaseBuilds', () => {
     const [build] = await listReleaseBuilds('hourly', 'win32')
 
     expect(build.installerUrl).toBe(
-      'https://github.com/stablyai/orca-hourly/releases/download/v1.4.163-hourly.202607312054/orca-windows-setup.exe'
+      'https://github.com/nplez1/orca/releases/download/v1.4.163-hourly.202607312054/orca-windows-setup.exe'
     )
   })
 
@@ -456,7 +458,7 @@ describe('listReleaseBuilds', () => {
     await expect(failure).rejects.not.toThrow(/rate limit/)
   })
 
-  it('reports a missing hourly repo distinctly', async () => {
+  it('reports a missing releases repository distinctly', async () => {
     fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 404 }))
     await expect(listReleaseBuilds('hourly', 'darwin')).rejects.toThrow(/No releases repository/i)
   })
@@ -512,21 +514,19 @@ describe('describeRateLimitReset', () => {
 })
 
 describe('resolveTargetBuild', () => {
-  it('pins an hourly tag at the hourly repo download path', () => {
+  it("pins an hourly tag at this repo's download path", () => {
     expect(resolveTargetBuild('hourly', 'v1.4.160-hourly.202607281400')).toEqual({
       tag: 'v1.4.160-hourly.202607281400',
       version: '1.4.160-hourly.202607281400',
-      feedUrl:
-        'https://github.com/stablyai/orca-hourly/releases/download/v1.4.160-hourly.202607281400'
+      feedUrl: 'https://github.com/nplez1/orca/releases/download/v1.4.160-hourly.202607281400'
     })
   })
 
-  it('pins a daily tag at the daily repo download path', () => {
+  it("pins a daily tag at this repo's download path", () => {
     expect(resolveTargetBuild('daily', 'v1.4.160-daily.202607281300')).toEqual({
       tag: 'v1.4.160-daily.202607281300',
       version: '1.4.160-daily.202607281300',
-      feedUrl:
-        'https://github.com/stablyai/orca-daily/releases/download/v1.4.160-daily.202607281300'
+      feedUrl: 'https://github.com/nplez1/orca/releases/download/v1.4.160-daily.202607281300'
     })
   })
 
