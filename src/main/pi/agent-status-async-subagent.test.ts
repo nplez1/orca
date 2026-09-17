@@ -31,14 +31,17 @@ function createHarness(kind: 'pi' | 'omp' | 'prime-agent' = 'pi') {
   const state = createHookListenerState()
   const states: (string | undefined)[] = []
   const accepted: (ParsedAgentStatusPayload | undefined)[] = []
+  const posted: Record<string, unknown>[] = []
   const harness = createAgentStatusExtensionHarness({
     kind,
     env: HOOK_ENV,
     fetchImpl: async (_url, init) => {
+      const body: { payload?: Record<string, unknown> } = JSON.parse(String(init?.body))
+      posted.push(body.payload ?? {})
       const event = normalizeHookPayload(
         state,
         kind === 'prime-agent' ? 'prime-agent' : kind,
-        JSON.parse(String(init?.body)),
+        body,
         'production'
       )
       if (event) {
@@ -49,7 +52,7 @@ function createHarness(kind: 'pi' | 'omp' | 'prime-agent' = 'pi') {
       return { ok: true }
     }
   })
-  return { ...harness, states, accepted }
+  return { ...harness, states, accepted, posted }
 }
 
 async function flushPosts(): Promise<void> {
@@ -156,6 +159,43 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     expect(harness.states.at(-1)).toBe('working')
 
     await emit(harness, EW_COMPLETE, { runId: 'run-9' })
+    expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('rides the live child set on the next post, so a swallowed add still lands', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'delegate' })
+    await drive(harness, 'agent_start')
+    // Why: this is the shape the transport loses — the child's own add post races the tool burst
+    // a background spawn ends with. What matters is that the NEXT ordinary event carries the set.
+    await emit(harness, FORK_STARTED, { id: 'run-1', type: 'researcher' })
+    await drive(harness, 'tool_execution_end', { tool_name: 'Agent' })
+
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([
+      expect.objectContaining({ id: 'run-1', agent_type: 'researcher' })
+    ])
+    // The pane reads that field off any event, so it holds for a child it only heard about here.
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({ id: 'run-1', agentType: 'researcher' })
+    ])
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+  })
+
+  it('clears the set on the next post after the last child finishes', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'delegate' })
+    await drive(harness, 'agent_start')
+    await emit(harness, FORK_STARTED, { id: 'run-1' })
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
+    // Why: a dropped clear would pin the pane working, so the empty set must ride ordinary
+    // events too — not only the dedicated post.
+    await drive(harness, 'agent_start')
+    await drive(harness, 'agent_end', {})
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([])
     expect(harness.states.at(-1)).toBe('done')
   })
 

@@ -8,8 +8,12 @@ import {
   upsertAgentDescendant,
   type AgentDescendantRoster
 } from '../agent-descendant-roster'
-import { normalizeAgentStatusPayload, type ParsedAgentStatusPayload } from '../agent-status-types'
-import type { DescendantEventFacts } from './descendant-events'
+import {
+  normalizeAgentStatusPayload,
+  type AgentStatusState,
+  type ParsedAgentStatusPayload
+} from '../agent-status-types'
+import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
 import type { HookListenerState } from './listener-state'
 
 function getOrCreateDescendantRoster(
@@ -50,7 +54,7 @@ export function applyDescendantEventToPane(
           agentType: facts.agentType,
           description: facts.description,
           model: facts.model,
-          state: 'working'
+          state: facts.waiting === true ? 'waiting' : 'working'
         },
         now
       )
@@ -61,8 +65,15 @@ export function applyDescendantEventToPane(
   // Why: a child event before any lead event still proves the pane is working — the lead spawned it.
   const leadState = state.descendantLeadStateByPaneKey.get(paneKey) ?? 'working'
   const cachedTool = state.lastToolByPaneKey.get(paneKey) ?? {}
+  // Why: a child's wait must surface even when its provider never named which child is waiting,
+  // so there is no roster row to carry the state.
+  const effectiveState =
+    facts.kind === 'child' && facts.waiting === true
+      ? 'waiting'
+      : agentDescendantEffectiveState(state.descendantRosterByPaneKey.get(paneKey), leadState)
   return normalizeAgentStatusPayload({
-    state: agentDescendantEffectiveState(state.descendantRosterByPaneKey.get(paneKey), leadState),
+    state: effectiveState,
+    ...descendantMonitoring(effectiveState, leadState),
     prompt: state.lastPromptByPaneKey.get(paneKey) ?? '',
     agentType: source,
     toolName: cachedTool.toolName,
@@ -72,6 +83,30 @@ export function applyDescendantEventToPane(
     lastAssistantMessageIsToolOutput: cachedTool.lastAssistantMessageIsToolOutput,
     subagents: agentDescendantRosterToSnapshots(state.descendantRosterByPaneKey.get(paneKey))
   })
+}
+
+/** The pane is monitoring, not working, when only its descendants hold it working —
+ *  the lead's own turn is over. Same distinction Copilot draws for background work. */
+function descendantMonitoring(
+  effectiveState: AgentStatusState,
+  leadState: AgentStatusState
+): { workingMode?: 'monitoring' } {
+  return effectiveState === 'working' && leadState !== 'working'
+    ? { workingMode: 'monitoring' }
+    : {}
+}
+
+/** Fold the live child set an event carried into the pane's roster. Returns nothing: the
+ *  event's own payload is still normalized and gated as usual, so this only updates what that
+ *  gate reads — which is how an add the transport coalesced away is repaired by the next event. */
+export function applyDescendantLiveSet(
+  state: HookListenerState,
+  paneKey: string,
+  children: readonly DescendantEntry[],
+  now = Date.now()
+): void {
+  replaceAgentDescendants(getOrCreateDescendantRoster(state, paneKey), children, now)
+  dropEmptyDescendantRoster(state, paneKey, now)
 }
 
 /** The pane is idle only when its lead session is idle AND no descendant is live.
@@ -91,9 +126,11 @@ export function gatePaneStateOnDescendants(
   if (!roster) {
     return payload
   }
+  const gated = agentDescendantEffectiveState(roster, payload.state)
   return {
     ...payload,
-    state: agentDescendantEffectiveState(roster, payload.state),
+    state: gated,
+    ...descendantMonitoring(gated, payload.state),
     subagents: agentDescendantRosterToSnapshots(roster)
   }
 }

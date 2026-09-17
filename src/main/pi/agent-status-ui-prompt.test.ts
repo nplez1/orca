@@ -41,7 +41,11 @@ describe('Pi UI prompt status', () => {
       await post(harness, 'ui_prompt_start', { kind, title: 'Private title' })
       expect(harness.statuses.at(-1)?.payload.state).toBe('waiting')
       const body = JSON.parse(String(harness.fetchMock.mock.calls.at(-1)?.[1]?.body))
-      expect(body.payload).toEqual({ hook_event_name: 'ui_prompt_start', ui_prompt_active: true })
+      expect(body.payload).toEqual({
+        hook_event_name: 'ui_prompt_start',
+        ui_prompt_active: true,
+        subagent_runs: []
+      })
 
       await harness.callHook('ui_prompt_end', { kind }, { isIdle: () => false })
       await flushPosts()
