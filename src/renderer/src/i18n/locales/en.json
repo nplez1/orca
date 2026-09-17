@@ -6005,6 +6005,17 @@
                 "be266af66c": "{{value0}} matches multiple directories in {{value1}}"
               }
             }
+          },
+          "branch": {
+            "cleanup": {
+              "toast": {
+                "failed": "Could not delete the remote branch for {{value0}}",
+                "alreadyAbsent": "The remote had no branch named {{value0}}.",
+                "noUpstream": "This branch tracks no remote branch, so nothing was deleted there.",
+                "skippedPreserved": "Orca kept the local branch, so it left the remote branch in place too.",
+                "keptTitle": "Remote branch kept for {{value0}}"
+              }
+            }
           }
         },
         "repo": {
@@ -6494,6 +6505,10 @@
           "architectureMismatch": "A Git-related executable could not run because its CPU architecture is incompatible with this execution host. Install Git and related tools for the host architecture.",
           "copyCommand": "Copy command",
           "copyDiagnostics": "Copy diagnostics"
+        },
+        "DeleteWorktreeRemoteBranchOption": {
+          "alsoDeleteRemoteBranch": "Also delete the remote branch",
+          "alsoDeleteRemoteBranchHint": "Permanently deletes this workspace's branch on its remote. Cannot be undone, and is skipped when the local branch is kept."
         }
       },
       "shared": {
@@ -7419,7 +7434,10 @@
           "externalWorktrees": "External worktrees",
           "externalWorktreesDescription": "Choose whether worktrees created outside Orca appear by default.",
           "show": "Show",
-          "hide": "Hide"
+          "hide": "Hide",
+          "deleteRemoteBranchOnWorkspaceDelete": "Delete Remote Branch By Default",
+          "deleteRemoteBranchOnWorkspaceDeleteDescription": "Pre-check the remote-branch option in the delete-workspace dialog. The branch is always kept when its local copy is kept.",
+          "deleteRemoteBranchOnWorkspaceDeleteRowDescription": "Pre-check the remote-branch option when deleting a workspace. Deletion runs git push --delete on the branch upstream and cannot be undone."
         },
         "GhosttyImportModal": {
           "9d3e56ca36": "Apply Changes",
@@ -12257,6 +12275,28 @@
         "TerminalRenderingSection": {
           "6d4c55bacc": "Inline Images",
           "fffab5890b": "Display images directly in the terminal using SIXEL, iTerm2 (IIP), and Kitty graphics protocols."
+        },
+        "AgentSessionSearchSection": {
+          "contentTitle": "Index conversation content",
+          "contentDescription": "Indexes session titles, working directories, branches, and message text from transcripts on this machine. When off, search covers titles and paths but not conversation contents.",
+          "retentionTitle": "History range",
+          "retentionDescription": "How far back to index transcripts. All history indexes every transcript the scan can find.",
+          "title": "Session History Search",
+          "description": "Search your local agent sessions by title, project, and conversation content.",
+          "allHistory": "All history",
+          "lastDays": "Last {{value0}} days"
+        },
+        "agent-session-search-search": {
+          "title": "Session History Search",
+          "description": "Index agent session transcripts so conversations are searchable on this machine.",
+          "session": "session",
+          "history": "history",
+          "search": "search",
+          "transcript": "transcript",
+          "index": "index",
+          "conversation": "conversation",
+          "content": "content",
+          "retention": "retention"
         }
       },
       "right": {
