@@ -32,6 +32,14 @@ export function gitExecOptions(
   }
 }
 
+/** Resolve the default base ref without inventing a fallback branch. */
+export function getDefaultBaseRef(
+  path: string,
+  options: LocalGitExecOptions = {}
+): Promise<string | null> {
+  return getDefaultBaseRefAsync(path, options)
+}
+
 export async function getBaseRefDefault(
   path: string,
   options: LocalGitExecOptions = {}

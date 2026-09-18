@@ -27,7 +27,7 @@ export function registerFilesystemGitUrlHandlers(context: FilesystemHandlerConte
       }
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
       await awaitWindowsHostGitEnvironmentReady({ cwd: worktreePath })
-      return getRemoteFileUrl(worktreePath, args.relativePath, args.line)
+      return await getRemoteFileUrl(worktreePath, args.relativePath, args.line)
     }
   )
 
@@ -48,7 +48,7 @@ export function registerFilesystemGitUrlHandlers(context: FilesystemHandlerConte
       }
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
       await awaitWindowsHostGitEnvironmentReady({ cwd: worktreePath })
-      return getRemoteCommitUrl(worktreePath, sha)
+      return await getRemoteCommitUrl(worktreePath, sha)
     }
   )
 }

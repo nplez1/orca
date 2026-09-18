@@ -6695,7 +6695,6 @@
           "retry": "Retry now",
           "restored": "Git is working again. Worktrees refreshed."
         },
-<<<<<<< HEAD
         "manualSortSwitch": {
           "title": "Sort changed to Manual",
           "description": "Manual keeps workspaces where you drop them.",
@@ -12672,7 +12671,6 @@
         "UnsealedCredentialNotice": {
           "body": "{{credential}} is stored unencrypted — this system has no OS keyring Orca can use. Anyone who can read your disk or a backup of it can read the credential. Install and unlock gnome-keyring or kwallet, then save it again to seal it."
         },
-<<<<<<< HEAD
         "ZcodePlanAccountsSection": {
           "site": {
             "bigmodel": "Zhipu · BigModel (open.bigmodel.cn)",

@@ -58,7 +58,10 @@ export async function scanNestedRepos(args: {
     joinPath: join,
     basename,
     hasGitMarker,
-    isSelectedPathGitRepo: async (path: string) => isGitRepo(path) || (await hasGitMarker(path))
+    // Why: the marker stat is cheap and local, so it short-circuits the git probe for the many
+    // non-repo candidates a nested scan walks past. OR is commutative, so the answer is unchanged.
+    isSelectedPathGitRepo: async (path: string) =>
+      (await hasGitMarker(path)) || (await isGitRepo(path))
   }
   const buildResult = (selectedPathKind: NestedRepoScanResult['selectedPathKind']) => ({
     selectedPath: args.path,
