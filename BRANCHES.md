@@ -1,6 +1,8 @@
 # Branch tracker
 
-Last updated **2026-09-16** (nplez1/main @ `bea2250ba6`, upstream main @ `560c42e1d1`).
+Last updated **2026-09-18** — `nplez1/main` rebased onto upstream main @ `0b57ce0295`, 215
+commits on from the previous base `291b4ddd6f`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
@@ -50,10 +52,23 @@ dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
 
-After the 2026-09-16 upstream sync, `nplez1/main` and the **seven PR-bound branches** sit on the
-current base (0 commits behind). `git range-diff` confirmed every patch was unchanged except the
-three deliberate resolutions during the integration rebase; `fix/copilot-background-work` needed the
-same `listener-state.ts` resolution there.
+After the 2026-09-18 sync, **every PR-bound branch sits on a pre-sync base** — none of them was
+rebased this time, because none is open and the plan is still to open them one at a time. Measured
+by merge-base against `upstream/main`:
+
+- the **seven PR-bound branches** (`fix/cli-symlink-world-readable`, `fix/copilot-background-work`,
+  `fix/repo-catalog-connection-fence`, `fix/claude-codex-enterprise-accounts`, `feat/copilot-usage`,
+  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **145 commits behind**;
+- the **five deliberately-left ones** (`feat/worktree-scan-cache-persistence`,
+  `fix/terminal-session-reconnect`, `feat/startup-worktree-hydration`,
+  `feat/startup-service-ordering`, `fix/agent-status-routing-readiness`) sit on `615b1370fb`,
+  **239 commits behind**.
+
+Re-measure rather than trusting those numbers (`node local/branch-status.mjs`, and merge-base against
+`upstream/main` for the behind count, which that script does not print). Note that `origin/main` — the
+branch PRs are nominally cut from — is itself still at `291b4ddd6f` until the next sync pushes
+`upstream/main` onto it; the seven PR-bound branches' base is *newer* than it, which is why they are
+fewer commits behind than the fork's own line was.
 
 **Five branches were deliberately left on the pre-sync base**, all unopened:
 
