@@ -1,6 +1,7 @@
 import { useAppMenuPaste } from '@/hooks/useAppMenuPaste'
 import { useAppMenuSelectionActions } from '@/hooks/useAppMenuSelectionActions'
 import { AgentKanbanBoard } from './AgentKanbanBoard'
+import { AgentDashboardSettingsMenu } from '@/components/dashboard/AgentDashboardSettingsMenu'
 import { useDashboardSnapshot } from './useDashboardSnapshot'
 
 /**
@@ -13,5 +14,12 @@ export function DashboardPopoutRoot(): React.JSX.Element {
   useAppMenuPaste()
   useAppMenuSelectionActions()
   const snapshot = useDashboardSnapshot()
-  return <AgentKanbanBoard snapshot={snapshot} />
+  return (
+    <AgentKanbanBoard
+      snapshot={snapshot}
+      // Why: without this the pop-out has no way back to the in-window board —
+      // the header settings menu is the only place the mode can be changed.
+      headerActions={<AgentDashboardSettingsMenu />}
+    />
+  )
 }

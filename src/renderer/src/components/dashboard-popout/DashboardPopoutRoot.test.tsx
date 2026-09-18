@@ -2,10 +2,22 @@
 
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { APP_MENU_PASTE_EVENT } from '@/lib/app-menu-paste'
 import { APP_MENU_SELECTION_ACTION_EVENT } from '@/lib/app-menu-selection-actions'
 
-vi.mock('./AgentKanbanBoard', () => ({ AgentKanbanBoard: () => null }))
+const boardProps = vi.hoisted(() => {
+  const props: { headerActions: ReactNode } = { headerActions: null }
+  return { props }
+})
+
+vi.mock('./AgentKanbanBoard', () => ({
+  AgentKanbanBoard: ({ headerActions }: { headerActions?: ReactNode }) => {
+    boardProps.props.headerActions = headerActions ?? null
+    return null
+  }
+}))
 vi.mock('./useDashboardSnapshot', () => ({ useDashboardSnapshot: () => null }))
 
 import { DashboardPopoutRoot } from './DashboardPopoutRoot'
@@ -18,6 +30,7 @@ describe('DashboardPopoutRoot', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    boardProps.props.headerActions = null
     emitAppMenuPaste = null
     emitAppMenuSelectionAction = null
     Object.assign(window, {
@@ -65,5 +78,17 @@ describe('DashboardPopoutRoot', () => {
     // Unclaimed here (no preview mounted), so both still reach the native path.
     expect(performNativePaste).toHaveBeenCalledOnce()
     expect(performNativeSelectionAction).toHaveBeenCalledWith('select-all')
+  })
+
+  // Why: without a header settings menu the pop-out is a one-way trip — the
+  // mode control is the only route back to the in-window board.
+  it('gives the pop-out board the dashboard settings menu', () => {
+    render(<DashboardPopoutRoot />)
+    expect(boardProps.props.headerActions).not.toBeNull()
+
+    const view = render(<TooltipProvider>{boardProps.props.headerActions}</TooltipProvider>)
+    expect(
+      view.container.querySelector('button[aria-label="Agent Dashboard settings"]')
+    ).not.toBeNull()
   })
 })

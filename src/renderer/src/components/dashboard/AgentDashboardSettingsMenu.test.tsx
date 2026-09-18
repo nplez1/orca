@@ -56,7 +56,7 @@ describe('AgentDashboardSettingsMenu', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     act(() => {
-      root?.render(<AgentDashboardSettingsMenu onSwitchToPopout={vi.fn()} onOpenChange={vi.fn()} />)
+      root?.render(<AgentDashboardSettingsMenu onOpenChange={vi.fn()} />)
     })
 
     const toggle = container.querySelector<HTMLButtonElement>(
@@ -67,5 +67,26 @@ describe('AgentDashboardSettingsMenu', () => {
     act(() => toggle?.click())
 
     expect(updateSettings).toHaveBeenCalledWith({ experimentalAgentDashboardShowIdle: true })
+  })
+
+  it('reports the mode handoff only when the mode actually changed', () => {
+    const onModeChange = vi.fn()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(<AgentDashboardSettingsMenu onModeChange={onModeChange} />)
+    })
+
+    const options = container.querySelectorAll<HTMLButtonElement>('button[role="radio"]')
+    expect(Array.from(options, (option) => option.textContent)).toEqual(['In-window', 'Pop-out'])
+
+    act(() => options[0]?.click())
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(onModeChange).not.toHaveBeenCalled()
+
+    act(() => options[1]?.click())
+    expect(updateSettings).toHaveBeenCalledWith({ experimentalAgentDashboardMode: 'popout' })
+    expect(onModeChange).toHaveBeenCalledWith('popout')
   })
 })
