@@ -126,8 +126,8 @@ type AgentKanbanBoardProps = {
   /** When provided, renders a close control in the header (in-window mode). The
    *  pop-out relies on its native window controls, so it omits this. */
   onClose?: () => void
-  /** Header controls rendered before the close button. The in-window host
-   *  passes its settings menu; the pop-out renderer has no store to drive it. */
+  /** Header controls rendered before the close button. Both hosts pass the
+   *  settings menu, so the board's mode can be changed from either surface. */
   headerActions?: React.ReactNode
 }
 

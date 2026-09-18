@@ -13,19 +13,20 @@ import type { AgentDashboardMode } from '../../../../shared/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
 
 type AgentDashboardSettingsMenuProps = {
-  /** Called after the mode switches to pop-out so the host can hand the board
-   *  over to the pop-out window instead of leaving a stale in-window board. */
-  onSwitchToPopout: () => void
+  /** Called after the mode flips so the host can hand the board over: the
+   *  in-window board closes for the pop-out, and the pop-out window is closed by
+   *  the main process. Omitted when the host needs no handoff. */
+  onModeChange?: (next: AgentDashboardMode) => void
   /** Lets the host keep the companion board open while this menu owns the
    *  next outside click, matching the workspace board's menu handling. */
-  onOpenChange: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void
 }
 
-/** Board-header settings for the in-window Agent Dashboard, mirroring the
- *  workspace board's settings menu. In-window only — the pop-out renderer has
- *  no store access, so it never mounts this. */
+/** Board-header settings for the Agent Dashboard, mirroring the workspace
+ *  board's settings menu. Both hosts mount it: the pop-out renderer has its own
+ *  settings-synced store, so the controls behave identically there. */
 export function AgentDashboardSettingsMenu({
-  onSwitchToPopout,
+  onModeChange,
   onOpenChange
 }: AgentDashboardSettingsMenuProps): React.JSX.Element {
   const mode = useAppStore((s) => s.settings?.experimentalAgentDashboardMode ?? 'in-window')
@@ -37,9 +38,7 @@ export function AgentDashboardSettingsMenu({
       return
     }
     updateSettings({ experimentalAgentDashboardMode: next })
-    if (next === 'popout') {
-      onSwitchToPopout()
-    }
+    onModeChange?.(next)
   }
 
   return (
