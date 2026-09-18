@@ -4,7 +4,10 @@ How to go from "certificate approved" to "four machines running my fork on my ow
 Everything here is fork-only; none of it touches upstream.
 
 Companions: [BRANCHES.md](./BRANCHES.md) for branch state, [LOCAL-PATCHES.md](./LOCAL-PATCHES.md)
-for the fork-only patches the builds depend on.
+for the fork-only patches the builds depend on, and
+[UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for the sync that usually precedes a
+release. This fork is a rebased patch series, so bring upstream in first — a release built from a
+stale base cannot see the fixes upstream has since landed.
 
 ## What is already done
 
