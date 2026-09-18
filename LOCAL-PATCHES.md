@@ -93,6 +93,9 @@ running app. Convenience only — not for upstream.
 
 ## Syncing with upstream
 
+**The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream
+main" means that document, start to finish. What matters specifically for the patches below:
+
 ```bash
 git fetch origin
 git rebase origin/main
@@ -100,7 +103,8 @@ git rebase origin/main
 
 The local commits replay on top. Because each patch is a one-line constant edit, a conflict here
 means upstream moved that exact line — re-apply by hand and amend that commit rather than resolving
-mechanically.
+mechanically. A conflict in a fork file that upstream does not have is *not* an upstream change at
+all: check all three merge stages (`git show :1:$f :2:$f :3:$f`) before assuming either side.
 
 After a sync, confirm the fork still behaves:
 
@@ -113,6 +117,15 @@ Then check the update path still points at this fork:
 
 ```bash
 grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/updater-*.ts src/shared/release-channel.ts
+```
+
+And that nothing of ours was dropped by the replay — every file that differs from the pre-sync tip
+while upstream never touched it is a file the rebase changed behind our back:
+
+```bash
+git diff --diff-filter=M --name-only backup/nplez1-main-pre-sync HEAD | sort > /tmp/modified.txt
+git diff --name-only <old-base> upstream/main | sort > /tmp/upstream-changed.txt
+comm -23 /tmp/modified.txt /tmp/upstream-changed.txt   # expect empty
 ```
 
 Confirm the series came through unchanged — `range-diff` prints `=` per patch that is byte-identical:
@@ -130,6 +143,32 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-18** — onto upstream `0b57ce0295` (215 commits), from the released tip `ef784bf681`
+  (np.8). 60 commits replayed. Three of them needed resolution beyond the mechanical, and the
+  conflicts fell into three classes worth naming:
+  - **Trivial additive** (9 files): both sides appended to one list — the credentials creators in
+    `web-preload-api.ts`, a `DetectedWorktreeListSource` member (`'cache'` vs `'session-fallback'`),
+    six per-pane enumerations in `listener-state.ts`, the pi test harness's `killMock`.
+  - **Rename replays** (2 files): `codexRoster*` → `agentDescendant*` re-applied onto
+    `codex-events.ts` and `codex-subagent-transcript.ts`.
+  - **Convergence** (2 decisions): `ae84a327e7`'s grok `stop_cancelled` fix was **dropped** —
+    upstream reimplemented it in `normalizeGrokEvent` (104 → 229 lines) with turn identity, session
+    boundaries and subagent gating, a strict superset. And `4adcf411a8`'s all-computers search engine
+    was **dropped in favour of upstream's** (#20582/#20753/#20754/#20870/#20886/#20887/#20986): the
+    fork's `ai-vault-search-merged-order.ts`, `ai-vault-search-status-aggregation.ts`,
+    `session-search-rank-fusion.ts`, `ai-vault-search-host-fanout.ts` and their tests are gone, while
+    the metadata FTS tier, the indexed list, the service `query`/`refresh` protocol and the Copilot
+    source — which upstream has no equivalent of — stay. Re-porting reciprocal-rank fusion and the
+    fork's per-host status vocabulary onto upstream's engine is left open, not lost.
+  - **Trap, hit for real:** a plain rebase drops merge commits, and this fork's one hand-resolved
+    merge (`b1daf0ca58`) held six resolutions that existed nowhere else — the grok/copilot union,
+    `workingMode: 'monitoring'`, the pi `pi.events` binding, the legacy-adapter test helpers, the
+    `StopCancelled` de-duplication. All of it had to be restored by hand. The pre-sync-tip diff in
+    UPSTREAM-SYNC-RUNBOOK.md Step 3 found it; nothing else would have.
+  - Verified: `pnpm tc` clean, `range-diff` clean across the series, the pre-sync-tip diff empty, and
+    620 tests green across ai-vault/session-search plus the agent-hook-listener, grok and pi suites.
+  - Left open: `SessionHistorySettingsPane` (upstream) and `AgentSessionSearchSection` (ours) are
+    both mounted and now both write `contentEnabled`; consolidating them is a UX task.
 - **2026-09-16** — onto upstream `291b4ddd6f` (131 commits). Three of the 29 local commits needed
   resolution: two i18n locale files (took upstream's side; the derived catalog was then regenerated,
   which removed exactly the stale fixture keys the local side carried) and
