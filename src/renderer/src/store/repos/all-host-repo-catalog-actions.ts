@@ -9,8 +9,6 @@ import { getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
-import type { FetchedRepoCatalog } from './repo-catalog-merge'
-import type { LocalRepoCatalogFetchOutcome } from './repo-catalog-fencing'
 import type { RepoSlice } from './repo-state'
 import { arrayElementsUnchanged } from '../catalog-identity'
 import {
@@ -20,6 +18,7 @@ import {
   isRuntimeRepoCatalogConnectionFenceCurrent,
   latestAllHostRepoCatalogGenerationByStore,
   startLocalRepoCatalogFetch,
+  type LocalRepoCatalogFetchOutcome,
   type RuntimeRepoCatalogConnectionFence
 } from './repo-catalog-fencing'
 import {
@@ -29,7 +28,8 @@ import {
   mergeFetchedRepoCatalog,
   projectCompatibilityForReconciledRepos,
   reconcileReadoptedSshWorktreeState,
-  reconcileSupersededSshRepos
+  reconcileSupersededSshRepos,
+  type FetchedRepoCatalog
 } from './repo-catalog-merge'
 import { getRuntimeTargetHostId } from '../runtime-target-host'
 import { listRuntimeEnvironmentsForAllHostLoad } from '../runtime-catalog-hosts'
