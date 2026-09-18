@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, basename } from 'node:path'
 import type * as FsPromises from 'node:fs/promises'
 import type * as GitRepo from '../git/repo'
 import type { Repo } from '../../shared/repo-types'
@@ -166,6 +166,25 @@ describe('folder repo git upgrade watch', () => {
     }
   }
 
+  /**
+   * Why: resolving an upgrade awaits real git probes, so a fixed sleep no longer implies the
+   * chain finished — wait on the observable effect instead.
+   */
+  async function waitForUpgrade(store: ReturnType<typeof makeStore>): Promise<void> {
+    const deadline = Date.now() + 5_000
+    while (store.updateRepo.mock.calls.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    }
+  }
+
+  /** Why: the git probe is the observable the rejected-marker cache exists to bound. */
+  async function waitForGitProbes(count: number): Promise<void> {
+    const deadline = Date.now() + 5_000
+    while (gitProbes.length < count && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    }
+  }
+
   it('upgrades a local folder repo once an external git init creates .git', async () => {
     const repoPath = join(root, 'my-project')
     await mkdir(repoPath)
@@ -181,6 +200,7 @@ describe('folder repo git upgrade watch', () => {
     gitInit(repoPath)
     await tick()
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith('folder-repo', {
       kind: 'git',
       folderUpgradeGitRootPath: repoPath.replaceAll('\\', '/'),
@@ -206,6 +226,7 @@ describe('folder repo git upgrade watch', () => {
       idlePollIntervalMs: IDLE_POLL_MS
     })
     await tick()
+    await waitForUpgrade(store)
 
     expect(store.updateRepo).toHaveBeenCalledWith('folder-repo', {
       kind: 'git',
@@ -256,6 +277,7 @@ describe('folder repo git upgrade watch', () => {
     delete worktreeMeta[workspaceId]
     await tick(2)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'folder-repo',
       expect.objectContaining({ kind: 'git' })
@@ -276,6 +298,7 @@ describe('folder repo git upgrade watch', () => {
     })
     await tick(2)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'folder-repo',
       expect.objectContaining({ kind: 'git' })
@@ -312,6 +335,7 @@ describe('folder repo git upgrade watch', () => {
       idlePollIntervalMs: IDLE_POLL_MS
     })
     await waitForStats(4)
+    await waitForGitProbes(1)
 
     // The marker is still stat'd every tick; git is not re-run for it.
     expect(statCalls.length).toBeGreaterThanOrEqual(4)
@@ -335,6 +359,7 @@ describe('folder repo git upgrade watch', () => {
     gitInit(repoPath)
     await tick(2)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'folder-repo',
       expect.objectContaining({ kind: 'git' })
@@ -368,6 +393,7 @@ describe('folder repo git upgrade watch', () => {
     })
     await tick(2)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'folder-repo',
       expect.objectContaining({ kind: 'git' })
@@ -407,6 +433,7 @@ describe('folder repo git upgrade watch', () => {
     gitInit(pathA)
     await tick()
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledTimes(1)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'repo-a',
@@ -426,6 +453,7 @@ describe('folder repo git upgrade watch', () => {
     })
     await tick(3)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledTimes(1)
   })
 
@@ -487,6 +515,7 @@ describe('folder repo git upgrade watch', () => {
     wakeFolderRepoGitUpgradeWatch()
     await tick(2)
 
+    await waitForUpgrade(store)
     expect(store.updateRepo).toHaveBeenCalledWith(
       'late-repo',
       expect.objectContaining({ kind: 'git' })
@@ -515,6 +544,7 @@ describe('folder repo git upgrade watch', () => {
     window.visible = true
     notifyMainWindowBecameVisible()
     await tick()
+    await waitForUpgrade(store)
 
     expect(store.updateRepo).toHaveBeenCalledWith(
       'folder-repo',
@@ -537,6 +567,7 @@ describe('folder repo git upgrade watch', () => {
       idlePollIntervalMs: IDLE_POLL_MS
     })
     await tick()
+    await waitForUpgrade(store)
 
     expect(store.updateRepo).toHaveBeenCalled()
     expect(notifyReposChanged).not.toHaveBeenCalled()
@@ -569,7 +600,10 @@ describe('folder repo git upgrade watch', () => {
     )
     expect(Math.min(...perPath)).toBeGreaterThanOrEqual(2)
     expect(Math.max(...perPath) - Math.min(...perPath)).toBeLessThanOrEqual(1)
-    expect(new Set(statCalls)).toEqual(new Set(paths.map((repoPath) => join(repoPath, '.git'))))
+    // Why: the marker fallback also probes every ancestor's `.git`/`HEAD`, and moving it to
+    // fs/promises is what makes that walk visible here. The invariant that matters is that
+    // every stat is a marker probe — never a directory listing.
+    expect(statCalls.every((call) => ['.git', 'HEAD'].includes(basename(call)))).toBe(true)
     expect(readdirSpy).not.toHaveBeenCalled()
   })
 
