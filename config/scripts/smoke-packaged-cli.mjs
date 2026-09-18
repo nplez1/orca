@@ -1,4 +1,5 @@
 import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { readdirSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -22,13 +23,23 @@ function readAppDirArg(argv) {
 }
 
 function getPackagedCliPath(appDir) {
-  if (process.platform === 'darwin' || appDir.endsWith('.app')) {
-    return join(appDir, 'Contents', 'Resources', 'bin', 'orca')
+  const binDir =
+    process.platform === 'darwin' || appDir.endsWith('.app')
+      ? join(appDir, 'Contents', 'Resources', 'bin')
+      : join(appDir, 'resources', 'bin')
+  // Why: the launcher's file name is an identity — the electron-builder extraResources
+  // mapping and src/main/cli/bundled-cli-launcher-path.ts decide it, and a fork renames it
+  // (this one ships orca-np.exe beside orca-np.cmd on Windows). Discover the launcher
+  // instead of hardcoding it, taking the executable rather than the shim beside it.
+  const entries = readdirSync(binDir)
+  const launcher =
+    process.platform === 'win32'
+      ? entries.find((name) => name.toLowerCase().endsWith('.exe'))
+      : entries.find((name) => !/\.(cmd|ps1|bat)$/i.test(name))
+  if (!launcher) {
+    throw new Error(`No bundled CLI launcher in ${binDir} (entries: ${entries.join(', ')})`)
   }
-  if (process.platform === 'win32') {
-    return join(appDir, 'resources', 'bin', 'orca.exe')
-  }
-  return join(appDir, 'resources', 'bin', 'orca-ide')
+  return join(binDir, launcher)
 }
 
 const appDir = resolve(readAppDirArg(process.argv.slice(2)))
