@@ -211,7 +211,7 @@ it('refuses a page cursor minted before clear even when the rebuilt generation m
     await writeClaudeTranscript(transcriptPath(id), [`shared clear fence ${id}`], id)
   }
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   const first = await subject.search({ query: 'shared clear fence', limit: 1 })
   if (first.kind !== 'results' || !first.page.cursor) {

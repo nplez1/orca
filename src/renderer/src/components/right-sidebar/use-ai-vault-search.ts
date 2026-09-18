@@ -145,7 +145,8 @@ export function useAiVaultPanelSearch(
   const scope: ExecutionHostScope | null =
     executionHostScope === ALL_EXECUTION_HOSTS_SCOPE ? ALL_EXECUTION_HOSTS_SCOPE : host
   const searching = query.trim().length > 0
-  const localConsent = executionHostScope === 'local' && !isWebClientLocation() && !policy.enabled
+  const localConsent =
+    executionHostScope === 'local' && !isWebClientLocation() && !policy.contentEnabled
   const request = useMemo(
     () =>
       searching && scope && !localConsent && agents.length > 0
