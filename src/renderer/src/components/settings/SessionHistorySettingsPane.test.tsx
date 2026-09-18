@@ -56,7 +56,7 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
 
 function pane(
-  enabled = false,
+  contentEnabled = false,
   confirm = vi.fn().mockResolvedValue(true),
   save = vi.fn().mockResolvedValue(undefined),
   historyDays: number | null = null
@@ -66,7 +66,7 @@ function pane(
       <SessionHistorySettingsPane
         settings={{
           ...getDefaultSettings('/synthetic'),
-          aiVaultSearch: { enabled, historyDays }
+          aiVaultSearch: { contentEnabled, historyDays }
         }}
         updateSettings={save}
       />
@@ -168,7 +168,7 @@ it('turns search on from the switch alone, touching no transcript while it is of
     fireEvent.click(screen.getByRole('switch'))
   })
   expect(confirm).not.toHaveBeenCalled()
-  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { enabled: true, historyDays: null } })
+  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { contentEnabled: true, historyDays: null } })
 })
 
 it('sends the user to the sidebar panel with one click', async () => {
@@ -189,7 +189,7 @@ it('turns search off from the switch alone', async () => {
     fireEvent.click(screen.getByRole('switch'))
   })
   expect(confirm).not.toHaveBeenCalled()
-  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { enabled: false, historyDays: null } })
+  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
 })
 
 it('keeps the stored retention window without offering a control for it', async () => {
@@ -200,7 +200,7 @@ it('keeps the stored retention window without offering a control for it', async 
   await act(async () => {
     fireEvent.click(screen.getByRole('switch'))
   })
-  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { enabled: true, historyDays: 30 } })
+  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { contentEnabled: true, historyDays: 30 } })
 })
 
 it('shows failed saves inline and unlocks controls', async () => {
@@ -257,7 +257,7 @@ it('turns search off before deleting so the host does not rebuild the index', as
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
   })
-  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { enabled: false, historyDays: null } })
+  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { contentEnabled: false, historyDays: null } })
   expect(order).toEqual(['save', 'clear'])
   expect(screen.getAllByText(/Turns off search and removes/).length).toBeGreaterThan(0)
   expect(toast.success).toHaveBeenCalledWith('Search turned off and search data cleared.')
@@ -443,7 +443,7 @@ it('enables this computer as part of enabling them all', async () => {
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enable on all computers' }))
   })
-  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { enabled: true, historyDays: null } })
+  expect(save).toHaveBeenCalledWith({ aiVaultSearch: { contentEnabled: true, historyDays: null } })
   expect(mocks.setEnabled).toHaveBeenCalledWith('runtime:off', true)
 })
 

@@ -70,7 +70,7 @@ export function AiVaultPanelSearch({
     try {
       const store = useAppStore.getState()
       await store.updateSettingsOrThrow({
-        aiVaultSearch: { ...resolveAiVaultSearchSettings(store.settings), enabled: true }
+        aiVaultSearch: { ...resolveAiVaultSearchSettings(store.settings), contentEnabled: true }
       })
       onRetry()
     } catch {

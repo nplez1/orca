@@ -154,7 +154,7 @@ export function useAiVaultPanelSearch(
   const trimmed = query.trim()
   const hasQuery = trimmed.length > 0
   const needsLocalConsent =
-    executionHostScope === 'local' && !isWebClientLocation() && !policy.enabled
+    executionHostScope === 'local' && !isWebClientLocation() && !policy.contentEnabled
   // Until indexing is on the box is still the legacy title filter, not index search.
   const searching = hasQuery && !needsLocalConsent
   // `within` is memoized by the caller; a fresh object per render would restart
