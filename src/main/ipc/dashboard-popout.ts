@@ -34,6 +34,7 @@ export function registerDashboardPopoutHandlers(
   keybindings?: KeybindingService
 ): void {
   ipcMain.removeHandler('dashboardPopout:open')
+  ipcMain.removeHandler('dashboardPopout:close')
   ipcMain.removeHandler('dashboard:publishSnapshot')
   ipcMain.removeHandler('dashboard:requestSnapshot')
   ipcMain.removeHandler('dashboard:getPopoutOpen')
@@ -64,6 +65,15 @@ export function registerDashboardPopoutHandlers(
     createOrFocusDashboardPopout(store, {
       getKeybindings: () => keybindings?.getOverrides()
     })
+  })
+
+  // The sidebar entry is a toggle: while the pop-out is open, a second click
+  // hides it, closing the window exactly as the entry opened it.
+  ipcMain.handle('dashboardPopout:close', (event): void => {
+    if (!isTrustedUIRenderer(event.sender) || !isDashboardEnabled(store)) {
+      return
+    }
+    closeDashboardPopout()
   })
 
   // Relay: the main renderer publishes derived snapshots; forward to the popout.

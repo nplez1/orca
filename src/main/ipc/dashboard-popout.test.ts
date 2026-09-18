@@ -142,6 +142,21 @@ describe('registerDashboardPopoutHandlers', () => {
     expect(closePopoutMock).toHaveBeenCalledOnce()
   })
 
+  it('hides the popout for only the trusted main renderer', () => {
+    const closePopout = handlers.get('dashboardPopout:close')!
+    closePopout({ sender: untrustedSender })
+    closePopout({ sender: popoutSender })
+    expect(closePopoutMock).not.toHaveBeenCalled()
+
+    store.getSettings.mockReturnValue({ experimentalAgentDashboardPopout: false })
+    closePopout({ sender: mainSender })
+    expect(closePopoutMock).not.toHaveBeenCalled()
+
+    store.getSettings.mockReturnValue({ experimentalAgentDashboardPopout: true })
+    closePopout({ sender: mainSender })
+    expect(closePopoutMock).toHaveBeenCalledOnce()
+  })
+
   it('caches and forwards only valid trusted snapshots', () => {
     const popout = makeWindow(popoutSender)
     getPopoutMock.mockReturnValue(popout)
