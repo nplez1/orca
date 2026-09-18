@@ -1,14 +1,16 @@
-import { execFileSync } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { runProcess } from '../../shared/child-process/run-process'
 import {
   __resetMacTailscaleDnsDiagnosticCacheForTests,
   parseMacTailscaleDnsDiagnostic,
+  primeMacTailscaleDnsDiagnostic,
+  readMacTailscaleDnsDiagnostic,
   withMacTailscaleDnsHint,
   withMacTailscaleDnsHintForDiagnostic
 } from './macos-tailscale-dns-diagnostic'
 
-vi.mock('node:child_process', () => ({
-  execFileSync: vi.fn()
+vi.mock('../../shared/child-process/run-process', () => ({
+  runProcess: vi.fn()
 }))
 
 const MAGIC_DNS_ONLY_SCUTIL = `
@@ -26,6 +28,19 @@ resolver #1
   nameserver[0] : 192.168.1.1
   if_index : 14 (en0)
 `
+
+function scutilResult(
+  stdout: string,
+  overrides: Partial<{ code: number | null; timedOut: boolean }> = {}
+): {
+  code: number | null
+  signal: null
+  stdout: string
+  stderr: string
+  timedOut: boolean
+} {
+  return { code: 0, signal: null, stdout, stderr: '', timedOut: false, ...overrides }
+}
 
 describe('parseMacTailscaleDnsDiagnostic', () => {
   it('detects Tailscale MagicDNS as the only global resolver', () => {
@@ -89,30 +104,86 @@ describe('withMacTailscaleDnsHintForDiagnostic', () => {
   })
 })
 
-describe('withMacTailscaleDnsHint', () => {
+describe('macOS resolver probe', () => {
   const originalPlatform = process.platform
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
-    vi.mocked(execFileSync).mockReset()
+    vi.mocked(runProcess).mockReset()
     __resetMacTailscaleDnsDiagnosticCacheForTests()
   })
 
-  it('reads macOS DNS state through the system scutil path', () => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
-    vi.mocked(execFileSync).mockReturnValue(MAGIC_DNS_ONLY_SCUTIL)
+  function setPlatform(value: NodeJS.Platform): void {
+    Object.defineProperty(process, 'platform', { configurable: true, value })
+  }
 
-    const result = withMacTailscaleDnsHint('Codex failed.', 'dns lookup failed')
+  it('reads macOS DNS state through the system scutil path', async () => {
+    setPlatform('darwin')
+    vi.mocked(runProcess).mockResolvedValue(scutilResult(MAGIC_DNS_ONLY_SCUTIL))
 
-    expect(result).toContain('Tailscale MagicDNS (100.100.100.100)')
-    expect(execFileSync).toHaveBeenCalledWith(
-      '/usr/sbin/scutil',
-      ['--dns'],
-      expect.objectContaining({
-        encoding: 'utf8',
-        timeout: 1500,
-        stdio: ['ignore', 'pipe', 'ignore']
+    await primeMacTailscaleDnsDiagnostic()
+
+    expect(runProcess).toHaveBeenCalledWith({
+      program: '/usr/sbin/scutil',
+      args: ['--dns'],
+      timeoutMs: 1500,
+      maxOutputBytes: 64 * 1024
+    })
+    expect(withMacTailscaleDnsHint('Codex failed.', 'dns lookup failed')).toContain(
+      'Tailscale MagicDNS (100.100.100.100)'
+    )
+  })
+
+  it('never blocks a reader on the probe', () => {
+    setPlatform('darwin')
+    vi.mocked(runProcess).mockResolvedValue(scutilResult(MAGIC_DNS_ONLY_SCUTIL))
+
+    // Why: a cold cache must answer immediately; the hint arrives on a later failure.
+    expect(readMacTailscaleDnsDiagnostic()).toBeNull()
+    expect(runProcess).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares one probe between concurrent readers and refreshes once per window', async () => {
+    setPlatform('darwin')
+    const pending: { resolve: ((value: ReturnType<typeof scutilResult>) => void) | null } = {
+      resolve: null
+    }
+    vi.mocked(runProcess).mockReturnValue(
+      new Promise((resolve) => {
+        pending.resolve = resolve
       })
     )
+
+    readMacTailscaleDnsDiagnostic()
+    readMacTailscaleDnsDiagnostic()
+    expect(runProcess).toHaveBeenCalledTimes(1)
+
+    pending.resolve?.(scutilResult(MAGIC_DNS_ONLY_SCUTIL))
+    await vi.waitFor(() => {
+      expect(readMacTailscaleDnsDiagnostic(0)).toEqual({
+        globalNameservers: ['100.100.100.100']
+      })
+    })
+    expect(runProcess).toHaveBeenCalledTimes(1)
+  })
+
+  it('degrades a timed-out probe to no diagnostic', async () => {
+    setPlatform('darwin')
+    vi.mocked(runProcess).mockResolvedValue(
+      scutilResult(MAGIC_DNS_ONLY_SCUTIL, { code: null, timedOut: true })
+    )
+
+    await primeMacTailscaleDnsDiagnostic()
+
+    expect(withMacTailscaleDnsHint('Codex failed.', 'dns lookup failed')).toBe('Codex failed.')
+  })
+
+  it('spawns nothing off macOS', async () => {
+    setPlatform('linux')
+
+    await primeMacTailscaleDnsDiagnostic()
+
+    expect(runProcess).not.toHaveBeenCalled()
+    expect(readMacTailscaleDnsDiagnostic()).toBeNull()
   })
 })
