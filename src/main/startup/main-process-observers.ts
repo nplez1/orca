@@ -14,6 +14,7 @@ import { initCohortClassifier } from '../telemetry/cohort-classifier'
 import { initOnboardingCohortClassifier } from '../telemetry/onboarding-cohort-classifier'
 import { StatsCollector } from '../stats/collector'
 import { AgentSessionTransitionRecorder } from '../stats/agent-session-transition-recorder'
+import { primeMacTailscaleDnsDiagnostic } from '../network/macos-tailscale-dns-diagnostic'
 import { ClaudeUsageStore } from '../claude-usage/store'
 import { CodexUsageStore } from '../codex-usage/store'
 import { OpenCodeUsageStore } from '../opencode-usage/store'
@@ -121,6 +122,10 @@ export function initializeMainProcessObservers(): void {
   const agentSessionRecorder = new AgentSessionTransitionRecorder(state.stats)
   agentHookServer.subscribeEnrichedStatus((enriched) => agentSessionRecorder.onStatus(enriched))
   agentHookServer.subscribePaneStatusClear((clear) => agentSessionRecorder.onCleared(clear))
+  // Why: the resolver probe only answers after it completes, so warm it here — the usage
+  // fetches below are the failures it exists to explain, and priming keeps the hint on the
+  // first of them instead of the second.
+  void primeMacTailscaleDnsDiagnostic()
   state.claudeUsage = new ClaudeUsageStore(store)
   state.codexUsage = new CodexUsageStore(store)
   state.openCodeUsage = new OpenCodeUsageStore(store)
