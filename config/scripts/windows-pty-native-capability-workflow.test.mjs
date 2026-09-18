@@ -16,9 +16,17 @@ describe('packaged Windows PTY native capability routing', () => {
 
     expect(job['runs-on']).toBe('windows-2022')
     expect(smokeIndex).toBe(packageIndex + 1)
+    // Why: the unpacked exe is named after the Windows executableName, which a fork may rename
+    // (this fork ships "Orca NP"), so the step must take the name from the build config rather
+    // than hardcoding Orca.exe.
     expect(smoke.run).toBe(
-      'pnpm run smoke:windows-pty-native-capability -- --exe=dist/win-unpacked/Orca.exe'
+      [
+        `$name = node -p "require('./config/electron-builder.config.cjs').win.executableName"`,
+        'pnpm run smoke:windows-pty-native-capability -- "--exe=dist/win-unpacked/$name.exe"',
+        ''
+      ].join('\n')
     )
+    expect(smoke.shell).toBe('pwsh')
     expect(smoke.if).toBeUndefined()
     expect(smoke['continue-on-error']).toBeUndefined()
     expect(packageJson.scripts['smoke:windows-pty-native-capability']).toBe(
