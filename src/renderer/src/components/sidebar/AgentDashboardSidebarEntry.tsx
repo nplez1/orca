@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { LayoutDashboard } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -58,32 +59,74 @@ function DashboardBucketCounts({
   )
 }
 
+/** Whether the pop-out window is showing, so the sidebar entry can render the
+ *  same selected state the in-window drawer gets from the store. */
+function useDashboardPopoutOpen(): boolean {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const dashboard = window.api?.dashboard
+    if (!dashboard?.onPopoutOpenChanged) {
+      return
+    }
+    let disposed = false
+    const offOpenChanged = dashboard.onPopoutOpenChanged((next) => {
+      if (!disposed) {
+        setOpen(next)
+      }
+    })
+    // Why: recover an already-open pop-out (renderer reload, entry remount) —
+    // the change event alone would leave the entry unselected.
+    void dashboard.getPopoutOpen?.().then((isOpen) => {
+      if (!disposed) {
+        setOpen(isOpen)
+      }
+    })
+    return () => {
+      disposed = true
+      offOpenChanged()
+    }
+  }, [])
+
+  return open
+}
+
 export default function AgentDashboardSidebarEntry(): React.JSX.Element {
   const dashboardBucketCounts = useAgentBucketCounts()
   const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
   const openAsPopout = useAppStore((s) => s.settings?.experimentalAgentDashboardMode === 'popout')
   const drawerOpen = useAppStore((s) => s.agentDashboardDrawerOpen)
   const setAgentDashboardDrawerOpen = useAppStore((s) => s.setAgentDashboardDrawerOpen)
+  const popoutOpen = useDashboardPopoutOpen()
+  const shown = openAsPopout ? popoutOpen : drawerOpen
 
   return (
     <button
       type="button"
       data-contextual-tour-target="agents-sidebar"
+      aria-pressed={shown}
+      data-current={shown ? 'true' : undefined}
       onClick={() => {
         if (openAsPopout) {
-          void window.api.dashboard.openPopout()
+          if (popoutOpen) {
+            void window.api.dashboard.closePopout?.()
+          } else {
+            void window.api.dashboard.openPopout()
+          }
         } else {
           setAgentDashboardDrawerOpen(!drawerOpen)
         }
       }}
       className={cn(
         'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',
-        'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
+        shown
+          ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+          : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
       )}
     >
       <LayoutDashboard
-        className="size-4 shrink-0 text-worktree-sidebar-foreground/30"
-        strokeWidth={1.75}
+        className={cn('size-4 shrink-0', !shown && 'text-worktree-sidebar-foreground/30')}
+        strokeWidth={shown ? 2.25 : 1.75}
       />
       <span className="flex-1">
         {translate('dashboard.sidebar.dashboardLabel', 'Agent Dashboard')}
