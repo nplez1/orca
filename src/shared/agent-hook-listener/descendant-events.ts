@@ -1,7 +1,13 @@
 import type { AgentHookSource } from '../agent-hook-relay'
+import { isAskUserQuestionTool } from '../agent-question-answered-intent'
 import { readFirstString } from './interactive-tool'
 import { isGrokEvent, normalizeHookEventName } from './provider-event-names'
 import { readString } from './tool-input-preview'
+
+/** Narrow one entry of a provider's child array where a cast would otherwise be needed. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 
 /** One live descendant as its provider names it. */
 export type DescendantEntry = {
@@ -27,7 +33,13 @@ export type DescendantEntry = {
  *  to clear it — whereas replacing the set makes every message self-sufficient, so the
  *  newest one repairs whatever was dropped before it. */
 export type DescendantEventFacts =
-  | ({ kind: 'child'; ended: boolean } & Partial<DescendantEntry>)
+  | ({
+      kind: 'child'
+      ended: boolean
+      /** The child is blocked on a human answer. A descendant's wait is the pane's actionable
+       *  state, so it surfaces even when the provider never names which child is waiting. */
+      waiting?: boolean
+    } & Partial<DescendantEntry>)
   | { kind: 'live-set'; children: readonly DescendantEntry[] }
 
 /** How one provider reports its descendants. Both questions live together on purpose: a
@@ -56,11 +68,18 @@ function readGrokDescendantEvent(
   if (!isLifecycleEvent && subagentType === undefined) {
     return null
   }
+  // Why: grok auto-allows ask_user_question, so a child blocked on a human answer announces it as
+  // a PreToolUse. Routing child events away from the lead normalizer would otherwise drop that
+  // wait entirely, and a pane silently waiting on an answer is the worst state to hide.
+  const isChildAsking =
+    isGrokEvent(eventName, 'pre_tool_use') &&
+    isAskUserQuestionTool(readFirstString(hookPayload, ['toolName', 'tool_name', 'name']))
   return {
     kind: 'child',
     id: readFirstString(hookPayload, ['subagentId', 'subagent_id']),
     agentType: subagentType,
     description: readFirstString(hookPayload, ['description']),
+    ...(isChildAsking ? { waiting: true } : {}),
     ended:
       isGrokEvent(eventName, 'subagent_stop', 'subagent_end') ||
       isGrokEvent(eventName, 'stop', 'session_end', 'stop_failure', 'stop_cancelled')
@@ -96,17 +115,16 @@ function readPiDescendantLiveSet(hookPayload: Record<string, unknown>): Descenda
   }
   const children: DescendantEntry[] = []
   for (const run of runs) {
-    if (typeof run !== 'object' || run === null) {
+    if (!isRecord(run)) {
       continue
     }
-    const record = run as Record<string, unknown>
-    const id = readFirstString(record, ['id', 'run_id', 'runId', 'subagent_id'])
+    const id = readFirstString(run, ['id', 'run_id', 'runId', 'subagent_id'])
     if (id) {
       children.push({
         id,
-        agentType: readFirstString(record, ['agent_type', 'agentType']),
-        description: readString(record, 'description'),
-        model: readString(record, 'model')
+        agentType: readFirstString(run, ['agent_type', 'agentType']),
+        description: readString(run, 'description'),
+        model: readString(run, 'model')
       })
     }
   }
