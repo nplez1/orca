@@ -115,9 +115,13 @@ export function isRootCodeQualityPath(file) {
 }
 
 function resolveBase(root, requestedBase) {
+  // Why: on a fork checkout origin is your own fork, so `origin/main` is not the
+  // branch the PR merges into — the review base is the parent's. CI passes the
+  // base SHA explicitly; this ordering only decides the local fallback.
   for (const candidate of [
     requestedBase,
     process.env.ORCA_CODE_QUALITY_BASE,
+    'upstream/main',
     'origin/main',
     'main'
   ]) {
@@ -132,7 +136,9 @@ function resolveBase(root, requestedBase) {
       return candidate
     }
   }
-  throw new Error('Pass the pull request base SHA or make origin/main available locally.')
+  throw new Error(
+    'Pass the pull request base SHA or make upstream/main or origin/main available locally.'
+  )
 }
 
 export function collectAddedLineRanges(root, requestedBase) {
