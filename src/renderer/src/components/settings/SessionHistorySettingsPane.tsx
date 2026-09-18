@@ -52,7 +52,7 @@ export function SessionHistorySettingsPane({
   const { environments, detailsByEnvironmentId } = useRuntimeEnvironmentCatalog()
   const localRead = useSessionSearchStatus({
     executionHostId: LOCAL_EXECUTION_HOST_ID,
-    active: policy.enabled && !isWebClient,
+    active: policy.contentEnabled && !isWebClient,
     refresh
   })
   const mounted = useRef(true)
@@ -67,7 +67,7 @@ export function SessionHistorySettingsPane({
   const localEntry: SessionSearchComputerEntry = {
     id: LOCAL_EXECUTION_HOST_ID,
     name: getLocalExecutionHostLabel(),
-    state: policy.enabled ? 'on' : 'off'
+    state: policy.contentEnabled ? 'on' : 'off'
   }
   const serverEntries = servers.map((environment) => ({
     id: environment.id,
@@ -113,7 +113,7 @@ export function SessionHistorySettingsPane({
   }
 
   function toggleEnabled(): Promise<void> {
-    return save({ enabled: !policy.enabled })
+    return save({ contentEnabled: !policy.contentEnabled })
   }
 
   /** Remembers nothing: what it acts on is read off the rows at the moment it is clicked. */
@@ -121,9 +121,9 @@ export function SessionHistorySettingsPane({
     setBusy(true)
     setError(null)
     try {
-      if (!policy.enabled) {
+      if (!policy.contentEnabled) {
         try {
-          await writePolicy({ enabled: true })
+          await writePolicy({ contentEnabled: true })
         } catch {
           setError(saveErrorMessage())
         }
@@ -147,7 +147,7 @@ export function SessionHistorySettingsPane({
   /** False when the settings write failed or the pane went away, so the delete is skipped. */
   async function turnSearchOffBeforeDelete(): Promise<boolean> {
     try {
-      await writePolicy({ enabled: false })
+      await writePolicy({ contentEnabled: false })
     } catch {
       if (mounted.current) {
         setError(saveErrorMessage())
@@ -158,9 +158,9 @@ export function SessionHistorySettingsPane({
   }
 
   // A stale answer from before the switch went off must not keep reporting progress.
-  const localStatus = policy.enabled ? localRead.status : null
+  const localStatus = policy.contentEnabled ? localRead.status : null
   let localStatusText: string | undefined
-  if (policy.enabled) {
+  if (policy.contentEnabled) {
     localStatusText = localRead.failed
       ? sessionSearchReadErrorMessage()
       : localStatus
@@ -205,7 +205,7 @@ export function SessionHistorySettingsPane({
           <SessionHistoryComputerRow
             kind="local"
             name={localEntry.name}
-            checked={policy.enabled}
+            checked={policy.contentEnabled}
             disabled={busy || isWebClient}
             onToggle={() => void toggleEnabled()}
             {...(isWebClient || localStatusText === undefined
@@ -250,7 +250,7 @@ export function SessionHistorySettingsPane({
         />
       )}
       <SessionSearchAdvancedSection
-        enabled={policy.enabled}
+        enabled={policy.contentEnabled}
         disabled={isWebClient}
         turnSearchOff={turnSearchOffBeforeDelete}
         onError={setError}
