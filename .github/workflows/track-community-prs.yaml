@@ -15,6 +15,10 @@ permissions:
 
 jobs:
   track-community-pr:
+    # Why: this job needs the StablyAI bufo-bot app key to add the PR to a Stably project.
+    # A fork has no such secret, so it failed on every PR there; the tracking is an
+    # upstream-repo concern.
+    if: github.repository == 'stablyai/orca'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
