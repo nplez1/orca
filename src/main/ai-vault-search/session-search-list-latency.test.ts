@@ -165,25 +165,25 @@ function queryPlan(sql: string): string[] {
 }
 
 /** `sessions` must be reached through `index`, and by a seek rather than a walk. */
-function expectSessionsIndex(plan: string[], index: string, shape: string): void {
+function expectSessionsIndex(plan: string[], index: string, queryLabel: string): void {
   const where = `plan was:\n  ${plan.join('\n  ')}`
   const lines = plan.filter((line) => line.includes('sessions'))
   expect(
     lines.some((line) => line.includes(`INDEX ${index}`)),
-    `expected ${shape} to use ${index}; ${where}`
+    `expected ${queryLabel} to use ${index}; ${where}`
   ).toBe(true)
   expect(
     lines
       .filter((line) => line.includes(`INDEX ${index}`))
       .every((line) => line.startsWith('SEARCH')),
-    `expected ${shape} to seek ${index} rather than walk it; ${where}`
+    `expected ${queryLabel} to seek ${index} rather than walk it; ${where}`
   ).toBe(true)
 }
 
-function expectNoSort(plan: string[], shape: string): void {
+function expectNoSort(plan: string[], queryLabel: string): void {
   expect(
     plan.some((line) => line.includes('TEMP B-TREE')),
-    `expected ${shape} to stop at the limit without sorting; plan was:\n  ${plan.join('\n  ')}`
+    `expected ${queryLabel} to stop at the limit without sorting; plan was:\n  ${plan.join('\n  ')}`
   ).toBe(false)
 }
 
