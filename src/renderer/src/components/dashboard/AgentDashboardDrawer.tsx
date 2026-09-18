@@ -71,7 +71,11 @@ function AgentDashboardDrawerBody({
       onClose={onClose}
       headerActions={
         <AgentDashboardSettingsMenu
-          onSwitchToPopout={handleSwitchToPopout}
+          onModeChange={(next) => {
+            if (next === 'popout') {
+              handleSwitchToPopout()
+            }
+          }}
           onOpenChange={onMenuOpenChange}
         />
       }
