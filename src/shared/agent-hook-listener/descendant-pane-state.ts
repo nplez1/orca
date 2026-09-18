@@ -62,18 +62,30 @@ export function applyDescendantEventToPane(
   }
   dropEmptyDescendantRoster(state, paneKey, now)
 
+  // Why: a child's END with no lead state has nothing to gate on. Publishing `working`
+  // from it would let a stray child completion relabel a pane whose own turn nobody has
+  // described, and no later child event could settle it — the grok contract is that a
+  // child's terminal events are ignored. Starts still prove the pane is working.
+  const leadState = state.descendantLeadStateByPaneKey.get(paneKey)
+  if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
+    return null
+  }
+
   // Why: a child event before any lead event still proves the pane is working — the lead spawned it.
-  const leadState = state.descendantLeadStateByPaneKey.get(paneKey) ?? 'working'
+  const effectiveLeadState = leadState ?? 'working'
   const cachedTool = state.lastToolByPaneKey.get(paneKey) ?? {}
   // Why: a child's wait must surface even when its provider never named which child is waiting,
   // so there is no roster row to carry the state.
   const effectiveState =
     facts.kind === 'child' && facts.waiting === true
       ? 'waiting'
-      : agentDescendantEffectiveState(state.descendantRosterByPaneKey.get(paneKey), leadState)
+      : agentDescendantEffectiveState(
+          state.descendantRosterByPaneKey.get(paneKey),
+          effectiveLeadState
+        )
   return normalizeAgentStatusPayload({
     state: effectiveState,
-    ...descendantMonitoring(effectiveState, leadState),
+    ...descendantMonitoring(effectiveState, effectiveLeadState),
     prompt: state.lastPromptByPaneKey.get(paneKey) ?? '',
     agentType: source,
     toolName: cachedTool.toolName,
