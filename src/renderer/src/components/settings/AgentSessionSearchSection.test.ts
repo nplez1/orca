@@ -32,13 +32,20 @@ function visit(node: unknown, cb: (node: ReactElementLike) => void): void {
   }
 }
 
+/** A rendered element's handler, as this harness invokes it by name. */
+type HandlerLike = (...args: unknown[]) => unknown
+
+function isHandlerLike(value: unknown): value is HandlerLike {
+  return typeof value === 'function'
+}
+
 /** Invokes a rendered element's handler by name without reaching for a cast on untyped props. */
 function callHandler(control: ReactElementLike, prop: string, args: unknown[]): void {
-  const handler = control.props[prop]
-  if (typeof handler !== 'function') {
+  const handler: unknown = control.props[prop]
+  if (!isHandlerLike(handler)) {
     throw new Error(`${prop} handler not found`)
   }
-  Reflect.apply(handler, undefined, args)
+  handler(...args)
 }
 
 function findContentSwitch(node: unknown): ReactElementLike {
