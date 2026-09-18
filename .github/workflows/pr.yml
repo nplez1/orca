@@ -872,8 +872,11 @@ jobs:
           rpm="dist/orca-ide-${version}.x86_64.rpm"
           test -s "$deb"
           test -s "$rpm"
-          deb_marker="$(dpkg-deb --fsys-tarfile "$deb" | tar -xOf - ./opt/Orca/resources/package-type)"
-          rpm_marker="$(rpm2cpio "$rpm" | cpio --quiet --extract --to-stdout ./opt/Orca/resources/package-type)"
+          # Why: the /opt directory is named after productName, and a fork may rename it —
+          # discover the marker rather than hardcoding "Orca" (after-install.sh already
+          # discovers its own directory for the same reason).
+          deb_marker="$(dpkg-deb --fsys-tarfile "$deb" | tar -xOf - --wildcards '*/resources/package-type')"
+          rpm_marker="$(rpm2cpio "$rpm" | cpio --quiet --extract --to-stdout '*/resources/package-type')"
           [[ "$deb_marker" == deb ]] || { echo "Expected deb marker, got: $deb_marker"; exit 1; }
           [[ "$rpm_marker" == rpm ]] || { echo "Expected rpm marker, got: $rpm_marker"; exit 1; }
 
