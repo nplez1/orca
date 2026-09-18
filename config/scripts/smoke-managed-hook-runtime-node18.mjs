@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
-import { constants } from 'node:fs'
+import { constants, readFileSync } from 'node:fs'
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -18,6 +18,15 @@ const PLATFORMS = [
 ]
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const require = createRequire(import.meta.url)
+
+/** The home-directory child the installers write under — an identity a fork renames
+ *  (`.orca-np` here), so it is read from its module rather than spelled out below. */
+function readHomeDirectoryName() {
+  const source = readFileSync(join(ROOT, 'src', 'shared', 'app-directory-names.ts'), 'utf8')
+  const match = source.match(/HOME_DIRECTORY_NAME\s*=\s*'([^']+)'/)
+  assert.ok(match, 'Could not read HOME_DIRECTORY_NAME from src/shared/app-directory-names.ts')
+  return match[1]
+}
 
 assert.match(process.versions.node, /^18\./, 'This smoke test must run under Node 18')
 
@@ -42,10 +51,14 @@ try {
 
   const codexHooks = await readFile(join(home, '.codex', 'hooks.json'), 'utf8')
   const claudeSettings = await readFile(join(home, '.claude', 'settings.json'), 'utf8')
-  assert.match(codexHooks, /\.orca\/agent-hooks\/codex-hook\.sh/)
-  assert.match(claudeSettings, /\.orca\/agent-hooks\/claude-hook\.sh/)
-  await access(join(home, '.orca', 'agent-hooks', 'codex-hook.sh'), constants.X_OK)
-  await access(join(home, '.orca', 'agent-hooks', 'claude-hook.sh'), constants.X_OK)
+  const homeDirectoryName = readHomeDirectoryName()
+  assert.ok(codexHooks.includes(`${homeDirectoryName}/agent-hooks/codex-hook.sh`), codexHooks)
+  assert.ok(
+    claudeSettings.includes(`${homeDirectoryName}/agent-hooks/claude-hook.sh`),
+    claudeSettings
+  )
+  await access(join(home, homeDirectoryName, 'agent-hooks', 'codex-hook.sh'), constants.X_OK)
+  await access(join(home, homeDirectoryName, 'agent-hooks', 'claude-hook.sh'), constants.X_OK)
 } finally {
   if (originalHome === undefined) {
     delete process.env.HOME
