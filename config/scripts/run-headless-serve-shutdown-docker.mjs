@@ -12,6 +12,18 @@ const entrypoint = valueAfter('--entrypoint') ?? 'app'
 const intDelivery = valueAfter('--int-delivery') ?? 'foreground-process-group'
 const launcherExecOverlay = args.includes('--launcher-exec-overlay')
 const allEntrypoints = args.includes('--all-entrypoints')
+
+/** The name this build installs into a PATH directory (~/.local/bin on Linux).
+ *  Why read it: the name is an identity — see cli-install-constants.ts — so the in-container
+ *  check must assert the name this build registers rather than upstream's `orca-ide`. */
+function readInstalledCliCommandName() {
+  const source = readFileSync(resolve('src/main/cli/cli-install-constants.ts'), 'utf8')
+  const match = source.match(/CLI_COMMAND_NAME\s*=\s*'([^']+)'/)
+  if (!match) {
+    fail('Could not read CLI_COMMAND_NAME from src/main/cli/cli-install-constants.ts')
+  }
+  return match[1]
+}
 if (
   allEntrypoints &&
   ['--entrypoint', '--signal-target', '--int-delivery', '--launcher-exec-overlay'].some((flag) =>
@@ -115,6 +127,7 @@ try {
   ])
 
   const failedSignals = []
+  const cliCommandName = readInstalledCliCommandName()
   for (const { entrypoint, signalTarget, intDelivery } of cases) {
     console.log(
       JSON.stringify({
@@ -146,6 +159,8 @@ try {
           `ORCA_TEST_ENTRYPOINT=${entrypoint}`,
           '-e',
           `ORCA_INT_DELIVERY=${intDelivery}`,
+          '-e',
+          `ORCA_TEST_CLI_COMMAND_NAME=${cliCommandName}`,
           '-v',
           `${appImage}:/input/orca.AppImage:ro`,
           '-v',
