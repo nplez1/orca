@@ -116,10 +116,7 @@ describe('remote branch cleanup threading', () => {
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
-        remoteBranchCleanup: {
-          status: 'failed',
-          message: expect.stringMatching(/did not report deleting/i)
-        }
+        remoteBranchCleanup: { status: 'failed' }
       })
     )
   })

@@ -71,16 +71,16 @@ export async function dispatchWorktreeRemoval(args: {
   if (options?.deleteRemoteBranch !== true || result.remoteBranchCleanup) {
     return result
   }
-  // Why: a host that never heard of the param drops it and answers without a cleanup, so silence
-  // would leave the user believing the remote branch is gone. Deliberately not "older host": a
-  // current host also omits the field on its unregistered/stale/orphan-folder removal paths, where
-  // no local branch was deleted and the remote branch was correctly left alone.
+  // Why: a host that never heard of the param drops it and answers without a cleanup, so the
+  // outcome has to say `failed` rather than let silence read as "the branch is gone". The
+  // sentence the user reads is the toast's; this field carries Git's own text, which the host
+  // never sent. Deliberately not "older host": a current host also omits the field on its
+  // unregistered/stale/orphan-folder removal paths, where no local branch was deleted and the
+  // remote branch was correctly left alone.
   return {
     ...result,
     remoteBranchCleanup: {
-      status: 'failed' as const,
-      message:
-        'The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone.'
+      status: 'failed' as const
     }
   }
 }
