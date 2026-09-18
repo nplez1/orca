@@ -171,9 +171,50 @@ export async function getDefaultBaseRef(
   executionHostId: ExecutionHostId,
   options: HostedReviewExecutionOptions = {}
 ): Promise<string | null> {
-  return resolveDefaultBaseRefViaExec((argv) =>
-    runGitForHostedReview(repoPath, argv, executionHostId, options)
-  )
+  const runGit: HostedReviewGitRun = (argv, commandOptions) =>
+    runGitForHostedReview(repoPath, argv, executionHostId, options, commandOptions)
+  return (await resolveUpstreamDefaultBaseRef(runGit)) ?? resolveDefaultBaseRefViaExec(runGit)
+}
+
+const UPSTREAM_DEFAULT_BASE_REF_PROBES: readonly { ref: string; returnAs: string }[] = [
+  { ref: 'refs/remotes/upstream/main', returnAs: 'upstream/main' },
+  { ref: 'refs/remotes/upstream/master', returnAs: 'upstream/master' }
+]
+
+/**
+ * The default base for a *review*, which belongs to the repo the review is
+ * created in — on a fork checkout that is the `upstream` parent (#7331), so the
+ * base must come from there. This is deliberately separate from the checkout's
+ * own default base ref, which is origin-only by design (see getDefaultBaseRef in
+ * git/repo.ts): a fork whose default branch is not the parent's (for example
+ * `<owner>/main`) otherwise becomes the base of every review, and the review
+ * then carries the fork's own commits as if the branch rewrote the repository.
+ */
+async function resolveUpstreamDefaultBaseRef(runGit: HostedReviewGitRun): Promise<string | null> {
+  try {
+    const { stdout } = await runGit(['symbolic-ref', '--quiet', 'refs/remotes/upstream/HEAD'])
+    const ref = stdout.trim()
+    if (ref && (await hasRefViaRun(runGit, ref))) {
+      return ref.replace(/^refs\/remotes\//, '')
+    }
+  } catch {
+    // No symbolic upstream HEAD (never fetched, or no upstream remote).
+  }
+  for (const { ref, returnAs } of UPSTREAM_DEFAULT_BASE_REF_PROBES) {
+    if (await hasRefViaRun(runGit, ref)) {
+      return returnAs
+    }
+  }
+  return null
+}
+
+async function hasRefViaRun(runGit: HostedReviewGitRun, ref: string): Promise<boolean> {
+  try {
+    await runGit(['rev-parse', '--verify', '--quiet', ref])
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

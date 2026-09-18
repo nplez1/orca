@@ -146,10 +146,11 @@ describe('createGitHubPullRequest', () => {
     expect(releaseMock).toHaveBeenCalledOnce()
   })
 
-  it('targets the origin fork (not the upstream parent) on a fork checkout (#7331)', async () => {
-    // Fork checkout: origin is the personal fork, upstream is the parent. The
-    // head branch is unqualified and lives on the fork, so `gh pr create` must
-    // run with --repo <fork> even though PR reads prefer upstream since #7331.
+  it('opens a fork checkout review against the parent with an owner-qualified head (#7331)', async () => {
+    // Fork checkout: origin is the personal fork and holds the head branch, while
+    // the review itself belongs to the upstream parent. `gh pr create` POSTs the
+    // review to --repo, so targeting the fork opened a review inside the fork —
+    // where the base and the branch's history diverge — instead of upstream.
     getOwnerRepoForRemoteMock.mockImplementation(async (_repoPath: string, remoteName: string) =>
       remoteName === 'origin'
         ? { owner: 'fsdwen', repo: 'orca' }
@@ -158,7 +159,7 @@ describe('createGitHubPullRequest', () => {
     ghExecFileAsyncMock.mockResolvedValueOnce({
       stdout: JSON.stringify({
         number: 5,
-        url: 'https://github.com/fsdwen/orca/pull/5'
+        url: 'https://github.com/stablyai/orca/pull/5'
       })
     })
 
@@ -176,8 +177,29 @@ describe('createGitHubPullRequest', () => {
     ).resolves.toEqual({
       ok: true,
       number: 5,
-      url: 'https://github.com/fsdwen/orca/pull/5'
+      url: 'https://github.com/stablyai/orca/pull/5'
     })
+
+    const [args] = ghExecFileAsyncMock.mock.calls[0]
+    expect(args[args.indexOf('--repo') + 1]).toBe('stablyai/orca')
+    expect(args[args.indexOf('--head') + 1]).toBe('fsdwen:my-branch')
+  })
+
+  it('keeps the bare head when the fork branch is the review base repo (#7331)', async () => {
+    // Same-repo (or fork-internal) checkout: no upstream to resolve, so the head
+    // branch is unqualified and the args stay exactly as before.
+    getOwnerRepoForRemoteMock.mockImplementation(async (_repoPath: string, remoteName: string) =>
+      remoteName === 'origin' ? { owner: 'fsdwen', repo: 'orca' } : null
+    )
+    ghExecFileAsyncMock.mockResolvedValueOnce({
+      stdout: JSON.stringify({ number: 6, url: 'https://github.com/fsdwen/orca/pull/6' })
+    })
+
+    await createGitHubPullRequest(
+      '/repo-root',
+      { provider: 'github', base: 'main', head: 'my-branch', title: 'Local PR' },
+      'local'
+    )
 
     const [args] = ghExecFileAsyncMock.mock.calls[0]
     expect(args[args.indexOf('--repo') + 1]).toBe('fsdwen/orca')

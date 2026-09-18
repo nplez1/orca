@@ -1,4 +1,5 @@
 import type { HostedReviewProvider } from '../../../../../../shared/hosted-review'
+import { hostedReviewHeadRef } from '../../../../../../shared/hosted-review-refs'
 import type { GitPushTarget } from '../../../../../../shared/worktree/types'
 import {
   branchFromRef,
@@ -87,11 +88,18 @@ export function buildSourceControlManualReviewUrlFromContext(
 }
 
 function githubHeadRef(base: RemoteRepoRef, head: RemoteRepoRef, branch: string): string {
-  if (base.path.toLowerCase() === head.path.toLowerCase()) {
-    return branch
-  }
-  const owner = head.path.split('/')[0]
-  return owner ? `${owner}:${branch}` : branch
+  // Shared with review creation so the compare link and the created review agree
+  // on when a head needs the fork's owner prefix.
+  return hostedReviewHeadRef(
+    repoIdentityFromPath(base.path),
+    repoIdentityFromPath(head.path),
+    branch
+  )
+}
+
+function repoIdentityFromPath(path: string): { owner: string; repo: string } | null {
+  const [owner, repo] = path.split('/')
+  return owner && repo ? { owner, repo } : null
 }
 
 function appendQuery(url: string, values: Record<string, string>): string {

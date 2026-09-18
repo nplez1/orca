@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  hostedReviewHeadRef,
   isRemoteHeadRef,
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
@@ -16,6 +17,27 @@ describe('hosted review ref normalization', () => {
   it('strips common remote prefixes from base refs', () => {
     expect(normalizeHostedReviewBaseRef('origin/main')).toBe('main')
     expect(normalizeHostedReviewBaseRef('refs/remotes/upstream/release/1.0')).toBe('release/1.0')
+  })
+})
+
+describe('hostedReviewHeadRef', () => {
+  const fork = { owner: 'fsdwen', repo: 'orca' }
+  const parent = { owner: 'stablyai', repo: 'orca' }
+
+  it('qualifies the head with the fork owner when the repos differ', () => {
+    expect(hostedReviewHeadRef(parent, fork, 'nplez1/Agent-Dashboard')).toBe(
+      'fsdwen:nplez1/Agent-Dashboard'
+    )
+  })
+
+  it('leaves the head bare inside one repo', () => {
+    expect(hostedReviewHeadRef(parent, parent, 'feature/x')).toBe('feature/x')
+    expect(hostedReviewHeadRef(parent, { owner: 'StablyAI', repo: 'ORCA' }, 'x')).toBe('x')
+  })
+
+  it('leaves the head bare when either repo is unknown', () => {
+    expect(hostedReviewHeadRef(null, fork, 'x')).toBe('x')
+    expect(hostedReviewHeadRef(parent, null, 'x')).toBe('x')
   })
 })
 
