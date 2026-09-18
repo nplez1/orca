@@ -211,7 +211,7 @@ it('refuses a page cursor minted before clear even when the rebuilt generation m
     await writeClaudeTranscript(transcriptPath(id), [`shared clear fence ${id}`], id)
   }
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   const first = await subject.search({ query: 'shared clear fence', limit: 1 })
   if (first.kind !== 'results' || !first.page.cursor) {
@@ -255,21 +255,23 @@ it('keeps pagination stable when the clock crosses retention before a purge', as
 })
 
 // An unresolvable scope is the host's last word, not its first: consent and
-// readiness are what the reader can act on, so they have to answer first.
-it('reports being switched off before blaming a scope it does not know', async () => {
+// readiness are what the reader can act on, so they have to answer first. This
+// fork always indexes the metadata tier, so "off" is not the absence of an
+// index: a scope it cannot resolve stays the scope's fault, not consent's.
+it('blames an unknown scope rather than consent with content search off', async () => {
   const subject = newInstance()
-  subject.apply({ enabled: false, historyDays: null })
+  subject.apply({ contentEnabled: false, historyDays: null })
   await subject.settled()
 
   expect(await subject.search({ query: 'anything' }, { kind: 'unknown' })).toEqual({
     kind: 'unavailable',
-    reason: 'disabled'
+    reason: 'scope-unknown'
   })
 })
 
 it('reports not being ready before blaming a scope it does not know', async () => {
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
   // Consent stands while no index does, which is what `not-ready` names.
   subject.close()
@@ -287,7 +289,7 @@ it('answers scope-unknown once it is switched on and ready', async () => {
     RECENT_SESSION_ID
   )
   const subject = newInstance()
-  subject.apply({ enabled: true, historyDays: null })
+  subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
 
   expect(await subject.search({ query: 'distinctive' }, { kind: 'unknown' })).toEqual({
