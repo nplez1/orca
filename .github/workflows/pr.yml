@@ -1032,7 +1032,12 @@ jobs:
         run: pnpm exec electron-builder --config config/electron-builder.config.cjs --dir
 
       - name: Smoke packaged Windows PTY native capability
-        run: pnpm run smoke:windows-pty-native-capability -- --exe=dist/win-unpacked/Orca.exe
+        shell: pwsh
+        # Why: the unpacked exe is named after the Windows executableName, which a fork may
+        # rename (this fork ships "Orca NP"). Derive it instead of hardcoding Orca.exe.
+        run: |
+          $name = node -p "require('./config/electron-builder.config.cjs').win.executableName"
+          pnpm run smoke:windows-pty-native-capability -- "--exe=dist/win-unpacked/$name.exe"
 
       - name: Smoke packaged CLI
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/win-unpacked
