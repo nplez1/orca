@@ -28,18 +28,17 @@ fn main() {
     };
     let Some(app_directory) = resources_directory.parent() else {
         fail(&format!(
-            "Unable to locate Orca.exe next to \"{}\"",
+            "Unable to locate the application executable next to \"{}\"",
             resources_directory.display()
         ))
     };
 
-    let electron_path = app_directory.join("Orca.exe");
-    if !electron_path.is_file() {
+    let Some(electron_path) = resolve_electron_path(app_directory) else {
         fail(&format!(
-            "Unable to locate Orca.exe next to \"{}\"",
+            "Unable to locate the application executable next to \"{}\"",
             resources_directory.display()
         ));
-    }
+    };
 
     let cli_path: PathBuf = resources_directory
         .join("app.asar.unpacked")
@@ -86,6 +85,39 @@ fn main() {
         Ok(status) => exit(status.code().unwrap_or(1)),
         Err(error) => fail(&format!("Unable to start the Orca CLI: {error}")),
     }
+}
+
+/// The packaged app executable, which is named after the product name — this fork ships
+/// "Orca NP.exe", so naming it here would break the CLI. Mirrors the Linux launcher: try the
+/// names a build can produce, then fall back to the install root's own executable, which is
+/// neither Chromium's crashpad helper nor the NSIS uninstaller.
+fn resolve_electron_path(app_directory: &Path) -> Option<PathBuf> {
+    for name in ["Orca.exe", "Orca NP.exe"] {
+        let candidate = app_directory.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    for entry in std::fs::read_dir(app_directory).ok()?.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let lowered = name.to_ascii_lowercase();
+        if !lowered.ends_with(".exe") || lowered.starts_with("uninstall") {
+            continue;
+        }
+        if lowered == "chrome_crashpad_handler.exe" {
+            continue;
+        }
+        return Some(path);
+    }
+
+    None
 }
 
 fn move_environment_variable(source_name: &str, target_name: &str) {
