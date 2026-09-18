@@ -1,26 +1,26 @@
-import { existsSync, statSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import { normalizeRuntimePathSeparators } from '../../shared/cross-platform-path'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
-import { scanGitMarkerSync, resolveRealPathSync } from './repo-git-marker-scan'
-import { gitExecFileSync } from './runner'
+import { scanGitMarker, resolveRealPath } from './repo-git-marker-scan'
+import { gitExecFileAsync } from './runner'
 
 type GitRepoProbeResult = 'repo' | 'not-repo' | 'indeterminate'
 
 let warnedMarkerFallbackThisSession = false
 
 /** Check if a path is a valid git repository (regular or bare). */
-export function isGitRepo(path: string): boolean {
+export async function isGitRepo(path: string): Promise<boolean> {
   try {
-    if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+    if (!(await stat(path)).isDirectory()) {
       return false
     }
   } catch {
     return false
   }
 
-  const gitProbeResult = probeGitRepo(path)
+  const gitProbeResult = await probeGitRepo(path)
   if (gitProbeResult === 'repo') {
     return true
   }
@@ -28,7 +28,7 @@ export function isGitRepo(path: string): boolean {
     return false
   }
 
-  const markerScan = scanGitMarkerSync(path)
+  const markerScan = await scanGitMarker(path)
   if (markerScan.status === 'valid' && !warnedMarkerFallbackThisSession) {
     warnedMarkerFallbackThisSession = true
     console.warn('[isGitRepo] git rev-parse could not confirm repo; accepted via .git marker', {
@@ -39,13 +39,14 @@ export function isGitRepo(path: string): boolean {
 }
 
 /** Only a clean pair of negative Git answers is a definitive non-repo. */
-function probeGitRepo(path: string): GitRepoProbeResult {
+async function probeGitRepo(path: string): Promise<GitRepoProbeResult> {
   let sawFailure = false
 
   try {
-    const insideWorkTree = gitExecFileSync(['rev-parse', '--is-inside-work-tree'], {
+    const { stdout } = await gitExecFileAsync(['rev-parse', '--is-inside-work-tree'], {
       cwd: path
-    }).trim()
+    })
+    const insideWorkTree = stdout.trim()
     if (insideWorkTree === 'true') {
       return 'repo'
     }
@@ -57,9 +58,10 @@ function probeGitRepo(path: string): GitRepoProbeResult {
   }
 
   try {
-    const bareRepo = gitExecFileSync(['rev-parse', '--is-bare-repository'], {
+    const { stdout } = await gitExecFileAsync(['rev-parse', '--is-bare-repository'], {
       cwd: path
-    }).trim()
+    })
+    const bareRepo = stdout.trim()
     if (bareRepo === 'true') {
       return 'repo'
     }
@@ -73,58 +75,67 @@ function probeGitRepo(path: string): GitRepoProbeResult {
   return sawFailure ? 'indeterminate' : 'not-repo'
 }
 
-export function getGitRepoRoot(path: string): string {
+export async function getGitRepoRoot(path: string): Promise<string> {
+  let isDirectory: boolean
   try {
-    if (!existsSync(path) || !statSync(path).isDirectory()) {
-      return path
-    }
-    // One spawn, not two: each sync git call blocks main for up to its whole 15s
-    // timeout, so the spawn count is the cost. Safe to combine only here — a bare
-    // repo makes the combined form exit non-zero, and both that throw and the
-    // plain `false` land on the same marker-scan fallback below. `probeGitRepo`
-    // must NOT combine: it has to read `false` cleanly to go on and detect bare.
-    const [insideWorkTree, toplevel] = gitExecFileSync(
+    isDirectory = (await stat(path)).isDirectory()
+  } catch {
+    return path
+  }
+  if (!isDirectory) {
+    return path
+  }
+  try {
+    // One spawn, not two: the spawn count is the cost — a bare repo makes the combined
+    // form exit non-zero, and both that throw and the plain `false` land on the same
+    // marker-scan fallback below. `probeGitRepo` must NOT combine: it has to read
+    // `false` cleanly to go on and detect bare.
+    const { stdout } = await gitExecFileAsync(
       ['rev-parse', '--is-inside-work-tree', '--show-toplevel'],
       { cwd: path }
     )
+    const [insideWorkTree, toplevel] = stdout
       .split('\n')
       .map((line) => line.trim())
     if (insideWorkTree === 'true' && toplevel) {
       return normalizeGitRepoRootForInputPath(path, toplevel)
     }
   } catch {
-    // Fall through to preserving the original path.
+    // Fall through to the marker scan, then to preserving the original path.
   }
-  const markerScan = scanGitMarkerSync(path)
+  const markerScan = await scanGitMarker(path)
   if (markerScan.status === 'valid') {
     return normalizeGitRepoRootForInputPath(path, markerScan.rootPath)
   }
   return path
 }
 
-function canonicalizeGitDirPath(path: string): string {
-  return resolveRealPathSync(path) ?? path
+async function canonicalizeGitDirPath(path: string): Promise<string> {
+  return (await resolveRealPath(path)) ?? path
 }
 
 /** Return the main-checkout path only when `path` is a linked worktree. */
-export function getLinkedWorktreeMainRepoRoot(path: string): string | null {
+export async function getLinkedWorktreeMainRepoRoot(path: string): Promise<string | null> {
   try {
-    if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+    if (!(await stat(path)).isDirectory()) {
       return null
     }
-    if (gitExecFileSync(['rev-parse', '--is-inside-work-tree'], { cwd: path }).trim() !== 'true') {
+    const { stdout: insideWorkTree } = await gitExecFileAsync(
+      ['rev-parse', '--is-inside-work-tree'],
+      { cwd: path }
+    )
+    if (insideWorkTree.trim() !== 'true') {
       return null
     }
-    const [gitDir, commonDir] = gitExecFileSync(['rev-parse', '--git-dir', '--git-common-dir'], {
+    const { stdout } = await gitExecFileAsync(['rev-parse', '--git-dir', '--git-common-dir'], {
       cwd: path
     })
-      .split('\n')
-      .map((line) => line.trim())
+    const [gitDir, commonDir] = stdout.split('\n').map((line) => line.trim())
     if (!gitDir || !commonDir) {
       return null
     }
-    const absoluteCommonDir = canonicalizeGitDirPath(resolve(path, commonDir))
-    if (canonicalizeGitDirPath(resolve(path, gitDir)) === absoluteCommonDir) {
+    const absoluteCommonDir = await canonicalizeGitDirPath(resolve(path, commonDir))
+    if ((await canonicalizeGitDirPath(resolve(path, gitDir))) === absoluteCommonDir) {
       return null
     }
     if (basename(absoluteCommonDir) !== '.git') {

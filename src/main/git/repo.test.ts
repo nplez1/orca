@@ -44,7 +44,7 @@ function getHeadSha(dir: string): string {
 }
 
 describe('buildSearchBaseRefsArgv', () => {
-  it('caps broad local ref searches before parsing results', () => {
+  it('caps broad local ref searches before parsing results', async () => {
     const argv = buildSearchBaseRefsArgv('feature', 25)
 
     expect(argv).toContain('--exclude=refs/remotes/*/HEAD')
@@ -53,7 +53,7 @@ describe('buildSearchBaseRefsArgv', () => {
     expect(argv).toContain('refs/remotes/**/*feature*/**')
   })
 
-  it('keeps segmented display-format searches bounded', () => {
+  it('keeps segmented display-format searches bounded', async () => {
     const argv = buildSearchBaseRefsArgv('upstream/main', 10)
 
     expect(argv).toContain('--exclude=refs/remotes/*/HEAD')
@@ -64,7 +64,7 @@ describe('buildSearchBaseRefsArgv', () => {
     expect(argv).toContain('refs/heads/upstream/main*')
   })
 
-  it('keeps remote HEAD excludes compact when many remotes are configured', () => {
+  it('keeps remote HEAD excludes compact when many remotes are configured', async () => {
     const ordinaryRemotes = Array.from({ length: 200 }, (_, index) => `remote-${index}`)
     const argv = buildSearchBaseRefsArgv('feature', 10, {
       remoteNames: [...ordinaryRemotes, 'origin', 'upstream', 'origin', 'foo/bar', 'foo/bar']
@@ -79,7 +79,7 @@ describe('buildSearchBaseRefsArgv', () => {
     ])
   })
 
-  it('anchors local-branch-name searches below configured remotes', () => {
+  it('anchors local-branch-name searches below configured remotes', async () => {
     const argv = buildSearchBaseRefsArgv('plan/docs', 10, { remoteNames: ['origin', 'foo/bar'] })
 
     expect(argv).toContain('refs/remotes/origin/plan/docs*')
@@ -87,7 +87,7 @@ describe('buildSearchBaseRefsArgv', () => {
     expect(argv).not.toContain('refs/remotes/**/*plan/docs*')
   })
 
-  it('can build display-format and branch-root patterns separately', () => {
+  it('can build display-format and branch-root patterns separately', async () => {
     const segmentedArgv = buildSearchBaseRefsArgv('upstream/feat', 10, {
       remoteNames: ['origin', 'upstream'],
       patternGroup: 'segmented'
@@ -103,7 +103,7 @@ describe('buildSearchBaseRefsArgv', () => {
     expect(argv).not.toContain('refs/remotes/*upstream*/*feat*')
   })
 
-  it('adds fallback headroom when remote HEAD cannot be excluded by git', () => {
+  it('adds fallback headroom when remote HEAD cannot be excluded by git', async () => {
     const argv = buildSearchBaseRefsArgv('feature', 25, { excludeRemoteHead: false })
 
     expect(argv).not.toContain('--exclude=refs/remotes/**/HEAD')
@@ -306,7 +306,7 @@ describe('searchBaseRefs (widened glob)', () => {
     expect(result).toBe('remote')
   })
 
-  it('uses the longest configured remote name when deriving local branch names', () => {
+  it('uses the longest configured remote name when deriving local branch names', async () => {
     const results = parseAndFilterSearchRefDetails(
       'refs/remotes/foo/bar/feature/something\u0000foo/bar/feature/something\n',
       10,
@@ -337,20 +337,20 @@ describe('searchBaseRefs (widened glob)', () => {
     expect(results).toEqual(['main', 'upstream/feature-x', 'upstream/main'])
   })
 
-  it('caps broad ref-search argv before git output is captured', () => {
+  it('caps broad ref-search argv before git output is captured', async () => {
     const argv = buildSearchBaseRefsArgv('', 12)
 
     expect(argv).toContain('--exclude=refs/remotes/*/HEAD')
     expect(argv).toContain('--count=48')
   })
 
-  it('does not hard-cap large explicit ref-search limits below the request size', () => {
+  it('does not hard-cap large explicit ref-search limits below the request size', async () => {
     const argv = buildSearchBaseRefsArgv('', 600)
 
     expect(argv).toContain('--count=2400')
   })
 
-  it('clamps oversized limits before constructing an unbounded Git count', () => {
+  it('clamps oversized limits before constructing an unbounded Git count', async () => {
     expect(buildSearchBaseRefsArgv('', REPO_SEARCH_REFS_MAX_LIMIT)).toContain('--count=4000')
     expect(buildSearchBaseRefsArgv('', REPO_SEARCH_REFS_MAX_SCAN_LIMIT)).toContain('--count=4004')
     expect(buildSearchBaseRefsArgv('', REPO_SEARCH_REFS_MAX_SCAN_LIMIT + 1)).toContain(
@@ -428,7 +428,7 @@ describe('searchBaseRefs (widened glob)', () => {
     expect(results).not.toContain('upstream/HEAD')
   })
 
-  it('preserves Git disambiguation prefixes for colliding local and remote refs', () => {
+  it('preserves Git disambiguation prefixes for colliding local and remote refs', async () => {
     const results = parseAndFilterSearchRefDetails(
       [
         'refs/heads/origin/main\0heads/origin/main',

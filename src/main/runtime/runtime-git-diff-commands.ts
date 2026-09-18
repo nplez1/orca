@@ -179,7 +179,7 @@ export class RuntimeGitDiffCommands {
       return provider.getRemoteFileUrl(target.worktree.path, normalizedRelativePath, line)
     }
     await awaitWindowsHostGitEnvironmentReady({ cwd: target.worktree.path })
-    return getRemoteFileUrl(target.worktree.path, normalizedRelativePath, line)
+    return await getRemoteFileUrl(target.worktree.path, normalizedRelativePath, line)
   }
 
   async getRuntimeGitRemoteCommitUrl(
@@ -192,6 +192,6 @@ export class RuntimeGitDiffCommands {
       return provider.getRemoteCommitUrl(target.worktree.path, sha)
     }
     await awaitWindowsHostGitEnvironmentReady({ cwd: target.worktree.path })
-    return getRemoteCommitUrl(target.worktree.path, sha)
+    return await getRemoteCommitUrl(target.worktree.path, sha)
   }
 }
