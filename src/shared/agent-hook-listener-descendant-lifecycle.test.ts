@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   clearPaneCacheState,
   createHookListenerState,
+  deleteLegacyAgentStatus,
   movePaneCacheState,
   paneHasStateClaims,
   type HookListenerState
@@ -135,19 +136,52 @@ describe('descendant lifecycle never settles the pane', () => {
 
       // Why: an interrupted turn skips the stop gate, so the child never reports a finish and
       // this cancel is the only proof it is gone. Without it the pane never settles again.
-      publish('grok', {
+      const cancelled = publish('grok', {
         hookEventName: 'StopCancelled',
         reason: 'user_interrupt',
         cancelledBy: 'user'
       })
+      // Why: assert what the PANE shows, not what the roster holds. Clearing the roster while
+      // publishing nothing leaves the renderer on the pre-cancel row — spinner still running,
+      // child still listed — which is exactly the shape a roster-only assertion cannot see.
+      expect(cancelled).not.toBeNull()
+      expect(cancelled?.payload.state).toBe('done')
+      expect(cancelled?.payload.subagents).toBeUndefined()
+      // Why: a cancelled turn did not finish; the flag is what makes the row read 'Interrupted'
+      // and any notification say 'stopped' rather than 'finished'.
+      expect(cancelled?.payload.interrupted).toBe(true)
       expect(state.descendantRosterByPaneKey.has(PANE_KEY)).toBe(false)
-      expect(
-        publishedState('grok', {
-          hookEventName: 'Notification',
-          notificationType: 'idle_prompt',
-          message: 'Type your message'
-        })
-      ).toBe('done')
+    })
+
+    it('settles a runtime-cancelled turn without waiting for an idle ping', () => {
+      startTurn()
+      publish('grok', { hookEventName: 'SubagentStart', subagentId: 'sub-1', subagentType: 'x' })
+      const cancelled = publish('grok', {
+        hookEventName: 'StopCancelled',
+        reason: 'max_turns',
+        cancelledBy: 'runtime'
+      })
+      expect(cancelled?.payload.state).toBe('done')
+      expect(cancelled?.payload.interrupted).toBe(true)
+      expect(cancelled?.payload.subagents).toBeUndefined()
+    })
+
+    it('surfaces a child blocked on a human answer', () => {
+      startTurn()
+      publish('grok', { hookEventName: 'SubagentStart', subagentId: 'sub-1', subagentType: 'x' })
+      // Why: grok auto-allows ask_user_question, so the child announces its wait as a PreToolUse.
+      // Routing child events away from the lead normalizer must not swallow it.
+      const asked = publish('grok', {
+        hookEventName: 'PreToolUse',
+        subagentType: 'x',
+        subagentId: 'sub-1',
+        toolName: 'ask_user_question',
+        toolInput: { question: 'which one?' }
+      })
+      expect(asked?.payload.state).toBe('waiting')
+
+      // The pane keeps waiting while the lead's own turn ends underneath it.
+      expect(publishedState('grok', { hookEventName: 'Stop', reason: 'end_turn' })).toBe('waiting')
     })
 
     it('keeps siblings alive when one child cancels itself', () => {
@@ -304,7 +338,7 @@ describe('descendant lifecycle never settles the pane', () => {
       // Why: the lead cache only refines a republish an incoming child event already
       // triggered; it never creates a row. With the pane's stored row gone it is the
       // only descendant state left, and it must not read as a live claim on its own.
-      state.lastStatusByPaneKey.delete(PANE_KEY)
+      deleteLegacyAgentStatus(state, PANE_KEY)
       expect(paneHasStateClaims(state, PANE_KEY)).toBe(false)
     })
 
