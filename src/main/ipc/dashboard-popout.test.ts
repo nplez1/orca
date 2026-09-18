@@ -83,17 +83,17 @@ function makeStore(enabled = true) {
   let settingsListener:
     | ((updates: Record<string, unknown>, settings: Record<string, unknown>) => void)
     | null = null
+  const settings: Record<string, unknown> = { experimentalAgentDashboardPopout: enabled }
   return {
-    getSettings: vi.fn(() => ({ experimentalAgentDashboardPopout: enabled })),
+    getSettings: vi.fn(() => settings),
     onSettingsChanged: vi.fn((listener) => {
       settingsListener = listener
       return vi.fn()
     }),
-    fireSettingsChanged: (nextEnabled: boolean) =>
-      settingsListener?.(
-        { experimentalAgentDashboardPopout: nextEnabled },
-        { experimentalAgentDashboardPopout: nextEnabled }
-      )
+    fireSettingsChanged: (updates: Record<string, unknown>) => {
+      Object.assign(settings, updates)
+      settingsListener?.(updates, { ...settings })
+    }
   }
 }
 
@@ -138,8 +138,24 @@ describe('registerDashboardPopoutHandlers', () => {
   })
 
   it('auto-closes the popout when the feature is disabled', () => {
-    store.fireSettingsChanged(false)
+    store.fireSettingsChanged({ experimentalAgentDashboardPopout: false })
     expect(closePopoutMock).toHaveBeenCalledOnce()
+  })
+
+  // Why: without the handoff the mode change closes the user's only board and
+  // leaves them with no way back to the in-window surface.
+  it('hands the board back to the in-window drawer when the mode leaves pop-out', () => {
+    getPopoutMock.mockReturnValue(makeWindow(popoutSender))
+    store.fireSettingsChanged({ experimentalAgentDashboardMode: 'in-window' })
+    expect(closePopoutMock).toHaveBeenCalledOnce()
+    expect(sendToTrustedMock).toHaveBeenCalledWith('ui:openAgentDashboardDrawer', null)
+  })
+
+  it('leaves an open popout alone while the mode stays pop-out', () => {
+    getPopoutMock.mockReturnValue(makeWindow(popoutSender))
+    store.fireSettingsChanged({ experimentalAgentDashboardMode: 'popout' })
+    expect(closePopoutMock).not.toHaveBeenCalled()
+    expect(sendToTrustedMock).not.toHaveBeenCalled()
   })
 
   it('hides the popout for only the trusted main renderer', () => {
