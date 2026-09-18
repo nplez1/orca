@@ -363,8 +363,13 @@ export class SessionSearchIndexWriter {
       add: (message) => {
         // The metadata tier needs no message rows: the session row it writes at
         // the end of the read is the whole of what it stores, and skipping here
-        // also skips the buffering that exists to chunk message rows.
-        if (released || fenced || this.closed || !this.storeContent) {
+        // also skips the buffering that exists to chunk message rows. Deliberately
+        // not a `discard()`: that marks the write released, and `commit` gates on
+        // it, which would drop the session row this tier exists to publish.
+        if (!this.storeContent) {
+          return
+        }
+        if (released || fenced || this.closed) {
           discard()
           return
         }
