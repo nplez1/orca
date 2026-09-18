@@ -124,7 +124,6 @@ src/main/memory/collector.ts
 src/main/native-chat/wsl-transcript-fs-process-slot.ts
 src/main/native-chat/wsl-transcript-fs-process-spawn.ts
 src/main/network/macos-system-resolver-health.ts
-src/main/network/macos-tailscale-dns-diagnostic.ts
 src/main/pi/agent-status-wsl-curl-source.ts
 src/main/plugins/plugin-host-process.ts
 src/main/ports/port-scan-command-execution.ts
