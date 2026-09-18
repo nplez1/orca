@@ -108,7 +108,15 @@ export async function lookupPRByNumber(args: {
   number: number
   ghOptions: ReturnType<typeof ghRepoExecOptions>
   executionScope: string
+  /**
+   * Why: a PR number is only unique inside one repo. A fork and the upstream it was forked from
+   * number independently, so both can hold a PR with this number — and the upstream one is
+   * unrelated. This worktree's own head ref tells the two apart, so prefer the candidate whose PR
+   * carries it instead of trusting probe order.
+   */
+  preferHeadRefName?: string | null
 }): Promise<{ data: PullRequestLookupData | null; dataRepo: OwnerRepo | null }> {
+  let mismatched: { data: PullRequestLookupData; dataRepo: OwnerRepo } | null = null
   for (const candidate of args.candidates) {
     try {
       const linkedData = await getPRByNumber(
@@ -120,13 +128,22 @@ export async function lookupPRByNumber(args: {
       if (!linkedData) {
         continue
       }
-      return { data: linkedData, dataRepo: candidate }
+      if (!args.preferHeadRefName || linkedData.headRefName === args.preferHeadRefName) {
+        return { data: linkedData, dataRepo: candidate }
+      }
+      // Why: still the answer when no candidate holds a PR for this head ref — a worktree created
+      // from a PR keeps a local branch that differs from the PR's, and its number stays authoritative.
+      mismatched ??= { data: linkedData, dataRepo: candidate }
     } catch (err) {
       if (shouldStopAfterExactLookupError(err)) {
         throw err
       }
       // Candidate probing is best-effort; another repo may own the PR.
     }
+  }
+
+  if (mismatched) {
+    return mismatched
   }
 
   if (args.candidates.length > 0) {

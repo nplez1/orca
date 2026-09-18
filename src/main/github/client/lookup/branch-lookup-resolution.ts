@@ -151,7 +151,8 @@ export async function resolvePRForBranchOutcome(input: {
       candidates,
       number: linkedPRNumber,
       ghOptions,
-      executionScope
+      executionScope,
+      preferHeadRefName: branchName || null
     })
     data = exactLookup.data
     dataRepo = exactLookup.dataRepo
@@ -223,7 +224,8 @@ export async function resolvePRForBranchOutcome(input: {
       candidates,
       number: fallbackPRNumber,
       ghOptions,
-      executionScope
+      executionScope,
+      preferHeadRefName: branchName || null
     })
     data = fallbackLookup.data
     dataRepo = fallbackLookup.dataRepo
