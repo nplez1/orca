@@ -11,6 +11,9 @@ export const dashboardApi = {
   // Open the pop-out dashboard window, or focus it if already open.
   openPopout: (): Promise<void> => ipcRenderer.invoke('dashboardPopout:open'),
 
+  // Hide the pop-out window; the sidebar entry toggles between the two.
+  closePopout: (): Promise<void> => ipcRenderer.invoke('dashboardPopout:close'),
+
   // ── Producer side (main window) ──────────────────────────────────────
   publishSnapshot: (snapshot: DashboardSnapshot): Promise<void> =>
     ipcRenderer.invoke('dashboard:publishSnapshot', snapshot),

@@ -2,6 +2,7 @@
 
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getDefaultSettings } from '../../../../shared/constants'
 import { useAppStore } from '@/store'
 import AgentDashboardSidebarHost from './AgentDashboardSidebarHost'
 
@@ -71,5 +72,56 @@ describe('AgentDashboardSidebarHost', () => {
     )
 
     await waitFor(() => expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(false))
+  })
+
+  it('clears an open drawer when the mode moves the board to the pop-out', async () => {
+    useAppStore.setState({
+      agentDashboardDrawerOpen: true,
+      settings: { ...getDefaultSettings('/tmp'), experimentalAgentDashboardMode: 'in-window' }
+    })
+    render(
+      <AgentDashboardSidebarHost
+        sidebarOpen
+        workspaceBoardOpen={false}
+        closeWorkspaceBoard={vi.fn()}
+        statusBarVisible
+      />
+    )
+    expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(true)
+
+    act(() => {
+      useAppStore.setState((state) => ({
+        settings: { ...state.settings!, experimentalAgentDashboardMode: 'popout' }
+      }))
+    })
+
+    await waitFor(() => expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(false))
+  })
+
+  // Why: handing the board back opens the drawer from the main process a tick
+  // before the mode reaches this store. Treating the stale pop-out mode as a
+  // reason to close would drop the board the user just asked for.
+  it('keeps a drawer the handoff opened before the mode update lands', async () => {
+    useAppStore.setState({
+      agentDashboardDrawerOpen: false,
+      settings: { ...getDefaultSettings('/tmp'), experimentalAgentDashboardMode: 'popout' }
+    })
+    render(
+      <AgentDashboardSidebarHost
+        sidebarOpen
+        workspaceBoardOpen={false}
+        closeWorkspaceBoard={vi.fn()}
+        statusBarVisible
+      />
+    )
+
+    act(() => useAppStore.setState({ agentDashboardDrawerOpen: true }))
+    act(() => {
+      useAppStore.setState((state) => ({
+        settings: { ...state.settings!, experimentalAgentDashboardMode: 'in-window' }
+      }))
+    })
+
+    expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(true)
   })
 })

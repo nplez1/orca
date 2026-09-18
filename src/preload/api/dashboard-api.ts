@@ -11,6 +11,7 @@ import type {
 
 export type DashboardApi = {
   openPopout: () => Promise<void>
+  closePopout: () => Promise<void>
   publishSnapshot: (snapshot: DashboardSnapshot) => Promise<void>
   getPopoutOpen: () => Promise<boolean>
   onPopoutOpenChanged: (callback: (open: boolean) => void) => () => void
