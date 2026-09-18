@@ -67,13 +67,13 @@ beforeEach(async () => {
     })
     // One process holds one index, so the transcript reader publishes every read
     // to every live consumer. Three machines means three indexes built alone.
-    instance.apply({ enabled: true, historyDays: null })
+    instance.apply({ contentEnabled: true, historyDays: null })
     await instance.settled()
     instance.close()
     hosts.push({ executionHostId, harness, instance, sessionIds })
   }
   for (const host of hosts) {
-    host.instance.apply({ enabled: true, historyDays: null })
+    host.instance.apply({ contentEnabled: true, historyDays: null })
     await host.instance.settled()
     const own = resultsOf(await host.instance.search({ query: 'needle', limit: 100 }))
     expect(own.hits.map((hit) => hit.sessionId).sort()).toEqual([...host.sessionIds].sort())
@@ -274,19 +274,16 @@ it('refuses a cursor whose page size or host set no longer matches the request',
   ).toEqual({ kind: 'malformed-cursor' })
 })
 
-it('reports a disabled host without aborting the merge', async () => {
-  hosts[2]!.instance.apply({ enabled: false, historyDays: null })
+it('keeps answering from the metadata tier when a host has content search off', async () => {
+  hosts[2]!.instance.apply({ contentEnabled: false, historyDays: null })
+  await hosts[2]!.instance.settled()
+  expect(hosts[2]!.instance.status()).toMatchObject({ enabled: true, contentEnabled: false })
   const { keys } = await paginate(5, 'relevance')
   expect(new Set(keys).size).toBe(keys.length)
-  expect([...keys].sort()).toEqual(
-    [
-      ...hosts[0]!.sessionIds.map((id) => `local/${id}`),
-      ...hosts[1]!.sessionIds.map((id) => `ssh:alpha/${id}`)
-    ].sort()
-  )
+  expect([...keys].sort()).toEqual(everyKey().sort())
   const first = resultsOf(await searchAllExecutionHosts({ query: 'needle', limit: 5 }, legs()))
   expect(first.hosts).toContainEqual({
     executionHostId: 'ssh:beta',
-    outcome: 'disabled'
+    outcome: 'searched'
   })
 })

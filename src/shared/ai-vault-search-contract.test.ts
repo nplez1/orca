@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  AiVaultSearchHostStatusSchema,
+  AiVaultSearchHostOutcomeSchema,
   AiVaultSearchRequestSchema,
   AiVaultSearchResponseSchema,
   AiVaultSearchStatusSchema
@@ -142,13 +142,13 @@ describe('session search cross-version skew', () => {
   it('strips additive and unknown fields from a newer host instead of rejecting them', () => {
     const response = {
       ...searchResults(),
-      hosts: [{ executionHostId: 'runtime:box', outcome: 'contributed' }],
+      hosts: [{ executionHostId: 'runtime:box', outcome: 'searched' }],
       futureField: { nested: true }
     }
     const parsed = AiVaultSearchResponseSchema.parse(response)
     expect(parsed).not.toHaveProperty('futureField')
     expect(parsed.kind === 'results' && parsed.hosts).toEqual([
-      { executionHostId: 'runtime:box', outcome: 'contributed' }
+      { executionHostId: 'runtime:box', outcome: 'searched' }
     ])
 
     const status = { ...unavailableSessionSearchStatus(), contentEnabled: true, futureField: 1 }
@@ -157,10 +157,10 @@ describe('session search cross-version skew', () => {
     expect(parsedStatus.contentEnabled).toBe(true)
   })
 
-  it('records a per-host outcome with no reason as not reported, never an invented one', () => {
+  it('records a known per-host outcome, never an invented one', () => {
     const hosts = [
-      { executionHostId: 'runtime:box', outcome: 'contributed' },
-      { executionHostId: 'ssh:box', outcome: 'unavailable', reason: 'timeout' }
+      { executionHostId: 'runtime:box', outcome: 'searched' },
+      { executionHostId: 'ssh:box', outcome: 'unreachable' }
     ]
     const parsed = AiVaultSearchResponseSchema.parse({ ...searchResults(), hosts })
     expect(parsed.kind === 'results' && parsed.hosts).toEqual(hosts)
@@ -171,8 +171,7 @@ describe('session search cross-version skew', () => {
       }).success
     ).toBe(false)
     expect(
-      AiVaultSearchHostStatusSchema.safeParse({ executionHostId: '', outcome: 'contributed' })
-        .success
+      AiVaultSearchHostOutcomeSchema.safeParse({ executionHostId: '', outcome: 'searched' }).success
     ).toBe(false)
   })
 
@@ -190,7 +189,7 @@ describe('session search cross-version skew', () => {
   it('passes a newer host per-host report through relay redaction without depending on it', async () => {
     const response = {
       ...searchResults(),
-      hosts: [{ executionHostId: 'runtime:box', outcome: 'unavailable', reason: 'timeout' }]
+      hosts: [{ executionHostId: 'runtime:box', outcome: 'unreachable' }]
     }
     const client = createSessionSearchClient(async () => response, 'relay')
     const result = await client.searchSessions({ query: 'needle' })

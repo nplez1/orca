@@ -121,7 +121,7 @@ test('panel renders transport failure and unavailable reasons without a local fa
   await orcaPage.evaluate(async () => {
     await window.__store
       ?.getState()
-      .updateSettingsOrThrow({ aiVaultSearch: { enabled: true, historyDays: null } })
+      .updateSettingsOrThrow({ aiVaultSearch: { contentEnabled: true, historyDays: null } })
     window.__store?.getState().setRightSidebarOpen(true)
     window.__store?.getState().setRightSidebarTab('vault')
   })
