@@ -27,8 +27,11 @@ export class RuntimeSessionSearchSettingsController {
       throw new Error('runtime_unavailable')
     }
     const before = this.store.getSettings()
+    // Upstream's per-host "enable indexing" toggle *is* this fork's content consent: metadata is
+    // always indexed here, so the only switch a paired client can turn is the content tier.
+    // Writing `enabled` would leave the toggle a no-op against AiVaultSearchSettings.
     this.store.updateSettings(
-      { aiVaultSearch: { ...resolveAiVaultSearchSettings(before), enabled } },
+      { aiVaultSearch: { ...resolveAiVaultSearchSettings(before), contentEnabled: enabled } },
       { notifyListeners: true }
     )
     this.apply?.(before, this.store.getSettings())
