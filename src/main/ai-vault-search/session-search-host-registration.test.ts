@@ -215,27 +215,33 @@ it('orcad indexes metadata without content consent and discovers a late root', a
 
 // A host with no scanner child has nothing to forward a policy to, so the installed
 // service is itself how a settings write reaches the index.
-it('re-applies consent on an in-process host without reinstalling the service', async () => {
+it('re-applies content consent on an in-process host without reinstalling the service', async () => {
   installed = installInProcessSessionSearchService({
     dataRoot: harness.root,
     roots: harness.roots,
-    settings: { enabled: false, historyDays: null }
+    settings: { contentEnabled: false, historyDays: null }
   })
-  expect(await searchSessionService({ query: 'ledger' }, 'relay')).toEqual({
-    kind: 'unavailable',
-    reason: 'disabled'
+  // Metadata is not a consent decision, so a host with content off still answers — from titles
+  // and paths rather than message bodies.
+  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+    enabled: true,
+    contentEnabled: false
   })
-
-  installed?.apply?.({ enabled: true, historyDays: null })
   expect(await searchSessionService({ query: 'ledger' }, 'relay')).not.toMatchObject({
     kind: 'unavailable',
     reason: 'disabled'
   })
 
-  installed?.apply?.({ enabled: false, historyDays: null })
-  expect(await searchSessionService({ query: 'ledger' }, 'relay')).toEqual({
-    kind: 'unavailable',
-    reason: 'disabled'
+  installed?.apply?.({ contentEnabled: true, historyDays: null })
+  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+    enabled: true,
+    contentEnabled: true
+  })
+
+  installed?.apply?.({ contentEnabled: false, historyDays: null })
+  expect(await sessionSearchServiceStatus({}, 'relay')).toMatchObject({
+    enabled: true,
+    contentEnabled: false
   })
 })
 
