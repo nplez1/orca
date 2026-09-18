@@ -6013,7 +6013,8 @@
                 "alreadyAbsent": "The remote had no branch named {{value0}}.",
                 "noUpstream": "This branch tracks no remote branch, so nothing was deleted there.",
                 "skippedPreserved": "Orca kept the local branch, so it left the remote branch in place too.",
-                "keptTitle": "Remote branch kept for {{value0}}"
+                "keptTitle": "Remote branch kept for {{value0}}",
+                "hostDidNotReport": "The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone."
               }
             }
           }
