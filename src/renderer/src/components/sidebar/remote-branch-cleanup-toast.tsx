@@ -29,7 +29,19 @@ export function showRemoteBranchCleanupNotice(
         'Could not delete the remote branch for {{value0}}',
         { value0: worktreeName }
       ),
-      { id, description: cleanup.message, duration: 12000, dismissible: true }
+      {
+        id,
+        // Why: `message` is Git's own text, so a host that never reported a cleanup has none —
+        // and silence there would read as "the branch is gone".
+        description:
+          cleanup.message ??
+          translate(
+            'auto.components.sidebar.remote.branch.cleanup.toast.hostDidNotReport',
+            'The connected host did not report deleting the remote branch. Check the branch on its remote before assuming it is gone.'
+          ),
+        duration: 12000,
+        dismissible: true
+      }
     )
     return
   }
