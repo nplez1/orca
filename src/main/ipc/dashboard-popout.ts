@@ -55,6 +55,18 @@ export function registerDashboardPopoutHandlers(
     ) {
       lastSnapshot = null
       closeDashboardPopout()
+      return
+    }
+    // Why: the mode setting names the surface that owns the board, so flipping
+    // it back to in-window closes this window and hands the board to the main
+    // window's drawer rather than leaving the user with neither surface.
+    if (
+      'experimentalAgentDashboardMode' in updates &&
+      settings.experimentalAgentDashboardMode !== 'popout' &&
+      getDashboardPopoutWindow()
+    ) {
+      closeDashboardPopout()
+      sendToTrustedUIRenderer('ui:openAgentDashboardDrawer', null)
     }
   })
 
