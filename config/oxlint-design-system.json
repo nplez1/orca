@@ -48,6 +48,17 @@
         "shadcn/no-raw-colors": "off",
         "shadcn/require-static-classes": "off"
       }
+    },
+    // Provider brand marks: every raw color in this module is a vendor's logo fill (the
+    // Fireworks mark's #6720FF among them), so a theme token or currentColor would render
+    // the mark in the wrong color. Exempted here rather than with an inline directive
+    // because the root lint scan does not load this plugin, so an inline directive always
+    // reads back as an unused directive there.
+    {
+      "files": ["**/src/renderer/src/components/status-bar/icons.tsx"],
+      "rules": {
+        "shadcn/no-raw-colors": "off"
+      }
     }
   ],
   "ignorePatterns": ["**/node_modules", "**/dist", "**/out", "cloud/**", "mobile/**"]
