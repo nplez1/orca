@@ -15,7 +15,12 @@ vi.mock('os', async (importOriginal) => ({
 }))
 
 import { CodexHookService } from './hook-service'
-import { CODEX_EVENTS, CODEX_EVENT_LABEL, getManagedCommand } from './codex-hook-definition'
+import {
+  CODEX_EVENTS,
+  CODEX_EVENT_LABEL,
+  getManagedCommand,
+  getManagedScriptPath
+} from './codex-hook-definition'
 import { readHooksJson, wrapWindowsHookCommand } from '../agent-hooks/installer-utils'
 import {
   computeTrustedHash,
@@ -33,8 +38,12 @@ describe.skipIf(process.platform !== 'win32')('Unicode Windows hook upgrade', ()
     const runtimeHome = join(homes.userDataDir, 'codex-runtime-home', 'home')
     const configPath = join(runtimeHome, 'hooks.json')
     const tomlPath = join(runtimeHome, 'config.toml')
-    const scriptPath = join(home, '.orca', 'agent-hooks', 'codex-hook.cmd')
-    const oldCommand = wrapWindowsHookCommand(scriptPath)
+    // Why (fork): the fixture is the PRE-upgrade install, so it names the pre-rename home on
+    // purpose — the managed assertions below must use the installer's own path, or the next
+    // identity move breaks this Windows-only case again (it never runs on macOS).
+    const oldScriptPath = join(home, '.orca', 'agent-hooks', 'codex-hook.cmd')
+    const oldCommand = wrapWindowsHookCommand(oldScriptPath)
+    const managedCommand = getManagedCommand(getManagedScriptPath())
     const userHome = join(home, '.codex')
     mkdirSync(userHome)
     const userConfig = JSON.stringify({
@@ -73,16 +82,14 @@ describe.skipIf(process.platform !== 'win32')('Unicode Windows hook upgrade', ()
       const trust = readFileSync(tomlPath, 'utf8')
       for (const event of CODEX_EVENTS) {
         const commands = hooks?.[event]?.flatMap((group) => group.hooks ?? []) ?? []
-        expect(
-          commands.filter((hook) => hook.command === getManagedCommand(scriptPath))
-        ).toHaveLength(1)
+        expect(commands.filter((hook) => hook.command === managedCommand)).toHaveLength(1)
         expect(commands.some((hook) => hook.command === oldCommand)).toBe(false)
         const entry = {
           sourcePath: getCodexExplicitHomeHookSourcePath(configPath),
           eventLabel: CODEX_EVENT_LABEL[event],
           groupIndex: 0,
           handlerIndex: 0,
-          command: getManagedCommand(scriptPath),
+          command: managedCommand,
           timeoutSec: 10
         }
         expect(trust).toContain(computeTrustedHash(entry))
