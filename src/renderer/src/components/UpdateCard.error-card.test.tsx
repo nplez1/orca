@@ -165,8 +165,11 @@ describe('UpdateCard hourly builds', () => {
     render(<UpdateCard />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Release notes' }))
+    // Why (fork): this build publishes a single stream out of nplez1/orca, so a dev-channel tag
+    // resolves to that repo rather than upstream's dedicated hourly repo (OFFERED_RELEASE_CHANNELS
+    // in src/shared/release-channel.ts).
     expect(openUrl).toHaveBeenCalledWith(
-      'https://github.com/stablyai/orca-hourly/releases/tag/v1.4.160-hourly.202607281400'
+      'https://github.com/nplez1/orca/releases/tag/v1.4.160-hourly.202607281400'
     )
   })
 })

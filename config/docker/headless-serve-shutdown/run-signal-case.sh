@@ -83,7 +83,10 @@ fi
 
 registered_cli_verified=false
 if [[ "$entrypoint_kind" == appimage ]]; then
-  registered_cli="$HOME/.local/bin/orca-ide"
+  # Why: the installed command name is an identity (see src/main/cli/cli-install-constants.ts),
+  # while the launcher it points at is the bundle's own name. The runner passes the first in.
+  registered_cli_name=${ORCA_TEST_CLI_COMMAND_NAME:-orca-ide}
+  registered_cli="$HOME/.local/bin/$registered_cli_name"
   expected_target="$XDG_CACHE_HOME/orca/appimage/launcher/orca-ide"
   actual_target=$(readlink "$registered_cli" 2>/dev/null || true)
   if [[ "$actual_target" != "$expected_target" ]]; then
