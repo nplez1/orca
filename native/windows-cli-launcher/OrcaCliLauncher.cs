@@ -12,7 +12,7 @@ internal static class OrcaCliLauncher
             string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca.exe");
+            string electronPath = ResolveElectronPath(appDirectory);
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -21,9 +21,12 @@ internal static class OrcaCliLauncher
                 "index.js"
             );
 
-            if (!File.Exists(electronPath))
+            if (electronPath == null)
             {
-                Console.Error.WriteLine("Unable to locate Orca.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine(
+                    "Unable to locate the application executable next to \"{0}\"",
+                    resourcesDirectory
+                );
                 return 1;
             }
 
@@ -65,6 +68,40 @@ internal static class OrcaCliLauncher
             Console.Error.WriteLine("Unable to start the Orca CLI: {0}", error.Message);
             return 1;
         }
+    }
+
+    /// <summary>
+    /// The packaged app executable, which is named after the product name — a fork renames it
+    /// (this build ships "Orca NP.exe"), so naming it here would break the CLI. Mirrors the
+    /// Linux launcher: try the names a build can produce, then fall back to the install root's
+    /// own executable, which is neither Chromium's crashpad helper nor the NSIS uninstaller.
+    /// </summary>
+    private static string ResolveElectronPath(string appDirectory)
+    {
+        string[] knownNames = { "Orca.exe", "Orca NP.exe" };
+        foreach (string name in knownNames)
+        {
+            string candidate = Path.Combine(appDirectory, name);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        foreach (string candidate in Directory.GetFiles(appDirectory, "*.exe"))
+        {
+            string name = Path.GetFileName(candidate);
+            if (
+                name.StartsWith("Uninstall", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("chrome_crashpad_handler.exe", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                continue;
+            }
+            return candidate;
+        }
+
+        return null;
     }
 
     private static void MoveEnvironmentVariable(string sourceName, string targetName)
