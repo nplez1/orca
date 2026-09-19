@@ -10,6 +10,7 @@ import type {
   SshTargetAddResult,
   SshTargetCreateInput,
   SshTargetUpdateInput,
+  SshTargetVisibilityInput,
   SshTerminateSessionsResult
 } from '../../shared/ssh-types'
 import type { FilesystemPathFlavor } from '../../shared/filesystem-entry-types'
@@ -21,6 +22,8 @@ export type SshApi = {
   addTarget: (args: { target: SshTargetCreateInput }) => Promise<SshTargetAddResult>
   updateTarget: (args: { id: string; updates: SshTargetUpdateInput }) => Promise<SshTarget>
   removeTarget: (args: { id: string }) => Promise<void>
+  /** Hide or unhide a ~/.ssh/config-imported host. Null when the target is gone. */
+  setTargetHidden: (args: SshTargetVisibilityInput) => Promise<SshTarget | null>
   importConfig: (args?: { reAdopt?: boolean }) => Promise<SshConfigImportResult>
   listConfigHosts: (args?: SshConfigHostListArgs) => Promise<SshConfigHostListResult>
   resolveConfigHost: (args: { alias: string }) => Promise<SshConfigHostResolution | null>

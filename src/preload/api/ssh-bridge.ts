@@ -9,6 +9,7 @@ import type {
   SshTargetCreateInput,
   SshTarget,
   SshTargetUpdateInput,
+  SshTargetVisibilityInput,
   SshTerminateSessionsResult,
   PortForwardEntry,
   EnrichedDetectedPort
@@ -34,6 +35,9 @@ export const sshApi = {
 
   removeTarget: (args: { id: string }): Promise<void> =>
     ipcRenderer.invoke('ssh:removeTarget', args),
+
+  setTargetHidden: (args: SshTargetVisibilityInput): Promise<SshTarget | null> =>
+    ipcRenderer.invoke('ssh:setTargetHidden', args),
 
   importConfig: (args?: { reAdopt?: boolean }): Promise<SshConfigImportResult> =>
     ipcRenderer.invoke('ssh:importConfig', args),

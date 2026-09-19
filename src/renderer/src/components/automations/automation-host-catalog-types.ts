@@ -64,6 +64,9 @@ export type AutomationHostCatalogEntry = {
   querySupport: AutomationHostQuerySupport
   /** Present only while `querySupport` is degraded; explains which repair, if any, applies. */
   scopeGap?: AutomationHostScopeGap
+  /** The user hid this host from pickers. The entry stays — an automation already
+   *  stored on it must still resolve — but it is not offered as a destination. */
+  hidden?: boolean
 }
 
 export type AutomationCatalogSshTargetInput = {
@@ -71,6 +74,8 @@ export type AutomationCatalogSshTargetInput = {
   label: string
   /** Durable registration generation; absent on legacy targets and old servers. */
   generation?: number
+  /** Hidden from host pickers on the authority that owns it. */
+  hidden?: boolean
 }
 
 /** One authority's mirrored SSH state. Desktop and runtime supply the same shape. */

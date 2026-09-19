@@ -43,6 +43,7 @@ export function SkillInstallDialog({
   const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
   const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
+  const hiddenSshTargetIds = useAppStore((state) => state.hiddenSshTargetIds)
   const [link, setLink] = useState(initialLink)
   const [preview, setPreview] = useState<ResolvedSkillShare | null>(null)
   const [environmentId, setEnvironmentId] = useState<string>('local')
@@ -74,12 +75,14 @@ export function SkillInstallDialog({
   )
   const sshConnections = useMemo(
     () =>
-      [...sshTargetLabels.entries()].map(([id, label]) => ({
-        id,
-        label,
-        connected: sshConnectionStates.get(id)?.status === 'connected'
-      })),
-    [sshConnectionStates, sshTargetLabels]
+      [...sshTargetLabels.entries()]
+        .filter(([id]) => !hiddenSshTargetIds.has(id))
+        .map(([id, label]) => ({
+          id,
+          label,
+          connected: sshConnectionStates.get(id)?.status === 'connected'
+        })),
+    [hiddenSshTargetIds, sshConnectionStates, sshTargetLabels]
   )
 
   const resolveLink = useCallback(async (value: string): Promise<void> => {

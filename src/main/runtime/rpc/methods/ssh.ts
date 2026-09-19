@@ -10,14 +10,17 @@ import type { SshTargetSummary } from '../../../../shared/ssh-types'
 import { SshTarget } from '../../../../shared/rpc-contract/ssh-params'
 
 // Why: `generation` stays optional on the wire — an old server simply omits it and its rows key on target id alone.
+// Same for `hidden`: never drop the row, because a paired client resolves labels and live
+// session state through this list. Clients that pick hosts drop the hidden ones themselves.
 function listRegisteredSshTargetSummaries(): SshTargetSummary[] {
-  return listRegisteredSshTargets().map(({ id, label, generation }) => {
+  return listRegisteredSshTargets().map(({ id, label, generation, hidden }) => {
     const state = getRegisteredSshState(id)
     const remotePlatform = state?.remotePlatform
     return {
       id,
       label,
       ...(generation === undefined ? {} : { generation }),
+      ...(hidden === true ? { hidden: true } : {}),
       connected: state?.status === 'connected',
       ...(state?.status === undefined ? {} : { connectionStatus: state.status }),
       ...(remotePlatform === undefined ? {} : { remotePlatform })

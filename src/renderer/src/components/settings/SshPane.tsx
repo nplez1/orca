@@ -10,7 +10,8 @@ import {
   describeSshTerminateOutcome,
   terminateSshSessionsWithReconnect
 } from './ssh-session-termination'
-import { SshTargetCard } from './SshTargetCard'
+import { SshTargetList } from './SshTargetList'
+import { setSshTargetHiddenWithReport } from './ssh-target-visibility'
 import { SshTargetDestructiveActions } from './SshTargetDestructiveActions'
 import { SshTargetForm, EMPTY_FORM, type EditingTarget } from './SshTargetForm'
 import { getEditingTargetForSshTarget } from './ssh-target-draft'
@@ -193,6 +194,19 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
     setShowForm(true)
   }
 
+  // Why no workspace dialog here: hiding changes nothing about the host's workspaces
+  // or sessions, so it needs no confirmation — unlike removal, which orphans them.
+  const handleSetHidden = async (target: SshTarget, hidden: boolean): Promise<void> => {
+    const report = await setSshTargetHiddenWithReport(window.api.ssh, target, hidden)
+    if (!mountedRef.current) {
+      return
+    }
+    toast[report.level](report.message)
+    if (report.applied) {
+      await loadTargets()
+    }
+  }
+
   const handleConnect = async (targetId: string): Promise<void> => {
     try {
       await window.api.ssh.connect({ targetId })
@@ -372,40 +386,20 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
         onTerminateSessions={handleTerminateSessions}
       >
         {({ busyActionForTarget, requestRemove, requestResetRelay, requestTerminateSessions }) => (
-          <>
-            {/* Target list */}
-            {targets.length === 0 ? (
-              <div className="flex items-center justify-center rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-5 text-sm text-muted-foreground">
-                {translate(
-                  'auto.components.settings.SshPane.c0f1c80166',
-                  'No SSH targets configured.'
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {targets.map((target) => (
-                  <SshTargetCard
-                    key={target.id}
-                    target={target}
-                    state={sshConnectionStates.get(target.id)}
-                    testing={testingIds.has(target.id)}
-                    busyAction={busyActionForTarget(target.id)}
-                    onConnect={handleConnect}
-                    onDisconnect={handleDisconnect}
-                    onTerminateSessions={(id) =>
-                      requestTerminateSessions({ id, label: target.label })
-                    }
-                    onResetRelay={(id) => requestResetRelay({ id, label: target.label })}
-                    onTest={handleTest}
-                    onEdit={handleEdit}
-                    onRemove={(id) =>
-                      requestRemoveTarget({ id, label: target.label }, requestRemove)
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </>
+          <SshTargetList
+            targets={targets}
+            connectionStates={sshConnectionStates}
+            testingIds={testingIds}
+            busyActionForTarget={busyActionForTarget}
+            onConnect={(target) => handleConnect(target.id)}
+            onDisconnect={(target) => handleDisconnect(target.id)}
+            onTerminateSessions={requestTerminateSessions}
+            onResetRelay={requestResetRelay}
+            onTest={(target) => handleTest(target.id)}
+            onEdit={handleEdit}
+            onRemove={(target) => requestRemoveTarget(target, requestRemove)}
+            onSetHidden={handleSetHidden}
+          />
         )}
       </SshTargetDestructiveActions>
 
