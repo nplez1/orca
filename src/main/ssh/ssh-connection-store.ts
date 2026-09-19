@@ -1,5 +1,6 @@
 import type { Store } from '../persistence'
 import type { SshRepoReadoption, SshTarget } from '../../shared/ssh-types'
+import { isAutoImportedSshTarget } from '../../shared/ssh-types'
 import { RUNTIME_OWNED_SSH_TARGET_ID_PREFIX } from '../../shared/execution-host'
 import { normalizeSshConfigAlias } from '../../shared/ssh-config-alias'
 import { loadUserSshConfig, sshConfigHostsToTargets } from './ssh-config-parser'
@@ -34,7 +35,7 @@ export class SshConnectionStore {
     return this.store.getSshTarget(id)
   }
 
-  addTarget(target: Omit<SshTarget, 'id'>): SshTarget {
+  addTarget(target: Omit<SshTarget, 'id' | 'hidden'>): SshTarget {
     const full: SshTarget = {
       ...target,
       configHost: target.configHost ?? target.host,
@@ -84,7 +85,7 @@ export class SshConnectionStore {
     return next
   }
 
-  updateTarget(id: string, updates: Partial<Omit<SshTarget, 'id'>>): SshTarget | null {
+  updateTarget(id: string, updates: Partial<Omit<SshTarget, 'id' | 'hidden'>>): SshTarget | null {
     const updated = this.store.updateSshTarget(id, updates)
     if (updated) {
       // Why: actively editing a target reclaims its alias from the deleted set,
@@ -92,6 +93,27 @@ export class SshConnectionStore {
       this.reclaimAlias(updated.configHost ?? updated.label)
     }
     return updated
+  }
+
+  /**
+   * Hide or unhide a discovered host. Hiding is only meaningful for hosts Orca imported
+   * from ~/.ssh/config: those come back on every sync, so removal never sticks. A host the
+   * user added in Orca has no external source to resurrect it and is removed instead, so
+   * hiding one is a caller bug rather than a state we persist.
+   */
+  setTargetHidden(id: string, hidden: boolean): SshTarget | null {
+    const target = this.store.getSshTarget(id)
+    if (!target || isRuntimeOwnedSshTarget(target)) {
+      return null
+    }
+    if (hidden && !isAutoImportedSshTarget(target)) {
+      throw new Error('ssh_target_not_hideable')
+    }
+    const isHidden = target.hidden === true
+    if (isHidden === hidden) {
+      return { ...target }
+    }
+    return this.store.updateSshTarget(id, { hidden })
   }
 
   removeTarget(id: string): void {
@@ -152,7 +174,7 @@ export class SshConnectionStore {
       const alias = normalizeSshConfigAlias(existing.configHost ?? existing.label)
       if (
         existing.source === 'manual' ||
-        (existing.source === undefined && !isLegacyConfigImportTarget(existing))
+        (existing.source === undefined && !isAutoImportedSshTarget(existing))
       ) {
         manualAliases.add(alias)
         continue
@@ -245,14 +267,4 @@ export function getRuntimeOwnedSshTargetId(runtimeId: string): string {
 
 export function isRuntimeOwnedSshTarget(target: SshTarget): boolean {
   return target.owner?.type === 'on-demand-runtime'
-}
-
-function isLegacyConfigImportTarget(target: SshTarget): boolean {
-  const alias = target.configHost ?? target.label
-  // Why: legacy manual and imported targets both lack `source`. Only adopt the
-  // old import shape, where the SSH alias was kept as label/configHost while
-  // host stored the resolved HostName; otherwise preserve the user's target.
-  return Boolean(
-    alias && target.label === alias && target.configHost === alias && target.host !== alias
-  )
 }

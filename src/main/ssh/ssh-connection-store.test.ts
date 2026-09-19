@@ -186,6 +186,96 @@ describe('SshConnectionStore', () => {
     expect(mockStore.removeSshTarget).toHaveBeenCalledWith('ssh-1')
   })
 
+  describe('setTargetHidden', () => {
+    function seedConfigTarget(overrides: Partial<SshTarget> = {}): SshTarget {
+      const target: SshTarget = {
+        id: 'ssh-config-1',
+        label: 'cluster',
+        configHost: 'cluster',
+        host: '10.0.0.5',
+        port: 22,
+        username: 'dev',
+        source: 'ssh-config',
+        ...overrides
+      }
+      mockStore.addSshTarget(target)
+      return target
+    }
+
+    it('hides a config-imported target and reports the updated row', () => {
+      seedConfigTarget()
+
+      expect(sshStore.setTargetHidden('ssh-config-1', true)).toEqual(
+        expect.objectContaining({ id: 'ssh-config-1', hidden: true })
+      )
+      expect(sshStore.getTarget('ssh-config-1')?.hidden).toBe(true)
+    })
+
+    it('unhides a target again', () => {
+      seedConfigTarget({ hidden: true })
+
+      expect(sshStore.setTargetHidden('ssh-config-1', false)?.hidden).toBe(false)
+    })
+
+    // The rule the pane depends on: a host the user added has no config entry to
+    // resurrect it, so it is removed rather than hidden, and hiding one is a bug.
+    it('refuses to hide a target the user added in Orca', () => {
+      mockStore.addSshTarget({
+        id: 'ssh-manual',
+        label: 'mine',
+        host: 'mine.example.com',
+        port: 22,
+        username: 'dev',
+        source: 'manual'
+      })
+
+      expect(() => sshStore.setTargetHidden('ssh-manual', true)).toThrow('ssh_target_not_hideable')
+      expect(sshStore.getTarget('ssh-manual')?.hidden).toBeUndefined()
+    })
+
+    // Legacy targets predate `source`; the import shape still marks them as discovered.
+    it('hides a legacy config-shaped target that has no source stamp', () => {
+      mockStore.addSshTarget({
+        id: 'ssh-legacy',
+        label: 'old',
+        configHost: 'old',
+        host: 'old.example.com',
+        port: 22,
+        username: 'dev'
+      })
+
+      expect(sshStore.setTargetHidden('ssh-legacy', true)?.hidden).toBe(true)
+    })
+
+    it('returns null for an unknown target', () => {
+      expect(sshStore.setTargetHidden('missing', true)).toBeNull()
+    })
+
+    it('keeps the hidden flag across a config sync that rewrites the endpoint', () => {
+      seedConfigTarget({ hidden: true })
+      loadUserSshConfigMock.mockReturnValue([{ host: 'cluster' }])
+      sshConfigHostsToTargetsMock.mockReturnValue([
+        {
+          id: 'tmp-cluster',
+          configHost: 'cluster',
+          label: 'cluster',
+          host: '10.0.0.5',
+          port: 2222,
+          username: 'dev'
+        }
+      ])
+
+      sshStore.importFromSshConfig()
+
+      // A sync must not be a back door that un-hides the host.
+      expect(sshStore.getTarget('ssh-config-1')?.hidden).toBe(true)
+      expect(mockStore.updateSshTarget).toHaveBeenCalledWith(
+        'ssh-config-1',
+        expect.not.objectContaining({ hidden: false })
+      )
+    })
+  })
+
   describe('importFromSshConfig', () => {
     function candidate(overrides: Partial<SshTarget> & { configHost: string }): SshTarget {
       return {

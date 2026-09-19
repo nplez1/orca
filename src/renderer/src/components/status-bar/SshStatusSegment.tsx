@@ -26,6 +26,7 @@ import {
 import { SshTargetStatusRow } from './SshTargetStatusRow'
 import { connectRuntimeEnvironmentAndRecordStatus } from './runtime-environment-explicit-connect'
 import {
+  isSshTargetListedInStatusBar,
   overallDotColor,
   overallStatus,
   runtimeHostConnectionDetail,
@@ -71,6 +72,7 @@ export function SshStatusSegment({
 }): React.JSX.Element | null {
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
+  const hiddenSshTargetIds = useAppStore((s) => s.hiddenSshTargetIds)
   const settings = useAppStore((s) => s.settings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
@@ -97,6 +99,15 @@ export function SshStatusSegment({
         syncStatus: remoteWorkspaceSyncStatusByTargetId[id]
       }
     })
+    // Why: a hidden host leaves this list as well, except while it is connected — a live
+    // connection stays visible and disconnectable here.
+    .filter((target) =>
+      isSshTargetListedInStatusBar({
+        targetId: target.id,
+        status: target.status,
+        hiddenTargetIds: hiddenSshTargetIds
+      })
+    )
   const runtimeHosts = runtimeEnvironments
     .filter(isUserManagedRuntimeEnvironment)
     .map((environment) => {
