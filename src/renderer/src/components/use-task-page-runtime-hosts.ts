@@ -20,6 +20,7 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
     repos,
     sshConnectionStates,
     sshTargetLabels,
+    hiddenSshTargetIds,
     runtimeEnvironments,
     runtimeStatusByEnvironmentId,
     selectedRepos,
@@ -60,6 +61,7 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
           repos,
           settings,
           sshTargetLabels,
+          hiddenSshTargetIds,
           sshConnectionStates,
           runtimeEnvironments,
           runtimeStatusByEnvironmentId,
@@ -69,6 +71,7 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
     [
       repos,
       settings,
+      hiddenSshTargetIds,
       sshConnectionStates,
       sshTargetLabels,
       runtimeEnvironments,

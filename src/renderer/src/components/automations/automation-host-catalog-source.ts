@@ -26,6 +26,9 @@ export type AutomationCatalogSshSource = {
   targetLabels: ReadonlyMap<string, string>
   /** Absent for a target whose authority never reported a registration generation. */
   targetGenerations?: ReadonlyMap<string, number>
+  /** Targets the user hid from host pickers. Only the authority that owns the
+   *  target list can report these — a paired host's buckets leave it unset. */
+  hiddenTargetIds?: ReadonlySet<string>
   removedTargetLabels: ReadonlyMap<string, string>
   connectionStates: ReadonlyMap<string, { status: SshConnectionStatus }>
 }
@@ -60,7 +63,12 @@ function toSshTargets(source: AutomationCatalogSshSource): AutomationCatalogSshT
   const targets: AutomationCatalogSshTargetInput[] = []
   for (const [targetId, label] of source.targetLabels) {
     const generation = source.targetGenerations?.get(targetId)
-    targets.push({ targetId, label, ...(generation === undefined ? {} : { generation }) })
+    targets.push({
+      targetId,
+      label,
+      ...(generation === undefined ? {} : { generation }),
+      ...(source.hiddenTargetIds?.has(targetId) ? { hidden: true } : {})
+    })
   }
   return targets
 }

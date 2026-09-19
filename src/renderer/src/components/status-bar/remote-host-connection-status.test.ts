@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { RemoteRuntimeSharedConnectionDiagnostics } from '../../../../shared/remote-runtime-shared-control-types'
-import { runtimeHostConnectionDetail } from './remote-host-connection-status'
+import {
+  isSshTargetListedInStatusBar,
+  runtimeHostConnectionDetail
+} from './remote-host-connection-status'
 
 describe('runtimeHostConnectionDetail', () => {
   it('suppresses stale failures while a handshake is in flight', () => {
@@ -43,3 +46,36 @@ function diagnostics(
     lastClose: null
   }
 }
+
+describe('status-bar SSH host rows', () => {
+  const hiddenTargetIds = new Set(['ssh-hidden'])
+
+  it('lists every host that is not hidden', () => {
+    expect(
+      isSshTargetListedInStatusBar({
+        targetId: 'ssh-visible',
+        status: 'disconnected',
+        hiddenTargetIds
+      })
+    ).toBe(true)
+  })
+
+  it('drops a hidden host with no live connection', () => {
+    for (const status of ['disconnected', 'auth-failed', 'reconnection-failed', 'error'] as const) {
+      expect(
+        isSshTargetListedInStatusBar({ targetId: 'ssh-hidden', status, hiddenTargetIds })
+      ).toBe(false)
+    }
+  })
+
+  it('keeps a hidden host that is connected or still working on a connection', () => {
+    // The exception the rule turns on: this popover is where a live connection is ended,
+    // so hiding a host must not hide a session that is actually up. `connecting` and
+    // `reconnecting` count as live too, or a hidden host blinks out on every reconnect.
+    for (const status of ['connected', 'connecting', 'reconnecting', 'deploying-relay'] as const) {
+      expect(
+        isSshTargetListedInStatusBar({ targetId: 'ssh-hidden', status, hiddenTargetIds })
+      ).toBe(true)
+    }
+  })
+})
