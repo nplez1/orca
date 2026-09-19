@@ -119,6 +119,8 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
 
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
 
+  const hiddenSshTargetIds = useAppStore((s) => s.hiddenSshTargetIds)
+
   const sshConnectedGeneration = useAppStore((s) => s.sshConnectedGeneration)
 
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
@@ -136,6 +138,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
         settings,
         hostSource: 'configured-only',
         sshTargetLabels,
+        hiddenSshTargetIds,
         sshConnectionStates,
         runtimeEnvironments,
         runtimeStatusByEnvironmentId,
@@ -144,6 +147,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
     [
       repos,
       settings,
+      hiddenSshTargetIds,
       sshConnectionStates,
       sshTargetLabels,
       runtimeEnvironments,

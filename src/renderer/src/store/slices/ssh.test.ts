@@ -412,6 +412,33 @@ describe('createSshSlice', () => {
     expect(store.getState().sshTargetGenerations.get('ssh-2')).toBe(7)
   })
 
+  it('mirrors the hidden targets without removing their labels', () => {
+    const store = createTestStore()
+
+    store.getState().setSshTargetsMetadata([
+      { id: 'ssh-1', label: 'Discoverable', hidden: true },
+      { id: 'ssh-2', label: 'Offered' }
+    ])
+
+    expect([...store.getState().hiddenSshTargetIds]).toEqual(['ssh-1'])
+    // A hidden host keeps its label: readers treat a missing label as removal evidence,
+    // and its existing workspaces still need a name.
+    expect(store.getState().sshTargetLabels.get('ssh-1')).toBe('Discoverable')
+  })
+
+  it('re-renders when only the hidden flag changes', () => {
+    const store = createTestStore()
+    store.getState().setSshTargetsMetadata([{ id: 'ssh-1', label: 'Discoverable' }])
+    const before = store.getState().sshTargetLabels
+
+    store.getState().setSshTargetsMetadata([{ id: 'ssh-1', label: 'Discoverable', hidden: true }])
+
+    expect([...store.getState().hiddenSshTargetIds]).toEqual(['ssh-1'])
+    // The early-return guard keys on labels + generations; a hidden-only change must
+    // not be swallowed by matching labels, or the picker keeps offering the host.
+    expect(store.getState().sshTargetLabels).not.toBe(before)
+  })
+
   it('marks targets hydrated on the first load, even when the list is empty', () => {
     const store = createTestStore()
     expect(store.getState().sshTargetsHydrated).toBe(false)

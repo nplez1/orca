@@ -38,6 +38,8 @@ type SkillInstallManagementDialogContentProps = {
   selectedKey: string
   sshConnectionStates: ReadonlyMap<string, { status: string }>
   sshTargetLabels: ReadonlyMap<string, string>
+  /** Hosts the user hid stay out of the machine picker. */
+  hiddenSshTargetIds: ReadonlySet<string>
   versionId: string
   onCancelInstall: () => void
   onClose: () => void
@@ -67,6 +69,7 @@ export function SkillInstallManagementDialogContent({
   selectedKey,
   sshConnectionStates,
   sshTargetLabels,
+  hiddenSshTargetIds,
   versionId,
   onCancelInstall,
   onClose,
@@ -98,11 +101,13 @@ export function SkillInstallManagementDialogContent({
         sshLabel={copy.ssh}
         disconnectedLabel={copy.disconnected}
         environments={runtimeEnvironments}
-        sshTargets={[...sshTargetLabels.entries()].map(([id, label]) => ({
-          id: `ssh:${id}`,
-          label,
-          connected: sshConnectionStates.get(id)?.status === 'connected'
-        }))}
+        sshTargets={[...sshTargetLabels.entries()]
+          .filter(([id]) => !hiddenSshTargetIds.has(id))
+          .map(([id, label]) => ({
+            id: `ssh:${id}`,
+            label,
+            connected: sshConnectionStates.get(id)?.status === 'connected'
+          }))}
       />
       {busy && installs.length === 0 ? <Loader2 className="mx-auto size-5 animate-spin" /> : null}
       {!busy && installs.length === 0 ? (

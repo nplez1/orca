@@ -31,6 +31,7 @@ export function useAutomationHostCatalogSourceState({
   runtimeEnvironments
 }: AutomationHostCatalogSourceStateInput): AutomationHostCatalogSourceState {
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
+  const hiddenSshTargetIds = useAppStore((s) => s.hiddenSshTargetIds)
   const removedSshTargetLabels = useAppStore((s) => s.removedSshTargetLabels)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const sshTargetsHydrated = useAppStore((s) => s.sshTargetsHydrated)
@@ -43,11 +44,13 @@ export function useAutomationHostCatalogSourceState({
       targetsHydrated: sshTargetsHydrated,
       targetLabels: sshTargetLabels,
       targetGenerations: desktopSshGenerations,
+      hiddenTargetIds: hiddenSshTargetIds,
       removedTargetLabels: removedSshTargetLabels,
       connectionStates: sshConnectionStates
     }),
     [
       desktopSshGenerations,
+      hiddenSshTargetIds,
       removedSshTargetLabels,
       sshConnectionStates,
       sshTargetLabels,

@@ -84,6 +84,7 @@ const SSH_IPC_CHANNELS = [
   'ssh:addTarget',
   'ssh:updateTarget',
   'ssh:removeTarget',
+  'ssh:setTargetHidden',
   'ssh:importConfig',
   'ssh:listConfigHosts',
   'ssh:resolveConfigHost',

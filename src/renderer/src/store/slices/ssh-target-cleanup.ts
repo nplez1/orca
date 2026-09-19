@@ -58,6 +58,24 @@ export function sshTargetGenerationsEqual(
   )
 }
 
+/**
+ * Target IDs the user hid, so host pickers can drop them while label and connection
+ * lookups keep working (a hidden host's existing workspaces are still live).
+ */
+export function collectHiddenSshTargetIds(targets: SshTargetSummary[]): Set<string> {
+  const hidden = new Set<string>()
+  for (const target of targets) {
+    if (target.hidden === true) {
+      hidden.add(target.id)
+    }
+  }
+  return hidden
+}
+
+export function sshTargetHiddenIdsEqual(current: Set<string>, next: Set<string>): boolean {
+  return current.size === next.size && [...next].every((targetId) => current.has(targetId))
+}
+
 function collectSshTargetTerminalTabIds(state: AppState, targetId: string): Set<string> {
   const targetWorktreeIds = resolveDirectSshTargetScope({
     targetId,

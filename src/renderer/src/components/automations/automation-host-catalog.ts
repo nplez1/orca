@@ -199,6 +199,7 @@ function projectSshEntries(ctx: AuthorityProjectionContext): AutomationHostCatal
           authorityLabel: ctx.authorityLabel,
           kind: 'ssh',
           catalogState,
+          ...(live?.hidden === true ? { hidden: true } : {}),
           authorityHealth: ctx.authorityHealth,
           executionHealth: resolveSshExecutionHealth(
             catalogState,

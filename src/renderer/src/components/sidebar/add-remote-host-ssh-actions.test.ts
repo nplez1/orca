@@ -115,6 +115,75 @@ describe('manual SSH host label fallback', () => {
     expect(outcome).toBe('saved')
     expect(savedTarget?.label).toBe('10.0.0.7')
   })
+
+  // The regression this guards: a hidden host still owns its alias, so saving a second
+  // copy is refused — but the refusal has to say the host is hidden, or hiding it reads
+  // as "Orca thinks this host exists and I cannot tell where".
+  it('names the hidden host when the alias is refused', async () => {
+    const ssh = {
+      resolveConfigHost: vi.fn(),
+      listTargets: vi.fn().mockResolvedValue([
+        {
+          id: 'ssh-prod',
+          label: 'prod',
+          configHost: 'prod',
+          host: 'prod.internal',
+          port: 22,
+          username: 'deploy',
+          source: 'ssh-config',
+          hidden: true
+        }
+      ]),
+      addTarget: vi.fn(),
+      listConfigHosts: vi.fn(),
+      importConfig: vi.fn()
+    }
+
+    const outcome = await saveNewSshHostFromForm({
+      form: { ...EMPTY_FORM, configHost: 'prod', label: 'prod', host: 'prod.internal' },
+      ssh,
+      recordSshRepoReadoptions: vi.fn(),
+      setSshTargetsMetadata: vi.fn(),
+      recordFeatureInteraction: vi.fn()
+    })
+
+    expect(outcome).toBe('validation-failed')
+    expect(ssh.addTarget).not.toHaveBeenCalled()
+    expect(toastMocks.error).toHaveBeenCalledWith(
+      expect.stringContaining('hidden in Settings → SSH hosts')
+    )
+  })
+
+  it('still reports a live host as already in Orca', async () => {
+    const ssh = {
+      resolveConfigHost: vi.fn(),
+      listTargets: vi.fn().mockResolvedValue([
+        {
+          id: 'ssh-prod',
+          label: 'prod',
+          configHost: 'prod',
+          host: 'prod.internal',
+          port: 22,
+          username: 'deploy',
+          source: 'ssh-config'
+        }
+      ]),
+      addTarget: vi.fn(),
+      listConfigHosts: vi.fn(),
+      importConfig: vi.fn()
+    }
+
+    const outcome = await saveNewSshHostFromForm({
+      form: { ...EMPTY_FORM, configHost: 'prod', label: 'prod', host: 'prod.internal' },
+      ssh,
+      recordSshRepoReadoptions: vi.fn(),
+      setSshTargetsMetadata: vi.fn(),
+      recordFeatureInteraction: vi.fn()
+    })
+
+    expect(outcome).toBe('validation-failed')
+    expect(toastMocks.error).toHaveBeenCalledWith('That SSH host is already in Orca.')
+  })
 })
 
 describe('bulk add of ~/.ssh/config hosts', () => {
