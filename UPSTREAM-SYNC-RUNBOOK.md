@@ -124,6 +124,15 @@ before resolving. Convergence decisions so far are recorded in LOCAL-PATCHES.md 
    itself; do not bypass the hook.
 7. **Reword a commit whose body no longer describes its content** (ours described the engine we
    dropped). Fold the doc fix in with `git rebase -i <sha>^`, mark it `edit`, amend, continue.
+8. **Both sides can pick the same persisted-format version for different reasons**, and that one
+   number then means two things. Upstream's Devin parse change bumped
+   `session-parse-cache-persistence.ts` 2 → 3 for the rows it invalidated, while this fork had
+   already shipped 3 for the Copilot cwd move, so an upgrading fork install crossed no boundary and
+   would have replayed rows the fix had just made wrong. Since schema 2 the `appVersion` equality
+   gate is gone, so the version number is the *only* compatibility signal — a collision is not
+   detectable any other way, and upstream's own test for its bump writes the previous version, so
+   it cannot see the fork's copy. **When both sides bump a persisted-format version in one sync,
+   the merged file takes the higher number**, even though the two reasons look compatible.
 
 ## Step 3 — verify, in this order
 

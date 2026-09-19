@@ -1,7 +1,7 @@
 # Branch tracker
 
-Last updated **2026-09-18** — `nplez1/main` rebased onto upstream main @ `0b57ce0295`, 215
-commits on from the previous base `291b4ddd6f`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+Last updated **2026-09-19** — `nplez1/main` rebased onto upstream main @ `3ad6b7e46e`, 96
+commits on from the previous base `0b57ce0295`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
 for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
@@ -63,23 +63,22 @@ dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
 
-After the 2026-09-18 sync, **every PR-bound branch sits on a pre-sync base** — none of them was
-rebased this time, because none is open and the plan is still to open them one at a time. Measured
-by merge-base against `upstream/main`:
+After the 2026-09-19 sync, **every PR-bound branch sits on a pre-sync base** — none of them was
+rebased this time either, because none is open and the plan is still to open them one at a time.
+Measured by merge-base against `upstream/main`:
 
 - the **seven PR-bound branches** (`fix/cli-symlink-world-readable`, `fix/copilot-background-work`,
   `fix/repo-catalog-connection-fence`, `fix/claude-codex-enterprise-accounts`, `feat/copilot-usage`,
-  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **145 commits behind**;
+  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **241 commits behind**;
 - the **five deliberately-left ones** (`feat/worktree-scan-cache-persistence`,
   `fix/terminal-session-reconnect`, `feat/startup-worktree-hydration`,
   `feat/startup-service-ordering`, `fix/agent-status-routing-readiness`) sit on `615b1370fb`,
-  **239 commits behind**.
+  **335 commits behind**.
 
 Re-measure rather than trusting those numbers (`node local/branch-status.mjs`, and merge-base against
-`upstream/main` for the behind count, which that script does not print). Note that `origin/main` — the
-branch PRs are nominally cut from — is itself still at `291b4ddd6f` until the next sync pushes
-`upstream/main` onto it; the seven PR-bound branches' base is *newer* than it, which is why they are
-fewer commits behind than the fork's own line was.
+`upstream/main` for the behind count, which that script does not print). `origin/main` was
+fast-forwarded to the new base (`3ad6b7e46e`) at push time in this sync, so it is no longer the thing
+holding the seven PR-bound branches back — their own base is.
 
 **Five branches were deliberately left on the pre-sync base**, all unopened:
 
@@ -180,8 +179,11 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Verified:** typecheck, 1,860 tests.
 - **Note:** 7 files here are the splitting agent's harness adaptations.
 
-### nplez1/Hide-hosts — PR #9, open
+### nplez1/Hide-hosts — PR #9, **merged** (2026-09-19)
 
+- **Landed as** `cad3e4df59` on `nplez1/main` (`72034293d5`, the tip this sync was rebased from).
+  The branch itself is gone from both the fork and this checkout, so `node local/branch-status.mjs`
+  reports it MISSING — that is expected, not drift.
 - **Why:** a host Orca imports from `~/.ssh/config` could only be removed, and the next sync brought
   it back, so there was no durable way to say "not on this machine's Orca". Discovered hosts now get
   a reversible Hide; hosts the user added keep the trashcan and cannot be hidden.
@@ -212,8 +214,9 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
   maintainer's; the bots have been the only reviewers. If nothing moves after a few days, one short
   comment on the PR, or their Discord (https://discord.gg/fzjDKHxv8Q), is the proportionate nudge.
 - **Do not open the other PRs yet.** A first-time contributor filing eight PRs into a queue that is
-  not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move. The six
-  PR-bound branches are already current, so opening them later costs nothing.
+  not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move. The
+  PR-bound branches are *not* current — see § Base drift for the measured distance — so whoever opens
+  one rebases it first, parent-first for the three-deep chain.
 - **The release line works end to end.** Apple Developer Program is approved; `v1.4.197-np.6` was the
   first build signed with a Developer ID, notarized and stapled (`spctl` reports
   *accepted, source=Notarized Developer ID*). What remains unproven is **self-update**: one release
