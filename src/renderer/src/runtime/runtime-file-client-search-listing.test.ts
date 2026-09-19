@@ -153,6 +153,7 @@ describe('runtime file client', () => {
       )
     ).resolves.toEqual({
       files: ['data/target.ts', 'src/target.ts'],
+      totalCount: 40,
       truncated: true
     })
 
@@ -191,6 +192,7 @@ describe('runtime file client', () => {
       )
     ).resolves.toEqual({
       files: ['src/target.ts', 'lib/target.ts'],
+      totalCount: null,
       truncated: true
     })
 
@@ -247,7 +249,7 @@ describe('runtime file client', () => {
           excludePaths: ['/remote/repo/nested']
         }
       )
-    ).resolves.toEqual({ files: ['src/target.ts'], truncated: true })
+    ).resolves.toEqual({ files: ['src/target.ts'], totalCount: 1, truncated: true })
 
     await expect(
       searchRuntimeFilePaths(
@@ -258,7 +260,7 @@ describe('runtime file client', () => {
         },
         { query: 'other', limit: 32 }
       )
-    ).resolves.toEqual({ files: ['src/other.ts'], truncated: true })
+    ).resolves.toEqual({ files: ['src/other.ts'], totalCount: 1, truncated: true })
 
     expect(runtimeEnvironmentCall.mock.calls.map(([request]) => request.method)).toEqual([
       'files.searchPaths',
@@ -356,7 +358,7 @@ describe('runtime file client', () => {
         },
         { query: 'target', limit: 32, excludePaths: ['/remote/repo/nested'] }
       )
-    ).resolves.toEqual({ files: ['src/target.ts'], truncated: false })
+    ).resolves.toEqual({ files: ['src/target.ts'], totalCount: 1, truncated: false })
 
     expect(runtimeEnvironmentCall.mock.calls.map(([request]) => request.method)).toEqual([
       'files.searchPaths',
@@ -467,10 +469,10 @@ describe('runtime file client', () => {
     }
     await expect(
       searchRuntimeFilePaths({ ...context, worktreePath: '/old/root' }, { query: 'target' })
-    ).resolves.toEqual({ files: ['old-target.ts'], truncated: false })
+    ).resolves.toEqual({ files: ['old-target.ts'], totalCount: 1, truncated: false })
     await expect(
       searchRuntimeFilePaths({ ...context, worktreePath: '/new/root' }, { query: 'target' })
-    ).resolves.toEqual({ files: ['new-target.ts'], truncated: false })
+    ).resolves.toEqual({ files: ['new-target.ts'], totalCount: 1, truncated: false })
 
     expect(runtimeEnvironmentCall.mock.calls.map(([request]) => request.method)).toEqual([
       'files.searchPaths',
