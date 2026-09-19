@@ -1,4 +1,7 @@
-import type { AgentStatusMetadata } from '../../store/slices/agent-status-contract'
+import type {
+  AgentStatusMetadata,
+  AgentStatusPayload
+} from '../../store/slices/agent-status-contract'
 import {
   normalizeAgentStatusPayload,
   type AgentStatusIpcPayload,
@@ -38,4 +41,25 @@ export function normalizeAgentStatusMetadata(
     ...(data.providerSession ? { providerSession: data.providerSession } : {}),
     ...(data.launchToken ? { launchToken: data.launchToken } : {})
   }
+}
+
+/**
+ * Fold the fields the IPC envelope carries — turn boundary, restored marker and
+ * observation provenance — onto an already-resolved status payload.
+ *
+ * Order is load-bearing only in that each field is optional; a field absent from
+ * the envelope leaves the payload untouched rather than clearing it.
+ */
+export function withAgentStatusEnvelopeFields(
+  payload: AgentStatusPayload,
+  data: AgentStatusIpcPayload
+): AgentStatusPayload {
+  const withTurnBoundary = data.promptInteractionKey
+    ? { ...payload, promptInteractionKey: data.promptInteractionKey }
+    : payload
+  const withRestored =
+    data.restoredUnconfirmed === true
+      ? { ...withTurnBoundary, restoredUnconfirmed: true }
+      : withTurnBoundary
+  return data.observation ? { ...withRestored, observation: data.observation } : withRestored
 }
