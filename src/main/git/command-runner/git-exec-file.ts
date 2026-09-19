@@ -24,6 +24,10 @@ import {
 import { prepareWindowsHostGitEnvironment } from './windows-host-git-environment'
 import { buildNetworkSshPolicyEnv } from './git-ssh-policy-env'
 import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-env'
+import {
+  localLoginShellGitEnvironmentSnapshot,
+  prepareLocalLoginShellGitEnvironment
+} from './local-login-shell-git-environment'
 import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
 
@@ -49,12 +53,13 @@ async function gitExecFileAsyncUnlocked(
         await readEnvironmentReady
       }
       let resolved = resolveGitCommand(args, options, false, options.captureWslLoginShellOutput)
-      const environmentReady = prepareWindowsHostGitEnvironment(
-        resolved,
-        options.env,
-        options.signal
-      )
-      const env = environmentReady ? await environmentReady : options.env
+      // Why local first: on POSIX only this one applies, and on Windows only the
+      // other, so the two are mutually exclusive rather than layered.
+      const environmentReady =
+        prepareLocalLoginShellGitEnvironment(resolved, options.env, options.signal) ??
+        prepareWindowsHostGitEnvironment(resolved, options.env, options.signal)
+      const preparedEnv = environmentReady ? await environmentReady : undefined
+      const env = preparedEnv ?? options.env
       const effectiveOptions = env === options.env ? options : { ...options, env }
       resolved = resolveGitCommand(
         args,
@@ -307,11 +312,12 @@ export function gitExecFileSync(
     return execFileSync(resolved.binary, resolved.args, {
       cwd: resolved.cwd,
       encoding: options.encoding ?? 'utf-8',
-      env: untranslatedGitOutputEnv(),
+      // Why best-effort: this path is sync, so it can only use a probe that already settled.
+      env: untranslatedGitOutputEnv(localLoginShellGitEnvironmentSnapshot(process.env)),
       stdio: options.stdio ?? ['pipe', 'pipe', 'pipe'],
       timeout: options.timeout ?? GIT_EXEC_SYNC_TIMEOUT_MS,
       windowsHide: true
-    }) as string
+    })
   } finally {
     // Sync exec blocks the main thread for its whole duration — the cost issue #7576 flags.
     recordSubprocessSpawn(resolved.binary, resolved.args, performance.now() - spawnStartedAt)
