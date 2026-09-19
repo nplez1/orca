@@ -221,6 +221,30 @@ describe('LinkActionPopover', () => {
     await waitFor(() => expect(mocks.writeClipboardText).toHaveBeenCalledTimes(2))
   })
 
+  it('renders a third row without a keyboard shortcut', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
+    const onClose = vi.fn()
+    const reveal = vi.fn()
+    const request: LinkActionRequest = {
+      anchorX: 100,
+      anchorY: 200,
+      destination: '/repo/src/main.ts',
+      kind: 'file',
+      primary: { label: 'Open file', run: vi.fn() },
+      alternate: { label: 'Open with default app', run: vi.fn() },
+      tertiary: { label: 'Show in Finder', run: reveal },
+      restoreFocus: vi.fn()
+    }
+
+    render(<LinkActionPopover request={request} onClose={onClose} />)
+
+    // Why: only the two modifier gestures the terminal can detect advertise a shortcut.
+    expect(screen.getAllByText('Click')).toHaveLength(2)
+    fireEvent.click(screen.getByText('Show in Finder'))
+    expect(reveal).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('does not offer copy link for non-URL destinations', () => {
     vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
     const request: LinkActionRequest = {

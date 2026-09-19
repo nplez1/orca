@@ -3338,7 +3338,13 @@
             "copiedLink": "Copied link",
             "copyLinkFailed": "Failed to copy link",
             "downloadOpenWithDefaultApp": "Download & open with default app",
-            "downloadOpenFailed": "Failed to download '{{value0}}'."
+            "downloadOpenFailed": "Failed to download '{{value0}}'.",
+            "showInFinder": "Show in Finder",
+            "downloadShowInFinder": "Download & show in Finder",
+            "showInFiles": "Show in Files",
+            "downloadShowInFiles": "Download & show in Files",
+            "showInFileExplorer": "Show in File Explorer",
+            "downloadShowInFileExplorer": "Download & show in File Explorer"
           },
           "TerminalSessionStateSaveFailureDialog": {
             "6bee0c8f17": "Open Disk Space Analyzer",

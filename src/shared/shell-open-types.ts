@@ -23,6 +23,15 @@ export type ShellOpenLocalPathResult =
   | { ok: true }
   | { ok: false; reason: ShellOpenLocalPathFailureReason }
 
+export type ShellOpenInFileManagerOptions = {
+  /**
+   * The caller already resolved the path as this client's own file — a local workspace pane, or a
+   * file it just downloaded to a user-chosen path. Without it, an active runtime environment
+   * makes main assume the renderer is handing it a remote path.
+   */
+  clientLocalPath?: boolean
+}
+
 export type ShellOpenExternalEditorResult =
   | { ok: true }
   | { ok: false; reason: Exclude<ShellOpenPathFailureReason, 'ssh-alias-required'> }

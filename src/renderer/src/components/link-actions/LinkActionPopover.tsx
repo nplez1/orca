@@ -16,20 +16,38 @@ type LinkActionPopoverProps<TRequest extends LinkActionRequest> = {
   onClose: (dismissed?: TRequest) => void
 }
 
-function ActionRow({
-  action,
-  alternate,
-  onRun
-}: {
+type ActionRowSpec = {
   action: LinkAction
-  alternate: boolean
-  onRun: () => void
-}): React.JSX.Element {
+  shortcutKeys?: string[]
+}
+
+/** Which modifier chord activates this row directly, without the popover. */
+function actionRowShortcutKeys(slot: 'primary' | 'alternate'): string[] {
   const isMac = navigator.userAgent.includes('Mac')
-  const keys = alternate
+  return slot === 'alternate'
     ? [isMac ? '⇧' : 'Shift', isMac ? '⌘' : 'Ctrl', 'Click']
     : [isMac ? '⌘' : 'Ctrl', 'Click']
+}
 
+function buildActionRows(request: LinkActionRequest): ActionRowSpec[] {
+  const rows: ActionRowSpec[] = [
+    { action: request.primary, shortcutKeys: actionRowShortcutKeys('primary') }
+  ]
+  if (request.alternate) {
+    rows.push({ action: request.alternate, shortcutKeys: actionRowShortcutKeys('alternate') })
+  }
+  // Why no keys: the last row exists for actions the pointer cannot invoke directly.
+  if (request.tertiary) {
+    rows.push({ action: request.tertiary })
+  }
+  return rows
+}
+
+function ActionRow({
+  action,
+  shortcutKeys,
+  onRun
+}: ActionRowSpec & { onRun: () => void }): React.JSX.Element {
   return (
     <Button
       className="h-8 w-full justify-start gap-1.5 px-1.5 text-[13px] font-normal has-[>svg]:px-1.5"
@@ -41,7 +59,9 @@ function ActionRow({
       <span className="min-w-0 flex-1 truncate text-left" title={action.label}>
         {action.label}
       </span>
-      <ShortcutKeyCombo keys={keys} keyCapClassName="min-w-5 px-1 py-0 text-[11px]" />
+      {shortcutKeys ? (
+        <ShortcutKeyCombo keys={shortcutKeys} keyCapClassName="min-w-5 px-1 py-0 text-[11px]" />
+      ) : null}
     </Button>
   )
 }
@@ -178,18 +198,14 @@ export function LinkActionPopover<TRequest extends LinkActionRequest>({
               </TooltipContent>
             </Tooltip>
           </div>
-          <ActionRow
-            action={request.primary}
-            alternate={false}
-            onRun={() => runAction(request.primary)}
-          />
-          {request.alternate ? (
+          {buildActionRows(request).map((row) => (
             <ActionRow
-              action={request.alternate}
-              alternate
-              onRun={() => runAction(request.alternate!)}
+              key={row.action.label}
+              action={row.action}
+              shortcutKeys={row.shortcutKeys}
+              onRun={() => runAction(row.action)}
             />
-          ) : null}
+          ))}
         </PopoverContent>
       ) : null}
     </Popover>

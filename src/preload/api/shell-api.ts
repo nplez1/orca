@@ -1,18 +1,23 @@
 import type {
   ShellOpenExternalEditorRequest,
   ShellOpenExternalEditorResult,
+  ShellOpenInFileManagerOptions,
   ShellOpenLocalPathResult
 } from '../../shared/shell-open-types'
 
 export type {
   ShellOpenExternalEditorRequest,
   ShellOpenExternalEditorResult,
+  ShellOpenInFileManagerOptions,
   ShellOpenLocalPathResult
 } from '../../shared/shell-open-types'
 
 export type ShellApi = {
   openPath: (path: string) => Promise<void>
-  openInFileManager: (path: string) => Promise<ShellOpenLocalPathResult>
+  openInFileManager: (
+    path: string,
+    options?: ShellOpenInFileManagerOptions
+  ) => Promise<ShellOpenLocalPathResult>
   openInExternalEditor: (
     request: ShellOpenExternalEditorRequest
   ) => Promise<ShellOpenExternalEditorResult>

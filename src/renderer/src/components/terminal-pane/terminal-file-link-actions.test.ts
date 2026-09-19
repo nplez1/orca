@@ -4,7 +4,9 @@ import type { TerminalLinkActionContext } from './terminal-link-action-request'
 const mocks = vi.hoisted(() => ({
   canOpenWithSystemDefault: true,
   downloadAndOpen: vi.fn(),
+  downloadAndReveal: vi.fn(),
   openDetectedFilePath: vi.fn(),
+  revealInFileManager: vi.fn(),
   worktreeRoot: false
 }))
 
@@ -21,7 +23,8 @@ vi.mock('./terminal-worktree-path-link', () => ({
 }))
 
 vi.mock('./terminal-remote-file-download-open', () => ({
-  downloadAndOpenRemoteTerminalFile: mocks.downloadAndOpen
+  downloadAndOpenRemoteTerminalFile: mocks.downloadAndOpen,
+  downloadAndRevealRemoteTerminalFile: mocks.downloadAndReveal
 }))
 
 import { handleTerminalFileLink } from './terminal-file-link-actions'
@@ -53,6 +56,9 @@ function context(request: ReturnType<typeof vi.fn>): TerminalLinkActionContext {
 
 beforeEach(() => {
   vi.stubGlobal('navigator', { userAgent: 'Macintosh' })
+  vi.stubGlobal('window', {
+    api: { shell: { openInFileManager: mocks.revealInFileManager } }
+  })
   mocks.canOpenWithSystemDefault = true
   mocks.worktreeRoot = false
   vi.clearAllMocks()
@@ -61,7 +67,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('terminal file link actions', () => {
-  it('offers Orca and system-default actions for a local file', () => {
+  it('offers Orca, system-default, and file-manager actions for a local file', () => {
     const request = vi.fn()
     expect(
       handleTerminalFileLink('/repo/src/main.ts', 12, 4, plainEvent(), deps, context(request))
@@ -73,16 +79,33 @@ describe('terminal file link actions', () => {
         destination: '/repo/src/main.ts',
         kind: 'file',
         primary: expect.objectContaining({ label: 'Open file' }),
-        alternate: expect.objectContaining({ label: 'Open with default app' })
+        alternate: expect.objectContaining({ label: 'Open with default app' }),
+        tertiary: expect.objectContaining({ label: 'Show in Finder' })
       })
     )
     actionRequest.primary.run()
     actionRequest.alternate.run()
+    actionRequest.tertiary.run()
     expect(mocks.openDetectedFilePath).toHaveBeenNthCalledWith(1, '/repo/src/main.ts', 12, 4, deps)
     expect(mocks.openDetectedFilePath).toHaveBeenNthCalledWith(2, '/repo/src/main.ts', 12, 4, {
       ...deps,
       openWithSystemDefault: true
     })
+    expect(mocks.revealInFileManager).toHaveBeenCalledWith('/repo/src/main.ts', {
+      clientLocalPath: true
+    })
+  })
+
+  it.each([
+    ['Windows', 'Show in File Explorer'],
+    ['Linux', 'Show in Files']
+  ])('names the file manager the way %s does', (userAgent, label) => {
+    vi.stubGlobal('navigator', { userAgent })
+    const request = vi.fn()
+
+    handleTerminalFileLink('/repo/src/main.ts', null, null, plainEvent(), deps, context(request))
+
+    expect(request.mock.calls[0][0].tertiary.label).toBe(label)
   })
 
   it('labels workspace switching and omits an impossible remote alternate', () => {
@@ -99,6 +122,8 @@ describe('terminal file link actions', () => {
       })
     )
     expect(actionRequest).not.toHaveProperty('alternate')
+    // Why: the workspace root's own open row already reveals the folder.
+    expect(actionRequest).not.toHaveProperty('tertiary')
   })
 
   it('offers the same rows for a remote previewable file, downloading before the OS opens it', () => {
@@ -116,10 +141,14 @@ describe('terminal file link actions', () => {
     const actionRequest = request.mock.calls[0][0]
     expect(actionRequest.primary.label).toBe('Open file')
     expect(actionRequest.alternate.label).toBe('Download & open with default app')
+    expect(actionRequest.tertiary.label).toBe('Download & show in Finder')
 
     actionRequest.alternate.run()
     expect(mocks.downloadAndOpen).toHaveBeenCalledWith({}, '/repo/docs/report.html')
+    actionRequest.tertiary.run()
+    expect(mocks.downloadAndReveal).toHaveBeenCalledWith({}, '/repo/docs/report.html')
     expect(mocks.openDetectedFilePath).not.toHaveBeenCalled()
+    expect(mocks.revealInFileManager).not.toHaveBeenCalled()
   })
 
   it('keeps row parity between local and remote previewable files', () => {
@@ -143,7 +172,8 @@ describe('terminal file link actions', () => {
       context(remoteRequest)
     )
 
-    const rowCount = (call: { alternate?: unknown }): number => 1 + (call.alternate ? 1 : 0)
+    const rowCount = (call: { alternate?: unknown; tertiary?: unknown }): number =>
+      1 + (call.alternate ? 1 : 0) + (call.tertiary ? 1 : 0)
     expect(rowCount(remoteRequest.mock.calls[0][0])).toBe(rowCount(localRequest.mock.calls[0][0]))
   })
 
@@ -156,5 +186,6 @@ describe('terminal file link actions', () => {
     handleTerminalFileLink('/repo/docs/', null, null, plainEvent(), deps, context(request))
 
     expect(request.mock.calls[0][0]).not.toHaveProperty('alternate')
+    expect(request.mock.calls[0][0]).not.toHaveProperty('tertiary')
   })
 })
