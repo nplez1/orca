@@ -111,6 +111,26 @@ export function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
     cancelListFiles: async () => {
       // Why: paired-web lists files over runtime RPC with its own timeout; there's no host-side scan to abort here.
     },
+    searchFilePaths: async ({ rootPath, query, limit, excludePaths, mode }) => {
+      // Why: a paired web client only has remote files, so path search always goes to the host.
+      const file = await resolveRuntimeFilePath(rootPath)
+      const result = await callRuntimeResult<{
+        files: { relativePath: string }[]
+        totalCount: number
+        truncated: boolean
+      }>('files.searchPaths', {
+        worktree: toRuntimeWorktreeSelector(file.worktree.id),
+        query,
+        limit,
+        excludePaths,
+        mode
+      })
+      return {
+        files: result.files.map((entry) => entry.relativePath),
+        totalCount: result.totalCount ?? null,
+        truncated: result.truncated
+      }
+    },
     search: async (args) => {
       const file = await resolveRuntimeFilePath(args.rootPath)
       return callRuntimeResult<SearchResult>('files.search', {

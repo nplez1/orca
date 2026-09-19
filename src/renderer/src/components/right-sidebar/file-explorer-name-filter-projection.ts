@@ -1,6 +1,10 @@
 import { joinPath, normalizeRelativePath } from '@/lib/path'
 import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard-text'
 import { compareFileNames } from '../../../../shared/file-name-sort'
+import {
+  pathMatchesQueryTokens,
+  splitPathQueryTokens
+} from '../../../../shared/quick-open-path-search'
 import type { FileExplorerOperationOwner, TreeNode } from './file-explorer-types'
 import {
   createFileExplorerRowProjectionFromParts,
@@ -14,9 +18,38 @@ export type FileExplorerNameFilterProjectionSource = {
   query: string
   relativePaths: readonly string[] | null
   operationOwner?: FileExplorerOperationOwner
+  /** Exact matches the host scanned; null when the listing was not query-scoped. */
+  totalCount?: number | null
+  /** True when the page is not the whole result set. */
+  truncated?: boolean
+}
+
+/**
+ * Which message an empty filtered pane may show. A truncated listing never scanned the whole
+ * workspace, so "no files match" is a claim we cannot make — only "not fully searched" is true.
+ */
+export function getFileExplorerNameFilterEmptyMessageKind({
+  hasNameFilter,
+  hasLoadError,
+  truncated
+}: {
+  hasNameFilter: boolean
+  hasLoadError: boolean
+  truncated: boolean
+}): 'no-match' | 'partial-scan' | null {
+  if (!hasNameFilter || hasLoadError) {
+    return null
+  }
+  return truncated ? 'partial-scan' : 'no-match'
 }
 
 export const FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES = 2 * 1024
+
+/**
+ * Bounded page the name filter keeps. Filters are usually narrow; when one is broad the host
+ * still counts every match, and the pane reports the count instead of implying completeness.
+ */
+export const FILE_EXPLORER_NAME_FILTER_MAX_RESULTS = 5_000
 
 export function getNextNameFilterCollapsedPaths(
   collapsedPaths: ReadonlySet<string>,
@@ -56,53 +89,7 @@ export function getFileExplorerNameFilterTokens(query: string | undefined): stri
   if (isFileExplorerNameFilterQueryTooLarge(query)) {
     return []
   }
-  return splitFileExplorerNameFilterTokens(query ?? '')
-}
-
-// Why: accepted pasted file-filter queries are still on a renderer hot path;
-// tokenize whitespace directly instead of allocating a regex split array.
-function splitFileExplorerNameFilterTokens(query: string): string[] {
-  const tokens: string[] = []
-  let tokenStart = -1
-  for (let index = 0; index <= query.length; index += 1) {
-    const isEnd = index === query.length
-    if (!isEnd && !isFileExplorerNameFilterWhitespace(query.charCodeAt(index))) {
-      if (tokenStart === -1) {
-        tokenStart = index
-      }
-      continue
-    }
-    if (tokenStart !== -1) {
-      tokens.push(query.slice(tokenStart, index).toLocaleLowerCase())
-      tokenStart = -1
-    }
-  }
-  return tokens
-}
-
-function isFileExplorerNameFilterWhitespace(code: number): boolean {
-  return (
-    code === 32 ||
-    (code >= 9 && code <= 13) ||
-    code === 160 ||
-    code === 5760 ||
-    (code >= 8192 && code <= 8202) ||
-    code === 8232 ||
-    code === 8233 ||
-    code === 8239 ||
-    code === 8287 ||
-    code === 12288 ||
-    code === 65279
-  )
-}
-
-function relativePathMatchesNameFilter(relativePath: string, tokens: readonly string[]): boolean {
-  if (tokens.length === 0) {
-    return true
-  }
-  // Why: callers pass already-normalized paths — lowercasing only, no second normalize per path per keystroke.
-  const haystack = relativePath.toLocaleLowerCase()
-  return tokens.every((token) => haystack.includes(token))
+  return splitPathQueryTokens(query ?? '')
 }
 
 export function getFileExplorerNameFilterIgnoredQueryRelativePaths(
@@ -122,7 +109,7 @@ export function getFileExplorerNameFilterIgnoredQueryRelativePaths(
       (relativePath) =>
         Boolean(relativePath) &&
         (showDotfiles || !isDotfileRelativePath(relativePath)) &&
-        relativePathMatchesNameFilter(relativePath, tokens)
+        pathMatchesQueryTokens(relativePath, tokens)
     )
 }
 
@@ -188,7 +175,7 @@ export function createNameFilteredFileExplorerProjection({
     if (!showGitIgnoredFiles && isPathIgnored(ignoredSet, relativePath)) {
       continue
     }
-    if (!relativePathMatchesNameFilter(relativePath, nameFilterTokens)) {
+    if (!pathMatchesQueryTokens(relativePath, nameFilterTokens)) {
       continue
     }
 

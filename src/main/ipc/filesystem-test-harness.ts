@@ -59,6 +59,12 @@ export const tryDeleteWslUncPathMock: IpcMock = vi.fn()
 export const recordCrashBreadcrumbMock: IpcMock = vi.fn()
 export const promoteLocalDownloadedFolderMock: IpcMock = vi.fn()
 
+export const searchQuickOpenFilePathsMock: IpcMock = vi.fn()
+
+export const filePathSearchModuleMock = {
+  searchQuickOpenFilePaths: searchQuickOpenFilePathsMock
+}
+
 export const electronMock = {
   BrowserWindow: { fromWebContents: fromWebContentsMock },
   dialog: { showSaveDialog: showSaveDialogMock, showOpenDialog: showOpenDialogMock },
@@ -234,7 +240,8 @@ const ALL_MOCKS = [
   textGenerationModuleMock,
   pullRequestContextMock,
   pullRequestTemplateMock,
-  pullRequestLinkedIssueMock
+  pullRequestLinkedIssueMock,
+  filePathSearchModuleMock
 ].flatMap(collectMocks)
 
 /** Resets every filesystem IPC mock and reinstalls the defaults every suite starts from. */
