@@ -18,6 +18,7 @@ import { initSshHostKeyStoreFile } from '../ssh/ssh-host-key-store'
 import { neutralizeLegacyTerminalShimDir } from '../pty/legacy-terminal-shim-dir'
 import { createWindowsShellPathHydration } from './windows-shell-path-hydration'
 import {
+  configureLocalLoginShellGitEnvironment,
   configureWindowsHostGitEnvironmentReadiness,
   setDefaultWslDistroOverride
 } from '../git/runner'
@@ -178,6 +179,12 @@ export async function initializeReadyFoundation(): Promise<void> {
   configureWindowsHostGitEnvironmentReadiness(
     process.platform === 'win32' ? windowsShellPathHydration.whenReady : null
   )
+  // Why packaged only: this is the launch shape that loses the shell's exports, and
+  // an interactive shell spawn is too much to pay per dev launch, which inherits
+  // them from the terminal it was started in.
+  if (app.isPackaged) {
+    configureLocalLoginShellGitEnvironment()
+  }
   if (process.platform === 'win32') {
     const settings = store.getSettings()
     if (app.isPackaged) {
