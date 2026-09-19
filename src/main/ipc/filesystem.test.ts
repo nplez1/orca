@@ -15,12 +15,17 @@ import {
   lstatMock,
   listWorktreesMock,
   getSshFilesystemProviderMock,
+  searchQuickOpenFilePathsMock,
   tryDeleteWslUncPathMock,
   recordCrashBreadcrumbMock,
   resetFilesystemIpcMocks
 } from './filesystem-test-harness'
 
 vi.mock('electron', async () => (await import('./filesystem-test-harness')).electronMock)
+vi.mock(
+  './filesystem-search-file-paths',
+  async () => (await import('./filesystem-test-harness')).filePathSearchModuleMock
+)
 vi.mock('fs/promises', async () => (await import('./filesystem-test-harness')).fsPromisesMock)
 vi.mock(
   '../wsl-unc-delete',
@@ -557,6 +562,60 @@ describe('registerFilesystemHandlers', () => {
     expect(listFilesMock).toHaveBeenCalledWith('/home/user/repo', {
       excludePaths: ['/home/user/repo/worktrees/feature']
     })
+  })
+
+  it('fs:searchFilePaths returns a bounded local page with the exact match count', async () => {
+    searchQuickOpenFilePathsMock.mockResolvedValue({
+      paths: ['src/a/b/drover.eve_schema'],
+      totalCount: 3,
+      truncated: true
+    })
+    registerFilesystemHandlers(store as never)
+
+    await expect(
+      handlers.get('fs:searchFilePaths')!(
+        { sender: { id: 1 } },
+        {
+          rootPath: '/home/user/repo',
+          query: 'drover',
+          limit: 5_000,
+          mode: 'name-filter',
+          requestToken: 'token-1'
+        }
+      )
+    ).resolves.toEqual({
+      files: ['src/a/b/drover.eve_schema'],
+      totalCount: 3,
+      truncated: true
+    })
+
+    expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
+      '/home/user/repo',
+      store,
+      expect.objectContaining({
+        query: 'drover',
+        limit: 5_000,
+        mode: 'name-filter',
+        signal: expect.any(AbortSignal)
+      })
+    )
+  })
+
+  it('fs:searchFilePaths clamps a caller limit to the shared listing ceiling', async () => {
+    searchQuickOpenFilePathsMock.mockResolvedValue({ paths: [], totalCount: 0, truncated: false })
+    registerFilesystemHandlers(store as never)
+
+    await handlers.get('fs:searchFilePaths')!(null, {
+      rootPath: '/home/user/repo',
+      query: 'target',
+      limit: 10_000_000
+    })
+
+    expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
+      '/home/user/repo',
+      store,
+      expect.objectContaining({ limit: 20_001 })
+    )
   })
 
   it('fs:listFiles forwards bounded Quick Open search options to SSH', async () => {

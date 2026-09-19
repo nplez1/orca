@@ -9,7 +9,13 @@ import {
   shouldIncludeQuickOpenPath,
   type RgOutputMode
 } from '../../shared/quick-open-filter'
-import { isQuickOpenQueryTooLarge, QuickOpenPathRanker } from '../../shared/quick-open-path-search'
+import {
+  isQuickOpenQueryTooLarge,
+  NameFilterPathMatcher,
+  QuickOpenPathRanker,
+  type PathSearchMatcher,
+  type PathSearchMode
+} from '../../shared/quick-open-path-search'
 import {
   absorbPendingRipgrepSpawnError,
   isRipgrepUnavailableExit,
@@ -40,6 +46,8 @@ export async function searchQuickOpenFilePaths(
     limit: number
     excludePaths?: string[]
     signal?: AbortSignal
+    /** Defaults to `quick-open` so the runtime RPC path keeps its ranking behavior. */
+    mode?: PathSearchMode
   }
 ): Promise<QuickOpenFilePathSearchResult> {
   if (args.limit <= 0 || !args.query.trim() || isQuickOpenQueryTooLarge(args.query)) {
@@ -64,17 +72,17 @@ export async function searchQuickOpenFilePaths(
   })
   // Fresh ranker per attempt so a retry cannot double-count paths from the aborted scan.
   const scanOnce = async (): Promise<QuickOpenFilePathSearchResult> => {
-    const ranker = new QuickOpenPathRanker(args.query, args.limit)
+    const matcher = createPathSearchMatcher(args.mode, args.query, args.limit)
     await scanRipgrepPaths({
       args: ignoredPass,
       authorizedRootPath,
       excludePathPrefixes,
       localGitOptions,
-      ranker,
+      matcher,
       signal: args.signal,
       wslDistroForOutput
     })
-    const result = ranker.result()
+    const result = matcher.result()
     return { ...result, truncated: result.totalCount > args.limit }
   }
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -105,12 +113,23 @@ export async function searchQuickOpenFilePaths(
   throw new Error('unreachable Quick Open retry state')
 }
 
+// Why: one ripgrep pass covers both matchers — every line is counted, only the page is kept.
+function createPathSearchMatcher(
+  mode: PathSearchMode | undefined,
+  query: string,
+  limit: number
+): PathSearchMatcher {
+  return mode === 'name-filter'
+    ? new NameFilterPathMatcher(query, limit)
+    : new QuickOpenPathRanker(query, limit)
+}
+
 function scanRipgrepPaths(args: {
   args: string[]
   authorizedRootPath: string
   excludePathPrefixes: readonly string[]
   localGitOptions: { wslDistro?: string }
-  ranker: QuickOpenPathRanker
+  matcher: PathSearchMatcher
   signal?: AbortSignal
   wslDistroForOutput?: string
 }): Promise<void> {
@@ -156,7 +175,7 @@ function scanRipgrepPaths(args: {
         shouldIncludeQuickOpenPath(relPath) &&
         !shouldExcludeQuickOpenRelPath(relPath, args.excludePathPrefixes)
       ) {
-        args.ranker.consider(relPath)
+        args.matcher.consider(relPath)
       }
     }
     const cleanup = (): void => {
