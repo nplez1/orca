@@ -1,4 +1,6 @@
 import type { SearchOptions, SearchResult } from '../../../shared/code-search-types'
+import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
+import type { PathSearchMode } from '../../../shared/quick-open-path-search'
 import type { RuntimeFileListResult } from '../../../shared/runtime-types'
 import {
   buildExcludePathPrefixes,
@@ -86,14 +88,27 @@ export async function searchRuntimeFilePaths(
     excludePaths?: string[]
     requestToken?: string
     signal?: AbortSignal
+    mode?: PathSearchMode
   }
-): Promise<{ files: string[]; truncated: boolean }> {
+): Promise<FilePathSearchResult> {
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind !== 'environment') {
-    if (!context.connectionId || !context.worktreePath) {
-      return { files: [], truncated: false }
+    if (!context.worktreePath) {
+      return { files: [], totalCount: null, truncated: false }
     }
     const limit = args.limit ?? 32
+    // Why: a local workspace has the same query-scoped search as a remote host, and only it
+    // can count matches past the page — an unscoped listing cannot.
+    if (!context.connectionId) {
+      return window.api.fs.searchFilePaths({
+        rootPath: context.worktreePath,
+        query: args.query,
+        limit,
+        mode: args.mode,
+        excludePaths: args.excludePaths,
+        requestToken: args.requestToken
+      })
+    }
     const files = await window.api.fs.listFiles({
       rootPath: context.worktreePath,
       connectionId: context.connectionId,
@@ -102,10 +117,10 @@ export async function searchRuntimeFilePaths(
       maxResults: limit + 1,
       searchQuery: args.query
     })
-    return { files: files.slice(0, limit), truncated: files.length > limit }
+    return { files: files.slice(0, limit), totalCount: null, truncated: files.length > limit }
   }
   if (!context.worktreeId) {
-    return { files: [], truncated: false }
+    return { files: [], totalCount: null, truncated: false }
   }
   const worktreeSelector = toRuntimeWorktreeSelector(context.worktreeId)
   const limit = args.limit ?? 32
@@ -184,6 +199,7 @@ export async function searchRuntimeFilePaths(
     files: result.files
       .map((entry) => entry.relativePath)
       .filter((relativePath) => !shouldExcludeQuickOpenRelPath(relativePath, excludePrefixes)),
+    totalCount: result.totalCount ?? null,
     truncated: result.truncated
   }
 }

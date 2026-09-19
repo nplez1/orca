@@ -8,6 +8,7 @@ import { getVisibleFileExplorerWorktreePath } from './file-explorer-reset'
 import { FileExplorerBackgroundMenu } from './FileExplorerBackgroundMenu'
 import { FileExplorerFilesTreePane } from './FileExplorerFilesTreePane'
 import { FileExplorerNameFilter } from './FileExplorerNameFilter'
+import { FileExplorerNameFilterTruncationNotice } from './FileExplorerNameFilterTruncationNotice'
 import { FileExplorerQueryStrip } from './FileExplorerQueryStrip'
 import { FileExplorerToolbar } from './FileExplorerToolbar'
 import { SearchFilters } from './SearchFilters'
@@ -244,6 +245,12 @@ function FileExplorerFiles(): React.JSX.Element {
               <SearchQueryRow {...searchPanel.queryRowProps} />
             </div>
           </div>
+          {explorerView === 'files' && hasNameFilter && nameFilterFiles.truncated ? (
+            <FileExplorerNameFilterTruncationNotice
+              shownCount={nameFilterFiles.files.length}
+              totalCount={nameFilterFiles.totalCount ?? null}
+            />
+          ) : null}
         </FileExplorerQueryStrip>
         <div
           className={cn(
