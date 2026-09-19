@@ -11,12 +11,15 @@ import {
 } from 'lucide-react'
 import {
   DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS,
+  isAutoImportedSshTarget,
   type SshConnectionState,
   type SshConnectionStatus,
   type SshTarget
 } from '../../../../shared/ssh-types'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
+import { SshTargetVisibilityToggle } from './SshTargetVisibilityToggle'
 import { isSshTargetConnecting, type SshTargetBusyAction } from './ssh-target-action-state'
 import { translate } from '@/i18n/i18n'
 
@@ -84,13 +87,15 @@ type SshTargetCardProps = {
   state: SshConnectionState | undefined
   testing: boolean
   busyAction?: SshTargetBusyAction
-  onConnect: (targetId: string) => void | Promise<void>
-  onDisconnect: (targetId: string) => void | Promise<void>
-  onTerminateSessions: (targetId: string) => void | Promise<void>
-  onResetRelay: (targetId: string) => void | Promise<void>
-  onTest: (targetId: string) => void | Promise<void>
-  onEdit: (target: SshTarget) => void
-  onRemove: (targetId: string) => void
+  /** Handlers take no target: the caller already binds this card's row. */
+  onConnect: () => void | Promise<void>
+  onDisconnect: () => void | Promise<void>
+  onTerminateSessions: () => void | Promise<void>
+  onResetRelay: () => void | Promise<void>
+  onTest: () => void | Promise<void>
+  onEdit: () => void
+  onRemove: () => void
+  onSetHidden: (hidden: boolean) => void | Promise<void>
 }
 
 export function SshTargetCard({
@@ -104,16 +109,25 @@ export function SshTargetCard({
   onResetRelay,
   onTest,
   onEdit,
-  onRemove
+  onRemove,
+  onSetHidden
 }: SshTargetCardProps): React.JSX.Element {
   const status: SshConnectionStatus = state?.status ?? 'disconnected'
   const [actionInFlight, setActionInFlight] = useState<
     'connect' | 'disconnect' | 'terminate' | 'reset' | null
   >(null)
-  const hasActionInFlight = actionInFlight !== null || busyAction !== undefined
+  // Why: hiding is not a destructive action, so it does not join the shared busy
+  // registry — but it does have to block the other buttons while it lands.
+  const [visibilityInFlight, setVisibilityInFlight] = useState(false)
+  const hasActionInFlight =
+    actionInFlight !== null || busyAction !== undefined || visibilityInFlight
   const terminateInFlight = actionInFlight === 'terminate' || busyAction === 'terminate'
   const resetInFlight = actionInFlight === 'reset' || busyAction === 'reset'
   const removeInFlight = busyAction === 'remove'
+  const hidden = target.hidden === true
+  // Why: deletion cannot stick for a host ~/.ssh/config keeps re-importing, so a discovered
+  // host is hidden instead. A host the user added in Orca has no such source and is removed.
+  const hideable = isAutoImportedSshTarget(target)
   const mountedRef = useRef(true)
   const endpoint = target.username
     ? `${target.username}@${target.host}:${target.port}`
@@ -137,7 +151,7 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('connect')
-    void Promise.resolve(onConnect(target.id)).finally(clearActionInFlight)
+    void Promise.resolve(onConnect()).finally(clearActionInFlight)
   }
 
   const handleDisconnect = (): void => {
@@ -145,7 +159,7 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('disconnect')
-    void Promise.resolve(onDisconnect(target.id)).finally(clearActionInFlight)
+    void Promise.resolve(onDisconnect()).finally(clearActionInFlight)
   }
 
   const handleTerminateSessions = (): void => {
@@ -153,7 +167,7 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('terminate')
-    void Promise.resolve(onTerminateSessions(target.id)).finally(clearActionInFlight)
+    void Promise.resolve(onTerminateSessions()).finally(clearActionInFlight)
   }
 
   const handleResetRelay = (): void => {
@@ -161,7 +175,19 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('reset')
-    void Promise.resolve(onResetRelay(target.id)).finally(clearActionInFlight)
+    void Promise.resolve(onResetRelay()).finally(clearActionInFlight)
+  }
+
+  const handleSetHidden = (next: boolean): void => {
+    if (hasActionInFlight) {
+      return
+    }
+    setVisibilityInFlight(true)
+    void Promise.resolve(onSetHidden(next)).finally(() => {
+      if (mountedRef.current) {
+        setVisibilityInFlight(false)
+      }
+    })
   }
 
   const renderEndRemoteTerminalsButton = (): React.JSX.Element => (
@@ -229,36 +255,21 @@ export function SshTargetCard({
     </Tooltip>
   )
 
-  const renderSecondaryIconActions = (includeEndRemoteTerminals: boolean): React.JSX.Element => (
-    <div className="flex items-center gap-1">
-      {includeEndRemoteTerminals ? renderEndRemoteTerminalsButton() : null}
-      {isSshTargetConnecting(status) ? null : renderResetRelayButton()}
+  const renderVisibilityAction = (): React.JSX.Element =>
+    hideable ? (
+      <SshTargetVisibilityToggle
+        hidden={hidden}
+        disabled={hasActionInFlight}
+        busy={visibilityInFlight}
+        onSetHidden={handleSetHidden}
+      />
+    ) : (
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onEdit(target)}
-            className="size-7"
-            disabled={hasActionInFlight}
-            aria-label={translate(
-              'auto.components.settings.SshTargetCard.3d8af2949f',
-              'Edit target'
-            )}
-          >
-            <Pencil className="size-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={4}>
-          {translate('auto.components.settings.SshTargetCard.3d8af2949f', 'Edit target')}
-        </TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onRemove(target.id)}
+            onClick={onRemove}
             className="size-7 text-muted-foreground hover:text-red-400"
             disabled={hasActionInFlight}
             aria-label={
@@ -278,6 +289,33 @@ export function SshTargetCard({
           {translate('auto.components.settings.SshTargetCard.7f7b3d7ab4', 'Remove target')}
         </TooltipContent>
       </Tooltip>
+    )
+
+  const renderSecondaryIconActions = (includeEndRemoteTerminals: boolean): React.JSX.Element => (
+    <div className="flex items-center gap-1">
+      {includeEndRemoteTerminals ? renderEndRemoteTerminalsButton() : null}
+      {isSshTargetConnecting(status) ? null : renderResetRelayButton()}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEdit}
+            className="size-7"
+            disabled={hasActionInFlight}
+            aria-label={translate(
+              'auto.components.settings.SshTargetCard.3d8af2949f',
+              'Edit target'
+            )}
+          >
+            <Pencil className="size-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={4}>
+          {translate('auto.components.settings.SshTargetCard.3d8af2949f', 'Edit target')}
+        </TooltipContent>
+      </Tooltip>
+      {renderVisibilityAction()}
     </div>
   )
 
@@ -293,6 +331,11 @@ export function SshTargetCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{target.label}</span>
+          {hidden ? (
+            <Badge variant="hostContext">
+              {translate('auto.components.settings.SshTargetCard.hiddenBadge', 'Hidden')}
+            </Badge>
+          ) : null}
           <span className={`size-2 shrink-0 rounded-full ${statusColor(status)}`} />
           <span className="text-[11px] text-muted-foreground">{STATUS_LABELS[status]}</span>
         </div>
@@ -337,7 +380,7 @@ export function SshTargetCard({
             <Button
               variant="ghost"
               size="xs"
-              onClick={() => onTest(target.id)}
+              onClick={() => onTest()}
               disabled={testing || hasActionInFlight}
               className="gap-1.5"
             >

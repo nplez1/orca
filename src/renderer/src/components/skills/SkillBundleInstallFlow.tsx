@@ -51,6 +51,7 @@ export function SkillBundleInstallFlow(props: {
   const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
   const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
+  const hiddenSshTargetIds = useAppStore((state) => state.hiddenSshTargetIds)
   const allSkillIds = useMemo(
     () => props.version.manifest.skills.map((skill) => skill.id),
     [props.version.manifest.skills]
@@ -89,12 +90,14 @@ export function SkillBundleInstallFlow(props: {
   )
   const sshConnections = useMemo(
     () =>
-      [...sshTargetLabels.entries()].map(([id, label]) => ({
-        id,
-        label,
-        connected: sshConnectionStates.get(id)?.status === 'connected'
-      })),
-    [sshConnectionStates, sshTargetLabels]
+      [...sshTargetLabels.entries()]
+        .filter(([id]) => !hiddenSshTargetIds.has(id))
+        .map(([id, label]) => ({
+          id,
+          label,
+          connected: sshConnectionStates.get(id)?.status === 'connected'
+        })),
+    [hiddenSshTargetIds, sshConnectionStates, sshTargetLabels]
   )
 
   const resetPreview = (): void => {

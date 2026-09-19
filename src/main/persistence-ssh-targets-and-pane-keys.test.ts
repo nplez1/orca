@@ -324,6 +324,55 @@ describe('Store', () => {
     expect(reloadedCluster?.source).toBe('ssh-config')
   })
 
+  it('keeps a hidden target hidden across flush, reload, and config sync', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {},
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {},
+      sshTargets: [
+        {
+          id: 'ssh-hidden-1',
+          label: 'cluster',
+          configHost: 'cluster',
+          host: '10.0.0.5',
+          port: 22,
+          username: 'dev',
+          source: 'ssh-config',
+          hidden: true
+        }
+      ]
+    })
+
+    const store = await createStore()
+    const sshStore = new SshConnectionStore(store)
+    expect(sshStore.getTarget('ssh-hidden-1')?.hidden).toBe(true)
+
+    // Hiding must survive the sync that runs every time the Settings pane opens —
+    // otherwise a hidden host silently reappears in every picker.
+    loadUserSshConfigMock.mockReturnValue([{ host: 'cluster' }])
+    sshConfigHostsToTargetsMock.mockReturnValue([
+      {
+        id: 'ssh-cfg-hidden',
+        label: 'cluster',
+        configHost: 'cluster',
+        host: '10.0.0.5',
+        port: 2200,
+        username: 'dev'
+      }
+    ])
+    sshStore.importFromSshConfig()
+
+    store.flush()
+    const reloaded = await createStore()
+    const reloadedTarget = new SshConnectionStore(reloaded).getTarget('ssh-hidden-1')
+    expect(reloadedTarget?.hidden).toBe(true)
+    expect(reloadedTarget?.port).toBe(2200)
+  })
+
   it('drops malformed migration-unsupported PTY entries on load', async () => {
     const repo = makeRepo()
     writeDataFile({

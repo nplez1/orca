@@ -126,6 +126,8 @@ export function createSshApi(): NonNullable<Partial<PreloadApi>['ssh']> {
     updateTarget: () =>
       Promise.reject(new Error('SSH target management is unavailable in the web client.')),
     removeTarget: () => Promise.resolve(),
+    setTargetHidden: () =>
+      Promise.reject(new Error('SSH target management is unavailable in the web client.')),
     importConfig: () => Promise.resolve({ targets: [], repoReadoptions: [] }),
     listConfigHosts: () =>
       Promise.resolve({
