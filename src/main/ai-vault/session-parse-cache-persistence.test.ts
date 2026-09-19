@@ -140,7 +140,7 @@ async function coldParseStats(path: string): Promise<SessionParseStats> {
  *
  * This table is the reminder. Changing the persisted session shape — or the
  * meaning of a field the parsers fill — breaks this `satisfies` and the fix
- * is to bump `SCHEMA_VERSION` in session-parse-cache-persistence.ts, not to
+ * is to bump `SESSION_PARSE_CACHE_SCHEMA_VERSION`, not to
  * silently extend the list.
  */
 const CACHED_SESSION_FIELDS = {

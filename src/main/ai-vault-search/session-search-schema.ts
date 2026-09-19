@@ -11,7 +11,9 @@ import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
 // policy, decided where the wire is.
 
 // Bump to drop and rebuild: the index is a cache over the transcripts, never a source.
-export const SESSION_SEARCH_SCHEMA_VERSION = 6
+// Schema 7 carries Copilot's typed-prompt titles instead of ones prefixed with the
+// injected `<current_datetime>` context, which unchanged files would otherwise keep.
+export const SESSION_SEARCH_SCHEMA_VERSION = 7
 
 // unicode61 keeps `_ . - /` inside tokens so paths and identifiers match exactly;
 // the `identifiers` column carries the split form (see session-search-identifier-split).

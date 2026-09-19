@@ -33,6 +33,8 @@ import type { SessionSidecarObservation } from './session-sidecar-stat'
 // match, so nothing re-parses them. Above schema 2 nothing else invalidates a row
 // (the appVersion equality gate is gone), which is why the number has to move.
 // The number itself is shared with the snapshot serializer, so it lives there.
+// Schema 5 prefers Copilot's typed `content` over its injected `transformedContent`,
+// so a schema 4 row carries the `<current_datetime>` prefix as the session title.
 const SCHEMA_VERSION = SESSION_PARSE_CACHE_SCHEMA_VERSION
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500
