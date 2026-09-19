@@ -23,6 +23,16 @@ import {
 import type { SessionSidecarObservation } from './session-sidecar-stat'
 
 // Bump when the persisted entry layout or cached session semantics change; a
+// mismatched file is discarded whole. Schema 3 moved Copilot's cached `cwd` to
+// the session.start context/first folder_trust, so the rows schema 2 wrote carry
+// the wrong workspace and must not be replayed. Schema 4 is that same rule
+// applied to a collision: this fork had already shipped 3 when upstream's Devin
+// parse/sidecar change landed and bumped 2 -> 3 on its own side for rows the fix
+// made wrong. Two meanings under one number leave an upgrading fork install
+// crossing no boundary, replaying pre-fix Devin rows whose mtime and size still
+// match, so nothing re-parses them. Above schema 2 nothing else invalidates a row
+// (the appVersion equality gate is gone), which is why the number has to move.
+// The number itself is shared with the snapshot serializer, so it lives there.
 const SCHEMA_VERSION = SESSION_PARSE_CACHE_SCHEMA_VERSION
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500
