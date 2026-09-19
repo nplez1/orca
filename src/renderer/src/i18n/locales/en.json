@@ -7285,7 +7285,12 @@
             "modeCopy": "Show the dashboard as an in-window board beside the sidebar or a separate pop-out window.",
             "modeAriaLabel": "Agent Dashboard open mode",
             "modeInWindow": "In-window",
-            "modePopout": "Pop-out"
+            "modePopout": "Pop-out",
+            "clickLabel": "Clicking a card",
+            "clickCopy": "Open the agent's workspace, or show the live terminal preview first.",
+            "clickAriaLabel": "Agent Dashboard card click action",
+            "clickWorkspace": "Open workspace",
+            "clickPreview": "Preview"
           }
         },
         "FloatingWorkspacePane": {
@@ -9829,7 +9834,10 @@
               "popout": "pop-out",
               "board": "board",
               "inWindow": "in-window",
-              "worktrees": "worktrees"
+              "worktrees": "worktrees",
+              "click": "click",
+              "preview": "preview",
+              "openWorkspace": "open workspace"
             }
           }
         },

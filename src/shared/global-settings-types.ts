@@ -27,6 +27,7 @@ import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalQuickCommand } from './terminal-quick-command-types'
 import type { TuiAgent } from './tui-agent'
 import type {
+  AgentDashboardCardClickAction,
   AgentDashboardMode,
   BranchPrefixStrategy,
   FloatingTerminalTriggerLocation,
@@ -464,6 +465,8 @@ export type GlobalSettings = {
   experimentalAgentDashboardMode?: AgentDashboardMode
   /** Includes stale quiet agents as a fourth Agent Dashboard column. */
   experimentalAgentDashboardShowIdle?: boolean
+  /** What clicking an Agent Dashboard card does. Defaults to opening the agent's workspace. */
+  experimentalAgentDashboardCardClickAction?: AgentDashboardCardClickAction
   /** One-shot migration guard for defaulting the Agents view off; later explicit opt-ins persist normally. */
   experimentalActivityDefaultedOffForAllUsers?: boolean
   /** Experimental: persistent terminal-pane attention ring for bell + agent-completion events. Opt-in while tuning signal/noise. */

@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import type {
   DashboardCard,
   DashboardFilterOptions,
+  DashboardRevealAgentArgs,
   DashboardSnapshot
 } from '../../../../shared/dashboard-snapshot'
 import type { RepoIcon } from '../../../../shared/repo-icon'
@@ -19,12 +20,12 @@ vi.mock('./AgentKanbanCard', () => ({
     card,
     repoIcon,
     now,
-    onOpenTerminal
+    onActivateCard
   }: {
     card: DashboardCard
     repoIcon?: RepoIcon | null
     now: number
-    onOpenTerminal: (card: DashboardCard) => void
+    onActivateCard: (card: DashboardCard) => void
   }) => (
     <div
       data-testid="card"
@@ -32,7 +33,7 @@ vi.mock('./AgentKanbanCard', () => ({
       data-unseen={card.unseen}
       data-now={now}
       data-repo-icon={repoIcon === null ? 'none' : JSON.stringify(repoIcon)}
-      onClick={() => onOpenTerminal(card)}
+      onClick={() => onActivateCard(card)}
     >
       {card.worktreeName}
     </div>
@@ -85,10 +86,18 @@ function renderBoard(
     showIdle?: boolean
     repoIconsByRepoId?: Record<string, RepoIcon | null>
     filterOptions?: DashboardFilterOptions
+    cardClickAction?: DashboardSnapshot['cardClickAction']
+    onRevealAgent?: (args: DashboardRevealAgentArgs) => void
   } = {}
 ): void {
-  const snapshot: DashboardSnapshot = { generatedAt: 1, cards, ...options }
-  render(<AgentKanbanBoard snapshot={snapshot} />)
+  const { cardClickAction, onRevealAgent, ...snapshotOptions } = options
+  const snapshot: DashboardSnapshot = {
+    generatedAt: 1,
+    cards,
+    ...(cardClickAction ? { cardClickAction } : {}),
+    ...snapshotOptions
+  }
+  render(<AgentKanbanBoard snapshot={snapshot} onRevealAgent={onRevealAgent ?? vi.fn()} />)
 }
 
 const ackAgent = vi.fn(async () => {})
@@ -288,10 +297,42 @@ describe('AgentKanbanBoard', () => {
     expect(screen.getByTestId('card').dataset.now).toBe('190000')
   })
 
+  it('jumps to the agent workspace by default instead of opening the preview', () => {
+    const onRevealAgent = vi.fn()
+    renderBoard([card({ paneKey: 'pk-reveal', worktreeId: 'w1', tabId: 'tab1', leafId: 'l1' })], {
+      onRevealAgent
+    })
+
+    fireEvent.click(screen.getByTestId('card'))
+
+    expect(onRevealAgent).toHaveBeenCalledWith({
+      repoId: 'r1',
+      worktreeId: 'w1',
+      executionHostId: undefined,
+      tabId: 'tab1',
+      leafId: 'l1'
+    })
+    expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('false')
+    // Going to the workspace still counts as seeing the agent.
+    expect(ackAgent).toHaveBeenCalledWith('pk-reveal')
+  })
+
+  it('opens the preview dialog instead of revealing when the click action says so', () => {
+    const onRevealAgent = vi.fn()
+    renderBoard([card({ paneKey: 'pk-preview' })], { cardClickAction: 'preview', onRevealAgent })
+
+    fireEvent.click(screen.getByTestId('card'))
+
+    expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('true')
+    expect(onRevealAgent).not.toHaveBeenCalled()
+  })
+
   it('keeps the terminal dialog open across bucket moves and card removal', () => {
     const agent = card({ paneKey: 'pk-1', bucket: 'done', worktreeName: 'wt1' })
     const { rerender } = render(
-      <AgentKanbanBoard snapshot={{ generatedAt: 1, cards: [agent], showIdle: true }} />
+      <AgentKanbanBoard
+        snapshot={{ generatedAt: 1, cards: [agent], showIdle: true, cardClickAction: 'preview' }}
+      />
     )
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('false')
 
@@ -301,7 +342,9 @@ describe('AgentKanbanBoard', () => {
     // Sending a message flips the agent done → working; the dialog must
     // follow the card to its new bucket instead of closing.
     const moved = { ...agent, bucket: 'working' as const, dotState: 'working' as const }
-    rerender(<AgentKanbanBoard snapshot={{ generatedAt: 2, cards: [moved] }} />)
+    rerender(
+      <AgentKanbanBoard snapshot={{ generatedAt: 2, cards: [moved], cardClickAction: 'preview' }} />
+    )
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('true')
     expect(screen.getByTestId('terminal-dialog').dataset.bucket).toBe('working')
 
@@ -314,7 +357,9 @@ describe('AgentKanbanBoard', () => {
 
   it('relays a seen-ack when a dialog opens and when the open agent changes state', () => {
     const agent = card({ paneKey: 'pk-ack', bucket: 'done', unseen: true })
-    const { rerender } = render(<AgentKanbanBoard snapshot={{ generatedAt: 1, cards: [agent] }} />)
+    const { rerender } = render(
+      <AgentKanbanBoard snapshot={{ generatedAt: 1, cards: [agent], cardClickAction: 'preview' }} />
+    )
     // unseen comes straight from the snapshot (the shared ack map).
     expect(screen.getByTestId('card').dataset.unseen).toBe('true')
 
@@ -328,7 +373,8 @@ describe('AgentKanbanBoard', () => {
         snapshot={{
           generatedAt: 2,
           cards: [{ ...agent, bucket: 'idle', unseen: false }],
-          showIdle: true
+          showIdle: true,
+          cardClickAction: 'preview'
         }}
       />
     )
@@ -343,7 +389,8 @@ describe('AgentKanbanBoard', () => {
         snapshot={{
           generatedAt: 3,
           cards: [{ ...agent, bucket: 'working' as const, stateChangedAt: 2000, unseen: true }],
-          showIdle: true
+          showIdle: true,
+          cardClickAction: 'preview'
         }}
       />
     )
