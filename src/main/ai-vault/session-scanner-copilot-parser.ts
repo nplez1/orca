@@ -92,14 +92,13 @@ function consumeCopilotRecordLine(accumulator: SessionAccumulator, line: string)
   }
   if (record.type === 'user.message' && data) {
     accumulator.messageCount++
-    accumulator.title ??= normalizeTitleText(
-      extractString(data.transformedContent) ?? extractString(data.content) ?? ''
-    )
-    addPreviewMessage(accumulator, {
-      role: 'user',
-      text: extractString(data.transformedContent) ?? extractString(data.content),
-      timestamp: record.timestamp
-    })
+    // Why: `content` is the prompt as typed; `transformedContent` is what the
+    // model sees, and Copilot prefixes that with injected context such as
+    // `<current_datetime>...</current_datetime>`. Prefer the typed prompt so
+    // injected context never becomes the session title, preview, or first prompt.
+    const userText = extractString(data.content) ?? extractString(data.transformedContent)
+    accumulator.title ??= normalizeTitleText(userText ?? '')
+    addPreviewMessage(accumulator, { role: 'user', text: userText, timestamp: record.timestamp })
     return
   }
   if (record.type === 'assistant.message' && data) {
