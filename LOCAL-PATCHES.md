@@ -143,6 +143,63 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-19** — onto upstream `3ad6b7e46e` (96 commits), from the released tip `72034293d5`
+  (np.9-to-be). 75 commits replayed: **65 byte-identical by `range-diff`, 10 adapted, none
+  dropped.** Eight of the 75 conflicted, across 10 files, in three classes:
+  - **Mechanical/orthogonal** (6 files): upstream had rewritten the file or the surrounding region
+    and our delta re-applied onto upstream's version. `agent-status-event-applicator.ts` (an import
+    plus the routing-readiness guard), `wsl-orca-env.test.ts` (one value, `orca.exe` →
+    `orca-np.exe`), and the three pi descendant sources, which landed on upstream's
+    `pi.on` → `onStatus` rewrite and its post-queue `metadata`/`cancelPostRetry` refactor; the test
+    harness's process-bus surface became the `pi.events` surface our commit binds, and gained
+    upstream's `registerCommand`/`setModel` alongside it. `06df7b1aef` and `a64e28aa72` differ only
+    as that context moved.
+  - **Additive union** (1 file): `en.json`. Upstream appends `TerminalRenderingSection` (inline
+    images) and we append `AgentSessionSearchSection` + `agent-session-search-search` to the same
+    `auto.components.settings` object, so both blocks were kept; the derived
+    `en-runtime-required.json` regenerated with **no diff**. Checked as a set property: every key
+    in upstream's catalogue and in the pre-sync tip is present in the result (0 missing).
+  - **Rename inside a rewrite** (1 file): `use-ai-vault-search.ts`. Upstream replaced the hook's
+    `paths` parameter with `within` and split `localConsent` into `hasQuery`/`needsLocalConsent`;
+    our consent rename (`policy.enabled` → `policy.contentEnabled`) re-applied inside that.
+  - **Convergence, asked and answered — the fork's metadata tier wins.** Upstream's new scope tests
+    assert that consent off means no index (`unavailable/disabled`). This fork always indexes the
+    metadata tier, so `disabled` has no producer left in the tree at all. The fork's always-on tier
+    was kept: the two compatible tests took the rename, and
+    `reports being switched off before blaming a scope it does not know` became *blames an unknown
+    scope rather than consent with content search off*, which is the same rule the previous sync
+    recorded for `e696169ecf`.
+  - **Cache-format collision, caught only after the sync had landed.** Upstream's Devin parse and
+    sidecar change invalidated rows cached under the old parser and bumped
+    `session-parse-cache-persistence.ts` 2 → 3 for them; this fork had *already shipped* 3, for the
+    Copilot cwd move. Same number, two meanings, so a fork install upgrading from the last release
+    crossed no version boundary and would have replayed its pre-fix Devin rows — whose mtime and
+    size still match, so nothing else re-parses them. Since schema 2 the `appVersion` equality gate
+    is gone, which makes the number the only compatibility signal left, and upstream's own test for
+    its bump writes the *previous* version, so it cannot see this collision. Fixed in the commit
+    that follows this one (4); the lesson is in UPSTREAM-SYNC-RUNBOOK.md § Traps.
+  - **Trap: a clean merge is not a correct merge — hit for real.** Upstream's new
+    `agent-status-extension-omp-model.test.ts` asserts exact pi payloads, and the descendant roster
+    deliberately rides *every* post (the transport keeps only the newest), so those payloads now
+    carry `subagent_runs: []`. Nothing conflicted; the touched-area tests found it. The expectation
+    was updated in the commit that put the field on every post, so the tree is green at every
+    commit.
+  - **Trap that did *not* apply:** all six merge commits in the replay range are clean automatic
+    merges — `git log --remerge-diff` is empty for each, against 590 lines for the previously
+    hand-resolved `b1daf0ca58` — so linearising them lost no hand-resolution content this time.
+  - Verified: `pnpm tc` clean; 2,543 tests green across 260 files covering every touched area
+    (ai-vault-search, ai-vault, pi, agent-hook-listener/descendant, ipc-events, right-sidebar,
+    runtime session-search settings, wsl env); `range-diff` with all 75 patches paired and the
+    pre-sync-tip lost-content diff empty; the three localization verifiers green; the fork's
+    builder config loads and its update-feed URLs are intact.
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports 37 findings
+    (28 of them design-system) on lines the fork added before this sync. Every flagged file but one
+    is byte-identical to the released tip, and the exception's finding is on a line this sync did
+    not touch. They surface now only because after a rebase the gate's base (`origin/HEAD`, the
+    fork's default branch) still names the pre-sync tip, so its merge-base falls back to the old
+    base and the whole fork+upstream delta reads as added lines. Worth its own pass; not a
+    regression to chase here.
+
 - **2026-09-18** — onto upstream `0b57ce0295` (215 commits), from the released tip `ef784bf681`
   (np.8). 60 commits replayed. Three of them needed resolution beyond the mechanical, and the
   conflicts fell into three classes worth naming:
