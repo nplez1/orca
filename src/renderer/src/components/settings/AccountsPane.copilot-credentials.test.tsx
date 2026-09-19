@@ -26,7 +26,13 @@ function installWindowApi(): void {
     configurable: true,
     value: {
       claudeAccounts: { list: () => Promise.resolve(emptyAccountsState) },
-      codexAccounts: { list: () => Promise.resolve(emptyAccountsState) },
+      codexAccounts: {
+        list: () => Promise.resolve(emptyAccountsState),
+        // Why: the Codex section's sign-in link notice subscribes from the pane's mount, so the
+        // double has to honour that contract. These cases never publish a link.
+        getPendingLoginUrl: () => Promise.resolve(null),
+        onPendingLoginUrlChanged: () => () => {}
+      },
       codexConfigSync: {
         status: () =>
           Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '/tmp/config.toml' })
