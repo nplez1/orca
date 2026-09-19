@@ -23,6 +23,7 @@ import {
   resolveGitCommandWithoutProbe
 } from './git-command-resolution'
 import { prepareWindowsHostGitEnvironment } from './windows-host-git-environment'
+import { prepareLocalLoginShellGitEnvironment } from './local-login-shell-git-environment'
 import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-env'
 import { gitSpawn } from './git-spawn'
 import { acquireGitAdmission } from './git-subprocess-admission'
@@ -83,13 +84,13 @@ export async function gitStreamStdout(
       await readEnvironmentReady
     }
     let resolved = resolveGitCommand(args, gitOptions)
-    const environmentReady = prepareWindowsHostGitEnvironment(
-      resolved,
-      gitOptions.env,
-      options.signal
-    )
+    // Why local first: on POSIX only this one applies, and on Windows only the
+    // other, so the two are mutually exclusive rather than layered.
+    const environmentReady =
+      prepareLocalLoginShellGitEnvironment(resolved, gitOptions.env, options.signal) ??
+      prepareWindowsHostGitEnvironment(resolved, gitOptions.env, options.signal)
     if (environmentReady) {
-      gitOptions.env = await environmentReady
+      gitOptions.env = (await environmentReady) ?? gitOptions.env
     }
     resolved = resolveGitCommand(args, gitOptions)
     const grant = await acquireGitAdmission({

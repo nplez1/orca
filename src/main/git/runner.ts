@@ -12,6 +12,7 @@
 export { extractExecError, parseRetryAfterMs } from './exec-error'
 
 export { setDefaultWslDistroOverride } from './command-runner/wsl-command-resolution'
+export { configureLocalLoginShellGitEnvironment } from './command-runner/local-login-shell-git-environment'
 export {
   awaitWindowsHostGitEnvironmentReady,
   configureWindowsHostGitEnvironmentReadiness
