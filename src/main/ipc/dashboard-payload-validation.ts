@@ -39,6 +39,7 @@ const DASHBOARD_DOT_STATES = new Set(['working', 'blocked', 'waiting', 'done', '
 const DASHBOARD_HOST_KINDS = new Set(['local', 'ssh', 'wsl', 'remote'])
 const DASHBOARD_WORKSPACE_KINDS = new Set(['worktree', 'folder'])
 const DASHBOARD_REVIEW_STATES = new Set(['open', 'closed', 'merged', 'draft'])
+const DASHBOARD_CARD_CLICK_ACTIONS = new Set(['workspace', 'preview'])
 const DASHBOARD_HOST_PLATFORMS = new Set([
   'aix',
   'android',
@@ -108,6 +109,8 @@ export function isDashboardSnapshot(value: unknown): value is DashboardSnapshot 
     snapshot.cards.every(isDashboardCard) &&
     isDashboardWorkspaceList(snapshot.workspaces) &&
     (snapshot.showIdle === undefined || typeof snapshot.showIdle === 'boolean') &&
+    (snapshot.cardClickAction === undefined ||
+      isDashboardCardClickAction(snapshot.cardClickAction)) &&
     isDashboardFilterOptions(snapshot.filterOptions) &&
     isDashboardLaunchOptions(snapshot.launchableAgentsByWorktreeId) &&
     isDashboardRepoIcons(snapshot.repoIconsByRepoId)
@@ -139,6 +142,8 @@ export function admitDashboardSnapshot(value: unknown): DashboardSnapshotAdmissi
     snapshot.cards.length > MAX_DASHBOARD_CARDS ||
     workspaces === null ||
     (snapshot.showIdle !== undefined && typeof snapshot.showIdle !== 'boolean') ||
+    (snapshot.cardClickAction !== undefined &&
+      !isDashboardCardClickAction(snapshot.cardClickAction)) ||
     !isDashboardFilterOptions(snapshot.filterOptions) ||
     !isDashboardLaunchOptions(snapshot.launchableAgentsByWorktreeId) ||
     !isDashboardRepoIcons(snapshot.repoIconsByRepoId)
@@ -154,6 +159,12 @@ export function admitDashboardSnapshot(value: unknown): DashboardSnapshotAdmissi
     },
     droppedCardCount: snapshot.cards.length - cards.length
   }
+}
+
+/** Why: the pop-out may run pre-upgrade code that sends no action at all, and
+ *  a value outside the union would silently lose its click destination. */
+function isDashboardCardClickAction(value: unknown): boolean {
+  return typeof value === 'string' && DASHBOARD_CARD_CLICK_ACTIONS.has(value)
 }
 
 /** Repo icons reach the pop-out's `<img src>`, so each one must survive the
