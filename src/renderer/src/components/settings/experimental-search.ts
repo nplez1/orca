@@ -88,6 +88,18 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
         ...translateSearchKeyword(
           'auto.components.settings.experimental.search.agentDashboard.worktrees',
           'worktrees'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.agentDashboard.click',
+          'click'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.agentDashboard.preview',
+          'preview'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.agentDashboard.openWorkspace',
+          'open workspace'
         )
       ]
     },
