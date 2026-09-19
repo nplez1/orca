@@ -16,8 +16,19 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
 
 ## Rules that keep this from rotting
 
-- PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is what makes it
-  impossible for a fork-only patch to leak into a PR.
+- **Where a PR goes is a decision, not a default.** Unless upstream is asked for in so many words,
+  a PR opens against this fork (`nplez1/orca`) with base `nplez1/main` — the fork's default branch.
+  `stablyai/orca` is the target only for the upstream-bound branches listed below, and only when
+  that is what was asked for. `node local/open-pr.mjs` applies the default and requires an explicit
+  `--upstream` to leave the fork.
+- **A PR's head must descend from its base.** The two branches called `main` here are different
+  lines: `nplez1/main` is this fork's own line, `main` mirrors upstream. A head cut from `main`
+  and opened against `nplez1/main` reads as a small diff locally, but the PR then carries every
+  fork-only patch as a reversion. Fork PRs are cut from `nplez1/main`; the upstream-bound branches
+  below are cut from `origin/main`, which is the base they are opened against. `open-pr.mjs`
+  refuses the mismatch instead of letting review find it.
+- Upstream-bound PR branches are cut from `origin/main`, **never** from `nplez1/main`. That is
+  what makes it impossible for a fork-only patch to leak into an upstream-bound PR.
 - A `local(...)` commit is refused on every branch except `nplez1/main` (`.husky/commit-msg`). If it
   fires, switch branches — do not bypass it.
 - A fork-only patch may only touch files that no PR branch owns. `package.json` and the
