@@ -102,7 +102,7 @@ function getCopilotBackgroundWorkState(
   return state.copilotBackgroundWorkByPaneKey.get(paneKey)
 }
 
-// Why: Copilot permission hooks fire before auto-approval resolves; only ask_user and elicitation dialogs are real blocked signals.
+// Why: PermissionRequest fires before allow/ask/deny (stays working), but the notification hook only fires once a prompt is actually shown to the user (copilot-cli 1.0.26, copilot-cli#2586), so permission_prompt is a real blocked signal.
 export function normalizeCopilotEvent(
   state: HookListenerState,
   eventName: unknown,
@@ -115,7 +115,8 @@ export function normalizeCopilotEvent(
   )
   const notificationType = readFirstString(hookPayload, ['notification_type', 'notificationType'])
   const isBlockingNotification =
-    normalizedEventName === 'Notification' && notificationType === 'elicitation_dialog'
+    normalizedEventName === 'Notification' &&
+    (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog')
   const toolSnapshot = extractToolFields('copilot', normalizedEventName, hookPayload)
   const backgroundShellStarted = isCopilotBackgroundShellStart(normalizedEventName, hookPayload)
   const subagentToolStarted = isCopilotSubagentToolStart(normalizedEventName, hookPayload)

@@ -175,7 +175,7 @@ export function extractCopilotToolFields(
   }
   if (eventName === 'Notification') {
     const notificationType = readFirstString(hookPayload, ['notification_type', 'notificationType'])
-    if (notificationType === 'elicitation_dialog') {
+    if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
       const message = readFirstString(hookPayload, ['message', 'body', 'text', 'title'])
       if (message) {
         update.lastAssistantMessage = message
