@@ -125,6 +125,10 @@ When adding or changing a Git command:
 - Prefer `rg` over the checked-out files for source searches. For history or refs, use a named ref, an explicit namespace/path, `--max-count`, and a bounded output; do not use an unqualified `--all` scan as a first diagnostic.
 - Keep repository-wide commands targeted to the current repository and worktree. If an unbounded scan is genuinely required, measure the ref count first, explain the cost, and get confirmation before running it.
 
+## File Path Search
+
+The Explore pane's filename filter and Quick Open both search a workspace's file paths, and both are bounded. Before changing how either pane filters, or any bound that applies to a file listing, read [`docs/reference/file-path-filtering-at-scale.md`](./docs/reference/file-path-filtering-at-scale.md): the search must scan and count everything while the display keeps a bounded page, and a filter may claim "no files match" only when the host scanned the whole workspace. `QUICK_OPEN_LISTING_MAX_RESULTS` is an OOM bound — do not raise or remove it to make a filter find more.
+
 ## Git Provider Compatibility
 
 Source-control and review changes must consider GitLab and other supported git providers, not only GitHub. Keep provider-specific behavior behind explicit checks, and avoid GitHub-only naming for generic review concepts.
