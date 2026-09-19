@@ -19,9 +19,38 @@ export type FileExplorerNameFilterProjectionSource = {
   query: string
   relativePaths: readonly string[] | null
   operationOwner?: FileExplorerOperationOwner
+  /** Exact matches the host scanned; null when the listing was not query-scoped. */
+  totalCount?: number | null
+  /** True when the page is not the whole result set. */
+  truncated?: boolean
+}
+
+/**
+ * Which message an empty filtered pane may show. A truncated listing never scanned the whole
+ * workspace, so "no files match" is a claim we cannot make — only "not fully searched" is true.
+ */
+export function getFileExplorerNameFilterEmptyMessageKind({
+  hasNameFilter,
+  hasLoadError,
+  truncated
+}: {
+  hasNameFilter: boolean
+  hasLoadError: boolean
+  truncated: boolean
+}): 'no-match' | 'partial-scan' | null {
+  if (!hasNameFilter || hasLoadError) {
+    return null
+  }
+  return truncated ? 'partial-scan' : 'no-match'
 }
 
 export const FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES = FILE_NAME_FILTER_QUERY_MAX_BYTES
+
+/**
+ * Bounded page the name filter keeps. Filters are usually narrow; when one is broad the host
+ * still counts every match, and the pane reports the count instead of implying completeness.
+ */
+export const FILE_EXPLORER_NAME_FILTER_MAX_RESULTS = 5_000
 
 export function getNextNameFilterCollapsedPaths(
   collapsedPaths: ReadonlySet<string>,

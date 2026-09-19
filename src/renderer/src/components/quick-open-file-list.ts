@@ -1,10 +1,21 @@
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: quick-open file lists are fetched over local or SSH runtime IPC, so loading/error/results track the request lifecycle. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { Worktree } from '../../../shared/worktree/types'
-import { isWindowsAbsolutePathLike } from '../../../shared/cross-platform-path'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { isQuickOpenRemoteQueryTooLarge } from '@/components/quick-open-search'
+import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import { getRuntimeFileListTarget } from './runtime-file-list-scan-target'
+
+export {
+  getNestedWorktreeExcludePaths,
+  getNestedWorktreeExcludeRequest,
+  getRuntimeFileListTarget,
+  isNestedWorktreePath
+} from './runtime-file-list-scan-target'
+export type {
+  NestedWorktreeExcludeRequest,
+  RuntimeFileListTarget
+} from './runtime-file-list-scan-target'
 import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listing-limits'
 import {
   cancelRuntimeFileList,
@@ -31,6 +42,8 @@ export type RuntimeFileListState = {
   loading: boolean
   loadError: string | null
   truncated?: boolean
+  /** Exact match count a query-scoped host search scanned; null for an unscoped listing. */
+  totalCount?: number | null
   operationOwner?: FileExplorerOperationOwner
 }
 
@@ -38,95 +51,37 @@ export type RuntimeFileListState = {
 type RuntimeFileListing = {
   requestKey: string
   files: string[]
+  totalCount: number | null
   truncated: boolean
 }
 
-const NO_LISTING: RuntimeFileListing = { requestKey: '', files: [], truncated: false }
+const NO_LISTING: RuntimeFileListing = {
+  requestKey: '',
+  files: [],
+  totalCount: null,
+  truncated: false
+}
 
 export function cleanRuntimeFileListError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   return raw.replace(/^Error invoking remote method '[^']+':\s*Error:\s*/, '')
 }
 
-export function isNestedWorktreePath(parentPath: string, childPath: string): boolean {
-  const windowsPath = isWindowsAbsolutePathLike(parentPath)
-  const parent = parentPath.replace(/[\\/]+$/, '').replace(/\\/g, '/')
-  const child = childPath.replace(/\\/g, '/')
-  // Why: Windows paths are case-insensitive and can arrive with mixed slash
-  // styles from git/Electron. Normalize before deciding whether to exclude a
-  // nested linked worktree from file scans.
-  const comparableParent = windowsPath ? parent.toLowerCase() : parent
-  const comparableChild = windowsPath ? child.toLowerCase() : child
-  return comparableChild.startsWith(`${comparableParent}/`)
-}
-
-export function getNestedWorktreeExcludePaths(
-  worktreeId: string,
-  worktreePath: string,
-  repoWorktrees: readonly Worktree[]
-): string[] {
-  return repoWorktrees
-    .filter(
-      (worktree) => worktree.id !== worktreeId && isNestedWorktreePath(worktreePath, worktree.path)
-    )
-    .map((worktree) => worktree.path)
-    .sort()
-}
-
-export type NestedWorktreeExcludeRequest = {
-  paths: string[]
-  key: string
-}
-
-export type RuntimeFileListTarget = {
-  canList: boolean
-  excludeRequest: NestedWorktreeExcludeRequest
-  worktreePath: string | null
-}
-
-export function getRuntimeFileListTarget(
-  worktreeId: string | null,
-  worktreePath: string | null | undefined,
-  repoWorktrees: readonly Worktree[]
-): RuntimeFileListTarget {
-  const resolvedWorktreePath = worktreePath ?? null
-  if (!worktreeId || !resolvedWorktreePath) {
-    return { canList: false, excludeRequest: { paths: [], key: '[]' }, worktreePath: null }
-  }
-  return {
-    canList: true,
-    excludeRequest: getNestedWorktreeExcludeRequest(
-      worktreeId,
-      resolvedWorktreePath,
-      repoWorktrees
-    ),
-    worktreePath: resolvedWorktreePath
-  }
-}
-
-export function getNestedWorktreeExcludeRequest(
-  worktreeId: string | null,
-  worktreePath: string | null,
-  repoWorktrees: readonly Worktree[]
-): NestedWorktreeExcludeRequest {
-  if (!worktreeId || !worktreePath || repoWorktrees.length === 0) {
-    return { paths: [], key: '[]' }
-  }
-  const paths = getNestedWorktreeExcludePaths(worktreeId, worktreePath, repoWorktrees)
-  // Why: worktree paths can contain newlines. Use JSON as a stable dependency
-  // key while passing the original array to IPC so paths stay lossless.
-  return { paths, key: JSON.stringify(paths) }
-}
-
 export function useRuntimeFileListForWorktree({
   enabled,
   worktreeId,
   query,
+  queryMode = 'quick-open',
+  queryLimit = 32,
   hostFilterWhenCapped = false
 }: {
   enabled: boolean
   worktreeId: string | null
   query?: string
+  /** Matcher the host uses for a query-scoped search; ignored for an unscoped listing. */
+  queryMode?: PathSearchMode
+  /** Bounded page size for a query-scoped search. */
+  queryLimit?: number
   /** When a local listing hits its cap, re-list with `query` applied as the Explorer name filter on the host. */
   hostFilterWhenCapped?: boolean
 }): RuntimeFileListState {
@@ -258,13 +213,16 @@ export function useRuntimeFileListForWorktree({
         // false unconditionally is what made the truncation silent — the host bounds the scan to
         // the cap it is given, so a full page means there are more paths behind it.
         files,
+        // Why: an unfiltered local listing counts nothing; only a query-scoped host search does.
+        totalCount: null,
         truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS
       }))
     const request = usesRuntimePathSearch
       ? debounceRuntimeFileRequest(120, requestAbortController.signal, () =>
           searchRuntimeFilePaths(requestContext, {
             query: remoteQuery,
-            limit: 32,
+            limit: queryLimit,
+            mode: queryMode,
             excludePaths,
             ...(connectionId ? { requestToken } : {}),
             signal: requestAbortController.signal
@@ -318,6 +276,8 @@ export function useRuntimeFileListForWorktree({
     connectionId,
     operationOwnerKey,
     operationRouteAvailable,
+    queryLimit,
+    queryMode,
     requestKey,
     hostNameFilter,
     listingKey,
@@ -335,6 +295,7 @@ export function useRuntimeFileListForWorktree({
     loading: loading || connectionPending,
     loadError,
     truncated: currentListing.truncated,
+    totalCount: currentListing.totalCount,
     operationOwner: listedOperationOwner
   }
 }

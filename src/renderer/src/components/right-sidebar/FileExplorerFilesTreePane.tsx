@@ -12,6 +12,7 @@ import { FileExplorerTreeStatus } from './FileExplorerTreeStatus'
 import { FileExplorerVirtualRows } from './FileExplorerVirtualRows'
 import { canShowAddAsProjectAction } from './file-explorer-add-project-action'
 import type { FileExplorerNameFilterProjectionSource } from './file-explorer-name-filter-projection'
+import { getFileExplorerNameFilterEmptyMessageKind } from './file-explorer-name-filter-projection'
 import type { FileExplorerRowProjection } from './file-explorer-row-projection'
 import type { useFileExplorerSelection } from './useFileExplorerSelection'
 import type { useFileExplorerTree } from './useFileExplorerTree'
@@ -125,13 +126,23 @@ export function FileExplorerFilesTreePane({
       : rootError
   const hasError = isEmptyState && !isLoading && treeError !== null
   const showTree = !isEmptyState
+  const emptyMessageKind = getFileExplorerNameFilterEmptyMessageKind({
+    hasNameFilter,
+    hasLoadError: !!nameFilterFiles.loadError,
+    truncated: !!nameFilterFiles.truncated
+  })
   const emptyMessage =
-    hasNameFilter && !nameFilterFiles.loadError
+    emptyMessageKind === 'partial-scan'
       ? translate(
-          'auto.components.right.sidebar.FileExplorer.2f4483d6c4',
-          'No files match this filter'
+          'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
+          'Only part of this workspace was searched — add more of the name to narrow it down'
         )
-      : undefined
+      : emptyMessageKind === 'no-match'
+        ? translate(
+            'auto.components.right.sidebar.FileExplorer.2f4483d6c4',
+            'No files match this filter'
+          )
+        : undefined
 
   return (
     <ScrollArea

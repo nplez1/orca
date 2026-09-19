@@ -59,6 +59,12 @@ export const tryDeleteWslUncPathMock: IpcMock = vi.fn()
 export const recordCrashBreadcrumbMock: IpcMock = vi.fn()
 export const promoteLocalDownloadedFolderMock: IpcMock = vi.fn()
 
+export const searchQuickOpenFilePathsMock: IpcMock = vi.fn()
+
+export const filePathSearchModuleMock = {
+  searchQuickOpenFilePaths: searchQuickOpenFilePathsMock
+}
+
 export const electronMock = {
   app: { getPath: () => '/orca-test-user-data' },
   BrowserWindow: { fromWebContents: fromWebContentsMock },
@@ -235,7 +241,8 @@ const ALL_MOCKS = [
   textGenerationModuleMock,
   pullRequestContextMock,
   pullRequestTemplateMock,
-  pullRequestLinkedIssueMock
+  pullRequestLinkedIssueMock,
+  filePathSearchModuleMock
 ].flatMap(collectMocks)
 
 /** A FileHandle double over `content`: positional reads copy from it, and stat reports its size. */

@@ -4,6 +4,8 @@ import type { SshMutationExpectation } from '../../shared/ssh-types'
 import type { LocalFileAccess } from '../../shared/local-file-access'
 import type { RuntimeUploadFileStreamRequest } from '../../shared/runtime-upload-staging-contract'
 import type { SearchResult } from '../../shared/code-search-types'
+import type { FilePathSearchResult } from '../../shared/file-path-search-result'
+import type { PathSearchMode } from '../../shared/quick-open-path-search'
 import type { FsChangedPayload } from '../../shared/filesystem-entry-types'
 import type {
   ImportItemResult,
@@ -155,6 +157,14 @@ export const fsApi = {
     searchQuery?: string
     nameFilter?: string
   }): Promise<string[]> => ipcRenderer.invoke('fs:listFiles', args),
+  searchFilePaths: (args: {
+    rootPath: string
+    excludePaths?: string[]
+    requestToken?: string
+    query: string
+    limit?: number
+    mode?: PathSearchMode
+  }): Promise<FilePathSearchResult> => ipcRenderer.invoke('fs:searchFilePaths', args),
   cancelListFiles: (args: { requestToken: string }): Promise<void> =>
     ipcRenderer.invoke('fs:cancelListFiles', args),
   search: (args: {
