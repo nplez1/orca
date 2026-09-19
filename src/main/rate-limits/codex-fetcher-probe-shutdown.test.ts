@@ -29,6 +29,14 @@ vi.mock('./codex-auth-presence', () => ({
   probeCodexAuthPresence: vi.fn(() => 'present')
 }))
 
+// Why: the probe's error path asks the macOS resolver diagnostic for a hint, and since that
+// diagnostic moved off the main thread it spawns /usr/sbin/scutil through the same
+// node:child_process these tests count — a stray spawn that lands in a later case's tally.
+// The hint is orthogonal to the shutdown and home-lock behavior under test.
+vi.mock('../network/macos-tailscale-dns-diagnostic', () => ({
+  withMacTailscaleDnsHint: (message: string) => message
+}))
+
 import { fetchCodexRateLimits } from './codex-fetcher'
 import { probeCodexAuthPresence } from './codex-auth-presence'
 
