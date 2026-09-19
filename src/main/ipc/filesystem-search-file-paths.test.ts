@@ -103,6 +103,53 @@ describe('searchQuickOpenFilePaths', () => {
     })
   })
 
+  it('finds a name-filter match buried past the unscoped listing cap', async () => {
+    const child = createMockProcess()
+    wslAwareSpawnMock.mockReturnValue(child)
+    // Why: the bug this guards — an unscoped listing stops at its cap in rg's traversal order,
+    // so a narrow filter must be answered by the scan itself, not by a truncated page of paths.
+    const promise = searchQuickOpenFilePaths('/repo', {} as Store, {
+      query: 'drover.eve',
+      limit: 32,
+      mode: 'name-filter'
+    })
+    await flushMicrotasks()
+    child.stdout!.emit(
+      'data',
+      `${Array.from({ length: 20_002 }, (_, index) => `data/payload-${index}.bin`).join('\n')}\n`
+    )
+    child.stdout!.emit('data', 'src/a/b/drover.eve_schema\n')
+    child.emit('close', 0, null)
+
+    await expect(promise).resolves.toEqual({
+      paths: ['src/a/b/drover.eve_schema'],
+      totalCount: 1,
+      truncated: false
+    })
+  })
+
+  it('counts every name-filter match while returning a bounded sorted page', async () => {
+    const child = createMockProcess()
+    wslAwareSpawnMock.mockReturnValue(child)
+    const promise = searchQuickOpenFilePaths('/repo', {} as Store, {
+      query: 'target',
+      limit: 2,
+      mode: 'name-filter'
+    })
+    await flushMicrotasks()
+    child.stdout!.emit(
+      'data',
+      'src/target-d.ts\nsrc/target-c.ts\nsrc/other.ts\nsrc/target-a.ts\nsrc/target-b.ts\n'
+    )
+    child.emit('close', 0, null)
+
+    await expect(promise).resolves.toEqual({
+      paths: ['src/target-a.ts', 'src/target-b.ts'],
+      totalCount: 4,
+      truncated: true
+    })
+  })
+
   it('kills the host scan when a superseded query aborts', async () => {
     const child = createMockProcess()
     wslAwareSpawnMock.mockReturnValue(child)

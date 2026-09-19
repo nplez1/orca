@@ -5,6 +5,7 @@ import {
   type RuntimeFileListState
 } from '@/components/quick-open-file-list'
 import {
+  FILE_EXPLORER_NAME_FILTER_MAX_RESULTS,
   isFileExplorerNameFilterQueryTooLarge,
   type FileExplorerNameFilterProjectionSource
 } from './file-explorer-name-filter-projection'
@@ -46,7 +47,10 @@ export function useFileExplorerNameFilter({
   const nameFilterFiles = useRuntimeFileListForWorktree({
     enabled: hasNameFilter && !nameFilterQueryTooLarge,
     worktreeId: activeWorktreeId,
-    query: nameFilterQuery
+    query: nameFilterQuery,
+    // Why: substring-AND is this pane's filter semantics, and it renders a tree, not a ranked list.
+    queryMode: 'name-filter',
+    queryLimit: FILE_EXPLORER_NAME_FILTER_MAX_RESULTS
   })
   const nameFilterSource = useMemo(
     () =>
@@ -54,6 +58,8 @@ export function useFileExplorerNameFilter({
         ? {
             query: nameFilterQuery,
             operationOwner: nameFilterFiles.operationOwner,
+            totalCount: nameFilterFiles.totalCount ?? null,
+            truncated: !!nameFilterFiles.truncated,
             relativePaths: nameFilterQueryTooLarge
               ? []
               : nameFilterFiles.loading
@@ -66,6 +72,8 @@ export function useFileExplorerNameFilter({
       nameFilterFiles.files,
       nameFilterFiles.loading,
       nameFilterFiles.operationOwner,
+      nameFilterFiles.totalCount,
+      nameFilterFiles.truncated,
       nameFilterQuery,
       nameFilterQueryTooLarge
     ]

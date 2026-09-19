@@ -38,7 +38,10 @@ describe('useFileExplorerNameFilter', () => {
     expect(useRuntimeFileListForWorktreeMock).toHaveBeenLastCalledWith({
       enabled: true,
       worktreeId: 'worktree-1',
-      query: 'AppDelegate.swift'
+      query: 'AppDelegate.swift',
+      // Why: substring-AND over a bounded page is this pane's filter contract.
+      queryMode: 'name-filter',
+      queryLimit: 5_000
     })
     expect(result.current.nameFilterSource?.query).toBe('AppDelegate.swift')
   })
@@ -57,6 +60,57 @@ describe('useFileExplorerNameFilter', () => {
     act(() => result.current.setNameFilterQuery('package.'))
 
     expect(result.current.nameFilterSource?.relativePaths).toEqual(['package.json', 'src/main.ts'])
+  })
+
+  it('filters a local full listing that no query produced', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: false,
+      loadError: null
+    })
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource?.relativePaths).toEqual(['src/a/b/drover.eve_schema'])
+  })
+
+  it('asks the host for a bounded substring-AND page instead of a truncated listing', () => {
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(useRuntimeFileListForWorktreeMock).toHaveBeenLastCalledWith({
+      enabled: true,
+      worktreeId: 'worktree-1',
+      query: 'drover.eve',
+      queryMode: 'name-filter',
+      queryLimit: 5_000
+    })
+  })
+
+  it('reports an exact match count and a partial page to the pane', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: false,
+      loadError: null,
+      totalCount: 182_311,
+      truncated: true
+    } satisfies RuntimeFileListState)
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource).toMatchObject({
+      totalCount: 182_311,
+      truncated: true
+    })
   })
 
   it('reports an unsettled source while the listing loads', () => {

@@ -99,14 +99,18 @@ function HookProbe({
   enabled,
   onState,
   query,
+  queryMode,
+  queryLimit,
   worktreeId
 }: {
   enabled: boolean
   onState: (state: RuntimeFileListState) => void
   query?: string
+  queryMode?: 'quick-open' | 'name-filter'
+  queryLimit?: number
   worktreeId: string | null
 }): null {
-  onState(useRuntimeFileListForWorktree({ enabled, worktreeId, query }))
+  onState(useRuntimeFileListForWorktree({ enabled, worktreeId, query, queryMode, queryLimit }))
   return null
 }
 
@@ -131,6 +135,8 @@ async function renderProbe(args: {
   enabled: boolean
   onState: (state: RuntimeFileListState) => void
   query?: string
+  queryMode?: 'quick-open' | 'name-filter'
+  queryLimit?: number
   worktreeId: string | null
 }): Promise<Root> {
   const container = document.createElement('div')
@@ -403,6 +409,7 @@ describe('useRuntimeFileListForWorktree', () => {
         {
           query: 'sta-4354-target',
           limit: 32,
+          mode: 'quick-open',
           excludePaths: undefined,
           signal: expect.any(AbortSignal)
         }
@@ -570,7 +577,11 @@ describe('useRuntimeFileListForWorktree', () => {
     vi.useFakeTimers()
     seedRemoteWorktree()
     const states: RuntimeFileListState[] = []
-    searchRuntimeFilePathsMock.mockResolvedValue({ files: ['src/tar.ts'], truncated: true })
+    searchRuntimeFilePathsMock.mockResolvedValue({
+      files: ['src/tar.ts'],
+      totalCount: 1,
+      truncated: true
+    })
 
     try {
       const root = await renderProbe({
@@ -643,7 +654,50 @@ describe('useRuntimeFileListForWorktree', () => {
     }
   })
 
-  it('keeps the local listing across query changes without restarting it', async () => {
+  it('searches local files by query instead of filtering a capped listing', async () => {
+    const workspaceKey = folderWorkspaceKey('folder-workspace-1')
+    useAppStore.setState({
+      folderWorkspaces: [makeFolderWorkspace()],
+      projectGroups: [makeProjectGroup()],
+      repos: [],
+      worktreesByRepo: {}
+    } as Partial<AppState>)
+    vi.useFakeTimers()
+    const states: RuntimeFileListState[] = []
+    searchRuntimeFilePathsMock.mockResolvedValue({
+      files: ['src/a/b/drover.eve_schema'],
+      totalCount: 1,
+      truncated: false
+    })
+
+    try {
+      await renderProbe({
+        enabled: true,
+        onState: (state) => states.push(state),
+        query: 'drover.eve',
+        queryMode: 'name-filter',
+        queryLimit: 5_000,
+        worktreeId: workspaceKey
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await flushEffects()
+
+      expect(listRuntimeFilesMock).not.toHaveBeenCalled()
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ worktreeId: workspaceKey }),
+        expect.objectContaining({ query: 'drover.eve', limit: 5_000, mode: 'name-filter' })
+      )
+      expect(states.at(-1)).toMatchObject({
+        files: ['src/a/b/drover.eve_schema'],
+        totalCount: 1,
+        truncated: false
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the unscoped local listing while the query is empty', async () => {
     const workspaceKey = folderWorkspaceKey('folder-workspace-1')
     useAppStore.setState({
       folderWorkspaces: [makeFolderWorkspace()],
@@ -653,32 +707,60 @@ describe('useRuntimeFileListForWorktree', () => {
     } as Partial<AppState>)
     const states: RuntimeFileListState[] = []
 
-    const root = await renderProbe({
+    await renderProbe({
       enabled: true,
-      onState: (state) => states.push(state),
-      query: 'one',
+      onState: () => {},
+      query: '',
       worktreeId: workspaceKey
     })
     await waitForListRuntimeFilesCall()
     await flushEffects()
     expect(states.at(-1)?.files).toEqual(['packages/app/package.json'])
 
-    await act(async () => {
-      root.render(
-        createElement(HookProbe, {
-          enabled: true,
-          onState: (state: RuntimeFileListState) => states.push(state),
-          query: 'two',
-          worktreeId: workspaceKey
-        })
-      )
-    })
-    await flushEffects()
+    expect(searchRuntimeFilePathsMock).not.toHaveBeenCalled()
+  })
 
-    expect(listRuntimeFilesMock).toHaveBeenCalledTimes(1)
-    expect(states.at(-1)).toMatchObject({
-      files: ['packages/app/package.json'],
-      loading: false
-    })
+  it('repeats a local query search instead of filtering one listing', async () => {
+    const workspaceKey = folderWorkspaceKey('folder-workspace-1')
+    useAppStore.setState({
+      folderWorkspaces: [makeFolderWorkspace()],
+      projectGroups: [makeProjectGroup()],
+      repos: [],
+      worktreesByRepo: {}
+    } as Partial<AppState>)
+    vi.useFakeTimers()
+
+    try {
+      const root = await renderProbe({
+        enabled: true,
+        onState: () => {},
+        query: 'one',
+        worktreeId: workspaceKey
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await flushEffects()
+
+      await act(async () => {
+        root.render(
+          createElement(HookProbe, {
+            enabled: true,
+            onState: () => {},
+            query: 'two',
+            worktreeId: workspaceKey
+          })
+        )
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await flushEffects()
+
+      expect(listRuntimeFilesMock).not.toHaveBeenCalled()
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledTimes(2)
+      expect(searchRuntimeFilePathsMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ query: 'two' })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
