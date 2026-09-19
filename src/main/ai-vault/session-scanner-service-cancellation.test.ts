@@ -20,6 +20,12 @@ vi.mock('./session-scanner-service-search', () => ({
     handles(): boolean {
       return false
     }
+    // Why: the service asks the index before the scanner and treats null as "no index
+    // here yet", which is the fallback these cases drive. Without it the call throws and
+    // the request settles before the cancel under test is sent.
+    listSessions(): Promise<null> {
+      return Promise.resolve(null)
+    }
     close(): void {
       closeSearch()
     }
