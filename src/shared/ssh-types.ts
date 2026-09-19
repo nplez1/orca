@@ -41,6 +41,10 @@ export type SshTarget = {
    *  predate this field (undefined) and are adopted into config-sync on next
    *  import. */
   source?: 'ssh-config' | 'manual'
+  /** Kept out of every host picker but still listed in Settings → SSH hosts.
+   *  Only set on targets Orca imported from ~/.ssh/config; a host the user added
+   *  in Orca is removed instead. */
+  hidden?: boolean
   /** Grace period in seconds before relay shuts down after disconnect.
    *  0 disables expiry. Default: 0 (until reset). Max: 604800 (7 days). */
   relayGracePeriodSeconds?: number
@@ -62,18 +66,50 @@ export type SshTarget = {
 }
 
 /** Renderer-authored target fields; registration generations are allocated and owned by main. */
-export type SshTargetCreateInput = Omit<SshTarget, 'id' | 'generation'>
+export type SshTargetCreateInput = Omit<SshTarget, 'id' | 'generation' | 'hidden'>
 export type SshTargetUpdateInput = Partial<SshTargetCreateInput>
 
-/** Public target identity and observed host metadata safe to mirror to a paired client. */
-export type SshTargetSummary = Pick<SshTarget, 'id' | 'label' | 'generation'> & {
-  /** The SSH host's OS, when it has connected and the relay has detected it. */
-  remotePlatform?: SshRemotePlatform
-  /** Whether the target currently has a host-owned connected SSH lifecycle. */
-  connected?: boolean
-  /** Current SSH lifecycle state, when the desktop has one for this target. */
-  connectionStatus?: SshConnectionStatus
+export type SshTargetVisibilityInput = { id: string; hidden: boolean }
+
+/**
+ * Whether Orca discovered this host rather than the user adding it, which decides the
+ * only lifecycle action offered: a discovered host is hidden (it comes back on every
+ * ~/.ssh/config sync), a user-added one is removed.
+ *
+ * Why the shape check and not just `source`: targets persisted before `source` existed
+ * carry the old import shape, where the SSH alias doubled as label and configHost while
+ * host held the resolved HostName. Those are imported hosts too.
+ */
+export function isAutoImportedSshTarget(
+  target: Pick<SshTarget, 'source' | 'label' | 'configHost' | 'host'>
+): boolean {
+  if (target.source === 'ssh-config') {
+    return true
+  }
+  if (target.source !== undefined) {
+    return false
+  }
+  const alias = target.configHost ?? target.label
+  return Boolean(
+    alias && target.label === alias && target.configHost === alias && target.host !== alias
+  )
 }
+
+/** Hidden targets stay listed in Settings; every host picker drops them. */
+export function isSshTargetHidden(target: Pick<SshTarget, 'hidden'>): boolean {
+  return target.hidden === true
+}
+
+/** Public target identity and observed host metadata safe to mirror to a paired client. */
+export type SshTargetSummary = Pick<SshTarget, 'id' | 'label' | 'generation'> &
+  Pick<SshTarget, 'hidden'> & {
+    /** The SSH host's OS, when it has connected and the relay has detected it. */
+    remotePlatform?: SshRemotePlatform
+    /** Whether the target currently has a host-owned connected SSH lifecycle. */
+    connected?: boolean
+    /** Current SSH lifecycle state, when the desktop has one for this target. */
+    connectionStatus?: SshConnectionStatus
+  }
 
 /** Identity of a removed SSH target, recorded so that re-adding the same host
  *  can re-point orphaned repos/worktrees from the old (deleted) target id to

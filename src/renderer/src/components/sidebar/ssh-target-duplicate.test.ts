@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDuplicateSshTargetAlias } from './ssh-target-duplicate'
+import { findDuplicateSshTargetAlias, isDuplicateSshTargetAlias } from './ssh-target-duplicate'
 
 describe('isDuplicateSshTargetAlias', () => {
   it('matches by configHost alias', () => {
@@ -57,5 +57,38 @@ describe('isDuplicateSshTargetAlias', () => {
         host: 'p.example'
       })
     ).toBe(false)
+  })
+})
+
+describe('findDuplicateSshTargetAlias', () => {
+  // The Add-remote-host form needs to tell a live host from a hidden one: it refuses both,
+  // but only the hidden case can be repaired by unhiding instead of adding a second copy.
+  it('reports the hidden owner of an alias', () => {
+    const existing = {
+      configHost: 'prod',
+      label: 'prod',
+      host: 'prod.internal',
+      hidden: true
+    }
+
+    expect(
+      findDuplicateSshTargetAlias({
+        existingTargets: [existing],
+        configHost: 'prod',
+        label: 'prod',
+        host: 'prod.internal'
+      })
+    ).toBe(existing)
+  })
+
+  it('returns null when nothing owns the alias', () => {
+    expect(
+      findDuplicateSshTargetAlias({
+        existingTargets: [{ configHost: 'staging', label: 'Staging', host: '10.0.0.1' }],
+        configHost: 'prod',
+        label: 'prod',
+        host: 'prod.internal'
+      })
+    ).toBeNull()
   })
 })
