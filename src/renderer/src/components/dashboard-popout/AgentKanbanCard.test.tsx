@@ -52,7 +52,7 @@ function renderCard(props: {
   card: DashboardCard
   now: number
   repoIcon?: RepoIcon | null
-  onOpenTerminal?: () => void
+  onActivateCard?: () => void
 }): ReturnType<typeof render> {
   return render(
     <TooltipProvider>
@@ -60,7 +60,7 @@ function renderCard(props: {
         card={props.card}
         repoIcon={props.repoIcon}
         now={props.now}
-        onOpenTerminal={props.onOpenTerminal ?? vi.fn()}
+        onActivateCard={props.onActivateCard ?? vi.fn()}
       />
     </TooltipProvider>
   )
@@ -98,7 +98,7 @@ describe('AgentKanbanCard', () => {
         <AgentKanbanCard
           card={{ ...attentionCard, askSummary: undefined }}
           now={2_000}
-          onOpenTerminal={vi.fn()}
+          onActivateCard={vi.fn()}
         />
       </TooltipProvider>
     )
@@ -124,7 +124,7 @@ describe('AgentKanbanCard', () => {
   })
 
   it('shows review metadata and expands grouped subagents without opening the terminal', () => {
-    const onOpenTerminal = vi.fn()
+    const onActivateCard = vi.fn()
     renderCard({
       card: card({
         review: { number: 11012, state: 'open' },
@@ -134,7 +134,7 @@ describe('AgentKanbanCard', () => {
         ]
       }),
       now: 2_000,
-      onOpenTerminal
+      onActivateCard
     })
 
     expect(screen.getByText('#11012')).toBeInTheDocument()
@@ -143,11 +143,11 @@ describe('AgentKanbanCard', () => {
     fireEvent.click(screen.getByRole('button', { name: '2 subagents' }))
     expect(screen.getByText('Review loop')).toBeInTheDocument()
     expect(screen.getByText('Smoke tests')).toBeInTheDocument()
-    expect(onOpenTerminal).not.toHaveBeenCalled()
+    expect(onActivateCard).not.toHaveBeenCalled()
   })
 
   it('opens the terminal from the footer while keeping subagent disclosure isolated', () => {
-    const onOpenTerminal = vi.fn()
+    const onActivateCard = vi.fn()
     renderCard({
       card: card({
         conversationName: 'Dashboard review',
@@ -155,14 +155,14 @@ describe('AgentKanbanCard', () => {
         subagents: [{ id: 'child-1', name: 'Review loop', dotState: 'working' }]
       }),
       now: 61_000,
-      onOpenTerminal
+      onActivateCard
     })
 
     fireEvent.click(screen.getByText('#11042'))
-    expect(onOpenTerminal).toHaveBeenCalledTimes(1)
+    expect(onActivateCard).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: '1 subagent' }))
-    expect(onOpenTerminal).toHaveBeenCalledTimes(1)
+    expect(onActivateCard).toHaveBeenCalledTimes(1)
   })
 
   it('labels one subagent accessibly and never renders a workspace-status dot', () => {
@@ -242,7 +242,7 @@ describe('AgentKanbanCard', () => {
   })
 
   it('skips structured-clone rerenders until visible card data or its age changes', () => {
-    const onOpenTerminal = vi.fn()
+    const onActivateCard = vi.fn()
     const initial = card({
       startedAt: 1_000,
       subagents: [{ id: 'child-1', name: 'Review loop', dotState: 'working' }]
@@ -254,7 +254,7 @@ describe('AgentKanbanCard', () => {
           card={initial}
           repoIcon={repoIcon}
           now={61_500}
-          onOpenTerminal={onOpenTerminal}
+          onActivateCard={onActivateCard}
         />
       </TooltipProvider>
     )
@@ -268,7 +268,7 @@ describe('AgentKanbanCard', () => {
           card={{ ...initial, subagents: initial.subagents?.map((subagent) => ({ ...subagent })) }}
           repoIcon={{ ...repoIcon }}
           now={62_000}
-          onOpenTerminal={onOpenTerminal}
+          onActivateCard={onActivateCard}
         />
       </TooltipProvider>
     )
@@ -280,7 +280,7 @@ describe('AgentKanbanCard', () => {
           card={{ ...initial, subagents: initial.subagents?.map((subagent) => ({ ...subagent })) }}
           repoIcon={{ ...repoIcon }}
           now={121_500}
-          onOpenTerminal={onOpenTerminal}
+          onActivateCard={onActivateCard}
         />
       </TooltipProvider>
     )
@@ -298,7 +298,7 @@ describe('AgentKanbanCard', () => {
         <AgentKanbanCard
           card={{ ...initial, workingMode: 'monitoring' }}
           now={2_000}
-          onOpenTerminal={vi.fn()}
+          onActivateCard={vi.fn()}
         />
       </TooltipProvider>
     )
@@ -307,7 +307,7 @@ describe('AgentKanbanCard', () => {
   })
 
   it('rerenders when the repo icon changes', () => {
-    const onOpenTerminal = vi.fn()
+    const onActivateCard = vi.fn()
     const initial = card({ startedAt: 1_000 })
     const { rerender } = render(
       <TooltipProvider>
@@ -315,7 +315,7 @@ describe('AgentKanbanCard', () => {
           card={initial}
           repoIcon={{ type: 'lucide', name: 'Rocket' }}
           now={61_500}
-          onOpenTerminal={onOpenTerminal}
+          onActivateCard={onActivateCard}
         />
       </TooltipProvider>
     )
@@ -327,7 +327,7 @@ describe('AgentKanbanCard', () => {
           card={{ ...initial }}
           repoIcon={{ type: 'lucide', name: 'Database' }}
           now={61_500}
-          onOpenTerminal={onOpenTerminal}
+          onActivateCard={onActivateCard}
         />
       </TooltipProvider>
     )
