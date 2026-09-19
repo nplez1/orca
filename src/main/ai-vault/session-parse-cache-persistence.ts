@@ -23,7 +23,9 @@ import type { SessionSidecarObservation } from './session-sidecar-stat'
 // crossing no boundary, replaying pre-fix Devin rows whose mtime and size still
 // match, so nothing re-parses them. Above schema 2 nothing else invalidates a row
 // (the appVersion equality gate is gone), which is why the number has to move.
-const SCHEMA_VERSION = 4
+// Schema 5 prefers Copilot's typed `content` over its injected `transformedContent`,
+// so a schema 4 row carries the `<current_datetime>` prefix as the session title.
+const SCHEMA_VERSION = 5
 // Debounce so back-to-back scans (desktop IPC + runtime RPC) collapse into one write.
 const SAVE_DEBOUNCE_MS = 1_500
 // The payload contains transcript-derived preview text; keep it user-only
