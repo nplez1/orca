@@ -99,6 +99,8 @@ function imageIconSrc(bodyBytes: number, withWhitespace = false): string {
 describe('dashboard payload validation', () => {
   it('accepts a complete dashboard snapshot', () => {
     expect(isDashboardSnapshot(SNAPSHOT)).toBe(true)
+    expect(isDashboardSnapshot({ ...SNAPSHOT, cardClickAction: 'preview' })).toBe(true)
+    expect(isDashboardSnapshot({ ...SNAPSHOT, cardClickAction: 'workspace' })).toBe(true)
     expect(
       isDashboardSnapshot({
         ...SNAPSHOT,
@@ -437,6 +439,7 @@ describe('dashboard payload validation', () => {
       // Why: showIdle and filterOptions describe the frame, not one card, so a
       // bad value there has no card to drop and must fail the whole snapshot.
       expect(admitDashboardSnapshot({ ...SNAPSHOT, showIdle: 'yes' })).toBeNull()
+      expect(admitDashboardSnapshot({ ...SNAPSHOT, cardClickAction: 'popover' })).toBeNull()
       expect(
         admitDashboardSnapshot({
           ...SNAPSHOT,
@@ -451,6 +454,7 @@ describe('dashboard payload validation', () => {
         { ...SNAPSHOT, cards: 'nope' },
         { ...SNAPSHOT, repoIconsByRepoId: [] },
         { ...SNAPSHOT, showIdle: 'yes' },
+        { ...SNAPSHOT, cardClickAction: 'popover' },
         { ...SNAPSHOT, filterOptions: { projects: [], workspaceStatuses: 'nope' } },
         null,
         []

@@ -16,6 +16,7 @@ export function AgentDashboardExperimentalSetting({
 }: AgentDashboardExperimentalSettingProps): React.JSX.Element {
   const enabled = settings.experimentalAgentDashboardPopout === true
   const mode = settings.experimentalAgentDashboardMode ?? 'in-window'
+  const cardClickAction = settings.experimentalAgentDashboardCardClickAction ?? 'workspace'
 
   return (
     <SearchableSetting
@@ -93,6 +94,49 @@ export function AgentDashboardExperimentalSetting({
                   label: translate(
                     'auto.components.settings.ExperimentalPane.agentDashboard.modePopout',
                     'Pop-out'
+                  )
+                }
+              ]}
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 shrink space-y-0.5">
+              <Label>
+                {translate(
+                  'auto.components.settings.ExperimentalPane.agentDashboard.clickLabel',
+                  'Clicking a card'
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.ExperimentalPane.agentDashboard.clickCopy',
+                  "Open the agent's workspace, or show the live terminal preview first."
+                )}
+              </p>
+            </div>
+            <SettingsSegmentedControl
+              value={cardClickAction}
+              onChange={(next) =>
+                updateSettings({ experimentalAgentDashboardCardClickAction: next })
+              }
+              ariaLabel={translate(
+                'auto.components.settings.ExperimentalPane.agentDashboard.clickAriaLabel',
+                'Agent Dashboard card click action'
+              )}
+              size="sm"
+              options={[
+                {
+                  value: 'workspace',
+                  label: translate(
+                    'auto.components.settings.ExperimentalPane.agentDashboard.clickWorkspace',
+                    'Open workspace'
+                  )
+                },
+                {
+                  value: 'preview',
+                  label: translate(
+                    'auto.components.settings.ExperimentalPane.agentDashboard.clickPreview',
+                    'Preview'
                   )
                 }
               ]}

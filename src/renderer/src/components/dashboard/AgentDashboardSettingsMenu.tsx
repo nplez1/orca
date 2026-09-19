@@ -31,6 +31,9 @@ export function AgentDashboardSettingsMenu({
 }: AgentDashboardSettingsMenuProps): React.JSX.Element {
   const mode = useAppStore((s) => s.settings?.experimentalAgentDashboardMode ?? 'in-window')
   const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
+  const cardClickAction = useAppStore(
+    (s) => s.settings?.experimentalAgentDashboardCardClickAction ?? 'workspace'
+  )
   const updateSettings = useAppStore((s) => s.updateSettings)
 
   const handleModeChange = (next: AgentDashboardMode): void => {
@@ -100,6 +103,51 @@ export function AgentDashboardSettingsMenu({
                 label: translate(
                   'auto.components.settings.ExperimentalPane.agentDashboard.modePopout',
                   'Pop-out'
+                )
+              }
+            ]}
+          />
+        </div>
+        <DropdownMenuSeparator />
+        <div className="flex items-start justify-between gap-3 rounded-md px-1.5 py-1.5">
+          <span className="min-w-0 space-y-0.5">
+            <span className="block text-[12px] font-medium leading-4 text-foreground">
+              {translate(
+                'auto.components.settings.ExperimentalPane.agentDashboard.clickLabel',
+                'Clicking a card'
+              )}
+            </span>
+            <span className="block text-[11px] leading-4 text-muted-foreground">
+              {translate(
+                'auto.components.settings.ExperimentalPane.agentDashboard.clickCopy',
+                "Open the agent's workspace, or show the live terminal preview first."
+              )}
+            </span>
+          </span>
+        </div>
+        <div className="px-1.5 pb-1">
+          <SettingsSegmentedControl
+            value={cardClickAction}
+            onChange={(next) => updateSettings({ experimentalAgentDashboardCardClickAction: next })}
+            ariaLabel={translate(
+              'auto.components.settings.ExperimentalPane.agentDashboard.clickAriaLabel',
+              'Agent Dashboard card click action'
+            )}
+            size="sm"
+            equalWidth
+            options={[
+              {
+                value: 'workspace',
+                label: translate(
+                  'auto.components.settings.ExperimentalPane.agentDashboard.clickWorkspace',
+                  'Open workspace'
+                )
+              },
+              {
+                value: 'preview',
+                label: translate(
+                  'auto.components.settings.ExperimentalPane.agentDashboard.clickPreview',
+                  'Preview'
                 )
               }
             ]}
