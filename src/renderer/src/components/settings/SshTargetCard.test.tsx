@@ -19,18 +19,24 @@ const target: SshTarget = {
   username: 'deploy'
 }
 
+/** Same row, but imported from ~/.ssh/config — the only shape that can be hidden. */
+const importedTarget: SshTarget = { ...target, source: 'ssh-config' }
+
 /** The real thing a host key mismatch produces: the remedy is the last clause. */
 const HOST_KEY_ERROR =
   'Host key verification failed for build-01.internal. The key does not match the entry in your known_hosts file. ssh and git will refuse this host too. Run: ssh-keygen -R build-01.internal'
 
-async function renderCard(state: SshConnectionState | undefined): Promise<HTMLElement> {
+async function renderCard(
+  state: SshConnectionState | undefined,
+  renderedTarget: SshTarget = target
+): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   await act(async () => {
     createRoot(container).render(
       <TooltipProvider>
         <SshTargetCard
-          target={target}
+          target={renderedTarget}
           state={state}
           testing={false}
           onConnect={vi.fn()}
@@ -40,6 +46,7 @@ async function renderCard(state: SshConnectionState | undefined): Promise<HTMLEl
           onTest={vi.fn()}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
+          onSetHidden={vi.fn()}
         />
       </TooltipProvider>
     )
@@ -80,5 +87,62 @@ describe('the connection error on an SSH target card', () => {
     const container = await renderCard(undefined)
 
     expect(container.textContent).not.toContain('Host key verification failed')
+  })
+})
+
+describe('the lifecycle action on an SSH target card', () => {
+  it('offers removal, not hiding, for a host the user added in Orca', async () => {
+    const container = await renderCard(undefined, target)
+
+    expect(container.querySelector('[aria-label="Remove target"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="Hide host"]')).toBeNull()
+  })
+
+  // The regression this guards: a host ~/.ssh/config keeps re-importing cannot be deleted,
+  // so offering the trashcan promised something the next sync would undo.
+  it('offers hiding, not removal, for a host imported from SSH config', async () => {
+    const container = await renderCard(undefined, importedTarget)
+
+    expect(container.querySelector('[aria-label="Hide host"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="Remove target"]')).toBeNull()
+  })
+
+  it('marks a hidden host and offers to unhide it', async () => {
+    const container = await renderCard(undefined, { ...importedTarget, hidden: true })
+
+    expect(container.textContent).toContain('Hidden')
+    expect(container.querySelector('[aria-label="Unhide host"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="Hide host"]')).toBeNull()
+  })
+
+  it('unhides without asking for confirmation', async () => {
+    const onSetHidden = vi.fn()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    await act(async () => {
+      createRoot(container).render(
+        <TooltipProvider>
+          <SshTargetCard
+            target={{ ...importedTarget, hidden: true }}
+            state={undefined}
+            testing={false}
+            onConnect={vi.fn()}
+            onDisconnect={vi.fn()}
+            onTerminateSessions={vi.fn()}
+            onResetRelay={vi.fn()}
+            onTest={vi.fn()}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onSetHidden={onSetHidden}
+          />
+        </TooltipProvider>
+      )
+    })
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Unhide host"]')?.click()
+    })
+
+    expect(onSetHidden).toHaveBeenCalledWith(false)
   })
 })

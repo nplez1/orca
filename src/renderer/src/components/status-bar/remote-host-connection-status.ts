@@ -45,6 +45,26 @@ export function sshStatusForOverall(status: SshConnectionStatus): HostStatus {
   return isConnectingSshStatus(status) ? 'connecting' : 'disconnected'
 }
 
+/**
+ * Whether an SSH target belongs in the status-bar host list.
+ *
+ * Hiding a host takes it out of this list too, with one exception: a host that is connected
+ * or still working on a connection stays, because this popover is where a live connection is
+ * seen and ended. Dropping it there would hide a session that is actually up, which reads as
+ * "the host is gone" (docs/reference/ssh-execution-boundary.md) — and dropping a
+ * `connecting` host would make a hidden host blink out and back on every reconnect.
+ */
+export function isSshTargetListedInStatusBar(args: {
+  targetId: string
+  status: SshConnectionStatus
+  hiddenTargetIds: ReadonlySet<string>
+}): boolean {
+  if (!args.hiddenTargetIds.has(args.targetId)) {
+    return true
+  }
+  return sshStatusForOverall(args.status) !== 'disconnected'
+}
+
 export function runtimeHostConnectionDetail(
   remoteControl?: RemoteRuntimeSharedConnectionDiagnostics | null
 ): string | undefined {

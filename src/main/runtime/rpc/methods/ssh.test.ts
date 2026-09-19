@@ -141,6 +141,31 @@ describe('ssh RPC methods', () => {
     expect(JSON.stringify(response)).not.toContain('bastion')
   })
 
+  it('carries the hidden flag without dropping the row', async () => {
+    // Why: paired clients resolve workspace labels and live session state through this
+    // list, so hiding may never be expressed as an absent row (wire-compat Rule 3).
+    listRegisteredSshTargetsMock.mockReturnValueOnce([
+      { id: 'ssh-1', label: 'Dev box', hidden: true },
+      { id: 'ssh-2', label: 'Offered' }
+    ])
+    getRegisteredSshStateMock.mockReturnValue(undefined)
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SSH_METHODS })
+
+    const response = await dispatcher.dispatch(makeRequest('ssh.listTargetSummaries'))
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        targets: [
+          { id: 'ssh-1', label: 'Dev box', hidden: true, connected: false },
+          { id: 'ssh-2', label: 'Offered', connected: false }
+        ]
+      }
+    })
+    expect(JSON.stringify(response)).not.toContain('"hidden":false')
+  })
+
   it('does not invent a platform before the SSH host has been detected', async () => {
     listRegisteredSshTargetsMock.mockReturnValueOnce([{ id: 'ssh-1', label: 'Dev box' }])
     getRegisteredSshStateMock.mockReturnValueOnce(undefined)

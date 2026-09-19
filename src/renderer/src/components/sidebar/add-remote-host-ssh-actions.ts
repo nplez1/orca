@@ -22,7 +22,7 @@ import type {
   SshTargetAddResult,
   SshTargetCreateInput
 } from '../../../../shared/ssh-types'
-import { isDuplicateSshTargetAlias } from './ssh-target-duplicate'
+import { findDuplicateSshTargetAlias } from './ssh-target-duplicate'
 
 type SshApi = {
   listTargets: () => Promise<SshTarget[]>
@@ -99,19 +99,25 @@ export async function saveNewSshHostFromForm({
 
   try {
     const existingTargets = await ssh.listTargets()
-    if (
-      isDuplicateSshTargetAlias({
-        existingTargets,
-        configHost: target.configHost,
-        label: target.label,
-        host: target.host
-      })
-    ) {
+    // Why: a hidden host still owns its alias — the duplicate check must see it, and say
+    // so, or hiding a host reads as "not in Orca" while a second copy is refused.
+    const duplicate = findDuplicateSshTargetAlias({
+      existingTargets,
+      configHost: target.configHost,
+      label: target.label,
+      host: target.host
+    })
+    if (duplicate) {
       toast.error(
-        translate(
-          'auto.components.sidebar.AddRemoteHostDialog.sshAlreadyExists',
-          'That SSH host is already in Orca.'
-        )
+        duplicate.hidden === true
+          ? translate(
+              'auto.components.sidebar.AddRemoteHostDialog.sshAlreadyHidden',
+              'That SSH host is hidden in Settings → SSH hosts. Unhide it there rather than adding a second copy.'
+            )
+          : translate(
+              'auto.components.sidebar.AddRemoteHostDialog.sshAlreadyExists',
+              'That SSH host is already in Orca.'
+            )
       )
       return 'validation-failed'
     }

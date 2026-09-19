@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import type { NestedRepoScanResult } from '../../../../shared/project-group-types'
 import type { SshTarget, SshConnectionState } from '../../../../shared/ssh-types'
+import { isSshTargetHidden } from '../../../../shared/ssh-types'
 import { createNestedRepoTelemetryAttemptId } from '../../../../shared/nested-repo-telemetry'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
@@ -75,7 +76,11 @@ export function useRemoteRepo(
       const gen = ++remoteGenRef.current
       setStep('remote')
       try {
-        const targets = (await window.api.ssh.listTargets()) as SshTarget[]
+        // Why: hidden hosts are not offered as a new repo's location. An in-flight
+        // add never reads this list — it only feeds the picker and its live states.
+        const targets = (await window.api.ssh.listTargets()).filter(
+          (target) => !isSshTargetHidden(target)
+        )
         if (gen !== remoteGenRef.current) {
           return
         }

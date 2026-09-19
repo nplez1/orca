@@ -140,6 +140,20 @@ describe('offered create hosts', () => {
     expect(automationCreateHostOffered(entry({ owner: null, catalogState: 'removed' }))).toBe(false)
   })
 
+  // Hiding is not removal: the row stays in the catalog so an automation already stored
+  // on it still resolves, but the create picker must stop offering it.
+  it('does not offer a host the user hid', () => {
+    expect(automationCreateHostOffered(sshEntry(3))).toBe(true)
+    expect(automationCreateHostOffered({ ...sshEntry(3), hidden: true })).toBe(false)
+  })
+
+  it('still resolves a destination on a hidden host for an existing automation', () => {
+    expect(resolveAutomationCreateDestination({ ...sshEntry(3), hidden: true })).toMatchObject({
+      status: 'ready',
+      destination: { selector: { kind: 'ssh', targetId: 'box' } }
+    })
+  })
+
   it('names the authorities a server update would repair, once each', () => {
     const legacySelf = entry({
       stableKey: 'runtime:r1:self',
