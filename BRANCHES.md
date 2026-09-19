@@ -180,6 +180,24 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Verified:** typecheck, 1,860 tests.
 - **Note:** 7 files here are the splitting agent's harness adaptations.
 
+### nplez1/Hide-hosts — PR #9, open
+
+- **Why:** a host Orca imports from `~/.ssh/config` could only be removed, and the next sync brought
+  it back, so there was no durable way to say "not on this machine's Orca". Discovered hosts now get
+  a reversible Hide; hosts the user added keep the trashcan and cannot be hidden.
+- **Shape:** a `hidden` flag on the target row plus `ssh:setTargetHidden`, mirrored into the renderer
+  store so the host pickers (add-repo, composer/new-workspace, task page, automations, skill install)
+  filter on it. Settings splits into a collapsed "Hidden (n)" section; the status bar drops a hidden
+  host unless it is connected or connecting. 34 production files, +614/−142, across 3 new modules.
+- **Why not filter `listTargets`:** that call also feeds the label/connection mirror whose readers
+  treat a missing entry as proof the host was removed, so a filtered list would have rendered a
+  hidden host's live workspaces as orphans. Fork PRs of this shape should keep the flag on the row.
+- **Verified:** typecheck, changed-code gate (0 findings), max-lines ratchet, localization extraction
+  + catalog, rpc-params catalog; 34,326 tests across the touched suites (487 in the files this PR
+  adds or changes).
+- **Note:** the `$electron` skill `AGENTS.md` names for rendered-UI checks is not installed in this
+  worktree, so the new section's layout has no live screenshot. PR body says so under Visual Proof.
+
 ### nplez1/main
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only
