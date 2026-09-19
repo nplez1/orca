@@ -21,12 +21,14 @@ import { SshStatusSegment } from './SshStatusSegment'
 type StoreState = {
   sshConnectionStates: Map<string, { status: SshConnectionStatus }>
   sshTargetLabels: Map<string, string>
+  hiddenSshTargetIds: Set<string>
   remoteWorkspaceSyncStatusByTargetId: Record<string, { phase: string }>
 }
 
 let storeState: StoreState = {
   sshConnectionStates: new Map(),
   sshTargetLabels: new Map(),
+  hiddenSshTargetIds: new Set(),
   remoteWorkspaceSyncStatusByTargetId: {}
 }
 
@@ -57,6 +59,7 @@ function setSshTargets(
   storeState = {
     sshConnectionStates: new Map(entries.map((entry) => [entry.id, { status: entry.status }])),
     sshTargetLabels: new Map(entries.map((entry) => [entry.id, entry.label])),
+    hiddenSshTargetIds: new Set(),
     remoteWorkspaceSyncStatusByTargetId: Object.fromEntries(
       entries.flatMap((entry) => (entry.syncPhase ? [[entry.id, { phase: entry.syncPhase }]] : []))
     )
