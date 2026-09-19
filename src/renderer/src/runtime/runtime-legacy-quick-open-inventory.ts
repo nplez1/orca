@@ -1,4 +1,5 @@
 import type { RuntimeFileListResult } from '../../../shared/runtime-types'
+import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import {
   buildExcludePathPrefixes,
   shouldExcludeQuickOpenRelPath
@@ -169,7 +170,7 @@ export async function searchLegacyQuickOpenInventory(args: {
   worktreePath: string | null | undefined
   excludePaths: string[] | undefined
   signal?: AbortSignal
-}): Promise<{ files: string[]; truncated: boolean }> {
+}): Promise<FilePathSearchResult> {
   const result = await loadLegacyQuickOpenInventory(
     args.target,
     args.worktreeSelector,
@@ -189,6 +190,7 @@ export async function searchLegacyQuickOpenInventory(args: {
   const matches = ranker.result()
   return {
     files: matches.paths,
+    totalCount: matches.totalCount,
     truncated: result.truncated || matches.totalCount > args.limit
   }
 }

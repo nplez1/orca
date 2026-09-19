@@ -12537,7 +12537,9 @@
             "79b1537dd3": "Select a workspace to browse files",
             "4da4d89845": "Back to Explorer",
             "6ed5ce817b": "Search",
-            "2f4483d6c4": "No files match this filter"
+            "2f4483d6c4": "No files match this filter",
+            "filterScannedPartialWorkspace": "Only part of this workspace was searched — add more of the name to narrow it down",
+            "filterShowingFirstMatches": "Showing the first {{value0}} of {{value1}} matches — add more of the name to narrow it down"
           },
           "FileExplorerBackgroundMenu": {
             "3b5e2dcb8d": "New Folder",

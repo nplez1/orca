@@ -35,7 +35,10 @@ import {
 import { bundledRipgrepUnavailableError } from '../../ripgrep/bundled-ripgrep-path'
 import { spawnBundledRipgrep } from '../../ripgrep/bundled-ripgrep-spawn'
 import { getLocalGitOptionsForRegisteredWorktree } from '../local-worktree-runtime-options'
-import { QuickOpenPathRanker } from '../../../shared/quick-open-path-search'
+import { QuickOpenPathRanker, type PathSearchMode } from '../../../shared/quick-open-path-search'
+import { resolveQuickOpenResultLimit } from '../../../shared/quick-open-listing-limits'
+import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
+import { searchQuickOpenFilePaths } from '../filesystem-search-file-paths'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 
 // 32 visible matches plus one truncation sentinel stays below the legacy frame ceiling.
@@ -293,4 +296,39 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
   ipcMain.handle('fs:cancelListFiles', (event, args: { requestToken: string }): void => {
     listFilesCancellations.cancel(event, args.requestToken)
   })
+
+  // Why: a local query-scoped path search, so a filtered pane is not limited to the first
+  // page of an unscoped listing. Remote hosts get their totals through `files.searchPaths`.
+  ipcMain.handle(
+    'fs:searchFilePaths',
+    async (
+      event,
+      args: {
+        rootPath: string
+        excludePaths?: string[]
+        requestToken?: string
+        query: string
+        limit?: number
+        mode?: PathSearchMode
+      }
+    ): Promise<FilePathSearchResult> => {
+      const controller = listFilesCancellations.begin(event, args.requestToken)
+      try {
+        const result = await searchQuickOpenFilePaths(args.rootPath, store, {
+          query: args.query,
+          limit: resolveQuickOpenResultLimit(args.limit),
+          mode: args.mode,
+          excludePaths: args.excludePaths,
+          signal: controller?.signal
+        })
+        return {
+          files: result.paths,
+          totalCount: result.totalCount,
+          truncated: result.truncated
+        }
+      } finally {
+        listFilesCancellations.finish(event, args.requestToken, controller)
+      }
+    }
+  )
 }

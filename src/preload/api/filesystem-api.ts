@@ -1,5 +1,7 @@
 import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
+import type { FilePathSearchResult } from '../../shared/file-path-search-result'
+import type { PathSearchMode } from '../../shared/quick-open-path-search'
 import type {
   DirEntry,
   FsChangedPayload,
@@ -139,6 +141,14 @@ export type FilesystemApi = {
       searchQuery?: string
       nameFilter?: string
     }) => Promise<string[]>
+    searchFilePaths: (args: {
+      rootPath: string
+      excludePaths?: string[]
+      requestToken?: string
+      query: string
+      limit?: number
+      mode?: PathSearchMode
+    }) => Promise<FilePathSearchResult>
     cancelListFiles: (args: { requestToken: string }) => Promise<void>
     search: (args: SearchOptions & { connectionId?: string }) => Promise<SearchResult>
     importExternalPaths: (
