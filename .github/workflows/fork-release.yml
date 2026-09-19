@@ -65,6 +65,10 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # Why here: electron-builder's beforePack requires out/mobile-web, and the bundle
+      # build resolves React Native and Expo from mobile/node_modules.
+      - uses: ./.github/actions/install-mobile-dependencies
+
       # Why conditional: the signed path needs a Developer ID certificate and notarization
       # credentials, but the update mechanism itself works on an unsigned build — Squirrel
       # only requires that every build carry the same signature identity, and one that is
@@ -241,6 +245,10 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why here: electron-builder's beforePack requires out/mobile-web, and the bundle
+      # build resolves React Native and Expo from mobile/node_modules.
+      - uses: ./.github/actions/install-mobile-dependencies
 
       - name: Stamp the release version
         shell: bash
