@@ -175,6 +175,19 @@ describe('ExperimentalPane', () => {
     expect(markup).not.toContain('Show idle agents')
   })
 
+  it('offers the agent dashboard card click action in global settings', () => {
+    const markup = renderToStaticMarkup(
+      <ExperimentalPane
+        settings={{ ...getDefaultSettings('/tmp'), experimentalAgentDashboardPopout: true }}
+        updateSettings={vi.fn()}
+      />
+    )
+
+    expect(markup).toContain('Clicking a card')
+    expect(markup).toContain('aria-label="Agent Dashboard card click action"')
+    expect(markup).toContain('Open workspace')
+  })
+
   it('renders Cloud VM as an off-by-default experimental subsection', () => {
     const settings = getDefaultSettings('/tmp')
     const markup = renderToStaticMarkup(
