@@ -6,7 +6,7 @@ import type { AiVaultSession } from '../../../../shared/ai-vault-types'
 import type { AiVaultSessionGroup } from './ai-vault-session-filters'
 
 const mockState: {
-  settings: { aiVaultSearch?: { enabled: boolean } }
+  settings: { aiVaultSearch?: { contentEnabled: boolean } }
   runtimeEnvironments: never[]
   folderWorkspaces: Record<string, never>
   projectGroups: never[]
@@ -20,9 +20,11 @@ const mockState: {
   repos: [],
   worktreesByRepo: {}
 }
-const updateSettingsOrThrow = vi.fn(async (next: { aiVaultSearch: { enabled: boolean } }) => {
-  mockState.settings = next
-})
+const updateSettingsOrThrow = vi.fn(
+  async (next: { aiVaultSearch: { contentEnabled: boolean } }) => {
+    mockState.settings = next
+  }
+)
 
 vi.mock('@/store', () => ({
   useAppStore: Object.assign((select: (state: typeof mockState) => unknown) => select(mockState), {
@@ -154,7 +156,7 @@ it('switches to index search with the same query once indexing is enabled', asyn
   await userEvent.click(screen.getByRole('button', { name: 'Enable' }))
 
   expect(updateSettingsOrThrow).toHaveBeenCalledWith({
-    aiVaultSearch: { enabled: true, historyDays: null }
+    aiVaultSearch: { contentEnabled: true, historyDays: null }
   })
   await waitFor(() =>
     expect(searchSessions).toHaveBeenCalledWith(expect.objectContaining({ query: 'foo' }), 'local')
