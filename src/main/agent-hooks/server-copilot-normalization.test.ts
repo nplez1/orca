@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentHookServer, _internals } from './server'
-import { buildBody, PANE } from './server.test-fixtures'
+import { buildBody, PANE, postHookEvent } from './server.test-fixtures'
 
 const { getCohortAtEmitMock, trackMock } = vi.hoisted(() => ({
   getCohortAtEmitMock: vi.fn(),
@@ -361,7 +361,7 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.toolInput).toBe('/repo/src/app.ts')
   })
 
-  it('ignores Notification(permission_prompt) because approval may be automatic', () => {
+  it('Notification(permission_prompt) maps to blocked and surfaces message text', () => {
     const result = _internals.normalizeHookPayload(
       'copilot',
       buildBody({
@@ -372,7 +372,39 @@ describe('Copilot hook normalization', () => {
       }),
       'production'
     )
-    expect(result).toBeNull()
+    expect(result?.payload.state).toBe('blocked')
+    expect(result?.payload.lastAssistantMessage).toBe('Allow Bash to run?')
+  })
+
+  it('keeps PermissionRequest working until the CLI actually prompts, then blocks', () => {
+    // Why: PermissionRequest also fires for requests a rule auto-approves, so only the
+    // notification — emitted once a prompt is shown (copilot-cli 1.0.26, copilot-cli#2586) — may block.
+    const states = [
+      buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'clean the cache' }),
+      buildBody({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'bash',
+        tool_input: { command: 'rm -rf /tmp/orca-cache' }
+      }),
+      buildBody({
+        hook_event_name: 'PermissionRequest',
+        tool_name: 'bash',
+        tool_input: { command: 'rm -rf /tmp/orca-cache' }
+      }),
+      buildBody({
+        hook_event_name: 'Notification',
+        notification_type: 'permission_prompt',
+        message: 'Allow Bash to run?'
+      }),
+      buildBody({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'bash',
+        tool_input: { command: 'rm -rf /tmp/orca-cache' },
+        tool_result: { text_result_for_llm: 'removed' }
+      })
+    ].map((body) => _internals.normalizeHookPayload('copilot', body, 'production')?.payload.state)
+
+    expect(states).toEqual(['working', 'working', 'working', 'blocked', 'working'])
   })
 
   it('Notification(elicitation_dialog) preserves the cached prompt', () => {
@@ -492,6 +524,34 @@ describe('Copilot hook normalization', () => {
           buildBody({ hook_event_name: 'Notification', notificationType: 'elicitation_dialog' })
         )
       })
+
+      expect(response.status).toBe(204)
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paneKey: PANE,
+          payload: expect.objectContaining({ state: 'blocked', agentType: 'copilot' })
+        })
+      )
+    } finally {
+      server.stop()
+    }
+  })
+
+  it('accepts a Copilot permission prompt over HTTP as blocked', async () => {
+    const server = new AgentHookServer()
+    await server.start({ env: 'production' })
+    try {
+      const listener = vi.fn()
+      server.setListener(listener)
+      const response = await postHookEvent(
+        server,
+        buildBody({
+          hook_event_name: 'Notification',
+          notification_type: 'permission_prompt',
+          message: 'Allow Bash to run?'
+        }),
+        '/hook/copilot'
+      )
 
       expect(response.status).toBe(204)
       expect(listener).toHaveBeenCalledWith(
