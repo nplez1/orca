@@ -19,11 +19,15 @@ const UPSTREAM = 'stablyai/orca'
 // their own and hide the dependency that decides merge order.
 const PARENTS = {
   'feat/terminal-session-reconnect': 'feat/worktree-scan-cache-persistence',
-  'feat/startup-worktree-hydration': 'fix/terminal-session-reconnect'
+  'feat/startup-worktree-hydration': 'fix/terminal-session-reconnect',
+  // Cut from this fork's own line, not origin/main: it is a fork PR, and the two branches
+  // called `main` here are different lines (see BRANCHES.md).
+  'nplez1/Hide-hosts': 'nplez1/main'
 }
 
 const BRANCHES = [
   'nplez1/main',
+  'nplez1/Hide-hosts',
   'fix/cli-symlink-world-readable',
   'fix/copilot-background-work',
   'fix/repo-catalog-connection-fence',
