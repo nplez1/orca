@@ -11,6 +11,7 @@ vi.mock('@/store', () => ({
       settings: {
         experimentalAgentDashboardMode: 'in-window'
         experimentalAgentDashboardShowIdle: boolean
+        experimentalAgentDashboardCardClickAction: 'workspace'
       }
       updateSettings: typeof updateSettings
     }) => unknown
@@ -18,7 +19,8 @@ vi.mock('@/store', () => ({
     selector({
       settings: {
         experimentalAgentDashboardMode: 'in-window',
-        experimentalAgentDashboardShowIdle: false
+        experimentalAgentDashboardShowIdle: false,
+        experimentalAgentDashboardCardClickAction: 'workspace'
       },
       updateSettings
     })
@@ -69,6 +71,32 @@ describe('AgentDashboardSettingsMenu', () => {
     expect(updateSettings).toHaveBeenCalledWith({ experimentalAgentDashboardShowIdle: true })
   })
 
+  it('owns the card click action', () => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(<AgentDashboardSettingsMenu onOpenChange={vi.fn()} />)
+    })
+
+    const group = container.querySelector<HTMLElement>(
+      '[role="radiogroup"][aria-label="Agent Dashboard card click action"]'
+    )
+    expect(group).not.toBeNull()
+    const options = group!.querySelectorAll<HTMLButtonElement>('button[role="radio"]')
+    expect(Array.from(options, (option) => option.textContent)).toEqual([
+      'Open workspace',
+      'Preview'
+    ])
+    expect(options[0]?.getAttribute('aria-checked')).toBe('true')
+
+    act(() => options[1]?.click())
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      experimentalAgentDashboardCardClickAction: 'preview'
+    })
+  })
+
   it('reports the mode handoff only when the mode actually changed', () => {
     const onModeChange = vi.fn()
     container = document.createElement('div')
@@ -78,7 +106,10 @@ describe('AgentDashboardSettingsMenu', () => {
       root?.render(<AgentDashboardSettingsMenu onModeChange={onModeChange} />)
     })
 
-    const options = container.querySelectorAll<HTMLButtonElement>('button[role="radio"]')
+    const group = container.querySelector<HTMLElement>(
+      '[role="radiogroup"][aria-label="Agent Dashboard open mode"]'
+    )!
+    const options = group.querySelectorAll<HTMLButtonElement>('button[role="radio"]')
     expect(Array.from(options, (option) => option.textContent)).toEqual(['In-window', 'Pop-out'])
 
     act(() => options[0]?.click())
