@@ -29,6 +29,7 @@ export function SkillInstallManagementDialog({
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
+  const hiddenSshTargetIds = useAppStore((state) => state.hiddenSshTargetIds)
   const [environmentId, setEnvironmentId] = useState('local')
   const [installs, setInstalls] = useState<ManagedSkillInstall[]>([])
   const [selectedKey, setSelectedKey] = useState('')
@@ -359,6 +360,7 @@ export function SkillInstallManagementDialog({
         selectedKey={selectedKey}
         sshConnectionStates={sshConnectionStates}
         sshTargetLabels={sshTargetLabels}
+        hiddenSshTargetIds={hiddenSshTargetIds}
         versionId={versionId}
         onCancelInstall={() => void cancelInstall()}
         onClose={close}

@@ -404,3 +404,47 @@ it('keeps an initial unknown-transport verification connecting', () => {
   })
   expect(hosts.find((host) => host.id === 'runtime:host')?.health).toBe('connecting')
 })
+
+describe('hidden SSH targets', () => {
+  const sshTargetLabels = new Map([
+    ['ssh-visible', 'Visible'],
+    ['ssh-hidden', 'Hidden']
+  ])
+  const hiddenSshTargetIds = new Set(['ssh-hidden'])
+
+  it('drops a hidden host from the configured run targets', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [],
+      settings: null,
+      hostSource: 'configured-only',
+      sshTargetLabels,
+      hiddenSshTargetIds
+    })
+
+    expect(hosts.map((host) => host.id)).toEqual(['local', 'ssh:ssh-visible'])
+  })
+
+  // Why: hiding is a picker decision, not evidence the host is gone. A repo already on it
+  // must keep a run target, or its workspaces lose the only host they can execute on.
+  it('keeps a hidden host that a repo already lives on', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [{ connectionId: 'ssh-hidden', executionHostId: 'ssh:ssh-hidden' }],
+      settings: null,
+      sshTargetLabels,
+      hiddenSshTargetIds
+    })
+
+    expect(hosts.find((host) => host.id === 'ssh:ssh-hidden')?.label).toBe('Hidden')
+  })
+
+  it('lists every target when no hidden set is supplied', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [],
+      settings: null,
+      hostSource: 'configured-only',
+      sshTargetLabels
+    })
+
+    expect(hosts.map((host) => host.id)).toEqual(['local', 'ssh:ssh-visible', 'ssh:ssh-hidden'])
+  })
+})

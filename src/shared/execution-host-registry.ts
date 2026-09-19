@@ -194,6 +194,10 @@ export function buildExecutionHostRegistry(args: {
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
   hostSource?: ExecutionHostSource
   sshTargetLabels?: ReadonlyMap<string, string>
+  /** Targets the user hid from host pickers. Only the targets sourced from
+   *  `sshTargetLabels` are dropped — a host a repo already lives on stays listed
+   *  so its existing workspaces keep a reachable run target. */
+  hiddenSshTargetIds?: ReadonlySet<string>
   sshConnectionStates?: ReadonlyMap<string, SshConnectionState>
   runtimeEnvironments?: readonly RuntimeEnvironmentSummary[]
   runtimeStatusByEnvironmentId?: RuntimeStatusByEnvironmentId
@@ -267,7 +271,11 @@ export function buildExecutionHostRegistry(args: {
   }
   for (const targetId of args.sshTargetLabels?.keys() ?? []) {
     const normalized = normalizeHostPart(targetId)
-    if (normalized && !isRuntimeOwnedSshTargetId(normalized)) {
+    if (
+      normalized &&
+      !isRuntimeOwnedSshTargetId(normalized) &&
+      !args.hiddenSshTargetIds?.has(normalized)
+    ) {
       sshTargetIds.add(normalized)
     }
   }

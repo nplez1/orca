@@ -70,7 +70,9 @@ export function automationCreateHostEligible(
  * orphan bucket and removed targets.
  */
 export function automationCreateHostOffered(entry: AutomationHostCatalogEntry): boolean {
-  return entry.kind !== 'orphan' && entry.catalogState !== 'removed'
+  // Why hidden is a separate axis from catalogState: the host is live and keeps its
+  // stored automations, the user just declined to be offered it for new ones.
+  return entry.kind !== 'orphan' && entry.catalogState !== 'removed' && entry.hidden !== true
 }
 
 /**
