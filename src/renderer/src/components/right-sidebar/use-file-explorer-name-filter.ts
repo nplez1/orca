@@ -5,6 +5,7 @@ import {
   type RuntimeFileListState
 } from '@/components/quick-open-file-list'
 import {
+  FILE_EXPLORER_NAME_FILTER_MAX_RESULTS,
   isFileExplorerNameFilterQueryTooLarge,
   type FileExplorerNameFilterProjectionSource
 } from './file-explorer-name-filter-projection'
@@ -46,17 +47,28 @@ export function useFileExplorerNameFilter({
   const nameFilterFiles = useRuntimeFileListForWorktree({
     enabled: hasNameFilter && !nameFilterQueryTooLarge,
     worktreeId: activeWorktreeId,
-    query: nameFilterQuery
+    query: nameFilterQuery,
+    // Why: substring-AND is this pane's filter semantics, and it renders a tree, not a ranked list.
+    queryMode: 'name-filter',
+    queryLimit: FILE_EXPLORER_NAME_FILTER_MAX_RESULTS
   })
+  // Why: a local listing is one full scan filtered here per keystroke, so an unscoped
+  // result (`undefined`) stays valid for whatever was typed; only a listing another query
+  // produced must be fenced out. Fencing `undefined` made every local filter match nothing.
+  const nameFilterListingIsUsable =
+    nameFilterFiles.resolvedQuery === undefined ||
+    nameFilterFiles.resolvedQuery === nameFilterQuery.trim()
   const nameFilterSource = useMemo(
     () =>
       hasNameFilter
         ? {
             query: nameFilterQuery,
             operationOwner: nameFilterFiles.operationOwner,
+            totalCount: nameFilterFiles.totalCount ?? null,
+            truncated: !!nameFilterFiles.truncated,
             relativePaths: nameFilterQueryTooLarge
               ? []
-              : nameFilterFiles.resolvedQuery === nameFilterQuery.trim()
+              : nameFilterListingIsUsable
                 ? nameFilterFiles.loading
                   ? null
                   : nameFilterFiles.files
@@ -70,7 +82,9 @@ export function useFileExplorerNameFilter({
       nameFilterFiles.files,
       nameFilterFiles.loading,
       nameFilterFiles.operationOwner,
-      nameFilterFiles.resolvedQuery,
+      nameFilterFiles.totalCount,
+      nameFilterFiles.truncated,
+      nameFilterListingIsUsable,
       nameFilterQuery,
       nameFilterQueryTooLarge
     ]

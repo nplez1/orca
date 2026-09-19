@@ -38,8 +38,96 @@ describe('useFileExplorerNameFilter', () => {
     expect(useRuntimeFileListForWorktreeMock).toHaveBeenLastCalledWith({
       enabled: true,
       worktreeId: 'worktree-1',
-      query: 'AppDelegate.swift'
+      query: 'AppDelegate.swift',
+      // Why: substring-AND over a bounded page is this pane's filter contract.
+      queryMode: 'name-filter',
+      queryLimit: 5_000
     })
     expect(result.current.nameFilterSource?.query).toBe('AppDelegate.swift')
+  })
+
+  it('filters a local full listing that no query produced', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: false,
+      loadError: null,
+      resolvedQuery: undefined
+    })
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource?.relativePaths).toEqual(['src/a/b/drover.eve_schema'])
+  })
+
+  it('fences a listing produced by a different query', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: false,
+      loadError: null,
+      resolvedQuery: 'drover'
+    })
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource?.relativePaths).toEqual([])
+  })
+
+  it('asks the host for a bounded substring-AND page instead of a truncated listing', () => {
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(useRuntimeFileListForWorktreeMock).toHaveBeenLastCalledWith({
+      enabled: true,
+      worktreeId: 'worktree-1',
+      query: 'drover.eve',
+      queryMode: 'name-filter',
+      queryLimit: 5_000
+    })
+  })
+
+  it('reports an exact match count and a partial page to the pane', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: false,
+      loadError: null,
+      resolvedQuery: 'drover.eve',
+      totalCount: 182_311,
+      truncated: true
+    } satisfies RuntimeFileListState)
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource).toMatchObject({
+      totalCount: 182_311,
+      truncated: true
+    })
+  })
+
+  it('withholds paths while the query that produced them is still settling', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['src/a/b/drover.eve_schema'],
+      loading: true,
+      loadError: null,
+      resolvedQuery: null
+    })
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('drover.eve'))
+
+    expect(result.current.nameFilterSource?.relativePaths).toBeNull()
   })
 })
