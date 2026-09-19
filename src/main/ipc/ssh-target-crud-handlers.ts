@@ -3,7 +3,8 @@ import type {
   SshConfigHostListArgs,
   SshRepoReadoption,
   SshTargetCreateInput,
-  SshTargetUpdateInput
+  SshTargetUpdateInput,
+  SshTargetVisibilityInput
 } from '../../shared/ssh-types'
 import {
   listUserSshConfigHostSummaries,
@@ -69,6 +70,10 @@ export function registerSshTargetCrudHandlers(): void {
 
   ipcMain.handle('ssh:removeTarget', async (_event, args: { id: string }) => {
     await removeRegisteredSshTarget(args.id)
+  })
+
+  ipcMain.handle('ssh:setTargetHidden', (_event, args: SshTargetVisibilityInput) => {
+    return getSshTargetRegistryStore()!.setTargetHidden(args.id, args.hidden)
   })
 
   ipcMain.handle('ssh:importConfig', (_event, args?: { reAdopt?: boolean }) => {

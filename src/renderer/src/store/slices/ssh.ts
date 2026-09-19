@@ -8,9 +8,11 @@ import type {
 } from '../../../../shared/ssh-types'
 import {
   buildRemovedSshTargetCleanupPatch,
+  collectHiddenSshTargetIds,
   collectSshTargetGenerations,
   sshConnectionStatesEqual,
   sshTargetGenerationsEqual,
+  sshTargetHiddenIdsEqual,
   sshTargetLabelsEqual
 } from './ssh-target-cleanup'
 
@@ -46,6 +48,10 @@ export type SshSlice = {
    * usable generation is simply absent — see `collectSshTargetGenerations`.
    */
   sshTargetGenerations: Map<string, number>
+  /** Targets the user hid from host pickers. They stay in `sshTargetLabels` — a
+   * hidden host with live workspaces still needs its label and connection state,
+   * and readers treat a missing label as removal evidence. */
+  hiddenSshTargetIds: Set<string>
   /** Maps REMOVED target IDs to their last known label (from re-adoption
    * tombstones). Lets ghost-host UI show a friendly name instead of the raw id
    * for a workspace still pinned to a deleted target. */
@@ -113,6 +119,7 @@ export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) =>
   sshConnectionStates: new Map(),
   sshTargetLabels: new Map(),
   sshTargetGenerations: new Map(),
+  hiddenSshTargetIds: new Set(),
   removedSshTargetLabels: new Map(),
   sshTargetsHydrated: false,
   remoteWorkspaceHydratedTargetIds: new Set(),
@@ -152,11 +159,13 @@ export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) =>
   setSshTargetsMetadata: (targets) =>
     set((s) => {
       const sshTargetGenerations = collectSshTargetGenerations(targets)
-      // Both maps gate the early return: a caller that first hydrated through a
+      const hiddenSshTargetIds = collectHiddenSshTargetIds(targets)
+      // All three maps gate the early return: a caller that first hydrated through a
       // generation-less path would otherwise be frozen out by matching labels.
       if (
         sshTargetLabelsEqual(s.sshTargetLabels, targets) &&
-        sshTargetGenerationsEqual(s.sshTargetGenerations, sshTargetGenerations)
+        sshTargetGenerationsEqual(s.sshTargetGenerations, sshTargetGenerations) &&
+        sshTargetHiddenIdsEqual(s.hiddenSshTargetIds, hiddenSshTargetIds)
       ) {
         // Why: an unchanged (even empty) list is still a successful load — the
         // hydration flag must flip on the first fetch of an empty target set.
@@ -165,6 +174,7 @@ export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) =>
       return {
         sshTargetLabels: new Map(targets.map((target) => [target.id, target.label])),
         sshTargetGenerations,
+        hiddenSshTargetIds,
         sshTargetsHydrated: true
       }
     }),
