@@ -12,6 +12,8 @@ export type LinkActionRequest = {
   kind: LinkActionKind
   primary: LinkAction
   alternate?: LinkAction
+  /** Last row, for actions with no direct-activation gesture to advertise. */
+  tertiary?: LinkAction
   /** Hands focus back to the surface that owned the click (terminal, chat transcript). */
   restoreFocus: () => void
 }

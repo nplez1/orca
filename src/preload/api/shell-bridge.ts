@@ -2,6 +2,7 @@ import { ipcRenderer } from 'electron'
 import type {
   ShellOpenExternalEditorRequest,
   ShellOpenExternalEditorResult,
+  ShellOpenInFileManagerOptions,
   ShellOpenLocalPathResult
 } from '../../shared/shell-open-types'
 import type { PreloadApi } from '../api-types'
@@ -9,8 +10,11 @@ import type { PreloadApi } from '../api-types'
 export const shellApi = {
   openPath: (path: string): Promise<void> => ipcRenderer.invoke('shell:openPath', path),
 
-  openInFileManager: (path: string): Promise<ShellOpenLocalPathResult> =>
-    ipcRenderer.invoke('shell:openInFileManager', path),
+  openInFileManager: (
+    path: string,
+    options?: ShellOpenInFileManagerOptions
+  ): Promise<ShellOpenLocalPathResult> =>
+    ipcRenderer.invoke('shell:openInFileManager', path, options),
 
   openInExternalEditor: (
     request: ShellOpenExternalEditorRequest

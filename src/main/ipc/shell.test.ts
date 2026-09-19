@@ -255,6 +255,40 @@ describe('registerShellHandlers', () => {
       await expect(handler({}, workspacePath)).resolves.toEqual({ ok: true })
       expect(showItemInFolderMock).toHaveBeenCalledWith(normalize(workspacePath))
     })
+
+    it('refuses while a runtime environment owns the active workspace', async () => {
+      settings.activeRuntimeEnvironmentId = 'env-1'
+      const handler = getHandler('shell:openInFileManager')
+
+      await expect(handler({}, resolve('workspace'))).resolves.toEqual({
+        ok: false,
+        reason: 'remote-runtime-unsupported'
+      })
+      expect(statMock).not.toHaveBeenCalled()
+      expect(showItemInFolderMock).not.toHaveBeenCalled()
+    })
+
+    it('reveals a path the caller already resolved to this client', async () => {
+      settings.activeRuntimeEnvironmentId = 'env-1'
+      const workspacePath = resolve('workspace')
+      const handler = getHandler('shell:openInFileManager')
+
+      await expect(handler({}, workspacePath, { clientLocalPath: true })).resolves.toEqual({
+        ok: true
+      })
+      expect(showItemInFolderMock).toHaveBeenCalledWith(normalize(workspacePath))
+    })
+
+    it('still validates the path of a client-local reveal', async () => {
+      settings.activeRuntimeEnvironmentId = 'env-1'
+      statMock.mockRejectedValueOnce(new Error('missing'))
+      const handler = getHandler('shell:openInFileManager')
+
+      await expect(
+        handler({}, resolve('missing-workspace'), { clientLocalPath: true })
+      ).resolves.toEqual({ ok: false, reason: 'not-found' })
+      expect(showItemInFolderMock).not.toHaveBeenCalled()
+    })
   })
 
   describe('shell:openInExternalEditor', () => {

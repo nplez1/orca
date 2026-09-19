@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type {
   ShellOpenExternalEditorRequest,
   ShellOpenExternalEditorResult,
+  ShellOpenInFileManagerOptions,
   ShellOpenLocalPathResult
 } from '../../shared/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
@@ -52,9 +53,13 @@ function hasActiveRuntime(store: Store): boolean {
 
 async function openInFileManager(
   store: Store,
-  pathValue: string
+  pathValue: string,
+  options?: ShellOpenInFileManagerOptions
 ): Promise<ShellOpenLocalPathResult> {
-  if (hasActiveRuntime(store)) {
+  // Why: the active-runtime check only assumes the renderer's paths belong to the remote owner.
+  // A caller that already resolved its path as this client's own — a local workspace pane, or a
+  // file it just downloaded to a user-chosen path — must still reach the local file manager.
+  if (!options?.clientLocalPath && hasActiveRuntime(store)) {
     return { ok: false, reason: 'remote-runtime-unsupported' }
   }
   const target = await validateLocalPathTarget(pathValue)
@@ -145,7 +150,11 @@ export function registerShellHandlers(store: Store): void {
 
   ipcMain.handle(
     'shell:openInFileManager',
-    (_event, path: string): Promise<ShellOpenLocalPathResult> => openInFileManager(store, path)
+    (
+      _event,
+      path: string,
+      options?: ShellOpenInFileManagerOptions
+    ): Promise<ShellOpenLocalPathResult> => openInFileManager(store, path, options)
   )
 
   ipcMain.handle(
