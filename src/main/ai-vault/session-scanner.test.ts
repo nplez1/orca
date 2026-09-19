@@ -365,6 +365,45 @@ describe('scanAiVaultSessions', () => {
     ])
   })
 
+  it("uses Copilot's typed prompt, not its injected context, for the title", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-copilot-injected-context-'))
+    tempRoots.push(root)
+    const roots = isolatedScanRoots(root)
+    const sessionDir = join(roots.copilotSessionsDir, 'copilot-injected-context')
+    await mkdir(sessionDir, { recursive: true })
+
+    // Copilot records the prompt as typed on `content` and the model-facing text
+    // (prefixed with `<current_datetime>`) on `transformedContent`.
+    await writeFile(
+      join(sessionDir, 'events.jsonl'),
+      jsonLines([
+        {
+          type: 'session.start',
+          data: { sessionId: 'copilot-injected-context', startTime: '2026-05-27T06:21:12.763Z' },
+          timestamp: '2026-05-27T06:21:12.763Z'
+        },
+        {
+          type: 'user.message',
+          data: {
+            content: 'Fix the authentication bug in src/auth.ts',
+            transformedContent:
+              '<current_datetime>2026-05-27T06:21:24.000Z</current_datetime>\n\nFix the authentication bug in src/auth.ts'
+          },
+          timestamp: '2026-05-27T06:21:24.000Z'
+        }
+      ])
+    )
+
+    const result = await scanAiVaultSessions({ ...roots, platform: 'darwin' })
+
+    expect(result.issues).toEqual([])
+    expect(result.sessions).toHaveLength(1)
+    expect(result.sessions[0]?.title).toBe('Fix the authentication bug in src/auth.ts')
+    expect(result.sessions[0]?.previewMessages.map((message) => message.text)).toEqual([
+      'Fix the authentication bug in src/auth.ts'
+    ])
+  })
+
   it('indexes every supported agent transcript format with native resume commands', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-all-agents-'))
     tempRoots.push(root)
