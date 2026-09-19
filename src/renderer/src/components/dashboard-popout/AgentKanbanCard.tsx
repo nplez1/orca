@@ -188,19 +188,21 @@ type AgentKanbanCardProps = {
   /** The card repo's icon. null renders the default folder glyph. */
   repoIcon?: RepoIcon | null
   now: number
-  /** Opens the board-level terminal dialog. The dialog is NOT owned by the
-   *  card: bucket moves remount the card, and an embedded dialog would close
-   *  the chat mid-conversation. */
-  onOpenTerminal: (card: DashboardCard) => void
+  /** Hands the card up to the board, which routes it per the board's
+   *  click-action setting. The dialog is NOT owned by the card: bucket moves
+   *  remount the card, and an embedded dialog would close the chat
+   *  mid-conversation. */
+  onActivateCard: (card: DashboardCard) => void
 }
 
-/** One agent on the kanban board. Clicking opens the board's live terminal dialog. */
+/** One agent on the kanban board. Clicking either opens the board's live
+ *  terminal dialog or jumps to the agent's workspace, per the board setting. */
 export const AgentKanbanCard = memo(
   function AgentKanbanCard({
     card,
     repoIcon = null,
     now,
-    onOpenTerminal
+    onActivateCard
   }: AgentKanbanCardProps): React.JSX.Element {
     useTranslation()
     const [subagentsOpen, setSubagentsOpen] = useState(false)
@@ -233,7 +235,7 @@ export const AgentKanbanCard = memo(
       >
         <button
           type="button"
-          onClick={() => onOpenTerminal(card)}
+          onClick={() => onActivateCard(card)}
           className="flex w-full flex-col gap-1.5 text-left focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <div className="flex w-full items-center gap-1.5">
@@ -316,7 +318,7 @@ export const AgentKanbanCard = memo(
 
         <button
           type="button"
-          onClick={() => onOpenTerminal(card)}
+          onClick={() => onActivateCard(card)}
           className="flex w-full items-center gap-2 rounded-md text-left text-[11px] text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <Tooltip>
@@ -350,7 +352,7 @@ export const AgentKanbanCard = memo(
     )
   },
   (previous, next) =>
-    previous.onOpenTerminal === next.onOpenTerminal &&
+    previous.onActivateCard === next.onActivateCard &&
     sameCard(previous.card, next.card) &&
     sameRepoIcon(previous.repoIcon, next.repoIcon) &&
     (displayTimestamp(previous.card) <= 0 ||

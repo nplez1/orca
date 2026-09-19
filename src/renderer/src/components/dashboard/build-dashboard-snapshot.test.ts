@@ -6,6 +6,7 @@ import {
   type AgentStatusOrchestrationContext
 } from '../../../../shared/agent-status-types'
 import { DASHBOARD_MAX_LABEL_LENGTH } from '../../../../shared/dashboard-snapshot'
+import { getDefaultSettings } from '../../../../shared/constants'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { Worktree } from '../../../../shared/worktree/types'
@@ -726,6 +727,22 @@ describe('buildDashboardSnapshot', () => {
     )
 
     expect(snapshot.showIdle).toBe(true)
+  })
+
+  it('defaults the card click action to the workspace and relays an override', () => {
+    expect(buildDashboardSnapshot(baseState({}), NOW).cardClickAction).toBe('workspace')
+
+    const snapshot = buildDashboardSnapshot(
+      baseState({
+        settings: {
+          ...getDefaultSettings('/tmp'),
+          experimentalAgentDashboardCardClickAction: 'preview'
+        }
+      }),
+      NOW
+    )
+
+    expect(snapshot.cardClickAction).toBe('preview')
   })
 
   it('attaches batched runtime orchestration metadata to dashboard rows', () => {

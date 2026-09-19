@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
   dashboardCardDisplayState,
+  dashboardCardRevealArgs,
   type DashboardCard,
   type DashboardRevealAgentArgs
 } from '../../../../shared/dashboard-snapshot'
@@ -41,13 +42,7 @@ function AgentTerminalFrame({
   onReveal
 }: AgentTerminalFrameProps): React.JSX.Element {
   const reveal = (): void => {
-    onReveal({
-      repoId: card.repoId,
-      worktreeId: card.worktreeId,
-      executionHostId: card.executionHostId,
-      tabId: card.tabId,
-      leafId: card.leafId
-    })
+    onReveal(dashboardCardRevealArgs(card))
     onOpenChange(false)
   }
 

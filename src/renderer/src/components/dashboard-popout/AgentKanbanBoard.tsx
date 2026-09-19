@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import {
   DASHBOARD_BUCKET_ORDER,
+  dashboardCardRevealArgs,
   type DashboardBucket,
   type DashboardCard,
   type DashboardSnapshot
@@ -71,13 +72,13 @@ function KanbanColumn({
   cards,
   repoIconsByRepoId,
   now,
-  onOpenTerminal
+  onActivateCard
 }: {
   bucket: DashboardBucket
   cards: DashboardCard[]
   repoIconsByRepoId: Record<string, RepoIcon | null> | undefined
   now: number
-  onOpenTerminal: (card: DashboardCard) => void
+  onActivateCard: (card: DashboardCard) => void
 }): React.JSX.Element {
   return (
     // Why: attention no longer tints the whole column — the cards inside carry
@@ -103,7 +104,7 @@ function KanbanColumn({
               card={card}
               repoIcon={repoIconsByRepoId?.[card.repoId] ?? null}
               now={now}
-              onOpenTerminal={onOpenTerminal}
+              onActivateCard={onActivateCard}
             />
           ))
         )}
@@ -195,6 +196,10 @@ export function AgentKanbanBoard({
     return () => document.removeEventListener('keydown', handleSearchShortcut)
   }, [])
 
+  // Why: the setting decides where a click lands — the workspace itself (the
+  // default) or the live terminal preview. The board owns the choice so both
+  // hosts behave identically without threading another prop.
+  const cardClickAction = snapshot.cardClickAction ?? 'workspace'
   // The open terminal dialog survives bucket moves: only the paneKey is
   // remembered, and the card data is re-resolved from each fresh snapshot.
   // The opened card is kept as a fallback so the dialog also survives the
@@ -220,14 +225,18 @@ export function AgentKanbanBoard({
   }, [])
 
   // Seen-state is the app-wide ack map (same signal as the sidebar's bold/mute
-  // rows): opening a dialog acks the agent, and the next snapshot comes back
-  // with unseen=false.
-  const handleOpenTerminal = useCallback(
+  // rows): activating an agent acks it, and the next snapshot comes back with
+  // unseen=false.
+  const handleActivateCard = useCallback(
     (card: DashboardCard) => {
       onAckAgent(card.paneKey)
+      if (cardClickAction === 'workspace') {
+        onRevealAgent(dashboardCardRevealArgs(card))
+        return
+      }
       setOpenedCard(card)
     },
-    [onAckAgent]
+    [cardClickAction, onAckAgent, onRevealAgent]
   )
   // Watching the open dialog counts as seeing state changes as they happen —
   // without this, an agent finishing while you watch would re-flag its card.
@@ -290,7 +299,7 @@ export function AgentKanbanBoard({
                 cards={grouped[bucket]}
                 repoIconsByRepoId={snapshot.repoIconsByRepoId}
                 now={now}
-                onOpenTerminal={handleOpenTerminal}
+                onActivateCard={handleActivateCard}
               />
             ))}
           </div>

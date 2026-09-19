@@ -2,6 +2,7 @@ import type { AgentType, AgentWorkingMode } from './agent-status-types'
 import type { ExecutionHostId } from './execution-host'
 import type { RepoIcon } from './repo-icon'
 import type { TuiAgent } from './tui-agent'
+import type { AgentDashboardCardClickAction } from './ui-chrome-types'
 
 /**
  * Serializable contract for the pop-out agent dashboard. The main renderer owns
@@ -192,6 +193,9 @@ export type DashboardSnapshot = {
    *  optional for preload compatibility with older snapshot producers. */
   workspaces?: DashboardWorkspace[]
   showIdle?: boolean
+  /** What clicking a card does. Optional so a pop-out running pre-upgrade code
+   *  still accepts the payload; readers default to 'workspace'. */
+  cardClickAction?: AgentDashboardCardClickAction
   /** Available filter dimensions are store-derived so zero-card projects and
    *  statuses remain selectable. Optional for preload-version compatibility. */
   filterOptions?: DashboardFilterOptions
@@ -222,6 +226,18 @@ export type DashboardRevealAgentArgs = {
   executionHostId?: ExecutionHostId
   tabId: string
   leafId: string | null
+}
+
+/** Reveal routing for one card, shared by the board's click-through and the
+ *  preview dialog's "Open worktree" button. */
+export function dashboardCardRevealArgs(card: DashboardCard): DashboardRevealAgentArgs {
+  return {
+    repoId: card.repoId,
+    worktreeId: card.worktreeId,
+    executionHostId: card.executionHostId,
+    tabId: card.tabId,
+    leafId: card.leafId
+  }
 }
 
 export type DashboardSpawnAgentArgs = {
