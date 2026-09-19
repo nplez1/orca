@@ -4,6 +4,10 @@ import { startGitSpan } from '../../observability/instrumentation'
 import { createAbortError } from './abort-error'
 import { resolveGitCommand } from './git-command-resolution'
 import { untranslatedGitOutputEnv } from './git-process-env'
+import {
+  localLoginShellGitEnvironmentSnapshot,
+  prepareLocalLoginShellGitEnvironment
+} from './local-login-shell-git-environment'
 import { prepareWindowsHostGitEnvironment } from './windows-host-git-environment'
 import type { GitAdmissionTier } from './git-exec-options'
 import { acquireGitAdmission } from './git-subprocess-admission'
@@ -30,8 +34,12 @@ export async function gitSpawnAfterWindowsEnvironmentReady(
     ...(options.wslDistro ? { wslDistro: options.wslDistro } : {}),
     ...(options.env ? { env: options.env } : {})
   })
-  const env = await (prepareWindowsHostGitEnvironment(resolved, options.env, options.signal) ??
-    options.env)
+  // Why local first: on POSIX only this one applies, and on Windows only the other,
+  // so the two are mutually exclusive rather than layered.
+  const environmentReady =
+    prepareLocalLoginShellGitEnvironment(resolved, options.env, options.signal) ??
+    prepareWindowsHostGitEnvironment(resolved, options.env, options.signal)
+  const env = (environmentReady ? await environmentReady : undefined) ?? options.env
   if (options.signal?.aborted) {
     throw createAbortError()
   }
@@ -111,7 +119,10 @@ export function gitSpawn(args: string[], options: GitSpawnOptions): ChildProcess
   const spawnStartedAt = performance.now()
   const child = spawn(resolved.binary, resolved.args, {
     ...spawnOptions,
-    env: untranslatedGitOutputEnv(spawnOptions.env ?? process.env),
+    env: untranslatedGitOutputEnv(
+      // Why best-effort: this path is sync, so it can only use a probe that already settled.
+      localLoginShellGitEnvironmentSnapshot(spawnOptions.env ?? process.env)
+    ),
     windowsHide: true,
     cwd: resolved.cwd
   })
