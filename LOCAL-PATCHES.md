@@ -143,6 +143,65 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-21** — onto upstream `663d670878` (128 commits), from the released tip `b2ac711f55`
+  (np.9 released; the next build stamps its own run number). 84 commits replayed: **75
+  byte-identical by `range-diff`, 9 adapted, none dropped.** Six of the 84 conflicted, across five
+  files, and every one was mechanical:
+  - **Additive union** (3 files, 8 sites): `AccountsPane.test.tsx` and `accounts-search.test.ts`
+    (upstream's OpenCode console-cookie tests landed beside our DeepSeek/Fireworks ones), and
+    `listener-state.ts` twice — our `copilotBackgroundWorkByPaneKey` and then
+    `descendantRosterByPaneKey`/`descendantLeadStateByPaneKey` against upstream's new
+    `opencodeSessionPaneBySessionId`/`lastLaunchTokenByPaneKey`. Both sides were kept at each site,
+    and the `CodexSubagentRoster` → `AgentDescendantRoster` rename replayed onto upstream's version.
+    Upstream never touched `paneHasStateClaims`, so our claim check on the Copilot map survived.
+  - **Derived file** (1 file): `en-runtime-required.json` conflicted in `bf3598c6ff`; the source
+    `en.json` auto-merged and the catalog was regenerated, never hand-merged.
+  - **One surface, two lineages** (1 file): the pi test harness. Our older commit bound a mocked
+    process bus (`emitProcessBus`) that the harness no longer needs, because upstream had already
+    added the `pi.events` surface our *later* commit converges onto. Kept upstream's implementation
+    and applied only our removals, so the file ended byte-identical to `upstream/main`.
+  - **The two traps that fired, both found by the gates and not by a conflict marker:**
+    1. **A new provider in a fork enumeration.** Upstream added `opencode2` to the shared
+       `AgentHookSource` union, and `descendant-events.ts` enumerates every provider in a `Record`
+       over that union *by design*, so `pnpm tc` failed instead of silently ignoring children.
+       Answered `null`, matching `opencode` (`9908062478`).
+    2. **Upstream built the same feature.** `35005fb65c` ("keep panes working while async subagents
+       run", #21882) reimplements what the fork's `42227039d5..0b0f8ac40d` series does. Both bound
+       `pi.events`, so `subagent:async-started`/`:async-complete` fired twice, and omp/prime-agent
+       got a binding the fork deliberately withholds. Converged on the fork's subsystem because
+       upstream's 39 lines are a narrow subset of it; channel coverage differs in both directions,
+       so upstream's OMP-only `task:subagent:lifecycle` gate stays and only the fork's two channels
+       were dropped from it. Upstream's alias test was adapted to assert the fork's `subagent_runs`
+       roster rather than a withheld `agent_end` (`c7e93e5b2d`).
+  - **Left open, named:** converging on the fork's subsystem gives up the async-alias coverage
+    upstream's #21882 adds for OMP runtimes. After this sync an OMP pane bound to
+    `@earendil-works/pi-subagents` is held only by upstream's `task:subagent:lifecycle` gate; the
+    only local evidence that channel has a producer is upstream's own test (OMP is not installed on
+    this machine, and both pi-subagents plugin trees emit `subagents:*` and `subagent:async-*`,
+    never `task:`). So OMP panes behave as they did in np.9 — not a regression, but the new OMP
+    coverage is not gained either. Closing it, if wanted, is one guarded binding for `kind !== 'pi'`
+    in `agent-status-handler-source.ts` plus the matching expectation in
+    `agent-status-async-subagent.test.ts`. An independent review of this sync also noted that
+    `lifecycleState.onEvent`'s `forcedStatus` parameter is now vestigial (nothing passes it) and that
+    a plugin emitting both lineages for one child would double-dispatch; neither is reachable with
+    the installed plugins.
+  - Verified: `pnpm tc` clean; **8,130 tests green across 897 files** covering every touched area
+    (rate-limits, pi, agent-hook-listener and its descendants, agent-hooks, settings/accounts,
+    sidebar branch groups, ai-vault, diagnostics, updater); `range-diff` with all 84 patches paired
+    and the pre-sync-tip lost-content diff empty; the localization catalog regenerated with no diff
+    and both verifiers green; the fork's builder config loads and all six update-feed URLs still name
+    `nplez1/orca`. The full `pnpm test` run's residual failures were all environmental and each was
+    proved so, never chased as regressions: they need `ORCA_BACKGROUND_LAUNCH=1`, `mobile`'s
+    generated engine artifacts, a Playwright browser for the newly-installed revision, the
+    uninstalled `cloud/` workspace (`pg`), or a cleared `tests/e2e/.cross-version-checkouts` cache
+    (1.3 GB of leftovers whose file count overflows a spread in that walker).
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports 52 findings
+    (24 design-system) since the old base, on the same footing as last sync — after a rebase the
+    gate's base (`origin/HEAD`) still names the pre-sync tip, so its merge-base falls back and the
+    whole fork+upstream delta reads as added lines. Nine of the fourteen flagged files are
+    byte-identical to the released tip and four carry upstream's own incoming `as` assertions. The
+    one finding that *was* ours — a type assertion in the adapted pi test — is fixed.
+
 - **2026-09-19** — onto upstream `3ad6b7e46e` (96 commits), from the released tip `72034293d5`
   (np.9-to-be). 75 commits replayed: **65 byte-identical by `range-diff`, 10 adapted, none
   dropped.** Eight of the 75 conflicted, across 10 files, in three classes:
