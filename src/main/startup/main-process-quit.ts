@@ -22,6 +22,7 @@ import { setUnreadDockBadgeCount } from '../dock/unread-badge'
 import { destroySystemTray } from '../tray/system-tray'
 import { shutdownTelemetry } from '../telemetry/client'
 import { shutdownObservability } from '../observability'
+import { closeUiHangLogSink } from '../diagnostics/ui-hang-log-sink'
 import { isQuittingForUpdate } from '../updater'
 import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { stopTccPromptNotice } from '../macos-tcc-prompt-notice'
@@ -110,6 +111,8 @@ function installWillQuitHandler(): void {
     state.desktopPushService?.stop()
     state.unsubscribeSystemResumeBroadcast?.()
     state.unsubscribeSystemResumeBroadcast = null
+    state.uninstallMainThreadStallProbe?.()
+    state.uninstallMainThreadStallProbe = null
     // Why: renderer guards can still cancel before this committed phase; `log stream` must survive those vetoes.
     stopTccPromptNotice()
     const updateQuitInProgress = isQuittingForUpdate()
@@ -261,6 +264,7 @@ function installWillQuitHandler(): void {
       })
       .then(() => shutdownTelemetry())
       .then(() => shutdownObservability())
+      .then(() => closeUiHangLogSink())
       .catch(() => {
         /* swallow — telemetry must never prevent app.quit() */
       })

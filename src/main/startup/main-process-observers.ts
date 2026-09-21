@@ -1,4 +1,5 @@
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { arch as osArch, platform as osPlatform, release as osRelease } from 'node:os'
 import { join } from 'node:path'
 import { AgentAwakeService } from '../agent-awake-service'
 import { normalizeComputerAwakeMode } from '../../shared/computer-awake-mode'
@@ -8,6 +9,8 @@ import { installHookStatusSessionTabsRepublish } from '../agent-hooks/hook-statu
 import { initTelemetry, track } from '../telemetry/client'
 import { setCodexTrustGrantTelemetry } from '../codex/codex-trust-grant-telemetry'
 import { initObservability } from '../observability'
+import { installMainThreadStallProbe } from '../diagnostics/main-thread-stall-probe'
+import { setUiHangLogMeta } from '../diagnostics/ui-hang-log-sink'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
 import { recoverPendingSkillTransactions } from '../skills/skill-transaction-startup-recovery'
 import { initCohortClassifier } from '../telemetry/cohort-classifier'
@@ -56,6 +59,21 @@ export function initializeMainProcessObservers(): void {
     unsubscribeStatusFreshness()
     uninstallHookStatusRepublish()
   }
+  // Why: a blocked main event loop freezes IPC and terminal input while the renderer keeps
+  // painting, so main stalls belong in the same opt-in log the renderer probe writes to.
+  // A hang log is only actionable if it names the build it came from.
+  setUiHangLogMeta({
+    appVersion: app.getVersion(),
+    platform: osPlatform(),
+    arch: osArch(),
+    osRelease: osRelease()
+  })
+  state.uninstallMainThreadStallProbe = installMainThreadStallProbe({
+    isEnabled: () => store.getSettings().uiHangDiagnosticsEnabled === true,
+    subscribe: (listener) => store.onSettingsChanged(listener),
+    isVisible: () =>
+      BrowserWindow.getAllWindows().some((window) => !window.isDestroyed() && window.isVisible())
+  })
   // Why: telemetry must init before any IPC handler/renderer can call track(); it's a no-op in dev and while TELEMETRY_ENABLED is false, so it's safe early.
   initTelemetry(store)
   // Why: the breadcrumb alone never leaves the machine — it rides crash reports, and a hang is not

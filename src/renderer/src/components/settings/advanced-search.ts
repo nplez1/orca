@@ -41,6 +41,33 @@ export const getAdvancedPaneSearchEntries = createLocalizedCatalog((): SettingsS
       ...translateSearchKeyword('auto.components.settings.advanced.search.e61ed8ab33', 'updates'),
       ...translateSearchKeyword('auto.components.settings.advanced.search.a7002e1ac4', 'updater')
     ]
+  },
+  {
+    title: translate('auto.components.settings.advanced.search.644da2eee3', 'UI Hang Logging'),
+    description: translate(
+      'auto.components.settings.advanced.search.8fabd940ab',
+      'Record UI-thread stalls and window freezes to a log file for troubleshooting.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.advanced.search.e04e9db503', 'advanced'),
+      ...translateSearchKeyword('auto.components.settings.advanced.search.6f65714112', 'debug'),
+      ...translateSearchKeyword('auto.components.settings.advanced.search.b2f94335b1', 'hang'),
+      ...translateSearchKeyword('auto.components.settings.advanced.search.20e4fb106c', 'freeze'),
+      ...translateSearchKeyword(
+        'auto.components.settings.advanced.search.2046f3a33e',
+        'unresponsive'
+      ),
+      ...translateSearchKeyword('auto.components.settings.advanced.search.70e4c7cdc0', 'jank'),
+      ...translateSearchKeyword('auto.components.settings.advanced.search.74e2892304', 'log'),
+      ...translateSearchKeyword(
+        'auto.components.settings.advanced.search.47b1470553',
+        'diagnostics'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.advanced.search.6576fce4d2',
+        'troubleshooting'
+      )
+    ]
   }
 ])
 
@@ -56,6 +83,9 @@ export function getAdvancedSearchEntry() {
   return {
     http1Compatibility: findEntry(
       translate('auto.components.settings.advanced.search.11eea3da72', 'HTTP/1.1 Compatibility')
+    ),
+    uiHangDiagnostics: findEntry(
+      translate('auto.components.settings.advanced.search.644da2eee3', 'UI Hang Logging')
     )
   } as const
 }
