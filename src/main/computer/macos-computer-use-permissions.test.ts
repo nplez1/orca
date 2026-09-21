@@ -2,6 +2,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ORCA_APP_ID } from '../../shared/local-build-compatibility'
 import {
   openComputerUsePermissions,
   resetComputerUsePermissions
@@ -239,6 +240,41 @@ describe('openComputerUsePermissions', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       '/usr/bin/tccutil',
       ['reset', 'ScreenCapture', 'com.example.orca.computer-use'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    )
+  })
+
+  it("falls back to this install's own helper bundle id when the plist is unreadable", async () => {
+    resolveHelperAppPathMock.mockReturnValue('/Applications/Orca Computer Use.app')
+    vi.mocked(readFile)
+      .mockResolvedValueOnce('{"accessibility":"granted","screenshots":"granted"}')
+      .mockResolvedValueOnce('{"accessibility":"not-granted","screenshots":"not-granted"}')
+    vi.mocked(execFileSync).mockImplementation(() => {
+      throw new Error('plist missing')
+    })
+    vi.mocked(spawnSync).mockReturnValue({ status: 0 } as ReturnType<typeof spawnSync>)
+
+    // Why: a literal here once reset the pre-rename helper's grants instead of this install's,
+    // which left users unable to clear the stale rows macOS kept denying against.
+    const ownHelperBundleId = `${ORCA_APP_ID}.computer-use`
+    await expect(resetComputerUsePermissions()).resolves.toEqual({
+      platform: 'darwin',
+      helperAppPath: '/Applications/Orca Computer Use.app',
+      helperUnavailableReason: null,
+      bundleId: ownHelperBundleId,
+      permissions: [
+        { id: 'accessibility', status: 'not-granted' },
+        { id: 'screenshots', status: 'not-granted' }
+      ]
+    })
+    expect(spawnSync).toHaveBeenCalledWith(
+      '/usr/bin/tccutil',
+      ['reset', 'Accessibility', ownHelperBundleId],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    )
+    expect(spawnSync).toHaveBeenCalledWith(
+      '/usr/bin/tccutil',
+      ['reset', 'ScreenCapture', ownHelperBundleId],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
     )
   })
