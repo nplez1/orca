@@ -29,6 +29,7 @@ describe('web preload API composition', () => {
       'keybindings',
       'ui',
       'crashReports',
+      'uiHangDiagnostics',
       'diagnostics',
       'session',
       'onboarding',

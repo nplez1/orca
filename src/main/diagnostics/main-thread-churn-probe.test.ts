@@ -13,11 +13,13 @@ import {
   drainSubprocessSpawnStats,
   isMainThreadDiagnosticsEnabled,
   recordSubprocessSpawn,
+  setSubprocessSpawnAttributionEnabled,
   startMainThreadChurnProbe
 } from './main-thread-churn-probe'
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  setSubprocessSpawnAttributionEnabled(false)
   drainSubprocessSpawnStats()
 })
 
@@ -82,6 +84,15 @@ describe('recordSubprocessSpawn', () => {
     expect(isMainThreadDiagnosticsEnabled()).toBe(false)
     recordSubprocessSpawn('git', ['status'], 1)
     expect(drainSubprocessSpawnStats()).toEqual({})
+  })
+
+  it('records while the UI-hang log enables attribution without the env var', () => {
+    vi.stubEnv(MAIN_THREAD_DIAGNOSTICS_ENV, '')
+    setSubprocessSpawnAttributionEnabled(true)
+    recordSubprocessSpawn('git', ['status'], 3)
+    expect(drainSubprocessSpawnStats()).toEqual({
+      'git status': { count: 1, blockMsTotal: 3, blockMsMax: 3 }
+    })
   })
 
   it('aggregates count and block time per command, and drain resets', () => {

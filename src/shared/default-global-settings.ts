@@ -125,6 +125,7 @@ export function buildDefaultSettings(args: {
     httpProxyUrl: '',
     httpProxyBypassRules: '',
     electronHttp1CompatibilityMode: false,
+    uiHangDiagnosticsEnabled: false,
     openLinksInApp: false,
     localhostWorktreeLabelsEnabled: false,
     openLinksInAppPreferencePrompted: false,
