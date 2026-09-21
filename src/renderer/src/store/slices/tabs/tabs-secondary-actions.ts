@@ -6,8 +6,21 @@ import { findSiblingGroupId, updateSplitRatio } from './tabs-layout'
 export function createTabsSecondaryActions(
   set: TabsSliceSet,
   get: TabsSliceGet
-): Pick<TabsSlice, 'copyUnifiedTabToGroup' | 'mergeGroupIntoSibling' | 'setTabGroupSplitRatio'> {
+): Pick<
+  TabsSlice,
+  'copyUnifiedTabToGroup' | 'mergeGroupIntoSibling' | 'setTabGroupSplitRatio' | 'setBranchGroupHost'
+> {
   return {
+    /** Shared by the sidebar card's dropdown and the tab strip's sibling rows. */
+    setBranchGroupHost: (groupKey, hostId) => {
+      set((state) => {
+        if (state.branchGroupHostByKey[groupKey] === hostId) {
+          return state
+        }
+        return { branchGroupHostByKey: { ...state.branchGroupHostByKey, [groupKey]: hostId } }
+      })
+    },
+
     copyUnifiedTabToGroup: (tabId, targetGroupId, init) => {
       const foundTab = findTabAndWorktree(get().unifiedTabsByWorktree, tabId)
       const foundTarget = findGroupAndWorktree(get().groupsByWorktree, targetGroupId)

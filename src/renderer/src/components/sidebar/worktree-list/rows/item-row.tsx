@@ -9,6 +9,7 @@ import {
 } from '../../../../../../shared/worktree/host-qualified-identity'
 import WorktreeCard, { type ActiveSurfaceVariant } from '../../WorktreeCard'
 import { PINNED_GROUP_KEY } from '../grouping/group-keys'
+import { resolveBranchGroupSelection } from '../grouping/branch-groups'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import {
   getFolderBackedRepoWorktreeCardContentIndent,
@@ -42,6 +43,9 @@ export type WorktreeItemRowContext = {
   selectedWorktrees: readonly Worktree[]
   getActiveSurfaceVariant: (row: WorktreeItemRow) => ActiveSurfaceVariant
   getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
+  /** Group by branch cards key their host choice by row key. */
+  branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
+  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
   onSelectionGesture: (event: React.MouseEvent<HTMLElement>, worktree: Worktree) => boolean
   onWorktreeCardClick?: () => void
   onContextMenuSelect: (
@@ -135,17 +139,32 @@ export function renderWorktreeItemRow(
   const lineageChildrenStyle = lineageChildren
     ? getLineageChildrenInlineStyle(lineageChildrenInlineOffset ?? LINEAGE_CHILDREN_INLINE_OFFSET)
     : undefined
+  // Why: a Group by branch card stands in for every host it merged. Until the
+  // user picks a host, it follows the active workspace, then falls back local-first.
+  const branchSelection = itemRow.branchGroup
+    ? resolveBranchGroupSelection({
+        members: itemRow.branchGroup,
+        groupKey: itemRow.branchGroupKey ?? '',
+        selection: ctx.branchGroupSelection,
+        activeWorktreeId: ctx.activeWorktreeId,
+        activeExecutionHostId: ctx.activeWorkspaceExecutionHostId
+      })
+    : null
+  const selectedBranchHostId = branchSelection?.selectedHostId
+  const cardWorktree = branchSelection?.member.worktree ?? itemRow.worktree
+  const cardRepo = branchSelection?.member.repo ?? itemRow.repo
   const worktreeDragGroupKey = ctx.groupKeyByRowKey.get(itemRow.rowKey)
-  const worktreeIdentity = getWorktreeHostIdentity(itemRow.worktree)
+  const worktreeIdentity = getWorktreeHostIdentity(cardWorktree)
   const isLineageDropTarget =
     ctx.worktreeDragState.draggingWorktreeId &&
     (ctx.worktreeDragState.lineageDropTargetId === itemRow.worktree.id ||
       ctx.nativeLineageDropTargetId === itemRow.worktree.id)
   const isActiveWorktree =
-    ctx.activeWorktreeId === itemRow.worktree.id &&
-    (!ctx.activeWorkspaceExecutionHostId ||
-      worktreeIdentity ===
-        composeWorktreeHostIdentity(ctx.activeWorkspaceExecutionHostId, itemRow.worktree.id))
+    Boolean(branchSelection?.isActiveGroup) ||
+    (ctx.activeWorktreeId === cardWorktree.id &&
+      (!ctx.activeWorkspaceExecutionHostId ||
+        worktreeIdentity ===
+          composeWorktreeHostIdentity(ctx.activeWorkspaceExecutionHostId, cardWorktree.id)))
   return (
     <div
       key={itemRow.rowKey}
@@ -153,17 +172,17 @@ export function renderWorktreeItemRow(
       role="option"
       aria-selected={ctx.selectedWorktreeIds.has(worktreeIdentity)}
       aria-current={isActiveWorktree ? 'page' : undefined}
-      data-worktree-id={itemRow.worktree.id}
+      data-worktree-id={cardWorktree.id}
       data-worktree-host-identity={worktreeIdentity}
       data-worktree-row-key={itemRow.rowKey}
       data-worktree-section-key={itemRow.sectionKey}
-      data-worktree-drag-id={worktreeDragGroupKey ? itemRow.worktree.id : undefined}
+      data-worktree-drag-id={worktreeDragGroupKey ? cardWorktree.id : undefined}
       data-worktree-drag-group-key={worktreeDragGroupKey}
       data-worktree-drag-group-index={ctx.groupIndexByRowKey.get(itemRow.rowKey)}
       className={cn(
         // Why: don't transition 'transform' — it lags/flashes when TanStack Virtual repositions adjacent rows.
         'relative transition-[opacity,filter] duration-150 ease-out',
-        ctx.worktreeDragState.draggingWorktreeId === itemRow.worktree.id &&
+        ctx.worktreeDragState.draggingWorktreeId === cardWorktree.id &&
           // Why: the fixed drag preview is the affordance; a translucent source row would bleed through sticky headers/footers.
           'pointer-events-none opacity-0'
       )}
@@ -179,17 +198,17 @@ export function renderWorktreeItemRow(
         if (nested) {
           event.stopPropagation()
         }
-        ctx.onRowPointerDown(event, itemRow.worktree, itemRow.rowKey)
+        ctx.onRowPointerDown(event, cardWorktree, itemRow.rowKey)
       }}
       style={{
         paddingLeft: surfaceInset > 0 ? `${surfaceInset}px` : undefined
       }}
     >
       <WorktreeCard
-        worktree={itemRow.worktree}
-        repo={itemRow.repo}
+        worktree={cardWorktree}
+        repo={cardRepo}
         isActive={isActiveWorktree}
-        isCurrentWorktree={ctx.currentWorktreeId === itemRow.worktree.id}
+        isCurrentWorktree={ctx.currentWorktreeId === cardWorktree.id}
         // Why: a child-active parent should look active without the active-card side effects (e.g. SSH reconnect UI).
         isActiveSurface={forceActiveSurface || isActiveWorktree}
         activeSurfaceVariant={
@@ -197,9 +216,7 @@ export function renderWorktreeItemRow(
         }
         isMultiSelected={ctx.selectedWorktreeIds.has(worktreeIdentity)}
         revealHighlight={ctx.highlightedRevealRowKey === itemRow.rowKey}
-        revealHighlightTone={
-          ctx.agentSendTargetWorktreeId === itemRow.worktree.id ? 'ai' : 'default'
-        }
+        revealHighlightTone={ctx.agentSendTargetWorktreeId === cardWorktree.id ? 'ai' : 'default'}
         selectedWorktrees={ctx.selectedWorktrees}
         nativeDragEnabled={false}
         isLineageDropTarget={Boolean(isLineageDropTarget)}
@@ -221,6 +238,10 @@ export function renderWorktreeItemRow(
         lineageCollapsed={itemRow.lineageCollapsed}
         lineageChildren={lineageChildren}
         lineageChildrenStyle={lineageChildrenStyle}
+        branchGroup={itemRow.branchGroup}
+        selectedBranchHostId={selectedBranchHostId}
+        branchGroupKey={itemRow.branchGroupKey}
+        onSelectBranchHost={ctx.onSelectBranchGroupHost}
         onLineageToggle={
           itemRow.lineageGroupKey ? ctx.getLineageToggleHandler(itemRow.lineageGroupKey) : undefined
         }
