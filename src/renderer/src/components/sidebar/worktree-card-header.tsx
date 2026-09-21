@@ -12,6 +12,7 @@ import { resolveRepoHeaderColor } from './project-header-color'
 import { formatSparseDirectoryPreview, shouldBeginWorktreeRename } from './worktree-card-model'
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import { WorktreeCardSshHostControl } from './WorktreeCardSshHostControl'
+import { WorktreeBranchHostSelect } from './WorktreeBranchHostSelect'
 import { WorktreeTitleInlineRename } from './WorktreeTitleInlineRename'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -83,6 +84,7 @@ export function WorktreeCardHeader({
     showInlineRepoBadge,
     showHeaderActions,
     showTitleRowPrimary,
+    showBranchHostSelect,
     showDeleteQuickAction,
     showTitleRowIndicators,
     titleRowIndicators,
@@ -266,6 +268,16 @@ export function WorktreeCardHeader({
 
       {showHeaderActions && (
         <div className="ml-auto flex shrink-0 items-center justify-center gap-1 pr-1.5">
+          {showBranchHostSelect && card.branchGroup ? (
+            <WorktreeBranchHostSelect
+              members={card.branchGroup}
+              selectedHostId={card.selectedBranchHostId ?? card.branchGroup[0].hostId}
+              groupKey={card.branchGroupKey ?? ''}
+              onSelectHost={card.onSelectBranchHost}
+              onPointerDown={stopQuickActionPointerPropagation}
+            />
+          ) : null}
+
           {showTitleRowPrimary && (
             <Tooltip>
               <TooltipTrigger asChild>

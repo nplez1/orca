@@ -9,9 +9,12 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../../../shared/execution-host'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { getHostDisplayLabelOverrides } from '../../../../../../shared/host-setting-overrides'
 import { buildRows } from '../grouping/build-rows'
+import { mergeSameBranchRows } from '../grouping/branch-groups'
+import { buildProjectGroupingIndex } from '../grouping/project-grouping'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, Row, WorktreeGroupBy } from '../grouping/row-types'
 import { getLogicalRepoOrderRankById } from '../../project-header-drop'
@@ -77,6 +80,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
+  const mergeSameBranchWorkspaces = useAppStore((s) => s.mergeSameBranchWorkspaces)
 
   // Why: manual header order is bound to state.repos; Recent/Smart derive order from the sorted worktree stream.
   const repoOrder = useMemo(
@@ -141,56 +145,73 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     [hostOptions]
   )
 
-  const rows: Row[] = useMemo(
-    () =>
-      buildRows(
-        args.groupBy,
-        worktrees,
-        repoMap,
-        args.prCache,
-        effectiveCollapsedGroups,
-        repoOrder,
-        args.workspaceStatuses,
-        args.projectOrderBy,
-        args.worktreeLineageById,
-        args.worktreeMap,
-        true,
-        args.settings,
-        args.visibleProjectGroupsForRows,
-        placeholderRepoIds,
-        args.importedWorktreesByRepo,
-        args.newExternalWorktreesInboxByRepo,
-        pendingCreations,
-        args.projectGrouping,
-        args.visibleFolderWorkspacesForRows,
-        hostLabelById,
-        defaultHostId,
-        args.pinnedDisplayPolicy
-      ),
-    [
+  const rows: Row[] = useMemo(() => {
+    const built = buildRows(
       args.groupBy,
       worktrees,
       repoMap,
       args.prCache,
       effectiveCollapsedGroups,
-      defaultHostId,
       repoOrder,
       args.workspaceStatuses,
       args.projectOrderBy,
       args.worktreeLineageById,
       args.worktreeMap,
+      true,
       args.settings,
-      args.projectGrouping,
       args.visibleProjectGroupsForRows,
-      args.visibleFolderWorkspacesForRows,
       placeholderRepoIds,
       args.importedWorktreesByRepo,
       args.newExternalWorktreesInboxByRepo,
       pendingCreations,
+      args.projectGrouping,
+      args.visibleFolderWorkspacesForRows,
       hostLabelById,
+      defaultHostId,
       args.pinnedDisplayPolicy
-    ]
-  )
+    )
+    // Why: merging is only sound inside a project section. An explicit host
+    // filter splits rows into host sections, where a cross-host card has no home.
+    const shouldMergeSameBranch =
+      args.groupBy === 'repo' &&
+      mergeSameBranchWorkspaces &&
+      args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE &&
+      !args.visibleWorkspaceHostIds
+    return shouldMergeSameBranch
+      ? mergeSameBranchRows(
+          built,
+          repoMap,
+          buildProjectGroupingIndex(args.projectGrouping),
+          defaultHostId,
+          hostLabelById
+        )
+      : built
+  }, [
+    args.groupBy,
+    worktrees,
+    repoMap,
+    args.prCache,
+    effectiveCollapsedGroups,
+    defaultHostId,
+    repoOrder,
+    args.workspaceStatuses,
+    args.projectOrderBy,
+    args.worktreeLineageById,
+    args.worktreeMap,
+    args.settings,
+    args.projectGrouping,
+    args.visibleProjectGroupsForRows,
+    args.visibleFolderWorkspacesForRows,
+    placeholderRepoIds,
+    args.importedWorktreesByRepo,
+    args.newExternalWorktreesInboxByRepo,
+    pendingCreations,
+    hostLabelById,
+    args.pinnedDisplayPolicy,
+    mergeSameBranchWorkspaces,
+    args.workspaceHostScope,
+    args.visibleWorkspaceHostIds
+  ])
   const orderedHostOptions = useMemo(
     () => orderHostSectionOptions(hostOptions, workspaceHostOrder),
     [hostOptions, workspaceHostOrder]

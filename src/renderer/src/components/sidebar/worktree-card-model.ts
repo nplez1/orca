@@ -1,7 +1,9 @@
 import type React from 'react'
 
 import type { Repo } from '../../../../shared/repo-types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { WorkspaceStatus, Worktree } from '../../../../shared/worktree/types'
+import type { BranchGroupMember } from './worktree-list/grouping/row-types'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 
 export type WorktreeRenameRequest = {
@@ -53,6 +55,13 @@ export type WorktreeCardProps = {
   nativeDragEnabled?: boolean
   affiliateListMode?: boolean
   statusPrDisplay?: WorktreeCardPrDisplay | null
+  /** Group by branch: every host's checkout of the branch, local-first. */
+  branchGroup?: readonly BranchGroupMember[]
+  /** Which host's workspace this card represents. */
+  selectedBranchHostId?: ExecutionHostId
+  /** Row key the branch-group selection is stored under. */
+  branchGroupKey?: string
+  onSelectBranchHost?: (groupKey: string, hostId: ExecutionHostId) => void
 }
 
 type DefaultedWorktreeCardProp =

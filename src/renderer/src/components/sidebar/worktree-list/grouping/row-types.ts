@@ -44,6 +44,19 @@ export type WorktreeRow = {
   lineageGroupKey?: string
   lineageCollapsed?: boolean
   hostContextLabel?: string
+  /** Present only when Group by branch merged two or more hosts onto one card.
+   *  Ordered local-first, and `worktree` above is always `branchGroup[0]`. */
+  branchGroup?: readonly BranchGroupMember[]
+  /** Stable key shared with the tab strip's host selection. */
+  branchGroupKey?: string
+}
+
+/** One host's checkout inside a same-branch merge (Group by branch). */
+export type BranchGroupMember = {
+  worktree: Worktree
+  repo: Repo | undefined
+  hostId: ExecutionHostId
+  hostLabel: string
 }
 
 export type ImportedWorktreesCardCandidate = {
