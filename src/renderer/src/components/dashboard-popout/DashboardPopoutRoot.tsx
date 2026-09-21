@@ -1,5 +1,6 @@
 import { useAppMenuPaste } from '@/hooks/useAppMenuPaste'
 import { useAppMenuSelectionActions } from '@/hooks/useAppMenuSelectionActions'
+import { useUiHangDiagnostics } from '@/lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 import { AgentKanbanBoard } from './AgentKanbanBoard'
 import { AgentDashboardSettingsMenu } from '@/components/dashboard/AgentDashboardSettingsMenu'
 import { useDashboardSnapshot } from './useDashboardSnapshot'
@@ -13,6 +14,7 @@ export function DashboardPopoutRoot(): React.JSX.Element {
   // Edit-menu IPC into the ownership events the terminal preview claims.
   useAppMenuPaste()
   useAppMenuSelectionActions()
+  useUiHangDiagnostics('popout')
   const snapshot = useDashboardSnapshot()
   return (
     <AgentKanbanBoard

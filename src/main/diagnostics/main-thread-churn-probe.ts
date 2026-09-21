@@ -84,17 +84,35 @@ export type SubprocessSpawnStats = {
 
 const spawnStatsByCommand = new Map<string, SubprocessSpawnStats>()
 
+// Why: the UI-hang log (Settings → Advanced → Debug Options) attributes main-thread stalls to
+// the spawns that blocked them, so attribution must be live whenever that setting is on — not
+// only under ORCA_MAIN_THREAD_DIAGNOSTICS. Owned by whichever lane enabled it.
+let settingAttributionEnabled = false
+
+/** Toggle attribution for the UI-hang log. Env mode keeps it on regardless. */
+export function setSubprocessSpawnAttributionEnabled(enabled: boolean): void {
+  settingAttributionEnabled = enabled
+  if (!isSubprocessSpawnAttributionEnabled()) {
+    // Why: leaving stale buckets behind would attribute an old window's spawns to the next stall.
+    spawnStatsByCommand.clear()
+  }
+}
+
+function isSubprocessSpawnAttributionEnabled(): boolean {
+  return settingAttributionEnabled || isMainThreadDiagnosticsEnabled()
+}
+
 /**
  * Record one subprocess spawn from the main process. `blockMs` is how long
  * the synchronous spawn/execFile initiation call held the main thread.
- * No-op unless ORCA_MAIN_THREAD_DIAGNOSTICS=1.
+ * No-op unless ORCA_MAIN_THREAD_DIAGNOSTICS=1 or the UI-hang log is enabled.
  */
 export function recordSubprocessSpawn(
   command: string,
   args: readonly string[],
   blockMs: number
 ): void {
-  if (!isMainThreadDiagnosticsEnabled()) {
+  if (!isSubprocessSpawnAttributionEnabled()) {
     return
   }
   const key = classifySubprocessCommand(command, args)
