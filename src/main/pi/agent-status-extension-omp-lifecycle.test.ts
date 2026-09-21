@@ -8,6 +8,17 @@ function postedHookNames(fetchMock: ReturnType<typeof vi.fn>): string[] {
   )
 }
 
+/** The descendant roster each post carried, in order. LOCAL(nplez1): the fork reports child runs
+ *  as a roster snapshot, so this is what an accepted alias has to show up in. */
+function postedSubagentRunIds(fetchMock: ReturnType<typeof vi.fn>): string[][] {
+  return fetchMock.mock.calls.map((call) => {
+    const body: { payload?: { subagent_runs?: { id: string }[] } } = JSON.parse(
+      String(call[1]?.body)
+    )
+    return (body.payload?.subagent_runs ?? []).map((run) => run.id)
+  })
+}
+
 const OMP_RUNTIME_CASES = [
   ['configured OMP', { kind: 'omp' as const }],
   ['title-routed OMP', { kind: 'pi' as const, title: 'omp' }],
@@ -53,12 +64,13 @@ describe('OMP agent_end contract', () => {
 
   it('accepts the pi-subagents async lifecycle aliases', async () => {
     const harness = createAgentStatusExtensionHarness({ kind: 'pi' })
+    // LOCAL(nplez1): these aliases feed the fork's descendant roster, and the pane is held
+    // working receiver-side from that roster — the lead's own `agent_end` is not withheld here.
     harness.emitPiEvent('subagent:async-started', { id: 'child-1' })
-    await harness.callHook('agent_settled')
-    expect(postedHookNames(harness.fetchMock)).toEqual(['agent_start'])
+    await vi.waitFor(() => expect(postedSubagentRunIds(harness.fetchMock)).toEqual([['child-1']]))
     harness.emitPiEvent('subagent:async-complete', { id: 'child-1' })
     await vi.waitFor(() =>
-      expect(postedHookNames(harness.fetchMock)).toEqual(['agent_start', 'agent_end'])
+      expect(postedSubagentRunIds(harness.fetchMock)).toEqual([['child-1'], []])
     )
   })
 
