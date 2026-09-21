@@ -10,6 +10,7 @@ import {
 import { resolveHostedReviewCreationProvider } from '../../../../../shared/hosted-review-creation-providers'
 import { localizedHostedReviewCopy } from '@/i18n/hosted-review-localized-copy'
 import { resolveChecksPanelReviewLookup } from '../checks-panel-review-lookup-authority'
+import { selectChecksCacheEntry } from '../checks-cache-entry-selection'
 import {
   getChecksPanelForegroundReviewEvidenceKey,
   resolveChecksPanelReviewEvidenceProvider
@@ -76,7 +77,20 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
   const prFetchedAt = useAppStore((s) =>
     prCacheKey ? s.prCache[prCacheKey]?.fetchedAt : undefined
   )
+  // Why: fetchPRChecks writes the head-sha keyed entry and only falls back to the legacy key on read; mirror both or the freshness gate never sees the write.
   const checksCacheKey =
+    repo && prNumber
+      ? getGitHubRepoCacheKey(
+          repo.path,
+          repo.id,
+          prChecksCacheSuffix(prNumber, pr?.prRepo, pr?.headSha),
+          settings,
+          repo.connectionId,
+          repo.executionHostId,
+          true
+        )
+      : ''
+  const legacyChecksCacheKey =
     repo && prNumber
       ? getGitHubRepoCacheKey(
           repo.path,
@@ -101,7 +115,9 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
         )
       : ''
   const checksFetchedAt = useAppStore((s) =>
-    checksCacheKey ? s.checksCache[checksCacheKey]?.fetchedAt : undefined
+    checksCacheKey
+      ? selectChecksCacheEntry(s.checksCache, checksCacheKey, legacyChecksCacheKey)?.fetchedAt
+      : undefined
   )
   const commentsFetchedAt = useAppStore((s) =>
     commentsCacheKey ? s.commentsCache[commentsCacheKey]?.fetchedAt : undefined
