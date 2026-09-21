@@ -211,6 +211,8 @@ export type GlobalSettings = {
   httpProxyBypassRules?: string
   /** Why: corporate TLS-intercepting proxies can break HTTP/2 downloads; opt-in Chromium process-wide HTTP/1.1 switch. */
   electronHttp1CompatibilityMode?: boolean
+  /** Opt-in stall logging for UI-hang diagnosis; off by default. Records renderer/main event-loop stalls and Electron unresponsive windows to logs/ui-hangs.ndjson. */
+  uiHangDiagnosticsEnabled?: boolean
   /** Opt-in in-app browsing (isolated guest surface); default keeps links opening in the system browser. */
   openLinksInApp: boolean
   /** Worktree-scoped localhost hostnames to distinguish tabs; opt-in since a non-localhost host can break apps binding cookies/sessions to localhost. */

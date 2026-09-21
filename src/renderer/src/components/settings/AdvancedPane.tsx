@@ -7,6 +7,7 @@ import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { AdvancedNetworkSettingsSection } from './AdvancedNetworkSettingsSection'
 import { SearchableSetting } from './SearchableSetting'
+import { UiHangDiagnosticsSetting } from './UiHangDiagnosticsSetting'
 import { SettingsSubsectionHeader, SettingsSwitch } from './SettingsFormControls'
 import { getAdvancedPaneSearchEntries, getAdvancedSearchEntry } from './advanced-search'
 import { translate } from '@/i18n/i18n'
@@ -146,6 +147,22 @@ export function AdvancedPane({ settings, updateSettings }: AdvancedPaneProps): R
           )}
         />
         <AdvancedNetworkSettingsSection settings={settings} updateSettings={updateSettings} />
+      </section>
+
+      <section className="space-y-3">
+        <SettingsSubsectionHeader
+          title={translate('auto.components.settings.AdvancedPane.c22adcc7c5', 'Debug Options')}
+          description={translate(
+            'auto.components.settings.AdvancedPane.9b1f52e764',
+            'Extra logging for troubleshooting Orca itself.'
+          )}
+        />
+        <UiHangDiagnosticsSetting
+          enabled={Boolean(settings.uiHangDiagnosticsEnabled)}
+          onToggle={() =>
+            updateSettings({ uiHangDiagnosticsEnabled: !settings.uiHangDiagnosticsEnabled })
+          }
+        />
       </section>
     </div>
   )
