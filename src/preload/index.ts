@@ -65,6 +65,7 @@ import { notebookApi } from './api/notebook-bridge'
 import { fsApi } from './api/fs-bridge'
 import { gitApi } from './api/git-bridge'
 import { uiApi } from './api/ui-bridge'
+import { uiHangDiagnosticsApi } from './api/ui-hang-diagnostics-api'
 import { statsApi } from './api/stats-bridge'
 import { memoryApi } from './api/memory-bridge'
 import { claudeUsageApi } from './api/claude-usage-bridge'
@@ -133,6 +134,7 @@ const api = {
   telemetryAcknowledgeBanner: telemetryAcknowledgeBannerApi,
   telemetryGetConsentState: telemetryGetConsentStateApi,
   diagnostics: diagnosticsApi,
+  uiHangDiagnostics: uiHangDiagnosticsApi,
   settings: settingsApi,
   agentAwake: agentAwakeApi,
   localhostWorktreeLabels: localhostWorktreeLabelsApi,

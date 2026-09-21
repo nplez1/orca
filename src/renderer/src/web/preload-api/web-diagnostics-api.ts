@@ -23,6 +23,12 @@ export function createWebDiagnosticsApi(): Partial<PreloadApi> {
       // Why: no Electron process on web; the caller falls back to performance.memory.
       readHeapStatistics: () => null
     },
+    // Why a no-op: there is no local Electron main process to own the log file, and the
+    // Debug Options pane that exposes the switch is desktop-only.
+    uiHangDiagnostics: {
+      record: () => {},
+      getStatus: () => Promise.resolve({ enabled: false, logFilePath: '' })
+    },
     diagnostics: {
       getStatus: () =>
         Promise.resolve({
