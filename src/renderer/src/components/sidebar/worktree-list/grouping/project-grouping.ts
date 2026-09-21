@@ -121,7 +121,7 @@ export type ProjectHeaderRevealTarget = {
 
 export function getProjectGroupingForRepo(
   repoId: string,
-  repoMap: Map<string, Repo>,
+  repoMap: ReadonlyMap<string, Repo>,
   projectIndex: ProjectGroupingIndex | null
 ): ProjectHeaderRevealTarget {
   const repo = repoMap.get(repoId)

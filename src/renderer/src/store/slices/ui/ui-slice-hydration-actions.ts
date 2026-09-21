@@ -137,6 +137,8 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           hideCliCreatedWorkspaces: ui.hideCliCreatedWorkspaces === true,
           hideDetachedHeadWorkspaces: ui.hideDetachedHeadWorkspaces === true,
           hideWorkspacesFromOtherDevices: ui.hideWorkspacesFromOtherDevices === true,
+          // Why !== false: absence means on, so profiles that predate the key still consolidate.
+          mergeSameBranchWorkspaces: ui.mergeSameBranchWorkspaces !== false,
           // Why !== false: profiles written before #8873 have no key, and they are
           // precisely the ones showing the bug, so absence must mean "exempt".
           alwaysShowDefaultBranchWorkspace: ui.alwaysShowDefaultBranchWorkspace !== false,
