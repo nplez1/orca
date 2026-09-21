@@ -22,4 +22,16 @@ describe('AdvancedPane', () => {
     expect(getAdvancedSearchEntry().http1Compatibility.keywords).toContain('support')
     expect(getAdvancedSearchEntry().http1Compatibility.keywords).toContain('troubleshooting')
   })
+
+  it('offers UI-hang logging in a Debug Options section, off by default', () => {
+    const markup = renderToStaticMarkup(
+      <AdvancedPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />
+    )
+
+    expect(markup).toContain('Debug Options')
+    expect(markup).toContain('Log UI hangs')
+    expect(markup).toContain('advanced-ui-hang-logging')
+    expect(getAdvancedSearchEntry().uiHangDiagnostics.keywords).toContain('hang')
+    expect(getAdvancedSearchEntry().uiHangDiagnostics.keywords).toContain('unresponsive')
+  })
 })
