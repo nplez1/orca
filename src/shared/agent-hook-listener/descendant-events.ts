@@ -169,6 +169,7 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   antigravity: null,
   amp: null,
   opencode: null,
+  opencode2: null,
   'mimo-code': null,
   cursor: null,
   droid: null,
