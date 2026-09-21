@@ -5623,6 +5623,7 @@
           "95c9754653": "Agent activity layout",
           "3d4b9c4997": "Hover",
           "ba87080fb7": "Show properties",
+          "mergeSameBranch": "Group by branch",
           "320b675c9a": "Card layout",
           "newCardDisplay": {
             "title": "Card display"
@@ -5711,6 +5712,9 @@
           "2ac106f6b2": "Color",
           "74b1413279": "Appearance",
           "ccbd1e2c69": "Customize {{value0}} appearance"
+        },
+        "WorktreeBranchHostSelect": {
+          "label": "Select host"
         },
         "WorktreeCard": {
           "a88c92d0e3": "{{value0}}/{{value1}} already exists.",

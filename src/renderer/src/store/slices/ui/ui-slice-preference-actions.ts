@@ -113,6 +113,8 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
     setHideDetachedHeadWorkspaces: (v) => set({ hideDetachedHeadWorkspaces: v }),
     hideWorkspacesFromOtherDevices: false,
     setHideWorkspacesFromOtherDevices: (v) => set({ hideWorkspacesFromOtherDevices: v }),
+    mergeSameBranchWorkspaces: true,
+    setMergeSameBranchWorkspaces: (v) => set({ mergeSameBranchWorkspaces: v }),
     alwaysShowDefaultBranchWorkspace: true,
     setAlwaysShowDefaultBranchWorkspace: (v) => set({ alwaysShowDefaultBranchWorkspace: v }),
 
