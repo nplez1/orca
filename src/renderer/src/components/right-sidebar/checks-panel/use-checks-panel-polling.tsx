@@ -5,10 +5,17 @@ import {
   checksPanelAsyncResultKey,
   checksPanelHostedReviewAsyncResultKey
 } from '../checks-panel-async-result-key'
+import type { PRCheckDetail } from '../../../../../shared/github/check-types'
+import type { CheckStatus } from '../../../../../shared/github/pull-request-types'
+import { derivePRCheckStatus } from '../../../../../shared/pr-check-status'
 import type { ChecksPanelContextState } from './use-checks-panel-context-state'
 import type { ChecksPanelControllerState } from './use-checks-panel-controller-state'
 import type { ChecksPanelComposerState } from './use-checks-panel-composer-state'
 import { fetchGitLabMRDetailsForChecks, gitLabMRCommentsToPRComments } from './gitlab-review-client'
+
+function hasUnfinishedChecks(checks: readonly PRCheckDetail[]): boolean {
+  return checks.some((check) => check.status !== 'completed')
+}
 
 type ChecksPanelPollingInput = Pick<
   ChecksPanelContextState,
@@ -19,6 +26,7 @@ type ChecksPanelPollingInput = Pick<
     | 'asyncResultKeyRef'
     | 'activeWorktree'
     | 'branch'
+    | 'checks'
     | 'fetchPRChecks'
     | 'isPanelVisible'
     | 'pollIntervalRef'
@@ -39,6 +47,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
     activeGitLabReview,
     asyncResultKeyRef,
     branch,
+    checks,
     fetchPRChecks,
     hostedReviewCacheKey,
     isCurrentAsyncResult,
@@ -57,6 +66,10 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
     gitLabProjectRefRef
   } = model
   const gitLabDetailsLoadingGenerationRef = useRef(0)
+  const checksPending = hasUnfinishedChecks(checks)
+  const checksStatus = derivePRCheckStatus(checks)
+  // Why: undefined until the panel has observed a PR status, so the first render doesn't force a redundant fetch.
+  const prChecksStatusRef = useRef<CheckStatus | null | undefined>(undefined)
   // Fetch checks via cached store method
   const fetchChecks = useCallback(
     async ({
@@ -83,7 +96,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
           pr?.headSha,
           pr?.prRepo,
           {
-            force,
+            // Why: a run can change state without a headSha bump; skip the renderer/gh cache so the panel shows live progress.
+            force: force || checksPending,
             repoId: repo.id
           }
         )
@@ -94,10 +108,11 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
 
         // Exponential backoff: unchanged checks double the interval (cap 120s), changes reset to 30s.
         const signature = JSON.stringify(result.map((c) => `${c.name}:${c.status}:${c.conclusion}`))
+        // Why: an unfinished run needs a steady 30s cadence; backing off would hide the next transition.
         pollIntervalRef.current =
-          signature === prevChecksRef.current
-            ? Math.min(pollIntervalRef.current * 2, 120_000)
-            : 30_000
+          hasUnfinishedChecks(result) || signature !== prevChecksRef.current
+            ? 30_000
+            : Math.min(pollIntervalRef.current * 2, 120_000)
         prevChecksRef.current = signature
       } catch (err) {
         if (
@@ -126,6 +141,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       pr?.headSha,
       pr?.prRepo,
       prCacheKey,
+      checksPending,
       fetchPRChecks,
       isCurrentAsyncResult,
       prevChecksRef,
@@ -189,9 +205,9 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         setComments(gitLabMRCommentsToPRComments(details?.comments))
         const signature = JSON.stringify(result.map((c) => `${c.name}:${c.status}:${c.conclusion}`))
         pollIntervalRef.current =
-          signature === prevChecksRef.current
-            ? Math.min(pollIntervalRef.current * 2, 120_000)
-            : 30_000
+          hasUnfinishedChecks(result) || signature !== prevChecksRef.current
+            ? 30_000
+            : Math.min(pollIntervalRef.current * 2, 120_000)
         prevChecksRef.current = signature
       } catch (err) {
         if (isRequestCurrent?.() === false || !isCurrentAsyncResult(requestKey)) {
@@ -229,6 +245,36 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       gitLabProjectRefRef
     ]
   )
+
+  // Why: a background PR refresh flips pr.checksStatus the moment a new run appears; refetch then instead of waiting out the backoff and the caches.
+  useEffect(() => {
+    if (activeGitLabReview || !isPanelVisible || !prNumber) {
+      prChecksStatusRef.current = undefined
+      return
+    }
+    const current = pr?.checksStatus ?? null
+    const previous = prChecksStatusRef.current
+    prChecksStatusRef.current = current
+    if (previous === undefined || previous === current) {
+      return
+    }
+    // Why: our own poll already painted this transition; only a PR-level move (a run we have not listed yet) needs the immediate refetch.
+    if (current === checksStatus) {
+      return
+    }
+    pollIntervalRef.current = 30_000
+    prevChecksRef.current = ''
+    void fetchChecks({ force: true })
+  }, [
+    activeGitLabReview,
+    checksStatus,
+    fetchChecks,
+    isPanelVisible,
+    pr?.checksStatus,
+    prNumber,
+    pollIntervalRef,
+    prevChecksRef
+  ])
 
   // Fetch checks on mount + poll with exponential backoff
   useEffect(() => {
