@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { WorktreeListScrollToTopButton } from '../../WorktreeListScrollToTopButton'
 import { renderWorktreeSidebarDropIndicators } from './drop-indicators'
 import { useWorktreeListScrollToTop } from './use-scroll-to-top'
@@ -63,6 +64,17 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const reveal = useSidebarRevealHighlight()
   const scrollSuppression = useWorktreeSidebarScrollSuppression(scrollRef)
   const { markDirectScrollInput, markScrollMovement } = scrollSuppression
+
+  // Why store state, not viewport state: the tab strip must see the same host
+  // choice the sidebar card shows, and virtualized rows unmount on scroll.
+  const branchGroupSelection = useAppStore((s) => s.branchGroupHostByKey)
+  const setBranchGroupHost = useAppStore((s) => s.setBranchGroupHost)
+  const handleSelectBranchGroupHost = useCallback(
+    (groupKey: string, hostId: ExecutionHostId) => {
+      setBranchGroupHost(groupKey, hostId)
+    },
+    [setBranchGroupHost]
+  )
 
   const renderRows = useMemo(() => buildRenderableRows(rows), [rows])
   const firstHeaderIndex = useMemo(
@@ -316,7 +328,9 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     getLineageToggleHandler,
     toggleGroupWithScrollAnchor,
     onRowClickCapture: handleWorktreeRowClickCapture,
-    onRowPointerDown: handleWorktreeRowPointerDown
+    onRowPointerDown: handleWorktreeRowPointerDown,
+    branchGroupSelection,
+    onSelectBranchGroupHost: handleSelectBranchGroupHost
   })
 
   return (

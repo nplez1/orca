@@ -70,6 +70,8 @@ export type PersistedUIState = {
   hideDetachedHeadWorkspaces?: boolean
   /** Hide workspaces with known provenance from another paired device or the host UI. */
   hideWorkspacesFromOtherDevices?: boolean
+  /** Consolidate same-branch workspaces from two or more hosts into one sidebar card. Absent means on. */
+  mergeSameBranchWorkspaces?: boolean
   /** Keep each project's main workspace out of the "Hide sleeping" sweep. Absent means on (#8873). */
   alwaysShowDefaultBranchWorkspace?: boolean
   /** Per-worktree Explorer dotfile visibility. Missing entries inherit the default: show. */
