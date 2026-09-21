@@ -42,3 +42,10 @@ export function getTraceFilePath(): string {
 export function getDaemonLogFilePath(): string {
   return join(getLogsDirectory(), 'daemon.log')
 }
+
+/** Opt-in UI-hang log (Settings → Advanced → Debug Options). Written only while
+ *  `uiHangDiagnosticsEnabled` is on; the settings pane shows this exact path so the
+ *  user can collect it without hunting through the logs folder. */
+export function getUiHangLogFilePath(): string {
+  return join(getLogsDirectory(), 'ui-hangs.ndjson')
+}
