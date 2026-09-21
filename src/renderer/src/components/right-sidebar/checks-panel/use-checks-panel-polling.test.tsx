@@ -34,12 +34,13 @@ import { useChecksPanelPolling } from './use-checks-panel-polling'
 type PollingInput = Parameters<typeof useChecksPanelPolling>[0]
 
 function createModel(overrides: Partial<PollingInput> = {}): PollingInput {
-  const fetchPRChecks = vi.fn<() => Promise<PRCheckDetail[]>>().mockResolvedValue([])
+  const fetchPRChecks = vi.fn<PollingInput['fetchPRChecks']>().mockResolvedValue([])
   return {
     activeGitLabReview: null,
     activeWorktree: null,
     asyncResultKeyRef: { current: 'cache::main::42' },
     branch: 'main',
+    checks: [],
     fetchPRChecks,
     hostedReviewCacheKey: 'hosted-review',
     isCurrentAsyncResult: () => true,
@@ -240,5 +241,76 @@ describe('useChecksPanelPolling live behavior', () => {
     await act(async () => secondRequest)
     expect(model.setChecksLoading).toHaveBeenLastCalledWith(false)
     expect(model.setCommentsLoading).toHaveBeenLastCalledWith(false)
+  })
+
+  it('bypasses the checks cache and holds a 30s cadence while a run is unfinished', async () => {
+    const inProgress: PRCheckDetail = {
+      name: 'build',
+      status: 'in_progress',
+      conclusion: null,
+      url: null
+    }
+    const model = createModel({ checks: [inProgress] })
+    vi.mocked(model.fetchPRChecks).mockResolvedValue([inProgress])
+    renderHook(() => useChecksPanelPolling(model))
+
+    await act(async () => poller.run?.())
+
+    expect(vi.mocked(model.fetchPRChecks)).toHaveBeenCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'head-1',
+      { owner: 'orca', repo: 'app', host: 'github.com' },
+      { force: true, repoId: 'repo-1' }
+    )
+    expect(model.pollIntervalRef.current).toBe(30_000)
+  })
+
+  it('keeps the cache for a settled run and backs off the poll interval', async () => {
+    const settled: PRCheckDetail = {
+      name: 'build',
+      status: 'completed',
+      conclusion: 'success',
+      url: null
+    }
+    const model = createModel({ checks: [settled] })
+    vi.mocked(model.fetchPRChecks).mockResolvedValue([settled])
+    renderHook(() => useChecksPanelPolling(model))
+
+    await act(async () => poller.run?.())
+    expect(vi.mocked(model.fetchPRChecks)).toHaveBeenLastCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'head-1',
+      expect.anything(),
+      { force: false, repoId: 'repo-1' }
+    )
+    expect(model.pollIntervalRef.current).toBe(30_000)
+
+    await act(async () => poller.run?.())
+    expect(model.pollIntervalRef.current).toBe(60_000)
+  })
+
+  it('refetches checks immediately when the PR check status changes', async () => {
+    const model = createModel()
+    const { rerender } = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: model }
+    })
+    await act(async () => {})
+    vi.mocked(model.fetchPRChecks).mockClear()
+
+    rerender({ input: { ...model, pr: { ...model.pr!, checksStatus: 'pending' } } })
+    await act(async () => {})
+
+    expect(vi.mocked(model.fetchPRChecks)).toHaveBeenCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'head-1',
+      expect.anything(),
+      { force: true, repoId: 'repo-1' }
+    )
   })
 })
