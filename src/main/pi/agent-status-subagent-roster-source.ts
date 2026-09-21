@@ -11,8 +11,9 @@ export function getPiSubagentRosterSetupSourceLines(): string[] {
     '    const listener = (event: unknown) => lifecycleState.onEvent?.(event)',
     '    lifecycleState.listener = listener',
     "    piEventBus.on('task:subagent:lifecycle', listener)",
-    "    piEventBus.on('subagent:async-started', (event: unknown) => lifecycleState.onEvent?.(event, 'started'))",
-    "    piEventBus.on('subagent:async-complete', (event: unknown) => lifecycleState.onEvent?.(event, 'completed'))",
+    // LOCAL(nplez1): the `subagent:async-*` aliases belong to the fork's descendant bus, which binds them
+    // once for pi only (agent-status-async-subagent-source.ts); binding them here too fired every child
+    // lifecycle event twice. `task:subagent:lifecycle` is OMP-only and stays.
     '  }',
     // Why: separate guard so a roster created by an older in-process build still subscribes.
     '  if (piEventBus?.on && !lifecycleState.runnerExitListener) {',
