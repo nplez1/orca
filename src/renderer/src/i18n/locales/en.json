@@ -6771,7 +6771,9 @@
           "8b7a8df299": "Low-level workarounds for support troubleshooting.",
           "8d8d8ac599": "Compatibility",
           "network": "Network",
-          "networkDescription": "App-level network routing for proxies and corporate environments."
+          "networkDescription": "App-level network routing for proxies and corporate environments.",
+          "c22adcc7c5": "Debug Options",
+          "9b1f52e764": "Extra logging for troubleshooting Orca itself."
         },
         "AgentLocationSetting": {
           "92f4238f1a": "WSL default",
@@ -9287,7 +9289,16 @@
             "2b4d26d11e": "networking",
             "e04e9db503": "advanced",
             "585f56fae0": "Use HTTP/1.1 for Electron networking when HTTP/2 fails behind a proxy.",
-            "11eea3da72": "HTTP/1.1 Compatibility"
+            "11eea3da72": "HTTP/1.1 Compatibility",
+            "644da2eee3": "UI Hang Logging",
+            "8fabd940ab": "Record UI-thread stalls and window freezes to a log file for troubleshooting.",
+            "6f65714112": "debug",
+            "b2f94335b1": "hang",
+            "20e4fb106c": "freeze",
+            "2046f3a33e": "unresponsive",
+            "70e4c7cdc0": "jank",
+            "74e2892304": "log",
+            "47b1470553": "diagnostics"
           }
         },
         "agents": {
@@ -12361,6 +12372,13 @@
         "SshTargetVisibilityToggle": {
           "hide": "Hide host",
           "unhide": "Unhide host"
+        },
+        "UiHangDiagnosticsSetting": {
+          "7879895603": "Log UI hangs",
+          "38d00b7a2e": "Off by default. Records UI-thread stalls and window freezes so you can share them when reporting a hang.",
+          "e19f83d807": "Log file",
+          "9fa69c4cae": "Written while logging is on.",
+          "2b5bd8a767": "Local log writes are disabled by policy (CI or ORCA_DIAGNOSTICS_DISABLED)."
         }
       },
       "right": {
