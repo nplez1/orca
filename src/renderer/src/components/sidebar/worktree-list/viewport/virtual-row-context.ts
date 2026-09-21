@@ -1,5 +1,6 @@
 import type React from 'react'
 import type { AppState } from '@/store/types'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { RenderRow } from '../listing/render-row'
@@ -45,6 +46,8 @@ type BuildArgs = {
     worktree: Worktree,
     rowKey: string
   ) => void
+  branchGroupSelection: Readonly<Record<string, ExecutionHostId>>
+  onSelectBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
 }
 
 // Assembles the per-render context the row dispatcher reads. Plain data — everything in it
@@ -126,6 +129,8 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       selectedWorktrees: props.selectedWorktrees,
       getActiveSurfaceVariant: primaryActive.getActiveSurfaceVariant,
       getLineageToggleHandler: args.getLineageToggleHandler,
+      branchGroupSelection: args.branchGroupSelection,
+      onSelectBranchGroupHost: args.onSelectBranchGroupHost,
       onSelectionGesture: props.onSelectionGesture,
       onContextMenuSelect: props.onContextMenuSelect,
       onImmediateActivate: primaryActive.handleImmediateWorktreeRowActivate,
