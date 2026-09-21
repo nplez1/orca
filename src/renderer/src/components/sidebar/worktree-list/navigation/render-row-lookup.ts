@@ -4,7 +4,7 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import type { RenderRow } from '../listing/render-row'
-import type { PinnedWorktreeDisplayPolicy } from '../grouping/row-types'
+import type { PinnedWorktreeDisplayPolicy, BranchGroupMember } from '../grouping/row-types'
 import { isPinnedWorktreeRow, type WorktreeItemRow } from '../listing/renderable-rows'
 
 export function getRenderRowSidebarKey(row: RenderRow): string | null {
@@ -36,11 +36,29 @@ export function rowKeyMatchesRenderRow(row: RenderRow, rowKey: string): boolean 
   return getRenderRowSidebarKey(row) === rowKey
 }
 
+function memberMatchesWorktree(
+  member: BranchGroupMember,
+  worktreeId: string,
+  executionHostId?: ExecutionHostId
+): boolean {
+  return (
+    member.worktree.id === worktreeId &&
+    (executionHostId === undefined || member.hostId === executionHostId)
+  )
+}
+
 function itemMatchesWorktree(
   item: WorktreeItemRow,
   worktreeId: string,
   executionHostId?: ExecutionHostId
 ): boolean {
+  // A Group by branch card stands in for every host it merged, so a reveal
+  // targeting any sibling must still land on this row.
+  if (item.branchGroup) {
+    return item.branchGroup.some((member) =>
+      memberMatchesWorktree(member, worktreeId, executionHostId)
+    )
+  }
   // Hostless matching is presentation-only legacy fallback; it never routes a workspace action.
   return (
     item.worktree.id === worktreeId &&
@@ -75,6 +93,15 @@ export function getRenderRowWorktreeItem(
     return row.rows.find((item) => itemMatchesWorktree(item, worktreeId, executionHostId)) ?? null
   }
   return row.type === 'item' && itemMatchesWorktree(row, worktreeId, executionHostId) ? row : null
+}
+
+function itemMatchesBranchGroupIdentity(item: WorktreeItemRow, identity: string): boolean {
+  return (
+    item.branchGroup?.some(
+      (member) =>
+        getWorktreeHostIdentity({ id: member.worktree.id, hostId: member.hostId }) === identity
+    ) ?? false
+  )
 }
 
 // Prefer the worktree's natural group row over its pinned duplicate when both are rendered.
@@ -119,7 +146,9 @@ export function findPreferredRenderRowIndexForWorktreeIdentity(
     }
     const itemRows = row.type === 'lineage-group' ? row.rows : row.type === 'item' ? [row] : []
     const itemRow = itemRows.find(
-      (candidate) => getWorktreeHostIdentity(candidate.worktree) === identity
+      (candidate) =>
+        getWorktreeHostIdentity(candidate.worktree) === identity ||
+        itemMatchesBranchGroupIdentity(candidate, identity)
     )
     if (!itemRow) {
       continue

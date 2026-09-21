@@ -7,6 +7,7 @@ import type {
   TabGroupLayoutNode
 } from '../../../../../shared/tab-types'
 import type { WorkspaceSessionState } from '../../../../../shared/workspace-session-state-types'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace-session-hydration-keys'
 
 export type TabSplitDirection = 'left' | 'right' | 'up' | 'down'
@@ -16,6 +17,10 @@ export type TabsSlice = {
   groupsByWorktree: Record<string, TabGroup[]>
   activeGroupIdByWorktree: Record<string, string>
   layoutByWorktree: Record<string, TabGroupLayoutNode>
+  /** Group-by-branch host choice, shared by the sidebar card and the tab strip.
+   *  Ephemeral view state: deliberately not part of the persisted workspace session. */
+  branchGroupHostByKey: Record<string, ExecutionHostId>
+  setBranchGroupHost: (groupKey: string, hostId: ExecutionHostId) => void
   createUnifiedTab: (
     worktreeId: string,
     contentType: TabContentType,

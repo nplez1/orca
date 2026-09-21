@@ -103,6 +103,30 @@ describe('createUISlice hydratePersistedUI', () => {
     expect(store.getState().alwaysShowDefaultBranchWorkspace).toBe(false)
   })
 
+  it('defaults same-branch consolidation to on', () => {
+    expect(createUIStore().getState().mergeSameBranchWorkspaces).toBe(true)
+  })
+
+  it('treats a legacy profile with no same-branch key as opted in', () => {
+    const store = createUIStore()
+    const legacy = makePersistedUI()
+    delete legacy.mergeSameBranchWorkspaces
+
+    store.getState().hydratePersistedUI(legacy, 'startup')
+
+    expect(store.getState().mergeSameBranchWorkspaces).toBe(true)
+  })
+
+  it('preserves an explicit same-branch consolidation opt-out on hydration', () => {
+    const store = createUIStore()
+
+    store
+      .getState()
+      .hydratePersistedUI(makePersistedUI({ mergeSameBranchWorkspaces: false }), 'startup')
+
+    expect(store.getState().mergeSameBranchWorkspaces).toBe(false)
+  })
+
   it('defaults workspace host scope to all hosts', () => {
     expect(getDefaultUIState().workspaceHostScope).toBe('all')
     expect(createUIStore().getState().workspaceHostScope).toBe('all')
