@@ -1,6 +1,10 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import {
+  COMPUTER_USE_BUNDLE_ID,
+  COMPUTER_USE_DISPLAY_NAME
+} from './computer-use-bundle-identity.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '../..')
 const packagePath = path.join(repoRoot, 'native', 'computer-use-macos')
@@ -14,8 +18,8 @@ const entitlementsPath = path.join(
   'build',
   'entitlements.computer-use.mac.plist'
 )
-const bundleId = process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? 'com.nplez1.orca.computer-use'
-const displayName = 'Orca Computer Use'
+const bundleId = process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID ?? COMPUTER_USE_BUNDLE_ID
+const displayName = COMPUTER_USE_DISPLAY_NAME
 const signingIdentity = resolveSigningIdentity()
 const universalTriples = ['arm64-apple-macosx', 'x86_64-apple-macosx']
 

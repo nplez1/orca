@@ -3,6 +3,7 @@ import { RuntimeClientError } from './runtime-client-error'
 import { readMacosBundleId, resetMacosTccPermission } from '../macos-tcc-reset'
 import { resolveMacOSComputerUseAppPath } from './macos-native-provider-paths'
 import { getComputerUsePermissionStatus } from './macos-computer-use-permission-status'
+import { ORCA_APP_ID } from '../../shared/local-build-compatibility'
 import type {
   ComputerUsePermissionId,
   ComputerUsePermissionResetResult,
@@ -10,7 +11,9 @@ import type {
   ComputerUsePermissionStatusResult
 } from '../../shared/computer-use-permissions-types'
 
-const DEFAULT_COMPUTER_USE_BUNDLE_ID = 'com.stablyai.orca.computer-use'
+// Why derived: the helper sits in the same reverse-DNS namespace as the app, and a literal here
+// once kept resetting the pre-rename bundle id instead of this install's own.
+const DEFAULT_COMPUTER_USE_BUNDLE_ID = `${ORCA_APP_ID}.computer-use`
 
 export { getComputerUsePermissionStatus } from './macos-computer-use-permission-status'
 
