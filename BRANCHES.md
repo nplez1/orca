@@ -1,7 +1,7 @@
 # Branch tracker
 
-Last updated **2026-09-19** — `nplez1/main` rebased onto upstream main @ `3ad6b7e46e`, 96
-commits on from the previous base `0b57ce0295`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+Last updated **2026-09-21** — `nplez1/main` rebased onto upstream main @ `663d670878`, 128
+commits on from the previous base `3ad6b7e46e`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
 for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
@@ -63,21 +63,21 @@ dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
 
-After the 2026-09-19 sync, **every PR-bound branch sits on a pre-sync base** — none of them was
+After the 2026-09-21 sync, **every PR-bound branch sits on a pre-sync base** — none of them was
 rebased this time either, because none is open and the plan is still to open them one at a time.
 Measured by merge-base against `upstream/main`:
 
 - the **seven PR-bound branches** (`fix/cli-symlink-world-readable`, `fix/copilot-background-work`,
   `fix/repo-catalog-connection-fence`, `fix/claude-codex-enterprise-accounts`, `feat/copilot-usage`,
-  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **241 commits behind**;
+  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **369 commits behind**;
 - the **five deliberately-left ones** (`feat/worktree-scan-cache-persistence`,
   `fix/terminal-session-reconnect`, `feat/startup-worktree-hydration`,
   `feat/startup-service-ordering`, `fix/agent-status-routing-readiness`) sit on `615b1370fb`,
-  **335 commits behind**.
+  **463 commits behind**.
 
 Re-measure rather than trusting those numbers (`node local/branch-status.mjs`, and merge-base against
 `upstream/main` for the behind count, which that script does not print). `origin/main` was
-fast-forwarded to the new base (`3ad6b7e46e`) at push time in this sync, so it is no longer the thing
+fast-forwarded to the new base (`663d670878`) at push time in this sync, so it is no longer the thing
 holding the seven PR-bound branches back — their own base is.
 
 **Five branches were deliberately left on the pre-sync base**, all unopened:
@@ -225,3 +225,11 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
   bundle id, data directory, home directory and CLI; see LOCAL-PATCHES.md § local(identity)), version
   numbering (`<package.json version>-np.<run number>`, already what the workflow derives), and the
   dev-channel leak (one update stream; see LOCAL-PATCHES.md § local(updater)).
+- **A full `pnpm test` needs its environment before it can be trusted.** Verified on 2026-09-21, four
+  unrelated setup gaps look like regressions and are not: the browser viewport suites need
+  `ORCA_BACKGROUND_LAUNCH=1`; the mobile bundle and render suites need `mobile`'s postinstall
+  (`node scripts/build-*-engine.mjs`) and a Playwright browser for the installed revision; the relay
+  unit suites need the `cloud/` workspace installed (`pg`); and a leftover
+  `tests/e2e/.cross-version-checkouts` (1.3 GB, ~184k files) overflows the `found.push(...)` spread in
+  the e2e walker with `Maximum call stack size exceeded`. With those in place the 2026-09-21 sync ran
+  green; without them, expect ~96 false failures.
