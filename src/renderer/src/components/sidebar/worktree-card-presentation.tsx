@@ -54,6 +54,7 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     hoverReview,
     hoverComment,
     linearIssue,
+    branchGroup,
     handleEditIssue,
     handleEditComment,
     handleOpenGitHubIssueInOrca,
@@ -109,7 +110,9 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
   const hasMetaRow = compactCards
     ? hasMetadataBadge || cacheStartedAt != null
     : hasDetailedMetaRowContent
-  const showHeaderActions = showTitleRowPrimary || showDeleteQuickAction
+  // Why: a same-branch merge is the only card that carries a host switcher.
+  const showBranchHostSelect = (branchGroup?.length ?? 0) > 1
+  const showHeaderActions = showTitleRowPrimary || showDeleteQuickAction || showBranchHostSelect
   // Why: normalize the title once so title/branch de-dupe and identity-only hover eligibility stay in sync.
   const trimmedVisibleCardTitle = visibleCardTitle.trim()
   const showBranchIdentityHover = newCardStyle
@@ -277,6 +280,7 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     showTitleRowIndicators,
     hasMetaRow,
     showHeaderActions,
+    showBranchHostSelect,
     showDeleteQuickAction,
     hoverBranchName,
     hoverWorkspaceTitle,

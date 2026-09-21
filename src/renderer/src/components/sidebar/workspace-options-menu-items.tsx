@@ -1,6 +1,7 @@
 import { useMemo, type JSX } from 'react'
 import { useAppStore } from '@/store'
 import {
+  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -96,6 +97,8 @@ export function WorkspaceOptionsMenuItems({
   const setSortBy = useAppStore((s) => s.setSortBy)
   const groupBy = useAppStore((s) => s.groupBy)
   const setGroupBy = useAppStore((s) => s.setGroupBy)
+  const mergeSameBranchWorkspaces = useAppStore((s) => s.mergeSameBranchWorkspaces)
+  const setMergeSameBranchWorkspaces = useAppStore((s) => s.setMergeSameBranchWorkspaces)
   const projectOrderBy = useAppStore((s) => s.projectOrderBy)
   const setProjectOrderBy = useAppStore((s) => s.setProjectOrderBy)
   const { hostOptions } = useSidebarHostScopeOptions()
@@ -233,6 +236,19 @@ export function WorkspaceOptionsMenuItems({
       )}
 
       <WorktreeCardDisplayMenuSection preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen} />
+      {/* Why: same-branch consolidation only has meaning inside a project section. */}
+      {groupBy === 'repo' && (
+        <DropdownMenuCheckboxItem
+          checked={mergeSameBranchWorkspaces}
+          onCheckedChange={(checked) => setMergeSameBranchWorkspaces(checked === true)}
+          onSelect={(e) => e.preventDefault()}
+        >
+          {translate(
+            'auto.components.sidebar.SidebarWorkspaceOptionsMenu.mergeSameBranch',
+            'Group by branch'
+          )}
+        </DropdownMenuCheckboxItem>
+      )}
       <DropdownMenuSeparator />
       <SidebarWorkspaceFilterSection />
     </>

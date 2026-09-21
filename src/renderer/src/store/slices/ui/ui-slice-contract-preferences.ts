@@ -57,6 +57,8 @@ export type UISlicePreferences = {
   setHideDetachedHeadWorkspaces: (v: boolean) => void
   hideWorkspacesFromOtherDevices: boolean
   setHideWorkspacesFromOtherDevices: (v: boolean) => void
+  mergeSameBranchWorkspaces: boolean
+  setMergeSameBranchWorkspaces: (v: boolean) => void
   alwaysShowDefaultBranchWorkspace: boolean
   setAlwaysShowDefaultBranchWorkspace: (v: boolean) => void
   showDotfilesByWorktree: Record<string, boolean>
