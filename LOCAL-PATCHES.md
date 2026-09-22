@@ -143,6 +143,73 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-22** — onto upstream `6ae5ef2d00` (67 commits), from the released tip `08b1285fda`
+  (np.10 released) plus the commit that landed on `nplez1/main` while the sync was running
+  (`3a346cc657`, #25 — cherry-picked onto the rebased line, where it replays byte-identical). 95
+  commits replayed: **87 byte-identical by `range-diff`, 8 adapted, none dropped.** Four of the 95
+  conflicted, across eight files:
+  - **Additive union** (1 file): `en.json` took upstream's `NativeChatResumeStatusSegment` (#21397)
+    beside our `providerCredits` block at the same spot. The derived catalog was regenerated, never
+    hand-merged.
+  - **Upstream rewrote the same hook** (4 files): upstream's #22173 (`b57facc5bc`, stale listings)
+    deleted `resolvedQuery` from `RuntimeFileListState` and replaced the hook's
+    `files`/`truncated`/`loading`/`resolvedQuery` state with a request-keyed `{ listing,
+    loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalCount`,
+    `ignoredFiles`, `queryMode`/`queryLimit` and the name-filter matcher to that same hook.
+    Converged on upstream's model: `totalCount` and `ignoredFiles` moved *into* the request-keyed
+    listing — upstream's own comment there already promises "local listings key without the query, so
+    they answer every query" — so every `setTotalCount`/`setIgnoredFiles` site collapsed into
+    `setListing(NO_LISTING)` / `setListing({ requestKey, ...result })`, and our renderer-side
+    `nameFilterListingIsUsable` fence was deleted rather than ported, because the hook now produces
+    exactly the behaviour it implemented. One upstream test was **dropped**:
+    `'keeps the local listing across query changes without restarting it'` asserts the pre-#20
+    premise (one `listRuntimeFiles` across query changes) that #20 deliberately replaces with a
+    per-query host search, so it cannot hold here.
+  - **Upstream refactored the same surface** (3 files): upstream's #22098 (`6ce7208b98`) moved
+    `buildVisibleWorktreeOptionsFromState` and the paired-device helpers out of `visible-worktrees.ts`
+    into `visible-worktree-options-from-state.ts`, while our #23 extracted the four kind filters into
+    `visible-worktree-kind-filters.ts`, added `hiddenWorkspaceStatusIds` to `VisibleWorktreeOptions`
+    and threaded it through the sidebar pipeline, the jump palette and the board. Re-seated rather
+    than unioned: the status field now lands in the *new* builder module; `visible-worktrees.ts`
+    takes upstream's narrower import set plus our `applyWorkspaceKindFilters`, which is what retires
+    `isDefaultBranchWorkspace` and the paired-device helpers from that file; and the jump palette
+    keeps upstream's `worktreeIdsWithStructuredChat` memo beside our `kindFilteredWorktrees`.
+  - **The traps, both found by a gate and neither behind a conflict marker** — five sites across four
+    files, split across two gates:
+    1. **`pnpm tc`** (`90a9b123d1`): `use-file-explorer-name-filter.test.ts` set `resolvedQuery` on a
+       mocked listing (upstream deleted the field); `use-visible-worktrees.test.tsx` built a
+       `filterState` for a test upstream added in #22098 without `hiddenWorkspaceStatusIds`, which
+       our #23 made required; and `AiVaultPanel.legacy-filter.test.tsx` enabled the vault search as
+       `enabled`, the legacy name, in two tests upstream added, against the `contentEnabled` type our
+       `3141d7578a` had narrowed. Those last two still **passed** at runtime through
+       `resolveAiVaultSearchSettings`'s legacy `enabled` fallback, so only the typechecker saw them.
+    2. **A failing test, not a type error** (`7f011bbc1c`): our `da585d39a4`'s "falls back to this
+       install's own helper bundle id" test read the helper plist with `execFileSync` and asserted
+       the reset against `spawnSync`; upstream then moved both the bundle-id read and `tccutil reset`
+       onto the shared `runProcess` chokepoint (`macos-tcc-reset.ts`). The clean merge kept our test
+       with upstream's implementation, so the test's way of making the plist unreadable never reached
+       the code under test. Its production half is intact and still what the test pins:
+       `DEFAULT_COMPUTER_USE_BUNDLE_ID` is `${ORCA_APP_ID}.computer-use` here, where upstream
+       hardcodes `com.stablyai.orca.computer-use`.
+    Both are carried as **two commits on top of the replayed series** rather than folded back into
+    the commits they belong to, matching how the 2026-09-21 sync carried `9908062478` and
+    `c7e93e5b2d`. They are the two `>` entries the sync's `range-diff` prints.
+  - Verified: `pnpm tc` clean; **7,308 passing tests across 850 files** (4 skipped) covering every
+    touched area — the explorer name filter and its projection/truncation notices, quick-open,
+    sidebar listing/jump-palette/board, settings accounts, ai-vault, rate-limits, updater,
+    computer-use, the github PR cache and source control, and filesystem search; `range-diff` with all
+    95 patches paired and the pre-sync-tip lost-content diff empty; the localization catalog
+    regenerated with no diff and both verifiers green; the fork's builder config loads and the update
+    feed still names `nplez1/orca`; `pnpm install --frozen-lockfile` clean, the `package.json` delta
+    being scripts only.
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports 36 findings
+    (27 design-system) across 1,396 changed files. The gate's base still resolves to the old base
+    `663d670878` — `origin/HEAD` names the pre-sync tip, so its merge-base falls back and the whole
+    fork+upstream delta reads as added lines. All nine flagged files are **byte-identical to the
+    released np.10 tip**, so this sync added none of them.
+  - **Still open from 2026-09-21, unchanged:** the OMP async-alias coverage given up by converging on
+    the fork's pi subsystem.
+
 - **2026-09-21** — onto upstream `663d670878` (128 commits), from the released tip `b2ac711f55`
   (np.9 released; the next build stamps its own run number). 84 commits replayed: **75
   byte-identical by `range-diff`, 9 adapted, none dropped.** Six of the 84 conflicted, across five
