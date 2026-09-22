@@ -68,6 +68,8 @@ export type PersistedUIState = {
   hideCliCreatedWorkspaces?: boolean
   /** Hide workspaces sitting on a detached HEAD; folder workspaces (no head at all) are unaffected. */
   hideDetachedHeadWorkspaces?: boolean
+  /** Board status ids the sidebar hides; empty means every status is visible. Unassigned/unknown statuses stay visible. */
+  hiddenWorkspaceStatusIds?: string[]
   /** Hide workspaces with known provenance from another paired device or the host UI. */
   hideWorkspacesFromOtherDevices?: boolean
   /** Consolidate same-branch workspaces from two or more hosts into one sidebar card. Absent means on. */
