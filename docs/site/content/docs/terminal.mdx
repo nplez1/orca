@@ -72,7 +72,9 @@ The floating terminal is a global shell surface that's always one chord away, re
 
 - Toggle it with `Cmd+Option+A` (macOS) / `Ctrl+Alt+A` (Linux/Windows). The same chord focuses the panel if it's already open and dismisses it if it's already focused.
 - Click the floating button on the edge of the window, or move the trigger to the status bar under [Settings → Terminal → Floating terminal](/docs/settings).
-- Set the starting working directory under the same setting (`~` by default) so new floating tabs land where you expect.
+- New floating tabs, agents, and terminals start in the floating workspace's own folder, `~/.orca/floating-workspace`, so they never inherit a repo or your home directory as a working directory. Pick a different folder under the same setting if you want one.
+- Put floating-workspace agent instructions in that folder's `AGENTS.md` (Orca seeds a comment-only file there); agents launched from the floating panel read it from their working directory. Use **Show in Finder** / **Show in Explorer** next to the setting to open the folder.
+- Floating markdown notes are saved in that same folder, even when you point the terminal directory somewhere else, so notes, agent instructions, and scratch files stay together.
 - The floating panel hosts its own tabs and supports orchestration setup — kick off background runs without claiming a worktree pane.
 
 ## Quick Commands

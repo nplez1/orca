@@ -1,11 +1,13 @@
 import { statSync } from 'node:fs'
 import type { Store } from '../../../persistence'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
 import {
   resolveTerminalStartupCwdForWorkspace,
   type TerminalStartupCwdMissingDirFallback
 } from '../../../../shared/terminal-startup-cwd'
+import { ensureFloatingWorkspaceLaunchDirectorySync } from '../../../floating-workspace-launch-directory'
 import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus
@@ -33,6 +35,11 @@ export function resolvePtySpawnStartupCwd(
   cwd: string | undefined,
   missingDirFallback?: TerminalStartupCwdMissingDirFallback
 ): string | undefined {
+  if (worktreeId === FLOATING_TERMINAL_WORKTREE_ID && !cwd?.trim()) {
+    // Why: the floating workspace has no worktree root to anchor a default, so an omitted cwd would
+    // otherwise land in whatever directory the host process happens to run from.
+    return ensureFloatingWorkspaceLaunchDirectorySync()
+  }
   return resolveTerminalStartupCwdForWorkspace({
     workspaceId: worktreeId,
     requestedCwd: cwd,
