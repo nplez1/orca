@@ -1,6 +1,6 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import { collectRuntimeWorktreeAgentSources } from './runtime-worktree-agent-sources'
-import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './orca-runtime-start-tui-idle-visible-read-probe'
+import { OrcaRuntimeWithSetupRunnerState } from './orca-runtime-setup-runner-state'
 import { DEFAULT_WORKTREE_PS_LIMIT } from './orca-runtime-postlude'
 import type { RuntimeWorktreePsResult } from '../../shared/runtime-types'
 import { buildRuntimeWorktreePsSummaries } from './runtime-worktree-ps-summaries'
@@ -25,7 +25,7 @@ import { claudeStructuredPermissionModeForSettings } from '../claude/claude-stru
 import { codexStructuredPermissionPolicyForSettings } from '../codex/codex-structured-permission-policy'
 import { claudeStructuredAuthPolicyForSettings } from '../claude-accounts/claude-structured-auth-policy'
 
-export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVisibleReadProbe {
+export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithSetupRunnerState {
   async getWorktreePs(
     limit = DEFAULT_WORKTREE_PS_LIMIT,
     sourceDefaultsSupported = true

@@ -289,6 +289,53 @@ describe('resolveWorktreeStatus', () => {
     ).toBe('permission')
   })
 
+  it('reports setup while the repo setup script runs, above the passive states', () => {
+    const base = {
+      tabs: [{ id: 'tab-1', title: 'bash' }],
+      browserTabs: [],
+      ptyIdsByTabId: livePtyMap('tab-1'),
+      hasPermission: false,
+      hasLiveWorking: false,
+      hasLiveDone: false,
+      hasRetainedDone: false
+    }
+
+    // Why: the setup runner is the worktree's only live PTY and reports no
+    // agent status, so without this it would read as plain 'active'.
+    expect(resolveWorktreeStatus({ ...base, setupRunning: true })).toBe('setup')
+    expect(resolveWorktreeStatus({ ...base, setupRunning: true, hasLiveDone: true })).toBe('setup')
+    expect(resolveWorktreeStatus({ ...base, setupRunning: true, hasInterrupted: true })).toBe(
+      'setup'
+    )
+    expect(resolveWorktreeStatus({ ...base, setupRunning: false })).toBe('active')
+  })
+
+  it('lets a real agent state outrank setup', () => {
+    const base = {
+      tabs: [{ id: 'tab-1', title: 'bash' }],
+      browserTabs: [],
+      ptyIdsByTabId: livePtyMap('tab-1'),
+      hasLiveDone: false,
+      hasRetainedDone: false,
+      setupRunning: true
+    }
+
+    expect(resolveWorktreeStatus({ ...base, hasPermission: true, hasLiveWorking: true })).toBe(
+      'permission'
+    )
+    expect(resolveWorktreeStatus({ ...base, hasPermission: false, hasLiveWorking: true })).toBe(
+      'working'
+    )
+    expect(
+      resolveWorktreeStatus({
+        ...base,
+        hasPermission: false,
+        hasLiveWorking: false,
+        hasLiveMonitoring: true
+      })
+    ).toBe('monitoring')
+  })
+
   it('lets heuristic working beat hasLiveDone (newer in-progress signal wins)', () => {
     const status = resolveWorktreeStatus({
       tabs: [{ id: 'tab-1', title: 'claude [working]' }],

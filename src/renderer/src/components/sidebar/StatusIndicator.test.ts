@@ -85,6 +85,25 @@ describe('StatusIndicator', () => {
     expect(classNames).not.toContain('bg-emerald-500')
   })
 
+  it('renders setup as a pulsing amber dot, not a working spinner', () => {
+    const classNames = renderDotClassNames('setup')
+    const markup = renderMarkup('setup')
+
+    expect(classNames).toContain('bg-workspace-status-progress')
+    expect(classNames).toContain('animate-pulse')
+    // Why: a pulsing dot must still read as a static dot under reduced motion.
+    expect(classNames).toContain('motion-reduce:animate-none')
+    expect(classNames).not.toContain('bg-emerald-500')
+    expect(markup).not.toContain('data-agent-spinner')
+  })
+
+  it('labels setup as its own state rather than an agent one', () => {
+    const markup = renderMarkup('setup')
+
+    expect(markup).toContain('data-state-indicator-tooltip="Setting up…"')
+    expect(markup).not.toContain(' title=')
+  })
+
   it.each([
     ['working', 'Working'],
     ['monitoring', 'Monitoring background tasks'],

@@ -246,8 +246,10 @@ export function terminalTabActivityToAgentDotState(
     case 'interrupted':
     case 'done':
       return status
+    // Why: setup is a worktree-level fact; a single tab has no setup state of its own.
     case 'active':
     case 'inactive':
+    case 'setup':
       return null
   }
 }
