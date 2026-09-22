@@ -291,34 +291,40 @@ describe('openComputerUsePermissions', () => {
     vi.mocked(readFile)
       .mockResolvedValueOnce('{"accessibility":"granted","screenshots":"granted"}')
       .mockResolvedValueOnce('{"accessibility":"not-granted","screenshots":"not-granted"}')
-    vi.mocked(execFileSync).mockImplementation(() => {
-      throw new Error('plist missing')
-    })
     vi.mocked(spawnSync).mockReturnValue({ status: 0 } as ReturnType<typeof spawnSync>)
+    // Why: an empty PlistBuddy reply is how the shared reader reports "unreadable".
+    plistBuddyStdout.value = ''
 
     // Why: a literal here once reset the pre-rename helper's grants instead of this install's,
     // which left users unable to clear the stale rows macOS kept denying against.
     const ownHelperBundleId = `${ORCA_APP_ID}.computer-use`
-    await expect(resetComputerUsePermissions()).resolves.toEqual({
-      platform: 'darwin',
-      helperAppPath: '/Applications/Orca Computer Use.app',
-      helperUnavailableReason: null,
-      bundleId: ownHelperBundleId,
-      permissions: [
-        { id: 'accessibility', status: 'not-granted' },
-        { id: 'screenshots', status: 'not-granted' }
-      ]
-    })
-    expect(spawnSync).toHaveBeenCalledWith(
-      '/usr/bin/tccutil',
-      ['reset', 'Accessibility', ownHelperBundleId],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-    )
-    expect(spawnSync).toHaveBeenCalledWith(
-      '/usr/bin/tccutil',
-      ['reset', 'ScreenCapture', ownHelperBundleId],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-    )
+    try {
+      await expect(resetComputerUsePermissions()).resolves.toEqual({
+        platform: 'darwin',
+        helperAppPath: '/Applications/Orca Computer Use.app',
+        helperUnavailableReason: null,
+        bundleId: ownHelperBundleId,
+        permissions: [
+          { id: 'accessibility', status: 'not-granted' },
+          { id: 'screenshots', status: 'not-granted' }
+        ]
+      })
+      // Argv is asserted exactly; the options belong to the shared spawn chokepoint these now run
+      // through, which owns and tests them.
+      const throughChokepoint = expect.objectContaining({ shell: false, windowsHide: true })
+      expect(spawn).toHaveBeenCalledWith(
+        '/usr/bin/tccutil',
+        ['reset', 'Accessibility', ownHelperBundleId],
+        throughChokepoint
+      )
+      expect(spawn).toHaveBeenCalledWith(
+        '/usr/bin/tccutil',
+        ['reset', 'ScreenCapture', ownHelperBundleId],
+        throughChokepoint
+      )
+    } finally {
+      plistBuddyStdout.value = 'com.example.orca.computer-use\n'
+    }
   })
 })
 
