@@ -14,7 +14,9 @@ const subscribeMethod = eraseRpcMethods(ALL_RPC_METHODS).find(
   (method) => method.name === 'runtime.clientEvents.subscribe' && isStreamingMethod(method)
 ) as RpcStreamingMethod
 
-function makeRuntime(): {
+function makeRuntime(overrides?: {
+  getSetupRunnerClientEventSnapshot?: () => RuntimeClientEvent[]
+}): {
   runtime: OrcaRuntimeService
   onClientEvent: ReturnType<typeof vi.fn>
   cleanups: (() => void)[]
@@ -33,6 +35,7 @@ function makeRuntime(): {
       cleanups.push(cleanup)
     }
   } as unknown as OrcaRuntimeService
+  Object.assign(runtime, overrides)
   return { runtime, onClientEvent, cleanups }
 }
 
@@ -65,6 +68,28 @@ describe('runtime.clientEvents.subscribe', () => {
     expect(onClientEvent).toHaveBeenCalledWith(expect.any(Function), {
       consumesTerminalSideEffects: true
     })
+    cleanups.forEach((cleanup) => cleanup())
+    await done
+  })
+
+  it('replays the setting-up snapshot so a reloaded client cannot strand the dot', async () => {
+    const setupRunning: RuntimeClientEvent = {
+      type: 'worktreeSetupRunnerState',
+      worktreeId: 'wt-1',
+      running: true
+    }
+    const { runtime, cleanups } = makeRuntime({
+      getSetupRunnerClientEventSnapshot: () => [setupRunning]
+    })
+    const emitted: unknown[] = []
+
+    const done = subscribeMethod.handler(
+      undefined,
+      { runtime, connectionId: 'conn-1' } as RpcContext,
+      (event) => emitted.push(event)
+    )
+
+    expect(emitted).toContainEqual(setupRunning)
     cleanups.forEach((cleanup) => cleanup())
     await done
   })

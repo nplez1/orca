@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
+import type { RuntimeClientEvent } from '../../../shared/runtime-client-events'
+import { SETUP_RUNNER_WATCHDOG_MS } from '../orca-runtime-setup-runner-state'
 import {
   TEST_WORKTREE_ID,
   TEST_WORKTREE_PATH,
@@ -10,6 +12,36 @@ import {
 } from '../orca-runtime-test-fixtures.spec'
 
 describe('OrcaRuntimeService', () => {
+  /** 133;D also emits a `terminalSideEffects` fact; these tests only assert on the state event. */
+  function setupRunnerEvents(events: readonly RuntimeClientEvent[]): RuntimeClientEvent[] {
+    return events.filter((event) => event.type === 'worktreeSetupRunnerState')
+  }
+
+  /** A runtime with one live PTY whose setup runner has just been armed. */
+  async function startArmedSetupRunner(ptyId: string): Promise<{
+    runtime: OrcaRuntimeService
+    events: RuntimeClientEvent[]
+    handle: string
+  }> {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: ptyId }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const events: RuntimeClientEvent[] = []
+    runtime.onClientEvent((event) => events.push(event))
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.armWorktreeSetupRunner(handle, TEST_WORKTREE_ID, `token-${ptyId}`)
+    expect(setupRunnerEvents(events)).toEqual([
+      { type: 'worktreeSetupRunnerState', worktreeId: TEST_WORKTREE_ID, running: true }
+    ])
+    return { runtime, events, handle }
+  }
+
   it('waits for exit on background terminal handles', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
@@ -649,5 +681,138 @@ describe('OrcaRuntimeService', () => {
       condition: 'tui-idle',
       status: 'running'
     })
+  })
+
+  it('announces a worktree as setting up until its runner reports completion', async () => {
+    const { runtime, events, handle } = await startArmedSetupRunner('pty-setup-state')
+
+    // Why: a renderer reload while setup runs gets this on subscribe instead of
+    // the already-emitted 'running' event, which it never saw.
+    expect(runtime.getSetupRunnerClientEventSnapshot()).toEqual([
+      { type: 'worktreeSetupRunnerState', worktreeId: TEST_WORKTREE_ID, running: true }
+    ])
+
+    runtime.onPtyData(
+      'pty-setup-state',
+      '__ORCA_SETUP_COMPLETE__:token-pty-setup-state:0\r\n$',
+      100
+    )
+
+    // Why: the runner's interactive shell stays alive, so only the completion
+    // marker (not a PTY exit) may clear the state.
+    await vi.waitFor(() => expect(events).toHaveLength(2))
+    expect(events[1]).toEqual({
+      type: 'worktreeSetupRunnerState',
+      worktreeId: TEST_WORKTREE_ID,
+      running: false
+    })
+    expect(runtime.getSetupRunnerClientEventSnapshot()).toEqual([])
+    await expect(runtime.readTerminal(handle)).resolves.toMatchObject({ status: 'running' })
+  })
+
+  it('does not announce setup for a handle that is already gone', () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-setup-absent' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const events: RuntimeClientEvent[] = []
+    runtime.onClientEvent((event) => events.push(event))
+
+    // Why: announcing 'running' for a runner that already ended would strand the dot.
+    runtime.armWorktreeSetupRunner('handle-never-issued', TEST_WORKTREE_ID, 'token-absent')
+
+    expect(events).toEqual([])
+  })
+
+  it('clears setting-up when the runner is interrupted before its marker prints', async () => {
+    const { runtime, events } = await startArmedSetupRunner('pty-setup-interrupt')
+
+    // Why: Ctrl+C kills the wrapped command line before the wrapper's marker
+    // runs, so only the prompt returning (OSC 133;D) reports the abort.
+    runtime.onPtyData('pty-setup-interrupt', '^C\r\n\x1b]133;D;130\x07\r\n$ ', 100)
+
+    expect(setupRunnerEvents(events)).toEqual([
+      { type: 'worktreeSetupRunnerState', worktreeId: TEST_WORKTREE_ID, running: true },
+      { type: 'worktreeSetupRunnerState', worktreeId: TEST_WORKTREE_ID, running: false }
+    ])
+  })
+
+  it('clears setting-up when the setup PTY exits, and does not resurrect it', async () => {
+    const { runtime, events } = await startArmedSetupRunner('pty-setup-exit')
+
+    runtime.onPtyExit('pty-setup-exit', 1)
+
+    expect(setupRunnerEvents(events)).toHaveLength(2)
+    expect(setupRunnerEvents(events)[1]).toEqual({
+      type: 'worktreeSetupRunnerState',
+      worktreeId: TEST_WORKTREE_ID,
+      running: false
+    })
+    expect(runtime.getSetupRunnerClientEventSnapshot()).toEqual([])
+
+    // Why: a repeated exit, or the completion that raced it, must not re-announce.
+    runtime.onPtyExit('pty-setup-exit', 1)
+    runtime.onPtyData('pty-setup-exit', '__ORCA_SETUP_COMPLETE__:token-pty-setup-exit:0\r\n$', 101)
+    expect(setupRunnerEvents(events)).toHaveLength(2)
+  })
+
+  it('clears setting-up when a runner never reports an end at all', async () => {
+    vi.useFakeTimers()
+    try {
+      const { runtime, events } = await startArmedSetupRunner('pty-setup-wedged')
+
+      // Why: a shell wedged in its own rc never runs the queued setup command, so
+      // no OSC 133, no marker, and no exit ever arrive while the PTY stays alive.
+      await vi.advanceTimersByTimeAsync(SETUP_RUNNER_WATCHDOG_MS + 1)
+
+      expect(events).toHaveLength(2)
+      expect(events[1]).toMatchObject({ running: false })
+      expect(runtime.getSetupRunnerClientEventSnapshot()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a worktree setting up until every runner for it has ended', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi
+        .fn()
+        .mockResolvedValueOnce({ id: 'pty-setup-first' })
+        .mockResolvedValueOnce({ id: 'pty-setup-second' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const events: RuntimeClientEvent[] = []
+    runtime.onClientEvent((event) => events.push(event))
+    const first = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'setup-a'
+    })
+    const second = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'setup-b'
+    })
+    expect(second.handle).not.toBe(first.handle)
+
+    runtime.armWorktreeSetupRunner(first.handle, TEST_WORKTREE_ID, 'token-first')
+    runtime.armWorktreeSetupRunner(second.handle, TEST_WORKTREE_ID, 'token-second')
+    expect(setupRunnerEvents(events)).toHaveLength(1)
+
+    runtime.onPtyData('pty-setup-first', '\x1b]133;D;0\x07', 100)
+    // Why: the other runner for this worktree is still going, so the dot stays.
+    expect(runtime.getSetupRunnerClientEventSnapshot()).toHaveLength(1)
+    expect(setupRunnerEvents(events)).toHaveLength(1)
+
+    runtime.onPtyData('pty-setup-second', '\x1b]133;D;0\x07', 100)
+    expect(runtime.getSetupRunnerClientEventSnapshot()).toEqual([])
+    expect(setupRunnerEvents(events)).toHaveLength(2)
+    expect(setupRunnerEvents(events)[1]).toMatchObject({ running: false })
   })
 })
