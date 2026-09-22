@@ -194,7 +194,7 @@ it('keeps sort off the filter menu, which is filters only', async () => {
 })
 
 it('puts the hit count and the search sort on the same bar once the index answers', async () => {
-  mockState.settings = { aiVaultSearch: { enabled: true } }
+  mockState.settings = { aiVaultSearch: { contentEnabled: true } }
   searchSessions.mockResolvedValue({
     kind: 'results',
     hits: [
@@ -225,7 +225,7 @@ it('puts the hit count and the search sort on the same bar once the index answer
 })
 
 it('hands the list one untitled group while searching, and titled groups while browsing', async () => {
-  mockState.settings = { aiVaultSearch: { enabled: true } }
+  mockState.settings = { aiVaultSearch: { contentEnabled: true } }
   searchSessions.mockResolvedValue({
     kind: 'results',
     hits: [
