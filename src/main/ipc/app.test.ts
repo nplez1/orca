@@ -102,7 +102,7 @@ vi.mock('../app-relaunch', () => ({
 }))
 
 vi.mock('./floating-workspace-directory', () => ({
-  ensureDefaultFloatingWorkspacePath: vi.fn(),
+  ensureFloatingWorkspaceDirectory: vi.fn(),
   grantFloatingWorkspaceDirectory: grantFloatingWorkspaceDirectoryMock,
   resolveFloatingTerminalCwd: vi.fn()
 }))

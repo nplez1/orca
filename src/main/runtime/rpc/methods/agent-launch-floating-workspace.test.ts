@@ -1,6 +1,6 @@
-import { homedir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { resolveFloatingWorkspaceLaunchDirectory } from '../../../floating-workspace-launch-directory'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { CAPABLE_CLIENT, methodNamed, STRUCTURED_PREFERENCE } from './agent-launch.test-fixture'
@@ -26,7 +26,8 @@ describe('agent.launch with the real floating workspace resolver', () => {
     )
     await expect(runtime.showTerminalWorkspaceLaunchScope(selector)).resolves.toEqual({
       id: FLOATING_TERMINAL_WORKTREE_ID,
-      path: homedir(),
+      // Why: the floating workspace launches in its own folder, not in the user's home directory.
+      path: resolveFloatingWorkspaceLaunchDirectory(),
       connectionId: null,
       repo: null,
       folderWorkspace: null
