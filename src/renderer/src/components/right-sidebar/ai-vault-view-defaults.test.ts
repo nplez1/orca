@@ -75,4 +75,33 @@ describe('ai-vault-view-defaults', () => {
       })
     ).toBe(5)
   })
+
+  it('does not count globally disabled agents as an adjustment', () => {
+    // Settings turned Codex off, so the view offering every remaining agent is still the default.
+    const agentUniverse = AI_VAULT_AGENTS.filter((agent) => agent !== 'codex')
+    expect(
+      countAiVaultViewAdjustments({
+        agents: [...agentUniverse],
+        agentUniverse,
+        sort: DEFAULT_AI_VAULT_SORT,
+        group: DEFAULT_AI_VAULT_GROUP,
+        hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+        sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
+      })
+    ).toBe(0)
+  })
+
+  it('counts an agent the view dropped from the enabled universe', () => {
+    const agentUniverse = AI_VAULT_AGENTS.filter((agent) => agent !== 'codex')
+    expect(
+      countAiVaultViewAdjustments({
+        agents: agentUniverse.filter((agent) => agent !== 'claude'),
+        agentUniverse,
+        sort: DEFAULT_AI_VAULT_SORT,
+        group: DEFAULT_AI_VAULT_GROUP,
+        hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+        sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
+      })
+    ).toBe(1)
+  })
 })

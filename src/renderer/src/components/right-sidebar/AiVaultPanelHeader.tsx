@@ -26,6 +26,7 @@ type AiVaultPanelHeaderProps = {
   executionHostScope: ExecutionHostScope
   hostScopeOptions: readonly AiVaultHostScopeOption[]
   agents: readonly AiVaultAgent[]
+  availableAgents: readonly AiVaultAgent[]
   sort: AiVaultSort
   group: AiVaultGroup
   hideEmptySessions: boolean
@@ -59,6 +60,7 @@ export function AiVaultPanelHeader({
   executionHostScope,
   hostScopeOptions,
   agents,
+  availableAgents,
   sort,
   group,
   hideEmptySessions,
@@ -137,6 +139,7 @@ export function AiVaultPanelHeader({
           <VaultViewMenu
             searching={searching}
             agents={agents}
+            availableAgents={availableAgents}
             sort={sort}
             group={group}
             hideEmptySessions={hideEmptySessions}

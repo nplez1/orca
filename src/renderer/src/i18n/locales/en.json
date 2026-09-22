@@ -13558,7 +13558,7 @@
             "transcriptsSkipped": "{{count}} transcript skipped",
             "noAgentSessionsFound": "No agent sessions found",
             "noSessionsMatchFilters": "No sessions match the current filters",
-            "noAgentsSelected": "No agents selected",
+            "noAgentsSelected": "No agents selected. Turn one on in the Agents menu, or in Settings → Agents.",
             "sessionId": "Session ID",
             "logPath": "Log path",
             "originalPaneUnavailable": "Original pane is no longer available.",
