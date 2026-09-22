@@ -22,6 +22,7 @@ type WorktreeActivityStatusState = Pick<
   | 'migrationUnsupportedByPtyId'
   | 'retainedAgentsByPaneKey'
   | 'runtimeAgentOrchestrationByPaneKey'
+  | 'setupRunningWorktreeIds'
 >
 
 export function selectWorktreeActivityStatuses(
@@ -59,7 +60,8 @@ export function selectWorktreeActivityStatuses(
         hasInterrupted,
         hasLiveDone,
         hasRetainedDone,
-        hasRetainedFailed
+        hasRetainedFailed,
+        setupRunning: statusInputs.setupRunningWorktreeIds[worktreeId] === true
       })
     )
   }

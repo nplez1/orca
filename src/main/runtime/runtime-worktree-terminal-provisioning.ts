@@ -29,6 +29,9 @@ export type WorktreeTerminalProvisioningHost = {
   getSettings: () => ReturnType<RuntimeStore['getSettings']>
   getPtyId: (handle: string) => string | undefined
   recordSetupCompletionToken: (ptyId: string, token: string) => void
+  /** Announces the worktree as setting up until its runner ends. Omitted by hosts
+   *  that never produce a completion token, so no dot can be left stuck. */
+  armWorktreeSetupRunner?: (handle: string, worktreeId: string, completionToken: string) => void
 }
 
 export type WorktreeTerminalProvisioningArgs = {
@@ -143,6 +146,7 @@ export async function provisionWorktreeTerminals(
       const ptyId = host.getPtyId(setupTerminal.handle)
       if (completionToken && ptyId) {
         host.recordSetupCompletionToken(ptyId, completionToken)
+        host.armWorktreeSetupRunner?.(setupTerminal.handle, args.worktreeId, completionToken)
       }
     }
   } catch (error) {

@@ -21,6 +21,7 @@ export type WorktreeStatus =
   | 'interrupted'
   | 'done'
   | 'inactive'
+  | 'setup'
 
 type WorktreeStatusHeuristicOptions = {
   liveAgentStatus?: LiveAgentWorktreeStatus
@@ -39,7 +40,8 @@ const STATUS_LABELS: Record<WorktreeStatus, string> = {
   failed: 'Failed',
   interrupted: 'Interrupted',
   done: 'Done',
-  inactive: 'Inactive'
+  inactive: 'Inactive',
+  setup: 'Setting up…'
 }
 
 export function getWorktreeStatus(
@@ -188,6 +190,9 @@ export function resolveWorktreeStatus(args: {
   hasLiveDone: boolean
   hasRetainedDone: boolean
   hasRetainedFailed?: boolean
+  /** The repo setup script is still running in this worktree. Host-observed, so
+   *  it covers a worktree whose only live PTY is the setup runner. */
+  setupRunning?: boolean
 }): WorktreeStatus {
   const heuristic = getWorktreeStatus(
     args.tabs,
@@ -219,6 +224,11 @@ export function resolveWorktreeStatus(args: {
   }
   if (args.hasLiveMonitoring || heuristic === 'monitoring') {
     return 'monitoring'
+  }
+  // Why: setup outranks the outcome states below — a worktree being set up has no
+  // agent verdict yet, and its runner would otherwise read as plain 'active'.
+  if (args.setupRunning) {
+    return 'setup'
   }
   // Why: a departed agent's failure has no expiry, so it must not pin the card over live work.
   if (args.hasRetainedFailed) {

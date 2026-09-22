@@ -20,6 +20,7 @@ type MockState = {
   runtimeAgentOrchestrationByPaneKey: Record<string, NonNullable<AgentStatusEntry['orchestration']>>
   migrationUnsupportedByPtyId: Record<string, never>
   retainedAgentsByPaneKey: Record<string, unknown>
+  setupRunningWorktreeIds: Record<string, true>
 }
 
 let mockState: MockState
@@ -113,12 +114,31 @@ describe('useWorktreeActivityStatus', () => {
       agentStatusByPaneKey: {},
       runtimeAgentOrchestrationByPaneKey: {},
       migrationUnsupportedByPtyId: {},
-      retainedAgentsByPaneKey: {}
+      retainedAgentsByPaneKey: {},
+      setupRunningWorktreeIds: {}
     }
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('reports setup while the host says the setup runner is running', () => {
+    const worktreeId = 'repo1::/path/wt1'
+    mockState = {
+      ...mockState,
+      tabsByWorktree: {
+        [worktreeId]: [makeTab('tab-1', worktreeId)]
+      },
+      ptyIdsByTabId: {
+        'tab-1': ['pty-1']
+      },
+      setupRunningWorktreeIds: { [worktreeId]: true }
+    }
+
+    // Why: the setup runner is a script on a plain live PTY, so without the
+    // host's flag this worktree would render as plain 'active'.
+    expect(renderToStaticMarkup(<StatusProbe worktreeId={worktreeId} />)).toBe('<span>setup</span>')
   })
 
   it('keeps a restored offscreen working agent yellow from the hook snapshot', () => {
