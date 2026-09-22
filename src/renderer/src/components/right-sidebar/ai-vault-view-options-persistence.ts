@@ -40,11 +40,6 @@ export function createDefaultAiVaultViewOptions(): AiVaultViewOptions {
   }
 }
 
-export function enabledAiVaultAgents(disabledAgents: readonly AiVaultAgent[]): AiVaultAgent[] {
-  const disabled = new Set<AiVaultAgent>(disabledAgents)
-  return AI_VAULT_AGENTS.filter((agent) => !disabled.has(agent))
-}
-
 function isAiVaultSort(value: unknown): value is AiVaultSort {
   return value === 'updated' || value === 'created'
 }

@@ -3,7 +3,6 @@ import { AI_VAULT_AGENTS } from '../../../../shared/ai-vault-types'
 import {
   AI_VAULT_VIEW_OPTIONS_STORAGE_KEY,
   createDefaultAiVaultViewOptions,
-  enabledAiVaultAgents,
   normalizeAiVaultViewOptions,
   readAiVaultViewOptions,
   writeAiVaultViewOptions
@@ -84,7 +83,6 @@ describe('AI Vault view option persistence', () => {
     })
 
     expect(normalized.disabledAgents).toEqual([...AI_VAULT_AGENTS])
-    expect(enabledAiVaultAgents(normalized.disabledAgents)).toEqual([])
   })
 
   it('falls back safely when JSON or storage access is unavailable', () => {

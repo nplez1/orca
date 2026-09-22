@@ -82,6 +82,7 @@ export default function AiVaultPanel(): React.JSX.Element {
   const [scope, setScope] = useState<AiVaultScope>(DEFAULT_AI_VAULT_SCOPE)
   const {
     agents,
+    availableAgents,
     sort,
     group,
     hideEmptySessions,
@@ -93,7 +94,7 @@ export default function AiVaultPanel(): React.JSX.Element {
     setAgentEnabled,
     setAllAgentsEnabled,
     resetViewOptions
-  } = usePersistedAiVaultViewOptions()
+  } = usePersistedAiVaultViewOptions(settings?.disabledTuiAgents)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const userChangedScopeRef = useRef(false)
   const preferredScopeRef = useRef<AiVaultScope>(DEFAULT_AI_VAULT_SCOPE)
@@ -201,6 +202,7 @@ export default function AiVaultPanel(): React.JSX.Element {
   })
   const viewAdjustmentCount = countAiVaultViewAdjustments({
     agents,
+    agentUniverse: availableAgents,
     sort,
     group,
     hideEmptySessions,
@@ -336,6 +338,7 @@ export default function AiVaultPanel(): React.JSX.Element {
         executionHostScope={executionHostScope}
         hostScopeOptions={hostScopeOptions}
         agents={agents}
+        availableAgents={availableAgents}
         sort={sort}
         group={group}
         hideEmptySessions={hideEmptySessions}

@@ -14,14 +14,19 @@ export const DEFAULT_AI_VAULT_GROUP: AiVaultGroup = 'project'
 
 export function countAiVaultViewAdjustments(options: {
   agents: readonly AiVaultAgent[]
+  /** Agents the user has enabled in Settings. Defaults to every agent Orca knows. */
+  agentUniverse?: readonly AiVaultAgent[]
   sort: AiVaultSort
   group: AiVaultGroup
   hideEmptySessions: boolean
   sessionLimit: AiVaultSessionLimit
 }): number {
+  // Why: count against the enabled universe, not the whole catalog — a globally disabled
+  // agent is not an adjustment the user made in this view.
+  const agentUniverse = options.agentUniverse ?? AI_VAULT_AGENTS
   // Why: count by membership, not length — an agent swap keeps the array length but
   // still deviates from the default of every agent enabled.
-  const allAgentsEnabled = AI_VAULT_AGENTS.every((agent) => options.agents.includes(agent))
+  const allAgentsEnabled = agentUniverse.every((agent) => options.agents.includes(agent))
   return (
     (allAgentsEnabled ? 0 : 1) +
     (options.sort === DEFAULT_AI_VAULT_SORT ? 0 : 1) +

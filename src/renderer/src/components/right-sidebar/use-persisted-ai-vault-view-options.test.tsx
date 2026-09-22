@@ -76,6 +76,56 @@ describe('usePersistedAiVaultViewOptions', () => {
     expect(hook.result.current.sort).toBe('created')
   })
 
+  it('offers only the agents enabled in Settings', () => {
+    const hook = renderHook(() => usePersistedAiVaultViewOptions(['codex']))
+
+    expect(hook.result.current.availableAgents).not.toContain('codex')
+    expect(hook.result.current.agents).not.toContain('codex')
+    // Every enabled agent is selected until the view drops one.
+    expect(hook.result.current.agents).toEqual(hook.result.current.availableAgents)
+  })
+
+  it('keeps a view-unchecked agent out of the effective list', () => {
+    const hook = renderHook(() => usePersistedAiVaultViewOptions())
+
+    act(() => hook.result.current.setAgentEnabled('codex', false))
+
+    expect(hook.result.current.availableAgents).toContain('codex')
+    expect(hook.result.current.agents).not.toContain('codex')
+  })
+
+  it('scopes the bulk actions to the enabled universe', () => {
+    const hook = renderHook(() => usePersistedAiVaultViewOptions(['codex']))
+
+    act(() => hook.result.current.setAllAgentsEnabled(false))
+    expect(hook.result.current.agents).toEqual([])
+
+    act(() => hook.result.current.setAgentEnabled('claude', true))
+    expect(hook.result.current.agents).toEqual(['claude'])
+
+    act(() => hook.result.current.setAllAgentsEnabled(true))
+    expect(hook.result.current.agents).toEqual(hook.result.current.availableAgents)
+    expect(hook.result.current.agents).not.toContain('codex')
+  })
+
+  it('brings an agent back when Settings re-enables it, without losing the view choice', () => {
+    const hook = renderHook(
+      ({ disabled }: { disabled: string[] }) => usePersistedAiVaultViewOptions(disabled),
+      { initialProps: { disabled: ['codex'] } }
+    )
+
+    act(() => hook.result.current.setAgentEnabled('claude', false))
+    expect(hook.result.current.agents).not.toContain('claude')
+    expect(hook.result.current.availableAgents).not.toContain('codex')
+
+    hook.rerender({ disabled: [] })
+
+    expect(hook.result.current.availableAgents).toContain('codex')
+    expect(hook.result.current.agents).toContain('codex')
+    // Claude was unchecked in the view, so re-enabling Codex must not resurrect it.
+    expect(hook.result.current.agents).not.toContain('claude')
+  })
+
   it('resets every persisted option to its default', () => {
     const hook = renderHook(() => usePersistedAiVaultViewOptions())
     act(() => {

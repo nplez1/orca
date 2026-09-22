@@ -93,7 +93,7 @@ export function AiVaultPanelSearch({
   } else if (noAgents) {
     message = translate(
       'auto.components.right.sidebar.AiVaultPanel.noAgentsSelected',
-      'No agents selected'
+      'No agents selected. Turn one on in the Agents menu, or in Settings → Agents.'
     )
   } else if (unavailable === 'disabled') {
     message = translate(

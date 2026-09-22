@@ -24,12 +24,11 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
-import {
-  AI_VAULT_AGENTS,
-  type AiVaultAgent,
-  type AiVaultGroup,
-  type AiVaultScope,
-  type AiVaultSort
+import type {
+  AiVaultAgent,
+  AiVaultGroup,
+  AiVaultScope,
+  AiVaultSort
 } from '../../../../shared/ai-vault-types'
 import { getExecutionHostLabel, type ExecutionHostScope } from '../../../../shared/execution-host'
 import { agentLabel, type AiVaultSessionGroup } from './ai-vault-session-filters'
@@ -206,6 +205,7 @@ export function VaultHostScopeMenu({
 export function VaultViewMenu({
   searching = false,
   agents,
+  availableAgents,
   sort,
   group,
   hideEmptySessions,
@@ -221,6 +221,7 @@ export function VaultViewMenu({
 }: {
   searching?: boolean
   agents: readonly AiVaultAgent[]
+  availableAgents: readonly AiVaultAgent[]
   sort: AiVaultSort
   group: AiVaultGroup
   hideEmptySessions: boolean
@@ -234,7 +235,9 @@ export function VaultViewMenu({
   onSessionLimitChange: (limit: AiVaultSessionLimit) => void
   onReset: () => void
 }): React.JSX.Element {
-  const allAgentsSelected = agents.length === AI_VAULT_AGENTS.length
+  // Why: the menu only offers agents enabled in Settings, so "all" is relative to that
+  // universe — comparing against the full catalog would always look incomplete.
+  const allAgentsSelected = availableAgents.every((agent) => agents.includes(agent))
   const noAgentsSelected = agents.length === 0
 
   return (
@@ -304,7 +307,7 @@ export function VaultViewMenu({
             </DropdownMenuItem>
           </div>
         </div>
-        {AI_VAULT_AGENTS.map((agent) => (
+        {availableAgents.map((agent) => (
           <DropdownMenuCheckboxItem
             key={agent}
             checked={agents.includes(agent)}

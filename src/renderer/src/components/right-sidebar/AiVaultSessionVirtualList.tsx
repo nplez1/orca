@@ -183,7 +183,7 @@ export function AiVaultSessionVirtualList({
               noAgentsSelected
                 ? translate(
                     'auto.components.right.sidebar.AiVaultPanel.noAgentsSelected',
-                    'No agents selected'
+                    'No agents selected. Turn one on in the Agents menu, or in Settings → Agents.'
                   )
                 : translate(
                     'auto.components.right.sidebar.AiVaultPanel.noSessionsMatchFilters',
