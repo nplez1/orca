@@ -17,6 +17,7 @@ import {
 import { cancelLocalBatchFlush } from './filesystem-watcher-batch-control'
 import { scheduleLocalCapacityRetry } from './filesystem-watcher-local-capacity'
 import { installLocalWatcher } from './filesystem-watcher-local-install'
+import { evictQuickOpenPathInventory } from './quick-open-path-inventory'
 
 // ── Subscribe / Unsubscribe ──────────────────────────────────────────
 
@@ -216,6 +217,8 @@ export function unsubscribeLocalWatcher(worktreePath: string, senderId: number):
       }
       void trackDetachedLocalUnsubscribe(rootKey, currentRoot)
       cancelLocalBatchFlush(currentRoot)
+      // Why: a workspace nobody is watching does not need a warm path index either.
+      evictQuickOpenPathInventory(currentRoot.rootPath)
       watcherLifecycleState.watchedRoots.delete(rootKey)
     }, WATCHER_TEARDOWN_GRACE_MS)
 

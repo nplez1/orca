@@ -41,7 +41,9 @@ describe('useFileExplorerNameFilter', () => {
       query: 'AppDelegate.swift',
       // Why: substring-AND over a bounded page is this pane's filter contract.
       queryMode: 'name-filter',
-      queryLimit: 5_000
+      queryLimit: 5_000,
+      // Why: the scan scope must match what the tree shows.
+      includeIgnoredFiles: true
     })
     expect(result.current.nameFilterSource?.query).toBe('AppDelegate.swift')
   })
@@ -90,8 +92,28 @@ describe('useFileExplorerNameFilter', () => {
       worktreeId: 'worktree-1',
       query: 'drover.eve',
       queryMode: 'name-filter',
-      queryLimit: 5_000
+      queryLimit: 5_000,
+      includeIgnoredFiles: true
     })
+  })
+
+  it('carries the host-classified ignored subset so the pane need not re-ask git', () => {
+    useRuntimeFileListForWorktreeMock.mockReturnValue({
+      files: ['ignored/a.ts', 'src/b.ts'],
+      loading: false,
+      loadError: null,
+      resolvedQuery: 'a.ts',
+      totalCount: 2,
+      truncated: false,
+      ignoredFiles: ['ignored/a.ts']
+    } satisfies RuntimeFileListState)
+    const { result } = renderHook(() =>
+      useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId: 'worktree-1' })
+    )
+
+    act(() => result.current.setNameFilterQuery('a.ts'))
+
+    expect(result.current.nameFilterSource?.ignoredRelativePaths).toEqual(['ignored/a.ts'])
   })
 
   it('reports an exact match count and a partial page to the pane', () => {

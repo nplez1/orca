@@ -2,6 +2,7 @@ import { disposeWatcherProcess } from './parcel-watcher-process'
 import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
 import { trackDetachedLocalUnsubscribe } from './filesystem-watcher-listener-lifecycle'
 import { cancelLocalBatchFlush } from './filesystem-watcher-batch-control'
+import { clearQuickOpenPathInventories } from './quick-open-path-inventory'
 
 /** Tear down all watchers on app shutdown. */
 export async function closeAllWatchers(): Promise<void> {
@@ -62,6 +63,7 @@ export async function closeAllWatchers(): Promise<void> {
     await trackDetachedLocalUnsubscribe(rootKey, root).catch(() => undefined)
   }
   watcherLifecycleState.watchedRoots.clear()
+  clearQuickOpenPathInventories()
   await Promise.allSettled(Array.from(watcherLifecycleState.pendingLocalUnsubscribes))
   watcherLifecycleState.failedLocalUnsubscribes.clear()
   // Why: kill the forked watcher process instead of watcher.node's crash-prone async teardown; process death frees native handles.

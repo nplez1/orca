@@ -71,6 +71,30 @@ Memory is bounded independently of repository size: rg's stdout buffer, the reta
 synthetic tree over the retained page. At the retention bound the host **degrades** —
 returns the sorted page, the exact total, and `truncated: true` — it does not fail.
 
+### Warm path inventory (local)
+
+A name filter only needs file names, so the walk — not the match — is the entire cost, and
+paying it per keystroke is what made the pane slower than the Contents tab. The main process
+keeps a per-root path inventory (`src/main/ipc/quick-open-path-inventory.ts`): `included` (the
+Contents-tab scope, gitignore-aware) and `all` (the `--no-ignore-vcs` superset a pane showing
+gitignored files needs). It is warmed off the interactive path when the pane loads its
+unscoped listing, and answers `fs:searchFilePaths` name-filter queries from memory.
+
+The scan scope must match the display scope: `showGitIgnoredFiles: false` searches `included`
+(the same set the Contents tab scans), `true` searches `all`. There is no third, always-
+superset scope — that is what made a name filter walk a much larger tree than a content search.
+
+Freshness is honest by construction: the local watcher drops the entry when the path set
+changes and a debounced build re-warms it, a TTL covers events the host never sees, and a query
+that finds the entry stale or rebuilding returns "not warmed" so the caller scans live. A
+missing or over-budget entry is **never** reported as "no matches". The budget is separate from
+`QUICK_OPEN_LISTING_MAX_RESULTS` (a listing OOM bound): crossing it drops the cache with a log
+line and degrades to the live scan, rather than truncating.
+
+Because the inventory already knows which paths git ignores, the host returns that subset on
+the matched page and the pane skips its own per-keystroke `git check-ignore` (measured ~0.9s
+over 5 000 paths) for the filtered view.
+
 ### What happens to the 20 001 bound
 
 It stays. It is an OOM bound from the memory-hardening work (#10179 / #10299), aliased by
@@ -115,12 +139,15 @@ Per [`remote-wire-compatibility.md`](./remote-wire-compatibility.md):
    environments answer a substring query with an exact total rather than a fuzzy page. Until
    then SSH reports `truncated` without a count, and the pane renders the partial-scan message
    instead of a number.
-3. **Optional, measured.** A host-side inventory cache keyed by root path, invalidated by
-   the existing file watcher, capped by the existing retained-path budget, with live scans
-   past the budget. Only if walk latency on cold SSH hosts proves it necessary: rg is
-   usually fast enough that an index is a staleness liability before it is an asset.
+3. **Local warm inventory — LANDED.** A host-side path inventory keyed by authorized root,
+   warmed when the pane loads, invalidated by the local watcher and re-warmed on a debounce,
+   with its own path/byte budget and a live-scan fallback past it. It answers the local name
+   filter in memory and carries the ignored subset so the pane can drop its own
+   `git check-ignore`. Remote hosts keep the live scan (and the check-ignore) until they grow an
+   equivalent host-side inventory.
 
-`QUICK_OPEN_LISTING_MAX_RESULTS` is untouched by all three stages.
+`QUICK_OPEN_LISTING_MAX_RESULTS` is untouched by all three stages. The inventory budget is
+separate and deliberately larger — it bounds a cache, not a listing.
 
 ## Tests that prove it
 
@@ -136,6 +163,14 @@ Per [`remote-wire-compatibility.md`](./remote-wire-compatibility.md):
   inventory fallback.
 - Cancellation: a superseded keystroke kills the prior rg (the pattern already exists for
   `fs:search`).
+- Inventory scope: in a real git repo a `.gitignore`d file is absent from `included` and present
+  in `all`; the local `fs:searchFilePaths` search excludes it with `includeIgnoredFiles: false`
+  and includes it by default.
+- Inventory honesty: a query before any warm returns "not warmed", not "no matches"; an
+  invalidated entry stops answering until its debounced rebuild lands; the budget predicate
+  flips on both path count and retained bytes.
+- Renderer: the pane issues no `git check-ignore` while a name filter is active and the host
+  supplied the ignored subset.
 
 ## Already landed
 
@@ -149,5 +184,9 @@ Per [`remote-wire-compatibility.md`](./remote-wire-compatibility.md):
 - **Honest presentation.** `getFileExplorerNameFilterEmptyMessageKind` — a truncated listing
   never claims "no files match", it renders the partial-scan message. When the host counted
   matches, the pane says "Showing the first N of M matches".
+- **Warm local inventory.** `src/main/ipc/quick-open-path-inventory.ts`, warmed from the pane's
+  unscoped listing, invalidated on watcher flush and shutdown, with a budget fallback. The name
+  filter's scan scope follows `showGitIgnoredFiles`, so turning ignored files off makes it scan
+  exactly what the Contents tab scans.
 - `retainQuickOpenPath` and the readdir fallback are untouched, so the unscoped listing keeps
   its OOM bound.
