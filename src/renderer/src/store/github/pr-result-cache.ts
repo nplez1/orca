@@ -18,13 +18,19 @@ export function applyPRCacheResult(
   pr: PRInfo | null,
   fetchedAt: number,
   accepted: boolean,
-  preserveExisting: boolean
+  preserveExisting: boolean,
+  preserveOnReject = false
 ): AppState['prCache'] {
   if (preserveExisting) {
     return cache
   }
   if (accepted) {
     return withBoundedCacheEntry(cache, cacheKey, { data: pr, fetchedAt })
+  }
+  // Why: a rejected result lost a race to a newer write; deleting the newer entry
+  // blanked the Checks panel to its loading interstitial until the next PR fetch.
+  if (preserveOnReject) {
+    return cache
   }
   if (!cache[cacheKey]) {
     return cache
@@ -132,7 +138,8 @@ export function setGitHubPRResultCaches(
       linkedPRNumber: args.linkedPRNumber,
       fallbackPRNumber: args.fallbackPRNumber
     }),
-    preserveExistingPRForFallbackMiss
+    preserveExistingPRForFallbackMiss,
+    hostedReviewSync.preservePRCacheOnReject
   )
   return {
     ...(nextPRCache === state.prCache ? {} : { prCache: nextPRCache }),
@@ -215,7 +222,8 @@ export function applyGitHubPRResultToCaches(args: {
         linkedPRNumber: args.linkedPRNumber,
         fallbackPRNumber: args.fallbackPRNumber
       }),
-      preserveExistingPRForFallbackMiss
+      preserveExistingPRForFallbackMiss,
+      hostedReviewSync.preservePRCacheOnReject
     ),
     hostedReviewCache: hostedReviewSync.cache
   }
