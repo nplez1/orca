@@ -140,6 +140,7 @@ export type FilesystemApi = {
       query: string
       limit?: number
       mode?: PathSearchMode
+      includeIgnoredFiles?: boolean
     }) => Promise<FilePathSearchResult>
     cancelListFiles: (args: { requestToken: string }) => Promise<void>
     search: (args: SearchOptions & { connectionId?: string }) => Promise<SearchResult>

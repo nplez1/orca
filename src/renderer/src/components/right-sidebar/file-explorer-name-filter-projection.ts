@@ -22,6 +22,12 @@ export type FileExplorerNameFilterProjectionSource = {
   totalCount?: number | null
   /** True when the page is not the whole result set. */
   truncated?: boolean
+  /**
+   * Subset of `relativePaths` the host already classified as gitignored. When present the pane
+   * must not re-ask git: a per-keystroke check-ignore over the matched page is otherwise paid
+   * for a purely cosmetic dim.
+   */
+  ignoredRelativePaths?: readonly string[]
 }
 
 /**
