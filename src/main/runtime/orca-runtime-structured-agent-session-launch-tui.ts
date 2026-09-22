@@ -1,5 +1,5 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
-import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './orca-runtime-start-tui-idle-visible-read-probe'
+import { OrcaRuntimeWithSetupRunnerState } from './orca-runtime-setup-runner-state'
 import { join } from 'node:path'
 import type { StructuredTuiOwner } from '../native-chat/agent-session-wire/structured-agent-session-handoff-types'
 import { readCodexResumeProcessIdentity } from '../codex/codex-resume-process-proof'
@@ -8,7 +8,7 @@ import { codexProviderHandleLink } from '../codex/codex-structured-owner-identit
 import { claudeProviderHandleLink } from '../claude/claude-structured-owner-identity'
 import { StructuredTuiLaunchCleanupError } from '../native-chat/agent-session-wire/structured-agent-session-handoff-types'
 
-export class OrcaRuntimeWithStructuredAgentSessionLaunchTui extends OrcaRuntimeWithStartTuiIdleVisibleReadProbe {
+export class OrcaRuntimeWithStructuredAgentSessionLaunchTui extends OrcaRuntimeWithSetupRunnerState {
   protected createStructuredAgentSessionLaunchTuiCallback() {
     return async ({ record, fence, spawnToken, onSpawned }) => {
       const head = record.providerHandleChain.at(-1)

@@ -32,6 +32,9 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
     agentStatusPaneIdsByTabId,
     stalePaneIdsByTabId
   } = useAppStore(useShallow((s) => selectWorktreeAgentActivitySummary(s, worktreeId)))
+  // Why the optional read: several suites mock @/store with a hand-built partial
+  // state, so a missing slice must read as "not setting up", not throw.
+  const setupRunning = useAppStore((s) => s.setupRunningWorktreeIds?.[worktreeId] === true)
 
   // Why: compact and detailed cards need the same status-dot semantics:
   // runtime liveness gates title-derived states, then explicit agent rows can
@@ -51,7 +54,8 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
         hasLiveMonitoring,
         hasInterrupted,
         hasLiveDone,
-        hasRetainedDone
+        hasRetainedDone,
+        setupRunning
       }),
     [
       tabs,
@@ -66,7 +70,8 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
       hasLiveMonitoring,
       hasInterrupted,
       hasLiveDone,
-      hasRetainedDone
+      hasRetainedDone,
+      setupRunning
     ]
   )
 }
