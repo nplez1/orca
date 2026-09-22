@@ -146,6 +146,7 @@ export const fsApi = {
     query: string
     limit?: number
     mode?: PathSearchMode
+    includeIgnoredFiles?: boolean
   }): Promise<FilePathSearchResult> => ipcRenderer.invoke('fs:searchFilePaths', args),
   cancelListFiles: (args: { requestToken: string }): Promise<void> =>
     ipcRenderer.invoke('fs:cancelListFiles', args),

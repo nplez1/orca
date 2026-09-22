@@ -44,6 +44,11 @@ export type RuntimeFileListState = {
   /** Exact match count a query-scoped host search scanned; null for an unscoped listing. */
   totalCount?: number | null
   /**
+   * Subset of `files` the host already knows are gitignored, when it answered from its path
+   * inventory. Undefined means the caller must resolve ignored status itself.
+   */
+  ignoredFiles?: string[]
+  /**
    * Query that produced `files`. `null` means a request is still settling; `undefined`
    * means the listing was not produced by a query (a local full scan, filtered by callers).
    */
@@ -83,7 +88,8 @@ export function useRuntimeFileListForWorktree({
   worktreeId,
   query,
   queryMode = 'quick-open',
-  queryLimit = 32
+  queryLimit = 32,
+  includeIgnoredFiles
 }: {
   enabled: boolean
   worktreeId: string | null
@@ -92,6 +98,8 @@ export function useRuntimeFileListForWorktree({
   queryMode?: PathSearchMode
   /** Bounded page size for a query-scoped search. */
   queryLimit?: number
+  /** Scope for a query-scoped search; the Explore pane passes its show-ignored setting. */
+  includeIgnoredFiles?: boolean
 }): RuntimeFileListState {
   const worktree = useAppStore((state) =>
     // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
@@ -105,6 +113,7 @@ export function useRuntimeFileListForWorktree({
   const [truncated, setTruncated] = useState(false)
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [resolvedQuery, setResolvedQuery] = useState<string | null | undefined>(undefined)
+  const [ignoredFiles, setIgnoredFiles] = useState<string[] | undefined>(undefined)
   const [listedOperationOwner, setListedOperationOwner] = useState<FileExplorerOperationOwner>({
     kind: 'unresolved'
   })
@@ -176,6 +185,7 @@ export function useRuntimeFileListForWorktree({
       setLoading(false)
       setResolvedQuery(null)
       setTotalCount(null)
+      setIgnoredFiles(undefined)
       setListedOperationOwner({ kind: 'unresolved' })
       return
     }
@@ -188,6 +198,7 @@ export function useRuntimeFileListForWorktree({
       setTruncated(false)
       setTotalCount(null)
       setResolvedQuery(null)
+      setIgnoredFiles(undefined)
       return
     }
 
@@ -196,6 +207,7 @@ export function useRuntimeFileListForWorktree({
     if (requestKeyChanged) {
       setFiles([])
       setResolvedQuery(null)
+      setIgnoredFiles(undefined)
     }
     lastRequestKeyRef.current = requestKey
     setLoadError(null)
@@ -206,6 +218,7 @@ export function useRuntimeFileListForWorktree({
       setFiles([])
       setLoading(false)
       setResolvedQuery(remoteQuery)
+      setIgnoredFiles(undefined)
       setListedOperationOwner(operationOwnerRef.current)
       return
     }
@@ -230,6 +243,7 @@ export function useRuntimeFileListForWorktree({
             limit: queryLimit,
             mode: queryMode,
             excludePaths,
+            includeIgnoredFiles,
             ...(usesRuntimeEnvironmentRpc ? {} : { requestToken }),
             signal: requestAbortController.signal
           })
@@ -246,7 +260,8 @@ export function useRuntimeFileListForWorktree({
           // the cap it is given, so a full page means there are more paths behind it.
           files,
           totalCount: null,
-          truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS
+          truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS,
+          ignoredFiles: undefined
         }))
 
     void request
@@ -255,6 +270,7 @@ export function useRuntimeFileListForWorktree({
           setFiles(result.files)
           setTruncated(result.truncated)
           setTotalCount(result.totalCount ?? null)
+          setIgnoredFiles(result.ignoredFiles)
           setResolvedQuery(usesRuntimePathSearch ? remoteQuery : undefined)
           setListedOperationOwner(requestOperationOwner)
         }
@@ -264,6 +280,7 @@ export function useRuntimeFileListForWorktree({
           setFiles([])
           setTruncated(false)
           setTotalCount(null)
+          setIgnoredFiles(undefined)
           setResolvedQuery(usesRuntimePathSearch ? remoteQuery : null)
           setLoadError(cleanRuntimeFileListError(error))
         }
@@ -287,6 +304,7 @@ export function useRuntimeFileListForWorktree({
     enabled,
     excludeRequest,
     connectionId,
+    includeIgnoredFiles,
     operationOwnerKey,
     operationRouteAvailable,
     queryLimit,
@@ -308,6 +326,7 @@ export function useRuntimeFileListForWorktree({
     loadError,
     truncated,
     totalCount,
+    ignoredFiles,
     resolvedQuery,
     operationOwner: listedOperationOwner
   }

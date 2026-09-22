@@ -8,4 +8,9 @@ export type FilePathSearchResult = {
   /** Exact number of matches the host scanned; null when the host cannot count them. */
   totalCount: number | null
   truncated: boolean
+  /**
+   * Subset of `files` git ignores, when the host could answer from its path inventory.
+   * Undefined means the host could not classify them, and the caller must resolve it itself.
+   */
+  ignoredFiles?: string[]
 }
