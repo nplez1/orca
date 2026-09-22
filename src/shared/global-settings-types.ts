@@ -294,7 +294,7 @@ export type GlobalSettings = {
   browserSshWorkspaceRoutingProbeSkippedTargetIds?: string[]
   /** One-shot migration flag for the floating-workspace default-on rollout; after migration an explicit off sticks. */
   floatingTerminalDefaultedForAllUsers?: boolean
-  /** Start dir for new floating-workspace terminal tabs; empty or '~' = home dir. */
+  /** Start dir for new floating-workspace terminal tabs; empty = Orca's floating-workspace folder. */
   floatingTerminalCwd: string
   /** Picker-approved floating-workspace dirs reauthorized across restarts; renderer text alone must not populate this. */
   floatingTerminalTrustedCwds?: string[]

@@ -14,11 +14,11 @@ vi.mock('../ipc/filesystem-auth', () => ({
   authorizeExternalPath: vi.fn()
 }))
 vi.mock('../ipc/floating-workspace-directory', () => ({
-  ensureDefaultFloatingWorkspacePath: vi.fn()
+  ensureFloatingWorkspaceDirectory: vi.fn()
 }))
 
 const { authorizeExternalPath } = await import('../ipc/filesystem-auth')
-const { ensureDefaultFloatingWorkspacePath } = await import('../ipc/floating-workspace-directory')
+const { ensureFloatingWorkspaceDirectory } = await import('../ipc/floating-workspace-directory')
 
 describe('markdownPathsFromArguments', () => {
   it('keeps absolute markdown paths and drops other extensions', () => {
@@ -249,10 +249,10 @@ describe('resolveOpenedMarkdownDocuments', () => {
 
   beforeEach(async () => {
     vi.mocked(authorizeExternalPath).mockClear()
-    vi.mocked(ensureDefaultFloatingWorkspacePath).mockClear()
+    vi.mocked(ensureFloatingWorkspaceDirectory).mockClear()
     floatingRoot = await mkdtemp(join(tmpdir(), 'orca-os-open-root-'))
     fileRoot = await mkdtemp(join(tmpdir(), 'orca-os-open-files-'))
-    vi.mocked(ensureDefaultFloatingWorkspacePath).mockResolvedValue(floatingRoot)
+    vi.mocked(ensureFloatingWorkspaceDirectory).mockResolvedValue(floatingRoot)
   })
 
   afterEach(async () => {
@@ -300,7 +300,7 @@ describe('resolveOpenedMarkdownDocuments', () => {
 
   it('returns nothing for an empty input without touching the filesystem', async () => {
     expect(await resolveOpenedMarkdownDocuments([])).toEqual([])
-    expect(ensureDefaultFloatingWorkspacePath).not.toHaveBeenCalled()
+    expect(ensureFloatingWorkspaceDirectory).not.toHaveBeenCalled()
     expect(authorizeExternalPath).not.toHaveBeenCalled()
   })
 })
