@@ -54,6 +54,57 @@ describe('createGitHubSlice.fetchPRForBranch', () => {
     expect(store.getState().prCache[`repo-1::${branch}`]?.data).toEqual(cachedPR)
   })
 
+  it('keeps the last good PR entry when a direct refresh loses to a newer hosted-review write', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(100)
+    const store = createTestStore()
+    const repoPath = '/repo'
+    const repoId = 'repo-1'
+    const branch = 'feature/direct-race'
+    const cacheKey = `${repoId}::${branch}`
+    const hostedReviewCacheKey = getHostedReviewCacheKey(repoPath, branch, null, repoId)
+    const cachedPR = makePR({ number: 12, title: 'Visible cached PR', state: 'open' })
+    const foundPR = makePR({ number: 12, title: 'Freshly fetched PR', state: 'open' })
+
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test seeds only the slice state this lookup reads; Repo is not fully specified.
+    store.setState({
+      repos: [{ id: repoId, path: repoPath, name: 'repo', kind: 'git' }],
+      prCache: { [cacheKey]: { data: cachedPR, fetchedAt: 1 } },
+      hostedReviewCache: {
+        [hostedReviewCacheKey]: {
+          data: {
+            provider: 'github',
+            number: 12,
+            title: 'Visible cached PR',
+            state: 'open',
+            url: 'https://github.com/acme/orca/pull/12',
+            status: 'pending',
+            updatedAt: '2026-03-28T00:00:00Z',
+            mergeable: 'UNKNOWN'
+          },
+          fetchedAt: 1,
+          linkedReviewHintKey: 'github:12'
+        }
+      }
+    } as unknown as Partial<AppState>)
+    // A hosted-review-only refresh (which never writes prCache) lands while this PR lookup is in flight.
+    mockApi.gh.refreshPRNow.mockImplementationOnce(async () => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test writes only the cache slice this lookup reads.
+      store.setState({
+        hostedReviewCache: {
+          [hostedReviewCacheKey]: { data: null, fetchedAt: 150, linkedReviewHintKey: 'github:12' }
+        }
+      } as unknown as Partial<AppState>)
+      return { kind: 'found', pr: foundPR, fetchedAt: 160 }
+    })
+
+    await expect(
+      store.getState().fetchPRForBranch(repoPath, branch, { force: true, repoId })
+    ).resolves.toEqual(foundPR)
+    // Why: deleting the last good entry here flipped the Checks panel to its loading interstitial.
+    expect(store.getState().prCache[cacheKey]).toEqual({ data: cachedPR, fetchedAt: 1 })
+  })
+
   it.each(['open', 'draft'] as const)(
     'clears visible cached %s PR data when a fallback refresh misses',
     async (state) => {
