@@ -120,14 +120,19 @@ export function prepareLoadedTerminalSettings(
   }
   const floatingTerminalCwdMigrated =
     parsed.settings?.floatingTerminalCwdMigratedToAppWorkspace === true
-  // Why: an earlier migration wrote '' for the notes dir; floating terminals still open at home, notes use a separate IPC.
-  const migratedFloatingTerminalCwd = floatingTerminalCwdMigrated
-    ? !parsed.settings?.floatingTerminalCwd
-      ? defaults.settings.floatingTerminalCwd
-      : parsed.settings.floatingTerminalCwd
-    : parsed.settings?.floatingTerminalCwd === undefined
-      ? defaults.settings.floatingTerminalCwd
-      : parsed.settings.floatingTerminalCwd
+  const rawFloatingTerminalCwd = parsed.settings?.floatingTerminalCwd
+  // Why: before the floating workspace had its own folder, '' and '~' both meant "the default" (home).
+  // Only a real custom path survives; the rest move to the floating-workspace folder, which also
+  // fixes profiles whose floating terminals opened in whatever project $HOME held.
+  const migratedFloatingTerminalCwd =
+    typeof rawFloatingTerminalCwd === 'string' &&
+    rawFloatingTerminalCwd.trim().length > 0 &&
+    rawFloatingTerminalCwd.trim() !== '~'
+      ? rawFloatingTerminalCwd
+      : defaults.settings.floatingTerminalCwd
+  if (migratedFloatingTerminalCwd !== rawFloatingTerminalCwd) {
+    markNeedsSave()
+  }
   const normalizedFloatingTerminalTrustedCwds = normalizeFloatingWorkspaceTrustedCwds(
     parsed.settings?.floatingTerminalTrustedCwds,
     homeDir

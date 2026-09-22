@@ -16,8 +16,8 @@ import { isGitBashAvailable } from '../git-bash'
 import { setUnreadDockBadgeCount } from '../dock/unread-badge'
 import { destroySystemTray } from '../tray/system-tray'
 import {
-  ensureDefaultFloatingWorkspacePath,
-  trustFloatingWorkspaceDirectory,
+  ensureFloatingWorkspaceDirectory,
+  grantFloatingWorkspaceDirectory,
   resolveFloatingTerminalCwd
 } from './floating-workspace-directory'
 import { isMarkdownDocumentName, markdownDocumentFromFilePath } from './markdown-documents'
@@ -42,7 +42,7 @@ type RegisterAppHandlersOptions = {
 async function pickFloatingMarkdownDocument(
   event: IpcMainInvokeEvent
 ): Promise<MarkdownDocument | null> {
-  const cwd = await ensureDefaultFloatingWorkspacePath()
+  const cwd = await ensureFloatingWorkspaceDirectory()
   const options = {
     defaultPath: cwd,
     properties: ['openFile'],
@@ -79,7 +79,7 @@ async function pickFloatingWorkspaceDirectory(
   }
   const selectedDir = result.filePaths[0]
   // Why: only a user-approved picker selection may become the floating terminal's cwd, unlike typed settings text.
-  await trustFloatingWorkspaceDirectory(store, selectedDir)
+  await grantFloatingWorkspaceDirectory(store, selectedDir)
   return selectedDir
 }
 
@@ -326,7 +326,7 @@ export function registerAppHandlers(store: Store, options: RegisterAppHandlersOp
     resolveFloatingTerminalCwd(store, args)
   )
 
-  ipcMain.handle('app:getFloatingMarkdownDirectory', () => ensureDefaultFloatingWorkspacePath())
+  ipcMain.handle('app:getFloatingMarkdownDirectory', () => ensureFloatingWorkspaceDirectory())
 
   ipcMain.handle('app:pickFloatingMarkdownDocument', (event) => pickFloatingMarkdownDocument(event))
 

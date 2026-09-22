@@ -2,7 +2,8 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FileDocument } from '../../shared/filesystem-entry-types'
-import { ensureDefaultFloatingWorkspacePath } from '../ipc/floating-workspace-directory'
+import { authorizeExternalPath } from '../ipc/filesystem-auth'
+import { ensureFloatingWorkspaceDirectory } from '../ipc/floating-workspace-directory'
 import { fileDocumentFromFilePath, isMarkdownDocumentName } from '../ipc/markdown-documents'
 
 export function isOsOpenedDocumentName(name: string): boolean {
@@ -146,7 +147,7 @@ export async function resolveOsOpenedDocuments(
   if (supportedPaths.length === 0) {
     return []
   }
-  const floatingRoot = await ensureDefaultFloatingWorkspacePath()
+  const floatingRoot = await ensureFloatingWorkspaceDirectory()
   const documents: FileDocument[] = []
   for (const filePath of supportedPaths) {
     try {
@@ -158,6 +159,8 @@ export async function resolveOsOpenedDocuments(
     } catch {
       continue
     }
+    // Security contract: a path we never validated must never be authorized for renderer reads.
+    authorizeExternalPath(filePath)
     documents.push(
       fileDocumentFromFilePath(floatingRoot, filePath, {
         outsideRootRelativePath: 'basename'
