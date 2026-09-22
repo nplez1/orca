@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, FolderSearch } from 'lucide-react'
+import { toast } from 'sonner'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { FloatingTerminalTriggerLocation } from '../../../../shared/ui-chrome-types'
 import { Button } from '../ui/button'
@@ -12,24 +13,25 @@ import { matchesSettingsSearch } from './settings-search'
 import { useAppStore } from '../../store'
 import { translate } from '@/i18n/i18n'
 import { isWebClientLocation } from '@/lib/web-client-location'
+import { getRendererAppPlatform } from '@/lib/renderer-app-platform'
 
 type FloatingWorkspacePaneProps = {
-  settings: GlobalSettings
+  settings: Pick<
+    GlobalSettings,
+    'floatingTerminalCwd' | 'floatingTerminalEnabled' | 'floatingTerminalTriggerLocation'
+  >
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }
 
-export function getFloatingWorkspaceDirectoryInputValue({
-  configuredFloatingWorkspacePath,
-  resolvedFloatingWorkspacePath
-}: {
-  configuredFloatingWorkspacePath: string
-  resolvedFloatingWorkspacePath: string
-}): string {
-  const configuredPath = configuredFloatingWorkspacePath.trim()
-  if (!configuredPath || configuredPath === '~') {
-    return '~'
+// Why: the settings panes share one reveal label, so the platform copy keeps one translation each.
+function getRevealDirectoryLabel(platform: NodeJS.Platform): string {
+  if (platform === 'darwin') {
+    return translate('auto.components.settings.CliSection.6f894ef9c2', 'Show in Finder')
   }
-  return resolvedFloatingWorkspacePath
+  if (platform === 'win32') {
+    return translate('auto.components.settings.CliSection.cbe55e4d48', 'Show in Explorer')
+  }
+  return translate('auto.components.settings.CliSection.9fd4023db0', 'Show in File Manager')
 }
 
 export function FloatingWorkspacePane({
@@ -70,10 +72,22 @@ export function FloatingWorkspacePane({
     updateSettings({ floatingTerminalCwd: path })
   }
 
-  const directoryInputValue = getFloatingWorkspaceDirectoryInputValue({
-    configuredFloatingWorkspacePath: settings.floatingTerminalCwd,
-    resolvedFloatingWorkspacePath
-  })
+  const revealDirectoryLabel = getRevealDirectoryLabel(getRendererAppPlatform())
+
+  const revealFloatingWorkspaceDirectory = async (): Promise<void> => {
+    if (!resolvedFloatingWorkspacePath) {
+      return
+    }
+    const result = await window.api.shell.openInFileManager(resolvedFloatingWorkspacePath)
+    if (!result.ok) {
+      toast.error(
+        translate(
+          'auto.components.settings.FloatingWorkspacePane.revealFailed',
+          'Could not open the floating workspace folder.'
+        )
+      )
+    }
+  }
 
   if (!matchesSettingsSearch(searchQuery, getFloatingWorkspaceSearchEntries({ includeBrowser }))) {
     return null
@@ -133,16 +147,21 @@ export function FloatingWorkspacePane({
           )}
           description={translate(
             'auto.components.settings.FloatingWorkspacePane.81afb79785',
-            "New floating terminal tabs start here. Markdown notes are saved in Orca's app-owned floating workspace."
+            'New floating terminals and agents start here. Floating markdown notes always live in the floating-workspace folder, next to its AGENTS.md instructions.'
           )}
           control={
             <div className="flex w-72 max-w-full gap-2">
-              <Input
-                value={directoryInputValue}
-                readOnly
-                placeholder="~"
-                className="min-w-0 flex-1"
-              />
+              <Input value={resolvedFloatingWorkspacePath} readOnly className="min-w-0 flex-1" />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={revealDirectoryLabel}
+                disabled={!resolvedFloatingWorkspacePath}
+                onClick={() => void revealFloatingWorkspaceDirectory()}
+              >
+                <FolderSearch className="size-4" />
+              </Button>
               <Button
                 type="button"
                 variant="outline"

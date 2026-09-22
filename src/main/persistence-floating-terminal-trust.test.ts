@@ -136,7 +136,7 @@ describe('Store', () => {
     expect(store.getSettings().floatingTerminalTrustedCwds).toEqual([])
   })
 
-  it('restores migrated blank floating terminal cwd settings to home shorthand', async () => {
+  it('keeps blank floating terminal cwd settings on the floating-workspace folder default', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -152,10 +152,10 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().floatingTerminalCwd).toBe('~')
+    expect(store.getSettings().floatingTerminalCwd).toBe('')
   })
 
-  it('preserves legacy home shorthand as the floating terminal cwd', async () => {
+  it('moves legacy home shorthand off $HOME and onto the floating-workspace folder', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -170,7 +170,7 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().floatingTerminalCwd).toBe('~')
+    expect(store.getSettings().floatingTerminalCwd).toBe('')
     expect(store.getSettings().floatingTerminalTrustedCwds).toEqual([])
   })
 

@@ -20,7 +20,7 @@ import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
 import type { ResolvedTerminalWorkspaceLaunchTarget } from './orca-runtime-core'
 import { AGENT_HOOK_RUNTIME_ENV_KEYS } from './orca-runtime-core'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
-import { homedir } from 'node:os'
+import { resolveFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'
 import { getExplicitWorktreeIdSelector } from './runtime-worktree-selection'
 import { WORKTREE_ID_SEPARATOR } from '../../shared/worktree/id'
 import { WorktreeIdRequiresFullPathError } from './runtime-worktree-lineage-resolution'
@@ -104,7 +104,9 @@ export class OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree extend
       return {
         scope: {
           id: FLOATING_TERMINAL_WORKTREE_ID,
-          path: homedir(),
+          // Why: the Floating Workspace's own folder, not $HOME — a floating terminal or agent must
+          // not inherit a project (or the whole home directory) as its working directory.
+          path: resolveFloatingWorkspaceLaunchDirectory(),
           connectionId: null,
           repo: null,
           folderWorkspace: null

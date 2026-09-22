@@ -1,4 +1,14 @@
-import { mkdtemp, mkdir, realpath, rm, symlink, unlink } from 'node:fs/promises'
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  unlink,
+  writeFile
+} from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,7 +30,7 @@ vi.mock('./filesystem-auth', () => ({
 }))
 
 import {
-  ensureDefaultFloatingWorkspacePath,
+  ensureFloatingWorkspaceDirectory,
   grantFloatingWorkspaceDirectory,
   resolveFloatingTerminalCwd,
   sanitizeFloatingWorkspaceDirectorySetting
@@ -52,11 +62,13 @@ describe('floating workspace directory authorization', () => {
   let tempRoot: string
   let homeDir: string
   let userDataDir: string
+  let floatingWorkspaceDir: string
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'orca-floating-workspace-'))
     homeDir = path.join(tempRoot, 'home')
     userDataDir = path.join(tempRoot, 'user-data')
+    floatingWorkspaceDir = path.join(homeDir, '.orca', 'floating-workspace')
     await mkdir(homeDir)
     appGetPathMock.mockImplementation((name: string) => {
       if (name === 'home') {
@@ -78,22 +90,47 @@ describe('floating workspace directory authorization', () => {
     await symlink(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
   }
 
-  it('defaults terminal cwd to home without authorizing home for markdown writes', async () => {
+  it('defaults the terminal cwd to the floating-workspace folder without authorizing home', async () => {
     const store = createStore()
 
-    await expect(resolveFloatingTerminalCwd(store as never)).resolves.toBe(homeDir)
+    await expect(resolveFloatingTerminalCwd(store)).resolves.toBe(floatingWorkspaceDir)
 
+    expect(authorizeExternalPathMock).toHaveBeenCalledWith(floatingWorkspaceDir)
     expect(authorizeExternalPathMock).not.toHaveBeenCalledWith(homeDir)
   })
 
-  it('keeps the app-owned directory for floating markdown notes', async () => {
-    await expect(ensureDefaultFloatingWorkspacePath()).resolves.toBe(
-      path.join(userDataDir, 'floating-workspace')
-    )
+  it('resolves and authorizes the same folder floating terminals start in', async () => {
+    await expect(ensureFloatingWorkspaceDirectory()).resolves.toBe(floatingWorkspaceDir)
 
-    expect(authorizeExternalPathMock).toHaveBeenCalledWith(
-      path.join(userDataDir, 'floating-workspace')
+    expect(authorizeExternalPathMock).toHaveBeenCalledWith(floatingWorkspaceDir)
+  })
+
+  it('moves markdown notes out of the legacy app-data folder', async () => {
+    const legacyDir = path.join(userDataDir, 'floating-workspace')
+    await mkdir(legacyDir, { recursive: true })
+    await writeFile(path.join(legacyDir, 'note.md'), '# legacy note')
+
+    await ensureFloatingWorkspaceDirectory()
+
+    await expect(readFile(path.join(floatingWorkspaceDir, 'note.md'), 'utf-8')).resolves.toBe(
+      '# legacy note'
     )
+    await expect(stat(legacyDir)).rejects.toThrow()
+  })
+
+  it('keeps a newer note instead of overwriting it with a legacy copy', async () => {
+    const legacyDir = path.join(userDataDir, 'floating-workspace')
+    await mkdir(legacyDir, { recursive: true })
+    await mkdir(floatingWorkspaceDir, { recursive: true })
+    await writeFile(path.join(legacyDir, 'note.md'), 'legacy')
+    await writeFile(path.join(floatingWorkspaceDir, 'note.md'), 'current')
+
+    await ensureFloatingWorkspaceDirectory()
+
+    await expect(readFile(path.join(floatingWorkspaceDir, 'note.md'), 'utf-8')).resolves.toBe(
+      'current'
+    )
+    await expect(readFile(path.join(legacyDir, 'note.md'), 'utf-8')).resolves.toBe('legacy')
   })
 
   it('persists picker-approved directories and reauthorizes them on resolution', async () => {
@@ -142,7 +179,7 @@ describe('floating workspace directory authorization', () => {
         path: selectedLink,
         requireTrusted: true
       })
-    ).resolves.toBe(path.join(userDataDir, 'floating-workspace'))
+    ).resolves.toBe(floatingWorkspaceDir)
     await expect(
       sanitizeFloatingWorkspaceDirectorySetting(store as never, selectedLink)
     ).resolves.toBe('')
@@ -166,7 +203,7 @@ describe('floating workspace directory authorization', () => {
     ])
   })
 
-  it('falls back to the app-owned workspace for untrusted settings paths', async () => {
+  it('falls back to the floating-workspace folder for untrusted settings paths', async () => {
     const store = createStore()
     const arbitraryDir = path.join(tempRoot, 'arbitrary')
     await mkdir(arbitraryDir)
@@ -176,20 +213,22 @@ describe('floating workspace directory authorization', () => {
         path: arbitraryDir,
         requireTrusted: true
       })
-    ).resolves.toBe(path.join(userDataDir, 'floating-workspace'))
+    ).resolves.toBe(floatingWorkspaceDir)
     await expect(
       sanitizeFloatingWorkspaceDirectorySetting(store as never, arbitraryDir)
     ).resolves.toBe('')
   })
 
-  it('preserves home shorthand as a terminal-only setting', async () => {
+  it('treats the home shorthand as an input, not a stored directory', async () => {
     const store = createStore()
 
-    await expect(sanitizeFloatingWorkspaceDirectorySetting(store as never, '~')).resolves.toBe('~')
-    await expect(resolveFloatingTerminalCwd(store as never, { path: '~' })).resolves.toBe(homeDir)
+    // Why: '~' stopped being a durable setting value — the picker stores absolute paths — so a
+    // write through the sanitizer drops it back onto the floating-workspace folder.
+    await expect(sanitizeFloatingWorkspaceDirectorySetting(store, '~')).resolves.toBe('')
+    await expect(resolveFloatingTerminalCwd(store, { path: '~' })).resolves.toBe(homeDir)
     await expect(
-      resolveFloatingTerminalCwd(store as never, { path: '~', requireTrusted: true })
-    ).resolves.toBe(path.join(userDataDir, 'floating-workspace'))
+      resolveFloatingTerminalCwd(store, { path: '~', requireTrusted: true })
+    ).resolves.toBe(floatingWorkspaceDir)
   })
 
   it('still resolves accessible ad hoc terminal directories when trust is not required', async () => {
