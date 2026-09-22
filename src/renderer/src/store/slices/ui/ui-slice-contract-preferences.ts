@@ -55,6 +55,8 @@ export type UISlicePreferences = {
   setHideCliCreatedWorkspaces: (v: boolean) => void
   hideDetachedHeadWorkspaces: boolean
   setHideDetachedHeadWorkspaces: (v: boolean) => void
+  hiddenWorkspaceStatusIds: readonly string[]
+  setHiddenWorkspaceStatusIds: (ids: readonly string[]) => void
   hideWorkspacesFromOtherDevices: boolean
   setHideWorkspacesFromOtherDevices: (v: boolean) => void
   mergeSameBranchWorkspaces: boolean

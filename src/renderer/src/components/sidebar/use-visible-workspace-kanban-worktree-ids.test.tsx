@@ -71,4 +71,46 @@ describe('useVisibleWorkspaceKanbanWorktreeIds', () => {
 
     expect(result.current).toEqual(new Set([getWorktreeHostIdentity(worktree)]))
   })
+
+  it('keeps status-hidden workspaces on the board so they can be dragged to a shown lane', () => {
+    const hidden = { ...makeWorktree('hidden', 'Hidden status'), workspaceStatus: 'completed' }
+    const shown = { ...makeWorktree('shown', 'Shown status'), workspaceStatus: 'todo' }
+    const repo = makeRepo()
+    useAppStore.setState({
+      worktreesByRepo: { [repo.id]: [hidden, shown] },
+      showSleepingWorkspaces: true,
+      hiddenWorkspaceStatusIds: ['completed']
+    })
+
+    const { result } = renderHook(() =>
+      useVisibleWorkspaceKanbanWorktreeIds({
+        allWorktrees: [hidden, shown],
+        repoMap: new Map([[repo.id, repo]])
+      })
+    )
+
+    expect(result.current).toEqual(
+      new Set([getWorktreeHostIdentity(hidden), getWorktreeHostIdentity(shown)])
+    )
+  })
+
+  it('still applies non-status filters to the board', () => {
+    const onBranch = makeWorktree('on-branch', 'On branch')
+    const detached = makeWorktree('detached', 'Detached', { branch: '', head: 'deadbeefcafe' })
+    const repo = makeRepo()
+    useAppStore.setState({
+      worktreesByRepo: { [repo.id]: [onBranch, detached] },
+      showSleepingWorkspaces: true,
+      hideDetachedHeadWorkspaces: true
+    })
+
+    const { result } = renderHook(() =>
+      useVisibleWorkspaceKanbanWorktreeIds({
+        allWorktrees: [onBranch, detached],
+        repoMap: new Map([[repo.id, repo]])
+      })
+    )
+
+    expect(result.current).toEqual(new Set([getWorktreeHostIdentity(onBranch)]))
+  })
 })

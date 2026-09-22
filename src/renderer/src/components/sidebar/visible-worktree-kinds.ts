@@ -56,6 +56,7 @@ export type SidebarFilterState = {
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean
   hideDetachedHeadWorkspaces: boolean
+  hiddenWorkspaceStatusIds: readonly string[]
   hideWorkspacesFromOtherDevices: boolean
   /** Keeps each project's main workspace out of the "Hide sleeping" sweep; absent means on. */
   alwaysShowDefaultBranchWorkspace?: boolean
