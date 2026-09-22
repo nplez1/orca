@@ -165,17 +165,29 @@ export function useFileExplorerVisibleRowProjection(
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const showGitIgnoredFiles = settings?.showGitIgnoredFiles ?? true
+  // Why: when the host already classified the filtered page, re-asking git would launch an
+  // uncancellable check-ignore over up to 5000 paths on every keystroke for a cosmetic dim.
+  const hostIgnoredPaths = nameFilter?.ignoredRelativePaths
+  const hostProvidesIgnoredPaths = nameFilter != null && hostIgnoredPaths !== undefined
   const rebuiltRelativePaths = useMemo(
     () =>
-      activeRepoSupportsGit
-        ? nameFilter
+      !activeRepoSupportsGit || hostProvidesIgnoredPaths
+        ? EMPTY_RELATIVE_PATHS
+        : nameFilter
           ? getFileExplorerNameFilterIgnoredQueryRelativePaths(nameFilter, showDotfiles)
           : getFileExplorerIgnoredQueryRelativePaths(
               { dirCache, expanded, worktreePath },
               showDotfiles
-            )
-        : EMPTY_RELATIVE_PATHS,
-    [activeRepoSupportsGit, dirCache, expanded, nameFilter, showDotfiles, worktreePath]
+            ),
+    [
+      activeRepoSupportsGit,
+      dirCache,
+      expanded,
+      hostProvidesIgnoredPaths,
+      nameFilter,
+      showDotfiles,
+      worktreePath
+    ]
   )
   // Why: the name-filter list is debounced per keystroke, so it must keep a fresh
   // identity; only the dirCache-derived list needs stability across wave commits.
@@ -193,7 +205,13 @@ export function useFileExplorerVisibleRowProjection(
     shouldDebounceIgnoredQuery,
     worktreePath
   })
-  const ignoredSet = useMemo(() => buildIgnoredSet(effectiveIgnoredPaths), [effectiveIgnoredPaths])
+  const ignoredSet = useMemo(
+    () =>
+      buildIgnoredSet(
+        hostProvidesIgnoredPaths && hostIgnoredPaths ? hostIgnoredPaths : effectiveIgnoredPaths
+      ),
+    [effectiveIgnoredPaths, hostIgnoredPaths, hostProvidesIgnoredPaths]
+  )
   const rowProjection = useMemo(
     () =>
       createVisibleFileExplorerRowProjection(
