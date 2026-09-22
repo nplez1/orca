@@ -35,6 +35,9 @@ export async function renderWorktreeListMarkup(): Promise<string> {
 export function createAppStoreModuleMock(): Record<string, unknown> {
   const getMockState = (): Record<string, unknown> => ({
     detectedWorktreesByRepo: {},
+    // Why: the sidebar pipeline treats this as a list, so a partial mock state
+    // without it would crash on `.length` instead of failing an assertion.
+    hiddenWorkspaceStatusIds: [],
     ...mockStore.state
   })
   const useAppStore = ((selector: (state: Record<string, unknown>) => unknown) =>

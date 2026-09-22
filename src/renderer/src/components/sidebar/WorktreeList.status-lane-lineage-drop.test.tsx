@@ -259,6 +259,7 @@ function setStatusLaneState(): void {
     fetchIssue: mockStore.fetchIssue,
     fetchLinearIssue: mockStore.fetchLinearIssue,
     filterRepoIds: [],
+    hiddenWorkspaceStatusIds: [],
     ...makeFolderWorkspacePathStatusState(),
     gitConflictOperationByWorktree: {},
     groupBy: 'workspace-status',

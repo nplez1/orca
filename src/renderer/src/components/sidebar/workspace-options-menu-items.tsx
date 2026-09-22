@@ -15,6 +15,7 @@ import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import { isSleepingSweepExemptionNarrowingList } from './visible-worktrees'
 import SidebarRepositoryFilterSection from './SidebarRepositoryFilterSection'
 import SidebarWorkspaceFilterSection from './SidebarWorkspaceFilterSection'
+import SidebarWorkspaceStatusFilterSection from './SidebarWorkspaceStatusFilterSection'
 import { getSidebarHostVisibilityLabel, shouldShowHostScopeControls } from './sidebar-host-options'
 import { useSidebarHostScopeOptions } from './use-sidebar-host-scope-options'
 import { SidebarHostScopeMenuSection } from './SidebarHostScopeMenuSection'
@@ -33,6 +34,8 @@ export function useWorkspaceOptionsFilterBadge(): {
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
   const hideCliCreatedWorkspaces = useAppStore((s) => s.hideCliCreatedWorkspaces)
   const hideDetachedHeadWorkspaces = useAppStore((s) => s.hideDetachedHeadWorkspaces)
+  const hiddenWorkspaceStatusIds = useAppStore((s) => s.hiddenWorkspaceStatusIds)
+  const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const filterRepoIds = useAppStore((s) => s.filterRepoIds)
@@ -48,6 +51,18 @@ export function useWorkspaceOptionsFilterBadge(): {
     }
     return count
   }, [repos, filterRepoIds])
+
+  // Why derived from workspaceStatuses: a status removed elsewhere leaves a
+  // stale id behind, and counting it would report a filter the user cannot see.
+  const hiddenStatusCount = useMemo(() => {
+    let count = 0
+    for (const status of workspaceStatuses) {
+      if (hiddenWorkspaceStatusIds.includes(status.id)) {
+        count += 1
+      }
+    }
+    return count
+  }, [workspaceStatuses, hiddenWorkspaceStatusIds])
 
   const hasSleepingFilter = showSleepingWorkspaces !== DEFAULT_SHOW_SLEEPING_WORKSPACES
   const hasSleepingExemptionFilter = isSleepingSweepExemptionNarrowingList(
@@ -65,6 +80,7 @@ export function useWorkspaceOptionsFilterBadge(): {
     hideWorkspacesFromOtherDevices ||
     hasSleepingExemptionFilter ||
     hasRepoFilter ||
+    hiddenStatusCount > 0 ||
     hasHostVisibilityFilter
   const activeFilterCount =
     (hasSleepingFilter ? 1 : 0) +
@@ -75,7 +91,8 @@ export function useWorkspaceOptionsFilterBadge(): {
     (hideWorkspacesFromOtherDevices ? 1 : 0) +
     (hasSleepingExemptionFilter ? 1 : 0) +
     (hasHostVisibilityFilter ? 1 : 0) +
-    selectedCount
+    selectedCount +
+    hiddenStatusCount
 
   return {
     hasAnyFilter,
@@ -90,6 +107,7 @@ export function WorkspaceOptionsMenuItems({
   preserveWorkspaceBoardOpen?: boolean
 }): JSX.Element {
   const repos = useAppStore((s) => s.repos)
+  const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const setWorkspaceHostScope = useAppStore((s) => s.setWorkspaceHostScope)
   const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
   const setVisibleWorkspaceHostIds = useAppStore((s) => s.setVisibleWorkspaceHostIds)
@@ -108,6 +126,7 @@ export function WorkspaceOptionsMenuItems({
     PROJECT_ORDER_OPTIONS.find((opt) => opt.id === projectOrderBy)?.label ?? 'Manual'
   const hostVisibilityLabel = getSidebarHostVisibilityLabel(visibleWorkspaceHostIds, hostOptions)
   const boardAttr = preserveWorkspaceBoardOpen ? '' : undefined
+  const showStatusFilter = workspaceStatuses.length > 0
 
   return (
     <>
@@ -117,9 +136,9 @@ export function WorkspaceOptionsMenuItems({
           'Workspace options'
         )}
       </DropdownMenuLabel>
-      {/* Why: host + project filters share one section and the same single-row
-          shell as Sort by (label left, value right) so the menu stays flat. */}
-      {(showHostScopeControls || repos.length > 1) && (
+      {/* Why: host + project + status filters share one section and the same
+          single-row shell as Sort by (label left, value right) so the menu stays flat. */}
+      {(showHostScopeControls || repos.length > 1 || showStatusFilter) && (
         <>
           <DropdownMenuLabel>
             {translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.showSection', 'Show')}
@@ -135,6 +154,11 @@ export function WorkspaceOptionsMenuItems({
             />
           )}
           <SidebarRepositoryFilterSection preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen} />
+          {showStatusFilter && (
+            <SidebarWorkspaceStatusFilterSection
+              preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
+            />
+          )}
           <DropdownMenuSeparator />
         </>
       )}

@@ -24,6 +24,7 @@ export type PersistedUIWriteBaseline = {
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean
   hideDetachedHeadWorkspaces: boolean
+  hiddenWorkspaceStatusIds: readonly string[]
   hideWorkspacesFromOtherDevices: boolean
   mergeSameBranchWorkspaces: boolean
   alwaysShowDefaultBranchWorkspace: boolean
@@ -54,6 +55,7 @@ const PERSISTED_UI_WRITE_BASELINE_FIELD_SET = {
   hideAutomationGeneratedWorkspaces: true,
   hideCliCreatedWorkspaces: true,
   hideDetachedHeadWorkspaces: true,
+  hiddenWorkspaceStatusIds: true,
   hideWorkspacesFromOtherDevices: true,
   mergeSameBranchWorkspaces: true,
   alwaysShowDefaultBranchWorkspace: true,
@@ -98,7 +100,7 @@ function stringArrayEqual(a: readonly string[], b: readonly string[]): boolean {
 }
 
 function writeFieldEqual(field: keyof PersistedUIWriteBaseline, a: unknown, b: unknown): boolean {
-  if (field === 'filterRepoIds') {
+  if (field === 'filterRepoIds' || field === 'hiddenWorkspaceStatusIds') {
     return stringArrayEqual(a as readonly string[], b as readonly string[])
   }
   if (
@@ -150,6 +152,8 @@ export function persistedUIWriteFieldsToWireUpdate(
       // Why: the store keeps this readonly for identity stability, but PersistedUI crosses to
       // main, which owns a mutable array — copy at the boundary rather than widening the wire type.
       update.filterRepoIds = [...(fields.filterRepoIds ?? [])]
+    } else if (field === 'hiddenWorkspaceStatusIds') {
+      update.hiddenWorkspaceStatusIds = [...(fields.hiddenWorkspaceStatusIds ?? [])]
     } else {
       assignSameNameWireField(
         update,
@@ -163,7 +167,7 @@ export function persistedUIWriteFieldsToWireUpdate(
 
 type SameNameWriteField = Exclude<
   keyof PersistedUIWriteBaseline,
-  'showSleepingWorkspaces' | 'filterRepoIds'
+  'showSleepingWorkspaces' | 'filterRepoIds' | 'hiddenWorkspaceStatusIds'
 >
 
 // Compile check: every non-special mirror field must exist on PersistedUIState

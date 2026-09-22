@@ -11,12 +11,7 @@ export {
 } from './visible-worktree-kinds'
 export { sidebarHasActiveFilters, computeClearFilterActions } from './sidebar-filter-actions'
 export type { ClearFilterActions } from './sidebar-filter-actions'
-import {
-  isAutomationGeneratedWorkspace,
-  isCliCreatedWorkspace,
-  isDetachedHeadWorkspace,
-  isSleepingSweepExemptWorkspace
-} from './visible-worktree-kinds'
+import { isSleepingSweepExemptWorkspace } from './visible-worktree-kinds'
 import {
   getVisibleWorkspaceHostIdSet,
   worktreeMatchesVisibleHost
@@ -48,7 +43,7 @@ import {
   computeRenderedSidebarWorktrees
 } from './rendered-sidebar-worktree-order'
 import { isWorkspaceFromOtherDevice } from './workspace-creator-visibility'
-import { isDefaultBranchWorkspace } from './default-branch-workspace'
+import { applyWorkspaceKindFilters } from './visible-worktree-kind-filters'
 import { getLineageAncestorIndex, getSortedWorktreeRankIndex } from './visible-worktree-indexes'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
@@ -76,6 +71,7 @@ export type VisibleWorktreeOptions = {
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean
   hideDetachedHeadWorkspaces: boolean
+  hiddenWorkspaceStatusIds: readonly string[]
   hideWorkspacesFromOtherDevices: boolean
   pairedDeviceIdsByEnvironment: ReadonlyMap<string, string>
   alwaysShowDefaultBranchWorkspace?: boolean
@@ -108,21 +104,7 @@ export function computeVisibleWorktrees(
     )
   }
 
-  if (opts.hideDefaultBranchWorkspace) {
-    all = all.filter((w) => !isDefaultBranchWorkspace(w))
-  }
-
-  if (opts.hideAutomationGeneratedWorkspaces) {
-    all = all.filter((w) => !isAutomationGeneratedWorkspace(w))
-  }
-
-  if (opts.hideCliCreatedWorkspaces) {
-    all = all.filter((w) => !isCliCreatedWorkspace(w))
-  }
-
-  if (opts.hideDetachedHeadWorkspaces) {
-    all = all.filter((w) => !isDetachedHeadWorkspace(w))
-  }
+  all = applyWorkspaceKindFilters(all, opts)
 
   const visibleHostIds =
     opts.visibleWorkspaceHostIds ??
