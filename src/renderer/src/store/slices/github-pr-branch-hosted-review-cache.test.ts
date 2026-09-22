@@ -183,7 +183,10 @@ describe('createGitHubSlice.fetchPRForBranch', () => {
       }
     })
 
-    expect(store.getState().prCache[cacheKey]).toBeUndefined()
+    // Why: the rejected result must not delete the last good PR entry. The Checks
+    // panel renders GitHub reviews from prCache only, so deleting it flipped the
+    // panel to its "Checking PR status" interstitial until the next fetch landed.
+    expect(store.getState().prCache[cacheKey]).toEqual({ data: stalePR, fetchedAt: 1 })
     expect(store.getState().hostedReviewCache[hostedReviewCacheKey]).toEqual({
       data: newerReview,
       fetchedAt: 3,
