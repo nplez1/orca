@@ -1,8 +1,12 @@
 import type { Terminal } from '@xterm/xterm'
 import { copyTerminalSelection } from '@/components/terminal-pane/terminal-selection-copy'
+import { suppressTerminalRightClickPtyMouseReport } from '@/components/terminal-pane/terminal-right-click-pty-mouse-suppression'
 import type { PreviewTerminalPasteSource } from './preview-terminal-paste'
 
-type PreviewRightClickTerminal = Pick<Terminal, 'getSelection' | 'clearSelection'>
+type PreviewRightClickTerminal = Pick<
+  Terminal,
+  'element' | 'options' | 'getSelection' | 'clearSelection'
+> & { modes: Pick<Terminal['modes'], 'mouseTrackingMode'> }
 
 /**
  * Terminal-style right-click for the preview terminal, mirroring the pane's
@@ -40,6 +44,20 @@ export function installPreviewTerminalRightClickPaste({
     }
     pasteClipboardText(document.activeElement, 'right-click')
   }
+  const onMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 2 || !isRightClickToPasteEnabled()) {
+      return
+    }
+    const terminal = getTerminal()
+    if (!terminal || terminal.modes.mouseTrackingMode === 'none') {
+      return
+    }
+    suppressTerminalRightClickPtyMouseReport(terminal)
+  }
   container.addEventListener('contextmenu', onContextMenu)
-  return () => container.removeEventListener('contextmenu', onContextMenu)
+  container.addEventListener('mousedown', onMouseDown, { capture: true })
+  return () => {
+    container.removeEventListener('contextmenu', onContextMenu)
+    container.removeEventListener('mousedown', onMouseDown, { capture: true })
+  }
 }

@@ -70,6 +70,48 @@ process.stdin.on('data', (chunk) => {
 `
 }
 
+function mouseTrackingPasteEchoScript(runId: string): string {
+  return `
+process.stdin.setEncoding('utf8')
+if (process.stdin.isTTY) process.stdin.setRawMode(true)
+process.stdin.resume()
+let seq = 0
+const interrupt = String.fromCharCode(3)
+const escape = String.fromCharCode(27)
+// Why: Copilot CLI requests mouse tracking and then reads the clipboard itself,
+// so an Orca-owned right-click must not also reach it as a mouse report.
+process.stdout.write(escape + '[?1003h' + escape + '[?1006h')
+process.stdout.write('MOUSE_PASTE_READY_${runId}\\n')
+process.stdin.on('data', (chunk) => {
+  if (chunk.includes(interrupt)) {
+    process.exit(0)
+  }
+  seq += 1
+  const encoded = Buffer.from(chunk, 'utf8').toString('base64')
+  process.stdout.write('MOUSE_PASTE_CHUNK_${runId}_' + seq + ':' + encoded + '\\n')
+})
+`
+}
+
+// Why: the escape is built from a char code because a regex literal with \u001b
+// trips no-control-regex.
+const SGR_MOUSE_REPORT_PATTERN = new RegExp(
+  `${String.fromCharCode(27)}\\<(\\d+);\\d+;\\d+[Mm]`,
+  'g'
+)
+
+// Why: SGR reports encode the button in the code — 2 is the right button, plus 32
+// when the report is a drag. Motion reports without a button (35) stay legitimate.
+function countRightButtonMouseReports(value: string): number {
+  let count = 0
+  for (const report of value.matchAll(SGR_MOUSE_REPORT_PATTERN)) {
+    if (Number(report[1]) % 32 === 2) {
+      count += 1
+    }
+  }
+  return count
+}
+
 function countOccurrences(value: string, needle: string): number {
   let count = 0
   let index = value.indexOf(needle)
@@ -401,6 +443,54 @@ test.describe('terminal paste ownership', () => {
 
       const writes = (await readTerminalPtyWrites(electronApp)).join('')
       expect(countOccurrences(writes, payload), 'right-click PTY write count').toBe(1)
+    } finally {
+      if (scriptStarted) {
+        await sendToTerminal(orcaPage, ptyId, '\x03').catch(() => undefined)
+      }
+      rmSync(scriptPath, { force: true })
+    }
+  })
+
+  test('right-click paste stays Orca-owned when the app tracks the mouse', async ({
+    electronApp,
+    orcaPage,
+    testRepoPath
+  }) => {
+    await waitForSessionReady(orcaPage)
+    await waitForActiveWorktree(orcaPage)
+    await ensureTerminalVisible(orcaPage)
+    await orcaPage.evaluate(async () => {
+      await window.__store?.getState().updateSettings({ terminalRightClickToPaste: true })
+    })
+    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await installTerminalPtyWriteSpy(electronApp)
+
+    const ptyId = await waitForActivePanePtyId(orcaPage)
+    const runId = randomUUID()
+    const scriptPath = path.join(testRepoPath, `.orca-paste-right-click-tracking-${runId}.mjs`)
+    writeFileSync(scriptPath, mouseTrackingPasteEchoScript(runId))
+    let scriptStarted = false
+
+    try {
+      await sendToTerminal(orcaPage, ptyId, `node ${JSON.stringify(scriptPath)}\r`)
+      scriptStarted = true
+      await waitForTerminalOutput(orcaPage, `MOUSE_PASTE_READY_${runId}`, 10_000)
+
+      const payload = `ORCA_E2E_TRACKING_RIGHT_CLICK_PASTE_${runId}`
+      const encodedPayload = Buffer.from(payload, 'utf8').toString('base64')
+      await clearTerminalPtyWriteLog(electronApp)
+      await orcaPage.evaluate((text) => window.api.ui.writeClipboardText(text), payload)
+      await focusActiveTerminalInput(orcaPage)
+
+      await rightClickActiveTerminalSurface(orcaPage)
+      await waitForTerminalOutput(orcaPage, encodedPayload, 10_000, 12_000)
+
+      const writes = (await readTerminalPtyWrites(electronApp)).join('')
+      expect(countOccurrences(writes, payload), 'right-click PTY write count').toBe(1)
+      expect(
+        countRightButtonMouseReports(writes),
+        'right-button reports forwarded to a mouse-tracking app'
+      ).toBe(0)
     } finally {
       if (scriptStarted) {
         await sendToTerminal(orcaPage, ptyId, '\x03').catch(() => undefined)
