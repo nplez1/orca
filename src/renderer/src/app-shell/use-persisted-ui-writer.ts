@@ -159,6 +159,7 @@ export function usePersistedUIWriter(): void {
       hideAutomationGeneratedWorkspaces: s.hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces: s.hideCliCreatedWorkspaces,
       hideDetachedHeadWorkspaces: s.hideDetachedHeadWorkspaces,
+      hiddenWorkspaceStatusIds: s.hiddenWorkspaceStatusIds,
       hideWorkspacesFromOtherDevices: s.hideWorkspacesFromOtherDevices,
       mergeSameBranchWorkspaces: s.mergeSameBranchWorkspaces,
       alwaysShowDefaultBranchWorkspace: s.alwaysShowDefaultBranchWorkspace,
