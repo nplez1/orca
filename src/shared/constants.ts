@@ -198,10 +198,7 @@ export function getDefaultRepoHookSettings(): RepoHookSettings {
     mode: 'auto',
     setupRunPolicy: 'run-by-default',
     setupAgentStartupPolicy: DEFAULT_SETUP_AGENT_STARTUP_POLICY,
-    scripts: {
-      setup: '',
-      archive: ''
-    }
+    scripts: { setup: '', archive: '' }
   }
 }
 
@@ -267,6 +264,7 @@ export function getDefaultUIState(): PersistedUIState {
     hideAutomationGeneratedWorkspaces: false,
     hideCliCreatedWorkspaces: false,
     hideDetachedHeadWorkspaces: false,
+    hiddenWorkspaceStatusIds: [],
     hideWorkspacesFromOtherDevices: false,
     alwaysShowDefaultBranchWorkspace: true,
     showDotfilesByWorktree: {},

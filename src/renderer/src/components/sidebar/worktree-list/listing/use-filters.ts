@@ -38,6 +38,7 @@ export function useSidebarWorktreeFilters() {
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
   const hideCliCreatedWorkspaces = useAppStore((s) => s.hideCliCreatedWorkspaces)
   const hideDetachedHeadWorkspaces = useAppStore((s) => s.hideDetachedHeadWorkspaces)
+  const hiddenWorkspaceStatusIds = useAppStore((s) => s.hiddenWorkspaceStatusIds)
   const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
@@ -50,6 +51,7 @@ export function useSidebarWorktreeFilters() {
   )
   const setHideCliCreatedWorkspaces = useAppStore((s) => s.setHideCliCreatedWorkspaces)
   const setHideDetachedHeadWorkspaces = useAppStore((s) => s.setHideDetachedHeadWorkspaces)
+  const setHiddenWorkspaceStatusIds = useAppStore((s) => s.setHiddenWorkspaceStatusIds)
   const setHideWorkspacesFromOtherDevices = useAppStore((s) => s.setHideWorkspacesFromOtherDevices)
   const setAlwaysShowDefaultBranchWorkspace = useAppStore(
     (s) => s.setAlwaysShowDefaultBranchWorkspace
@@ -107,6 +109,14 @@ export function useSidebarWorktreeFilters() {
     if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(worktree)) {
       state.setHideDetachedHeadWorkspaces(false)
     }
+    if (
+      worktree.workspaceStatus &&
+      state.hiddenWorkspaceStatusIds.includes(worktree.workspaceStatus)
+    ) {
+      state.setHiddenWorkspaceStatusIds(
+        state.hiddenWorkspaceStatusIds.filter((id) => id !== worktree.workspaceStatus)
+      )
+    }
     if (state.hideWorkspacesFromOtherDevices) {
       const pairedDeviceIds = getPairedDeviceIdsByEnvironment(
         state.runtimeEnvironments,
@@ -150,6 +160,7 @@ export function useSidebarWorktreeFilters() {
       hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces,
       hideDetachedHeadWorkspaces,
+      hiddenWorkspaceStatusIds,
       hideWorkspacesFromOtherDevices,
       alwaysShowDefaultBranchWorkspace,
       visibleWorkspaceHostIds,
@@ -162,6 +173,7 @@ export function useSidebarWorktreeFilters() {
       hideAutomationGeneratedWorkspaces,
       hideCliCreatedWorkspaces,
       hideDetachedHeadWorkspaces,
+      hiddenWorkspaceStatusIds,
       hideWorkspacesFromOtherDevices,
       alwaysShowDefaultBranchWorkspace,
       visibleWorkspaceHostIds,
@@ -189,6 +201,9 @@ export function useSidebarWorktreeFilters() {
     if (actions.resetHideDetachedHeadWorkspaces) {
       setHideDetachedHeadWorkspaces(false)
     }
+    if (actions.resetHiddenWorkspaceStatusIds) {
+      setHiddenWorkspaceStatusIds([])
+    }
     if (actions.resetHideWorkspacesFromOtherDevices) {
       setHideWorkspacesFromOtherDevices(false)
     }
@@ -205,6 +220,7 @@ export function useSidebarWorktreeFilters() {
     setHideAutomationGeneratedWorkspaces,
     setHideCliCreatedWorkspaces,
     setHideDetachedHeadWorkspaces,
+    setHiddenWorkspaceStatusIds,
     setHideWorkspacesFromOtherDevices,
     setAlwaysShowDefaultBranchWorkspace,
     setVisibleWorkspaceHostIds,

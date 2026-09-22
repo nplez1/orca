@@ -1,11 +1,6 @@
 import { useMemo } from 'react'
-import {
-  isAutomationGeneratedWorkspace,
-  isCliCreatedWorkspace,
-  isDetachedHeadWorkspace,
-  isSleepingSweepExemptWorkspace
-} from '@/components/sidebar/visible-worktrees'
-import { isDefaultBranchWorkspace } from '@/components/sidebar/default-branch-workspace'
+import { isSleepingSweepExemptWorkspace } from '@/components/sidebar/visible-worktrees'
+import { applyWorkspaceKindFilters } from '@/components/sidebar/visible-worktree-kind-filters'
 import { sortWorktreesSmart } from '@/components/sidebar/smart-sort'
 import { buildWorktreeChecksReviewIndex } from '@/components/cmd-j/worktree-checks-review-index'
 import { getLiveAgentStatusByWorktreeId, isInactiveWorkspace } from '@/lib/worktree-activity-state'
@@ -51,6 +46,7 @@ export function useWorktreeJumpPaletteWorktrees({
   hideAutomationGeneratedWorkspaces,
   hideCliCreatedWorkspaces,
   hideDetachedHeadWorkspaces,
+  hiddenWorkspaceStatusIds,
   hideWorkspacesFromOtherDevices,
   showSleepingWorkspaces,
   alwaysShowDefaultBranchWorkspace,
@@ -94,25 +90,31 @@ export function useWorktreeJumpPaletteWorktrees({
         : EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
     [hideWorkspacesFromOtherDevices, runtimeEnvironments, runtimeStatusByEnvironmentId]
   )
+  const kindFilteredWorktrees = useMemo(
+    () =>
+      applyWorkspaceKindFilters(allWorktrees, {
+        hideDefaultBranchWorkspace,
+        hideAutomationGeneratedWorkspaces,
+        hideCliCreatedWorkspaces,
+        hideDetachedHeadWorkspaces,
+        hiddenWorkspaceStatusIds
+      }),
+    [
+      allWorktrees,
+      hideDefaultBranchWorkspace,
+      hideAutomationGeneratedWorkspaces,
+      hideCliCreatedWorkspaces,
+      hideDetachedHeadWorkspaces,
+      hiddenWorkspaceStatusIds
+    ]
+  )
   const emptyQueryVisibleWorktrees = useMemo(
     () =>
-      allWorktrees.filter((worktree) => {
+      kindFilteredWorktrees.filter((worktree) => {
         if (worktree.isArchived) {
           return false
         }
         if (filterPredicate && !filterPredicate.matchesWorktree(worktree)) {
-          return false
-        }
-        if (hideDefaultBranchWorkspace && isDefaultBranchWorkspace(worktree)) {
-          return false
-        }
-        if (hideAutomationGeneratedWorkspaces && isAutomationGeneratedWorkspace(worktree)) {
-          return false
-        }
-        if (hideCliCreatedWorkspaces && isCliCreatedWorkspace(worktree)) {
-          return false
-        }
-        if (hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(worktree)) {
           return false
         }
         if (
@@ -137,15 +139,11 @@ export function useWorktreeJumpPaletteWorktrees({
         return true
       }),
     [
-      allWorktrees,
       alwaysShowDefaultBranchWorkspace,
       browserTabsByWorktree,
       filterPredicate,
-      hideAutomationGeneratedWorkspaces,
-      hideCliCreatedWorkspaces,
-      hideDefaultBranchWorkspace,
-      hideDetachedHeadWorkspaces,
       hideWorkspacesFromOtherDevices,
+      kindFilteredWorktrees,
       pairedDeviceIdsByEnvironment,
       ptyIdsByTabId,
       showSleepingWorkspaces,

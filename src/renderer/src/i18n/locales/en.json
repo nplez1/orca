@@ -6517,6 +6517,12 @@
         "DeleteWorktreeRemoteBranchOption": {
           "alsoDeleteRemoteBranch": "Also delete the remote branch",
           "alsoDeleteRemoteBranchHint": "Permanently deletes this workspace's branch on its remote. Cannot be undone, and is skipped when the local branch is kept."
+        },
+        "SidebarWorkspaceStatusFilterSection": {
+          "bda5f9404e": "All statuses",
+          "63cf2888f5": "{{value0}} hidden",
+          "040f28a2a6": "Status",
+          "66ae0c2967": "Show all"
         }
       },
       "shared": {
