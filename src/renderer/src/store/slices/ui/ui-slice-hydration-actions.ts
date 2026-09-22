@@ -136,6 +136,7 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           hideAutomationGeneratedWorkspaces: ui.hideAutomationGeneratedWorkspaces === true,
           hideCliCreatedWorkspaces: ui.hideCliCreatedWorkspaces === true,
           hideDetachedHeadWorkspaces: ui.hideDetachedHeadWorkspaces === true,
+          hiddenWorkspaceStatusIds: sanitizePersistedRepoIds(ui.hiddenWorkspaceStatusIds),
           hideWorkspacesFromOtherDevices: ui.hideWorkspacesFromOtherDevices === true,
           // Why !== false: absence means on, so profiles that predate the key still consolidate.
           mergeSameBranchWorkspaces: ui.mergeSameBranchWorkspaces !== false,

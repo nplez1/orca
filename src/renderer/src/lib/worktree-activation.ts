@@ -288,6 +288,11 @@ export function activateAndRevealWorktree(
     if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(wt)) {
       state.setHideDetachedHeadWorkspaces(false)
     }
+    if (wt.workspaceStatus && state.hiddenWorkspaceStatusIds.includes(wt.workspaceStatus)) {
+      state.setHiddenWorkspaceStatusIds(
+        state.hiddenWorkspaceStatusIds.filter((id) => id !== wt.workspaceStatus)
+      )
+    }
   }
 
   // 6. Reveal in sidebar
