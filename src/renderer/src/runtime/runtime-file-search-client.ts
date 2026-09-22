@@ -92,6 +92,7 @@ export async function searchRuntimeFilePaths(
     requestToken?: string
     signal?: AbortSignal
     mode?: PathSearchMode
+    includeIgnoredFiles?: boolean
   }
 ): Promise<FilePathSearchResult> {
   const target = getActiveRuntimeTarget(context.settings)
@@ -109,6 +110,7 @@ export async function searchRuntimeFilePaths(
         limit,
         mode: args.mode,
         excludePaths: args.excludePaths,
+        includeIgnoredFiles: args.includeIgnoredFiles,
         requestToken: args.requestToken
       })
     }

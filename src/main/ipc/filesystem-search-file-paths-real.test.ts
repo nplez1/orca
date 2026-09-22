@@ -99,6 +99,37 @@ describe.skipIf(!hasRipgrep())('searchQuickOpenFilePaths against real ripgrep', 
     expect(result.truncated).toBe(true)
   })
 
+  it('scopes the walk to the Contents-tab file set when ignored files are excluded', async () => {
+    const root = tempDir!
+    execFileSync('git', ['init'], { cwd: root })
+    await writeFile(join(root, '.gitignore'), 'ignored/\n')
+    await writeRel(root, 'ignored/secret-target.ts')
+    await writeRel(root, 'src/keep-target.ts')
+
+    const withIgnored = await searchQuickOpenFilePaths(root, asStore(root), {
+      query: 'target',
+      limit: 5_000,
+      mode: 'name-filter'
+    })
+    expect(withIgnored).toEqual({
+      paths: ['ignored/secret-target.ts', 'src/keep-target.ts'],
+      totalCount: 2,
+      truncated: false
+    })
+
+    const withoutIgnored = await searchQuickOpenFilePaths(root, asStore(root), {
+      query: 'target',
+      limit: 5_000,
+      mode: 'name-filter',
+      includeIgnoredFiles: false
+    })
+    expect(withoutIgnored).toEqual({
+      paths: ['src/keep-target.ts'],
+      totalCount: 1,
+      truncated: false
+    })
+  })
+
   it('keeps the default fuzzy mode working against real ripgrep', async () => {
     const root = tempDir!
     await writeRel(root, 'src/a/b/drover.eve_schema')

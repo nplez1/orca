@@ -39,6 +39,10 @@ import { QuickOpenPathRanker, type PathSearchMode } from '../../../shared/quick-
 import { resolveQuickOpenResultLimit } from '../../../shared/quick-open-listing-limits'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import { searchQuickOpenFilePaths } from '../filesystem-search-file-paths'
+import {
+  prewarmQuickOpenPathInventory,
+  queryQuickOpenPathInventory
+} from '../quick-open-path-inventory'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 
 // 32 visible matches plus one truncation sentinel stays below the legacy frame ceiling.
@@ -276,6 +280,9 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
           return []
         }
         const nameFilterTokens = args.nameFilter ? splitFileNameFilterTokens(args.nameFilter) : []
+        // Why: the pane's first unscoped listing is the earliest signal that this workspace's
+        // Files view is open, so warm the filter index before the user types a name filter.
+        prewarmQuickOpenPathInventory(args.rootPath, store)
         return await listQuickOpenFiles(
           args.rootPath,
           store,
@@ -310,15 +317,37 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
         query: string
         limit?: number
         mode?: PathSearchMode
+        includeIgnoredFiles?: boolean
       }
     ): Promise<FilePathSearchResult> => {
       const controller = listFilesCancellations.begin(event, args.requestToken)
+      const limit = resolveQuickOpenResultLimit(args.limit)
       try {
+        // Why: a name filter only needs the path list, so answer from the warm inventory when
+        // the workspace has one — a per-keystroke walk is the entire cost this avoids.
+        const inventoryMatch =
+          args.mode === 'name-filter'
+            ? await queryQuickOpenPathInventory(args.rootPath, store, {
+                query: args.query,
+                limit,
+                excludePaths: args.excludePaths,
+                includeIgnoredFiles: args.includeIgnoredFiles ?? true
+              })
+            : null
+        if (inventoryMatch) {
+          return {
+            files: inventoryMatch.paths,
+            totalCount: inventoryMatch.totalCount,
+            truncated: inventoryMatch.truncated,
+            ignoredFiles: inventoryMatch.ignoredPaths
+          }
+        }
         const result = await searchQuickOpenFilePaths(args.rootPath, store, {
           query: args.query,
-          limit: resolveQuickOpenResultLimit(args.limit),
+          limit,
           mode: args.mode,
           excludePaths: args.excludePaths,
+          includeIgnoredFiles: args.includeIgnoredFiles,
           signal: controller?.signal
         })
         return {
