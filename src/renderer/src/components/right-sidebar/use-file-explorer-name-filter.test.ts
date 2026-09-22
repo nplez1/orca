@@ -103,7 +103,6 @@ describe('useFileExplorerNameFilter', () => {
       files: ['ignored/a.ts', 'src/b.ts'],
       loading: false,
       loadError: null,
-      resolvedQuery: 'a.ts',
       totalCount: 2,
       truncated: false,
       ignoredFiles: ['ignored/a.ts']
