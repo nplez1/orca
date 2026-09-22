@@ -3,7 +3,8 @@ import {
   type ParsedAgentStatusPayload
 } from '../../agent-status-types'
 import { readFirstString } from '../interactive-tool'
-import type { CopilotBackgroundWorkState, HookListenerState } from '../listener-state'
+import type { HookListenerState } from '../listener-state'
+import type { CopilotBackgroundWorkState } from '../copilot-background-work-state'
 import { resolvePrompt, resolveToolState } from '../prompt-fields'
 import { extractToolFields, isNewTurnEvent } from '../provider-event-routing'
 import {
