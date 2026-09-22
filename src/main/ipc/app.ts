@@ -17,7 +17,7 @@ import { setUnreadDockBadgeCount } from '../dock/unread-badge'
 import { destroySystemTray } from '../tray/system-tray'
 import { authorizeExternalPath } from './filesystem-auth'
 import {
-  ensureDefaultFloatingWorkspacePath,
+  ensureFloatingWorkspaceDirectory,
   grantFloatingWorkspaceDirectory,
   resolveFloatingTerminalCwd
 } from './floating-workspace-directory'
@@ -43,7 +43,7 @@ type RegisterAppHandlersOptions = {
 async function pickFloatingMarkdownDocument(
   event: IpcMainInvokeEvent
 ): Promise<MarkdownDocument | null> {
-  const cwd = await ensureDefaultFloatingWorkspacePath()
+  const cwd = await ensureFloatingWorkspaceDirectory()
   const options = {
     defaultPath: cwd,
     properties: ['openFile'],
@@ -318,7 +318,7 @@ export function registerAppHandlers(store: Store, options: RegisterAppHandlersOp
     resolveFloatingTerminalCwd(store, args)
   )
 
-  ipcMain.handle('app:getFloatingMarkdownDirectory', () => ensureDefaultFloatingWorkspacePath())
+  ipcMain.handle('app:getFloatingMarkdownDirectory', () => ensureFloatingWorkspaceDirectory())
 
   ipcMain.handle('app:pickFloatingMarkdownDocument', (event) => pickFloatingMarkdownDocument(event))
 

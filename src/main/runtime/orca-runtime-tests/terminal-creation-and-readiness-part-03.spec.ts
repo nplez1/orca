@@ -4,7 +4,6 @@ import {
   OrcaRuntimeService,
   SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV,
   electronMocks,
-  homedir,
   ipcMain,
   join,
   markCodexProjectTrustedMock,
@@ -14,6 +13,7 @@ import {
   tmpdir,
   unregisterSshGitProvider
 } from '../orca-runtime-test-mocks.spec'
+import { resolveFloatingWorkspaceLaunchDirectory } from '../../floating-workspace-launch-directory'
 import {
   TEST_FOLDER_PROJECT_GROUP_ID,
   TEST_FOLDER_WORKSPACE_ID,
@@ -375,7 +375,7 @@ describe('OrcaRuntimeService', () => {
         }
       | undefined
     expect(spawnCall).toMatchObject({
-      cwd: homedir(),
+      cwd: resolveFloatingWorkspaceLaunchDirectory(),
       connectionId: null,
       worktreeId: FLOATING_TERMINAL_WORKTREE_ID
     })

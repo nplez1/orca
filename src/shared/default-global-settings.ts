@@ -161,7 +161,7 @@ export function buildDefaultSettings(args: {
     floatingTerminalEnabled: true,
     browserClientHostedRemoteEnabled: true,
     floatingTerminalDefaultedForAllUsers: true,
-    floatingTerminalCwd: '~',
+    floatingTerminalCwd: '',
     floatingTerminalTrustedCwds: [],
     floatingTerminalCwdMigratedToAppWorkspace: true,
     floatingTerminalTriggerLocation: 'floating-button',

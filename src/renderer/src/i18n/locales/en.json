@@ -7312,12 +7312,13 @@
           "3c900e26e5": "The keyboard shortcut works regardless of where the toggle is shown.",
           "5e5a8da236": "Toggle Button Location",
           "505001823e": "Choose floating workspace directory",
-          "81afb79785": "New floating terminal tabs start here. Markdown notes are saved in Orca's app-owned floating workspace.",
+          "81afb79785": "New floating terminals and agents start here. Floating markdown notes always live in the floating-workspace folder, next to its AGENTS.md instructions.",
           "12aa09f10c": "Terminal Directory",
           "41eb95f7f0": "Shows the floating workspace button and panel.",
           "5136813663": "Enable Floating Workspace",
           "37df688d6f": "Enable the floating workspace and choose where new tabs start.",
-          "1f67f39384": "Floating Workspace"
+          "1f67f39384": "Floating Workspace",
+          "revealFailed": "Could not open the floating workspace folder."
         },
         "AgentCacheTimerSection": {
           "05de84a104": "1 hour",
