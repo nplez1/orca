@@ -24,7 +24,9 @@ export class OrcaRuntimeWithGetWorktreeTerminalProvisioningHost extends OrcaRunt
       getSettings: () => this.requireStore().getSettings(),
       getPtyId: (handle) => this.getLivePtyForHandle(handle)?.pty.ptyId,
       recordSetupCompletionToken: (ptyId, token) =>
-        this.setupCompletionTokenByPtyId.set(ptyId, token)
+        this.setupCompletionTokenByPtyId.set(ptyId, token),
+      armWorktreeSetupRunner: (handle, worktreeId, completionToken) =>
+        this.armWorktreeSetupRunner(handle, worktreeId, completionToken)
     }
   }
 
