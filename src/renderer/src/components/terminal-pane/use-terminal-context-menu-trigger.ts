@@ -3,6 +3,7 @@ import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import type { TerminalPasteSource } from './terminal-paste-coordinator'
 import { copyTerminalSelection } from './terminal-selection-copy'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
+import { suppressTerminalRightClickPtyMouseReport } from './terminal-right-click-pty-mouse-suppression'
 
 type UseTerminalContextMenuTriggerDeps = {
   managerRef: React.RefObject<PaneManager | null>
@@ -20,6 +21,7 @@ type TerminalContextMenuTrigger = {
   point: { x: number; y: number }
   menuOpenedAtRef: React.RefObject<number>
   onContextMenuCapture: (event: React.MouseEvent<HTMLDivElement>) => void
+  onMouseDownCapture: (event: React.MouseEvent<HTMLDivElement>) => void
   onPaneTitleContextMenu: (event: React.MouseEvent<HTMLElement>, paneId: number) => void
 }
 
@@ -107,6 +109,25 @@ export function useTerminalContextMenuTrigger({
     openContextMenu(event, clickedPane?.id ?? null, event.currentTarget)
   }
 
+  // Why: xterm encodes the mouse report on mousedown, before contextmenu decides
+  // paste vs copy, so the whole Orca-owned gesture has to be claimed here.
+  const onMouseDownCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
+    if (!rightClickToPaste || event.button !== 2) {
+      return
+    }
+    const target = event.target
+    if (!(target instanceof Node)) {
+      return
+    }
+    const clickedPane = managerRef.current
+      ?.getPanes()
+      .find((pane) => pane.container.contains(target))
+    if (!clickedPane || clickedPane.terminal.modes.mouseTrackingMode === 'none') {
+      return
+    }
+    suppressTerminalRightClickPtyMouseReport(clickedPane.terminal)
+  }
+
   const onPaneTitleContextMenu = (event: React.MouseEvent<HTMLElement>, paneId: number): void => {
     const boundsElement = containerRef.current
     if (!boundsElement) {
@@ -116,5 +137,13 @@ export function useTerminalContextMenuTrigger({
     openContextMenu(event, paneId, boundsElement)
   }
 
-  return { open, setOpen, point, menuOpenedAtRef, onContextMenuCapture, onPaneTitleContextMenu }
+  return {
+    open,
+    setOpen,
+    point,
+    menuOpenedAtRef,
+    onContextMenuCapture,
+    onMouseDownCapture,
+    onPaneTitleContextMenu
+  }
 }
