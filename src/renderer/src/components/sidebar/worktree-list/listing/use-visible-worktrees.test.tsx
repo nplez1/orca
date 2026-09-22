@@ -179,6 +179,7 @@ describe('useVisibleSidebarWorktrees', () => {
           hideAutomationGeneratedWorkspaces: false,
           hideCliCreatedWorkspaces: false,
           hideDetachedHeadWorkspaces: false,
+          hiddenWorkspaceStatusIds: [],
           hideWorkspacesFromOtherDevices: false,
           alwaysShowDefaultBranchWorkspace: true,
           visibleWorkspaceHostIds: null,
