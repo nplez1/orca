@@ -43,7 +43,15 @@ export function resolveCopilotEventName(
 ): unknown {
   const explicit =
     eventName ??
-    readFirstString(hookPayload, ['hook_event_name', 'hookEventName', 'hook_type', 'hookType'])
+    readFirstString(hookPayload, [
+      'hook_event_name',
+      'hookEventName',
+      'hook_type',
+      'hookType',
+      // Why: Copilot's permissionRequest payload is camelCase with no `hook_event_name`; without
+      // this it falls through to the tool-name heuristic and reads as a PreToolUse.
+      'hookName'
+    ])
   if (explicit) {
     return explicit
   }
@@ -104,6 +112,18 @@ export function readCopilotToolCall(hookPayload: Record<string, unknown>): {
   }
 }
 
+export function readCopilotToolInput(hookPayload: Record<string, unknown>): unknown {
+  const toolCall = readCopilotToolCall(hookPayload)
+  return (
+    hookPayload.tool_input ??
+    hookPayload.toolInput ??
+    hookPayload.toolArgs ??
+    hookPayload.input ??
+    hookPayload.arguments ??
+    toolCall.toolInputSource
+  )
+}
+
 export function isAskUserTool(toolName: string | undefined): boolean {
   return toolName?.replaceAll(/[^a-z0-9]/gi, '').toLowerCase() === 'askuser'
 }
@@ -113,6 +133,22 @@ export function extractCopilotToolFields(
   hookPayload: Record<string, unknown>
 ): ToolSnapshot {
   const update: ToolSnapshot = {}
+  // Why: Copilot's permission notification is async, so a request that resolves without the user
+  // (auto-approved) can notify after its tool already completed; that ordering is the stale signal.
+  if (eventName === 'PreToolUse' || eventName === 'PermissionRequest') {
+    update.toolCompleted = false
+  } else if (eventName === 'PostToolUse' || eventName === 'PostToolUseFailure') {
+    update.toolCompleted = true
+  }
+  // Why: userPromptSubmitted can precede sessionStart (seen on 1.0.87), so adopt the lead session id
+  // on either turn boundary. Subagent events never reach this extractor (normalizeCopilotEvent drops
+  // them first), so a child cannot overwrite it.
+  if (eventName === 'SessionStart' || eventName === 'UserPromptSubmit') {
+    const sessionId = readFirstString(hookPayload, ['session_id', 'sessionId'])
+    if (sessionId) {
+      update.leadSessionId = sessionId
+    }
+  }
   if (eventName === 'PostToolUseFailure' || eventName === 'ErrorOccurred') {
     Object.assign(update, clearActiveToolFieldsUpdate())
   } else if (
