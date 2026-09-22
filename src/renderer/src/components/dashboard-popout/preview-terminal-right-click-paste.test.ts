@@ -10,11 +10,19 @@ describe('installPreviewTerminalRightClickPaste', () => {
   let selection: string
   let clearSelection: ReturnType<typeof vi.fn<() => void>>
   let rightClickToPaste: boolean
+  let mouseTrackingMode: 'none' | 'any'
+  let terminalOptions: { mouseEventsRequireAlt: boolean }
 
   const install = (): (() => void) =>
     installPreviewTerminalRightClickPaste({
       container,
-      getTerminal: () => ({ getSelection: () => selection, clearSelection }),
+      getTerminal: () => ({
+        getSelection: () => selection,
+        clearSelection,
+        element: container,
+        modes: { mouseTrackingMode },
+        options: terminalOptions
+      }),
       isRightClickToPasteEnabled: () => rightClickToPaste,
       pasteClipboardText
     })
@@ -25,6 +33,12 @@ describe('installPreviewTerminalRightClickPaste', () => {
     return event
   }
 
+  const mouseDown = (init: MouseEventInit = {}): void => {
+    container.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, ...init })
+    )
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
@@ -33,6 +47,8 @@ describe('installPreviewTerminalRightClickPaste', () => {
     selection = ''
     clearSelection = vi.fn<() => void>()
     rightClickToPaste = true
+    mouseTrackingMode = 'any'
+    terminalOptions = { mouseEventsRequireAlt: false }
     Object.assign(window, { api: { ui: { writeTerminalClipboardText } } })
   })
 
@@ -90,7 +106,30 @@ describe('installPreviewTerminalRightClickPaste', () => {
 
     const disposeSecond = install()
     disposeSecond()
+    mouseDown({ button: 2 })
+    expect(terminalOptions.mouseEventsRequireAlt).toBe(false)
     expect(rightClick().defaultPrevented).toBe(false)
     expect(pasteClipboardText).not.toHaveBeenCalled()
+  })
+
+  it('keeps a right-click from also reaching a mouse-tracking app', () => {
+    install()
+
+    mouseDown({ button: 2 })
+
+    expect(terminalOptions.mouseEventsRequireAlt).toBe(true)
+  })
+
+  it('leaves the right-click to the app when the setting is off or the app ignores the mouse', () => {
+    install()
+    rightClickToPaste = false
+    mouseDown({ button: 2 })
+    expect(terminalOptions.mouseEventsRequireAlt).toBe(false)
+
+    rightClickToPaste = true
+    mouseTrackingMode = 'none'
+    mouseDown({ button: 2 })
+    mouseDown({ button: 1 })
+    expect(terminalOptions.mouseEventsRequireAlt).toBe(false)
   })
 })
