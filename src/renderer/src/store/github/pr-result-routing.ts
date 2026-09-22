@@ -88,7 +88,16 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
   preserveExistingPRForFallbackMiss?: boolean
   requestStartedAt?: number
   requestStartedEntry?: AppState['hostedReviewCache'][string]
-}): { cache: AppState['hostedReviewCache']; accepted: boolean } {
+}): {
+  cache: AppState['hostedReviewCache']
+  accepted: boolean
+  /**
+   * The result lost a race to a newer hosted-review write. The paired PR entry
+   * must be kept, not deleted: the newer write may be a hosted-review-only refresh
+   * (which never writes prCache), so deleting would blank the Checks panel mid-refresh.
+   */
+  preservePRCacheOnReject: boolean
+} {
   const hostedReviewCacheKey = getHostedReviewCacheKey(
     args.repoPath,
     args.branch,
@@ -107,7 +116,7 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
       args.requestStartedEntry
     )
   ) {
-    return { cache: args.cache, accepted: false }
+    return { cache: args.cache, accepted: false, preservePRCacheOnReject: true }
   }
   const hostedReviewEntry = args.cache[hostedReviewCacheKey]
   if (
@@ -115,10 +124,10 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
     hostedReviewEntry !== undefined &&
     hostedReviewEntry.fetchedAt >= args.fetchedAt
   ) {
-    return { cache: args.cache, accepted: false }
+    return { cache: args.cache, accepted: false, preservePRCacheOnReject: true }
   }
   if (args.pr && hostedReviewEntry?.data && hostedReviewEntry.data.provider !== 'github') {
-    return { cache: args.cache, accepted: false }
+    return { cache: args.cache, accepted: false, preservePRCacheOnReject: false }
   }
   // Why: a hosted-review row survives an authoritative miss only when the paired PR cache preserves a terminal, head-current PR.
   if (
@@ -131,10 +140,14 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
     args.preserveExistingPRForFallbackMiss === true &&
     canPreserveReviewForFallbackMiss(hostedReviewEntry.data.state)
   ) {
-    return { cache: args.cache, accepted: false }
+    return { cache: args.cache, accepted: false, preservePRCacheOnReject: false }
   }
   if (!args.pr && !shouldClearHostedReviewForNoGitHubPR(hostedReviewEntry)) {
-    return { cache: args.cache, accepted: hostedReviewEntry?.data == null }
+    return {
+      cache: args.cache,
+      accepted: hostedReviewEntry?.data == null,
+      preservePRCacheOnReject: false
+    }
   }
   // Why: hosted-review fallbacks may be stale exact links; inherit branch provenance only when already proven.
   const branchLookupGitHubPRNumber =
@@ -156,7 +169,8 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
         : linkedReviewHintKeyForNoGitHubPR(hostedReviewEntry),
       ...(branchLookupGitHubPRNumber !== undefined ? { branchLookupGitHubPRNumber } : {})
     }),
-    accepted: true
+    accepted: true,
+    preservePRCacheOnReject: false
   }
 }
 
