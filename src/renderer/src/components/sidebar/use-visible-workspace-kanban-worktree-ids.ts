@@ -20,6 +20,7 @@ type UseVisibleWorkspaceKanbanWorktreeIdsParams = {
 }
 
 const EMPTY_WORKTREE_ID_SET: ReadonlySet<string> = new Set()
+const EMPTY_HIDDEN_WORKSPACE_STATUS_IDS: readonly string[] = []
 const EMPTY_RUNTIME_ENVIRONMENTS: AppState['runtimeEnvironments'] = []
 const EMPTY_RUNTIME_STATUS_BY_ENVIRONMENT_ID: AppState['runtimeStatusByEnvironmentId'] = new Map()
 
@@ -77,6 +78,8 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
   return useMemo(() => {
     // Why: the board has its own status ordering, but visibility must match
     // the sidebar filters exactly so hidden workspaces do not reappear here.
+    // The status filter is the one exception: a board whose lanes are emptied
+    // by it gives no way to drag a card out of a hidden status.
     const sortedIds = allWorktrees.map((worktree) => worktree.id)
     return new Set(
       computeVisibleWorktrees(worktreesByRepo, sortedIds, {
@@ -91,6 +94,7 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
         hideAutomationGeneratedWorkspaces,
         hideCliCreatedWorkspaces,
         hideDetachedHeadWorkspaces,
+        hiddenWorkspaceStatusIds: EMPTY_HIDDEN_WORKSPACE_STATUS_IDS,
         hideWorkspacesFromOtherDevices,
         pairedDeviceIdsByEnvironment: hideWorkspacesFromOtherDevices
           ? getPairedDeviceIdsByEnvironment(runtimeEnvironments, runtimeStatusByEnvironmentId)

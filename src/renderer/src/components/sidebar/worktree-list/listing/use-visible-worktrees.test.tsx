@@ -50,6 +50,7 @@ describe('useVisibleSidebarWorktrees', () => {
           hideAutomationGeneratedWorkspaces: false,
           hideCliCreatedWorkspaces: false,
           hideDetachedHeadWorkspaces: false,
+          hiddenWorkspaceStatusIds: [],
           hideWorkspacesFromOtherDevices: false,
           alwaysShowDefaultBranchWorkspace: true,
           visibleWorkspaceHostIds: null,
@@ -85,6 +86,7 @@ describe('useVisibleSidebarWorktrees', () => {
           hideAutomationGeneratedWorkspaces: false,
           hideCliCreatedWorkspaces: false,
           hideDetachedHeadWorkspaces: false,
+          hiddenWorkspaceStatusIds: [],
           hideWorkspacesFromOtherDevices: false,
           alwaysShowDefaultBranchWorkspace: true,
           visibleWorkspaceHostIds: ['ssh:box'],
@@ -108,7 +110,7 @@ describe('useVisibleSidebarWorktrees', () => {
     const worktree = makeWorktree('alpha', 'Alpha workspace', { hostId: 'local' })
     useAppStore.setState({ worktreesByRepo: { [repo.id]: [worktree] } })
 
-    const baseArgs = {
+    const baseArgs: Parameters<typeof useVisibleSidebarWorktrees>[0] = {
       filterState: {
         showSleepingWorkspaces: true,
         filterRepoIds: [],
@@ -116,6 +118,7 @@ describe('useVisibleSidebarWorktrees', () => {
         hideAutomationGeneratedWorkspaces: false,
         hideCliCreatedWorkspaces: false,
         hideDetachedHeadWorkspaces: false,
+        hiddenWorkspaceStatusIds: [],
         hideWorkspacesFromOtherDevices: false,
         alwaysShowDefaultBranchWorkspace: true,
         visibleWorkspaceHostIds: null,
@@ -127,7 +130,7 @@ describe('useVisibleSidebarWorktrees', () => {
       worktreeLineageById: {},
       defaultHostId: LOCAL_EXECUTION_HOST_ID,
       agentSendTargetWorktreeId: null
-    } as Parameters<typeof useVisibleSidebarWorktrees>[0]
+    }
     // Why the extra `settings`: it is the pre-fix memo key. Passing it keeps
     // this test red against the old hook, which re-keyed the whole scan on the
     // settings object identity.
@@ -145,9 +148,10 @@ describe('useVisibleSidebarWorktrees', () => {
     expect(callsAfterFirstRender).toBe(1)
 
     // A settings write that does not move the focused execution host.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: spreading possibly-absent settings yields optional fields; the test only needs a new settings object identity.
     const nextSettings = {
       ...useAppStore.getState().settings,
-      sidebarWidth: 321
+      appFontFamily: 'Inter'
     } as ReturnType<typeof useAppStore.getState>['settings']
     useAppStore.setState({ settings: nextSettings })
     rerender(withSettings(nextSettings))

@@ -56,6 +56,7 @@ function visibleOptions(overrides: Partial<VisibleOptions> = {}): VisibleOptions
     hideAutomationGeneratedWorkspaces: false,
     hideCliCreatedWorkspaces: false,
     hideDetachedHeadWorkspaces: false,
+    hiddenWorkspaceStatusIds: [],
     hideWorkspacesFromOtherDevices: false,
     pairedDeviceIdsByEnvironment: new Map(),
     repoMap,
