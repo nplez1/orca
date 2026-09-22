@@ -117,6 +117,25 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Targets:** no issue of its own. It is the Copilot counterpart of #10997 / #12382 (Claude).
 - **Verified:** typecheck, 1,138 tests, plain `oxlint`.
 
+### nplez1/Copilot-Auto-Approval-Issue
+
+- **Why:** follow-up to `fix/copilot-background-work`, verified against live Copilot CLI 1.0.87
+  captures. Copilot panes still showed "Needs attention" for permission requests resolved without
+  the user (auto-approval), and the background-work tracker matched signals Copilot never sends:
+  shells were detected via invented `background`/`run_in_background` fields (never a real one), every
+  `task` counted as background (so sync subagents leaked a count and pinned monitoring), a subagent's
+  own background shell was dropped, and a subagent's session events were attributed to the lead pane.
+- **Shape:** corrected to the real signals — `mode:"async"`/`detach:true` shells registered from the
+  start's result and settled by a `shell_completed` notification or a `read_bash`/`stop_bash` result
+  — plus per-shell identity matching, `mode:"background"`-only subagent counting, and child-session
+  events keyed against the pane's lead session id. New `copilot-background-work-state.ts` and three
+  test files (two split off the oversized normalization test, one replaying a real capture).
+- **Targets:** upstream #19780 (auto-approved permission notifications) and #20810 (Copilot pane
+  `done` while background work runs).
+- **Verified:** `pnpm tc`, changed-code quality gate, targeted `oxlint`, 1,300 tests across
+  `src/main/agent-hooks` + `src/shared/agent-hook-listener`, and a replay of a real nested Copilot
+  capture.
+
 ### fix/repo-catalog-connection-fence
 
 - **Why:** an all-hosts repo catalog fetch could outlive the connection it started on, letting a

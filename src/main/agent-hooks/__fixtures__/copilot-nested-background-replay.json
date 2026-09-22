@@ -1,0 +1,220 @@
+[
+  {
+    "hook_event_name": "UserPromptSubmit",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:22.360Z",
+    "prompt": "Use the task tool with mode=\"background\" to launch a subagent. Give that subagent this instruction: 'Use the task tool with mode=\"background\" to launch a nested subagent, and tell it to run the shell command sleep 20 with mode=\"async\" (background shell).' Then stop."
+  },
+  {
+    "hook_event_name": "SessionStart",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:22.373Z",
+    "source": "new",
+    "initial_prompt": "Use the task tool with mode=\"background\" to launch a subagent. Give that subagent this instruction: 'Use the task tool with mode=\"background\" to launch a nested subagent, and tell it to run the shell command sleep 20 with mode=\"async\" (background shell).' Then stop."
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:26.931Z",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Launch a nested background subagent per user instruction",
+      "prompt": "Use the task tool with mode=\"background\" to launch a nested subagent, and tell it to run the shell command sleep 20 with mode=\"async\" (background shell).",
+      "agent_type": "general-purpose",
+      "name": "nested-subagent",
+      "mode": "background"
+    }
+  },
+  {
+    "hook_event_name": "PostToolUse",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:26.949Z",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Launch a nested background subagent per user instruction",
+      "prompt": "Use the task tool with mode=\"background\" to launch a nested subagent, and tell it to run the shell command sleep 20 with mode=\"async\" (background shell).",
+      "agent_type": "general-purpose",
+      "name": "nested-subagent",
+      "mode": "background"
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "Agent started in background with agent_id: 73c57907-bd4f-4e0e-af1f-26de720697e5. You'll be notified when it completes. Tell the user you're waiting and end your response, or continue unrelated work until notified. The agent supports multi-turn conversations \u2014 use write_agent to send follow-up messages."
+    }
+  },
+  {
+    "sessionId": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": 1790052627057,
+    "agentName": "general-purpose",
+    "hookEventName": "subagentStart"
+  },
+  {
+    "hook_event_name": "UserPromptSubmit",
+    "session_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+    "timestamp": "2026-09-22T04:50:27.451Z",
+    "prompt": "Use the task tool with mode=\"background\" to launch a nested subagent, and tell it to run the shell command sleep 20 with mode=\"async\" (background shell)."
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:29.076Z",
+    "tool_name": "read_agent",
+    "tool_input": {
+      "agent_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+      "wait": true,
+      "timeout": 30
+    }
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "session_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+    "timestamp": "2026-09-22T04:50:30.245Z",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Launch nested background sleeper",
+      "prompt": "Run the shell command `sleep 20` using the shell tool in async/background mode. Do not do anything else; report once the command has been launched and, if possible, its completion status.",
+      "agent_type": "task",
+      "name": "background-sleeper"
+    }
+  },
+  {
+    "sessionId": "b70835ac-5c9a-424e-b84d-11cefc517f2e",
+    "timestamp": 1790052630334,
+    "agentName": "task",
+    "hookEventName": "subagentStart"
+  },
+  {
+    "hook_event_name": "UserPromptSubmit",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:30.576Z",
+    "prompt": "Run the shell command `sleep 20` using the shell tool in async/background mode. Do not do anything else; report once the command has been launched and, if possible, its completion status."
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:32.131Z",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "sleep 20",
+      "description": "Run sleep 20 in background mode as requested",
+      "mode": "async"
+    }
+  },
+  {
+    "hook_event_name": "PostToolUse",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:32.168Z",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "sleep 20",
+      "description": "Run sleep 20 in background mode as requested",
+      "mode": "async"
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "<command started in background with shellId: 0>"
+    }
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:34.041Z",
+    "tool_name": "read_bash",
+    "tool_input": {
+      "shellId": "0",
+      "delay": 20
+    }
+  },
+  {
+    "hook_event_name": "PostToolUse",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:52.178Z",
+    "tool_name": "read_bash",
+    "tool_input": {
+      "shellId": "0",
+      "delay": 20
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "\n<shellId: 0 completed with exit code 0>"
+    }
+  },
+  {
+    "hook_event_name": "Stop",
+    "session_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "timestamp": "2026-09-22T04:50:53.988Z",
+    "stop_reason": "end_turn",
+    "stop_hook_active": false
+  },
+  {
+    "hook_event_name": "SubagentStop",
+    "session_id": "b70835ac-5c9a-424e-b84d-11cefc517f2e",
+    "timestamp": "2026-09-22T04:50:53.994Z",
+    "agent_id": "fea149d6-ad5d-48d1-ab17-86eeb3aafa4c",
+    "agent_type": "task",
+    "agent_name": "task",
+    "last_assistant_message": "Launched `sleep 20` in background mode. It completed successfully with exit code 0.",
+    "stop_reason": "end_turn"
+  },
+  {
+    "hook_event_name": "PostToolUse",
+    "session_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+    "timestamp": "2026-09-22T04:50:54.003Z",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Launch nested background sleeper",
+      "prompt": "Run the shell command `sleep 20` using the shell tool in async/background mode. Do not do anything else; report once the command has been launched and, if possible, its completion status.",
+      "agent_type": "task",
+      "name": "background-sleeper"
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "Launched `sleep 20` in background mode. It completed successfully with exit code 0."
+    }
+  },
+  {
+    "hook_event_name": "Stop",
+    "session_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+    "timestamp": "2026-09-22T04:50:54.986Z",
+    "stop_reason": "end_turn",
+    "stop_hook_active": false
+  },
+  {
+    "hook_event_name": "SubagentStop",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:54.993Z",
+    "agent_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+    "agent_type": "general-purpose",
+    "agent_name": "general-purpose",
+    "last_assistant_message": "Launched the nested background subagent to run `sleep 20`; it completed successfully with exit code 0.",
+    "stop_reason": "end_turn"
+  },
+  {
+    "hook_event_name": "PostToolUse",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:55.003Z",
+    "tool_name": "read_agent",
+    "tool_input": {
+      "agent_id": "73c57907-bd4f-4e0e-af1f-26de720697e5",
+      "wait": true,
+      "timeout": 30
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "Agent is idle (waiting for messages). agent_id: 73c57907-bd4f-4e0e-af1f-26de720697e5, agent_type: general-purpose, status: idle, description: Launch a nested background subagent per user instruction, elapsed: 28s, total_turns: 1\n\n[Turn 0]\nLaunched the nested background subagent to run `sleep 20`; it completed successfully with exit code 0."
+    }
+  },
+  {
+    "hook_event_name": "Stop",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:56.998Z",
+    "stop_reason": "end_turn",
+    "stop_hook_active": false
+  },
+  {
+    "hook_event_name": "SessionEnd",
+    "session_id": "d3e97113-4122-4878-9f40-cdf41fbeeb24",
+    "timestamp": "2026-09-22T04:50:57.005Z",
+    "reason": "complete"
+  }
+]

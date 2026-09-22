@@ -29,6 +29,33 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/** A background shell start is registered from its RESULT (the tool that really backgrounded it),
+ *  not from the PreToolUse — an async shell that finishes within `initial_wait` returns its output
+ *  directly and must not be tracked as pending. */
+function postCopilotBackgroundShell(shellId: number, options: { detach?: boolean } = {}): void {
+  const toolInput = {
+    command: 'pnpm test',
+    description: `shell ${shellId}`,
+    mode: 'async',
+    ...(options.detach ? { detach: true } : {})
+  }
+  for (const body of [
+    buildBody({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: toolInput }),
+    buildBody({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: toolInput,
+      tool_result: {
+        text_result_for_llm: `<command started in ${
+          options.detach ? 'detached ' : ''
+        }background with shellId: ${shellId}>`
+      }
+    })
+  ]) {
+    _internals.normalizeHookPayload('copilot', body, 'production')
+  }
+}
+
 describe('Copilot hook normalization', () => {
   it('UserPromptSubmit maps to working and captures the prompt', () => {
     const result = _internals.normalizeHookPayload(
@@ -114,15 +141,7 @@ describe('Copilot hook normalization', () => {
   })
 
   it('keeps a stopped Copilot turn monitoring a running background shell', () => {
-    _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command: 'pnpm test', background: true }
-      }),
-      'production'
-    )
+    postCopilotBackgroundShell(0)
 
     const stopped = _internals.normalizeHookPayload(
       'copilot',
@@ -137,21 +156,39 @@ describe('Copilot hook normalization', () => {
     })
   })
 
-  it('settles a monitored Copilot turn after its background shell completes', () => {
+  it('does not monitor a plain foreground shell command', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({
         hook_event_name: 'PreToolUse',
         tool_name: 'Bash',
-        tool_input: { command: 'pnpm test', run_in_background: true }
+        tool_input: { command: 'pnpm test', mode: 'sync' }
       }),
       'production'
     )
+
+    const stopped = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Stop' }),
+      'production'
+    )
+
+    expect(stopped?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
+  })
+
+  it('settles a monitored Copilot turn after its background shell completes', () => {
+    postCopilotBackgroundShell(0)
     _internals.normalizeHookPayload('copilot', buildBody({ hook_event_name: 'Stop' }), 'production')
 
     const completed = _internals.normalizeHookPayload(
       'copilot',
-      buildBody({ hook_event_name: 'Notification', notification_type: 'shell_completed' }),
+      buildBody({
+        hook_event_name: 'Notification',
+        notification_type: 'shell_completed',
+        title: 'shell 0',
+        message: 'Shell command "shell 0" (shellId: 0) has completed successfully.'
+      }),
       'production'
     )
 
@@ -162,22 +199,18 @@ describe('Copilot hook normalization', () => {
   })
 
   it('does not settle a stopped Copilot turn until every background shell completes', () => {
-    for (const command of ['pnpm test', 'pnpm build']) {
-      _internals.normalizeHookPayload(
-        'copilot',
-        buildBody({
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Bash',
-          tool_input: { command, runInBackground: true }
-        }),
-        'production'
-      )
-    }
+    postCopilotBackgroundShell(0, { detach: true })
+    postCopilotBackgroundShell(1, { detach: true })
     _internals.normalizeHookPayload('copilot', buildBody({ hook_event_name: 'Stop' }), 'production')
 
     const firstCompleted = _internals.normalizeHookPayload(
       'copilot',
-      buildBody({ hook_event_name: 'Notification', notification_type: 'shell_detached_completed' }),
+      buildBody({
+        hook_event_name: 'Notification',
+        notification_type: 'shell_detached_completed',
+        title: 'shell 0',
+        message: 'Detached shell "shell 0" (shellId: 0) has completed.'
+      }),
       'production'
     )
 
@@ -185,15 +218,7 @@ describe('Copilot hook normalization', () => {
   })
 
   it('does not let a completed background shell settle a later foreground turn', () => {
-    _internals.normalizeHookPayload(
-      'copilot',
-      buildBody({
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command: 'pnpm test', background: true }
-      }),
-      'production'
-    )
+    postCopilotBackgroundShell(0)
     _internals.normalizeHookPayload('copilot', buildBody({ hook_event_name: 'Stop' }), 'production')
     _internals.normalizeHookPayload(
       'copilot',
@@ -203,7 +228,12 @@ describe('Copilot hook normalization', () => {
 
     const completed = _internals.normalizeHookPayload(
       'copilot',
-      buildBody({ hook_event_name: 'Notification', notification_type: 'shell_completed' }),
+      buildBody({
+        hook_event_name: 'Notification',
+        notification_type: 'shell_completed',
+        title: 'shell 0',
+        message: 'Shell command "shell 0" (shellId: 0) has completed successfully.'
+      }),
       'production'
     )
 
@@ -252,11 +282,106 @@ describe('Copilot hook normalization', () => {
       buildBody({
         hook_event_name: 'PreToolUse',
         tool_name: 'Agent',
-        tool_input: { description: 'Inspect the build' }
+        tool_input: { description: 'Inspect the build', mode: 'background' }
       }),
       'production'
     )
     _internals.normalizeHookPayload('copilot', buildBody({ hook_event_name: 'Stop' }), 'production')
+
+    const completed = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Notification', notification_type: 'agent_completed' }),
+      'production'
+    )
+
+    expect(completed?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
+  })
+
+  it('does not monitor a stopped turn for a synchronous task subagent', () => {
+    // Why: a sync `task` completes with its PostToolUse; counting it as background work stranded the
+    // pane in monitoring for the rest of the session (the general-purpose agent emits no
+    // subagentStart/subagentStop, so nothing decremented it).
+    _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'sync' }
+      }),
+      'production'
+    )
+    _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'sync' },
+        tool_result: { text_result_for_llm: 'done' }
+      }),
+      'production'
+    )
+
+    const stopped = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Stop' }),
+      'production'
+    )
+
+    expect(stopped?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
+  })
+
+  it('does not keep monitoring a background task whose launch failed', () => {
+    // Why: the task tool rejects a missing agent name after PreToolUse already counted the launch;
+    // without consuming it on the failure the pane stuck in monitoring for the session.
+    for (const body of [
+      buildBody({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'background' }
+      }),
+      buildBody({
+        hook_event_name: 'PostToolUseFailure',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'background' },
+        error: '"name": Required'
+      })
+    ]) {
+      _internals.normalizeHookPayload('copilot', body, 'production')
+    }
+
+    const stopped = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Stop' }),
+      'production'
+    )
+
+    expect(stopped?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
+  })
+
+  it('monitors a background task subagent and settles it on agent_completed without a SubagentStop', () => {
+    _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'background' }
+      }),
+      'production'
+    )
+    _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'subagentStart', agent_name: 'general-purpose' }),
+      'production'
+    )
+
+    const stopped = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Stop' }),
+      'production'
+    )
+    expect(stopped?.payload).toMatchObject({ state: 'working', workingMode: 'monitoring' })
 
     const completed = _internals.normalizeHookPayload(
       'copilot',
