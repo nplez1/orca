@@ -23,4 +23,9 @@ export function liftSidebarFiltersHidingWorktree(wt: Worktree): void {
   if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(wt)) {
     state.setHideDetachedHeadWorkspaces(false)
   }
+  if (wt.workspaceStatus && state.hiddenWorkspaceStatusIds.includes(wt.workspaceStatus)) {
+    state.setHiddenWorkspaceStatusIds(
+      state.hiddenWorkspaceStatusIds.filter((id) => id !== wt.workspaceStatus)
+    )
+  }
 }

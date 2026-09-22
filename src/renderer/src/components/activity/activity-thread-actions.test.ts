@@ -85,6 +85,7 @@ describe('activity thread host routing', () => {
       hideAutomationGeneratedWorkspaces: false,
       hideCliCreatedWorkspaces: false,
       hideDetachedHeadWorkspaces: false,
+      hiddenWorkspaceStatusIds: [],
       hideWorkspacesFromOtherDevices: false,
       alwaysShowDefaultBranchWorkspace: true,
       visibleWorkspaceHostIds: null,

@@ -41,6 +41,7 @@ function filterState(overrides: Partial<FilterState> = {}): FilterState {
     hideAutomationGeneratedWorkspaces: false,
     hideCliCreatedWorkspaces: false,
     hideDetachedHeadWorkspaces: false,
+    hiddenWorkspaceStatusIds: [],
     hideWorkspacesFromOtherDevices: false,
     alwaysShowDefaultBranchWorkspace: true,
     workspaceHostScope: 'all',
@@ -109,6 +110,12 @@ describe('sidebarHasActiveFilters', () => {
     expect(sidebarHasActiveFilters(filterState({ hideDetachedHeadWorkspaces: true }))).toBe(true)
   })
 
+  it('returns true when only statuses are hidden', () => {
+    expect(sidebarHasActiveFilters(filterState({ hiddenWorkspaceStatusIds: ['completed'] }))).toBe(
+      true
+    )
+  })
+
   it('returns true when workspaces from other devices are hidden', () => {
     expect(sidebarHasActiveFilters(filterState({ hideWorkspacesFromOtherDevices: true }))).toBe(
       true
@@ -163,6 +170,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: false
@@ -180,6 +188,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: false
@@ -196,6 +205,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: true,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: false
@@ -210,6 +220,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: true,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: false
@@ -224,6 +235,22 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: true,
+      resetHiddenWorkspaceStatusIds: false,
+      resetHideWorkspacesFromOtherDevices: false,
+      resetAlwaysShowDefaultBranchWorkspace: false,
+      resetVisibleWorkspaceHostIds: false
+    })
+  })
+
+  it('flags only the hidden status list for reset when it is the sole filter', () => {
+    expect(computeClearFilterActions(filterState({ hiddenWorkspaceStatusIds: ['todo'] }))).toEqual({
+      resetShowSleepingWorkspaces: false,
+      resetFilterRepoIds: false,
+      resetHideDefaultBranchWorkspace: false,
+      resetHideAutomationGeneratedWorkspaces: false,
+      resetHideCliCreatedWorkspaces: false,
+      resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: true,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: false
@@ -251,6 +278,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: true
@@ -267,6 +295,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: false,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: true,
       resetVisibleWorkspaceHostIds: false
@@ -291,6 +320,7 @@ describe('computeClearFilterActions', () => {
       resetHideAutomationGeneratedWorkspaces: true,
       resetHideCliCreatedWorkspaces: false,
       resetHideDetachedHeadWorkspaces: false,
+      resetHiddenWorkspaceStatusIds: false,
       resetHideWorkspacesFromOtherDevices: false,
       resetAlwaysShowDefaultBranchWorkspace: false,
       resetVisibleWorkspaceHostIds: true

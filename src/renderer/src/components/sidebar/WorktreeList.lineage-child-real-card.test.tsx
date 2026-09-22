@@ -281,6 +281,7 @@ function setLineageState(
     fetchIssue: mockStore.fetchIssue,
     fetchLinearIssue: mockStore.fetchLinearIssue,
     filterRepoIds: [],
+    hiddenWorkspaceStatusIds: [],
     ...makeFolderWorkspacePathStatusState(),
     gitConflictOperationByWorktree: {},
     groupBy: 'none',

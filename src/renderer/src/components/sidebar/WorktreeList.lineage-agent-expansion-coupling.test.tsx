@@ -307,6 +307,7 @@ function setAgentLineageState(options: {
     fetchIssue: vi.fn(),
     fetchLinearIssue: vi.fn(),
     filterRepoIds: [],
+    hiddenWorkspaceStatusIds: [],
     folderWorkspaces: [],
     folderWorkspacePathStatuses: {},
     getFolderWorkspacePathStatusCacheKey: (request: unknown) => JSON.stringify(request),

@@ -83,6 +83,7 @@ function visibleOptions(overrides: Partial<VisibleOptions> = {}): VisibleOptions
     hideAutomationGeneratedWorkspaces: false,
     hideCliCreatedWorkspaces: false,
     hideDetachedHeadWorkspaces: false,
+    hiddenWorkspaceStatusIds: [],
     hideWorkspacesFromOtherDevices: false,
     pairedDeviceIdsByEnvironment: new Map(),
     repoMap,
@@ -304,6 +305,33 @@ describe('computeVisibleWorktreeIds', () => {
     )
 
     expect(result).toEqual([folder.id])
+  })
+
+  it('hides workspaces whose status is unchecked, keeping other statuses and unassigned rows', () => {
+    const todo = { ...makeWorktree('status-todo'), workspaceStatus: 'todo' }
+    const done = { ...makeWorktree('status-done'), workspaceStatus: 'completed' }
+    const unassigned = makeWorktree('status-none')
+
+    const result = computeVisibleWorktreeIds(
+      { repo1: [todo, done, unassigned] },
+      [todo.id, done.id, unassigned.id],
+      visibleOptions({ hiddenWorkspaceStatusIds: ['completed'] })
+    )
+
+    expect(result).toEqual([todo.id, unassigned.id])
+  })
+
+  it('keeps every workspace visible while the status filter is empty', () => {
+    const todo = { ...makeWorktree('status-todo'), workspaceStatus: 'todo' }
+    const done = { ...makeWorktree('status-done'), workspaceStatus: 'completed' }
+
+    const result = computeVisibleWorktreeIds(
+      { repo1: [todo, done] },
+      [todo.id, done.id],
+      visibleOptions({ hiddenWorkspaceStatusIds: [] })
+    )
+
+    expect(result).toEqual([todo.id, done.id])
   })
 
   it('does not treat slept wake-hint tabs as live surfaces', () => {
