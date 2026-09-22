@@ -710,7 +710,15 @@ describe('registerWorktreeHandlers', () => {
     const startupCommand = (startupCreateCall[1] as { command: string }).command
     const setupCommand = (setupCreateCall[1] as { command: string }).command
     expect(startupCommand).toBe('claude --prefill test')
-    expect(setupCommand).toBe('bash /workspace/repo/.git/orca/setup-runner.sh')
+    // Why the wrapper: it is the only shell-agnostic way to learn the runner
+    // ended (cmd.exe emits no OSC 133), so the sidebar can leave "Setting up".
+    expect(setupCommand).toContain('bash /workspace/repo/.git/orca/setup-runner.sh')
+    expect(setupCommand).toContain('__ORCA_SETUP_COMPLETE__:')
+    expect(runtimeStub.armWorktreeSetupRunner).toHaveBeenCalledWith(
+      'term-startup',
+      'repo-1::/workspace/improve-dashboard',
+      expect.any(String)
+    )
     expect(result.setup).toBeUndefined()
     expect(result.startupTerminal).toEqual({ spawned: true, surface: 'visible' })
     expect(runtimeStub.invalidateWorktreeCatalog).toHaveBeenCalledWith('repo-1')

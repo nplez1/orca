@@ -26,7 +26,8 @@ const AGENT_STATUS_TOOLTIP_STATUSES = new Set<Status>([
   'monitoring',
   'permission',
   'interrupted',
-  'done'
+  'done',
+  'setup'
 ])
 
 const StatusIndicator = React.memo(function StatusIndicator({
@@ -74,6 +75,17 @@ const StatusIndicator = React.memo(function StatusIndicator({
         {...rest}
       >
         <AgentQuestionIcon className="size-3" />
+      </span>
+    )
+  } else if (status === 'setup') {
+    // Why: the setup runner is a script, not an agent, so it gets its own amber
+    // pulse instead of the working spinner — visibly "busy" without claiming an agent.
+    indicator = (
+      <span
+        className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
+        {...rest}
+      >
+        <span className="block size-2 animate-pulse rounded-full bg-workspace-status-progress motion-reduce:animate-none" />
       </span>
     )
   } else {
