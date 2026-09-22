@@ -175,10 +175,15 @@ export function useFileExplorerVisibleRowProjection(
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const showGitIgnoredFiles = settings?.showGitIgnoredFiles ?? true
+  // Why: when the host already classified the filtered page, re-asking git would launch an
+  // uncancellable check-ignore over up to 5000 paths on every keystroke for a cosmetic dim.
+  const hostIgnoredPaths = nameFilter?.ignoredRelativePaths
+  const hostProvidesIgnoredPaths = nameFilter != null && hostIgnoredPaths !== undefined
   const rebuiltRelativePaths = useMemo(
     () =>
-      activeRepoSupportsGit
-        ? nameFilter
+      !activeRepoSupportsGit || hostProvidesIgnoredPaths
+        ? EMPTY_RELATIVE_PATHS
+        : nameFilter
           ? getFileExplorerNameFilterIgnoredQueryRelativePaths(
               nameFilter,
               showDotfiles,
@@ -187,12 +192,12 @@ export function useFileExplorerVisibleRowProjection(
           : getFileExplorerIgnoredQueryRelativePaths(
               { dirCache, expanded, worktreePath, displayRootPath },
               showDotfiles
-            )
-        : EMPTY_RELATIVE_PATHS,
+            ),
     [
       activeRepoSupportsGit,
       dirCache,
       expanded,
+      hostProvidesIgnoredPaths,
       nameFilter,
       showDotfiles,
       worktreePath,
@@ -216,8 +221,12 @@ export function useFileExplorerVisibleRowProjection(
     worktreePath
   })
   const ignoredSet = useMemo(
-    () => buildIgnoredSet(effectiveIgnoredPaths, worktreePath),
-    [effectiveIgnoredPaths, worktreePath]
+    () =>
+      buildIgnoredSet(
+        hostProvidesIgnoredPaths && hostIgnoredPaths ? hostIgnoredPaths : effectiveIgnoredPaths,
+        worktreePath
+      ),
+    [effectiveIgnoredPaths, hostIgnoredPaths, hostProvidesIgnoredPaths, worktreePath]
   )
   const rowProjection = useMemo(
     () =>

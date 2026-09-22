@@ -44,6 +44,11 @@ export type RuntimeFileListState = {
   truncated?: boolean
   /** Exact match count a query-scoped host search scanned; null for an unscoped listing. */
   totalCount?: number | null
+  /**
+   * Subset of `files` the host already knows are gitignored, when it answered from its path
+   * inventory. Undefined means the caller must resolve ignored status itself.
+   */
+  ignoredFiles?: string[]
   operationOwner?: FileExplorerOperationOwner
 }
 
@@ -52,6 +57,7 @@ type RuntimeFileListing = {
   requestKey: string
   files: string[]
   totalCount: number | null
+  ignoredFiles?: string[]
   truncated: boolean
 }
 
@@ -73,7 +79,8 @@ export function useRuntimeFileListForWorktree({
   query,
   queryMode = 'quick-open',
   queryLimit = 32,
-  hostFilterWhenCapped = false
+  hostFilterWhenCapped = false,
+  includeIgnoredFiles
 }: {
   enabled: boolean
   worktreeId: string | null
@@ -84,6 +91,8 @@ export function useRuntimeFileListForWorktree({
   queryLimit?: number
   /** When a local listing hits its cap, re-list with `query` applied as the Explorer name filter on the host. */
   hostFilterWhenCapped?: boolean
+  /** Scope for a query-scoped search; the Explore pane passes its show-ignored setting. */
+  includeIgnoredFiles?: boolean
 }): RuntimeFileListState {
   const worktree = useAppStore((state) =>
     // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
@@ -224,6 +233,7 @@ export function useRuntimeFileListForWorktree({
             limit: queryLimit,
             mode: queryMode,
             excludePaths,
+            includeIgnoredFiles,
             ...(connectionId ? { requestToken } : {}),
             signal: requestAbortController.signal
           })
@@ -274,6 +284,7 @@ export function useRuntimeFileListForWorktree({
     enabled,
     excludeRequest,
     connectionId,
+    includeIgnoredFiles,
     operationOwnerKey,
     operationRouteAvailable,
     queryLimit,
@@ -296,6 +307,7 @@ export function useRuntimeFileListForWorktree({
     loadError,
     truncated: currentListing.truncated,
     totalCount: currentListing.totalCount,
+    ignoredFiles: currentListing.ignoredFiles,
     operationOwner: listedOperationOwner
   }
 }

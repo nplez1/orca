@@ -17,6 +17,7 @@ import {
   trackDetachedLocalUnsubscribe
 } from './filesystem-watcher-listener-lifecycle'
 import { cancelLocalBatchFlush, createDebouncedBatch } from './filesystem-watcher-batch-control'
+import { invalidateQuickOpenPathInventory } from './quick-open-path-inventory'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 
 // Why: matches the watcher subprocess budget in parcel-watcher-event-delivery.ts.
@@ -123,6 +124,8 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
     }
 
     if (overflowed || rawEvents.length > MAX_BATCHED_WATCHER_EVENTS) {
+      // Why: an overflow means events were lost, so the cached path set can no longer be trusted.
+      invalidateQuickOpenPathInventory(root.rootPath)
       // Why: deletion storms can be too large to coalesce/stat per path; one overflow asks the renderer for the same conservative refresh.
       if (!root.batch.cancelled) {
         emitOverflowPayload(root)
@@ -131,6 +134,10 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
     }
 
     const coalesced = coalesceEvents(rawEvents)
+    // Why: only create/delete change which paths exist; an update must not drop a warm index.
+    if (coalesced.some((event) => event.type !== 'update')) {
+      invalidateQuickOpenPathInventory(root.rootPath)
+    }
 
     // Why: a full batch is up to MAX_BATCHED_WATCHER_EVENTS paths; unbounded stat() would swamp
     // libuv's 4-thread pool, which also serves git reads and persistence writes.
