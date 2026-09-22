@@ -118,6 +118,10 @@ export function registerRuntimeClientIpcBridge(
       )
       return
     }
+    if (event.type === 'worktreeSetupRunnerState') {
+      useAppStore.getState().setWorktreeSetupRunning(event.worktreeId, event.running)
+      return
+    }
     if (event.type === 'linearLinkedIssueUpdated') {
       void useAppStore
         .getState()

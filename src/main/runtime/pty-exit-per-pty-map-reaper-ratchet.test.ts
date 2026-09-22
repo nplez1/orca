@@ -34,6 +34,10 @@ const CLEARED_BY_REAPER_HELPER: Record<string, { helper: string; module: string 
     helper: 'disposePtyTitleTracker',
     module: 'src/main/runtime/orca-runtime-apply-tracked-pty-title.ts'
   },
+  setupRunnerObservationByPtyId: {
+    helper: 'reapWorktreeSetupRunnerState',
+    module: 'src/main/runtime/orca-runtime-setup-runner-state.ts'
+  },
   agentPromptLifecycleByPtyId: {
     helper: 'advancePtyLifecycleGeneration',
     module: 'src/main/runtime/orca-runtime-record-agent-prompt-lifecycle-state.ts'

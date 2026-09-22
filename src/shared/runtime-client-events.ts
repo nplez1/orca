@@ -46,6 +46,9 @@ export type RuntimeClientEvent =
       startup?: WorktreeStartupLaunch
       defaultTabs?: WorktreeDefaultTabsLaunch
     }
+  // Why: the setup runner is a plain shell script, so no agent status can carry
+  // "setup is running". The host that spawned it owns that fact and announces it.
+  | { type: 'worktreeSetupRunnerState'; worktreeId: string; running: boolean }
 
 export type RuntimeClientEventStreamMessage =
   | ({ type: 'ready'; subscriptionId: string } & {

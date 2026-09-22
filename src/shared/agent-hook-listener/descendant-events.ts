@@ -179,7 +179,8 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   copilot: null,
   hermes: null,
   devin: null,
-  kimi: null
+  kimi: null,
+  zcode: null
 }
 
 /** Providers whose normalizer already tracks its own descendants and derives the pane state

@@ -40,6 +40,9 @@ export const CLIENT_EVENT_METHODS = [
           []) {
           emit(event)
         }
+        for (const event of runtime.getSetupRunnerClientEventSnapshot?.() ?? []) {
+          emit(event)
+        }
         const sshStates = listRegisteredSshTargets().flatMap((target) => {
           const state = getPublicSshState(getRegisteredSshState(target.id) ?? null)
           return state ? [{ targetId: target.id, state }] : []
