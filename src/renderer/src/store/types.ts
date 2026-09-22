@@ -44,6 +44,7 @@ import type { NewIssueDraftSlice } from './slices/new-issue-draft'
 import type { TaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
+import type { WorktreeSetupRunnerSlice } from './slices/worktree-setup-runner'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -88,4 +89,5 @@ export type AppState = RepoSlice &
   NewIssueDraftSlice &
   TaskCreationDraftsSlice &
   RemoteServerUpdatesSlice &
-  TerminalQuickCommandHostsSlice
+  TerminalQuickCommandHostsSlice &
+  WorktreeSetupRunnerSlice

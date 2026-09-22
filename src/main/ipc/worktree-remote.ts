@@ -150,6 +150,7 @@ import {
   getSetupRunnerCommandPlatformForPath
 } from '../../shared/setup-runner-command'
 import { createSequencedSetupAgentCommands } from '../../shared/setup-agent-sequencing'
+import { buildObservedSetupCommand } from '../runtime/orchestration/setup-completion-signal'
 import { shouldWaitForSetupBeforeAgentStartup } from '../../shared/setup-agent-startup-policy'
 import { createWorktreeCreateTimingRecorder } from '../worktree-create-timing'
 import {
@@ -475,8 +476,24 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   let didSpawnSetup = false
   if (setup) {
     try {
+      // Why: the desktop create spawns Setup itself, so this is the only place
+      // that can tell the sidebar a script (not an agent) is working here. The
+      // sequenced variant already wraps the runner and is left unobserved.
+      const completionToken = wrappedSetupCommandStr ? null : randomUUID()
+      const observed = completionToken
+        ? buildObservedSetupCommand(
+            setup.runnerScriptPath,
+            getSetupRunnerCommandPlatformForLaunch(
+              setup,
+              process.platform === 'win32' ? 'windows' : 'posix'
+            ),
+            completionToken,
+            setup.shell
+          )
+        : null
       const setupCommand =
         wrappedSetupCommandStr ??
+        observed?.command ??
         buildSetupRunnerCommand(
           setup.runnerScriptPath,
           getSetupRunnerCommandPlatformForLaunch(
@@ -485,28 +502,39 @@ async function spawnLocalStartupAndSetupTerminals(args: {
           ),
           setup.shell
         )
+      const setupEnv = { ...setup.envVars, ...observed?.env }
       const setupLaunchMode =
         (settings as Partial<Pick<GlobalSettings, 'setupScriptLaunchMode'>>)
           .setupScriptLaunchMode ?? 'new-tab'
+      let setupTerminalHandle: string | undefined
       if (setupLaunchMode === 'split-vertical' || setupLaunchMode === 'split-horizontal') {
         if (!startupTerminalHandle) {
           throw new Error('startup_terminal_missing')
         }
-        await runtime.splitTerminal(startupTerminalHandle, {
-          direction: setupLaunchMode === 'split-horizontal' ? 'horizontal' : 'vertical',
-          command: setupCommand,
-          env: setup.envVars,
-          activate: false
-        })
+        setupTerminalHandle = (
+          await runtime.splitTerminal(startupTerminalHandle, {
+            direction: setupLaunchMode === 'split-horizontal' ? 'horizontal' : 'vertical',
+            command: setupCommand,
+            env: setupEnv,
+            activate: false
+          })
+        ).handle
       } else {
-        await runtime.createTerminal(`id:${worktree.id}`, {
-          title: 'Setup',
-          command: setupCommand,
-          env: setup.envVars,
-          activate: false
-        })
+        setupTerminalHandle = (
+          await runtime.createTerminal(`id:${worktree.id}`, {
+            title: 'Setup',
+            command: setupCommand,
+            env: setupEnv,
+            activate: false
+          })
+        ).handle
       }
+      // Why before arming: an observation failure must not make a spawned runner
+      // look like a failed spawn and send the renderer off to re-queue setup.
       didSpawnSetup = true
+      if (completionToken && setupTerminalHandle) {
+        runtime.armWorktreeSetupRunner(setupTerminalHandle, worktree.id, completionToken)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const nextWarning = `failed to create the setup terminal for ${worktree.path}: ${message}`
