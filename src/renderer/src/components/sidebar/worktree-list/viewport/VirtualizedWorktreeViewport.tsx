@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { WorktreeListScrollToTopButton } from '../../WorktreeListScrollToTopButton'
 import { renderWorktreeSidebarDropIndicators } from './drop-indicators'
 import { useWorktreeListScrollToTop } from './use-scroll-to-top'
@@ -25,6 +24,7 @@ import { useWorktreeNativeDrag } from '../drag/use-native-drag'
 import { useWorktreePointerDrag } from '../drag/use-pointer-drag'
 import { useWorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import { useWorktreeSidebarScrollSuppression } from './use-scroll-suppression'
+import { useBranchGroupHostSelection } from './use-branch-group-host-selection'
 import { EMPTY_PROJECT_GROUPS, type VirtualizedWorktreeViewportProps } from './viewport-props'
 import { useWorktreeDropCommitContext } from '../drag/use-drop-commit-context'
 import { buildWorktreeVirtualRowContext } from './virtual-row-context'
@@ -69,12 +69,6 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   // choice the sidebar card shows, and virtualized rows unmount on scroll.
   const branchGroupSelection = useAppStore((s) => s.branchGroupHostByKey)
   const setBranchGroupHost = useAppStore((s) => s.setBranchGroupHost)
-  const handleSelectBranchGroupHost = useCallback(
-    (groupKey: string, hostId: ExecutionHostId) => {
-      setBranchGroupHost(groupKey, hostId)
-    },
-    [setBranchGroupHost]
-  )
 
   const renderRows = useMemo(() => buildRenderableRows(rows), [rows])
   const firstHeaderIndex = useMemo(
@@ -126,6 +120,12 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     activeWorkspaceExecutionHostId: props.activeWorkspaceExecutionHostId,
     pinnedDisplayPolicy,
     onImmediateWorktreeActivate: props.onImmediateWorktreeActivate
+  })
+
+  const handleSelectBranchGroupHost = useBranchGroupHostSelection({
+    rows,
+    setBranchGroupHost,
+    onImmediateActivate: props.onImmediateWorktreeActivate
   })
 
   const getCachedFolderWorkspacePathStatus = useFolderWorkspacePathStatusRows({
