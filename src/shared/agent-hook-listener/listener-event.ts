@@ -57,6 +57,12 @@ export type StructuredHostStatus = 'held' | 'owned'
 export type ToolSnapshot = {
   toolName?: string
   toolInput?: string
+  /** True once a tool completed since the last tool start in this turn; a late async permission
+   *  notification is stale news by then (copilot-cli#2586). Undefined means "no update". */
+  toolCompleted?: boolean
+  /** Copilot-only: the pane's LEAD session id, adopted at each turn boundary. A subagent's own
+   *  hook events carry its own session id on the lead pane; comparing against this drops them. */
+  leadSessionId?: string
   /** Full JSON of an AskUserQuestion tool input; set only on its own event and NOT inherited (resolveToolState) so no stale prompt lingers. */
   interactivePrompt?: string
   hasToolUpdate?: boolean

@@ -15,6 +15,7 @@ import type { AgentDescendantRoster } from '../agent-descendant-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
 import type { MuseSessionLogState } from '../muse-session-log'
 import type { AgentHookEventPayload, ToolSnapshot } from './listener-event'
+import type { CopilotBackgroundWorkState } from './copilot-background-work-state'
 import {
   moveOpenCodeSessionBindings,
   unbindOpenCodeSessionsOfPane,
@@ -92,13 +93,6 @@ export type GrokActiveTurn = {
   sessionId?: string
 }
 
-export type CopilotBackgroundWorkState = {
-  pendingShellCount: number
-  /** Agent tool starts not yet associated with a SubagentStart lifecycle hook. */
-  pendingUnidentifiedSubagentCount: number
-  pendingSubagentLifecycleCount: number
-  leadStopped: boolean
-}
 
 const legacyStatusAdapterByState = new WeakMap<HookListenerState, AgentStatusLegacyAdapter>()
 
