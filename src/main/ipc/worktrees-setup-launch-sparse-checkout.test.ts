@@ -10,6 +10,26 @@ import {
 } from './worktrees-test-module-mocks'
 import { handlers, mainWindow, setupWorktreeHandlers, store } from './worktrees-test-harness'
 import { createdWorktreeList } from './worktrees-test-fixtures'
+import type { WorktreeRuntimeStub } from './worktrees-test-runtime-stub'
+
+function expectHostSetupSpawn(runtime: WorktreeRuntimeStub, worktreeId: string): void {
+  expect(runtime.createTerminal).toHaveBeenCalledTimes(2)
+  expect(runtime.createTerminal).toHaveBeenNthCalledWith(1, `id:${worktreeId}`, { activate: true })
+  expect(runtime.createTerminal).toHaveBeenNthCalledWith(
+    2,
+    `id:${worktreeId}`,
+    expect.objectContaining({
+      title: 'Setup',
+      command: expect.stringContaining('__ORCA_SETUP_COMPLETE__:'),
+      activate: false
+    })
+  )
+  expect(runtime.armWorktreeSetupRunner).toHaveBeenCalledWith(
+    'term-setup',
+    worktreeId,
+    expect.any(String)
+  )
+}
 
 vi.mock('electron', async () =>
   (await import('./worktrees-test-module-mocks')).electronModuleMock()
@@ -94,11 +114,13 @@ vi.mock('../runtime/worktree-teardown', async () =>
 vi.mock('./pty', async () => (await import('./worktrees-test-module-mocks')).ptyModuleMock())
 
 describe('registerWorktreeHandlers', () => {
+  let runtimeStub: WorktreeRuntimeStub
+
   beforeEach(() => {
-    setupWorktreeHandlers()
+    runtimeStub = setupWorktreeHandlers()
   })
 
-  it('returns a setup launch payload when setup should run', async () => {
+  it('host-spawns and observes setup when setup should run', async () => {
     listWorktreesMock.mockResolvedValue(createdWorktreeList)
     getEffectiveHooksMock.mockReturnValue({
       scripts: {
@@ -106,6 +128,9 @@ describe('registerWorktreeHandlers', () => {
       }
     })
     shouldRunSetupForCreateMock.mockReturnValue(true)
+    runtimeStub.createTerminal
+      .mockResolvedValueOnce({ handle: 'term-primary', surface: 'visible' })
+      .mockResolvedValueOnce({ handle: 'term-setup' })
 
     const result = await handlers['worktrees:create'](null, {
       repoId: 'repo-1',
@@ -121,19 +146,15 @@ describe('registerWorktreeHandlers', () => {
       undefined,
       undefined
     )
+    expectHostSetupSpawn(runtimeStub, 'repo-1::/workspace/improve-dashboard')
+    expect(result).not.toHaveProperty('setup')
     expect(result).toMatchObject({
       worktree: expect.objectContaining({
         repoId: 'repo-1',
         path: '/workspace/improve-dashboard',
         branch: 'improve-dashboard'
       }),
-      setup: {
-        runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh',
-        envVars: {
-          ORCA_ROOT_PATH: '/workspace/repo',
-          ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
-        }
-      }
+      startupTerminal: { spawned: true, surface: 'visible' }
     })
     expect(addWorktreeMock).toHaveBeenCalledWith(
       '/workspace/repo',
@@ -146,7 +167,7 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
-  it('launches setup even when primary and worktree orca.yaml scripts diverge', async () => {
+  it('host-spawns setup when primary and worktree orca.yaml scripts diverge', async () => {
     // Why: benign orca.yaml divergence must not disable setup (regression from #1280 content-equality gate); repo trust already gates execution.
     listWorktreesMock.mockResolvedValue(createdWorktreeList)
     getEffectiveHooksMock.mockImplementation((_repo, worktreePath?: string) => ({
@@ -160,6 +181,9 @@ describe('registerWorktreeHandlers', () => {
       }
     })
     shouldRunSetupForCreateMock.mockReturnValue(true)
+    runtimeStub.createTerminal
+      .mockResolvedValueOnce({ handle: 'term-primary', surface: 'visible' })
+      .mockResolvedValueOnce({ handle: 'term-setup' })
 
     const result = await handlers['worktrees:create'](null, {
       repoId: 'repo-1',
@@ -175,13 +199,11 @@ describe('registerWorktreeHandlers', () => {
       undefined,
       undefined
     )
-    expect(result).toEqual(
-      expect.objectContaining({
-        setup: expect.objectContaining({
-          runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh'
-        })
-      })
-    )
+    expectHostSetupSpawn(runtimeStub, 'repo-1::/workspace/improve-dashboard')
+    expect(result).not.toHaveProperty('setup')
+    expect(result).toMatchObject({
+      startupTerminal: { spawned: true, surface: 'visible' }
+    })
   })
 
   it('creates a sparse worktree and persists its sparse metadata', async () => {
