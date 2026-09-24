@@ -738,6 +738,56 @@ describe('registerWorktreeHandlers', () => {
     expect(result.timing?.preparedCheckout).toEqual({ status: 'miss', reason: 'none_armed' })
   })
 
+  it('spawns and observes setup for a blank local worktree create', async () => {
+    addWorktreeMock.mockResolvedValue({})
+    listWorktreesMock.mockResolvedValueOnce([
+      {
+        path: '/workspace/improve-dashboard',
+        head: 'def',
+        branch: 'improve-dashboard',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    loadHooksMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
+    getEffectiveHooksMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
+    getEffectiveHooksFromConfigMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
+    shouldRunSetupForCreateMock.mockReturnValue(true)
+    runtimeStub.createTerminal
+      .mockResolvedValueOnce({ handle: 'term-primary', surface: 'visible' })
+      .mockResolvedValueOnce({ handle: 'term-setup' })
+
+    const result = await handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'improve-dashboard'
+    })
+
+    expect(runtimeStub.createTerminal).toHaveBeenCalledTimes(2)
+    expect(runtimeStub.createTerminal).toHaveBeenNthCalledWith(
+      1,
+      'id:repo-1::/workspace/improve-dashboard',
+      { activate: true }
+    )
+    expect(runtimeStub.createTerminal).toHaveBeenNthCalledWith(
+      2,
+      'id:repo-1::/workspace/improve-dashboard',
+      expect.objectContaining({
+        title: 'Setup',
+        command: expect.stringContaining('__ORCA_SETUP_COMPLETE__:'),
+        activate: false
+      })
+    )
+    expect(runtimeStub.armWorktreeSetupRunner).toHaveBeenCalledWith(
+      'term-setup',
+      'repo-1::/workspace/improve-dashboard',
+      expect.any(String)
+    )
+    expect(result).not.toHaveProperty('setup')
+    expect(result).toMatchObject({
+      startupTerminal: { spawned: true, surface: 'visible' }
+    })
+  })
+
   it('returns the wrapped setup command when startup spawned but setup creation failed', async () => {
     addWorktreeMock.mockResolvedValue({})
     listWorktreesMock.mockResolvedValueOnce([
