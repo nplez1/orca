@@ -133,13 +133,6 @@ export function extractCopilotToolFields(
   hookPayload: Record<string, unknown>
 ): ToolSnapshot {
   const update: ToolSnapshot = {}
-  // Why: Copilot's permission notification is async, so a request that resolves without the user
-  // (auto-approved) can notify after its tool already completed; that ordering is the stale signal.
-  if (eventName === 'PreToolUse' || eventName === 'PermissionRequest') {
-    update.toolCompleted = false
-  } else if (eventName === 'PostToolUse' || eventName === 'PostToolUseFailure') {
-    update.toolCompleted = true
-  }
   // Why: userPromptSubmitted can precede sessionStart (seen on 1.0.87), so adopt the lead session id
   // on either turn boundary. Subagent events never reach this extractor (normalizeCopilotEvent drops
   // them first), so a child cannot overwrite it.
@@ -211,7 +204,7 @@ export function extractCopilotToolFields(
   }
   if (eventName === 'Notification') {
     const notificationType = readFirstString(hookPayload, ['notification_type', 'notificationType'])
-    if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
+    if (notificationType === 'elicitation_dialog') {
       const message = readFirstString(hookPayload, ['message', 'body', 'text', 'title'])
       if (message) {
         update.lastAssistantMessage = message

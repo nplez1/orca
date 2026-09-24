@@ -142,9 +142,6 @@ export function resolveToolState(
   const merged: ToolSnapshot = {
     toolName,
     toolInput,
-    // Why: a completion flag outlives the tool fields it belongs to; only an explicit update
-    // (a new tool start or completion) may change it within the turn.
-    toolCompleted: update.toolCompleted ?? previous.toolCompleted,
     // Why: the lead session id outlives every tool of the turn; only a turn boundary re-adopts it.
     leadSessionId: update.leadSessionId ?? previous.leadSessionId,
     // Why: don't inherit previous.interactivePrompt — valid only for its one AskUserQuestion event; carrying it forward leaves a stale live card.

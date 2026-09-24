@@ -140,7 +140,7 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.toolInput).toBe('pnpm test')
   })
 
-  it('keeps a stopped Copilot turn monitoring a running background shell', () => {
+  it('keeps a stopped Copilot turn working while a background shell runs', () => {
     postCopilotBackgroundShell(0)
 
     const stopped = _internals.normalizeHookPayload(
@@ -149,11 +149,8 @@ describe('Copilot hook normalization', () => {
       'production'
     )
 
-    expect(stopped?.payload).toMatchObject({
-      state: 'working',
-      workingMode: 'monitoring',
-      agentType: 'copilot'
-    })
+    expect(stopped?.payload).toMatchObject({ state: 'working', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
   })
 
   it('does not monitor a plain foreground shell command', () => {
@@ -177,7 +174,7 @@ describe('Copilot hook normalization', () => {
     expect(stopped?.payload.workingMode).toBeUndefined()
   })
 
-  it('settles a monitored Copilot turn after its background shell completes', () => {
+  it('settles a Copilot turn after its background shell completes', () => {
     postCopilotBackgroundShell(0)
     _internals.normalizeHookPayload('copilot', buildBody({ hook_event_name: 'Stop' }), 'production')
 
@@ -240,7 +237,7 @@ describe('Copilot hook normalization', () => {
     expect(completed).toBeNull()
   })
 
-  it('keeps a stopped Copilot turn monitoring a running subagent', () => {
+  it('keeps a stopped Copilot turn working while a subagent runs', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({ hook_event_name: 'subagentStart', agent_name: 'code-reviewer' }),
@@ -252,14 +249,41 @@ describe('Copilot hook normalization', () => {
       'production'
     )
 
-    expect(stopped?.payload).toMatchObject({
-      state: 'working',
-      workingMode: 'monitoring',
-      agentType: 'copilot'
-    })
+    expect(stopped?.payload).toMatchObject({ state: 'working', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
   })
 
-  it('settles a monitored Copilot turn after its subagent stops', () => {
+  it('does not let a permission notification demote background work to blocked', () => {
+    _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Agent',
+        tool_input: { description: 'Inspect the build', mode: 'background' }
+      }),
+      'production'
+    )
+    const stopped = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({ hook_event_name: 'Stop' }),
+      'production'
+    )
+    const permissionNotification = _internals.normalizeHookPayload(
+      'copilot',
+      buildBody({
+        hook_event_name: 'Notification',
+        notification_type: 'permission_prompt',
+        message: 'Allow Bash to run?'
+      }),
+      'production'
+    )
+
+    expect(stopped?.payload).toMatchObject({ state: 'working', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
+    expect(permissionNotification).toBeNull()
+  })
+
+  it('settles a Copilot turn after its subagent stops', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({ hook_event_name: 'subagentStart', agent_name: 'code-reviewer' }),
@@ -276,7 +300,7 @@ describe('Copilot hook normalization', () => {
     expect(stopped?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
   })
 
-  it('settles a monitored general-purpose subagent after its completion notification', () => {
+  it('settles a background general-purpose subagent after its completion notification', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({
@@ -297,9 +321,9 @@ describe('Copilot hook normalization', () => {
     expect(completed?.payload).toMatchObject({ state: 'done', agentType: 'copilot' })
   })
 
-  it('does not monitor a stopped turn for a synchronous task subagent', () => {
+  it('settles a synchronous task subagent before the lead Stop', () => {
     // Why: a sync `task` completes with its PostToolUse; counting it as background work stranded the
-    // pane in monitoring for the rest of the session (the general-purpose agent emits no
+    // pane in Working for the rest of the session (the general-purpose agent emits no
     // subagentStart/subagentStop, so nothing decremented it).
     _internals.normalizeHookPayload(
       'copilot',
@@ -331,9 +355,9 @@ describe('Copilot hook normalization', () => {
     expect(stopped?.payload.workingMode).toBeUndefined()
   })
 
-  it('does not keep monitoring a background task whose launch failed', () => {
+  it('does not keep a failed background task working', () => {
     // Why: the task tool rejects a missing agent name after PreToolUse already counted the launch;
-    // without consuming it on the failure the pane stuck in monitoring for the session.
+    // without consuming it on failure the pane stays working for the rest of the session.
     for (const body of [
       buildBody({
         hook_event_name: 'PreToolUse',
@@ -360,7 +384,7 @@ describe('Copilot hook normalization', () => {
     expect(stopped?.payload.workingMode).toBeUndefined()
   })
 
-  it('monitors a background task subagent and settles it on agent_completed without a SubagentStop', () => {
+  it('keeps a background task working until agent_completed without SubagentStop', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({
@@ -381,7 +405,8 @@ describe('Copilot hook normalization', () => {
       buildBody({ hook_event_name: 'Stop' }),
       'production'
     )
-    expect(stopped?.payload).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    expect(stopped?.payload).toMatchObject({ state: 'working', agentType: 'copilot' })
+    expect(stopped?.payload.workingMode).toBeUndefined()
 
     const completed = _internals.normalizeHookPayload(
       'copilot',
@@ -486,7 +511,7 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.toolInput).toBe('/repo/src/app.ts')
   })
 
-  it('Notification(permission_prompt) maps to blocked and surfaces message text', () => {
+  it('ignores Notification(permission_prompt) because approval may be automatic', () => {
     const result = _internals.normalizeHookPayload(
       'copilot',
       buildBody({
@@ -497,13 +522,12 @@ describe('Copilot hook normalization', () => {
       }),
       'production'
     )
-    expect(result?.payload.state).toBe('blocked')
-    expect(result?.payload.lastAssistantMessage).toBe('Allow Bash to run?')
+    expect(result).toBeNull()
   })
 
-  it('keeps PermissionRequest working until the CLI actually prompts, then blocks', () => {
-    // Why: PermissionRequest also fires for requests a rule auto-approves, so only the
-    // notification — emitted once a prompt is shown (copilot-cli 1.0.26, copilot-cli#2586) — may block.
+  it('keeps PermissionRequest working and ignores its fire-and-forget notification', () => {
+    // Why: permission_prompt may fire for an auto-approved request, so it cannot reliably mean
+    // the user needs to act.
     const states = [
       buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'clean the cache' }),
       buildBody({
@@ -527,9 +551,12 @@ describe('Copilot hook normalization', () => {
         tool_input: { command: 'rm -rf /tmp/orca-cache' },
         tool_result: { text_result_for_llm: 'removed' }
       })
-    ].map((body) => _internals.normalizeHookPayload('copilot', body, 'production')?.payload.state)
+    ].map(
+      (body) =>
+        _internals.normalizeHookPayload('copilot', body, 'production')?.payload.state ?? null
+    )
 
-    expect(states).toEqual(['working', 'working', 'working', 'blocked', 'working'])
+    expect(states).toEqual(['working', 'working', 'working', null, 'working'])
   })
 
   it('Notification(elicitation_dialog) preserves the cached prompt', () => {
@@ -662,7 +689,7 @@ describe('Copilot hook normalization', () => {
     }
   })
 
-  it('accepts a Copilot permission prompt over HTTP as blocked', async () => {
+  it('accepts a Copilot permission notification over HTTP without publishing a blocked status', async () => {
     const server = new AgentHookServer()
     await server.start({ env: 'production' })
     try {
@@ -679,12 +706,7 @@ describe('Copilot hook normalization', () => {
       )
 
       expect(response.status).toBe(204)
-      expect(listener).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paneKey: PANE,
-          payload: expect.objectContaining({ state: 'blocked', agentType: 'copilot' })
-        })
-      )
+      expect(listener).not.toHaveBeenCalled()
     } finally {
       server.stop()
     }

@@ -80,7 +80,7 @@ function pressCtrlC(server: AgentHookServer): boolean {
 describe('a Claude cancel with a background shell (captured)', () => {
   const records = loadCapture('claude-cancel-shell-hooks')
 
-  it('keeps a shell the cancelled turn left running as monitoring, in both cancel shapes', async () => {
+  it('keeps a shell the cancelled turn left running as working without monitoring, in both cancel shapes', async () => {
     const server = await startServer()
     try {
       for (const index of [0, 1, 2, 3, 4]) {
@@ -92,7 +92,6 @@ describe('a Claude cancel with a background shell (captured)', () => {
       ])
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done' }
       })
 
@@ -111,7 +110,6 @@ describe('a Claude cancel with a background shell (captured)', () => {
       // the shell, the verdict rides `mainAgent.outcome`, and `interrupted` (a done-row flag) is absent.
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       })
       expect(row(server).interrupted).toBeUndefined()
@@ -122,7 +120,6 @@ describe('a Claude cancel with a background shell (captured)', () => {
       expect(hookAt(records, 8).sleep_procs).toEqual([expect.stringContaining('sleep 600')])
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done' }
       })
       expect(row(server).mainAgent).not.toHaveProperty('outcome')
@@ -135,7 +132,6 @@ describe('a Claude cancel with a background shell (captured)', () => {
       expect(pressCtrlC(server)).toBe(true)
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       })
     } finally {
@@ -156,12 +152,12 @@ describe('a Claude cancel with a background shell (captured)', () => {
       expect(pressCtrlC(server)).toBe(true)
       await post(server, hookAt(records, 10))
       await post(server, hookAt(records, 11))
-      expect(row(server)).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+      expect(row(server)).toMatchObject({ state: 'working' })
 
       // The rig SIGKILLs the shell. That is not evidence yet: nothing has reported it.
       const kill = records.find((record) => record.kind === 'kill' && record.needle === 'sleep 600')
       expect(kill).toBeDefined()
-      expect(row(server)).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+      expect(row(server)).toMatchObject({ state: 'working' })
 
       // The CLI notices within a second and injects a task-notification turn whose Stop reports
       // an empty inventory; that Stop is what retires the shell.
@@ -196,7 +192,7 @@ describe('a Claude cancel with a background shell (captured)', () => {
       expect(hookAt(records, 20).payload.background_tasks).toEqual([
         expect.objectContaining({ command: 'sleep 500', status: 'running' })
       ])
-      expect(row(server)).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+      expect(row(server)).toMatchObject({ state: 'working' })
       await post(server, hookAt(records, 21))
       expect(row(server)).toMatchObject({ state: 'working', mainAgent: { state: 'working' } })
 
@@ -212,7 +208,6 @@ describe('a Claude cancel with a background shell (captured)', () => {
       expect(pressCtrlC(server)).toBe(true)
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       })
       // The shell's death notification opens a real turn, so the cancel's verdict gives way to it.
