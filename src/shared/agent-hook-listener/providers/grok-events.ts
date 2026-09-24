@@ -220,9 +220,6 @@ export function normalizeGrokEvent(
     interactivePrompt: snapshot.interactivePrompt,
     lastAssistantMessage: snapshot.lastAssistantMessage,
     lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
-    ...(stateName === 'working' && isGrokEvent(eventName, 'stop')
-      ? { workingMode: 'monitoring' as const }
-      : {}),
     ...(isGrokEvent(eventName, 'stop_cancelled') ? { interrupted: true } : {}),
     ...(sessionBoundary ? { sessionBoundary: true } : {})
   })

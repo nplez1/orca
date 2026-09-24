@@ -25,6 +25,7 @@ export type {
 
 export const AGENT_STATUS_STATES = ['working', 'blocked', 'waiting', 'done'] as const
 export type AgentStatusState = (typeof AGENT_STATUS_STATES)[number]
+/** A scheduled cron callback keeps a session active after its foreground turn ends. */
 export type AgentWorkingMode = 'monitoring'
 // Why: agent types aren't a fixed set (custom agents exist); any non-empty string is
 // accepted — the well-known names are the launchable TuiAgent ids plus the 'unknown'
@@ -85,7 +86,7 @@ export type AgentStatusEntry = {
   /** Renderer-local status-feed confirmation for children; absent on hook rows. */
   subagentObservation?: 'live' | 'unverifiable'
   state: AgentStatusState
-  /** Ongoing work that does not require foreground agent execution. Only valid while working. */
+  /** Active scheduled callback mode. Only valid while the session state is working. */
   workingMode?: AgentWorkingMode
   /** The user's most recent prompt. Cached across the turn — later tool-use events
    *  omit it, so the last value persists until a new prompt or pane reset. Empty when unknown. */
@@ -167,7 +168,7 @@ export type AgentStatusEntry = {
 
 export type AgentStatusPayload = {
   state: AgentStatusState
-  /** Ongoing work that does not require foreground agent execution. Only valid while working. */
+  /** Active scheduled callback mode. Only valid while the session state is working. */
   workingMode?: AgentWorkingMode
   prompt?: string
   agentType?: AgentType

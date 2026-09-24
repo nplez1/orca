@@ -135,12 +135,11 @@ export function resolveClaudePaneStatus(
   if (claudeRosterHasWorkingSubagent(roster)) {
     return { stateName: 'working' }
   }
-  if (
-    !lead.interrupted &&
-    (state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) ||
-      state.claudeActiveSessionCronPaneKeys.has(paneKey))
-  ) {
+  if (!lead.interrupted && state.claudeActiveSessionCronPaneKeys.has(paneKey)) {
     return { stateName: 'working', workingMode: 'monitoring' }
+  }
+  if (!lead.interrupted && state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)) {
+    return { stateName: 'working' }
   }
   return { stateName: 'done' }
 }

@@ -709,7 +709,7 @@ describe('useRuntimeFileListForWorktree', () => {
 
     await renderProbe({
       enabled: true,
-      onState: () => {},
+      onState: (state) => states.push(state),
       query: '',
       worktreeId: workspaceKey
     })

@@ -79,10 +79,11 @@ describe('Last-status persistence', () => {
         stateStartedAt: expect.any(Number),
         payload: expect.objectContaining({
           state: 'working',
-          workingMode: 'monitoring',
+          turnCompletedAt: expect.any(Number),
           prompt: 'persist me'
         })
       })
+      expect(file.entries[PANE].payload).not.toHaveProperty('workingMode')
       expect(file.entries[PANE].launchToken).toBeUndefined()
       expect(file.entries[PANE].launchTokenHash).toBe(
         createHash('sha256').update('launch-bearer-must-not-persist').digest('hex')
