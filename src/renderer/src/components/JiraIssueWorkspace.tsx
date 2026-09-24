@@ -37,13 +37,15 @@ type JiraIssueWorkspaceProps = {
   onUse: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
+  refreshSignal?: number
 }
 
 export default function JiraIssueWorkspace({
   issue,
   onUse,
   onClose,
-  sourceContext
+  sourceContext,
+  refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const providerSettings = sourceContext ?? settings
@@ -62,6 +64,7 @@ export default function JiraIssueWorkspace({
   const [commentDraft, setCommentDraft] = useState('')
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const requestIdRef = useRef(0)
+  const lastRefreshSignalRef = useRef(refreshSignal)
   const optimisticCommentsRef = useRef<JiraComment[]>([])
 
   const displayed = fullIssue ?? issue
@@ -169,6 +172,20 @@ export default function JiraIssueWorkspace({
       // Keep the visible issue snapshot if refresh fails.
     }
   }, [displayed, patchJiraIssue, providerSettings, sourceContext])
+
+  useEffect(() => {
+    if (lastRefreshSignalRef.current === refreshSignal) {
+      return
+    }
+    lastRefreshSignalRef.current = refreshSignal
+    if (!displayed) {
+      return
+    }
+    void refreshIssue()
+    void jiraListTransitions(providerSettings, displayed.key, displayed.siteId)
+      .then(setTransitions)
+      .catch(() => {})
+  }, [displayed, providerSettings, refreshIssue, refreshSignal])
 
   const mutateIssue = useCallback(
     async (

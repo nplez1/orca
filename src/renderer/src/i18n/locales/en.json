@@ -2419,7 +2419,41 @@
         "linearModeHasWorktreeTooltip": "Linear tickets linked to an Orca workspace",
         "linearEmptyHasWorktree": "No Linear tickets are linked to an Orca workspace yet. Start work from a Linear issue to see it here.",
         "linearOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
-        "linearWorktreesColumn": "Workspaces"
+        "linearWorktreesColumn": "Workspaces",
+        "16d73d88ad": "Backlog",
+        "jiraBacklogCount": "Backlog · {{value0}} issues",
+        "jiraNoActiveSprint": "This board has no active sprint; showing its backlog.",
+        "jiraBoardHasNoSprints": "This board does not use sprints; showing its board-filter backlog.",
+        "jiraBacklogLoadedCount": "{{value0}} loaded",
+        "jiraBacklogEmpty": "No backlog issues match this filter.",
+        "jiraBacklogPageEmpty": "No matching issues in this page. Load more to continue searching the backlog.",
+        "jiraBoardLoadingMore": "Loading…",
+        "jiraLoadMoreBacklog": "Load more backlog issues",
+        "jiraBoardRequiresNewRuntime": "This Jira runtime does not support board views. Showing the issue list instead.",
+        "jiraIssueMoved": "{{value0}} moved to {{value1}}",
+        "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}.",
+        "jiraCurrentSprint": "Current sprint",
+        "jiraSprintEmpty": "No issues match this filter in the active sprint.",
+        "jiraLoadMoreSprint": "Load more sprint issues",
+        "jiraBoardEmptyColumn": "No issues",
+        "jiraBoardView": "Jira board",
+        "jiraBoardStatusColumns": "Status columns · active sprint only",
+        "jiraBoardNoSprintDescription": "No active sprint · board-filter backlog",
+        "jiraBoardSprintLoading": "Loading sprint details from the board",
+        "jiraIssueListView": "Issue list",
+        "jiraBoardViews": "Jira board views",
+        "jiraSprintView": "Sprint",
+        "jiraFilterLabel": "Filter",
+        "jiraMeFilter": "Me",
+        "jiraTeamFilter": "Team",
+        "jiraAllFilter": "All",
+        "jiraConfigureTeamFilter": "Configure Team",
+        "jiraReturnToBoard": "Return to board",
+        "jiraTaskSettings": "Jira task settings",
+        "jiraChooseTransition": "Choose a status change",
+        "jiraChooseTransitionDescription": "More than one Jira transition can move {{value0}} to that column. Choose one to continue.",
+        "jiraFilterGroupLabel": "Filter Jira issues",
+        "jiraBoardLoading": "Loading…"
       },
       "Terminal": {
         "73768427cf": "Close",
@@ -10795,7 +10829,9 @@
             "setup": "setup",
             "apiKey": "api key",
             "skill": "skill",
-            "connect": "connect"
+            "connect": "connect",
+            "jiraBoard": "board sprint backlog",
+            "jiraTeamField": "team custom field"
           }
         },
         "terminal": {
@@ -12485,6 +12521,22 @@
           "e19f83d807": "Log file",
           "9fa69c4cae": "Written while logging is on.",
           "2b5bd8a767": "Local log writes are disabled by policy (CI or ORCA_DIAGNOSTICS_DISABLED)."
+        },
+        "JiraBoardSettings": {
+          "title": "Jira board view",
+          "description": "Choose a default board and the Jira custom field used by the Team filter in Tasks.",
+          "defaultBoard": "Default board",
+          "chooseBoard": "Choose a board",
+          "useListView": "No default board (use issue list)",
+          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter.",
+          "teamField": "Team field",
+          "chooseTeamField": "Choose a custom field",
+          "noTeamField": "No Team field",
+          "teamFieldHelp": "Text, number, single-select, and Jira Team custom fields are supported.",
+          "teamValue": "Team value",
+          "teamValuePlaceholder": "Exact value from the selected Jira field",
+          "teamValueHelp": "Issues match this Jira field value exactly. For option and Jira Team values, enter the ID.",
+          "retry": "Retry"
         }
       },
       "right": {

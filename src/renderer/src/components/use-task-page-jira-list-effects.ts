@@ -10,6 +10,7 @@ import { JIRA_ITEM_LIMIT, TASK_SEARCH_DEBOUNCE_MS } from './task-page-source-con
 export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffectsModel) {
   const {
     settings,
+    jiraBoardViewMode,
     setTaskResumeState,
     searchJiraIssues,
     listJiraIssues,
@@ -65,6 +66,13 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
       return
     }
     if (!jiraConnected) {
+      return
+    }
+    if (settings?.defaultJiraBoard && jiraBoardViewMode === 'board') {
+      setJiraIssues([])
+      setJiraLoading(false)
+      setJiraError(null)
+      setJiraErrorDetailsOpen(false)
       return
     }
     let cancelled = false
@@ -125,6 +133,9 @@ export function useTaskPageJiraListEffects(model: TaskPageLinearCollectionEffect
     taskSource,
     jiraConnected,
     selectedJiraSiteId,
+    jiraBoardViewMode,
+    settings?.defaultJiraBoard?.boardId,
+    settings?.defaultJiraBoard?.siteId,
     appliedJiraSearch,
     activeJiraPreset,
     jiraRefreshNonce,
