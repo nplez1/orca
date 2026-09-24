@@ -99,3 +99,26 @@ export const ProjectStatusOrder = z.object({
   projectKey: requiredString('Project key is required'),
   siteId: OptionalString
 })
+
+export const BoardIdentifier = z.object({
+  boardId: requiredString('Board ID is required'),
+  siteId: requiredString('Site ID is required')
+})
+
+const BoardIssuePageFields = {
+  boardId: requiredString('Board ID is required'),
+  siteId: requiredString('Site ID is required'),
+  teamFieldId: OptionalString,
+  pageToken: OptionalString,
+  startAt: OptionalFiniteNumber,
+  maxResults: OptionalFiniteNumber
+}
+
+export const BoardIssuePage = z.discriminatedUnion('scope', [
+  z.object({ ...BoardIssuePageFields, scope: z.literal('backlog') }),
+  z.object({
+    ...BoardIssuePageFields,
+    scope: z.literal('sprint'),
+    sprintId: requiredString('Sprint ID is required')
+  })
+])

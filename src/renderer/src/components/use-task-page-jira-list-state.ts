@@ -12,6 +12,7 @@ import type {
 import { jiraListPriorities } from '@/runtime/runtime-jira-client'
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const { settings, jiraConnected, selectedJiraSiteId, taskSource, jiraTaskSourceContext } = model
+  const [jiraBoardViewMode, setJiraBoardViewMode] = useState<'board' | 'list'>('board')
   // Jira tab state
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
   const [jiraLoading, setJiraLoading] = useState(false)
@@ -95,6 +96,8 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     setJiraErrorDetailsOpen,
     jiraJqlRejection,
     setJiraJqlRejection,
+    jiraBoardViewMode,
+    setJiraBoardViewMode,
     jiraSearchInput,
     setJiraSearchInput,
     appliedJiraSearch,

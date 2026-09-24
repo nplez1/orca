@@ -24,6 +24,7 @@ type TaskPageJiraIssueListProps = {
   showSiteContext: boolean
   statusDirection?: 'asc' | 'desc'
   statusOrder: JiraProjectStatusOrder | null
+  groupByStatus?: boolean
 }
 
 function statusColumnRanks(order: JiraProjectStatusOrder | null): Map<string, number> {
@@ -284,13 +285,32 @@ export function TaskPageJiraIssueList({
   selectedIssue,
   showSiteContext,
   statusDirection = 'asc',
-  statusOrder
+  statusOrder,
+  groupByStatus = true
 }: TaskPageJiraIssueListProps): React.JSX.Element {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const sections = useMemo(
-    () => groupJiraIssuesByStatus(issues, statusOrder, statusDirection),
-    [issues, statusDirection, statusOrder]
+    () => (groupByStatus ? groupJiraIssuesByStatus(issues, statusOrder, statusDirection) : []),
+    [groupByStatus, issues, statusDirection, statusOrder]
   )
+  if (!groupByStatus) {
+    return (
+      <div className="divide-y divide-border/50">
+        {issues.map((issue) => (
+          <JiraIssueRow
+            key={`${issue.siteId ?? 'site'}:${issue.id || issue.key}`}
+            formatUpdatedAt={formatUpdatedAt}
+            getStatusTone={getStatusTone}
+            issue={issue}
+            onOpenIssue={onOpenIssue}
+            onStartWorkspace={onStartWorkspace}
+            selected={isSelectedIssue(issue, selectedIssue)}
+            showSiteContext={showSiteContext}
+          />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="divide-y divide-border/50">

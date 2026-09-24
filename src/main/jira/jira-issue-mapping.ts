@@ -3,6 +3,7 @@ import type {
   JiraCreateFieldAllowedValue,
   JiraIssue,
   JiraIssueType,
+  JiraIssueTeamValue,
   JiraPriority,
   JiraProject,
   JiraSite,
@@ -11,6 +12,7 @@ import type {
 } from '../../shared/jira-types'
 import { adfToMarkdownText, textToAdf, type AdfToMarkdownOptions } from './adf-markdown'
 import {
+  asIdentifier,
   asRecord,
   asString,
   asStringArray,
@@ -182,10 +184,27 @@ export function toBodyText(site: JiraSite, text: string): unknown {
   return site.authType === 'server' ? text : textToAdf(text)
 }
 
+function mapIssueTeamValue(value: unknown): JiraIssueTeamValue | undefined {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const key = String(value).trim()
+    return key ? { key, label: key } : undefined
+  }
+  const record = asRecord(value)
+  const key = asIdentifier(record.id) || asString(record.value) || asString(record.name)
+  if (!key) {
+    return undefined
+  }
+  return {
+    key,
+    label: asString(record.name) || asString(record.value) || key
+  }
+}
+
 export function mapJiraIssue(
   site: JiraSite,
   raw: JiraRecord,
-  adfOptions?: AdfToMarkdownOptions
+  adfOptions?: AdfToMarkdownOptions,
+  teamFieldId?: string
 ): JiraIssue {
   const fields = asRecord(raw.fields)
   const key = asString(raw.key)
@@ -204,6 +223,7 @@ export function mapJiraIssue(
     assignee: mapUser(fields.assignee),
     reporter: mapUser(fields.reporter),
     priority: mapPriority(fields.priority),
+    teamValue: teamFieldId ? mapIssueTeamValue(fields[teamFieldId]) : undefined,
     createdAt: asString(fields.created, new Date().toISOString()),
     updatedAt: asString(fields.updated, new Date().toISOString())
   }
