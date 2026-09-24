@@ -74,8 +74,8 @@ function isCopilotBackgroundShellLaunch(hookPayload: Record<string, unknown>): b
 
 // Why: the `task` tool runs an agent in `sync` or `background` mode. Only background mode outlives
 // the lead turn; a sync task completes with its PostToolUse, and counting it left the pane
-// "Monitoring background tasks" for the rest of the session (the general-purpose agent emits no
-// subagentStart/subagentStop, so nothing ever decremented it).
+// working for the rest of the session (the general-purpose agent emits no subagentStart/subagentStop,
+// so nothing ever decremented it).
 function isCopilotBackgroundSubagentLaunch(hookPayload: Record<string, unknown>): boolean {
   const toolName = readCopilotToolName(hookPayload)?.toLowerCase()
   if (toolName !== 'agent' && toolName !== 'task') {
@@ -126,10 +126,8 @@ function getCopilotBackgroundWorkState(
   return state.copilotBackgroundWorkByPaneKey.get(paneKey)
 }
 
-// Why: PermissionRequest fires before allow/ask/deny (stays working). The notification hook is
-// supposed to fire only once a prompt is shown to the user (copilot-cli 1.0.26, copilot-cli#2586),
-// but it is fire-and-forget and also fires for requests that auto-approve, so `permission_prompt`
-// blocks only while the request is still in flight (see stalePermissionPromptNotification below).
+// Why: PermissionRequest precedes approval, and its fire-and-forget permission_prompt can also
+// fire for auto-approved requests; only elicitation_dialog reliably means the user is blocked.
 export function normalizeCopilotEvent(
   state: HookListenerState,
   eventName: unknown,
@@ -149,18 +147,8 @@ export function normalizeCopilotEvent(
     normalizedEventName,
     hookPayload
   )
-  // Why: Copilot's notification hook is fire-and-forget, so a permission_prompt for a request that
-  // resolves without the user (session/rule/`--yolo` auto-approval, copilot-cli#2586) can land after
-  // the tool already ran and strand the pane `blocked` until the next turn. A completed tool is
-  // positive evidence the prompt was never shown; an absent snapshot still blocks, so a real prompt
-  // is never hidden.
-  const stalePermissionPromptNotification =
-    notificationType === 'permission_prompt' &&
-    state.lastToolByPaneKey.get(paneKey)?.toolCompleted === true
   const isBlockingNotification =
-    normalizedEventName === 'Notification' &&
-    (notificationType === 'elicitation_dialog' ||
-      (notificationType === 'permission_prompt' && !stalePermissionPromptNotification))
+    normalizedEventName === 'Notification' && notificationType === 'elicitation_dialog'
   const toolSnapshot = extractToolFields('copilot', normalizedEventName, hookPayload)
   const backgroundShellResultText =
     normalizedEventName === 'PostToolUse' ? readCopilotToolResultText(hookPayload) : undefined
@@ -178,7 +166,7 @@ export function normalizeCopilotEvent(
     normalizedEventName === 'PreToolUse' && isCopilotBackgroundSubagentLaunch(hookPayload)
   // Why: a background task launch that fails (e.g. the task tool rejects a missing agent name) never
   // starts anything, so nothing will ever complete it; consume the entry the PreToolUse added or the
-  // pane stays "Monitoring background tasks" for the rest of the session.
+  // pane stays working for the rest of the session.
   const failedBackgroundLaunch =
     normalizedEventName === 'PostToolUseFailure' && isCopilotBackgroundSubagentLaunch(hookPayload)
   const completionShellId = readCopilotShellCompletionShellId(hookPayload)
@@ -349,7 +337,6 @@ export function normalizeCopilotEvent(
     toolInput: snapshot.toolInput,
     interactivePrompt: snapshot.interactivePrompt,
     lastAssistantMessage: snapshot.lastAssistantMessage,
-    lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
-    ...(stopWaitsForBackgroundWork ? { workingMode: 'monitoring' as const } : {})
+    lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput
   })
 }

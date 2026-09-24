@@ -277,7 +277,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     expect(harness.states.at(-1)).toBe('done')
   })
 
-  it('names the held state monitoring once only the child is still working', async () => {
+  it('keeps the held state working once only the child is still working', async () => {
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'delegate the sweep' })
     await drive(harness, 'agent_start')
@@ -288,7 +288,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     await drive(harness, 'agent_end', {})
     expect(harness.accepted.at(-1)).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring'
+      workingMode: undefined
     })
 
     await emit(harness, FORK_COMPLETED, { id: 'run-1' })

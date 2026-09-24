@@ -172,12 +172,12 @@ export function resolveClaudePaneStatus(
       // A child's permission wait displaces the main agent record itself (`waitingAgentId`,
       // `stateBeforeWait`) instead of living on the roster, so the roster never carries one.
       hasWaitingChildWork: false,
-      hasLiveAgentWork: claudeRosterHasWorkingSubagent(
-        state.claudeSubagentRosterByPaneKey.get(paneKey)
-      ),
-      hasLiveNonAgentWork:
-        state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) ||
-        state.claudeActiveSessionCronPaneKeys.has(paneKey)
+      // LOCAL(nplez1): an ordinary background shell reads as plain `working`; only a Claude
+      // session-cron callback earns the monitoring mode (see LOCAL-PATCHES.md).
+      hasLiveAgentWork:
+        claudeRosterHasWorkingSubagent(state.claudeSubagentRosterByPaneKey.get(paneKey)) ||
+        state.claudeRunningNonAgentTaskPaneKeys.has(paneKey),
+      hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey)
     })
   })
 }

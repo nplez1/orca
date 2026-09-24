@@ -420,7 +420,7 @@ describe('AgentHookServer listener replay', () => {
       const baseline = server.getStatusSnapshot()[0]
 
       expect(baseline).not.toHaveProperty('claudeRunningNonAgentTask')
-      expect(baseline).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+      expect(baseline).toMatchObject({ state: 'working', workingMode: undefined })
       expect(
         server.inferInterrupt({
           paneKey: PANE,
@@ -440,6 +440,7 @@ describe('AgentHookServer listener replay', () => {
         })
       ).resolves.toMatchObject({ status: 204 })
       const cronBaseline = server.getStatusSnapshot()[0]
+      expect(cronBaseline).toMatchObject({ state: 'working', workingMode: 'monitoring' })
       expect(server._getStateForTests().claudeActiveSessionCronPaneKeys.has(PANE)).toBe(true)
       expect(
         server.inferInterrupt({
@@ -451,6 +452,13 @@ describe('AgentHookServer listener replay', () => {
           intent: 'ctrl-c'
         })
       ).toBe(false)
+
+      await expect(
+        postHook({ hook_event_name: 'UserPromptSubmit', prompt: 'continue working' })
+      ).resolves.toMatchObject({ status: 204 })
+      const nextTurn = server.getStatusSnapshot()[0]
+      expect(nextTurn).toMatchObject({ state: 'working' })
+      expect(nextTurn.workingMode).toBeUndefined()
     } finally {
       server.stop()
     }
