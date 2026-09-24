@@ -121,14 +121,14 @@ describe('Claude background task status', () => {
         hook_event_name: 'Stop',
         background_tasks: [RUNNING_SHELL]
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    ).toMatchObject({ state: 'working', workingMode: undefined })
     expect(
       claudeEvent(state, SOURCE_PANE, {
         hook_event_name: 'SubagentStop',
         agent_id: 'a70fdf2986e38302b',
         background_tasks: [RUNNING_SHELL]
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    ).toMatchObject({ state: 'working', workingMode: undefined })
 
     expect(
       claudeEvent(state, SOURCE_PANE, {
@@ -147,26 +147,22 @@ describe('Claude background task status', () => {
     expect(state.claudeRunningNonAgentTaskPaneKeys.has(SOURCE_PANE)).toBe(false)
   })
 
-  // Why: STA-4119's second complaint is the missing completion notification. The renderer's
-  // completion coordinator announces off `turnCompletedAt` on a still-`working` payload, so the
-  // stamp — not the rendered state — is what makes the notification fire when a turn ends into
-  // monitoring. The stamp predicate and the monitoring predicate are computed from the same
-  // "lead said done but the pane resolves to working" expression, so a refactor that renames one
-  // can silently drop the other with nothing else going red. These pin both halves.
-  it('stamps the turn end when a finished lead falls back to monitoring', () => {
+  // Why: the completion coordinator announces off `turnCompletedAt` on a still-working payload;
+  // background work keeps the pane working after the lead turn ends, so the stamp must survive.
+  it('stamps the turn end when background work keeps a finished lead working', () => {
     const state = createHookListenerState()
 
     claudeEvent(state, SOURCE_PANE, {
       hook_event_name: 'UserPromptSubmit',
       prompt: 'start the dev server'
     })
-    const monitoring = claudeEvent(state, SOURCE_PANE, {
+    const stillWorking = claudeEvent(state, SOURCE_PANE, {
       hook_event_name: 'Stop',
       background_tasks: [RUNNING_SHELL]
     })
 
-    expect(monitoring).toMatchObject({ state: 'working', workingMode: 'monitoring' })
-    expect(typeof monitoring?.turnCompletedAt).toBe('number')
+    expect(stillWorking).toMatchObject({ state: 'working', workingMode: undefined })
+    expect(typeof stillWorking?.turnCompletedAt).toBe('number')
   })
 
   it('stamps a lead that ends into a working subagent, which carries no monitoring mode', () => {
@@ -198,7 +194,7 @@ describe('Claude background task status', () => {
     expect(midTurn?.turnCompletedAt).toBeUndefined()
   })
 
-  it('does not stamp an interrupted lead, which settles done instead of monitoring', () => {
+  it('does not stamp an interrupted lead, which settles done despite background work', () => {
     const state = createHookListenerState()
 
     claudeEvent(state, SOURCE_PANE, { hook_event_name: 'UserPromptSubmit', prompt: 'start it' })
@@ -229,7 +225,7 @@ describe('Claude background task status', () => {
     expect(finished?.turnCompletedAt).toBeUndefined()
   })
 
-  it('keeps foreground child work active before falling back to monitoring', () => {
+  it('keeps a background task working after a child finishes', () => {
     const state = createHookListenerState()
     claudeEvent(state, SOURCE_PANE, {
       hook_event_name: 'SubagentStart',
@@ -247,7 +243,7 @@ describe('Claude background task status', () => {
         hook_event_name: 'SubagentStop',
         agent_id: 'child-1'
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    ).toMatchObject({ state: 'working', workingMode: undefined })
   })
 
   it('keeps pending task state when pane authority moves', () => {
@@ -660,7 +656,7 @@ describe('Claude background task status', () => {
 
     expect(claudeEvent(state, SOURCE_PANE, { hook_event_name: 'Stop' })).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring'
+      workingMode: undefined
     })
     expect(state.claudeRunningNonAgentTaskPaneKeys.has(SOURCE_PANE)).toBe(true)
     clearPaneCacheState(state, SOURCE_PANE)

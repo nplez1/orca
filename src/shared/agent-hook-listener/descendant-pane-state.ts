@@ -8,11 +8,7 @@ import {
   upsertAgentDescendant,
   type AgentDescendantRoster
 } from '../agent-descendant-roster'
-import {
-  normalizeAgentStatusPayload,
-  type AgentStatusState,
-  type ParsedAgentStatusPayload
-} from '../agent-status-types'
+import { normalizeAgentStatusPayload, type ParsedAgentStatusPayload } from '../agent-status-types'
 import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
 import type { HookListenerState } from './listener-state'
 
@@ -85,7 +81,6 @@ export function applyDescendantEventToPane(
         )
   return normalizeAgentStatusPayload({
     state: effectiveState,
-    ...descendantMonitoring(effectiveState, effectiveLeadState),
     prompt: state.lastPromptByPaneKey.get(paneKey) ?? '',
     agentType: source,
     toolName: cachedTool.toolName,
@@ -95,17 +90,6 @@ export function applyDescendantEventToPane(
     lastAssistantMessageIsToolOutput: cachedTool.lastAssistantMessageIsToolOutput,
     subagents: agentDescendantRosterToSnapshots(state.descendantRosterByPaneKey.get(paneKey))
   })
-}
-
-/** The pane is monitoring, not working, when only its descendants hold it working —
- *  the lead's own turn is over. Same distinction Copilot draws for background work. */
-function descendantMonitoring(
-  effectiveState: AgentStatusState,
-  leadState: AgentStatusState
-): { workingMode?: 'monitoring' } {
-  return effectiveState === 'working' && leadState !== 'working'
-    ? { workingMode: 'monitoring' }
-    : {}
 }
 
 /** Fold the live child set an event carried into the pane's roster. Returns nothing: the
@@ -142,7 +126,6 @@ export function gatePaneStateOnDescendants(
   return {
     ...payload,
     state: gated,
-    ...descendantMonitoring(gated, payload.state),
     subagents: agentDescendantRosterToSnapshots(roster)
   }
 }

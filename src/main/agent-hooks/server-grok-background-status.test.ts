@@ -62,7 +62,7 @@ describe('Grok background status ownership', () => {
         expect.objectContaining({
           paneKey: PANE,
           state: 'working',
-          workingMode: 'monitoring',
+          workingMode: undefined,
           agentType: 'grok'
         })
       ])

@@ -61,7 +61,7 @@ describe('Grok completion observations', () => {
 
     expect(lead).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring'
+      workingMode: undefined
     })
     expect(followUp).toMatchObject({
       state: 'done',
@@ -214,7 +214,7 @@ describe('Grok completion observations', () => {
         hookEventName: 'Stop',
         backgroundTasks: [{ id: 'task-1', type: 'subagent', status: 'starting' }]
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    ).toMatchObject({ state: 'working', workingMode: undefined })
   })
 
   it('uses only idle_prompt, not task_complete text, as the session-idle backstop', () => {
