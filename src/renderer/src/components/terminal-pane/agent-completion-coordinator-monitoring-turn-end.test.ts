@@ -7,7 +7,7 @@ import { makePaneKey } from '../../../../shared/stable-pane-id'
 
 // Why: STA-4119's second complaint is the missing completion notification. This drives the REAL
 // hook listener and feeds its real output into the REAL coordinator, rather than hand-writing a
-// payload — the whole question is whether the two layers actually agree about a monitoring turn.
+// payload — the whole question is whether the two layers agree about a turn that ends into background work.
 const PANE = makePaneKey('tab-1', '11111111-1111-4111-8111-111111111111')
 const RUNNING_SHELL = {
   id: 'shell-1',
@@ -56,7 +56,7 @@ function completionMeta(dispatchCompletion: ReturnType<typeof vi.fn>) {
     | undefined
 }
 
-describe('completion notification when a lead turn ends into monitoring', () => {
+describe('completion notification when a lead turn ends into background work', () => {
   useAgentCompletionCoordinatorLifecycle()
 
   it('announces completion when the turn ends but the pane stays working for a background shell', () => {
@@ -66,16 +66,16 @@ describe('completion notification when a lead turn ends into monitoring', () => 
     coordinator.observeHookStatus(
       hookPayload(listener, { hook_event_name: 'UserPromptSubmit', prompt: 'start the dev server' })
     )
-    const monitoring = hookPayload(listener, {
+    const backgroundWork = hookPayload(listener, {
       hook_event_name: 'Stop',
       background_tasks: [RUNNING_SHELL]
     })
 
-    // Precondition: the pane really is in the monitoring state, not done.
-    expect(monitoring).toMatchObject({ state: 'working', workingMode: 'monitoring' })
-    expect(typeof monitoring.turnCompletedAt).toBe('number')
+    // Precondition: background work keeps the pane working after the lead turn ends.
+    expect(backgroundWork).toMatchObject({ state: 'working', workingMode: undefined })
+    expect(typeof backgroundWork.turnCompletedAt).toBe('number')
 
-    coordinator.observeHookStatus(monitoring)
+    coordinator.observeHookStatus(backgroundWork)
 
     expect(dispatchCompletion).toHaveBeenCalledTimes(1)
     const meta = completionMeta(dispatchCompletion)
