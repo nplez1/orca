@@ -16,6 +16,7 @@ import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { CodeHostSetupSteps, JiraSetupSteps } from './TaskSourceSimpleSetup'
 import { TaskSourceLinearSetup } from './TaskSourceLinearSetup'
 import { TaskSourceProviderCard } from './TaskSourceProviderCard'
+import { JiraBoardSettings } from './JiraBoardSettings'
 import {
   getStalledVisibleTaskProviders,
   resolveStickyAutoExpandedTaskProvider
@@ -265,6 +266,8 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
           )}
         </p>
       </section>
+
+      <JiraBoardSettings settings={settings} updateSettings={updateSettings} />
     </div>
   )
 }

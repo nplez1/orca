@@ -28,6 +28,10 @@ vi.mock('./use-task-source-provider-readiness', () => ({
   useTaskSourceProviderReadiness: () => mocks.readiness
 }))
 
+vi.mock('./JiraBoardSettings', () => ({
+  JiraBoardSettings: () => <div data-testid="jira-board-settings">Jira board settings</div>
+}))
+
 vi.mock('./use-integration-provider-status-refresh', () => ({
   useIntegrationProviderStatusRefresh: vi.fn()
 }))
@@ -156,6 +160,7 @@ describe('TasksPane', () => {
     const markup = renderPane()
 
     expect(markup).toContain('Task management setup')
+    expect(markup).toContain('data-testid="jira-board-settings"')
     expect(markup).toContain('Linear also needs the agent skill')
     expect(markup).toContain(INCOMPLETE_BANNER)
     expect(markup).toContain('Linear setup steps')
