@@ -5,6 +5,8 @@ import {
 import { defineMethod, defineStreamingMethod } from '../core'
 import {
   AssignableUsers,
+  BoardIdentifier,
+  BoardIssuePage,
   Connect,
   CreateIssue,
   IssueComment,
@@ -192,5 +194,26 @@ export const JIRA_METHODS = [
     params: ProjectStatusOrder,
     handler: async (params, { runtime }) =>
       runtime.jiraGetProjectStatusOrder(params.projectKey.trim(), params.siteId)
+  }),
+  defineMethod({
+    name: 'jira.listBoards',
+    params: SiteSelection,
+    handler: async (params, { runtime }) => runtime.jiraListBoards(params?.siteId)
+  }),
+  defineMethod({
+    name: 'jira.listCustomFields',
+    params: SiteSelection,
+    handler: async (params, { runtime }) => runtime.jiraListCustomFields(params?.siteId)
+  }),
+  defineMethod({
+    name: 'jira.getBoardOverview',
+    params: BoardIdentifier,
+    handler: async (params, { runtime }) =>
+      runtime.jiraGetBoardOverview(params.boardId.trim(), params.siteId.trim())
+  }),
+  defineMethod({
+    name: 'jira.listBoardIssues',
+    params: BoardIssuePage,
+    handler: async (params, { runtime }) => runtime.jiraListBoardIssues(params)
   })
 ]

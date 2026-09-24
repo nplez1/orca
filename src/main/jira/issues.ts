@@ -12,3 +12,9 @@ export {
   searchUsers
 } from './jira-issue-create-metadata'
 export { getProjectStatusOrder, listTransitions } from './jira-transition-queries'
+export {
+  getBoardOverview,
+  listBoardIssues,
+  listBoards,
+  listCustomFields
+} from './jira-board-queries'

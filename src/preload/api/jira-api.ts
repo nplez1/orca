@@ -1,4 +1,8 @@
 import type {
+  JiraBoardIssuePage,
+  JiraBoardIssuePageRequest,
+  JiraBoardOverview,
+  JiraBoard,
   JiraComment,
   JiraConnectionStatus,
   JiraCreateField,
@@ -7,6 +11,7 @@ import type {
   JiraIssueFilter,
   JiraIssueType,
   JiraIssueUpdate,
+  JiraField,
   JiraPriority,
   JiraProject,
   JiraProjectStatusOrder,
@@ -82,4 +87,8 @@ export type JiraApi = {
     projectKey: string
     siteId?: string
   }) => Promise<JiraProjectStatusOrder>
+  listBoards: (args?: { siteId?: JiraSiteSelection }) => Promise<JiraBoard[]>
+  listCustomFields: (args?: { siteId?: JiraSiteSelection }) => Promise<JiraField[]>
+  getBoardOverview: (args: { boardId: string; siteId: string }) => Promise<JiraBoardOverview>
+  listBoardIssues: (args: JiraBoardIssuePageRequest) => Promise<JiraBoardIssuePage>
 }
