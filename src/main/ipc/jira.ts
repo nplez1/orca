@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { connect, disconnect, getStatus, selectSite, testConnection } from '../jira/client'
 import { _resetPreflightCache } from './preflight'
 import { JiraCancellableRequests } from './jira-cancellable-requests'
+import { registerJiraBoardHandlers } from './jira-board-handlers'
 import {
   addIssueComment,
   createIssue,
@@ -322,4 +323,6 @@ export function registerJiraHandlers(): void {
       return getProjectStatusOrder(args.projectKey.trim(), normalizeSiteId(args.siteId))
     }
   )
+
+  registerJiraBoardHandlers()
 }

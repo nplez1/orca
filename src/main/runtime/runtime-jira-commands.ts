@@ -1,5 +1,6 @@
 import type {
   JiraConnectArgs,
+  JiraBoardIssuePageRequest,
   JiraCreateIssueArgs,
   JiraIssueFilter,
   JiraIssueUpdate,
@@ -9,12 +10,16 @@ import { connect, disconnect, getStatus, selectSite, testConnection } from '../j
 import {
   addIssueComment,
   createIssue,
+  getBoardOverview,
   getIssue,
   getIssueComments,
   getIssueSummary,
   getProjectStatusOrder,
   listAssignableUsers,
+  listBoardIssues,
+  listBoards,
   listCreateFields,
+  listCustomFields,
   listIssueTypes,
   listIssues,
   listPriorities,
@@ -146,5 +151,21 @@ export class RuntimeJiraCommands {
     siteId?: string
   ): ReturnType<typeof getProjectStatusOrder> {
     return getProjectStatusOrder(projectKey, siteId)
+  }
+
+  jiraListBoards(siteId?: JiraSiteSelection): ReturnType<typeof listBoards> {
+    return listBoards(siteId)
+  }
+
+  jiraListCustomFields(siteId?: JiraSiteSelection): ReturnType<typeof listCustomFields> {
+    return listCustomFields(siteId)
+  }
+
+  jiraGetBoardOverview(boardId: string, siteId: string): ReturnType<typeof getBoardOverview> {
+    return getBoardOverview(boardId, siteId)
+  }
+
+  jiraListBoardIssues(request: JiraBoardIssuePageRequest): ReturnType<typeof listBoardIssues> {
+    return listBoardIssues(request)
   }
 }
