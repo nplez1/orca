@@ -142,7 +142,9 @@ const STORIES: Story[] = [
         { hook_event_name: 'UserPromptSubmit', prompt: 'go' },
         { hook_event_name: 'Stop', background_tasks: [RUNNING_SHELL] }
       ],
-      expect: { state: 'working', workingMode: 'monitoring', mainAgent: { state: 'done' } }
+      // LOCAL(nplez1): a watch loop reads plain `working`; monitoring is reserved for Claude
+      // session-cron callbacks (see LOCAL-PATCHES.md).
+      expect: { state: 'working', mainAgent: { state: 'done' } }
     },
     structured: {
       status: 'idle',
@@ -154,7 +156,7 @@ const STORIES: Story[] = [
         { hookEventName: 'user_prompt_submit', prompt: 'go' },
         { hookEventName: 'stop', reason: 'end_turn', backgroundTasks: [RUNNING_SHELL] }
       ],
-      expect: { state: 'working', workingMode: 'monitoring', mainAgent: { state: 'done' } }
+      expect: { state: 'working', mainAgent: { state: 'done' } }
     }
   },
   {
@@ -284,7 +286,6 @@ const STORIES: Story[] = [
       ],
       expect: {
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       }
     },
@@ -305,7 +306,6 @@ const STORIES: Story[] = [
       ],
       expect: {
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       }
     }
@@ -341,7 +341,6 @@ const STORIES: Story[] = [
       ],
       expect: {
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       }
     }
@@ -358,7 +357,6 @@ const STORIES: Story[] = [
       ],
       expect: {
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       }
     }
@@ -441,10 +439,11 @@ describe('mainAgent status parity across lanes', () => {
       // This lane holds a child's wait on the displaced main agent record, not the roster.
       hasWaitingChildWork:
         state.claudeLeadStateByPaneKey.get(PANE_KEY)?.waitingAgentId !== undefined,
-      hasLiveAgentWork: payload.subagents?.some((child) => child.state === 'working') === true,
-      hasLiveNonAgentWork:
-        state.claudeRunningNonAgentTaskPaneKeys.has(PANE_KEY) ||
-        state.claudeActiveSessionCronPaneKeys.has(PANE_KEY)
+      // LOCAL(nplez1): a running shell is not watch work here, so it must not read monitoring.
+      hasLiveAgentWork:
+        payload.subagents?.some((child) => child.state === 'working') === true ||
+        state.claudeRunningNonAgentTaskPaneKeys.has(PANE_KEY),
+      hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(PANE_KEY)
     })
   }
 
@@ -489,11 +488,9 @@ describe('mainAgent status parity across lanes', () => {
         last.hookEventName !== 'stop_failure' &&
         last.hookEventName !== 'stop_cancelled'
           ? null
-          : hasType('subagent')
+          : hasType('subagent') || hasType('shell') || last.stopHookActive === true
             ? 'working'
-            : hasType('shell') || last.stopHookActive === true
-              ? 'monitoring'
-              : null
+            : null
       expect(row).toEqual(refold(row.mainAgent, liveness))
     })
   })

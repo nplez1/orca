@@ -63,7 +63,7 @@ describe('Grok background status ownership', () => {
         expect.objectContaining({
           paneKey: PANE,
           state: 'working',
-          workingMode: 'monitoring',
+          workingMode: undefined,
           agentType: 'grok'
         })
       ])
@@ -101,8 +101,11 @@ describe('Grok background status ownership', () => {
     {
       label: 'a background shell',
       task: { id: 'task-1', type: 'shell', status: 'running', command: 'sleep 30' },
-      workingMode: 'monitoring',
-      countsAfterMainAgentStops: false
+      // LOCAL(nplez1): a shell is not watch work, so it reads plain `working` (see LOCAL-PATCHES.md).
+      // Consequence: `isAgentTimeAccruing` no longer excludes it, so the shell period counts as
+      // agent time — the same treatment a background subagent gets.
+      workingMode: undefined,
+      countsAfterMainAgentStops: true
     }
   ])(
     'counts agent time after the main agent stops only for $label',

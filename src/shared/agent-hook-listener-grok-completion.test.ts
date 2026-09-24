@@ -61,7 +61,7 @@ describe('Grok completion observations', () => {
 
     expect(lead).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring'
+      workingMode: undefined
     })
     expect(followUp).toMatchObject({
       state: 'done',
@@ -243,7 +243,7 @@ describe('Grok completion observations', () => {
         hookEventName: 'Stop',
         backgroundTasks: [{ id: 'task-1', type: 'shell', status: 'starting' }]
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+    ).toMatchObject({ state: 'working', workingMode: undefined })
   })
 
   // Real Grok 1.0.41 Stop entry for a background `spawn_subagent`, identifiers dropped.

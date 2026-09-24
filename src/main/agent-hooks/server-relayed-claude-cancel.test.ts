@@ -298,14 +298,12 @@ describe('a relayed Claude cancel with a background shell (captured)', () => {
     expect(pressCtrlC(pane.desktop)).toBe(true)
     expect(row(pane.desktop)).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring',
       mainAgent: { state: 'done', outcome: 'cancellation' }
     })
 
     expect(pane.relay.replayCachedPayloadsForPanes()).toBe(1)
     expect(row(pane.desktop)).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring',
       mainAgent: { state: 'done', outcome: 'cancellation' }
     })
 
@@ -315,7 +313,6 @@ describe('a relayed Claude cancel with a background shell (captured)', () => {
     await pane.post(hookAt(records, 8).payload)
     expect(row(pane.desktop)).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring',
       mainAgent: { state: 'done' }
     })
     expect(row(pane.desktop).mainAgent).not.toHaveProperty('outcome')
