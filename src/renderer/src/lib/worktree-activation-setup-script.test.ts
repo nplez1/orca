@@ -325,6 +325,31 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     })
   })
 
+  it('keeps a backend-spawned shell and Setup tab without queueing a duplicate', () => {
+    const tabs = [{ id: 'tab-primary' }, { id: 'tab-setup' }]
+    const store = createMockStore({
+      tabsByWorktree: { 'wt-1': tabs },
+      reconcileWorktreeTabModel: vi.fn(() => ({ renderableTabCount: tabs.length }))
+    })
+
+    const result = ensureWorktreeHasInitialTerminal(
+      store,
+      'wt-1',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { backendStartupTerminalSpawned: true }
+    )
+
+    expect(result).toBe('tab-primary')
+    expect(store.tabsByWorktree['wt-1']).toEqual(tabs)
+    expect(store.createTab).not.toHaveBeenCalled()
+    expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
+    expect(store.queueTabSetupSplit).not.toHaveBeenCalled()
+    expect(store.setActiveTab).not.toHaveBeenCalled()
+  })
+
   it('creates a background Setup tab when setupScriptLaunchMode is new-tab', () => {
     setSetupScriptLaunchMode('new-tab')
     let createdIndex = 0
