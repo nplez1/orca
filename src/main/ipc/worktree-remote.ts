@@ -406,7 +406,11 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   createdWithAgent: CreateWorktreeArgs['createdWithAgent']
 }): Promise<StagedStartupResult> {
   const { runtime, worktree, startup, setup, defaultTabs, settings, createdWithAgent } = args
-  if (!runtime || !startup || defaultTabs?.tabs.length) {
+  const setupLaunchMode = settings.setupScriptLaunchMode ?? 'new-tab'
+  const hasDefaultTabs = (defaultTabs?.tabs.length ?? 0) > 0
+  const canSpawnSetupWithoutStartup =
+    setup !== undefined && (!hasDefaultTabs || setupLaunchMode === 'new-tab')
+  if (!runtime || (startup && hasDefaultTabs) || (!startup && !canSpawnSetupWithoutStartup)) {
     return { didSpawnSetup: false }
   }
 
@@ -436,43 +440,50 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   }
 
   try {
-    // Why: only after `git worktree add` + metadata registration is the path safe for a runtime PTY to boot the agent while setup runs alongside.
-    if (isTuiAgent(createdWithAgent)) {
-      const preset = TUI_AGENT_CONFIG[createdWithAgent].preflightTrust
-      try {
-        if (preset === 'cursor') {
-          markCursorWorkspaceTrusted(worktree.path)
-        } else if (preset === 'copilot') {
-          markCopilotFolderTrusted(worktree.path)
-        } else if (preset === 'codex') {
-          // Why: the PTY below spawns Codex immediately; a discarded Promise let
-          // it reach the trust menu before the write landed, and its rejection
-          // escaped this synchronous catch. Bounded so a wedged config lane
-          // cannot stall worktree creation.
-          await awaitAgentTrustWriteWithinDeadline(markCodexProjectTrusted(worktree.path), {
-            preset,
-            workspacePath: worktree.path
-          })
+    if (startup && sequencedStartup) {
+      // Why: only after `git worktree add` + metadata registration is the path safe for a runtime PTY to boot the agent while setup runs alongside.
+      if (isTuiAgent(createdWithAgent)) {
+        const preset = TUI_AGENT_CONFIG[createdWithAgent].preflightTrust
+        try {
+          if (preset === 'cursor') {
+            markCursorWorkspaceTrusted(worktree.path)
+          } else if (preset === 'copilot') {
+            markCopilotFolderTrusted(worktree.path)
+          } else if (preset === 'codex') {
+            // Why: the PTY below spawns Codex immediately; a discarded Promise let
+            // it reach the trust menu before the write landed, and its rejection
+            // escaped this synchronous catch. Bounded so a wedged config lane
+            // cannot stall worktree creation.
+            await awaitAgentTrustWriteWithinDeadline(markCodexProjectTrusted(worktree.path), {
+              preset,
+              workspacePath: worktree.path
+            })
+          }
+        } catch {
+          // Best-effort: launch still proceeds and the agent can ask interactively.
         }
-      } catch {
-        // Best-effort: launch still proceeds and the agent can ask interactively.
       }
-    }
-    const terminal = await runtime.createTerminal(`id:${worktree.id}`, {
-      command: sequencedStartup.command,
-      ...(setup ? { claudeAgentTeamsSourceCommand: startup.command } : {}),
-      env: sequencedStartup.env,
-      ...(sequencedStartup.launchConfig ? { launchConfig: sequencedStartup.launchConfig } : {}),
-      ...(isTuiAgent(createdWithAgent) ? { launchAgent: createdWithAgent } : {}),
-      ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
-      startupCommandDelivery: sequencedStartup.startupCommandDelivery,
-      telemetry: sequencedStartup.telemetry,
-      activate: true
-    })
-    startupTerminalHandle = terminal.handle
-    startupTerminal = {
-      spawned: true,
-      surface: terminal.surface
+      const terminal = await runtime.createTerminal(`id:${worktree.id}`, {
+        command: sequencedStartup.command,
+        ...(setup ? { claudeAgentTeamsSourceCommand: startup.command } : {}),
+        env: sequencedStartup.env,
+        ...(sequencedStartup.launchConfig ? { launchConfig: sequencedStartup.launchConfig } : {}),
+        ...(isTuiAgent(createdWithAgent) ? { launchAgent: createdWithAgent } : {}),
+        ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
+        startupCommandDelivery: sequencedStartup.startupCommandDelivery,
+        telemetry: sequencedStartup.telemetry,
+        activate: true
+      })
+      startupTerminalHandle = terminal.handle
+      startupTerminal = {
+        spawned: true,
+        surface: terminal.surface
+      }
+    } else if (setup && !hasDefaultTabs) {
+      // Why: blank worktree creates normally seed this first shell in the renderer; spawning it here keeps setup status under host observation.
+      const terminal = await runtime.createTerminal(`id:${worktree.id}`, { activate: true })
+      startupTerminalHandle = terminal.handle
+      startupTerminal = { spawned: true, surface: terminal.surface }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -511,9 +522,6 @@ async function spawnLocalStartupAndSetupTerminals(args: {
           setup.shell
         )
       const setupEnv = { ...setup.envVars, ...observed?.env }
-      const setupLaunchMode =
-        (settings as Partial<Pick<GlobalSettings, 'setupScriptLaunchMode'>>)
-          .setupScriptLaunchMode ?? 'new-tab'
       let setupTerminalHandle: string | undefined
       if (setupLaunchMode === 'split-vertical' || setupLaunchMode === 'split-horizontal') {
         if (!startupTerminalHandle) {
