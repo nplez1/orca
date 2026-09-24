@@ -1,5 +1,13 @@
 import { ipcRenderer } from 'electron'
-import type { JiraProjectStatusOrder } from '../../shared/jira-types'
+import type {
+  JiraBoardIssuePage,
+  JiraBoardIssuePageRequest,
+  JiraBoardOverview,
+  JiraBoard,
+  JiraField,
+  JiraProjectStatusOrder,
+  JiraSiteSelection
+} from '../../shared/jira-types'
 import type { PreloadApi } from '../api-types'
 
 export const jiraApi = {
@@ -86,5 +94,13 @@ export const jiraApi = {
   getProjectStatusOrder: (args: {
     projectKey: string
     siteId?: string
-  }): Promise<JiraProjectStatusOrder> => ipcRenderer.invoke('jira:getProjectStatusOrder', args)
+  }): Promise<JiraProjectStatusOrder> => ipcRenderer.invoke('jira:getProjectStatusOrder', args),
+  listBoards: (args?: { siteId?: JiraSiteSelection }): Promise<JiraBoard[]> =>
+    ipcRenderer.invoke('jira:listBoards', args),
+  listCustomFields: (args?: { siteId?: JiraSiteSelection }): Promise<JiraField[]> =>
+    ipcRenderer.invoke('jira:listCustomFields', args),
+  getBoardOverview: (args: { boardId: string; siteId: string }): Promise<JiraBoardOverview> =>
+    ipcRenderer.invoke('jira:getBoardOverview', args),
+  listBoardIssues: (args: JiraBoardIssuePageRequest): Promise<JiraBoardIssuePage> =>
+    ipcRenderer.invoke('jira:listBoardIssues', args)
 } satisfies PreloadApi['jira']

@@ -3,7 +3,7 @@ import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
 import type { GitLabProjectSettings } from './gitlab-types'
-import type { TaskProvider } from './task-providers'
+import type { TaskViewSettings } from './task-view-settings-types'
 import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
@@ -34,8 +34,7 @@ import type {
   LeftSidebarAppearanceMode,
   OpenInApplication,
   SourceControlGroupOrder,
-  SourceControlViewMode,
-  TaskViewPresetId
+  SourceControlViewMode
 } from './ui-chrome-types'
 import type { SetupScriptLaunchMode } from './worktree/launch-types'
 import type {
@@ -377,20 +376,6 @@ export type GlobalSettings = {
   skipDeleteArtifactConfirm: boolean
   /** Why: a Codex rate-limit reset spends a scarce credit on the live account; keep this skip separate from local confirmations. */
   skipCodexRateLimitResetConfirm: boolean
-  /** Default preset in the new-workspace GitHub task view. */
-  defaultTaskViewPreset: TaskViewPresetId
-  /** Persisted last-used task source so Tasks reopens to the same provider instead of defaulting to GitHub. */
-  defaultTaskSource: TaskProvider
-  /** Persisted visible task providers; hides unused providers from Tasks chrome and sidebar shortcuts. */
-  visibleTaskProviders: TaskProvider[]
-  /** Why: one-shot guard to make Jira visible for existing profiles once, without re-adding after a later opt-out. */
-  visibleTaskProvidersDefaultedForJira: boolean
-  /** Persisted repo selection (cross-repo tasks view). null = sticky-all (includes future-added repos);
-   *  string[] = frozen curated subset (ineligible ids dropped on load; empty after drop is treated as null). */
-  defaultRepoSelection: string[] | null
-  /** Persisted Linear team selection (tasks view). Same nullable-array pattern as
-   *  defaultRepoSelection: null = sticky-all, string[] = frozen subset of team IDs. */
-  defaultLinearTeamSelection: string[] | null
   /** Session cookie for OpenCode Go rate-limit fetching. Stored encrypted. */
   opencodeSessionCookie: string
   /** Optional OpenCode Go workspace ID override; when set, skips the workspaces lookup and fetches usage directly. */
@@ -528,7 +513,7 @@ export type GlobalSettings = {
   voice?: VoiceSettings
   /** Transcript full-text search consent + retention. Absent means off; nothing indexes until the user opts in. */
   aiVaultSearch?: AiVaultSearchSettings
-}
+} & TaskViewSettings
 
 export type OrcaWorkspaceLayout = {
   path: string

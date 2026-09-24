@@ -28,6 +28,12 @@ export {
   jiraSearchUsers
 } from './runtime-jira-user-fields-client'
 export type { RuntimeJiraSettings } from './runtime-jira-target'
+export {
+  jiraGetBoardOverview,
+  jiraListBoardIssues,
+  jiraListBoards,
+  jiraListCustomFields
+} from './runtime-jira-board-client'
 
 export type JiraConnectResult = { ok: true; viewer: JiraViewer } | { ok: false; error: string }
 export type JiraCommentResult = { ok: true; id: string } | { ok: false; error: string }

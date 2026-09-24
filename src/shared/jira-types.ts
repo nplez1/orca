@@ -91,6 +91,71 @@ export type JiraProjectStatusOrder = {
   statusIdsByColumn: string[][]
 }
 
+export type JiraField = {
+  id: string
+  name: string
+  schemaType?: string
+  customType?: string
+  siteId: string
+  siteName: string
+}
+
+export type JiraBoard = {
+  id: string
+  name: string
+  type: string
+  siteId: string
+  siteName: string
+}
+
+export type JiraBoardSelection = {
+  boardId: string
+  siteId: string
+}
+
+export type JiraBoardColumn = {
+  name: string
+  statusIds: string[]
+}
+
+export type JiraSprint = {
+  id: string
+  name: string
+  state: string
+  startDate?: string
+  endDate?: string
+}
+
+export type JiraBoardOverview = {
+  board: JiraBoard
+  columns: JiraBoardColumn[]
+  activeSprints: JiraSprint[]
+}
+
+export type JiraBoardIssuePage = {
+  issues: JiraIssue[]
+  startAt: number
+  nextPageToken: string | null
+  total: number | null
+  isLast: boolean
+}
+
+export type JiraBoardIssuePageRequest = {
+  boardId: string
+  siteId: string
+  teamFieldId?: string
+  startAt?: number
+  maxResults?: number
+} & (
+  | { scope: 'backlog'; pageToken?: string; sprintId?: never }
+  | { scope: 'sprint'; pageToken?: string; sprintId: string }
+)
+
+export type JiraIssueTeamValue = {
+  key: string
+  label: string
+}
+
 export type JiraTransition = {
   id: string
   name: string
@@ -112,6 +177,7 @@ export type JiraIssue = {
   assignee?: JiraUser
   reporter?: JiraUser
   priority?: JiraPriority
+  teamValue?: JiraIssueTeamValue
   updatedAt: string
   createdAt: string
 }

@@ -5,6 +5,8 @@ import { translate } from '@/i18n/i18n'
 import { X, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { shouldShowJiraSiteSelector } from '../task-page-jira-board-model'
+import { TaskPageJiraSettingsLink } from './jira/SettingsLink'
 import { LinearScopeSelector } from '@/components/linear-scope-selector'
 import {
   Select,
@@ -19,6 +21,8 @@ export function TaskPageSourceBar({
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
   const {
+    settings,
+    jiraBoardViewMode,
     openTaskPage,
     closeTaskPage,
     updateSettings,
@@ -191,9 +195,14 @@ export function TaskPageSourceBar({
           </Tooltip>
         </div>
       ) : null}
-      {taskSource === 'jira' && jiraConnected ? (
+      {taskSource === 'jira' ? (
         <div className="flex items-center gap-2">
-          {jiraSites.length > 1 ? (
+          {shouldShowJiraSiteSelector(
+            jiraConnected,
+            Boolean(settings?.defaultJiraBoard),
+            jiraBoardViewMode,
+            jiraSites.length
+          ) ? (
             <Select
               value={selectedJiraSiteId ?? undefined}
               onValueChange={(value) => {
@@ -224,6 +233,7 @@ export function TaskPageSourceBar({
               </SelectContent>
             </Select>
           ) : null}
+          <TaskPageJiraSettingsLink />
         </div>
       ) : null}
     </div>
