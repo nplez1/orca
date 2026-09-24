@@ -269,7 +269,8 @@ export function normalizeGrokEvent(
     interactivePrompt: snapshot.interactivePrompt,
     lastAssistantMessage: snapshot.lastAssistantMessage,
     lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
-    ...(resolution.workingMode ? { workingMode: resolution.workingMode } : {}),
+    // LOCAL(nplez1): a grok background shell reads plain `working`, not monitoring — monitoring is
+    // reserved for Claude session-cron callbacks (see LOCAL-PATCHES.md).
     // Why: derived from the main agent, so the idle backstop that settles a cancelled turn held open by a task still reads interrupted.
     ...(mainAgent.outcome === 'cancellation' ? { interrupted: true } : {}),
     ...(sessionBoundary ? { sessionBoundary: true } : {}),

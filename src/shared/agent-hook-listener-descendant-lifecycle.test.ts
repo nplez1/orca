@@ -79,8 +79,10 @@ describe('descendant lifecycle never settles the pane', () => {
         expect.objectContaining({ id: 'sub-1', state: 'working', agentType: 'explore' })
       ])
 
-      // The lead's own Stop is real, but a live child means the pane is not idle yet.
-      expect(publishedState('grok', { hookEventName: 'Stop', reason: 'end_turn' })).toBe('working')
+      // The lead's own Stop is real, but a live child means the pane is still working.
+      const leadStop = publish('grok', { hookEventName: 'Stop', reason: 'end_turn' })
+      expect(leadStop?.payload.state).toBe('working')
+      expect(leadStop?.payload.workingMode).toBeUndefined()
 
       const drained = publish('grok', {
         hookEventName: 'SubagentStop',

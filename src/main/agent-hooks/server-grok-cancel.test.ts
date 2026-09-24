@@ -72,9 +72,9 @@ async function startTaskThenSettle(server: AgentHookServer): Promise<void> {
     stopHookActive: false,
     backgroundTasks: [RUNNING_TASK]
   })
+  // LOCAL(nplez1): the shell keeps the pane working without the monitoring mode (see LOCAL-PATCHES.md).
   expect(row(server)).toMatchObject({
     state: 'working',
-    workingMode: 'monitoring',
     mainAgent: { state: 'done' }
   })
 }
@@ -120,7 +120,6 @@ describe('a Grok cancel never hides a running task', () => {
       })
       expect(row(server)).toMatchObject({
         state: 'working',
-        workingMode: 'monitoring',
         mainAgent: { state: 'done', outcome: 'cancellation' }
       })
     } finally {
