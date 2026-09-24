@@ -11,6 +11,7 @@ import type {
 import { jiraListPriorities } from '@/runtime/runtime-jira-client'
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const { settings, jiraConnected, selectedJiraSiteId, taskSource, jiraTaskSourceContext } = model
+  const [jiraBoardViewMode, setJiraBoardViewMode] = useState<'board' | 'list'>('board')
   // Jira tab state
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
   const [jiraLoading, setJiraLoading] = useState(false)
@@ -82,60 +83,35 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
     },
     [jiraOrderBy]
   )
-  const nextModel = model as typeof model & {
-    jiraIssues: typeof jiraIssues
-    setJiraIssues: typeof setJiraIssues
-    jiraLoading: typeof jiraLoading
-    setJiraLoading: typeof setJiraLoading
-    jiraError: typeof jiraError
-    setJiraError: typeof setJiraError
-    jiraErrorDetailsOpen: typeof jiraErrorDetailsOpen
-    setJiraErrorDetailsOpen: typeof setJiraErrorDetailsOpen
-    jiraSearchInput: typeof jiraSearchInput
-    setJiraSearchInput: typeof setJiraSearchInput
-    appliedJiraSearch: typeof appliedJiraSearch
-    setAppliedJiraSearch: typeof setAppliedJiraSearch
-    activeJiraPreset: typeof activeJiraPreset
-    setActiveJiraPreset: typeof setActiveJiraPreset
-    jiraRefreshNonce: typeof jiraRefreshNonce
-    setJiraRefreshNonce: typeof setJiraRefreshNonce
-    jiraProjectStatusOrder: typeof jiraProjectStatusOrder
-    setJiraProjectStatusOrder: typeof setJiraProjectStatusOrder
-    jiraOrderBy: typeof jiraOrderBy
-    setJiraOrderBy: typeof setJiraOrderBy
-    jiraOrderDirection: typeof jiraOrderDirection
-    setJiraOrderDirection: typeof setJiraOrderDirection
-    jiraPrioritiesBySite: typeof jiraPrioritiesBySite
-    setJiraPrioritiesBySite: typeof setJiraPrioritiesBySite
-    jiraPrioritySiteIdsKey: typeof jiraPrioritySiteIdsKey
-    handleJiraSort: typeof handleJiraSort
-  }
-  nextModel.jiraIssues = jiraIssues
-  nextModel.setJiraIssues = setJiraIssues
-  nextModel.jiraLoading = jiraLoading
-  nextModel.setJiraLoading = setJiraLoading
-  nextModel.jiraError = jiraError
-  nextModel.setJiraError = setJiraError
-  nextModel.jiraErrorDetailsOpen = jiraErrorDetailsOpen
-  nextModel.setJiraErrorDetailsOpen = setJiraErrorDetailsOpen
-  nextModel.jiraSearchInput = jiraSearchInput
-  nextModel.setJiraSearchInput = setJiraSearchInput
-  nextModel.appliedJiraSearch = appliedJiraSearch
-  nextModel.setAppliedJiraSearch = setAppliedJiraSearch
-  nextModel.activeJiraPreset = activeJiraPreset
-  nextModel.setActiveJiraPreset = setActiveJiraPreset
-  nextModel.jiraRefreshNonce = jiraRefreshNonce
-  nextModel.setJiraRefreshNonce = setJiraRefreshNonce
-  nextModel.jiraProjectStatusOrder = jiraProjectStatusOrder
-  nextModel.setJiraProjectStatusOrder = setJiraProjectStatusOrder
-  nextModel.jiraOrderBy = jiraOrderBy
-  nextModel.setJiraOrderBy = setJiraOrderBy
-  nextModel.jiraOrderDirection = jiraOrderDirection
-  nextModel.setJiraOrderDirection = setJiraOrderDirection
-  nextModel.jiraPrioritiesBySite = jiraPrioritiesBySite
-  nextModel.setJiraPrioritiesBySite = setJiraPrioritiesBySite
-  nextModel.jiraPrioritySiteIdsKey = jiraPrioritySiteIdsKey
-  nextModel.handleJiraSort = handleJiraSort
-  return nextModel
+  return Object.assign(model, {
+    jiraBoardViewMode,
+    setJiraBoardViewMode,
+    jiraIssues,
+    setJiraIssues,
+    jiraLoading,
+    setJiraLoading,
+    jiraError,
+    setJiraError,
+    jiraErrorDetailsOpen,
+    setJiraErrorDetailsOpen,
+    jiraSearchInput,
+    setJiraSearchInput,
+    appliedJiraSearch,
+    setAppliedJiraSearch,
+    activeJiraPreset,
+    setActiveJiraPreset,
+    jiraRefreshNonce,
+    setJiraRefreshNonce,
+    jiraProjectStatusOrder,
+    setJiraProjectStatusOrder,
+    jiraOrderBy,
+    setJiraOrderBy,
+    jiraOrderDirection,
+    setJiraOrderDirection,
+    jiraPrioritiesBySite,
+    setJiraPrioritiesBySite,
+    jiraPrioritySiteIdsKey,
+    handleJiraSort
+  })
 }
 export type TaskPageJiraListStateModel = ReturnType<typeof useTaskPageJiraListState>

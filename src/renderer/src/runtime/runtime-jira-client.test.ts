@@ -3,6 +3,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   jiraCreateIssue,
+  jiraGetBoardOverview,
+  jiraListBoardIssues,
+  jiraListBoards,
+  jiraListCustomFields,
   jiraGetIssue,
   jiraIssueComments,
   jiraListAssignableUsers,
@@ -25,6 +29,10 @@ const jiraSearchIssuesLocal = vi.fn()
 const jiraListAssignableUsersLocal = vi.fn()
 const jiraSearchUsersLocal = vi.fn()
 const jiraCreateIssueLocal = vi.fn()
+const jiraListBoardsLocal = vi.fn()
+const jiraListCustomFieldsLocal = vi.fn()
+const jiraGetBoardOverviewLocal = vi.fn()
+const jiraListBoardIssuesLocal = vi.fn()
 const jiraReadStatusLocal = vi.fn()
 const jiraLookupIssueSummaryLocal = vi.fn()
 const jiraCancelIssueSummaryLocal = vi.fn()
@@ -37,6 +45,10 @@ beforeEach(() => {
   jiraListAssignableUsersLocal.mockReset()
   jiraSearchUsersLocal.mockReset()
   jiraCreateIssueLocal.mockReset()
+  jiraListBoardsLocal.mockReset()
+  jiraListCustomFieldsLocal.mockReset()
+  jiraGetBoardOverviewLocal.mockReset()
+  jiraListBoardIssuesLocal.mockReset()
   jiraReadStatusLocal.mockReset()
   jiraLookupIssueSummaryLocal.mockReset()
   jiraCancelIssueSummaryLocal.mockReset()
@@ -51,7 +63,11 @@ beforeEach(() => {
         searchIssues: jiraSearchIssuesLocal,
         listAssignableUsers: jiraListAssignableUsersLocal,
         searchUsers: jiraSearchUsersLocal,
-        createIssue: jiraCreateIssueLocal
+        createIssue: jiraCreateIssueLocal,
+        listBoards: jiraListBoardsLocal,
+        listCustomFields: jiraListCustomFieldsLocal,
+        getBoardOverview: jiraGetBoardOverviewLocal,
+        listBoardIssues: jiraListBoardIssuesLocal
       },
       runtimeEnvironments: {
         call: runtimeCall,
@@ -327,6 +343,63 @@ describe('runtime Jira client search bounds', () => {
           customFields: { reporter: 'account-1' },
           userFieldKeys: ['reporter']
         },
+        selector: 'env-1'
+      })
+    )
+  })
+
+  it('routes Jira board metadata and issue pages to local and paired-runtime owners', async () => {
+    const selection = { boardId: '42', siteId: 'site-1' }
+    const issuePage = {
+      boardId: '42',
+      siteId: 'site-1',
+      scope: 'backlog' as const,
+      teamFieldId: 'customfield_10001',
+      pageToken: 'cursor-1',
+      startAt: 100,
+      maxResults: 100
+    }
+    jiraListBoardsLocal.mockResolvedValue([{ id: '42', name: 'Payments' }])
+    jiraListCustomFieldsLocal.mockResolvedValue([{ id: 'customfield_10001', name: 'Team' }])
+    jiraGetBoardOverviewLocal.mockResolvedValue({
+      board: { id: '42' },
+      columns: [],
+      activeSprints: []
+    })
+    jiraListBoardIssuesLocal.mockResolvedValue({
+      issues: [],
+      startAt: 100,
+      nextPageToken: 'cursor-2',
+      total: null,
+      isLast: false
+    })
+
+    await jiraListBoards(null, 'site-1')
+    await jiraListCustomFields(null, 'site-1')
+    await jiraGetBoardOverview(null, '42', 'site-1')
+    await jiraListBoardIssues(null, issuePage)
+
+    expect(jiraListBoardsLocal).toHaveBeenCalledWith({ siteId: 'site-1' })
+    expect(jiraListCustomFieldsLocal).toHaveBeenCalledWith({ siteId: 'site-1' })
+    expect(jiraGetBoardOverviewLocal).toHaveBeenCalledWith(selection)
+    expect(jiraListBoardIssuesLocal).toHaveBeenCalledWith(issuePage)
+
+    runtimeCall.mockImplementation(async (args: { method: string }) => {
+      if (args.method === 'status.get') {
+        return createCompatibleRuntimeStatusResponse()
+      }
+      return {
+        id: 'rpc-1',
+        ok: true,
+        result: [],
+        _meta: { runtimeId: 'remote-runtime' }
+      }
+    })
+    await jiraListBoards({ activeRuntimeEnvironmentId: 'env-1' }, 'site-1')
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'jira.listBoards',
+        params: { siteId: 'site-1' },
         selector: 'env-1'
       })
     )
