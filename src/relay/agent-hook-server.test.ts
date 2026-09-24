@@ -244,7 +244,7 @@ describe('RelayAgentHookServer', () => {
     }
   })
 
-  it('forwards Claude background monitoring until its authoritative inventory drains', async () => {
+  it('forwards Claude background work until its authoritative inventory drains', async () => {
     const forward = vi.fn<(envelope: AgentHookRelayEnvelope) => void>()
     const server = new RelayAgentHookServer({ endpointDir: dir, forward })
     await server.start()
@@ -267,7 +267,7 @@ describe('RelayAgentHookServer', () => {
 
       expect(forward.mock.calls[0][0]).toMatchObject({
         claudeRunningNonAgentTask: true,
-        payload: { state: 'working', workingMode: 'monitoring', agentType: 'claude' }
+        payload: { state: 'working', workingMode: undefined, agentType: 'claude' }
       })
 
       await fetch(`http://127.0.0.1:${port}/hook/claude`, {

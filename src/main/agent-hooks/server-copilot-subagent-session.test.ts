@@ -121,18 +121,48 @@ describe('Copilot background shell tracking', () => {
     }
   }
 
-  function monitoringLeadShell(shellId: number): void {
+  function workingLeadShell(shellId: number): void {
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
     post(startShell(LEAD, 'lead shell'))
     post(shellStarted(LEAD, 'lead shell', shellId))
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload).toMatchObject({
-      state: 'working',
-      workingMode: 'monitoring'
+      state: 'working'
     })
   }
 
+  function startWorkingLeadShellAndSubagent(): void {
+    post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
+    post(startShell(LEAD, 'lead shell'))
+    post(shellStarted(LEAD, 'lead shell', 0))
+    post({
+      hook_event_name: 'PreToolUse',
+      session_id: LEAD,
+      tool_name: 'Agent',
+      tool_input: { name: 'reviewer', mode: 'background' }
+    })
+    post({ hook_event_name: 'subagentStart', sessionId: LEAD, agentName: 'reviewer' })
+
+    expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload).toMatchObject({
+      state: 'working'
+    })
+  }
+
+  it('stays working when the shell finishes before its background subagent', () => {
+    startWorkingLeadShellAndSubagent()
+
+    expect(post(shellComplete('lead shell', 0))).toBeNull()
+    expect(post({ hook_event_name: 'SubagentStop', session_id: LEAD })?.payload.state).toBe('done')
+  })
+
+  it('stays working when the subagent finishes before its background shell', () => {
+    startWorkingLeadShellAndSubagent()
+
+    expect(post({ hook_event_name: 'SubagentStop', session_id: LEAD })).toBeNull()
+    expect(post(shellComplete('lead shell', 0))?.payload.state).toBe('done')
+  })
+
   it('tracks a subagent shell so its completion cannot consume the lead shell', () => {
-    monitoringLeadShell(0)
+    workingLeadShell(0)
     expect(post(startShell(CHILD, 'child shell'))).toBeNull()
     expect(post(shellStarted(CHILD, 'child shell', 1))).toBeNull()
 
@@ -141,14 +171,14 @@ describe('Copilot background shell tracking', () => {
   })
 
   it('ignores a completion for a shell it never saw start', () => {
-    monitoringLeadShell(0)
+    workingLeadShell(0)
 
     expect(post(shellComplete('some other shell', 9))).toBeNull()
     expect(post(shellComplete('lead shell', 0))?.payload.state).toBe('done')
   })
 
   it('does not let a redundant agent completion consume a pending shell', () => {
-    monitoringLeadShell(0)
+    workingLeadShell(0)
 
     expect(
       post({
@@ -198,8 +228,7 @@ describe('Copilot background shell tracking', () => {
     expect(post(shellStarted(childTwo, 'nested shell', 2))).toBeNull()
 
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload).toMatchObject({
-      state: 'working',
-      workingMode: 'monitoring'
+      state: 'working'
     })
 
     // Completions arrive in a mixed, non-nesting order.
@@ -215,7 +244,7 @@ describe('Copilot background shell tracking', () => {
     expect(post({ hook_event_name: 'SubagentStop', session_id: LEAD })?.payload.state).toBe('done')
   })
 
-  it('keeps monitoring when a nested subagent starts a shell after the lead stopped', () => {
+  it('keeps the pane working when a nested subagent starts a shell after the lead stopped', () => {
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
     post({
       hook_event_name: 'PreToolUse',
@@ -225,11 +254,10 @@ describe('Copilot background shell tracking', () => {
     })
     post({ hook_event_name: 'subagentStart', sessionId: LEAD, agentName: 'first' })
     expect(post({ hook_event_name: 'Stop', session_id: LEAD })?.payload).toMatchObject({
-      state: 'working',
-      workingMode: 'monitoring'
+      state: 'working'
     })
 
-    // The stopped lead's child starts its own background shell; the pane must stay monitoring.
+    // The stopped lead's child starts its own background shell; the pane must stay working.
     expect(post(startShell('deep-session', 'deep shell'))).toBeNull()
     expect(post(shellStarted('deep-session', 'deep shell', 3))).toBeNull()
     expect(post(shellComplete('deep shell', 3))).toBeNull()
@@ -240,7 +268,7 @@ describe('Copilot background shell tracking', () => {
   it('does not monitor an async shell that finished within initial_wait', () => {
     // Why: an async shell that finishes inside initial_wait returns its output directly (never
     // `started in background`), so nothing will ever report it complete; tracking it would strand
-    // the pane in monitoring.
+    // the pane in Working.
     post({ hook_event_name: 'UserPromptSubmit', session_id: LEAD, prompt: 'go' })
     post(startShell(LEAD, 'inline shell'))
     post({
@@ -259,7 +287,7 @@ describe('Copilot background shell tracking', () => {
   it('settles a background shell the agent reads to completion instead of waiting for a notification', () => {
     // Why: the real nested run read its shell with read_bash and Copilot then suppressed the
     // shell_completed notification; the read result is the only completion signal.
-    monitoringLeadShell(0)
+    workingLeadShell(0)
 
     expect(
       post({

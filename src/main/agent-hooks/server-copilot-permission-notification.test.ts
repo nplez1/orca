@@ -15,7 +15,7 @@ beforeEach(() => {
 
 /** Copilot's `notification` hook is fire-and-forget, so a `permission_prompt` that resolves without
  *  the user (auto-approval, copilot-cli#2586) can land after the tool already ran. */
-describe('Copilot permission notification staleness', () => {
+describe('Copilot permission notifications', () => {
   it('resolves the camelCase permissionRequest payload Copilot actually sends', () => {
     // Why: real permissionRequest payloads carry `hookName`, not `hook_event_name`; without it the
     // tool-name fallback reads the event as a PreToolUse.
@@ -30,9 +30,8 @@ describe('Copilot permission notification staleness', () => {
     ).toBe('PermissionRequest')
   })
 
-  it('ignores a permission notification that lands after the tool already ran', () => {
-    // Why: an auto-approved request's prompt notification can arrive after PostToolUse and otherwise
-    // strand the pane blocked until the next turn; a completed tool proves it resolved without the user.
+  it('ignores a permission notification after an auto-approved tool', () => {
+    // Why: permission notifications are fire-and-forget and may describe auto-approved requests.
     const states = [
       buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'clean the cache' }),
       buildBody({
@@ -64,7 +63,7 @@ describe('Copilot permission notification staleness', () => {
     expect(states).toEqual(['working', 'working', 'working', 'working', null])
   })
 
-  it('still blocks a real prompt that follows an earlier completed tool in the same turn', () => {
+  it('does not block on permission_prompt while a tool request is still in flight', () => {
     const states = [
       buildBody({ hook_event_name: 'UserPromptSubmit', prompt: 'clean the cache' }),
       buildBody({ hook_event_name: 'PreToolUse', tool_name: 'bash' }),
@@ -76,12 +75,15 @@ describe('Copilot permission notification staleness', () => {
         notification_type: 'permission_prompt',
         message: 'Allow Bash to run?'
       })
-    ].map((body) => _internals.normalizeHookPayload('copilot', body, 'production')?.payload.state)
+    ].map(
+      (body) =>
+        _internals.normalizeHookPayload('copilot', body, 'production')?.payload.state ?? null
+    )
 
-    expect(states).toEqual(['working', 'working', 'working', 'working', 'working', 'blocked'])
+    expect(states).toEqual(['working', 'working', 'working', 'working', 'working', null])
   })
 
-  it('blocks a permission notification in a later turn after a stale one was ignored', () => {
+  it('continues ignoring permission notifications in a later turn', () => {
     _internals.normalizeHookPayload(
       'copilot',
       buildBody({ hook_event_name: 'PreToolUse', tool_name: 'bash' }),
@@ -111,6 +113,6 @@ describe('Copilot permission notification staleness', () => {
       'production'
     )
 
-    expect(result?.payload.state).toBe('blocked')
+    expect(result).toBeNull()
   })
 })
