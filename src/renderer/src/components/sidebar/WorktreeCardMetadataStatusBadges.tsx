@@ -2,6 +2,10 @@ import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { CircleCheck, CircleDot, CircleX, Clock, GitMerge } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  getHostedReviewMergeReadiness,
+  hostedReviewMergeVerdictLabel
+} from '@/components/hosted-review-merge-readiness'
 import { PullRequestIcon, checksLabel } from './WorktreeCardHelpers'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import type { IssueInfo } from '../../../../shared/github/pull-request-types'
@@ -150,6 +154,50 @@ export function ReviewStateBadge({
     >
       {label === 'MR' ? <GitMerge /> : <PullRequestIcon />}
     </MetadataStatusBadge>
+  )
+}
+
+/**
+ * Why this sits beside the checks badge rather than replacing it: "Checks: Passing" answers
+ * "did CI pass", and on its own it reads as "this can merge" — exactly the wrong conclusion
+ * while an approval is still outstanding. Splitting the two facts keeps each one honest.
+ */
+export function ReviewMergeReadinessBadge({
+  review
+}: {
+  review: WorktreeCardPrDisplay
+}): React.JSX.Element | null {
+  const mergeReadiness = getHostedReviewMergeReadiness(review)
+  // Why: null means the checks badge beside this one already carries the story, or the
+  // provider has not reported a merge state to report at all.
+  const label = hostedReviewMergeVerdictLabel(mergeReadiness)
+  if (label === null) {
+    return null
+  }
+  const { readiness } = mergeReadiness
+  const title = translate(
+    'auto.components.sidebar.WorktreeCardMetadataStatusBadges.mergeVerdictTitle',
+    'Merge: {{value0}}',
+    { value0: label }
+  )
+
+  if (readiness === 'mergeable') {
+    return (
+      <Badge variant="statusSuccess" title={title}>
+        <CircleCheck />
+        <span>{label}</span>
+      </Badge>
+    )
+  }
+
+  const variant: 'statusWarning' | 'statusDanger' =
+    readiness === 'blocked' ? 'statusDanger' : 'statusWarning'
+
+  return (
+    <Badge variant={variant} title={title}>
+      {readiness === 'blocked' ? <CircleX /> : <Clock />}
+      <span>{label}</span>
+    </Badge>
   )
 }
 

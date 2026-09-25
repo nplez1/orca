@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorktreeCardStatusSlot } from './WorktreeCardStatusSlot'
+import type { HostedReviewInfo } from '../../../../shared/hosted-review'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 
 const mocks = vi.hoisted(() => ({
@@ -501,5 +502,121 @@ describe('WorktreeCardStatusSlot', () => {
     expect(markup).not.toContain('text-amber-500')
     expect(markup).not.toContain('bg-emerald-500')
     expect(markup).not.toContain('data-tooltip-root')
+  })
+
+  describe('merge readiness marker', () => {
+    // Why a separate channel from the glyph colour: checks and mergeability are different
+    // questions, and a green glyph with green checks used to be the only signal a reader got.
+    const renderStatedSlot = (prDisplay: WorktreeCardPrDisplay): string =>
+      renderToStaticMarkup(
+        <WorktreeCardStatusSlot
+          worktreeId="wt-1"
+          showStatus
+          showUnreadAction={false}
+          isUnread={false}
+          unreadTooltip="Mark as unread"
+          onPointerDown={vi.fn()}
+          onToggleUnread={vi.fn()}
+          prDisplay={prDisplay}
+          newCardStyle
+        />
+      )
+
+    // Why a concrete base rather than spreading the union-typed fixture: spreading a union
+    // makes every field optional, which then satisfies neither review shape.
+    const reviewBase: HostedReviewInfo = {
+      provider: 'github',
+      number: 123,
+      title: 'Review me',
+      state: 'open',
+      url: 'https://example.com/pull/123',
+      status: 'failure',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      mergeable: 'MERGEABLE'
+    }
+    const prWith = (overrides: Partial<HostedReviewInfo>): WorktreeCardPrDisplay => ({
+      ...reviewBase,
+      ...overrides
+    })
+
+    it('keeps the checks colour and adds a marker, so green checks never imply mergeable', () => {
+      const blockers: [WorktreeCardPrDisplay, string, string][] = [
+        [
+          prWith({ status: 'success', reviewDecision: 'REVIEW_REQUIRED' }),
+          'waiting',
+          'bg-status-warning'
+        ],
+        [prWith({ status: 'success', mergeable: 'CONFLICTING' }), 'blocked', 'bg-destructive']
+      ]
+
+      for (const [prDisplay, readiness, tone] of blockers) {
+        const markup = renderStatedSlot(prDisplay)
+
+        expect(markup).toContain('text-emerald-500/80')
+        expect(markup).toContain(`data-review-merge-marker="${readiness}"`)
+        expect(markup).toContain(tone)
+      }
+    })
+
+    it('names the specific blocker in the accessible label', () => {
+      const markup = renderStatedSlot(
+        prWith({ status: 'success', reviewDecision: 'REVIEW_REQUIRED' })
+      )
+
+      expect(markup).toContain('PR checks: Passing · Approval required')
+    })
+
+    it('drops the marker and claims readiness once the provider confirms the merge box is open', () => {
+      const markup = renderStatedSlot(prWith({ status: 'success', mergeStateStatus: 'CLEAN' }))
+
+      expect(markup).not.toContain('data-review-merge-marker')
+      expect(markup).toContain('PR checks: Passing · Ready to merge')
+    })
+
+    it('marks a not-yet-computed merge state as undecided, not as ready', () => {
+      // Why: GitHub recomputes the merge box after every push. During that window every blocker
+      // is unknown, so a dotless green glyph would assert a mergeability nobody confirmed.
+      const markup = renderStatedSlot(prWith({ status: 'success', mergeStateStatus: 'UNKNOWN' }))
+
+      expect(markup).toContain('data-review-merge-marker="checking"')
+      expect(markup).toContain('bg-muted-foreground/70')
+      expect(markup).toContain('PR checks: Passing · Checking')
+      expect(markup).not.toContain('Ready to merge')
+      expect(markup).not.toContain('bg-status-warning')
+    })
+
+    it('stays silent when the provider reports no merge state at all', () => {
+      // Why now silent: unlike a recompute, this is the steady state for a provider that cannot
+      // answer, so dotting it would flag rows forever rather than for a moment.
+      const markup = renderStatedSlot(prWith({ status: 'success', mergeable: 'UNKNOWN' }))
+
+      expect(markup).not.toContain('data-review-merge-marker')
+      expect(markup).not.toContain('Ready to merge')
+    })
+
+    it('stays silent when CI is the only thing in the way, since the glyph already says so', () => {
+      // Why: the marker exists to report what the checks channel cannot. Firing it for a
+      // checks-only blocker would dot nearly every in-flight PR and mean nothing more
+      // than the colour it sits on.
+      const markup = renderStatedSlot(prWith({ status: 'failure', mergeStateStatus: 'CLEAN' }))
+
+      expect(markup).not.toContain('data-review-merge-marker')
+      expect(markup).toContain('PR checks: Failed')
+      expect(markup).not.toContain('Ready to merge')
+    })
+
+    it('does not raise a marker for a review whose state is already settled', () => {
+      for (const state of ['merged', 'closed', 'draft'] as const) {
+        const markup = renderStatedSlot(
+          prWith({
+            state,
+            status: 'success',
+            mergeable: 'CONFLICTING'
+          })
+        )
+
+        expect(markup).not.toContain('data-review-merge-marker')
+      }
+    })
   })
 })
