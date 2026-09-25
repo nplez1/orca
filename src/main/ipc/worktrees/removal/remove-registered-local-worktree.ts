@@ -10,6 +10,7 @@ import {
   removeWorktree
 } from '../../../git/worktree'
 import { gitExecFileAsync } from '../../../git/runner'
+import { getConfiguredWorktreeIncludePaths } from '../../../git/worktree-include-file'
 import { getWorktreeSharedLinkPaths } from '../../../git/worktree-shared-directories'
 import { cleanupLocalOrphanedWorktreeDirectory } from '../../../local-orphaned-worktree-cleanup'
 import { recoverLocalWindowsWorktreeRemoval } from '../../../local-worktree-removal-recovery'
@@ -24,6 +25,7 @@ import {
   findExistingWorktreeSymlinkPaths,
   removeWorktreeLinkedPaths
 } from '../../worktree-symlinks'
+import { removeStaleWorktreeMaterializationStagingDirectories } from '../../worktree-materialization-staging'
 import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
 import { runWorktreeChangeInvalidators } from '../../worktree-change-invalidators'
 import {
@@ -83,6 +85,11 @@ export async function removeRegisteredLocalWorktree(
   // directory-only ignore rule leaves those links untracked, so removal must
   // tolerate and unlink them exactly like the per-user shared paths.
   const linkedPaths = getWorktreeSharedLinkPaths(repo)
+  const includePaths = await getConfiguredWorktreeIncludePaths(repo.path)
+  await removeStaleWorktreeMaterializationStagingDirectories(canonicalWorktreePath, [
+    ...linkedPaths,
+    ...includePaths
+  ])
   const ignoredLinkedPaths = args.force
     ? []
     : await findExistingWorktreeSymlinkPaths(canonicalWorktreePath, linkedPaths)
