@@ -5858,7 +5858,8 @@
           "e888362def": "State: Closed",
           "f394b3e86e": "State: Merged",
           "af2b07bda5": "State: {{value0}}",
-          "29df45afa2": "MR"
+          "29df45afa2": "MR",
+          "mergeVerdictTitle": "Merge: {{value0}}"
         },
         "WorktreeCardPorts": {
           "34f733dda2": "Go to Worktree",
@@ -17800,6 +17801,23 @@
         "preloadApi": {
           "cursorAccounts": {
             "hostOnly": "Cursor sign-in details are only readable on the computer running Orca."
+          }
+        }
+      },
+      "hosted": {
+        "review": {
+          "merge": {
+            "readiness": {
+              "ready": "Ready to merge",
+              "checking": "Checking",
+              "conflicts": "Conflicts",
+              "changesRequested": "Changes requested",
+              "approvalRequired": "Approval required",
+              "unresolvedThreads": "Unresolved threads",
+              "behind": "Behind base",
+              "mergeQueue": "Merge queue",
+              "blocked": "Blocked"
+            }
           }
         }
       }
