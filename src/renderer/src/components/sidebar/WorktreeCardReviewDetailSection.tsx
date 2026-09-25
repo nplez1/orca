@@ -14,7 +14,11 @@ import {
   WorktreeCardDetailSectionContent
 } from './WorktreeCardDetailSection'
 import { DetailHeader, MetadataActionIcon } from './WorktreeCardMetadataControls'
-import { ReviewChecksBadge, ReviewStateBadge } from './WorktreeCardMetadataStatusBadges'
+import {
+  ReviewChecksBadge,
+  ReviewMergeReadinessBadge,
+  ReviewStateBadge
+} from './WorktreeCardMetadataStatusBadges'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import { getProviderName, getReviewLabel, ReviewIcon } from './worktree-review-helpers'
 import { HostedReviewUnlinkMenuItem } from '@/components/HostedReviewUnlinkMenuItem'
@@ -174,6 +178,9 @@ export function WorktreeCardReviewDetailSection({
           <div className="flex flex-wrap gap-1">
             <ReviewStateBadge state={review.state} label={reviewLabel} />
             <ReviewChecksBadge status={review.status} />
+            {/* Why beside the checks badge: the two answer different questions, and
+                "Checks: Passing" alone reads as "this can merge". */}
+            <ReviewMergeReadinessBadge review={review} />
           </div>
         )}
       </WorktreeCardDetailSectionContent>
