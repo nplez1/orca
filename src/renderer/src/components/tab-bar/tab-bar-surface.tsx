@@ -23,8 +23,10 @@ import type { TabBarItemProjection } from './use-tab-bar-item-projection'
 import type { TabBarItem } from './tab-bar-item-model'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { TabBarStaticCreateMenu } from './tab-bar-static-create-menu'
+import { TabBarDefaultAgentButton } from './TabBarDefaultAgentButton'
 import ClientHostedBrowserTabRows from './ClientHostedBrowserTabRows'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 
 const EMPTY_CLIENT_HOSTED_ROWS: readonly ClientHostedBrowserRow[] = []
 
@@ -88,6 +90,10 @@ export function renderTabBarSurface({
   } = createMenu
   const { orderedItems, sortableIds, dropIndicatorByVisibleId } = itemProjection
   const clientHostedBrowserRows = props.clientHostedBrowserRows ?? EMPTY_CLIENT_HOSTED_ROWS
+  const launchDefaultAgent = (agent: TuiAgent): void => {
+    launchAgentFromNewTabEntry(agent)
+    runPendingNewTabMenuFocusAfterClose()
+  }
   const { tabStripRef, tabStripOverflowState, scrollTabStrip } = tabStripNavigation
   const includeTopTabBorder = tabStripChrome !== 'floating-panel'
   const renderedItems = renderTabBarItems({
@@ -279,6 +285,9 @@ export function renderTabBarSurface({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+      {showAgentLaunchItems ? (
+        <TabBarDefaultAgentButton worktreeId={worktreeId} onLaunchAgent={launchDefaultAgent} />
+      ) : null}
     </div>
   )
 }

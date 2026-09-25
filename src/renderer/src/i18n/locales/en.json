@@ -3635,6 +3635,9 @@
             "7a9b4af2af": "Scroll tabs left",
             "232e075b07": "Scroll tabs right"
           },
+          "TabBarDefaultAgentButton": {
+            "2a0cbdc8a1": "Open {{value0}} in a new tab"
+          },
           "TabBarCreateEntry": {
             "d62d63b807": "Create file",
             "25dc1cd653": "Open file",
