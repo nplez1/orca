@@ -130,6 +130,23 @@ export function gatePaneStateOnDescendants(
   }
 }
 
+/** Whether a child this lane knows about is blocked on a human answer. Only the narrow grok reader
+ *  records one for a provider that owns its own roster, and that wait is the one state the owning
+ *  lane cannot answer for: `providers/grok-events.ts` drops every payload naming a child, so
+ *  without this the row would settle `done` over a question nobody has answered. */
+export function paneHasWaitingDescendant(state: HookListenerState, paneKey: string): boolean {
+  const roster = state.descendantRosterByPaneKey.get(paneKey)
+  if (!roster) {
+    return false
+  }
+  for (const tracked of roster.values()) {
+    if (tracked.state === 'waiting') {
+      return true
+    }
+  }
+  return false
+}
+
 /** Reap children nothing has mentioned for the quiet window, then forget a roster with
  *  nothing left in it — the pane must not keep a claim it can no longer justify. */
 function dropEmptyDescendantRoster(state: HookListenerState, paneKey: string, now: number): void {

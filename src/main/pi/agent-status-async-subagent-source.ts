@@ -10,7 +10,9 @@ import type { PiAgentKind } from '../../shared/pi-agent-kind'
  *  emits on is simply never fired:
  *  - `pi-subagents` (tintinweb, the local fork) — `subagents:created` / `:started` add a child,
  *    `:completed` / `:failed` retire it. Documented in its README as emitted via `pi.events`.
- *  - `@earendil-works/pi-subagents` — `subagent:async-started` / `subagent:async-complete`.
+ *  - `@earendil-works/pi-subagents` — `subagent:async-started` / `subagent:async-complete`
+ *    retire a child; `subagent:process-terminal` retires one whose runner exited without ever
+ *    emitting a completion of its own.
  *  Neither plugin emits any of these on `process`, so nothing is bound there.
  *
  *  Posts the FULL live set rather than a start/complete delta. `post` in the extension transport
@@ -71,7 +73,11 @@ export function getPiAgentStatusAsyncSubagentSourceLines(kind: PiAgentKind): str
     "    for (const channel of ['subagents:created', 'subagents:started', 'subagent:async-started']) {",
     '      bus?.on?.(channel, onAsyncStarted)',
     '    }',
-    "    for (const channel of ['subagents:completed', 'subagents:failed', 'subagent:async-complete']) {",
+    '    // Why: a child whose only end signal is its runner exit (`subagent:process-terminal`) would',
+    '    // otherwise stay in the live set until the descendant lane quiet-reaped it. That event names',
+    "    // the run as `runId` — one of readRunId's aliases — and only shrinks the posted set: the pane",
+    '    // recomputes its own hold from that set rather than settling on the event.',
+    "    for (const channel of ['subagents:completed', 'subagents:failed', 'subagent:async-complete', 'subagent:process-terminal']) {",
     '      bus?.on?.(channel, onAsyncComplete)',
     '    }',
     '    piAsyncSubagentBusBound = true',

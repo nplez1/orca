@@ -22,6 +22,9 @@ const FORK_COMPLETED = 'subagents:completed'
 const FORK_FAILED = 'subagents:failed'
 const EW_STARTED = 'subagent:async-started'
 const EW_COMPLETE = 'subagent:async-complete'
+/** Upstream's roster also binds this for its own runner-exit grace, so a pi pane carries one
+ *  roster subscription plus the fork bus's own. */
+const RUNNER_EXIT = 'subagent:process-terminal'
 const START_CHANNELS = [FORK_CREATED, FORK_STARTED, EW_STARTED]
 const END_CHANNELS = [FORK_COMPLETED, FORK_FAILED, EW_COMPLETE]
 
@@ -296,6 +299,22 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     expect(harness.accepted.at(-1)?.workingMode).toBeUndefined()
   })
 
+  it('retires a child from the live set when its runner exits', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'fan out' })
+    await drive(harness, 'agent_start')
+    await emit(harness, EW_STARTED, { runId: 'run-1', agentType: 'scout' })
+    await drive(harness, 'agent_end', {})
+    expect(harness.states.at(-1)).toBe('working')
+
+    // Why: this lineage's only end signal for an awaited workflow child is its runner exit, so the
+    // set must shrink here instead of stranding the child until the quiet-reap window.
+    await emit(harness, RUNNER_EXIT, { runId: 'run-1', state: 'observed' })
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([])
+    // The pane recomputes its hold from the new set; the exit itself never settles it.
+    expect(harness.accepted.at(-1)?.state).toBe('done')
+  })
+
   it('ignores a bus payload with no child id rather than inventing a child', async () => {
     const harness = createHarness()
     await drive(harness, 'before_agent_start', { prompt: 'go' })
@@ -320,6 +339,7 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {
       expect(harness.piEventListenerCount(channel)).toBe(1)
     }
+    expect(harness.piEventListenerCount(RUNNER_EXIT)).toBe(2)
   })
 
   it('does not register the pi subagent bus for omp or prime-agent', () => {
@@ -328,6 +348,8 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
       for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {
         expect(harness.piEventListenerCount(channel)).toBe(0)
       }
+      // Upstream's roster binds the runner-exit channel for every kind; only the fork's bus is pi-only.
+      expect(harness.piEventListenerCount(RUNNER_EXIT)).toBe(1)
     }
   })
 })

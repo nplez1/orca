@@ -63,7 +63,7 @@ Anchors:
 
 - `src/main/updater-prerelease-feed.ts` — `probeCandidates`, widened from a fixed six-wide
   `slice(newestNewerIndex, newestNewerIndex + MAX_MANIFEST_PROBE_CANDIDATES)` to
-  `Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)` entries. Keeping six as a *floor* is
+  `Math.max(newerCandidateCount, MAX_MANIFEST_PROBE_CANDIDATES)` entries. Keeping six as a _floor_ is
   deliberate: the tag after the primary is the fallback feed a missing manifest walks back to, and
   widening only when more newer candidates exist leaves upstream-shaped feeds byte-identical.
 - `src/main/updater-prerelease-feed.test.ts` — `probes every newer candidate concurrently`.
@@ -93,13 +93,16 @@ running app. Convenience only — not for upstream.
 
 ### `local(agents)`: one binding per pi subagent channel
 
-Upstream's `#21882` tracks pi's async children *inside* the generated extension source — its own
+Upstream's `#21882` tracks pi's async children _inside_ the generated extension source — its own
 roster withholds the lead's `agent_end` while a child is live. This fork does the same job one layer
 down: `agent-status-async-subagent-source.ts` binds **both** plugin lineages (`subagents:*` from the
 tintinweb fork, `subagent:async-*` from `@earendil-works/pi-subagents`), posts the full live set as
-`subagent_runs` on every post, and the pane is held `working` receiver-side from that roster. With
-both in place every child lifecycle event fired twice, and the fork's deliberate silence on those
-channels for omp/prime-agent was filled by upstream's unconditional binding.
+`subagent_runs` on every post, and the pane is held `working` receiver-side from that roster. That
+binding spans `subagent:process-terminal` too, so a child whose only end signal is its runner exit
+leaves the live set there — the quiet-reap window is the recovery for a loss nothing reports, not
+the normal path. With both lineages in place every child lifecycle event fired twice, and the fork's
+deliberate silence on those channels for omp/prime-agent was filled by upstream's unconditional
+binding.
 
 So the two `subagent:async-*` bindings are dropped from upstream's roster setup; upstream's
 OMP-only `task:subagent:lifecycle` binding stays. Channel coverage differs in both directions (see
@@ -109,23 +112,59 @@ upstream's.
 Anchors:
 
 - `src/main/pi/agent-status-subagent-roster-source.ts` — `getPiSubagentRosterSetupSourceLines()`, the
-two bindings removed, marked with a `LOCAL(nplez1)` comment. Upstream `#21882` later moved these
-lines out of `agent-status-handler-source.ts`; the 2026-09-25 sync re-seated the patch into the new
-module.
+  two bindings removed, marked with a `LOCAL(nplez1)` comment. Upstream `#21882` later moved these
+  lines out of `agent-status-handler-source.ts`; the 2026-09-25 sync re-seated the patch into the new
+  module.
+- `src/main/pi/agent-status-async-subagent-source.ts` — `getPiAgentStatusAsyncSubagentSourceLines()`,
+  the fork's own bus: both lineages' start/end channels and the single retire-and-repost path they
+  share, including `subagent:process-terminal`.
 - Tests pinned to the fork's contract: `src/main/pi/agent-status-async-subagent.test.ts` drives the
-real generated source into the real listener; `agent-status-extension-async-subagents.test.ts`
-asserts the `subagent_runs` roster rather than upstream's withheld `agent_end` (the deferral cases
-there were re-seated onto this contract by that same sync); `agent-status-extension-omp-lifecycle.test.ts`
-carries the equivalent adaptation from 2026-09-21.
+  real generated source into the real listener; `agent-status-extension-async-subagents.test.ts`
+  asserts the `subagent_runs` roster rather than upstream's withheld `agent_end` (the deferral cases
+  there were re-seated onto this contract by that same sync); `agent-status-extension-omp-lifecycle.test.ts`
+  carries the equivalent adaptation from 2026-09-21.
 
 Still not gained from upstream, and unchanged since 2026-09-21: an OMP pane bound to
 `@earendil-works/pi-subagents` is held only by upstream's `task:subagent:lifecycle` gate, whose only
 local evidence of a producer is upstream's own test. Closing it means one guarded binding for
 `kind !== 'pi'` plus the matching expectation.
 
+### `local(agents)`: the descendant lane is pi's, plus one grok child question
+
+After the 2026-09-25 sync, upstream's `providers/grok-events.ts` is the single owner of grok's child
+lifecycle: it refuses to settle the parent from a child event and reads a background subagent as
+`working`. The fork's generic descendant lane therefore serves **pi**, whose live child set
+`agent-status-async-subagent-source.ts` posts as `subagent_runs` on every post, and the lane's
+working-state gating for grok — a second copy of what the owning lane already does — is gone.
+
+The one surface that cannot be given up is the _wait_. Grok auto-allows `ask_user_question`, so a
+child blocked on a human answer announces it as a `PreToolUse` carrying `subagentType` — which is
+exactly the payload shape upstream drops, so the row would settle `done` over a question nobody has
+answered. The lane keeps one narrow grok reader for that event and nothing else, and the dispatch
+gates an owning provider's row only while its own roster holds a waiting child: the sole state the
+owning lane cannot answer for, rather than a parallel implementation of the states it can.
+
+Anchors:
+
+- `src/shared/agent-hook-listener/descendant-events.ts` — `readGrokChildQuestion` (requires
+  `subagentType`, so the LEAD's own question still goes through the normalizer that carries
+  `toolName` and `interactivePrompt`), `DESCENDANT_PROVIDERS.grok`, and
+  `providerOwnsDescendantLifecycle` claiming grok.
+- `src/shared/agent-hook-listener/descendant-pane-state.ts` — `paneHasWaitingDescendant`.
+- `src/shared/agent-hook-listener/provider-dispatch.ts` — the read runs for every provider that has
+  a reader (a `null` adapter answers nothing), and the row is gated when the provider does not own a
+  roster **or** our roster holds a waiting child.
+- Tests: `agent-hook-listener-descendant-lifecycle.test.ts`'s "a grok child blocked on a human
+  answer" case (the wait surfaces, survives the lead's own turn ending underneath it, and every
+  other grok child event is left alone); `agent-hook-listener-grok.test.ts` pins the lead's own
+  question path.
+
+Bounded by the lane's quiet window, not by a scope reset: an owning provider's roster has no reset
+for this lane to read, so a question nothing ever retracts cannot hold the row forever.
+
 ### `local(agents)`: monitoring is reserved for Claude session-cron callbacks
 
-Upstream's lead-status fold reads *any* live non-agent child work as `workingMode: 'monitoring'`,
+Upstream's lead-status fold reads _any_ live non-agent child work as `workingMode: 'monitoring'`,
 which includes an ordinary background shell. This fork's `#26` reserves the monitoring badge for
 Claude session-cron callbacks, because a shell the agent started as part of its turn is still agent
 work. The fork owner chose (2026-09-25) to keep this policy and express it on upstream's fold rather
@@ -134,17 +173,17 @@ than revert to upstream's semantics.
 Anchors, all on upstream-owned files and marked `LOCAL(nplez1)`:
 
 - `src/shared/agent-hook-listener/providers/claude-roster-state.ts` — `resolveClaudePaneStatus`: the
-fold's `hasLiveAgentWork` is "the roster has a working child **or** a background shell is running",
-and `hasLiveNonAgentWork` is the session-cron set alone.
+  fold's `hasLiveAgentWork` is "the roster has a working child **or** a background shell is running",
+  and `hasLiveNonAgentWork` is the session-cron set alone.
 - `src/shared/agent-hook-listener/providers/grok-events.ts` — the payload drops
-`resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
-so it never earns the badge.
+  `resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
+  so it never earns the badge.
 - Tests that encode the policy (all would need re-adapting if it is ever dropped):
-`src/shared/claude-background-task-status.test.ts`, `src/shared/main-agent-status-parity.test.ts`
-(the Claude and Grok lane helpers plus the six shell/watcher stories),
-`src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
-`server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`. The
-structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
+  `src/shared/claude-background-task-status.test.ts`, `src/shared/main-agent-status-parity.test.ts`
+  (the Claude and Grok lane helpers plus the six shell/watcher stories),
+  `src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
+  `server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`. The
+  structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
 
 Weigh this before keeping it: `isAgentTimeAccruing` is `state === 'working' && workingMode !== 'monitoring'`,
 so a shell-held row now **accrues agent time** where it previously did not. That is a session-stats
@@ -164,7 +203,7 @@ git rebase origin/main
 
 The local commits replay on top. Because each patch is a one-line constant edit, a conflict here
 means upstream moved that exact line — re-apply by hand and amend that commit rather than resolving
-mechanically. A conflict in a fork file that upstream does not have is *not* an upstream change at
+mechanically. A conflict in a fork file that upstream does not have is _not_ an upstream change at
 all: check all three merge stages (`git show :1:$f :2:$f :3:$f`) before assuming either side.
 
 After a sync, confirm the fork still behaves:
@@ -228,14 +267,14 @@ pnpm run sync:localization-runtime-catalog
     one union lost the DeepSeek doc-comment opener and `pnpm tc` caught it, and one lost a closing
     brace, caught by `JSON.parse`).
   - **Codex child-work lane, converged onto upstream's fold** (`66ca697812`, the sync's largest
-    decision): upstream's `#22521`/`b4d732685c` landed *after* our commit was authored and pushed
+    decision): upstream's `#22521`/`b4d732685c` landed _after_ our commit was authored and pushed
     Codex child work through the shared `agent-lead-status-fold`, while our commit generalized the
     Codex roster to `AgentDescendantRoster` and added a generic descendant lane. Took upstream's
     `codex-events.ts`/`codex-state.ts` and applied our rename mapping to them (longest identifiers
     first), kept upstream's `codexRosterChildWorkLiveness` name because upstream's parity test
     imports it, and kept our `agentDescendantEffectiveState` for the generic lane. `muse` and
     `opencode2` were then added to the provider enumerations: upstream added both to the shared
-    `AgentHookSource` union, and the enumerations are `Record`s over it *by design*, so a new member
+    `AgentHookSource` union, and the enumerations are `Record`s over it _by design_, so a new member
     is a compile error rather than a silent gap (muse answers "owns its own lifecycle" — its
     provider already filters child sessions). That last addition made the fork's own later
     `dc725bef8b` redundant, and git **dropped it as already-applied**; its whole diff is the one
@@ -283,15 +322,16 @@ pnpm run sync:localization-runtime-catalog
     deferral cases now assert what the fork actually does (the child ids ride `subagent_runs` and the
     lead's `agent_end` is not withheld at source) instead of upstream's withheld `agent_end`, keeping
     each case's subject and asserting exact roster sequences rather than weakening to truthiness.
-    **Named gap this exposes:** upstream's roster removes a child on `subagent:process-terminal`,
-    which the fork's bus does not bind, so a pi child whose only end signal is a runner exit stays in
-    the fork's live set until the descendant lane's quiet-reap window or a scope reset retracts it.
-    That is the behaviour difference the adaptation records, not a regression this sync introduced,
-    and it is the reason the fork keeps `AGENT_DESCENDANT_QUIET_REAP_MS`.
+    **Gap closed after the sync:** upstream's roster removes a child on `subagent:process-terminal`,
+    which the fork's bus did not bind, so a pi child whose only end signal was a runner exit stayed in
+    the fork's live set until the descendant lane's quiet-reap window or a scope reset retracted it.
+    The fork's bus now binds that channel through the same retire-and-repost path as its other end
+    channels, so the child leaves the live set on its runner exit and the pane recomputes its hold
+    from the shrunken set; the quiet reap remains the recovery for a loss nothing reports at all.
   - **Other mechanical resolutions:** `local(identity)`'s builder-config import; the `main.css`
-    add/add of the *same* `--status-warning` tokens with different values (kept upstream's `#ca8a04`
+    add/add of the _same_ `--status-warning` tokens with different values (kept upstream's `#ca8a04`
     light / `#eab308` dark — upstream's yellow serves our own comment's stated intent, since our
-    `#b45309` *is* amber-700); `agent-descendant-roster.ts` keeping both upstream's
+    `#b45309` _is_ amber-700); `agent-descendant-roster.ts` keeping both upstream's
     `codexRosterChildWorkLiveness` and our `agentDescendantEffectiveState`; and `listener-state.ts`
     twice (upstream's extraction of the lead-turn types to `main-agent-turn-state.ts` beside our
     `CopilotBackgroundWorkState`, which a later fork commit moved to its own module).
@@ -323,7 +363,7 @@ pnpm run sync:localization-runtime-catalog
     `AiVaultPanel.legacy-filter.test.tsx` (`enabled` vs our renamed `contentEnabled`),
     `use-file-explorer-name-filter.test.ts` (a `resolvedQuery` field that exists in neither tip) and
     the `ReadonlyMap` misuse in two of our test files are all fixed by commits later in the series
-    (`90a9b123d1` and `e51c334309`'s successors). Each was checked against the *original* commit with
+    (`90a9b123d1` and `e51c334309`'s successors). Each was checked against the _original_ commit with
     `git show <sha>:<path>` before deciding, and every one was pre-existing in the fork's own history
     rather than rebase-induced. Fixing them mid-replay would only have created a conflict at the
     commit that already owns the fix.
@@ -354,20 +394,22 @@ pnpm run sync:localization-runtime-catalog
     `upstream/main`, and now, and which carries no `SAFETY:` comment in any of the three. So this sync
     introduced none of the 36, and the harness finding is attributable only because the fork's own
     commit adds lines in that file and the gate's added-line window covers the assertion.
-    As before, the gate's own base resolves to the *pre-sync* tip (`origin/HEAD` names `nplez1/main`,
+    As before, the gate's own base resolves to the _pre-sync_ tip (`origin/HEAD` names `nplez1/main`,
     which the rebase has not been pushed to yet), so its merge-base falls back and the whole
     fork+upstream delta reads as added lines — the run is only meaningful once `origin/main` is
     fast-forwarded, or with the explicit base above.
-  - **Left open, named — grok is now gated twice:** our generic descendant lane owns grok
-    (`providerOwnsDescendantLifecycle` excludes only claude/codex/muse) while upstream's new grok lane
-    both refuses to settle the parent from a child event and reads a background subagent as working.
-    They are not identical: our lane republishes a payload from the LEAD's last state when a child
-    event arrives, upstream's returns `null` and publishes nothing, and our lane keeps a persistent
-    roster with a quiet-reap recovery for a lost stop. Every grok test on both sides passes with both
-    mechanisms in place, so this was left as-is rather than silently deleting the fork's lane; the
-    one-line convergence (add `grok` to `providerOwnsDescendantLifecycle`, answer `grok: null` in
-    `DESCENDANT_PROVIDERS`, adapt `agent-hook-listener-descendant-lifecycle.test.ts`'s grok cases) is
-    the revert path if the duplication is judged worse than the republish.
+  - **Resolved after the sync — grok no longer gated twice, and its one child question kept:** our
+    generic descendant lane owned grok while upstream's new grok lane both refuses to settle the
+    parent from a child event and reads a background subagent as working. Upstream's
+    `providers/grok-events.ts` is now the single owner of grok's child lifecycle, and the fork's
+    grok-specific reader and its descendant-lifecycle cases were deleted; the cases that were really
+    about the generic lane's own bookkeeping (roster, quiet reap, scope reset, pane-scoped cache)
+    moved to pi, its other provider. One surface could not simply be given up, because it is the one
+    upstream's lane cannot carry: grok auto-allows `ask_user_question`, so a child blocked on a human
+    answer announces it as a PreToolUse carrying `subagentType` — and upstream drops every payload
+    that names a child. A row settling `done` over an unanswered question is the worst state to hide,
+    so the lane keeps exactly that one reader and gates an owning provider's row only while its
+    roster holds a waiting child. See the `local(agents)` section below for the anchors.
 
 - **2026-09-22** — onto upstream `6ae5ef2d00` (67 commits), from the released tip `08b1285fda`
   (np.10 released) plus the commit that landed on `nplez1/main` while the sync was running
@@ -380,9 +422,9 @@ pnpm run sync:localization-runtime-catalog
   - **Upstream rewrote the same hook** (4 files): upstream's #22173 (`b57facc5bc`, stale listings)
     deleted `resolvedQuery` from `RuntimeFileListState` and replaced the hook's
     `files`/`truncated`/`loading`/`resolvedQuery` state with a request-keyed `{ listing,
-    loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalCount`,
+loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalCount`,
     `ignoredFiles`, `queryMode`/`queryLimit` and the name-filter matcher to that same hook.
-    Converged on upstream's model: `totalCount` and `ignoredFiles` moved *into* the request-keyed
+    Converged on upstream's model: `totalCount` and `ignoredFiles` moved _into_ the request-keyed
     listing — upstream's own comment there already promises "local listings key without the query, so
     they answer every query" — so every `setTotalCount`/`setIgnoredFiles` site collapsed into
     `setListing(NO_LISTING)` / `setListing({ requestKey, ...result })`, and our renderer-side
@@ -396,7 +438,7 @@ pnpm run sync:localization-runtime-catalog
     into `visible-worktree-options-from-state.ts`, while our #23 extracted the four kind filters into
     `visible-worktree-kind-filters.ts`, added `hiddenWorkspaceStatusIds` to `VisibleWorktreeOptions`
     and threaded it through the sidebar pipeline, the jump palette and the board. Re-seated rather
-    than unioned: the status field now lands in the *new* builder module; `visible-worktrees.ts`
+    than unioned: the status field now lands in the _new_ builder module; `visible-worktrees.ts`
     takes upstream's narrower import set plus our `applyWorkspaceKindFilters`, which is what retires
     `isDefaultBranchWorkspace` and the paired-device helpers from that file; and the jump palette
     keeps upstream's `worktreeIdsWithStructuredChat` memo beside our `kindFilteredWorktrees`.
@@ -417,9 +459,9 @@ pnpm run sync:localization-runtime-catalog
        the code under test. Its production half is intact and still what the test pins:
        `DEFAULT_COMPUTER_USE_BUNDLE_ID` is `${ORCA_APP_ID}.computer-use` here, where upstream
        hardcodes `com.stablyai.orca.computer-use`.
-    Both are carried as **two commits on top of the replayed series** rather than folded back into
-    the commits they belong to, matching how the 2026-09-21 sync carried `9908062478` and
-    `c7e93e5b2d`. They are the two `>` entries the sync's `range-diff` prints.
+       Both are carried as **two commits on top of the replayed series** rather than folded back into
+       the commits they belong to, matching how the 2026-09-21 sync carried `9908062478` and
+       `c7e93e5b2d`. They are the two `>` entries the sync's `range-diff` prints.
   - Verified: `pnpm tc` clean; **7,308 passing tests across 850 files** (4 skipped) covering every
     touched area — the explorer name filter and its projection/truncation notices, quick-open,
     sidebar listing/jump-palette/board, settings accounts, ai-vault, rate-limits, updater,
@@ -451,12 +493,12 @@ pnpm run sync:localization-runtime-catalog
     `en.json` auto-merged and the catalog was regenerated, never hand-merged.
   - **One surface, two lineages** (1 file): the pi test harness. Our older commit bound a mocked
     process bus (`emitProcessBus`) that the harness no longer needs, because upstream had already
-    added the `pi.events` surface our *later* commit converges onto. Kept upstream's implementation
+    added the `pi.events` surface our _later_ commit converges onto. Kept upstream's implementation
     and applied only our removals, so the file ended byte-identical to `upstream/main`.
   - **The two traps that fired, both found by the gates and not by a conflict marker:**
     1. **A new provider in a fork enumeration.** Upstream added `opencode2` to the shared
        `AgentHookSource` union, and `descendant-events.ts` enumerates every provider in a `Record`
-       over that union *by design*, so `pnpm tc` failed instead of silently ignoring children.
+       over that union _by design_, so `pnpm tc` failed instead of silently ignoring children.
        Answered `null`, matching `opencode` (`9908062478`).
     2. **Upstream built the same feature.** `35005fb65c` ("keep panes working while async subagents
        run", #21882) reimplements what the fork's `42227039d5..0b0f8ac40d` series does. Both bound
@@ -493,7 +535,7 @@ pnpm run sync:localization-runtime-catalog
     gate's base (`origin/HEAD`) still names the pre-sync tip, so its merge-base falls back and the
     whole fork+upstream delta reads as added lines. Nine of the fourteen flagged files are
     byte-identical to the released tip and four carry upstream's own incoming `as` assertions. The
-    one finding that *was* ours — a type assertion in the adapted pi test — is fixed.
+    one finding that _was_ ours — a type assertion in the adapted pi test — is fixed.
 
 - **2026-09-19** — onto upstream `3ad6b7e46e` (96 commits), from the released tip `72034293d5`
   (np.9-to-be). 75 commits replayed: **65 byte-identical by `range-diff`, 10 adapted, none
@@ -518,25 +560,25 @@ pnpm run sync:localization-runtime-catalog
     assert that consent off means no index (`unavailable/disabled`). This fork always indexes the
     metadata tier, so `disabled` has no producer left in the tree at all. The fork's always-on tier
     was kept: the two compatible tests took the rename, and
-    `reports being switched off before blaming a scope it does not know` became *blames an unknown
-    scope rather than consent with content search off*, which is the same rule the previous sync
+    `reports being switched off before blaming a scope it does not know` became _blames an unknown
+    scope rather than consent with content search off_, which is the same rule the previous sync
     recorded for `e696169ecf`.
   - **Cache-format collision, caught only after the sync had landed.** Upstream's Devin parse and
     sidecar change invalidated rows cached under the old parser and bumped
-    `session-parse-cache-persistence.ts` 2 → 3 for them; this fork had *already shipped* 3, for the
+    `session-parse-cache-persistence.ts` 2 → 3 for them; this fork had _already shipped_ 3, for the
     Copilot cwd move. Same number, two meanings, so a fork install upgrading from the last release
     crossed no version boundary and would have replayed its pre-fix Devin rows — whose mtime and
     size still match, so nothing else re-parses them. Since schema 2 the `appVersion` equality gate
     is gone, which makes the number the only compatibility signal left, and upstream's own test for
-    its bump writes the *previous* version, so it cannot see this collision. Fixed in the commit
+    its bump writes the _previous_ version, so it cannot see this collision. Fixed in the commit
     that follows this one (4); the lesson is in UPSTREAM-SYNC-RUNBOOK.md § Traps.
   - **Trap: a clean merge is not a correct merge — hit for real.** Upstream's new
     `agent-status-extension-omp-model.test.ts` asserts exact pi payloads, and the descendant roster
-    deliberately rides *every* post (the transport keeps only the newest), so those payloads now
+    deliberately rides _every_ post (the transport keeps only the newest), so those payloads now
     carry `subagent_runs: []`. Nothing conflicted; the touched-area tests found it. The expectation
     was updated in the commit that put the field on every post, so the tree is green at every
     commit.
-  - **Trap that did *not* apply:** all six merge commits in the replay range are clean automatic
+  - **Trap that did _not_ apply:** all six merge commits in the replay range are clean automatic
     merges — `git log --remerge-diff` is empty for each, against 590 lines for the previously
     hand-resolved `b1daf0ca58` — so linearising them lost no hand-resolution content this time.
   - Verified: `pnpm tc` clean; 2,543 tests green across 260 files covering every touched area
