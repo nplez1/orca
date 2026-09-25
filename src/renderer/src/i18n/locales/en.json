@@ -5797,7 +5797,8 @@
           "e888362def": "State: Closed",
           "f394b3e86e": "State: Merged",
           "af2b07bda5": "State: {{value0}}",
-          "29df45afa2": "MR"
+          "29df45afa2": "MR",
+          "mergeVerdictTitle": "Merge: {{value0}}"
         },
         "WorktreeCardPorts": {
           "34f733dda2": "Go to Worktree",
@@ -17568,6 +17569,23 @@
         "9a4c6b2d7e": "Skill sharing",
         "3d8e5f1b9c": "Share skills behind an unlisted link and install them on any machine you use.",
         "c5b3e8a17d": "Sign in to Orca"
+      },
+      "hosted": {
+        "review": {
+          "merge": {
+            "readiness": {
+              "ready": "Ready to merge",
+              "checking": "Checking",
+              "conflicts": "Conflicts",
+              "changesRequested": "Changes requested",
+              "approvalRequired": "Approval required",
+              "unresolvedThreads": "Unresolved threads",
+              "behind": "Behind base",
+              "mergeQueue": "Merge queue",
+              "blocked": "Blocked"
+            }
+          }
+        }
       }
     },
     "i18n": {

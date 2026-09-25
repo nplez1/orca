@@ -21,7 +21,17 @@ const badgeVariants = cva(
         /** The chip naming the machine a workspace runs on — quieter and squarer than `secondary`,
          *  so it reads as context beside a workspace name rather than as a status of its own. */
         hostContext:
-          'h-4 rounded border-border bg-accent px-1.5 text-[10px] leading-none text-muted-foreground dark:border-border/50 dark:bg-accent/80'
+          'h-4 rounded border-border bg-accent px-1.5 text-[10px] leading-none text-muted-foreground dark:border-border/50 dark:bg-accent/80',
+        /** Status tones for the compact meta pill shown beside a workspace's review details.
+         *  Sizing lives in the variant (like `hostContext`) because a state pill may not be
+         *  repainted by hand — its colour is the one signal a reader trusts without reading
+         *  the label, so the tone and the size that makes it legible travel together. */
+        statusSuccess:
+          'h-4 gap-1 rounded border-status-success-border bg-status-success-background px-1.5 text-[9px] font-medium leading-none text-status-success [&>svg]:size-2.5',
+        statusWarning:
+          'h-4 gap-1 rounded border-status-warning-border bg-status-warning-background px-1.5 text-[9px] font-medium leading-none text-status-warning [&>svg]:size-2.5',
+        statusDanger:
+          'h-4 gap-1 rounded border-destructive/25 bg-destructive/5 px-1.5 text-[9px] font-medium leading-none text-destructive [&>svg]:size-2.5'
       }
     },
     defaultVariants: {
