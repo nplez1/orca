@@ -19,6 +19,7 @@ import {
   createWorktreeSharedPaths
 } from '../ipc/worktree-symlinks'
 import { resolveWorktreeSharedDirectories } from '../git/worktree-shared-directories'
+import { formatWorktreeSharedDirectoriesWarning } from '../git/worktree-shared-directories-warning'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type { RemoteTrackingBase } from './runtime-remote-fetch-controller'
 import type { RuntimeStore } from './runtime-store-contract'
@@ -42,7 +43,7 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
   effectiveCreatedWithAgent?: TuiAgent
   localWorktreeGitOptions: LocalGitExecOptions
   onMetadataPersisted: (worktree: Worktree) => T
-}): Promise<{ worktree: Worktree; metadataResult: T; includeCopyWarning?: string }> {
+}): Promise<{ worktree: Worktree; metadataResult: T; materializationWarning?: string }> {
   const {
     request,
     repo,
@@ -142,11 +143,27 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
     resolveWorktreeSharedDirectories(repo.path, localWorktreeGitOptions),
     resolveWorktreeIncludePaths(repo.path, localWorktreeGitOptions)
   ])
+  const materializationWarnings: string[] = []
   if (sharedDirectories.length > 0) {
-    await createWorktreeSharedPaths(repo.path, created.path, sharedDirectories)
+    const failedSharedDirectories = await createWorktreeSharedPaths(
+      repo.path,
+      created.path,
+      sharedDirectories,
+      { sharedDirectoriesMode: repo.sharedDirectoriesMode }
+    )
+    const sharedDirectoriesWarning = formatWorktreeSharedDirectoriesWarning(failedSharedDirectories)
+    if (sharedDirectoriesWarning) {
+      console.warn(`[worktree-shared-directories] ${sharedDirectoriesWarning}`)
+      materializationWarnings.push(sharedDirectoriesWarning)
+    }
   }
   if (worktreeIncludePaths.length === 0) {
-    return { worktree, metadataResult }
+    const materializationWarning = materializationWarnings.join(' ')
+    return {
+      worktree,
+      metadataResult,
+      ...(materializationWarning ? { materializationWarning } : {})
+    }
   }
   const skippedIncludePaths = await createWorktreeCopiedPaths(
     repo.path,
@@ -156,6 +173,12 @@ export async function materializeRuntimeLocalWorktree<T>(args: {
   const includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
   if (includeCopyWarning) {
     console.warn(`[worktree-include] ${includeCopyWarning}`)
+    materializationWarnings.push(includeCopyWarning)
   }
-  return { worktree, metadataResult, ...(includeCopyWarning ? { includeCopyWarning } : {}) }
+  const materializationWarning = materializationWarnings.join(' ')
+  return {
+    worktree,
+    metadataResult,
+    ...(materializationWarning ? { materializationWarning } : {})
+  }
 }

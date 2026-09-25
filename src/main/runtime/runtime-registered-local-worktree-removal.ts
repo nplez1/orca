@@ -8,11 +8,13 @@ import type { LocalProjectWorktreeGitOptions } from '../project-runtime-git-opti
 import { gitExecFileAsync } from '../git/runner'
 import { assertWorktreeCleanForRemoval, listWorktreesStrict, removeWorktree } from '../git/worktree'
 import { getWorktreeSharedLinkPaths } from '../git/worktree-shared-directories'
+import { getConfiguredWorktreeIncludePaths } from '../git/worktree-include-file'
 import { runHook, getEffectiveHooks } from '../hooks'
 import {
   findExistingWorktreeSymlinkPaths,
   removeWorktreeLinkedPaths
 } from '../ipc/worktree-symlinks'
+import { removeStaleWorktreeMaterializationStagingDirectories } from '../ipc/worktree-materialization-staging'
 import { cleanupUnusedWorktreePushTargetRemote } from '../ipc/worktree-remote'
 import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import {
@@ -110,6 +112,11 @@ export async function removeRuntimeRegisteredLocalWorktree(args: {
   }
 
   const linkedPaths = getWorktreeSharedLinkPaths(repo)
+  const includePaths = await getConfiguredWorktreeIncludePaths(repo.path)
+  await removeStaleWorktreeMaterializationStagingDirectories(canonicalPath, [
+    ...linkedPaths,
+    ...includePaths
+  ])
   const ignoredLinkedPaths = args.force
     ? []
     : await findExistingWorktreeSymlinkPaths(canonicalPath, linkedPaths)

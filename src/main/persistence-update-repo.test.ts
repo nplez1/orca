@@ -561,6 +561,29 @@ describe('Store', () => {
     expect(cleared!.ghAccount).toBeUndefined()
   })
 
+  it('updateRepo persists shared directory mode across reloads', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+
+    const updated = store.updateRepo('r1', { sharedDirectoriesMode: 'apfs-copy' })
+    expect(updated?.sharedDirectoriesMode).toBe('apfs-copy')
+
+    store.flush()
+    const reloaded = await createStore()
+    expect(reloaded.getRepo('r1')?.sharedDirectoriesMode).toBe('apfs-copy')
+  })
+
+  it('drops invalid persisted shared directory modes during hydration', async () => {
+    writeDataFile({
+      ...getDefaultPersistedState(testState.dir),
+      repos: [{ ...makeRepo(), sharedDirectoriesMode: 'hardlink' }]
+    })
+
+    const store = await createStore()
+
+    expect(store.getRepo('r1')?.sharedDirectoriesMode).toBeUndefined()
+  })
+
   it('updateRepo persists fork sync mode across reloads', async () => {
     const store = await createStore()
     store.addRepo(makeRepo())

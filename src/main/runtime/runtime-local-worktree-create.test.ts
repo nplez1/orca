@@ -76,7 +76,7 @@ vi.mock('../git/worktree-include-file', () => ({
 vi.mock('../ipc/worktree-symlinks', () => ({
   createWorktreeCopiedPaths: mocks.copyPaths,
   createWorktreeLinkedPaths: vi.fn(),
-  createWorktreeSharedPaths: vi.fn()
+  createWorktreeSharedPaths: vi.fn(async () => [])
 }))
 
 import { createRuntimeLocalManagedWorktree } from './runtime-local-worktree-create'
