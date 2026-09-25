@@ -28,6 +28,7 @@ function header(focusSearchRequestId: number) {
       executionHostScope="local"
       hostScopeOptions={[]}
       agents={[]}
+      availableAgents={[]}
       group="project"
       hideEmptySessions={false}
       sessionLimit={250}
