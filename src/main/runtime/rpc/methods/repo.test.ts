@@ -362,6 +362,51 @@ describe('repo RPC methods', () => {
     })
   })
 
+  it('persists shared directory materialization mode updates', async () => {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime, 'updateRepo').mockResolvedValue({
+      id: 'repo-1',
+      path: '/srv/repo',
+      displayName: 'repo',
+      badgeColor: '#000000',
+      addedAt: 0,
+      externalWorktreeVisibility: 'show',
+      sharedDirectoriesMode: 'apfs-copy'
+    })
+    const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('repo.update', {
+        repo: 'repo-1',
+        updates: { sharedDirectoriesMode: 'apfs-copy' }
+      })
+    )
+
+    expect(runtime.updateRepo).toHaveBeenCalledWith('repo-1', {
+      sharedDirectoriesMode: 'apfs-copy'
+    })
+    expect(response).toMatchObject({
+      ok: true,
+      result: { repo: { id: 'repo-1', sharedDirectoriesMode: 'apfs-copy' } }
+    })
+  })
+
+  it('rejects unknown shared directory materialization modes', async () => {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime, 'updateRepo')
+    const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('repo.update', {
+        repo: 'repo-1',
+        updates: { sharedDirectoriesMode: 'hardlink' }
+      })
+    )
+
+    expect(runtime.updateRepo).not.toHaveBeenCalled()
+    expect(response).toMatchObject({ ok: false })
+  })
+
   it('persists fork sync mode updates', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

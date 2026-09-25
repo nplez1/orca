@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createWorktreeCopiedPaths: vi.fn(),
   createWorktreeLinkedPaths: vi.fn(),
-  createWorktreeSharedPaths: vi.fn(),
+  createWorktreeSharedPaths: vi.fn(async () => []),
   resolveWorktreeIncludePaths: vi.fn(async () => []),
   resolveWorktreeSharedDirectories: vi.fn(async () => [])
 }))

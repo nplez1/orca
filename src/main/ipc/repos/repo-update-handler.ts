@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
 import type { Store } from '../../persistence'
-import type { Repo } from '../../../shared/repo-types'
+import { isWorktreeSharedDirectoriesMode, type Repo } from '../../../shared/repo-types'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { normalizeExecutionHostId } from '../../../shared/execution-host'
 import { normalizeRepoBadgeColor } from '../../../shared/repo-badge-color'
@@ -37,6 +37,7 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
             | 'worktreeBasePath'
             | 'kind'
             | 'symlinkPaths'
+            | 'sharedDirectoriesMode'
             | 'issueSourcePreference'
             | 'forkSyncMode'
             | 'externalWorktreeVisibilityPromptDismissedAt'
@@ -97,6 +98,13 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         if (!Array.isArray(v) || !v.every((e) => typeof e === 'string')) {
           delete updates.symlinkPaths
         }
+      }
+      if (
+        'sharedDirectoriesMode' in updates &&
+        updates.sharedDirectoriesMode !== undefined &&
+        !isWorktreeSharedDirectoriesMode(updates.sharedDirectoriesMode)
+      ) {
+        delete updates.sharedDirectoriesMode
       }
       if ('worktreeBasePath' in updates && updates.worktreeBasePath !== undefined) {
         const v = updates.worktreeBasePath as unknown
