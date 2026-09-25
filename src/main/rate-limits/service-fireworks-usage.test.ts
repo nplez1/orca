@@ -31,8 +31,9 @@ vi.mock('./kimi-fetcher', () => ({
   fetchKimiRateLimits: vi.fn()
 }))
 
-vi.mock('./opencode-go-usage-fetcher', () => ({
-  fetchOpenCodeGoRateLimits: vi.fn()
+// Why: upstream's #22182 moved the OpenCode Go entry point; mock the module the service calls.
+vi.mock('./opencode-go-usage-source-selection', () => ({
+  fetchOpenCodeGoUsage: vi.fn()
 }))
 
 vi.mock('./minimax/minimax-fetcher', () => ({
