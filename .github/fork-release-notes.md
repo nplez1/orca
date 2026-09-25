@@ -34,6 +34,10 @@ The `.dmg` and the `.zip` contain the same app; either works.
 
 ## Worth knowing
 
+- A pane kept working by a **background shell** now counts that time as **agent time** in session stats.
+  This build reads an ordinary background shell as agent work rather than as a watch loop — monitoring
+  is reserved for Claude session-cron callbacks — so the stats now agree with the status bar. Earlier
+  builds excluded shell-held time from agent time, so a total may read higher than you are used to.
 - `orca://` is intentionally shared with official Orca, so pairing links and skill-share links work
   in both. On a machine with both installed, macOS routes `orca://` to only one of them.
 - The Windows build is unsigned by choice: one SmartScreen warning per installer, after which

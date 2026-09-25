@@ -1,7 +1,7 @@
 # Branch tracker
 
-Last updated **2026-09-22** — `nplez1/main` rebased onto upstream main @ `6ae5ef2d00`, 67
-commits on from the previous base `663d670878`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+Last updated **2026-09-25** — `nplez1/main` rebased onto upstream main @ `f5d2ce5de7`, 160
+commits on from the previous base `6ae5ef2d00`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
 for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
@@ -63,22 +63,22 @@ dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
 
-After the 2026-09-22 sync, **every PR-bound branch still sits on a pre-sync base** — none of them was
+After the 2026-09-25 sync, **every PR-bound branch still sits on a pre-sync base** — none of them was
 rebased this time either. `#20813` is open and was deliberately left where it is; the rest are
 unopened.
 Measured by merge-base against `upstream/main`:
 
 - the **seven PR-bound branches** (`fix/cli-symlink-world-readable`, `fix/copilot-background-work`,
   `fix/repo-catalog-connection-fence`, `fix/claude-codex-enterprise-accounts`, `feat/copilot-usage`,
-  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **436 commits behind**;
+  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **596 commits behind**;
 - the **five deliberately-left ones** (`feat/worktree-scan-cache-persistence`,
   `fix/terminal-session-reconnect`, `feat/startup-worktree-hydration`,
   `feat/startup-service-ordering`, `fix/agent-status-routing-readiness`) sit on `615b1370fb`,
-  **530 commits behind**.
+  **690 commits behind**.
 
 Re-measure rather than trusting those numbers (`node local/branch-status.mjs`, and merge-base against
 `upstream/main` for the behind count, which that script does not print). `origin/main` was
-fast-forwarded to the new base (`6ae5ef2d00`) at push time in this sync, so it is no longer the thing
+fast-forwarded to the new base (`f5d2ce5de7`) at push time in this sync, so it is no longer the thing
 holding the seven PR-bound branches back — their own base is.
 
 **Five branches were deliberately left on the pre-sync base**, all unopened:
