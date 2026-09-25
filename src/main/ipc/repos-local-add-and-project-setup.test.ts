@@ -393,6 +393,47 @@ describe('repos:add + repos:clone', () => {
     })
   })
 
+  it('persists shared directory mode through local repos:update', () => {
+    const updated = {
+      id: 'repo-shared-directories-mode',
+      path: '/tmp/repo-shared-directories-mode',
+      displayName: 'repo-shared-directories-mode',
+      kind: 'git',
+      badgeColor: '#22c55e',
+      sharedDirectoriesMode: 'apfs-copy'
+    }
+    mockStore.updateRepo.mockReturnValue(updated)
+
+    const result = handlers.get('repos:update')!(null, {
+      repoId: updated.id,
+      updates: { sharedDirectoriesMode: 'apfs-copy' }
+    })
+
+    expect(result).toBe(updated)
+    expect(mockStore.updateRepo).toHaveBeenCalledWith(updated.id, {
+      sharedDirectoriesMode: 'apfs-copy'
+    })
+  })
+
+  it('strips invalid shared directory mode through local repos:update', () => {
+    const updated = {
+      id: 'repo-invalid-shared-directories-mode',
+      path: '/tmp/repo-invalid-shared-directories-mode',
+      displayName: 'repo-invalid-shared-directories-mode',
+      kind: 'git',
+      badgeColor: '#22c55e'
+    }
+    mockStore.updateRepo.mockReturnValue(updated)
+
+    const result = handlers.get('repos:update')!(null, {
+      repoId: updated.id,
+      updates: { sharedDirectoriesMode: 'hardlink' }
+    })
+
+    expect(result).toBe(updated)
+    expect(mockStore.updateRepo).toHaveBeenCalledWith(updated.id, {})
+  })
+
   it('validates source definitions and preferences through local repos:update', () => {
     const updated = {
       id: 'repo-source-visibility',

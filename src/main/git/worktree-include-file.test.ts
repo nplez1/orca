@@ -2,7 +2,11 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseWorktreeIncludeFile, resolveWorktreeIncludePaths } from './worktree-include-file'
+import {
+  getConfiguredWorktreeIncludePaths,
+  parseWorktreeIncludeFile,
+  resolveWorktreeIncludePaths
+} from './worktree-include-file'
 import { gitExecFileAsync } from './runner'
 
 vi.mock('./runner', () => ({
@@ -38,6 +42,23 @@ describe('parseWorktreeIncludeFile', () => {
 
   it('normalizes backslashes to forward slashes', () => {
     expect(parseWorktreeIncludeFile('apps\\web\\.env\n')).toEqual(['apps/web/.env'])
+  })
+
+  it('retains absent paths for stale staging-directory cleanup', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'orca-worktreeinclude-configured-'))
+    try {
+      writeFileSync(
+        join(repo, '.worktreeinclude'),
+        'apps/web/.env\n.cache\n../unsafe\n*.log\n.git/config\n'
+      )
+
+      await expect(getConfiguredWorktreeIncludePaths(repo)).resolves.toEqual([
+        'apps/web/.env',
+        '.cache'
+      ])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
   })
 })
 

@@ -27,6 +27,19 @@ export type RepoKind = 'git' | 'folder'
  */
 export type IssueSourcePreference = 'upstream' | 'origin' | 'auto'
 export type ExternalWorktreeVisibility = 'hide' | 'show'
+export const WORKTREE_SHARED_DIRECTORIES_MODES = [
+  'symlink',
+  'apfs-symlink',
+  'apfs-copy',
+  'apfs-only'
+] as const
+export type WorktreeSharedDirectoriesMode = (typeof WORKTREE_SHARED_DIRECTORIES_MODES)[number]
+
+export function isWorktreeSharedDirectoriesMode(
+  value: unknown
+): value is WorktreeSharedDirectoriesMode {
+  return WORKTREE_SHARED_DIRECTORIES_MODES.some((mode) => mode === value)
+}
 
 export type BuiltInWorktreeVisibilitySourceId = 'claude' | 'gsd'
 
@@ -103,6 +116,10 @@ export type Repo = {
    *  on macOS when possible, otherwise symlinked, into newly created worktrees.
    *  Undefined/empty means no shared paths are created for this repo. */
   symlinkPaths?: string[]
+  /** Materialization policy for `worktree.sharedDirectories` in orca.yaml.
+   *  Absent preserves the legacy symlink behavior. APFS modes clone when possible
+   *  and select what to do when cloning is unavailable. */
+  sharedDirectoriesMode?: WorktreeSharedDirectoriesMode
   /** Durable sidebar-only repo organization. Execution remains repo-scoped. */
   projectGroupId?: string | null
   /** User-authored ordering inside the project group or ungrouped bucket. */

@@ -91,7 +91,7 @@ describe('runtime local create prepared-pool re-arm ordering', () => {
       return {
         worktree,
         worktreePath: worktree.path,
-        includeCopyWarning: undefined,
+        materializationWarning: undefined,
         created: { path: worktree.path, head: 'abc', branch: 'app' },
         addResult: {},
         metadataResult: { lineage: null, workspaceLineage: null, warnings: [] }

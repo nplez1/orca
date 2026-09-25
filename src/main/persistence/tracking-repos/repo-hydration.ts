@@ -9,7 +9,8 @@ import {
   sanitizeForkSyncMode,
   sanitizeGitRemoteIdentity,
   sanitizeRepoProjectHostSetupMethod,
-  sanitizeRepoUpstream
+  sanitizeRepoUpstream,
+  sanitizeWorktreeSharedDirectoriesMode
 } from './repo-sanitization'
 import {
   normalizeCustomWorktreeVisibilitySources,
@@ -36,6 +37,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
     sourceControlAi: rawSourceControlAi,
     projectHostSetupMethod: rawProjectHostSetupMethod,
     forkSyncMode: rawForkSyncMode,
+    sharedDirectoriesMode: rawSharedDirectoriesMode,
     ghAccount: rawGhAccount,
     customWorktreeVisibilitySources: rawCustomWorktreeVisibilitySources,
     worktreeVisibilitySourcePreferences: rawWorktreeVisibilitySourcePreferences,
@@ -47,6 +49,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
   const sourceControlAi = normalizeRepoSourceControlAiOverrides(rawSourceControlAi)
   const projectHostSetupMethod = sanitizeRepoProjectHostSetupMethod(rawProjectHostSetupMethod)
   const forkSyncMode = sanitizeForkSyncMode(rawForkSyncMode)
+  const sharedDirectoriesMode = sanitizeWorktreeSharedDirectoriesMode(rawSharedDirectoriesMode)
   const ghAccount = normalizeGhAccountBinding(rawGhAccount)
   const customWorktreeVisibilitySources = normalizeCustomWorktreeVisibilitySources(
     rawCustomWorktreeVisibilitySources
@@ -70,6 +73,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
     ...(sourceControlAi !== undefined ? { sourceControlAi } : {}),
     ...(projectHostSetupMethod !== undefined ? { projectHostSetupMethod } : {}),
     ...(forkSyncMode !== undefined ? { forkSyncMode } : {}),
+    ...(sharedDirectoriesMode !== undefined ? { sharedDirectoriesMode } : {}),
     ...(ghAccount ? { ghAccount } : {}),
     ...(customWorktreeVisibilitySources !== undefined ? { customWorktreeVisibilitySources } : {}),
     ...(worktreeVisibilitySourcePreferences !== undefined

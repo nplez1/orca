@@ -68,6 +68,30 @@ async function readWorktreeIncludeFile(repoPath: string): Promise<string | null>
   }
 }
 
+/** Read the safe configured `.worktreeinclude` paths without existence or gitignore filtering.
+ *  Removal uses these parents to find staging directories left by a failed create.
+ */
+export async function getConfiguredWorktreeIncludePaths(repoPath: string): Promise<string[]> {
+  try {
+    const content = await readWorktreeIncludeFile(repoPath)
+    if (content === null) {
+      return []
+    }
+    const candidates: string[] = []
+    for (const entry of parseWorktreeIncludeFile(content)) {
+      if (candidates.length >= WORKTREE_INCLUDE_MAX_ENTRIES) {
+        break
+      }
+      if (!isUnsupportedPattern(entry) && isSafeIncludePath(entry)) {
+        candidates.push(entry)
+      }
+    }
+    return candidates
+  } catch {
+    return []
+  }
+}
+
 /** Resolve `.worktreeinclude` at the repo root to concrete repo-relative paths
  *  to copy into a new worktree.
  *
