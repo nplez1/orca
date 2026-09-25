@@ -25,7 +25,8 @@ export type DescendantEntry = {
  *  `child` is a delta from a provider whose child events each arrive as their own HTTP
  *  post, so none can be lost in transit. Its `id` is optional because some providers
  *  only mark an event as "this fired inside a child" without naming which one — still
- *  enough to refuse the settle.
+ *  enough to refuse the settle. No provider emits it today: grok was the last user, and
+ *  its own lane (providers/grok-events.ts) owns that ground now.
  *
  *  `live-set` is the authoritative full set, for a provider whose transport can drop an
  *  intermediate message. Applying a delta over a lossy transport is unrecoverable — a
@@ -53,37 +54,6 @@ type DescendantProviderAdapter = {
   /** An event proving the descendants tracked so far can no longer be alive — the pane's
    *  agent process was replaced, or the turn that owns them was torn down. */
   isScopeReset: (eventName: unknown, hookPayload: Record<string, unknown>) => boolean
-}
-
-function readGrokDescendantEvent(
-  eventName: unknown,
-  hookPayload: Record<string, unknown>
-): DescendantEventFacts | null {
-  const isLifecycleEvent = isGrokEvent(eventName, 'subagent_start', 'subagent_stop', 'subagent_end')
-  const subagentType = readFirstString(hookPayload, ['subagentType', 'subagent_type'])
-  // Why: grok stamps `subagentType` on the payload of every event that can fire inside a child and
-  // omits it in the main session, so its presence — not the event name — is what tells a child
-  // apart. A child's own turn gate is remapped to SubagentStop, so the events that reach the
-  // parent's pane are the child's SessionEnd/StopFailure, which inherit its ORCA_PANE_KEY.
-  if (!isLifecycleEvent && subagentType === undefined) {
-    return null
-  }
-  // Why: grok auto-allows ask_user_question, so a child blocked on a human answer announces it as
-  // a PreToolUse. Routing child events away from the lead normalizer would otherwise drop that
-  // wait entirely, and a pane silently waiting on an answer is the worst state to hide.
-  const isChildAsking =
-    isGrokEvent(eventName, 'pre_tool_use') &&
-    isAskUserQuestionTool(readFirstString(hookPayload, ['toolName', 'tool_name', 'name']))
-  return {
-    kind: 'child',
-    id: readFirstString(hookPayload, ['subagentId', 'subagent_id']),
-    agentType: subagentType,
-    description: readFirstString(hookPayload, ['description']),
-    ...(isChildAsking ? { waiting: true } : {}),
-    ended:
-      isGrokEvent(eventName, 'subagent_stop', 'subagent_end') ||
-      isGrokEvent(eventName, 'stop', 'session_end', 'stop_failure', 'stop_cancelled')
-  }
 }
 
 function readPiDescendantEvent(
@@ -131,33 +101,55 @@ function readPiDescendantLiveSet(hookPayload: Record<string, unknown>): Descenda
   return children
 }
 
-/** Grok's own turn cancel. An interrupted turn skips the stop gate entirely, so a child
- *  spawned by that turn never reports a finish and the cancel is the only proof it is gone.
- *  A cancel carrying `subagentType` is one CHILD giving up (its own turn limit, or a declined
- *  permission) and must not tear down its siblings — `readEvent` ends just that child. */
-function isGrokLeadTurnCancel(eventName: unknown, hookPayload: Record<string, unknown>): boolean {
-  return (
-    isGrokEvent(eventName, 'stop_cancelled') &&
-    readFirstString(hookPayload, ['subagentType', 'subagent_type']) === undefined
-  )
-}
-
 /** Every provider answers, or is explicitly `null` for "reports no child sessions on the
  *  parent's pane". A `Record` over the source union makes a new provider a compile error
  *  here, so descendant support and its recovery are decided together, in one place.
  *
  *  Claude, Codex and Muse are `null` because they own richer rosters of their own — Claude's
- *  carries teammate parking, `background_tasks` folding and restored-snapshot provenance;
- *  Codex's carries rollout reconciliation; Muse's carries its own child-session filter — and
- *  each already derives the pane from them. */
+ *  carries teammate parking, `background_tasks` folding and restored-snapshot provenance; Codex's
+ *  carries rollout reconciliation; Muse's carries its own child-session filter — and each already
+ *  derives the pane from them. Grok owns its roster too (it refuses to settle the parent from a
+ *  child event and reads a background subagent as `working`), but it keeps one narrow reader here
+ *  for the child question it cannot carry. */
+/** Grok's one child event its own lane cannot carry. Grok auto-allows `ask_user_question`, so a
+ *  child blocked on a human answer announces it as a PreToolUse — and `providers/grok-events.ts`
+ *  drops every payload carrying `subagentType`, which would hide the wait entirely. Only this event
+ *  comes through here; a grok child's start, finish and cancel stay that lane's business. */
+function readGrokChildQuestion(
+  eventName: unknown,
+  hookPayload: Record<string, unknown>
+): DescendantEventFacts | null {
+  if (!isGrokEvent(eventName, 'pre_tool_use')) {
+    return null
+  }
+  // Why: grok stamps `subagentType` on every event that can fire inside a child and omits it in the
+  // main session, so its absence is what keeps the LEAD's own question on the path that carries
+  // `toolName` and `interactivePrompt`.
+  const subagentType = readFirstString(hookPayload, ['subagentType', 'subagent_type'])
+  if (subagentType === undefined) {
+    return null
+  }
+  if (!isAskUserQuestionTool(readFirstString(hookPayload, ['toolName', 'tool_name', 'name']))) {
+    return null
+  }
+  return {
+    kind: 'child',
+    id: readFirstString(hookPayload, ['subagentId', 'subagent_id']),
+    agentType: subagentType,
+    ended: false,
+    waiting: true
+  }
+}
+
 const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | null> = {
   claude: null,
   codex: null,
   muse: null,
   grok: {
-    readEvent: readGrokDescendantEvent,
-    isScopeReset: (eventName, hookPayload) =>
-      isGrokEvent(eventName, 'session_start') || isGrokLeadTurnCancel(eventName, hookPayload)
+    readEvent: readGrokChildQuestion,
+    // Why: a grok wait is retracted by the lane's quiet window rather than by a scope reset — the
+    // owning lane drops the child events that would name the end, so there is no reset to read.
+    isScopeReset: () => false
   },
   pi: {
     readEvent: readPiDescendantEvent,
@@ -185,7 +177,7 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
 /** Providers whose normalizer already tracks its own descendants and derives the pane state
  *  from them, so the generic path must not run a second, blinder copy over the same events. */
 export function providerOwnsDescendantLifecycle(source: AgentHookSource): boolean {
-  return source === 'claude' || source === 'codex' || source === 'muse'
+  return source === 'claude' || source === 'codex' || source === 'muse' || source === 'grok'
 }
 
 export function readDescendantEventFacts(

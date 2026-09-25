@@ -13,7 +13,8 @@ import {
   applyDescendantEventToPane,
   applyDescendantLiveSet,
   clearDescendantScope,
-  gatePaneStateOnDescendants
+  gatePaneStateOnDescendants,
+  paneHasWaitingDescendant
 } from './descendant-pane-state'
 import type { HookListenerState } from './listener-state'
 import type { ExtractedPromptText } from './prompt-fields'
@@ -67,20 +68,23 @@ export function normalizeProviderEvent(input: {
   // here, once, for every provider that does not own a roster. A child's lifecycle event never
   // reaches the provider normalizer, so it cannot settle the pane or relabel the row.
   const ownsDescendants = providerOwnsDescendantLifecycle(source)
+  if (!ownsDescendants && isDescendantScopeResetEvent(source, eventName, hookPayload)) {
+    clearDescendantScope(state, paneKey)
+  }
+  // Why: ask every provider that HAS a reader, not only the ones without a roster of their own. A
+  // provider that owns its roster can still hand over the one child event its own lane drops, and
+  // the record lookup is what decides who has something to say.
+  const descendant = readDescendantEventFacts(source, eventName, hookPayload)
+  if (descendant) {
+    return {
+      payload: applyDescendantEventToPane(state, source, paneKey, descendant),
+      // Why: a child's prompt is not the pane's turn label, and its tool events are not a user submit.
+      resolvedPromptText: '',
+      hasTranscriptPromptEvidence: false,
+      descendantScoped: true
+    }
+  }
   if (!ownsDescendants) {
-    if (isDescendantScopeResetEvent(source, eventName, hookPayload)) {
-      clearDescendantScope(state, paneKey)
-    }
-    const descendant = readDescendantEventFacts(source, eventName, hookPayload)
-    if (descendant) {
-      return {
-        payload: applyDescendantEventToPane(state, source, paneKey, descendant),
-        // Why: a child's prompt is not the pane's turn label, and its tool events are not a user submit.
-        resolvedPromptText: '',
-        hasTranscriptPromptEvidence: false,
-        descendantScoped: true
-      }
-    }
     // Why: a pi pane rides its live child set on every post, so an add the transport coalesced
     // away is repaired by the next event instead of leaving the pane blind to its own child.
     const liveSet = readPiDescendantLiveSetField(source, hookPayload)
@@ -195,8 +199,12 @@ export function normalizeProviderEvent(input: {
       break
   }
 
+  // Why: a provider that owns its roster still cannot answer for a child blocked on a human answer —
+  // the owning lane drops every event that names a child — so a waiter this lane recorded gates the
+  // row. Gating only that case keeps this from becoming a second copy of the owner's working logic.
+  const gateDescendants = !ownsDescendants || paneHasWaitingDescendant(state, paneKey)
   return {
-    payload: ownsDescendants ? payload : gatePaneStateOnDescendants(state, paneKey, payload),
+    payload: gateDescendants ? gatePaneStateOnDescendants(state, paneKey, payload) : payload,
     resolvedPromptText,
     promptInteractionKey,
     hasTranscriptPromptEvidence
