@@ -64,8 +64,8 @@ export function getConfiguredWorktreeSharedDirectoriesCacheSizeForTests(): numbe
   return configuredSharedDirectoriesByRepoPath.size
 }
 
-/** Every path Orca may have symlinked into a worktree: the per-user Worktree
- *  Shared Paths setting plus the repo's `orca.yaml` shared directories.
+/** Candidate paths Orca may have symlinked into a worktree: the per-user
+ *  Worktree Shared Paths setting plus the repo's `orca.yaml` shared directories.
  *
  *  Callers pair this with `findExistingWorktreeSymlinkPaths`, which keeps only
  *  the entries that really are symlinks — so a configured name that the user
@@ -77,11 +77,11 @@ export function getWorktreeSharedLinkPaths(repo: Pick<Repo, 'path' | 'symlinkPat
 }
 
 /** Resolve `worktree.sharedDirectories` from the repo-root `orca.yaml` to
- *  concrete repo-relative directories to symlink into a new worktree.
+ *  concrete repo-relative directories to materialize in a new worktree.
  *
  *  Only directories that exist in the primary checkout **and** are gitignored are
  *  returned: tracked directories are already materialized by the checkout, and
- *  sharing an unignored path would surface the link as a spurious worktree diff.
+ *  materializing an unignored path would surface it as a spurious worktree diff.
  *
  *  Never throws — any read/parse/git failure resolves to `[]` so worktree
  *  creation is never blocked by this file. */

@@ -14,6 +14,7 @@ import {
   createWorktreeCopyBudgetTracker,
   formatWorktreeIncludeCopyWarning
 } from './worktree-include-copy-budget'
+import { ApfsCloneUnavailableError } from './worktree-apfs-clone'
 import { createWorktreeCopiedPaths, createWorktreeLinkedPaths } from './worktree-symlinks'
 
 const posixIt = process.platform === 'win32' ? it.skip : it
@@ -343,7 +344,10 @@ describe('createWorktreeCopiedPaths copy budget', () => {
   it('still clones on macOS when only the byte budget would be exceeded', async () => {
     mkdirSync(join(primary, 'node_modules'))
     writeFileSync(join(primary, 'node_modules', 'pkg.js'), 'x'.repeat(200))
-    const cloneWorktreePath = vi.fn(async () => undefined)
+    const cloneWorktreePath = vi.fn(async (_source: string, target: string) => {
+      mkdirSync(target)
+      writeFileSync(join(target, 'pkg.js'), 'x'.repeat(200))
+    })
 
     const skipped = await createWorktreeCopiedPaths(primary, worktree, ['node_modules'], {
       platform: 'darwin',
@@ -380,7 +384,7 @@ describe('createWorktreeCopiedPaths copy budget', () => {
     writeFileSync(join(primary, 'models', 'checkpoint'), 'x'.repeat(500))
     // The clone was predicted (so bytes went uncharged) but fails mid-copy.
     const cloneWorktreePath = vi.fn(async () => {
-      throw Object.assign(new Error('EPERM'), { code: 'EPERM' })
+      throw new ApfsCloneUnavailableError('clonefile failed')
     })
 
     const skipped = await createWorktreeCopiedPaths(primary, worktree, ['models'], {
@@ -390,7 +394,7 @@ describe('createWorktreeCopiedPaths copy budget', () => {
     })
 
     expect(cloneWorktreePath).toHaveBeenCalledTimes(1)
-    expect(skipped).toEqual([{ path: 'models', reason: 'bytes', mayBePartial: true }])
+    expect(skipped).toEqual([{ path: 'models', reason: 'bytes' }])
     // The whole point: no unbudgeted byte-for-byte copy ran behind the failure.
     expect(existsSync(join(worktree, 'models'))).toBe(false)
   })
