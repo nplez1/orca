@@ -7,6 +7,7 @@ import {
   normalizeCustomWorktreeVisibilitySources,
   normalizeWorktreeVisibilitySourcePreferences
 } from '../worktree/visibility-sources'
+import { WORKTREE_SHARED_DIRECTORIES_MODES } from '../repo-types'
 import { OptionalFiniteNumber, OptionalString } from './rpc-param-primitives'
 
 export const RepoSourceControlAiOverrides = z
@@ -56,6 +57,7 @@ export function createRepoUpdateSchema<T extends Readonly<Record<string, z.ZodTy
       worktreeBasePath: OptionalString,
       kind: z.enum(['git', 'folder']).optional(),
       symlinkPaths: z.array(z.string()).optional(),
+      sharedDirectoriesMode: z.enum(WORKTREE_SHARED_DIRECTORIES_MODES).optional(),
       issueSourcePreference: z.enum(['auto', 'upstream', 'origin']).optional(),
       ghAccount: z
         .unknown()

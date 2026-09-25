@@ -17,7 +17,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createWorktreeCopiedPaths,
   createWorktreeLinkedPaths,
-  createWorktreeSharedPaths,
   createWorktreeSymlinks,
   worktreeSymlinkTypeCandidates,
   findExistingWorktreeSymlinkPaths,
@@ -226,14 +225,14 @@ describe('createWorktreeSymlinks', () => {
 
     expect(cloneWorktreePath).toHaveBeenCalledWith(
       join(primary, '.env'),
-      join(worktree, '.env'),
+      expect.stringContaining(join(worktree, '.orca-worktree-stage-')),
       false
     )
     expect(lstatSync(join(worktree, '.env')).isSymbolicLink()).toBe(false)
     expect(statSync(join(worktree, '.env')).isFile()).toBe(true)
   })
 
-  it('does not overwrite a file target that appears before APFS clone-copy is published', async () => {
+  it('preserves a file target that appears while an APFS clone is staged', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     const target = join(worktree, '.env')
     const deps = createApfsCloneDeps({
@@ -255,11 +254,13 @@ describe('createWorktreeSymlinks', () => {
 
     expect(readFileSync(target, 'utf8')).toBe('RACE=1\n')
     expect(existsSync(join(worktree, '.orca-apfs-clone-file-race'))).toBe(false)
-    expect(warn).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Materialization target appeared before publish')
+    )
     expect(error).not.toHaveBeenCalled()
   })
 
-  it('does not replace a directory target that appears before APFS clone-copy reserves it', async () => {
+  it('preserves a directory target that appears while an APFS clone is staged', async () => {
     mkdirSync(join(primary, 'node_modules'))
     writeFileSync(join(primary, 'node_modules', 'primary-marker'), 'PRIMARY\n')
     const target = join(worktree, 'node_modules')
@@ -272,8 +273,12 @@ describe('createWorktreeSymlinks', () => {
           writeFileSync(join(target, 'user-marker'), 'USER\n')
         }
       },
-      onCp: () => {
-        throw new Error('APFS clone-copy should not run after the target appears')
+      onCp: (args) => {
+        const stagedTarget = args.at(-1)
+        if (!stagedTarget) {
+          throw new Error('Missing APFS staging target')
+        }
+        writeFileSync(join(stagedTarget, 'clone-marker'), 'CLONE\n')
       }
     })
 
@@ -284,8 +289,11 @@ describe('createWorktreeSymlinks', () => {
 
     expect(readFileSync(join(target, 'user-marker'), 'utf8')).toBe('USER\n')
     expect(existsSync(join(target, 'primary-marker'))).toBe(false)
-    expect(deps.execFileAsync).not.toHaveBeenCalledWith('/bin/cp', expect.anything())
-    expect(warn).not.toHaveBeenCalled()
+    expect(existsSync(join(target, 'clone-marker'))).toBe(false)
+    expect(deps.execFileAsync).toHaveBeenCalledWith('/bin/cp', expect.anything())
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Materialization target appeared before publish')
+    )
     expect(error).not.toHaveBeenCalled()
   })
 
@@ -298,8 +306,14 @@ describe('createWorktreeSymlinks', () => {
     const deps = createApfsCloneDeps({
       onCp: (args) => {
         cpArgs = args
+        mkdirSync(target)
         writeFileSync(join(target, 'primary-marker'), 'USER\n')
-        throw new Error('clone-copy skipped an existing nested target')
+        const stagedTarget = args.at(-1)
+        if (!stagedTarget) {
+          throw new Error('Missing APFS staging target')
+        }
+        writeFileSync(join(stagedTarget, 'primary-marker'), 'PARTIAL\n')
+        throw new Error('clone-copy failed after partial directory copy')
       }
     })
 
@@ -308,16 +322,22 @@ describe('createWorktreeSymlinks', () => {
       apfsCloneDeps: deps
     })
 
-    expect(cpArgs).toEqual(['-n', '-c', '-R', `${source}${sep}.`, target])
+    expect(cpArgs).toEqual([
+      '-n',
+      '-c',
+      '-R',
+      `${source}${sep}.`,
+      expect.stringContaining(join(worktree, '.orca-worktree-stage-'))
+    ])
     expect(readFileSync(join(target, 'primary-marker'), 'utf8')).toBe('USER\n')
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('[worktree-symlinks] APFS clone-copy unavailable'),
       expect.any(Error)
     )
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('[worktree-symlinks] Failed to link "node_modules"'),
-      expect.any(Error)
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Materialization target appeared before publish')
     )
+    expect(error).not.toHaveBeenCalled()
   })
 
   posixIt('preserves the source directory mode after APFS clone-copy reserves it', async () => {
@@ -326,8 +346,12 @@ describe('createWorktreeSymlinks', () => {
     chmodSync(source, 0o700)
     const target = join(worktree, 'node_modules')
     const deps = createApfsCloneDeps({
-      onCp: () => {
-        writeFileSync(join(target, 'marker'), 'CLONED\n')
+      onCp: (args) => {
+        const stagedTarget = args.at(-1)
+        if (!stagedTarget) {
+          throw new Error('Missing APFS staging target')
+        }
+        writeFileSync(join(stagedTarget, 'marker'), 'CLONED\n')
       }
     })
 
@@ -359,7 +383,7 @@ describe('createWorktreeSymlinks', () => {
     )
   })
 
-  it('does not delete a target that appears while APFS clone-copy is failing', async () => {
+  it('removes a partial APFS file clone before symlink fallback', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     const cloneWorktreePath = vi.fn(async (_source: string, target: string) => {
       writeFileSync(target, 'RACE=1\n')
@@ -371,11 +395,9 @@ describe('createWorktreeSymlinks', () => {
       cloneWorktreePath
     })
 
-    expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('RACE=1\n')
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('[worktree-symlinks] Failed to link ".env"'),
-      expect.any(Error)
-    )
+    expect(lstatSync(join(worktree, '.env')).isSymbolicLink()).toBe(true)
+    expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('SECRET=1\n')
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('keeps symlink sources as symlinks instead of APFS clone-copying their targets', async () => {
@@ -421,75 +443,6 @@ describe('worktreeSymlinkTypeCandidates', () => {
   })
 })
 
-describe('createWorktreeSharedPaths', () => {
-  let root: string
-  let primary: string
-  let worktree: string
-  let warn: ReturnType<typeof vi.spyOn>
-  let error: ReturnType<typeof vi.spyOn>
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'orca-sharedpaths-'))
-    primary = join(root, 'primary')
-    worktree = join(root, 'worktree')
-    mkdirSync(primary, { recursive: true })
-    mkdirSync(worktree, { recursive: true })
-    warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    error = vi.spyOn(console, 'error').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    warn.mockRestore()
-    error.mockRestore()
-    rmSync(root, { recursive: true, force: true })
-  })
-
-  // Why: an APFS clone would give the worktree its own node_modules, defeating
-  // one-install-serves-all. Share mode must symlink even where cloning works.
-  posixIt('symlinks on macOS instead of APFS clone-copying', async () => {
-    mkdirSync(join(primary, 'node_modules'))
-    writeFileSync(join(primary, 'node_modules', 'marker'), 'ORIG\n')
-    const cloneWorktreePath = vi.fn()
-
-    await createWorktreeSharedPaths(primary, worktree, ['node_modules'], {
-      platform: 'darwin',
-      cloneWorktreePath
-    })
-
-    expect(cloneWorktreePath).not.toHaveBeenCalled()
-    expect(lstatSync(join(worktree, 'node_modules')).isSymbolicLink()).toBe(true)
-  })
-
-  posixIt('shares one directory so worktree writes reach the primary checkout', async () => {
-    mkdirSync(join(primary, 'node_modules'))
-
-    await createWorktreeSharedPaths(primary, worktree, ['node_modules'], { platform: 'linux' })
-
-    writeFileSync(join(worktree, 'node_modules', 'installed'), 'SHARED\n')
-    expect(readFileSync(join(primary, 'node_modules', 'installed'), 'utf8')).toBe('SHARED\n')
-  })
-
-  posixIt('skips a path already materialized by the per-user symlink pass', async () => {
-    mkdirSync(join(primary, 'node_modules'))
-    mkdirSync(join(worktree, 'node_modules'))
-
-    await createWorktreeSharedPaths(primary, worktree, ['node_modules'], { platform: 'linux' })
-
-    expect(lstatSync(join(worktree, 'node_modules')).isSymbolicLink()).toBe(false)
-  })
-
-  it('rejects unsafe paths without touching the filesystem', async () => {
-    writeFileSync(join(root, 'outside.txt'), 'DO_NOT_TOUCH')
-
-    await createWorktreeSharedPaths(primary, worktree, ['../outside.txt', '/etc/passwd'], {
-      platform: 'linux'
-    })
-
-    expect(readFileSync(join(root, 'outside.txt'), 'utf8')).toBe('DO_NOT_TOUCH')
-    expect(warn).toHaveBeenCalled()
-  })
-})
-
 describe('createWorktreeCopiedPaths', () => {
   let root: string
   let primary: string
@@ -522,6 +475,21 @@ describe('createWorktreeCopiedPaths', () => {
     expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('SECRET=1\n')
     writeFileSync(join(worktree, '.env'), 'SECRET=2\n')
     expect(readFileSync(join(primary, '.env'), 'utf8')).toBe('SECRET=1\n')
+  })
+
+  it('copies staged files when the filesystem does not support hard links', async () => {
+    writeFileSync(join(primary, '.env'), 'SECRET=1\n')
+    const linkStagedFile = vi.fn(async () => {
+      throw Object.assign(new Error('hard links are not supported'), { code: 'EPERM' })
+    })
+
+    await createWorktreeCopiedPaths(primary, worktree, ['.env'], {
+      platform: 'linux',
+      linkStagedFile
+    })
+
+    expect(linkStagedFile).toHaveBeenCalledOnce()
+    expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('SECRET=1\n')
   })
 
   it('copies a directory recursively without symlinking', async () => {
@@ -577,6 +545,18 @@ describe('createWorktreeCopiedPaths', () => {
     expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('MINE=1\n')
   })
 
+  it('keeps the copy budget for worktreeinclude-style copies', async () => {
+    writeFileSync(join(primary, '.env'), 'SECRET=1\n')
+
+    const skipped = await createWorktreeCopiedPaths(primary, worktree, ['.env'], {
+      platform: 'linux',
+      copyBudget: { maxBytes: 0, maxEntries: 100 }
+    })
+
+    expect(skipped).toEqual([{ path: '.env', reason: 'bytes' }])
+    expect(existsSync(join(worktree, '.env'))).toBe(false)
+  })
+
   it('rejects traversal and treats absolute paths as repo-relative', async () => {
     writeFileSync(join(root, 'outside.txt'), 'OUT=1')
 
@@ -605,6 +585,24 @@ describe('createWorktreeCopiedPaths', () => {
     expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('SECRET=1\n')
   })
 
+  it('retries the worktreeinclude copy after a partial APFS clone fails', async () => {
+    mkdirSync(join(primary, '.vscode'))
+    writeFileSync(join(primary, '.vscode', 'settings.json'), 'complete')
+    const cloneWorktreePath = vi.fn(async (_source: string, target: string) => {
+      mkdirSync(target)
+      writeFileSync(join(target, 'partial'), 'partial')
+      throw new Error('clonefile failed after partial directory copy')
+    })
+
+    await createWorktreeCopiedPaths(primary, worktree, ['.vscode'], {
+      platform: 'darwin',
+      cloneWorktreePath
+    })
+
+    expect(readFileSync(join(worktree, '.vscode', 'settings.json'), 'utf8')).toBe('complete')
+    expect(existsSync(join(worktree, '.vscode', 'partial'))).toBe(false)
+  })
+
   it('uses APFS clone-copy for configured paths on macOS', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     const cloneWorktreePath = vi.fn(async (_source: string, target: string) => {
@@ -618,7 +616,7 @@ describe('createWorktreeCopiedPaths', () => {
 
     expect(cloneWorktreePath).toHaveBeenCalledWith(
       join(primary, '.env'),
-      join(worktree, '.env'),
+      expect.stringContaining(join(worktree, '.orca-worktree-stage-')),
       false
     )
     expect(readFileSync(join(worktree, '.env'), 'utf8')).toBe('CLONED=1\n')

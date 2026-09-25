@@ -140,6 +140,7 @@ import {
   createWorktreeSharedPaths
 } from './worktree-symlinks'
 import { formatWorktreeIncludeCopyWarning } from './worktree-include-copy-budget'
+import { formatWorktreeSharedDirectoriesWarning } from '../git/worktree-shared-directories-warning'
 import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import { resolveWorktreeSharedDirectories } from '../git/worktree-shared-directories'
 import { normalizeSparseDirectories } from './sparse-checkout-directories'
@@ -2990,15 +2991,24 @@ async function performLocalWorktreeCreate(
       resolveWorktreeIncludePaths(repo.path, localWorktreeGitOptions)
     )
   ])
+  let materializationWarning: string | undefined
   if (sharedDirectories.length > 0) {
-    await timing.time('create_shared_directories', async () => {
-      await createWorktreeSharedPaths(repo.path, created.path, sharedDirectories)
-    })
+    const failedSharedDirectories = await timing.time(
+      'create_shared_directories',
+      async () =>
+        await createWorktreeSharedPaths(repo.path, created.path, sharedDirectories, {
+          sharedDirectoriesMode: repo.sharedDirectoriesMode
+        })
+    )
+    const sharedDirectoriesWarning = formatWorktreeSharedDirectoriesWarning(failedSharedDirectories)
+    if (sharedDirectoriesWarning) {
+      console.warn(`[worktree-shared-directories] ${sharedDirectoriesWarning}`)
+      materializationWarning = sharedDirectoriesWarning
+    }
   }
 
   // Why: project-level `.worktreeinclude` travels with the repo (issue #7549); copy semantics
   // (never symlink) so each worktree owns its files. Paths already linked above are skipped.
-  let includeCopyWarning: string | undefined
   if (includePaths.length > 0) {
     await timing.time('copy_worktreeinclude', async () => {
       const skippedIncludePaths = await createWorktreeCopiedPaths(
@@ -3006,9 +3016,13 @@ async function performLocalWorktreeCreate(
         created.path,
         includePaths
       )
-      includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
+      const includeCopyWarning = formatWorktreeIncludeCopyWarning(skippedIncludePaths)
       if (includeCopyWarning) {
         console.warn(`[worktree-include] ${includeCopyWarning}`)
+        materializationWarning = appendWorktreeCreateWarning(
+          materializationWarning,
+          includeCopyWarning
+        )
       }
     })
   }
@@ -3096,9 +3110,9 @@ async function performLocalWorktreeCreate(
     ...(stagedStartup.startupTerminal ? { startupTerminal: stagedStartup.startupTerminal } : {}),
     ...(baseFallback ? { baseFallback } : {}),
     ...(stagedStartup.warning
-      ? { warning: appendWorktreeCreateWarning(includeCopyWarning, stagedStartup.warning) }
-      : includeCopyWarning
-        ? { warning: includeCopyWarning }
+      ? { warning: appendWorktreeCreateWarning(materializationWarning, stagedStartup.warning) }
+      : materializationWarning
+        ? { warning: materializationWarning }
         : {}),
     timing: timing.finish()
   }
