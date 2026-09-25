@@ -204,9 +204,18 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-25 — released as `v1.4.197-np.12`** from `c80bbf6aba` (workflow run 36121027339,
+  signed and notarized). One commit landed on the remote's `nplez1/main` while the sync was running —
+  `dd06e8a8f4` (#32, hide disabled agents from the session-history filter). It was cherry-picked onto
+  the rebased line as `c80bbf6aba`, applied with no conflict and the same 130/57 delta; `pnpm tc`
+  stayed clean, its three touched suites pass 16/16, `local(identity)`'s `contentEnabled` rename in
+  `AiVaultPanel.legacy-filter.test.tsx` survived, and the localization catalog was regenerated with
+  no diff. The force-push was rejected first with `stale info` — the pinned lease caught it, which is
+  exactly what the lease is for — and re-issued against the real remote tip.
 - **2026-09-25** — onto upstream `f5d2ce5de7` (160 commits), from the released tip `244781de27`
   (np.11 released). 104 commits replayed: **83 byte-identical by `range-diff`, 20 adapted, 1 dropped
-  as already-applied, none added.** Sixteen of the 104 conflicted, across 22 files. Two
+  as already-applied, none added.** Fourteen of the 104 stopped on a conflict, across 29 distinct
+  files (a few files conflicted twice, from two different patches). Two
   convergences were put to the fork owner and both were decided for the fork's side of the question:
   the Codex child-work lane adapted onto upstream's fold, and the explorer name filter adapted onto
   upstream's host-filter model.
