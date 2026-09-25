@@ -4,12 +4,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
+import {
+  getHostedReviewMergeReadiness,
+  hostedReviewMergeVerdictLabel
+} from '@/components/hosted-review-merge-readiness'
 import { FilledBellIcon } from './WorktreeCardHelpers'
 import StatusIndicator from './StatusIndicator'
 import { useWorktreeActivityStatus } from './use-worktree-activity-status'
 import { useIsSleepingWorktree } from './use-worktree-sleep-state'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
-import { getReviewLabel, ReviewIcon } from './worktree-review-helpers'
+import { getReviewLabel, ReviewIconWithMergeMarker } from './worktree-review-helpers'
 
 type WorktreeCardStatusSlotProps = {
   worktreeId: string
@@ -72,25 +76,30 @@ function overlayNewCardUnreadStatus(
 
 function getReviewStatusLabel(review: WorktreeCardPrDisplay): string {
   const label = getReviewLabel(review)
-  if (review.state === 'merged') {
-    return `${label}: Merged`
+  const state = review.state
+  const status = review.status
+
+  let base = `${label}: Open`
+  if (state === 'merged') {
+    base = `${label}: Merged`
+  } else if (state === 'closed') {
+    base = `${label}: Closed`
+  } else if (state === 'draft') {
+    base = `${label}: Draft`
+  } else if (status === 'failure') {
+    base = `${label} checks: Failed`
+  } else if (status === 'pending') {
+    base = `${label} checks: Pending`
+  } else if (status === 'success') {
+    base = `${label} checks: Passing`
   }
-  if (review.state === 'closed') {
-    return `${label}: Closed`
-  }
-  if (review.state === 'draft') {
-    return `${label}: Draft`
-  }
-  if (review.status === 'failure') {
-    return `${label} checks: Failed`
-  }
-  if (review.status === 'pending') {
-    return `${label} checks: Pending`
-  }
-  if (review.status === 'success') {
-    return `${label} checks: Passing`
-  }
-  return `${label}: Open`
+
+  // Why: the marker says "not mergeable yet" without saying why, and this label is the only
+  // place the specific blocker is named — so it has to reach the tooltip and the screen-reader
+  // text. Null when the checks half of this same label already says it, or when the provider
+  // has not reported a merge state to report.
+  const mergeReason = hostedReviewMergeVerdictLabel(getHostedReviewMergeReadiness(review))
+  return mergeReason ? `${base} · ${mergeReason}` : base
 }
 
 export function WorktreeCardStatusSlot({
@@ -151,7 +160,11 @@ export function WorktreeCardStatusSlot({
     </span>
   ) : canShowReviewStatus && prDisplay ? (
     <span className={cn('inline-flex size-5 items-center justify-center p-0.5', className)}>
-      <ReviewIcon review={prDisplay} className={reviewStatusIconClassName} variant="generic" />
+      <ReviewIconWithMergeMarker
+        review={prDisplay}
+        className={reviewStatusIconClassName}
+        variant="generic"
+      />
       <span className="sr-only">{passiveStatusAnnouncement}</span>
     </span>
   ) : canShowBranchStatus ? (
@@ -213,7 +226,7 @@ export function WorktreeCardStatusSlot({
             {newCardStyle ? (
               showStatus && canShowReviewStatus && prDisplay ? (
                 <span className="inline-flex size-5 items-center justify-center p-0.5">
-                  <ReviewIcon
+                  <ReviewIconWithMergeMarker
                     review={prDisplay}
                     className={reviewStatusIconClassName}
                     variant="generic"

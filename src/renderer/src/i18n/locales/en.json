@@ -5837,7 +5837,8 @@
           "e888362def": "State: Closed",
           "f394b3e86e": "State: Merged",
           "af2b07bda5": "State: {{value0}}",
-          "29df45afa2": "MR"
+          "29df45afa2": "MR",
+          "mergeVerdictTitle": "Merge: {{value0}}"
         },
         "WorktreeCardPorts": {
           "34f733dda2": "Go to Worktree",
@@ -17726,6 +17727,23 @@
         "dispatchRejected": "The agent refused the “continue” message. Open the chat and send one yourself.",
         "unsupported": "This chat can’t be resumed by Orca. Open it to see where it stopped.",
         "fallback": "Orca couldn’t resume this chat. Open it to continue manually."
+      },
+      "hosted": {
+        "review": {
+          "merge": {
+            "readiness": {
+              "ready": "Ready to merge",
+              "checking": "Checking",
+              "conflicts": "Conflicts",
+              "changesRequested": "Changes requested",
+              "approvalRequired": "Approval required",
+              "unresolvedThreads": "Unresolved threads",
+              "behind": "Behind base",
+              "mergeQueue": "Merge queue",
+              "blocked": "Blocked"
+            }
+          }
+        }
       }
     },
     "i18n": {
