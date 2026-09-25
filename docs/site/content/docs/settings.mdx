@@ -145,7 +145,7 @@ Settings are grouped into panes. Everything here is searchable with `Cmd-,` then
 - Auto-run commands on worktree create.
 - Repo icons for the sidebar: choose an icon, full searchable emoji picker, uploaded image, website favicon, or GitHub avatar, then pick a preset or custom hex badge color.
 - Source Control AI overrides for commit messages, pull request details, and branch names.
-- **Worktree Shared Paths** — gitignored paths to materialize from the primary checkout into each new worktree (APFS clone-copy on macOS when possible, otherwise symlink). Complements repo-checked-in `worktree.sharedDirectories` in `orca.yaml` and `.worktreeinclude` (see [Worktrees](/docs/model/worktrees)).
+- **Worktree Shared Paths** — gitignored paths to materialize from the primary checkout into each new worktree (APFS clone-copy on macOS when possible, otherwise symlink). Choose how repo-checked-in `worktree.sharedDirectories` from `orca.yaml` are handled: keep symlinks, try APFS clones with a symlink or copy fallback, or skip when cloning is unavailable. Clones and copies are independent per worktree; only symlinks share writes. The copy fallback has no size or entry-count cap and may be slow or use substantial disk space. SSH worktrees do not materialize shared directories yet. On POSIX, a narrow check-to-rename race can replace a concurrently created empty destination directory, detaching handles already opened to it; non-empty targets are preserved. If Orca crashes during materialization and the nested path is later removed from configuration or its ownership marker is missing, the staging directory may need manual cleanup. `.worktreeinclude` remains a separate, budget-limited copy feature (see [Worktrees](/docs/model/worktrees)).
 
 ## Floating Workspace
 

@@ -162,7 +162,7 @@ export class OrcaRuntimeWithCreateManagedWorktree extends OrcaRuntimeWithGetWork
           : {})
       }
     }
-    const { worktree, worktreePath, includeCopyWarning, created, addResult, metadataResult } =
+    const { worktree, worktreePath, materializationWarning, created, addResult, metadataResult } =
       await createRuntimeLocalManagedWorktree({
         request: args,
         repo,
@@ -202,7 +202,7 @@ export class OrcaRuntimeWithCreateManagedWorktree extends OrcaRuntimeWithGetWork
         this.authoritativeWindowId !== null ||
         Boolean(effectiveStartup) ||
         Boolean(this.ptyController?.spawn),
-      warning: includeCopyWarning
+      warning: materializationWarning
     })
 
     this.invalidateResolvedWorktreeCache()

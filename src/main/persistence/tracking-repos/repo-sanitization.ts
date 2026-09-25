@@ -1,5 +1,5 @@
 import type { RepoProjectHostSetupMethod } from '../../../shared/project-types'
-import type { Repo } from '../../../shared/repo-types'
+import { isWorktreeSharedDirectoriesMode, type Repo } from '../../../shared/repo-types'
 import type { GitRemoteIdentity } from '../../../shared/git-remote-identity'
 import { normalizeRepoBadgeColor } from '../../../shared/repo-badge-color'
 import { sanitizeRepoIcon } from '../../../shared/repo-icon'
@@ -67,6 +67,12 @@ export function sanitizeForkSyncMode(value: unknown): Repo['forkSyncMode'] | und
   return value === 'ask' || value === 'safe-auto' || value === 'off' ? value : undefined
 }
 
+export function sanitizeWorktreeSharedDirectoriesMode(
+  value: unknown
+): Repo['sharedDirectoriesMode'] | undefined {
+  return isWorktreeSharedDirectoriesMode(value) ? value : undefined
+}
+
 export function sanitizeRepoUpdatesForPersistence<
   T extends Partial<
     Pick<
@@ -78,6 +84,7 @@ export function sanitizeRepoUpdatesForPersistence<
       | 'worktreeBasePath'
       | 'projectHostSetupMethod'
       | 'forkSyncMode'
+      | 'sharedDirectoriesMode'
       | 'customWorktreeVisibilitySources'
       | 'worktreeVisibilitySourcePreferences'
     >
@@ -140,6 +147,14 @@ export function sanitizeRepoUpdatesForPersistence<
       delete sanitized.forkSyncMode
     } else {
       sanitized.forkSyncMode = forkSyncMode
+    }
+  }
+  if ('sharedDirectoriesMode' in sanitized) {
+    const mode = sanitizeWorktreeSharedDirectoriesMode(sanitized.sharedDirectoriesMode)
+    if (mode === undefined) {
+      delete sanitized.sharedDirectoriesMode
+    } else {
+      sanitized.sharedDirectoriesMode = mode
     }
   }
   // Why: `null` is the clear sentinel for updateRepo; only malformed shapes are dropped.

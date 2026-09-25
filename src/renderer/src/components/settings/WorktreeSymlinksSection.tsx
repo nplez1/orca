@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Folder, Link2, Plus, X } from 'lucide-react'
-import type { Repo } from '../../../../shared/repo-types'
+import { WORKTREE_SHARED_DIRECTORIES_MODES, type Repo } from '../../../../shared/repo-types'
 import { Button } from '../ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '../ui/command'
+import { Label } from '../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { cn } from '@/lib/utils'
 import { getFileTypeIcon } from '@/lib/file-type-icons'
 import { SearchableSetting } from './SearchableSetting'
@@ -97,6 +99,13 @@ export function WorktreeSymlinksSection({
     updateRepo(repo.id, { symlinkPaths: paths.filter((p) => p !== path) })
   }
 
+  const handleSharedDirectoriesModeChange = (value: string): void => {
+    const mode = WORKTREE_SHARED_DIRECTORIES_MODES.find((candidate) => candidate === value)
+    if (mode) {
+      updateRepo(repo.id, { sharedDirectoriesMode: mode })
+    }
+  }
+
   return (
     <SearchableSetting
       title={translate(
@@ -112,6 +121,10 @@ export function WorktreeSymlinksSection({
         'apfs',
         'clone',
         'copy',
+        'fallback',
+        'orca.yaml',
+        'sharedDirectories',
+        'skip',
         'symlink',
         'symlinks',
         'worktree',
@@ -211,6 +224,57 @@ export function WorktreeSymlinksSection({
             </Command>
           </PopoverContent>
         </Popover>
+      </div>
+
+      <div className="max-w-md space-y-2">
+        <div className="space-y-1">
+          <Label htmlFor={`shared-directories-mode-${repo.id}`}>
+            {translate(
+              'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesModeLabel',
+              'orca.yaml sharedDirectories behavior'
+            )}
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesModeDescription',
+              'APFS clones and copies are independent per worktree. Symlinks share changes with the primary checkout. Copy fallback has no size or entry-count cap and can be slow or use substantial disk space. SSH worktrees do not materialize sharedDirectories yet.'
+            )}
+          </p>
+        </div>
+        <Select
+          value={repo.sharedDirectoriesMode ?? 'symlink'}
+          onValueChange={handleSharedDirectoriesModeChange}
+        >
+          <SelectTrigger id={`shared-directories-mode-${repo.id}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="symlink">
+              {translate(
+                'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesSymlink',
+                'Symlink (current behavior)'
+              )}
+            </SelectItem>
+            <SelectItem value="apfs-symlink">
+              {translate(
+                'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesApfsSymlink',
+                'APFS clone, then symlink'
+              )}
+            </SelectItem>
+            <SelectItem value="apfs-copy">
+              {translate(
+                'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesApfsCopy',
+                'APFS clone, then copy'
+              )}
+            </SelectItem>
+            <SelectItem value="apfs-only">
+              {translate(
+                'auto.components.settings.WorktreeSymlinksSection.sharedDirectoriesApfsOnly',
+                'APFS clone only (skip if unavailable)'
+              )}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {paths.length === 0 ? (
