@@ -244,7 +244,9 @@ pnpm run sync:localization-runtime-catalog
 ### Sync log
 
 - **2026-09-25 — released as `v1.4.197-np.12`** from `c80bbf6aba` (workflow run 36121027339,
-  signed and notarized). One commit landed on the remote's `nplez1/main` while the sync was running —
+  signed and notarized), then **`v1.4.197-np.13`** from `227953323b` (run 36173876959) carrying the
+  two `local(agents)` follow-ups below. One commit landed on the remote's `nplez1/main` while the sync
+  was running —
   `dd06e8a8f4` (#32, hide disabled agents from the session-history filter). It was cherry-picked onto
   the rebased line as `c80bbf6aba`, applied with no conflict and the same 130/57 delta; `pnpm tc`
   stayed clean, its three touched suites pass 16/16, `local(identity)`'s `contentEnabled` rename in
