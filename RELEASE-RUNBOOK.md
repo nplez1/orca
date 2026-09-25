@@ -19,11 +19,14 @@ stale base cannot see the fixes upstream has since landed.
   `workflow_dispatch` workflow runnable at all.
 - Pushing works over `ssh://git@ssh.github.com:443/...` (port 22 is blocked on this network).
 
-## Step 0 — validate the pipeline unsigned first
+## Step 0 — validate the pipeline unsigned first (already done; skip unless the workflow changes)
 
-**Why:** the first CI run has never happened. If you set the certificate first and the run fails, you
-cannot tell a pipeline bug from a signing bug. Run it once with no secrets — nothing gets deployed,
-and a green run proves the build, the publish, and the `latest-mac.yml` / `latest.yml` manifests.
+**Why:** if you set the certificate first and the run fails, you cannot tell a pipeline bug from a
+signing bug. Run it once with no secrets — nothing gets deployed, and a green run proves the build,
+the publish, and the `latest-mac.yml` / `latest.yml` manifests.
+
+This step is **complete** — the pipeline ran unsigned on 2026-09-16 and has published every release
+from np.6 to np.11 since, so the only reason to repeat it is a change to `fork-release.yml` itself.
 
 ```bash
 gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main
