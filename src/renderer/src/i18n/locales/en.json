@@ -13692,7 +13692,8 @@
             "currentProjectLower": "current project",
             "project": "Project",
             "hostScopeAriaLabel": "Session History host: {{value0}}",
-            "host": "Host"
+            "host": "Host",
+            "noEnabledAgents": "No agents enabled in Settings"
           },
           "AiVaultSessionDetails": {
             "originalAsk": "Original ask",
