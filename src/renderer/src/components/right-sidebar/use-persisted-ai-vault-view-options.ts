@@ -13,12 +13,14 @@ import {
   writeAiVaultViewOptions,
   type AiVaultViewOptions
 } from './ai-vault-view-options-persistence'
+import { filterEnabledTuiAgents } from '../../../../shared/tui-agent-selection'
 import type { AiVaultSessionLimit } from './ai-vault-session-limit'
 
 type AiVaultViewOptionsUpdate = (current: AiVaultViewOptions) => AiVaultViewOptions
 
-export function usePersistedAiVaultViewOptions(): {
+export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unknown> | null): {
   agents: AiVaultAgent[]
+  availableAgents: AiVaultAgent[]
   sort: AiVaultSort
   searchSort: AiVaultSearchSort
   group: AiVaultGroup
@@ -30,7 +32,7 @@ export function usePersistedAiVaultViewOptions(): {
   setHideEmptySessions: (hide: boolean) => void
   setSessionLimit: (limit: AiVaultSessionLimit) => void
   setAgentEnabled: (agent: AiVaultAgent, enabled: boolean) => void
-  setAllAgentsEnabled: (enabled: boolean) => void
+  setAllAgentsEnabled: (enabled: boolean, scope: readonly AiVaultAgent[]) => void
   resetViewOptions: () => void
 } {
   const [options, setOptions] = useState<AiVaultViewOptions>(() => readAiVaultViewOptions())
@@ -102,12 +104,20 @@ export function usePersistedAiVaultViewOptions(): {
     [updateOptions]
   )
   const setAllAgentsEnabled = useCallback(
-    (enabled: boolean) => {
+    (enabled: boolean, scope: readonly AiVaultAgent[]) => {
       updateOptions((current) => {
-        const disabledAgents = enabled ? [] : [...AI_VAULT_AGENTS]
+        const selectedAgents = new Set(enabledAiVaultAgents(current.disabledAgents))
+        for (const agent of scope) {
+          if (enabled) {
+            selectedAgents.add(agent)
+          } else {
+            selectedAgents.delete(agent)
+          }
+        }
+        const disabledAgents = AI_VAULT_AGENTS.filter((agent) => !selectedAgents.has(agent))
         if (
           disabledAgents.length === current.disabledAgents.length &&
-          disabledAgents.every((agent) => current.disabledAgents.includes(agent))
+          disabledAgents.every((agent, index) => agent === current.disabledAgents[index])
         ) {
           return current
         }
@@ -125,8 +135,13 @@ export function usePersistedAiVaultViewOptions(): {
     () => enabledAiVaultAgents(options.disabledAgents),
     [options.disabledAgents]
   )
+  const availableAgents = useMemo(
+    () => filterEnabledTuiAgents(AI_VAULT_AGENTS, disabledTuiAgents),
+    [disabledTuiAgents]
+  )
   return {
     agents,
+    availableAgents,
     sort: options.sort,
     searchSort: options.searchSort,
     group: options.group,
