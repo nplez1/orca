@@ -91,6 +91,67 @@ Anchor: `config/electron-builder.config.cjs`, `win.signtoolOptions`.
 `config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh`: build locally and install over the
 running app. Convenience only — not for upstream.
 
+### `local(agents)`: one binding per pi subagent channel
+
+Upstream's `#21882` tracks pi's async children *inside* the generated extension source — its own
+roster withholds the lead's `agent_end` while a child is live. This fork does the same job one layer
+down: `agent-status-async-subagent-source.ts` binds **both** plugin lineages (`subagents:*` from the
+tintinweb fork, `subagent:async-*` from `@earendil-works/pi-subagents`), posts the full live set as
+`subagent_runs` on every post, and the pane is held `working` receiver-side from that roster. With
+both in place every child lifecycle event fired twice, and the fork's deliberate silence on those
+channels for omp/prime-agent was filled by upstream's unconditional binding.
+
+So the two `subagent:async-*` bindings are dropped from upstream's roster setup; upstream's
+OMP-only `task:subagent:lifecycle` binding stays. Channel coverage differs in both directions (see
+the 2026-09-21 sync entry), which is why this converges on the fork's subsystem rather than
+upstream's.
+
+Anchors:
+
+- `src/main/pi/agent-status-subagent-roster-source.ts` — `getPiSubagentRosterSetupSourceLines()`, the
+two bindings removed, marked with a `LOCAL(nplez1)` comment. Upstream `#21882` later moved these
+lines out of `agent-status-handler-source.ts`; the 2026-09-25 sync re-seated the patch into the new
+module.
+- Tests pinned to the fork's contract: `src/main/pi/agent-status-async-subagent.test.ts` drives the
+real generated source into the real listener; `agent-status-extension-async-subagents.test.ts`
+asserts the `subagent_runs` roster rather than upstream's withheld `agent_end` (the deferral cases
+there were re-seated onto this contract by that same sync); `agent-status-extension-omp-lifecycle.test.ts`
+carries the equivalent adaptation from 2026-09-21.
+
+Still not gained from upstream, and unchanged since 2026-09-21: an OMP pane bound to
+`@earendil-works/pi-subagents` is held only by upstream's `task:subagent:lifecycle` gate, whose only
+local evidence of a producer is upstream's own test. Closing it means one guarded binding for
+`kind !== 'pi'` plus the matching expectation.
+
+### `local(agents)`: monitoring is reserved for Claude session-cron callbacks
+
+Upstream's lead-status fold reads *any* live non-agent child work as `workingMode: 'monitoring'`,
+which includes an ordinary background shell. This fork's `#26` reserves the monitoring badge for
+Claude session-cron callbacks, because a shell the agent started as part of its turn is still agent
+work. The fork owner chose (2026-09-25) to keep this policy and express it on upstream's fold rather
+than revert to upstream's semantics.
+
+Anchors, all on upstream-owned files and marked `LOCAL(nplez1)`:
+
+- `src/shared/agent-hook-listener/providers/claude-roster-state.ts` — `resolveClaudePaneStatus`: the
+fold's `hasLiveAgentWork` is "the roster has a working child **or** a background shell is running",
+and `hasLiveNonAgentWork` is the session-cron set alone.
+- `src/shared/agent-hook-listener/providers/grok-events.ts` — the payload drops
+`resolution.workingMode`, so a grok background shell reads plain `working`. Grok has no cron concept,
+so it never earns the badge.
+- Tests that encode the policy (all would need re-adapting if it is ever dropped):
+`src/shared/claude-background-task-status.test.ts`, `src/shared/main-agent-status-parity.test.ts`
+(the Claude and Grok lane helpers plus the six shell/watcher stories),
+`src/main/agent-hooks/server-grok-background-status.test.ts`, `server-grok-cancel.test.ts`,
+`server-claude-cancel-captures.test.ts` and `server-relayed-claude-cancel.test.ts`. The
+structured/native-chat lane is deliberately untouched: it still reads a watch loop as monitoring.
+
+Weigh this before keeping it: `isAgentTimeAccruing` is `state === 'working' && workingMode !== 'monitoring'`,
+so a shell-held row now **accrues agent time** where it previously did not. That is a session-stats
+change beyond the status-bar badge — inherent in calling a shell agent work rather than side effect
+of the fold. If the stats change is unwanted, the alternative is to keep upstream's evidence split
+and strip only the `workingMode` from the published payloads.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream
@@ -142,6 +203,162 @@ pnpm run sync:localization-runtime-catalog
 ```
 
 ### Sync log
+
+- **2026-09-25** — onto upstream `f5d2ce5de7` (160 commits), from the released tip `244781de27`
+  (np.11 released). 104 commits replayed: **83 byte-identical by `range-diff`, 20 adapted, 1 dropped
+  as already-applied, none added.** Sixteen of the 104 conflicted, across 22 files. Two
+  convergences were put to the fork owner and both were decided for the fork's side of the question:
+  the Codex child-work lane adapted onto upstream's fold, and the explorer name filter adapted onto
+  upstream's host-filter model.
+  - **Additive union, mechanical** (7 sites): `rate-limit-types.ts`, `rate-limit-state-factory.ts`,
+    `rate-limit-types.test.ts`, `service-configuration.ts` (upstream's `opencodeGoApiKeyConfigured`
+    beside our DeepSeek/Fireworks flags), `use-status-bar-controller.ts` (upstream's OpenCode key flag
+    beside ours — needed a hand fix, the union duplicated `grokAuthConfigured`), `accounts-pane`
+    (`apiKey` in the edited-settings ref beside our `useAccountsPaneCredentialSections`),
+    `electron-builder-config.test.mjs` (one import each) and `en.json` twice (`hosted.review` blocks;
+    one union lost the DeepSeek doc-comment opener and `pnpm tc` caught it, and one lost a closing
+    brace, caught by `JSON.parse`).
+  - **Codex child-work lane, converged onto upstream's fold** (`66ca697812`, the sync's largest
+    decision): upstream's `#22521`/`b4d732685c` landed *after* our commit was authored and pushed
+    Codex child work through the shared `agent-lead-status-fold`, while our commit generalized the
+    Codex roster to `AgentDescendantRoster` and added a generic descendant lane. Took upstream's
+    `codex-events.ts`/`codex-state.ts` and applied our rename mapping to them (longest identifiers
+    first), kept upstream's `codexRosterChildWorkLiveness` name because upstream's parity test
+    imports it, and kept our `agentDescendantEffectiveState` for the generic lane. `muse` and
+    `opencode2` were then added to the provider enumerations: upstream added both to the shared
+    `AgentHookSource` union, and the enumerations are `Record`s over it *by design*, so a new member
+    is a compile error rather than a silent gap (muse answers "owns its own lifecycle" — its
+    provider already filters child sessions). That last addition made the fork's own later
+    `dc725bef8b` redundant, and git **dropped it as already-applied**; its whole diff is the one
+    `opencode2: null` line, verified present.
+  - **Explorer name filter, converged onto upstream's host-filter model** (`99bb44623f`, `0b625aaca5`):
+    upstream independently built `hostFilterWhenCapped` + `shared/file-name-filter-tokens.ts` ("the
+    host can filter a scan exactly like the renderer") while our commits add `queryMode`/`queryLimit`,
+    an exact `totalCount`, `ignoredFiles` and the honest empty state. Both are driven from the same
+    call site, so a syntactic union would have sent two competing host-filter requests. Kept
+    upstream's `hostFilterWhenCapped` (and its `usesRuntimePathSearch` rule, dropping our local-query
+    rewrite) plus our `totalCount`/`truncated` plumbing and `getFileExplorerNameFilterEmptyMessageKind`
+    — upstream has no equivalent of that empty state, and `FileExplorerNameFilterTruncationNotice`
+    reads `totalCount`. The projection's tokenizer moved to upstream's shared module so renderer and
+    host cannot disagree. Two of our tests were **dropped**: they asserted the local-query search that
+    the capped host re-list replaces (`quick-open-file-list.react.test.tsx`), on the same footing as
+    the 2026-09-22 sync's dropped test; upstream's own `quick-open-file-list-host-name-filter.react.test.tsx`
+    covers the new path, `use-file-explorer-name-filter.test.ts` covers queryMode/queryLimit/totalCount,
+    and `file-explorer-name-filter-empty-message.test.ts` covers the empty state. The harness typo a
+    later fork commit also fixed (`onState: () => {}` never populating `states`) was fixed here.
+  - **Ripgrep scan extraction met upstream's in-place rework** (`0b625aaca5`): our commit extracted
+    `scanRipgrepPaths` into `quick-open-rg-path-scan.ts` while upstream reworked that same function in
+    place (bundled ripgrep, synchronous-spawn classifier, missing-cwd diagnosis, optional `stdout`).
+    Merged upstream's reworked body **into** the extracted module, keeping our `onPath`/early-stop
+    contract, then re-added `collectQuickOpenPaths` and the `includeIgnoredFiles` pass selection to
+    `filesystem-search-file-paths.ts`. This is the one place in the sync where two compilable halves
+    had to be fused rather than chosen.
+  - **`local(identity)`** (`1c7e1f6a7d`, `6dca5cd822`): the `.orca-np` predicate in the managed-hook
+    test is superseded by upstream's `/\\.(?:sh|cmd)$/` test, which no longer names a directory at all.
+  - **Ratchet pins are measured, not chosen** (`5741e10d96`): `DIRECT_IMPORTER_PIN` and
+    `UNHIDDEN_SPAWNER_PIN` were lowered on both sides for different reasons, so the merged tree's real
+    counts are the answer — `151` and `61`, taken from the failing tests' own messages. Never pick
+    either side's number here.
+  - **Monitoring policy, kept on upstream's fold** (`b56efa03ec`, the second fork-owner decision):
+    upstream's fold reads any live non-agent child work as `monitoring`, including a background shell;
+    our `#26` reserves the badge for Claude session-cron callbacks. Expressed the fork's policy on
+    upstream's fold (`hasLiveAgentWork` = roster-working or running shell; `hasLiveNonAgentWork` =
+    session-cron only) and dropped grok's `workingMode` spread, then realigned the seven test surfaces
+    that encode it. Now documented as a `local(agents)` patch — including the consequence flagged to
+    the fork owner: because `isAgentTimeAccruing` excludes only `monitoring`, a shell-held row now
+    accrues agent time where it did not before, which is a session-stats change beyond the badge.
+  - **pi single-binding patch, re-seated** (`183a25f9ba`): upstream `#21882` moved the pi subagent
+    bindings into `agent-status-subagent-roster-source.ts`, so the fork's removal of the two
+    `subagent:async-*` bindings moved with them (`LOCAL(nplez1)` comment). The matching test
+    adaptation followed into the new `agent-status-extension-async-subagents.test.ts`: its four
+    deferral cases now assert what the fork actually does (the child ids ride `subagent_runs` and the
+    lead's `agent_end` is not withheld at source) instead of upstream's withheld `agent_end`, keeping
+    each case's subject and asserting exact roster sequences rather than weakening to truthiness.
+    **Named gap this exposes:** upstream's roster removes a child on `subagent:process-terminal`,
+    which the fork's bus does not bind, so a pi child whose only end signal is a runner exit stays in
+    the fork's live set until the descendant lane's quiet-reap window or a scope reset retracts it.
+    That is the behaviour difference the adaptation records, not a regression this sync introduced,
+    and it is the reason the fork keeps `AGENT_DESCENDANT_QUIET_REAP_MS`.
+  - **Other mechanical resolutions:** `local(identity)`'s builder-config import; the `main.css`
+    add/add of the *same* `--status-warning` tokens with different values (kept upstream's `#ca8a04`
+    light / `#eab308` dark — upstream's yellow serves our own comment's stated intent, since our
+    `#b45309` *is* amber-700); `agent-descendant-roster.ts` keeping both upstream's
+    `codexRosterChildWorkLiveness` and our `agentDescendantEffectiveState`; and `listener-state.ts`
+    twice (upstream's extraction of the lead-turn types to `main-agent-turn-state.ts` beside our
+    `CopilotBackgroundWorkState`, which a later fork commit moved to its own module).
+  - **The traps, all found by a gate and none behind a conflict marker:**
+    1. **`pnpm tc`**: the DeepSeek doc-comment opener lost in an additive union; `AgentStatusState`
+       dropped from `listener-state.ts`'s imports when our commit's import edit collided with
+       upstream's; `descendant-events.ts`'s provider switch no longer exhaustive after upstream added
+       `muse`/`opencode2` to the source union; and a second `PathSearchMatcher` import dropped while
+       trimming unused imports after the scan extraction.
+    2. **A failing test, not a type error — three more surfaces upstream added that assume the
+       fork's environment away:** the fork's `service-deepseek-usage.test.ts` and
+       `service-fireworks-usage.test.ts` still mocked `./opencode-go-usage-fetcher`, which upstream
+       retired in favour of `./opencode-go-usage-source-selection` (both sides typecheck; only the
+       shared harness's `vi.mocked(...).mockResolvedValue` failed at runtime — 15 tests);
+       `muse/hook-service.test.ts` hardcoded `.orca` where `local(identity)` renamed the home
+       directory (now derived from `HOME_DIRECTORY_NAME`, so the next rename cannot leave it
+       behind); and `agent-hook-listener-grok-completion.test.ts` still expected
+       `workingMode: 'monitoring'` for a grok shell — the **eighth** surface of the monitoring policy,
+       which arrived with upstream after the seven the sync realigned. The worktree-listing trio
+       (`detected-worktree-scan-superseded`, `detected-provider-listing-catalog-version`,
+       `detected-provider-listing-overtaken-scan`) is the same shape from the other direction:
+       upstream's new test files build a minimal `store` double, and the fork's
+       `detected-worktree-scan-cache.ts` calls `getProfileStorageDirectory()`, which the fork's own
+       store doubles elsewhere already stub. The missing method made the scan degrade to its
+       metadata fallback and fail three unrelated assertions, so the fix is the double, not the scan.
+    3. **Ratchets** and **`main.css`**: see above — both are cases where "pick a side" is the wrong
+       operation.
+  - **Two red patches were proved transient, not chased:** the intermediate reds in
+    `AiVaultPanel.legacy-filter.test.tsx` (`enabled` vs our renamed `contentEnabled`),
+    `use-file-explorer-name-filter.test.ts` (a `resolvedQuery` field that exists in neither tip) and
+    the `ReadonlyMap` misuse in two of our test files are all fixed by commits later in the series
+    (`90a9b123d1` and `e51c334309`'s successors). Each was checked against the *original* commit with
+    `git show <sha>:<path>` before deciding, and every one was pre-existing in the fork's own history
+    rather than rebase-induced. Fixing them mid-replay would only have created a conflict at the
+    commit that already owns the fix.
+  - Verified: `pnpm tc` clean at the tip; the definitive full `pnpm test` run reports **9,571 passing
+    tests (9,648 files, 72 skipped) and 5 failing files — every one of them classified and proved
+    environmental rather than reconciled against the first run**: the 12
+    `browser-manager-viewport-ownership` cases pass with `ORCA_BACKGROUND_LAUNCH=1` (as this repo's
+    policy requires for a background-launched suite); the `build-native-for-platform` case
+    "stalls past the reap timeout" is a wall-clock test that passes 21/21 standalone;
+    `cross-version-wire/release-checkout` passes 10/10 standalone and only times out under full-suite
+    load (17.7 s case against a 30 s budget). The remaining three are the documented `tests/e2e` class:
+    the uninstalled `cloud/` workspace's `pg`, and the 1.5 GB `.cross-version-checkouts` walker. An
+    earlier run of the same suite reproduced exactly this set. Also verified: `range-diff` pairing all
+    104 patches with 83 `=` and 20 `!`; the pre-sync-tip lost-content diff reduced to the five files
+    this sync deliberately adapted (all five ours — upstream never touched any of them); the derived
+    localization catalog regenerated with **no diff** and both verifiers green; the fork's builder
+    config loads and all six update-feed references still name `nplez1/orca`; `fork-release.yml` is
+    byte-identical to np.11's with all five signing secrets present; `oxlint` reporting only the
+    repo's pre-existing findings (`check:max-lines-ratchet` green — "7 grandfathered suppression(s),
+    no new bypasses"); and the changed-code gate re-run against the true base (see below).
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports **36 findings
+    (27 design-system) across 908 changed files** when run with `ORCA_CODE_QUALITY_BASE=upstream/main`.
+    Identical in kind and count to the 2026-09-22 entry. Each of the nine flagged files was then
+    checked one by one, the way the reviewer asked: **eight are byte-identical to the released np.11
+    tip** (`git diff --quiet backup/nplez1-main-pre-sync HEAD -- <path>`), and the ninth,
+    `src/renderer/src/hooks/ipc-events-test-harness.ts`, is flagged for one assertion —
+    `} as Record<string, unknown>,` — whose text is byte-identical in the np.11 tip, in
+    `upstream/main`, and now, and which carries no `SAFETY:` comment in any of the three. So this sync
+    introduced none of the 36, and the harness finding is attributable only because the fork's own
+    commit adds lines in that file and the gate's added-line window covers the assertion.
+    As before, the gate's own base resolves to the *pre-sync* tip (`origin/HEAD` names `nplez1/main`,
+    which the rebase has not been pushed to yet), so its merge-base falls back and the whole
+    fork+upstream delta reads as added lines — the run is only meaningful once `origin/main` is
+    fast-forwarded, or with the explicit base above.
+  - **Left open, named — grok is now gated twice:** our generic descendant lane owns grok
+    (`providerOwnsDescendantLifecycle` excludes only claude/codex/muse) while upstream's new grok lane
+    both refuses to settle the parent from a child event and reads a background subagent as working.
+    They are not identical: our lane republishes a payload from the LEAD's last state when a child
+    event arrives, upstream's returns `null` and publishes nothing, and our lane keeps a persistent
+    roster with a quiet-reap recovery for a lost stop. Every grok test on both sides passes with both
+    mechanisms in place, so this was left as-is rather than silently deleting the fork's lane; the
+    one-line convergence (add `grok` to `providerOwnsDescendantLifecycle`, answer `grok: null` in
+    `DESCENDANT_PROVIDERS`, adapt `agent-hook-listener-descendant-lifecycle.test.ts`'s grok cases) is
+    the revert path if the duplication is judged worse than the republish.
 
 - **2026-09-22** — onto upstream `6ae5ef2d00` (67 commits), from the released tip `08b1285fda`
   (np.10 released) plus the commit that landed on `nplez1/main` while the sync was running
