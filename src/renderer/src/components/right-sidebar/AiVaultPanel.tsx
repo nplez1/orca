@@ -82,6 +82,7 @@ export default function AiVaultPanel(): React.JSX.Element {
   // Why: scope depends on current workspace/project availability, so only stable view options persist.
   const {
     agents,
+    availableAgents,
     sort,
     searchSort,
     group,
@@ -95,7 +96,7 @@ export default function AiVaultPanel(): React.JSX.Element {
     setAgentEnabled,
     setAllAgentsEnabled,
     resetViewOptions
-  } = usePersistedAiVaultViewOptions()
+  } = usePersistedAiVaultViewOptions(settings?.disabledTuiAgents)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const runtimeHostOptions = useMemo(
     () => buildRuntimeAiVaultHostScopeOptions(runtimeEnvironments),
@@ -306,6 +307,7 @@ export default function AiVaultPanel(): React.JSX.Element {
         executionHostScope={executionHostScope}
         hostScopeOptions={hostScopeOptions}
         agents={agents}
+        availableAgents={availableAgents}
         group={group}
         hideEmptySessions={hideEmptySessions}
         sessionLimit={sessionLimit}
@@ -315,7 +317,7 @@ export default function AiVaultPanel(): React.JSX.Element {
         onScopeChange={handleScopeChange}
         onExecutionHostScopeChange={onExecutionHostScopeChange}
         onAgentEnabledChange={setAgentEnabled}
-        onAllAgentsEnabledChange={setAllAgentsEnabled}
+        onAllAgentsEnabledChange={(enabled) => setAllAgentsEnabled(enabled, availableAgents)}
         onGroupChange={setGroup}
         onHideEmptySessionsChange={setHideEmptySessions}
         onSessionLimitChange={setSessionLimit}

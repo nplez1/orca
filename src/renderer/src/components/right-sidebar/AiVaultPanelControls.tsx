@@ -22,12 +22,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
-import {
-  AI_VAULT_AGENTS,
-  type AiVaultAgent,
-  type AiVaultGroup,
-  type AiVaultScope
-} from '../../../../shared/ai-vault-types'
+import type { AiVaultAgent, AiVaultGroup, AiVaultScope } from '../../../../shared/ai-vault-types'
 import { getExecutionHostLabel, type ExecutionHostScope } from '../../../../shared/execution-host'
 import { agentLabel, type AiVaultSessionGroup } from './ai-vault-session-filters'
 import { translate } from '@/i18n/i18n'
@@ -203,6 +198,7 @@ export function VaultHostScopeMenu({
 export function VaultViewMenu({
   searching = false,
   agents,
+  availableAgents,
   group,
   hideEmptySessions,
   sessionLimit,
@@ -216,6 +212,7 @@ export function VaultViewMenu({
 }: {
   searching?: boolean
   agents: readonly AiVaultAgent[]
+  availableAgents: readonly AiVaultAgent[]
   group: AiVaultGroup
   hideEmptySessions: boolean
   sessionLimit: AiVaultSessionLimit
@@ -227,8 +224,8 @@ export function VaultViewMenu({
   onSessionLimitChange: (limit: AiVaultSessionLimit) => void
   onReset: () => void
 }): React.JSX.Element {
-  const allAgentsSelected = agents.length === AI_VAULT_AGENTS.length
-  const noAgentsSelected = agents.length === 0
+  const allAgentsSelected = availableAgents.every((agent) => agents.includes(agent))
+  const noAgentsSelected = !availableAgents.some((agent) => agents.includes(agent))
 
   return (
     <DropdownMenu>
@@ -270,44 +267,58 @@ export function VaultViewMenu({
             {translate('auto.components.right.sidebar.AiVaultPanelControls.agents', 'Agents')}
           </span>
           {/* Why: real menu items so arrow keys reach them; plain buttons are skipped by Radix roving focus. */}
-          <div className="flex items-center gap-1">
-            <DropdownMenuItem
-              disabled={allAgentsSelected}
-              // Why: preventDefault keeps the menu open for further multi-select.
-              onSelect={(event) => {
-                event.preventDefault()
-                onAllAgentsEnabledChange(true)
-              }}
-              className={AGENT_BULK_ACTION_CLASS}
-            >
-              {translate(
-                'auto.components.right.sidebar.AiVaultPanelControls.selectAllAgents',
-                'Select all'
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={noAgentsSelected}
-              onSelect={(event) => {
-                event.preventDefault()
-                onAllAgentsEnabledChange(false)
-              }}
-              className={AGENT_BULK_ACTION_CLASS}
-            >
-              {translate('auto.components.right.sidebar.AiVaultPanelControls.clearAgents', 'Clear')}
-            </DropdownMenuItem>
-          </div>
+          {availableAgents.length > 0 && (
+            <div className="flex items-center gap-1">
+              <DropdownMenuItem
+                disabled={allAgentsSelected}
+                // Why: preventDefault keeps the menu open for further multi-select.
+                onSelect={(event) => {
+                  event.preventDefault()
+                  onAllAgentsEnabledChange(true)
+                }}
+                className={AGENT_BULK_ACTION_CLASS}
+              >
+                {translate(
+                  'auto.components.right.sidebar.AiVaultPanelControls.selectAllAgents',
+                  'Select all'
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={noAgentsSelected}
+                onSelect={(event) => {
+                  event.preventDefault()
+                  onAllAgentsEnabledChange(false)
+                }}
+                className={AGENT_BULK_ACTION_CLASS}
+              >
+                {translate(
+                  'auto.components.right.sidebar.AiVaultPanelControls.clearAgents',
+                  'Clear'
+                )}
+              </DropdownMenuItem>
+            </div>
+          )}
         </div>
-        {AI_VAULT_AGENTS.map((agent) => (
-          <DropdownMenuCheckboxItem
-            key={agent}
-            checked={agents.includes(agent)}
-            onCheckedChange={(checked) => onAgentEnabledChange(agent, checked === true)}
-            onSelect={(event) => event.preventDefault()}
-          >
-            <AgentIcon agent={agent} size={14} />
-            {agentLabel(agent)}
-          </DropdownMenuCheckboxItem>
-        ))}
+        {availableAgents.length === 0 ? (
+          <div className="px-2 pb-2 text-[11px] text-muted-foreground">
+            {translate(
+              'auto.components.right.sidebar.AiVaultPanelControls.noEnabledAgents',
+              'No agents enabled in Settings'
+            )}
+          </div>
+        ) : (
+          availableAgents.map((agent) => (
+            <DropdownMenuCheckboxItem
+              key={agent}
+              checked={agents.includes(agent)}
+              onCheckedChange={(checked) => onAgentEnabledChange(agent, checked === true)}
+              onSelect={(event) => event.preventDefault()}
+            >
+              <AgentIcon agent={agent} size={14} />
+              {agentLabel(agent)}
+            </DropdownMenuCheckboxItem>
+          ))
+        )}
         {!searching && (
           <>
             <DropdownMenuSeparator />
