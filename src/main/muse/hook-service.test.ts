@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { parseMuseSettingsText } from './hook-config-json'
 import { MuseHookService } from './hook-service'
 import { MUSE_HOOK_EVENTS } from './hook-settings'
@@ -37,8 +38,10 @@ afterEach(() => {
 })
 
 const configPath = (): string => join(home, '.config', 'muse', 'settings.json')
-const managedHooksPath = (): string => join(home, '.orca', 'agent-hooks', 'muse-hooks.json')
-const scriptPath = (): string => join(home, '.orca', 'agent-hooks', 'muse-hook.sh')
+// LOCAL(nplez1): derived from the shared constant so a future rename cannot leave this helper behind.
+const managedHooksPath = (): string =>
+  join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'muse-hooks.json')
+const scriptPath = (): string => join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'muse-hook.sh')
 
 describe('MuseHookService', () => {
   it('reports not_installed before install', () => {
@@ -117,8 +120,8 @@ describe('MuseHookService', () => {
 
   it('treats malformed managed hook entries as absent instead of throwing', () => {
     mkdirSync(join(home, '.config', 'muse'), { recursive: true })
-    mkdirSync(join(home, '.orca', 'agent-hooks'), { recursive: true })
-    const managedPath = join(home, '.orca', 'agent-hooks', 'muse-hooks.json')
+    mkdirSync(join(home, HOME_DIRECTORY_NAME, 'agent-hooks'), { recursive: true })
+    const managedPath = join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'muse-hooks.json')
     writeFileSync(configPath(), JSON.stringify({ schema_version: 1 }))
     const service = new MuseHookService()
     expect(service.install().state).toBe('installed')

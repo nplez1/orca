@@ -144,7 +144,8 @@ describe('Grok completion observations', () => {
         promptId: 'p-1',
         backgroundTasks: [{ id: 'task-1', type: 'shell', status: 'running' }]
       })
-    ).toMatchObject({ state: 'working', workingMode: 'monitoring' })
+      // LOCAL(nplez1): a grok shell reads plain `working`; monitoring is reserved for Claude session-cron callbacks.
+    ).toMatchObject({ state: 'working', workingMode: undefined })
     // A settled row without `interrupted` would announce the cancelled turn as a clean finish.
     expect(
       normalize({
