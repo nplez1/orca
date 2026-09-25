@@ -21,6 +21,17 @@ function agentEndCount(harness: AgentStatusExtensionHarness): number {
   return postedHookNames(harness).filter((name) => name === 'agent_end').length
 }
 
+/** The descendant roster each post carried, in order. LOCAL(nplez1): the fork reports child runs
+ *  as a roster snapshot, so this is what a tracked child has to show up in. */
+function postedSubagentRunIds(harness: AgentStatusExtensionHarness): string[][] {
+  return harness.fetchMock.mock.calls.map((call) => {
+    const body: { payload?: { subagent_runs?: { id: string }[] } } = JSON.parse(
+      String(call[1]?.body)
+    )
+    return (body.payload?.subagent_runs ?? []).map((run) => run.id)
+  })
+}
+
 function startWorkflow(harness: AgentStatusExtensionHarness): void {
   harness.emitPiEvent('subagent:async-started', {
     id: WORKFLOW,
@@ -70,7 +81,12 @@ describe('Pi async subagent roster', () => {
     exitRunner(harness, 'child-a')
     exitRunner(harness, 'child-b')
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(agentEndCount(harness)).toBe(0)
+    // LOCAL(nplez1): these aliases feed the fork's descendant roster, and the pane is held working
+    // receiver-side from that roster — the lead's `agent_end` is not withheld at source, and a
+    // runner exit is no completion this roster can see.
+    expect(agentEndCount(harness)).toBe(1)
+    expect(postedHookNames(harness).at(-1)).toBe('agent_end')
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([WORKFLOW, 'child-a', 'child-b'])
 
     // pi-subagents wakes the lead just before announcing only the workflow's completion.
     await harness.callHook('agent_start')
@@ -78,6 +94,8 @@ describe('Pi async subagent roster', () => {
     await endTurn(harness)
 
     expect(postedHookNames(harness).at(-1)).toBe('agent_end')
+    // The workflow retires itself; its awaited children are still on the roster holding the pane.
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['child-a', 'child-b'])
   })
 
   it('settles as soon as the workflow completes when its children already exited', async () => {
@@ -105,7 +123,7 @@ describe('Pi async subagent roster', () => {
     expect(agentEndCount(harness)).toBe(1)
   })
 
-  it('settles once a child runner exits after its workflow already completed', async () => {
+  it('ignores a child runner exit after its workflow already completed', async () => {
     const harness = createAgentStatusExtensionHarness({ kind: 'pi' })
     await harness.callHook('agent_start')
     startWorkflow(harness)
@@ -114,7 +132,11 @@ describe('Pi async subagent roster', () => {
     complete(harness, WORKFLOW)
     exitRunner(harness, 'child-a')
     await vi.advanceTimersByTimeAsync(500)
-    expect(agentEndCount(harness)).toBe(0)
+    // LOCAL(nplez1): a runner exit is not a completion the fork's descendant roster can see — only
+    // upstream's `task:subagent:lifecycle` roster reads them, and these aliases never reach it — so
+    // nothing defers the lead's `agent_end`, and the exiting child stays on the roster.
+    expect(agentEndCount(harness)).toBe(1)
+    expect(postedSubagentRunIds(harness)).toEqual([[], [WORKFLOW, 'child-a'], ['child-a']])
 
     await vi.advanceTimersByTimeAsync(5_000)
     expect(agentEndCount(harness)).toBe(1)
@@ -128,7 +150,11 @@ describe('Pi async subagent roster', () => {
     complete(harness, WORKFLOW)
     await endTurn(harness)
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(agentEndCount(harness)).toBe(0)
+    // LOCAL(nplez1): the workflow's completion retires only itself, so its explicit child is still
+    // on the fork's descendant roster and holds the pane working receiver-side — the lead's own
+    // `agent_end` is not withheld at source.
+    expect(agentEndCount(harness)).toBe(1)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['child-a'])
 
     // The child's own completion and the wake turn land right after its runner exits.
     exitRunner(harness, 'child-a')
@@ -136,10 +162,16 @@ describe('Pi async subagent roster', () => {
     await harness.callHook('agent_start')
     complete(harness, 'child-a')
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(agentEndCount(harness)).toBe(0)
+    // The child's completion drains the roster; the pane settles on the lead's next `agent_end`.
+    expect(agentEndCount(harness)).toBe(1)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
 
     await endTurn(harness)
-    expect(agentEndCount(harness)).toBe(1)
+    // Both turns posted their own `agent_end`: the first with the child still on the roster, this
+    // one with it drained.
+    expect(agentEndCount(harness)).toBe(2)
+    expect(postedHookNames(harness).at(-1)).toBe('agent_end')
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
   })
 
   it('ignores runner exits for runs it is not tracking', async () => {
@@ -151,7 +183,11 @@ describe('Pi async subagent roster', () => {
     harness.emitPiEvent('subagent:process-terminal', {})
     await vi.advanceTimersByTimeAsync(5_000)
 
-    expect(agentEndCount(harness)).toBe(0)
+    // LOCAL(nplez1): neither exit names a child the fork's descendant roster tracks, so both are
+    // inert — the roster is unchanged, no post follows, and the lead's `agent_end` was not withheld;
+    // the live run holds the pane working receiver-side from that roster.
+    expect(postedHookNames(harness)).toEqual(['agent_start', 'agent_end'])
+    expect(postedSubagentRunIds(harness)).toEqual([[], ['run-1']])
   })
 
   it('accepts completion events that identify the run only by runId', async () => {

@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { GitWorktreeInfo } from '../../../../shared/worktree/types'
@@ -33,7 +35,12 @@ const {
 const repo = { id: 'repo-1', path: '/repos/one', displayName: 'one' } as Repo
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the scan calls only the expectation capture; the metadata prune it feeds is mocked above.
 const store = {
-  captureNativeLocalWorktreeMetadataScanExpectation: () => ({ repo: { id: repo.id }, metadata: [] })
+  captureNativeLocalWorktreeMetadataScanExpectation: () => ({
+    repo: { id: repo.id },
+    metadata: []
+  }),
+  // Why: the fork's scan cache persists through this store method; an upstream-shaped double without it degrades the scan to its metadata fallback.
+  getProfileStorageDirectory: () => join(tmpdir(), 'orca-scan-cache-test')
 } as never
 
 function worktreeAt(path: string): GitWorktreeInfo {

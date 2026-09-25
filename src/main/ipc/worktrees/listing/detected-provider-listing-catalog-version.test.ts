@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { GitWorktreeInfo } from '../../../../shared/worktree/types'
@@ -57,7 +59,9 @@ function createStore(repo: Repo) {
     getAllWorktreeLineage: () => ({}),
     getAllWorkspaceLineage: () => ({}),
     removeWorktreeLineage: vi.fn(),
-    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined
+    captureNativeLocalWorktreeMetadataScanExpectation: () => undefined,
+    // Why: the fork's scan cache persists through this store method; an upstream-shaped double without it degrades the scan to its metadata fallback.
+    getProfileStorageDirectory: () => join(tmpdir(), 'orca-scan-cache-test')
   } as never
 }
 
