@@ -2,11 +2,14 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { AiVaultSession } from '../../../../shared/ai-vault-types'
+import { AI_VAULT_AGENTS, type AiVaultSession } from '../../../../shared/ai-vault-types'
 import type { AiVaultSessionListGroup } from './ai-vault-session-filters'
 
 const mockState: {
-  settings: { aiVaultSearch?: { contentEnabled: boolean } }
+  settings: {
+    aiVaultSearch?: { contentEnabled: boolean }
+    disabledTuiAgents?: string[]
+  }
   runtimeEnvironments: never[]
   folderWorkspaces: Record<string, never>
   projectGroups: never[]
@@ -180,6 +183,32 @@ it('shows the whole history and no offer while the box is empty', async () => {
   expect(screen.getByRole('button', { name: 'Sort sessions: Last updated' })).toBeTruthy()
   expect(screen.queryByText('2 results')).toBeNull()
   expect(screen.queryByRole('button', { name: /^Sort results:/ })).toBeNull()
+})
+
+it('hides agents disabled in Settings from the filter menu without hiding their history', async () => {
+  mockState.settings = { disabledTuiAgents: ['claude'] }
+  await typeQuery('')
+
+  expect(screen.getByText('Fix the foo pipeline')).toBeTruthy()
+  await userEvent.click(screen.getByRole('button', { name: 'Session History view options' }))
+
+  expect(await screen.findByRole('menuitem', { name: 'Select all' })).toBeTruthy()
+  expect(screen.queryByRole('menuitemcheckbox', { name: 'Claude' })).toBeNull()
+  expect(screen.queryByRole('menuitemcheckbox', { name: 'Codex' })).toBeTruthy()
+})
+
+it('shows an empty state when every agent is disabled and keeps their history visible', async () => {
+  mockState.settings = { disabledTuiAgents: [...AI_VAULT_AGENTS] }
+  await typeQuery('')
+
+  expect(screen.getByText('Fix the foo pipeline')).toBeTruthy()
+  await userEvent.click(screen.getByRole('button', { name: 'Session History view options' }))
+
+  expect(await screen.findByText('No agents enabled in Settings')).toBeTruthy()
+  expect(screen.getAllByRole('menuitemcheckbox')).toHaveLength(1)
+  expect(screen.getByRole('menuitemcheckbox', { name: 'Hide empty sessions' })).toBeTruthy()
+  expect(screen.queryByRole('menuitem', { name: 'Select all' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: 'Clear' })).toBeNull()
 })
 
 it('keeps sort off the filter menu, which is filters only', async () => {

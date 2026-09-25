@@ -39,13 +39,24 @@ describe('usePersistedAiVaultViewOptions', () => {
   it('allows clearing every agent so a single agent can be re-enabled', () => {
     const hook = renderHook(() => usePersistedAiVaultViewOptions())
 
-    act(() => hook.result.current.setAllAgentsEnabled(false))
+    act(() => hook.result.current.setAllAgentsEnabled(false, AI_VAULT_AGENTS))
     expect(hook.result.current.agents).toEqual([])
 
     act(() => hook.result.current.setAgentEnabled('claude', true))
     expect(hook.result.current.agents).toEqual(['claude'])
 
-    act(() => hook.result.current.setAllAgentsEnabled(true))
+    act(() => hook.result.current.setAllAgentsEnabled(true, AI_VAULT_AGENTS))
+    expect(hook.result.current.agents).toEqual([...AI_VAULT_AGENTS])
+  })
+
+  it('scopes bulk changes so hidden agents keep their saved selection', () => {
+    const hook = renderHook(() => usePersistedAiVaultViewOptions())
+    const visibleAgents = AI_VAULT_AGENTS.filter((agent) => agent !== 'codex')
+
+    act(() => hook.result.current.setAllAgentsEnabled(false, visibleAgents))
+    expect(hook.result.current.agents).toEqual(['codex'])
+
+    act(() => hook.result.current.setAllAgentsEnabled(true, visibleAgents))
     expect(hook.result.current.agents).toEqual([...AI_VAULT_AGENTS])
   })
 
