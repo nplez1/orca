@@ -44,9 +44,9 @@ describe('workspace path-search structural performance contracts', () => {
   })
 
   it('keeps the oracle battery equivalent on cheap realistic and adversarial profiles', () => {
-    for (const shape of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
+    for (const profile of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
       const rows = runWorkspacePathSearchQueryBattery(() =>
-        generateWorkspacePathCatalog({ size: 256, shape, seed: 0x50455246 })
+        generateWorkspacePathCatalog({ size: 256, profile, seed: 0x50455246 })
       )
       expect(rows).toHaveLength(WORKSPACE_PATH_SEARCH_QUERY_BATTERY.length)
     }

@@ -20,9 +20,9 @@ import {
 
 describe('workspace path-search correctness oracle', () => {
   it('agrees with NameFilterPathMatcher over the query battery and both generator profiles', () => {
-    for (const shape of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
+    for (const profile of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
       const rows = runWorkspacePathSearchQueryBattery(() =>
-        generateWorkspacePathCatalog({ size: 512, shape, seed: 0x1234 })
+        generateWorkspacePathCatalog({ size: 512, profile, seed: 0x1234 })
       )
       expect(rows).toHaveLength(WORKSPACE_PATH_SEARCH_QUERY_BATTERY.length)
     }

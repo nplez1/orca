@@ -124,7 +124,7 @@ async function measureCatalog(
     })
     for (const path of generateWorkspacePathCatalog({
       size: Math.ceil(BENCHMARK_PATH_COUNT * 1.4),
-      shape: profile,
+      profile,
       seed: 0x50455246
     })) {
       if (!builder.addPath(path, 'all')) {

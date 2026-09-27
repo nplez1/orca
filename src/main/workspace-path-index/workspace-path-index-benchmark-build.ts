@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import {
   generateWorkspacePathCatalog,
-  type WorkspacePathCatalogShape
+  type WorkspacePathCatalogProfile
 } from '../../shared/__fixtures__/workspace-path-catalog'
 import { isEligibleWorkspaceCatalogPath } from '../../shared/workspace-path-catalog'
 import { sampleProcessMemoryUsage } from '../../shared/__fixtures__/workspace-path-memory-measurement'
@@ -36,7 +36,7 @@ export type BenchmarkBuildObservations = {
 export function createBenchmarkBuildCallback(args: {
   worker: WorkspacePathIndexWorkerClient
   size: number
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   memoryBudgetBytes: number
   observations: BenchmarkBuildObservations
 }): (request: WorkspacePathIndexBuildRequest) => Promise<WorkspacePathIndexBuildResult> {
@@ -65,7 +65,7 @@ export function createBenchmarkBuildCallback(args: {
         let forwardedPathCount = 0
         for (const path of generateWorkspacePathCatalog({
           size: Math.ceil(args.size * 1.3),
-          shape: args.shape,
+          profile: args.profile,
           seed: 0x50455246
         })) {
           if (request.signal.aborted) {

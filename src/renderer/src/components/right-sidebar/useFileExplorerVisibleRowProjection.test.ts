@@ -509,7 +509,7 @@ describe('file explorer visible row projection', () => {
       worktreePath: '/repo/chunked',
       signal: new AbortController().signal
     })
-    const rowShape = (projection: typeof synchronous) =>
+    const visibleRowFields = (projection: typeof synchronous) =>
       projection.getVisibleSlice(0, 10).map(({ relativePath, name, depth, isDirectory }) => ({
         relativePath,
         name,
@@ -517,7 +517,7 @@ describe('file explorer visible row projection', () => {
         isDirectory
       }))
 
-    expect(rowShape(chunked)).toEqual(rowShape(synchronous))
+    expect(visibleRowFields(chunked)).toEqual(visibleRowFields(synchronous))
     expect(chunked.getVisibleSlice(0, 10).map((row) => row.relativePath)).toEqual([
       'a',
       'a/2.ts',

@@ -12,7 +12,7 @@ import type {
   WorkspacePathSearchTimingStage
 } from '../../shared/workspace-path-search-instrumentation'
 import { WORKSPACE_PATH_INDEX_BUILD_PEAK_RESERVATION_BYTES } from '../../shared/__fixtures__/workspace-path-memory-measurement'
-import type { WorkspacePathCatalogShape } from '../../shared/__fixtures__/workspace-path-catalog'
+import type { WorkspacePathCatalogProfile } from '../../shared/__fixtures__/workspace-path-catalog'
 import { WorkspacePathIndexAdmission } from './workspace-path-index-admission'
 import { WorkspacePathIndexService } from './workspace-path-index-service'
 import { WorkspacePathIndexWorkerClient } from './workspace-path-index-worker-client'
@@ -33,7 +33,7 @@ import {
 export async function createWorkspacePathIndexBenchmarkSession(args: {
   workerPath: string
   size: number
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   memoryBudgetBytes: number
 }): Promise<WorkspacePathIndexBenchmarkSession> {
   const owner: WorkspacePathSearchOwnerIdentity = {
@@ -94,7 +94,7 @@ export async function createWorkspacePathIndexBenchmarkSession(args: {
     build: createBenchmarkBuildCallback({
       worker,
       size: args.size,
-      shape: args.shape,
+      profile: args.profile,
       memoryBudgetBytes: args.memoryBudgetBytes,
       observations
     }),
@@ -143,7 +143,7 @@ export async function createWorkspacePathIndexBenchmarkSession(args: {
     buildReservationBytes: args.memoryBudgetBytes,
     firstScope: 'included' as const,
     activeWorkspace: true,
-    correlationId: `matrix-build-${args.size}-${args.shape}`
+    correlationId: `matrix-build-${args.size}-${args.profile}`
   }
   const initialEnsure = await service.ensure(ensureArgs)
   if (!initialEnsure.ready) {
@@ -173,7 +173,7 @@ export async function createWorkspacePathIndexBenchmarkSession(args: {
     async search(queryClass: WorkspacePathIndexQueryClass) {
       const correlationId = `matrix-search-${args.size}-${sequence}`
       const identity: WorkspacePathSearchFenceIdentity = {
-        query: getBenchmarkQueryText(args.shape, queryClass),
+        query: getBenchmarkQueryText(args.profile, queryClass),
         consumer: { consumerId: 'path-index-matrix', sequence: ++sequence },
         owner,
         generationId: null,

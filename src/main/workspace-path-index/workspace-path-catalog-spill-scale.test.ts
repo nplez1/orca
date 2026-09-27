@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   generateWorkspacePathCatalog,
-  type WorkspacePathCatalogShape
+  type WorkspacePathCatalogProfile
 } from '../../shared/__fixtures__/workspace-path-catalog'
 import {
   runWorkspacePathSearchOracle,
@@ -27,7 +27,7 @@ const SPILLED_SCALE_PAGE_BUDGET = {
   maxPaths: 5_000,
   maxSerializedBytes: 1_000_000
 }
-const SPILLED_SCALE_SHAPES: readonly WorkspacePathCatalogShape[] = [
+const SPILLED_SCALE_PROFILES: readonly WorkspacePathCatalogProfile[] = [
   'realistic-shared-prefixes',
   'adversarial-long-unshared'
 ]
@@ -42,22 +42,22 @@ afterEach(async () => {
 })
 
 describe.skipIf(!RUN_SPILLED_SCALE)('spilled workspace path scale parity', () => {
-  it.each(SPILLED_SCALE_SHAPES)(
+  it.each(SPILLED_SCALE_PROFILES)(
     'matches the full oracle battery and scope matrix for a spilled 1M %s catalog',
-    async (shape) => {
+    async (profile) => {
       temporaryDirectory = await mkdtemp(join(tmpdir(), 'orca-spilled-scale-'))
       // The oracle is pure in (snapshot, query, scope): materialize the deterministic fixture once
       // instead of regenerating 1.35M paths for every scope x query.
       let fixtureSnapshot: string[] | null = null
-      const paths = (): string[] => (fixtureSnapshot ??= [...exactFixturePaths(shape)])
+      const paths = (): string[] => (fixtureSnapshot ??= [...exactFixturePaths(profile)])
       const runs = new WorkspacePathCatalogSpillRuns(
         temporaryDirectory,
-        `spill-scale-${shape}`,
-        `spill-scale-generation-${shape}`
+        `spill-scale-${profile}`,
+        `spill-scale-generation-${profile}`
       )
       for (const pathSet of ['included', 'all'] as const) {
         let batch: string[] = []
-        for (const path of exactFixturePaths(shape)) {
+        for (const path of exactFixturePaths(profile)) {
           batch.push(path)
           if (batch.length === 256) {
             if (!(await runs.addBatch(pathSet, batch))) {
@@ -72,7 +72,7 @@ describe.skipIf(!RUN_SPILLED_SCALE)('spilled workspace path scale parity', () =>
       }
       const first = await runs.finishFirstScope('included')
       expect(first?.catalog.storageKind).toBe('disk-spilled')
-      const complete = await runs.finishAllScopes('all', `spill-scale-complete-${shape}`)
+      const complete = await runs.finishAllScopes('all', `spill-scale-complete-${profile}`)
       expect(complete?.catalog.storageKind).toBe('disk-spilled')
       if (!complete || complete.catalog.storageKind !== 'disk-spilled') {
         throw new Error('Spilled scale catalog was not published')
@@ -120,7 +120,7 @@ describe.skipIf(!RUN_SPILLED_SCALE)('spilled workspace path scale parity', () =>
         }
       }
       console.info(
-        `[spilled-path-search-scale] profile=${shape} count=${complete.catalog.pathCount}`
+        `[spilled-path-search-scale] profile=${profile} count=${complete.catalog.pathCount}`
       )
       await runs.cleanupScratch()
     },
@@ -129,11 +129,11 @@ describe.skipIf(!RUN_SPILLED_SCALE)('spilled workspace path scale parity', () =>
   )
 })
 
-function* exactFixturePaths(shape: WorkspacePathCatalogShape): Generator<string> {
+function* exactFixturePaths(profile: WorkspacePathCatalogProfile): Generator<string> {
   let includedCount = 0
   for (const path of generateWorkspacePathCatalog({
     size: Math.ceil(SPILLED_SCALE_SIZE * 1.35),
-    shape,
+    profile,
     seed: 0x50455246
   })) {
     if (!isEligibleWorkspaceCatalogPath(path)) {

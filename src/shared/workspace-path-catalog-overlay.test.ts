@@ -281,7 +281,7 @@ describe('workspace path catalog overlays', () => {
     expect(isWorkspacePathCatalogCompactionDue({ catalog: base, overlay })).toBe(true)
 
     const manyPaths = [
-      ...generateWorkspacePathCatalog({ size: 100_000, shape: 'realistic-shared-prefixes' })
+      ...generateWorkspacePathCatalog({ size: 100_000, profile: 'realistic-shared-prefixes' })
     ]
     const catalog = buildCatalog(manyPaths)
     let cancellationChecks = 0

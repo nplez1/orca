@@ -147,8 +147,8 @@ describe('workspace path catalog core', () => {
   })
 
   it('matches every query and scope for both generated profiles in prefix blocks', async () => {
-    for (const shape of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
-      const paths = [...generateWorkspacePathCatalog({ size: 500, shape, seed: 0x50455246 })]
+    for (const profile of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
+      const paths = [...generateWorkspacePathCatalog({ size: 500, profile, seed: 0x50455246 })]
       const catalog = buildCatalog(paths, 'prefix-compressed')
       for (const scope of allScopeDescriptors()) {
         const options = oracleOptions(scope)
@@ -240,7 +240,7 @@ describe('workspace path catalog core', () => {
 
   it('counts past byte-limited retention and matches escaped JSON page accounting', async () => {
     const paths = [
-      ...generateWorkspacePathCatalog({ size: 96, shape: 'realistic-shared-prefixes' }),
+      ...generateWorkspacePathCatalog({ size: 96, profile: 'realistic-shared-prefixes' }),
       'src/long-budget/"quoted-segment-0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"-target.ts',
       'src/long-budget/"quoted-segment-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"-target.ts'
     ]
@@ -370,7 +370,7 @@ async function assertGeneratedCatalogParity(
   const paths = [
     ...generateWorkspacePathCatalog({
       size,
-      shape: 'realistic-shared-prefixes',
+      profile: 'realistic-shared-prefixes',
       seed: 0x50455246
     })
   ]

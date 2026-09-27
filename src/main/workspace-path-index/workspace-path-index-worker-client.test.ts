@@ -162,7 +162,7 @@ describe('WorkspacePathIndexWorkerClient', () => {
     const paths = [
       ...generateWorkspacePathCatalog({
         size: 30_000,
-        shape: 'realistic-shared-prefixes',
+        profile: 'realistic-shared-prefixes',
         seed: 0x50455246
       })
     ]
@@ -322,7 +322,7 @@ describe('WorkspacePathIndexWorkerClient', () => {
     const snapshot = Array.from(
       generateWorkspacePathCatalog({
         size: 100_000,
-        shape: 'realistic-shared-prefixes',
+        profile: 'realistic-shared-prefixes',
         seed: 0x50455246
       })
     )

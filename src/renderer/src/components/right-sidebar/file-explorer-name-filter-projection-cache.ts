@@ -1,17 +1,22 @@
 import type { FileExplorerNameFilterProjectionSource } from './file-explorer-name-filter-policy'
 import type { FileExplorerRowProjection } from './file-explorer-row-projection'
 
+/** Objects whose identity distinguishes one projection result set from another. */
+type FileExplorerNameFilterProjectionIdentity =
+  | NonNullable<FileExplorerNameFilterProjectionSource['workspacePathSearch']>
+  | NonNullable<FileExplorerNameFilterProjectionSource['relativePaths']>
+
 const projectionCache = new Map<string, FileExplorerRowProjection>()
 const projectionCacheBytesByKey = new Map<string, number>()
 export const projectionEstimatedBytesByObject = new WeakMap<FileExplorerRowProjection, number>()
-const projectionIdentityByObject = new WeakMap<object, number>()
+const projectionIdentityByObject = new WeakMap<FileExplorerNameFilterProjectionIdentity, number>()
 let nextProjectionIdentity = 0
 let cachedProjectionBytes = 0
 const MAX_CACHED_FILTER_PROJECTIONS = 8
 const MAX_CACHED_FILTER_PROJECTION_BYTES = 16 * 1024 * 1024
 export const MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES = 16 * 1024 * 1024
 
-function getProjectionIdentity(value: object): number {
+function getProjectionIdentity(value: FileExplorerNameFilterProjectionIdentity): number {
   const existing = projectionIdentityByObject.get(value)
   if (existing !== undefined) {
     return existing

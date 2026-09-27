@@ -8,10 +8,10 @@ import type {
   WorkspacePathSearchTimingStage
 } from '../../shared/workspace-path-search-instrumentation'
 import type { WorkspacePathIndexService } from './workspace-path-index-service'
-import type { WorkspacePathCatalogShape } from '../../shared/__fixtures__/workspace-path-catalog'
+import type { WorkspacePathCatalogProfile } from '../../shared/__fixtures__/workspace-path-catalog'
 
 export const WORKSPACE_PATH_INDEX_BENCHMARK_SIZES = [100_000, 300_000, 500_000, 1_000_000] as const
-export const WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES: readonly WorkspacePathCatalogShape[] = [
+export const WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES: readonly WorkspacePathCatalogProfile[] = [
   'realistic-shared-prefixes',
   'adversarial-long-unshared'
 ]
@@ -123,7 +123,7 @@ export type WorkspacePathIndexBenchmarkSession = {
 }
 
 const QUERY_TEXT: Record<
-  WorkspacePathCatalogShape,
+  WorkspacePathCatalogProfile,
   Record<WorkspacePathIndexQueryClass, string>
 > = {
   'realistic-shared-prefixes': {
@@ -151,10 +151,10 @@ const QUERY_TEXT: Record<
 }
 
 export function getBenchmarkQueryText(
-  shape: WorkspacePathCatalogShape,
+  profile: WorkspacePathCatalogProfile,
   queryClass: WorkspacePathIndexQueryClass
 ): string {
-  return QUERY_TEXT[shape][queryClass]
+  return QUERY_TEXT[profile][queryClass]
 }
 
 export async function buildWorkspacePathIndexWorkerEntry(
@@ -224,4 +224,4 @@ export function isWorkerMemoryReading(
   )
 }
 
-export type { WorkspacePathCatalogShape }
+export type { WorkspacePathCatalogProfile }

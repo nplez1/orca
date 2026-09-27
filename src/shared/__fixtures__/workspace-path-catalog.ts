@@ -1,11 +1,11 @@
 export const WORKSPACE_PATH_CATALOG_SIZES = [100_000, 300_000, 500_000, 1_000_000] as const
 
 export type WorkspacePathCatalogSize = (typeof WORKSPACE_PATH_CATALOG_SIZES)[number]
-export type WorkspacePathCatalogShape = 'realistic-shared-prefixes' | 'adversarial-long-unshared'
+export type WorkspacePathCatalogProfile = 'realistic-shared-prefixes' | 'adversarial-long-unshared'
 
 export type WorkspacePathCatalogOptions = {
   size: number
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   seed?: number
 }
 
@@ -34,7 +34,7 @@ export const WORKSPACE_PATH_CATALOG_EDGE_PATHS = [
 /** Streams exactly `size` unique, forward-slash relative paths without retaining the catalog. */
 export function* generateWorkspacePathCatalog({
   size,
-  shape,
+  profile,
   seed = 0x4f524341
 }: WorkspacePathCatalogOptions): Generator<string> {
   if (!Number.isSafeInteger(size) || size < 0) {
@@ -50,7 +50,7 @@ export function* generateWorkspacePathCatalog({
   for (let index = edgeCount; index < size; index += 1) {
     const generatedIndex = index - WORKSPACE_PATH_CATALOG_EDGE_PATHS.length
     const randomValue = random()
-    yield shape === 'realistic-shared-prefixes'
+    yield profile === 'realistic-shared-prefixes'
       ? makeRealisticPath(generatedIndex, randomValue)
       : makeAdversarialPath(generatedIndex, randomValue)
   }

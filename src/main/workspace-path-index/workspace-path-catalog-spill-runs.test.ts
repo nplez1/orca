@@ -30,14 +30,14 @@ afterEach(async () => {
 describe('workspace path spill build runs', () => {
   it.each(['realistic-shared-prefixes', 'adversarial-long-unshared'] as const)(
     'matches the oracle battery and all scopes for a spilled %s catalog',
-    async (shape) => {
+    async (profile) => {
       temporaryDirectory = await mkdtemp(join(tmpdir(), 'orca-path-spill-parity-'))
-      const paths = [...generateWorkspacePathCatalog({ size: 500, shape, seed: 0x50455246 })]
+      const paths = [...generateWorkspacePathCatalog({ size: 500, profile, seed: 0x50455246 })]
       const ignoredPaths = new Set(['ignored/reports/target-ignored.ts'])
       const runs = new WorkspacePathCatalogSpillRuns(
         temporaryDirectory,
-        `spill-parity-${shape}`,
-        `spill-parity-generation-${shape}`
+        `spill-parity-${profile}`,
+        `spill-parity-generation-${profile}`
       )
       expect(
         await runs.addBatch(
@@ -47,7 +47,7 @@ describe('workspace path spill build runs', () => {
       ).toBe(true)
       expect(await runs.finishFirstScope('included')).not.toBeNull()
       expect(await runs.addBatch('all', paths)).toBe(true)
-      const completed = await runs.finishAllScopes('all', `spill-parity-complete-${shape}`)
+      const completed = await runs.finishAllScopes('all', `spill-parity-complete-${profile}`)
       expect(completed).not.toBeNull()
       if (!completed || completed.catalog.storageKind !== 'disk-spilled') {
         throw new Error('Expected completed spill catalog')

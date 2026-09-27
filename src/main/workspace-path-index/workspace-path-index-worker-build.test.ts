@@ -290,7 +290,7 @@ describe('WorkspacePathIndexWorkerClient streamed builds', () => {
     let batch: string[] = []
     for (const path of generateWorkspacePathCatalog({
       size: 50_000,
-      shape: 'realistic-shared-prefixes',
+      profile: 'realistic-shared-prefixes',
       seed: 0x50455246
     })) {
       batch.push(path)
@@ -414,7 +414,7 @@ describe('WorkspacePathIndexWorkerClient streamed builds', () => {
     let batch: string[] = []
     for (const path of generateWorkspacePathCatalog({
       size: 50_000,
-      shape: 'realistic-shared-prefixes',
+      profile: 'realistic-shared-prefixes',
       seed: 0x50455246
     })) {
       batch.push(path)

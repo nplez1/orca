@@ -90,7 +90,7 @@ async function benchmarkStorage(
     let discovered = 0
     for (const path of generateWorkspacePathCatalog({
       size: Math.ceil(STORAGE_BENCHMARK_PATH_COUNT * 1.3),
-      shape: 'realistic-shared-prefixes',
+      profile: 'realistic-shared-prefixes',
       seed: 0x50455246
     })) {
       if (!builder.addPath(path, 'all')) {

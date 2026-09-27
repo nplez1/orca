@@ -7,7 +7,7 @@ const discovery = await readJson('workspace-path-index-discovery.json')
 const renderer = await readJson('workspace-path-index-renderer-matrix.json')
 const output = join(outputDirectory, 'workspace-path-index-matrix.md')
 const sizes = matrix.metadata.selectedSizes
-const shapes = ['realistic-shared-prefixes', 'adversarial-long-unshared']
+const profiles = ['realistic-shared-prefixes', 'adversarial-long-unshared']
 const queryClasses = matrix.matrix[0]?.queries.map((query) => query.queryClass) ?? []
 const lines = [
   '# Workspace path-index performance matrix',
@@ -30,15 +30,17 @@ const lines = [
 
 for (const queryClass of queryClasses) {
   const cells = sizes.map((size) => {
-    const rows = shapes.map((shape) => {
-      const fixture = matrix.matrix.find((entry) => entry.size === size && entry.shape === shape)
+    const rows = profiles.map((profile) => {
+      const fixture = matrix.matrix.find(
+        (entry) => entry.size === size && entry.profile === profile
+      )
       const result = fixture?.queries.find((query) => query.queryClass === queryClass)
       const verdict = String(result?.verdict ?? 'unmeasured').toUpperCase()
       const excess =
         typeof result?.overTargetMilliseconds === 'number'
           ? ` (+${format(result.overTargetMilliseconds)} over)`
           : ''
-      return `${shape === shapes[0] ? 'R' : 'A'} ${format(result?.p95Milliseconds)} ms ${verdict}${excess}`
+      return `${profile === profiles[0] ? 'R' : 'A'} ${format(result?.p95Milliseconds)} ms ${verdict}${excess}`
     })
     return rows.join('<br>')
   })
@@ -56,7 +58,7 @@ lines.push(
 )
 for (const fixture of matrix.matrix) {
   lines.push(
-    `| ${fixture.shape} | ${fixture.size.toLocaleString()} | ${format(fixture.build?.firstScopeReadyMilliseconds)} | ${format(fixture.build?.allScopesReadyMilliseconds)} | ${format(fixture.build?.generatedPathsPerSecond, 0)} | ${format(fixture.build?.retainedBytes, 0)} | ${formatMiB(fixture.build?.memorySamples?.[0]?.rssBytes)} / ${formatMiB(fixture.build?.peakRssBytes)} / +${formatMiB(fixture.build?.peakRssDeltaBytes)} | ${formatMiB(fixture.build?.peakHostHeapUsedBytes)} | ${formatMiB(fixture.build?.peakHostExternalBytes)} | ${formatMiB(fixture.build?.peakWorkerHeapUsedBytes)} / +${formatMiB(fixture.build?.peakWorkerHeapUsedDeltaBytes)} | ${formatMiB(fixture.build?.peakWorkerExternalBytes)} | ${format(fixture.build?.eventLoopDelayMaximumMilliseconds)} |`
+    `| ${fixture.profile} | ${fixture.size.toLocaleString()} | ${format(fixture.build?.firstScopeReadyMilliseconds)} | ${format(fixture.build?.allScopesReadyMilliseconds)} | ${format(fixture.build?.generatedPathsPerSecond, 0)} | ${format(fixture.build?.retainedBytes, 0)} | ${formatMiB(fixture.build?.memorySamples?.[0]?.rssBytes)} / ${formatMiB(fixture.build?.peakRssBytes)} / +${formatMiB(fixture.build?.peakRssDeltaBytes)} | ${formatMiB(fixture.build?.peakHostHeapUsedBytes)} | ${formatMiB(fixture.build?.peakHostExternalBytes)} | ${formatMiB(fixture.build?.peakWorkerHeapUsedBytes)} / +${formatMiB(fixture.build?.peakWorkerHeapUsedDeltaBytes)} | ${formatMiB(fixture.build?.peakWorkerExternalBytes)} | ${format(fixture.build?.eventLoopDelayMaximumMilliseconds)} |`
   )
 }
 lines.push(
@@ -105,7 +107,7 @@ lines.push(
   '- Input-to-paint: unmeasured. No hidden-renderer CDP session was available with the required `$electron` skill in this environment; no paint number is inferred or fabricated. Host round-trip, projection, and virtual commit were measured separately and are not summed because they came from independent runs.',
   '- Phase 6 query acceleration: needed for the 1M target. Every size/profile/class misses; selective/no-match, multi-token, long-path, Unicode, extension/directory, and slash-spanning queries scan the complete candidate set and are trigram-addressable. One-character broad scans are not trigram-addressable and also miss; postings cannot remove their O(N) cost.',
   '- Phase 6 compact/spill: needed to meet the 1M scale floor under 256 MiB/root. Default service admission stops at the measured profile-specific boundaries above, below 1M. The 1M reservation is refused; retain a visible fallback until compact/spill is measured.',
-  `- Phase 7 checkpointing: measure a prototype before deciding to implement. Cold synthetic all-scope rebuilds cost ${formatBuildAt(matrix, 1_000_000, shapes[0])} ms realistic and ${formatBuildAt(matrix, 1_000_000, shapes[1])} ms adversarial; the real 100k filesystem build is ${format(discovery.allScopesReadyMilliseconds)} ms. Checkpoint load plus reconciliation/revisit latency is not implemented or measured, so rebuild cost alone does not establish net benefit.`,
+  `- Phase 7 checkpointing: measure a prototype before deciding to implement. Cold synthetic all-scope rebuilds cost ${formatBuildAt(matrix, 1_000_000, profiles[0])} ms realistic and ${formatBuildAt(matrix, 1_000_000, profiles[1])} ms adversarial; the real 100k filesystem build is ${format(discovery.allScopesReadyMilliseconds)} ms. Checkpoint load plus reconciliation/revisit latency is not implemented or measured, so rebuild cost alone does not establish net benefit.`,
   '',
   '## Re-run',
   '',
@@ -138,7 +140,7 @@ function maxValue(values) {
   return values.length > 0 ? Math.max(...values) : null
 }
 
-function formatBuildAt(report, size, shape) {
-  const fixture = report.matrix.find((entry) => entry.size === size && entry.shape === shape)
+function formatBuildAt(report, size, profile) {
+  const fixture = report.matrix.find((entry) => entry.size === size && entry.profile === profile)
   return format(fixture?.build?.allScopesReadyMilliseconds, 0)
 }

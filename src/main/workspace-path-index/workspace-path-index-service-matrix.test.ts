@@ -25,7 +25,7 @@ import {
   WORKSPACE_PATH_INDEX_BENCHMARK_MILLION_REPETITIONS,
   WORKSPACE_PATH_INDEX_BENCHMARK_REPETITIONS,
   WORKSPACE_PATH_INDEX_BENCHMARK_SEED,
-  WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES,
+  WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES,
   WORKSPACE_PATH_INDEX_BENCHMARK_SIZES,
   WORKSPACE_PATH_INDEX_QUERY_CLASSES,
   type WorkspacePathIndexQueryClass
@@ -61,15 +61,15 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
     const fixtures: Record<string, unknown>[] = []
     let churn: Record<string, unknown> | null = null
     try {
-      for (const shape of WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES) {
+      for (const profile of WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES) {
         for (const size of MATRIX_SIZES) {
-          const fixtureId = `${shape}:${size}`
-          const estimatedPeakBytes = estimateFixturePeakBytes(size, shape)
+          const fixtureId = `${profile}:${size}`
+          const estimatedPeakBytes = estimateFixturePeakBytes(size, profile)
           if (estimatedPeakBytes > Math.min(freemem() * 0.75, MATRIX_BUDGET_BYTES)) {
             fixtures.push({
               fixtureId,
               size,
-              shape,
+              profile,
               seed: WORKSPACE_PATH_INDEX_BENCHMARK_SEED,
               status: 'resource-cap',
               estimatedPeakBytes,
@@ -81,7 +81,7 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
           const session = await createWorkspacePathIndexBenchmarkSession({
             workerPath,
             size,
-            shape,
+            profile,
             memoryBudgetBytes: MATRIX_BUDGET_BYTES
           })
           try {
@@ -94,7 +94,7 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
             const fixture: Record<string, unknown> = {
               fixtureId,
               size,
-              shape,
+              profile,
               seed: WORKSPACE_PATH_INDEX_BENCHMARK_SEED,
               status: session.ready ? 'measured' : 'build-unavailable',
               build: {
@@ -115,7 +115,7 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
             const defaultBudgetSession = await createWorkspacePathIndexBenchmarkSession({
               workerPath,
               size,
-              shape,
+              profile,
               memoryBudgetBytes: WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES
             })
             try {
@@ -144,7 +144,7 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
             if (
               !churn &&
               size === 100_000 &&
-              shape === 'realistic-shared-prefixes' &&
+              profile === 'realistic-shared-prefixes' &&
               session.ready
             ) {
               churn = await measureChurn(session, fixtures.length)
@@ -190,7 +190,7 @@ describe.skipIf(!runMatrix)('workspace path index service performance matrix', (
         `[workspace-path-index-matrix] fixtures=${fixtures.length} churn=${Boolean(churn)}`
       )
       expect(fixtures).toHaveLength(
-        MATRIX_SIZES.length * WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES.length
+        MATRIX_SIZES.length * WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES.length
       )
     } finally {
       await removePathIndexBenchmarkTemporaryDirectory(temporaryDirectory)
@@ -286,14 +286,14 @@ async function measureChurn(
 async function measureAdmissionBoundary(workerPath: string): Promise<Record<string, unknown>> {
   const rootBudgetBytes = WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES
   const hostBudgetBytes = WORKSPACE_PATH_INDEX_HOST_MEMORY_BUDGET_BYTES
-  const boundaries = WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES.map((shape) => {
+  const boundaries = WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES.map((profile) => {
     let reservationBytes = 0
     let admittedCatalogPathCount = 0
     let generatedPathsBeforeBoundary = 0
     let nextPathReservationBytes: number | null = null
     for (const path of generateWorkspacePathCatalog({
       size: 1_000_000,
-      shape,
+      profile,
       seed: WORKSPACE_PATH_INDEX_BENCHMARK_SEED
     })) {
       generatedPathsBeforeBoundary += 1
@@ -313,7 +313,7 @@ async function measureAdmissionBoundary(workerPath: string): Promise<Record<stri
       admittedCatalogPathCount += 1
     }
     return {
-      fixtureId: shape,
+      fixtureId: profile,
       maximumEligibleCatalogPathCountByBuilderReservation: admittedCatalogPathCount,
       generatedPathsBeforeBoundary,
       maximumSingleRootReservationBytes: reservationBytes,
@@ -372,8 +372,8 @@ async function measureAdmissionBoundary(workerPath: string): Promise<Record<stri
   })
   service.dispose()
   const verifiedServiceBoundary: Record<string, unknown>[] = []
-  for (const shape of WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES) {
-    verifiedServiceBoundary.push(await measureVerifiedServiceBoundary(workerPath, shape))
+  for (const profile of WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES) {
+    verifiedServiceBoundary.push(await measureVerifiedServiceBoundary(workerPath, profile))
   }
   return {
     defaultRootBudgetBytes: rootBudgetBytes,
@@ -399,19 +399,19 @@ async function measureAdmissionBoundary(workerPath: string): Promise<Record<stri
 
 async function measureVerifiedServiceBoundary(
   workerPath: string,
-  shape: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES)[number]
+  profile: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES)[number]
 ): Promise<Record<string, unknown>> {
   let admittedSize = 0
   let rejectedSize = 1_000_000
   const probes: Record<string, unknown>[] = []
   const millionProbes: { admitted: boolean; record: Record<string, unknown> }[] = []
   for (let repetition = 0; repetition < 2; repetition += 1) {
-    millionProbes.push(await runBoundaryProbe(workerPath, shape, 1_000_000, repetition))
+    millionProbes.push(await runBoundaryProbe(workerPath, profile, 1_000_000, repetition))
   }
   probes.push(...millionProbes.map((probe) => probe.record))
   if (millionProbes.every((probe) => probe.admitted)) {
     return {
-      fixtureId: shape,
+      fixtureId: profile,
       method:
         'complete 1M WorkspacePathIndexService worker build at default budgets; scale-floor admission proven',
       requestedPathCountResolution: 1_000,
@@ -422,7 +422,7 @@ async function measureVerifiedServiceBoundary(
   }
   while (rejectedSize - admittedSize > 1_000) {
     const candidateSize = Math.floor((admittedSize + rejectedSize) / 2 / 1_000) * 1_000
-    const probe = await runBoundaryProbe(workerPath, shape, candidateSize)
+    const probe = await runBoundaryProbe(workerPath, profile, candidateSize)
     probes.push(probe.record)
     if (probe.admitted) {
       admittedSize = candidateSize
@@ -431,7 +431,7 @@ async function measureVerifiedServiceBoundary(
     }
   }
   return {
-    fixtureId: shape,
+    fixtureId: profile,
     method:
       'binary search through complete WorkspacePathIndexService worker builds at default budgets',
     requestedPathCountResolution: 1_000,
@@ -443,14 +443,14 @@ async function measureVerifiedServiceBoundary(
 
 async function runBoundaryProbe(
   workerPath: string,
-  shape: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES)[number],
+  profile: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES)[number],
   candidateSize: number,
   repetition = 0
 ): Promise<{ admitted: boolean; record: Record<string, unknown> }> {
   const session = await createWorkspacePathIndexBenchmarkSession({
     workerPath,
     size: candidateSize,
-    shape,
+    profile,
     memoryBudgetBytes: WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES
   })
   try {
@@ -555,13 +555,13 @@ function percentile(sortedValues: readonly number[], quantile: number): number |
 
 function estimateFixturePeakBytes(
   size: number,
-  shape: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES)[number]
+  profile: (typeof WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES)[number]
 ): number {
   let sampledCharacters = 0
   let sampledPaths = 0
   for (const path of generateWorkspacePathCatalog({
     size: 1_000,
-    shape,
+    profile,
     seed: WORKSPACE_PATH_INDEX_BENCHMARK_SEED
   })) {
     sampledCharacters += path.length

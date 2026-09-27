@@ -117,26 +117,31 @@ export function validateWorkspacePathCatalogCheckpointManifest(
   }
 }
 
-function readString(source: object, key: string): string | null {
-  if (!(key in source)) {
+function readString(source: unknown, key: string): string | null {
+  if (!isManifestFieldSource(source) || !(key in source)) {
     return null
   }
-  const value: unknown = Reflect.get(source, key)
+  const value = source[key]
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
-function readCount(source: object, key: string): number | null {
-  if (!(key in source)) {
+function readCount(source: unknown, key: string): number | null {
+  if (!isManifestFieldSource(source) || !(key in source)) {
     return null
   }
-  const value: unknown = Reflect.get(source, key)
+  const value = source[key]
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
 function readScope(
-  source: object,
+  source: unknown,
   key: string
 ): WorkspacePathCatalogCheckpointManifest['publishedScope'] | null {
   const value = readString(source, key)
   return value === 'included' || value === 'all' || value === 'both' ? value : null
+}
+
+/** The manifest is parsed from a file, so fields are read off an unknown record at that boundary. */
+function isManifestFieldSource(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

@@ -40,7 +40,7 @@ describe.skipIf(!runCatalogBenchmark)('workspace path catalog warm-query perform
         let discovered = 0
         for (const path of generateWorkspacePathCatalog({
           size: Math.ceil(size * 1.3),
-          shape: 'realistic-shared-prefixes',
+          profile: 'realistic-shared-prefixes',
           seed: 0x50455246
         })) {
           if (!builder.addPath(path, 'all')) {

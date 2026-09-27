@@ -6,26 +6,26 @@ import {
 
 describe('workspace path catalog generator', () => {
   it('is deterministic for matching seeds, sizes, and profiles', () => {
-    for (const shape of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
-      const first = [...generateWorkspacePathCatalog({ size: 256, shape, seed: 17 })]
-      const second = [...generateWorkspacePathCatalog({ size: 256, shape, seed: 17 })]
+    for (const profile of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
+      const first = [...generateWorkspacePathCatalog({ size: 256, profile, seed: 17 })]
+      const second = [...generateWorkspacePathCatalog({ size: 256, profile, seed: 17 })]
       expect(first).toEqual(second)
       expect(new Set(first).size).toBe(first.length)
     }
   })
 
   it('streams exactly the requested number of paths and varies by seed', () => {
-    const options = { size: 128, shape: 'realistic-shared-prefixes' as const }
+    const options = { size: 128, profile: 'realistic-shared-prefixes' as const }
     const first = [...generateWorkspacePathCatalog({ ...options, seed: 1 })]
     const second = [...generateWorkspacePathCatalog({ ...options, seed: 2 })]
     expect(first).toHaveLength(options.size)
     expect(first).not.toEqual(second)
-    expect([...generateWorkspacePathCatalog({ size: 0, shape: options.shape })]).toEqual([])
+    expect([...generateWorkspacePathCatalog({ size: 0, profile: options.profile })]).toEqual([])
   })
 
   it('covers the planned Unicode, natural-sort, mixed-case, slash, and dotfile corpus', () => {
     const generated = [
-      ...generateWorkspacePathCatalog({ size: 128, shape: 'realistic-shared-prefixes' })
+      ...generateWorkspacePathCatalog({ size: 128, profile: 'realistic-shared-prefixes' })
     ]
     for (const edgePath of WORKSPACE_PATH_CATALOG_EDGE_PATHS) {
       expect(generated).toContain(edgePath)
@@ -42,10 +42,10 @@ describe('workspace path catalog generator', () => {
 
   it('creates shared dense prefixes and longer near-unique adversarial paths', () => {
     const realistic = [
-      ...generateWorkspacePathCatalog({ size: 512, shape: 'realistic-shared-prefixes' })
+      ...generateWorkspacePathCatalog({ size: 512, profile: 'realistic-shared-prefixes' })
     ]
     const adversarial = [
-      ...generateWorkspacePathCatalog({ size: 512, shape: 'adversarial-long-unshared' })
+      ...generateWorkspacePathCatalog({ size: 512, profile: 'adversarial-long-unshared' })
     ]
     const realisticGenerated = realistic.slice(WORKSPACE_PATH_CATALOG_EDGE_PATHS.length)
     const adversarialGenerated = adversarial.slice(WORKSPACE_PATH_CATALOG_EDGE_PATHS.length)
@@ -62,10 +62,10 @@ describe('workspace path catalog generator', () => {
 
   it('rejects invalid sizes', () => {
     expect(() => [
-      ...generateWorkspacePathCatalog({ size: -1, shape: 'realistic-shared-prefixes' })
+      ...generateWorkspacePathCatalog({ size: -1, profile: 'realistic-shared-prefixes' })
     ]).toThrow(RangeError)
     expect(() => [
-      ...generateWorkspacePathCatalog({ size: 1.5, shape: 'adversarial-long-unshared' })
+      ...generateWorkspacePathCatalog({ size: 1.5, profile: 'adversarial-long-unshared' })
     ]).toThrow(RangeError)
   })
 })

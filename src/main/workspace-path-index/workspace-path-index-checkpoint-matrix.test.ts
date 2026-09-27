@@ -24,9 +24,9 @@ import {
   createPathIndexBenchmarkTemporaryDirectory,
   getBenchmarkQueryText,
   removePathIndexBenchmarkTemporaryDirectory,
-  WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES,
+  WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES,
   WORKSPACE_PATH_INDEX_BENCHMARK_SIZES,
-  type WorkspacePathCatalogShape
+  type WorkspacePathCatalogProfile
 } from './workspace-path-index-benchmark-fixture'
 import { WorkspacePathIndexService } from './workspace-path-index-service'
 import { WorkspacePathIndexWorkerClient } from './workspace-path-index-worker-client'
@@ -58,11 +58,11 @@ const SIZES = process.env.ORCA_PATH_INDEX_CHECKPOINT_SIZES
       .map((value) => Number(value.trim()))
       .filter((size) => Number.isSafeInteger(size) && size > 0)
   : WORKSPACE_PATH_INDEX_BENCHMARK_SIZES.filter((size) => size <= MAX_SIZE)
-const SHAPES = process.env.ORCA_PATH_INDEX_CHECKPOINT_SHAPE
-  ? WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES.filter(
-      (shape) => shape === process.env.ORCA_PATH_INDEX_CHECKPOINT_SHAPE
+const PROFILES = process.env.ORCA_PATH_INDEX_CHECKPOINT_SHAPE
+  ? WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES.filter(
+      (profile) => profile === process.env.ORCA_PATH_INDEX_CHECKPOINT_SHAPE
     )
-  : WORKSPACE_PATH_INDEX_BENCHMARK_SHAPES
+  : WORKSPACE_PATH_INDEX_BENCHMARK_PROFILES
 const RESTORE_REPETITIONS = 5
 const WRITE_REPETITIONS = 3
 const ROW_BUDGET_BYTES = WORKSPACE_PATH_INDEX_ROOT_MEMORY_BUDGET_BYTES
@@ -86,13 +86,13 @@ describe.skipIf(!RUN_MATRIX)('workspace path index checkpoint matrix', () => {
       const workerPath = await buildWorkspacePathIndexWorkerEntry(temporaryDirectory)
       const cells: Record<string, unknown>[] = []
       try {
-        for (const shape of SHAPES) {
+        for (const profile of PROFILES) {
           for (const size of SIZES) {
             cells.push(
               await measureCell({
                 workerPath,
                 temporaryDirectory,
-                shape,
+                profile,
                 size
               })
             )
@@ -143,20 +143,20 @@ function createReport(cells: readonly Record<string, unknown>[]): Record<string,
 async function measureCell(args: {
   workerPath: string
   temporaryDirectory: string
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   size: number
 }): Promise<Record<string, unknown>> {
-  const cellDirectory = join(args.temporaryDirectory, `${args.shape}-${args.size}`)
+  const cellDirectory = join(args.temporaryDirectory, `${args.profile}-${args.size}`)
   const spillDirectory = join(cellDirectory, 'spill')
   const checkpointDirectory = workspacePathCatalogCheckpointDirectory(
     join(cellDirectory, 'checkpoints'),
-    workspacePathCatalogCheckpointIdentityHash(`${args.shape}:${args.size}`)
+    workspacePathCatalogCheckpointIdentityHash(`${args.profile}:${args.size}`)
   )
   const cellArgs = {
     workerPath: args.workerPath,
     spillDirectory,
     checkpointDirectory,
-    shape: args.shape,
+    profile: args.profile,
     size: args.size
   }
 
@@ -320,8 +320,8 @@ async function measureCell(args: {
   }
 
   return {
-    fixtureId: `${args.shape}:${args.size}`,
-    shape: args.shape,
+    fixtureId: `${args.profile}:${args.size}`,
+    profile: args.profile,
     size: args.size,
     storageMode,
     spillFileBytes,
@@ -405,20 +405,20 @@ function lastSpillBlocksRead(events: readonly WorkspacePathSearchInstrumentation
   return blocks
 }
 
-function ownerFor(shape: string, size: number) {
+function ownerFor(profile: string, size: number) {
   return {
     executionHost: {
       provider: 'local' as const,
       incarnationId: 'checkpoint-matrix'
     },
-    authorizedCanonicalRoot: `/checkpoint-matrix/${shape}/${size}`
+    authorizedCanonicalRoot: `/checkpoint-matrix/${profile}/${size}`
   }
 }
 
 type Harness = {
   service: WorkspacePathIndexService
   worker: WorkspacePathIndexWorkerClient
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   size: number
   owner: ReturnType<typeof ownerFor>
   identity: WorkspacePathSearchFenceIdentity
@@ -432,12 +432,12 @@ function createService(args: {
   workerPath: string
   spillDirectory: string
   checkpointDirectory: string
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   size: number
 }): Harness {
   const events: WorkspacePathSearchInstrumentationEvent[] = []
   const worker = createWorker(args.workerPath, args.spillDirectory, events)
-  const owner = ownerFor(args.shape, args.size)
+  const owner = ownerFor(args.profile, args.size)
   const storage: Harness['storage'] = { mode: 'unknown', spillFileBytes: 0 }
   const observations: BenchmarkBuildObservations = {
     startedAt: 0,
@@ -463,12 +463,12 @@ function createService(args: {
   return {
     service,
     worker,
-    shape: args.shape,
+    profile: args.profile,
     size: args.size,
     owner,
     identity: {
-      query: getBenchmarkQueryText(args.shape, 'broad-one-character'),
-      consumer: { consumerId: `checkpoint-matrix-${args.shape}`, sequence: 1 },
+      query: getBenchmarkQueryText(args.profile, 'broad-one-character'),
+      consumer: { consumerId: `checkpoint-matrix-${args.profile}`, sequence: 1 },
       owner,
       generationId: null,
       mode: 'name-filter',
@@ -483,7 +483,7 @@ function createService(args: {
     observations,
     storage,
     events,
-    correlationId: `checkpoint-matrix-${args.shape}-${args.size}`
+    correlationId: `checkpoint-matrix-${args.profile}-${args.size}`
   }
 }
 
@@ -495,7 +495,7 @@ function createServiceInstance(
     observations: BenchmarkBuildObservations
     args: {
       checkpointDirectory: string
-      shape: WorkspacePathCatalogShape
+      profile: WorkspacePathCatalogProfile
       size: number
     }
   }
@@ -507,7 +507,7 @@ function createServiceInstance(
       const built = await createBenchmarkBuildCallback({
         worker,
         size: args.size,
-        shape: args.shape,
+        profile: args.profile,
         memoryBudgetBytes: ROW_BUDGET_BYTES,
         observations
       })(request)
@@ -566,7 +566,7 @@ async function createReadyService(args: {
   workerPath: string
   spillDirectory: string
   checkpointDirectory: string
-  shape: WorkspacePathCatalogShape
+  profile: WorkspacePathCatalogProfile
   size: number
 }): Promise<
   Harness & {
@@ -593,7 +593,7 @@ async function createReadyService(args: {
     ensured = await ensureOnce()
   }
   if (!ensured.ready) {
-    throw new Error(`Cold build never became ready for ${args.shape}:${args.size}`)
+    throw new Error(`Cold build never became ready for ${args.profile}:${args.size}`)
   }
   // A first-scope publication is already "ready"; the checkpoint unit is the complete snapshot.
   for (let attempt = 0; harness.observations.outcome === null && attempt < 7_200; attempt += 1) {
@@ -603,14 +603,14 @@ async function createReadyService(args: {
     await sleep(100)
   }
   if (harness.observations.outcome === null) {
-    throw new Error(`Cold build never published both scopes for ${args.shape}:${args.size}`)
+    throw new Error(`Cold build never published both scopes for ${args.profile}:${args.size}`)
   }
   await sleep(100)
   // Re-read after completion: the final generation carries the second scope, unlike the
   // first-scope publication that made the entry "ready" moments earlier.
   const completed = await ensureOnce()
   if (!completed.ready) {
-    throw new Error(`Completed build did not stay ready for ${args.shape}:${args.size}`)
+    throw new Error(`Completed build did not stay ready for ${args.profile}:${args.size}`)
   }
   const observations = harness.observations
   return {

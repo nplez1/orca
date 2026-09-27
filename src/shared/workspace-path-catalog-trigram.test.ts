@@ -213,10 +213,10 @@ describe('workspace path catalog trigram postings', () => {
         excludePaths: ['/fixture/packages/app']
       }
     ] as const
-    for (const shape of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
+    for (const profile of ['realistic-shared-prefixes', 'adversarial-long-unshared'] as const) {
       const snapshot = [
         ...new Set([
-          ...generateWorkspacePathCatalog({ size: 512, shape, seed: 0x6a71 }),
+          ...generateWorkspacePathCatalog({ size: 512, profile, seed: 0x6a71 }),
           ignoredPath,
           excludedPath
         ])
@@ -242,7 +242,7 @@ describe('workspace path catalog trigram postings', () => {
               totalCount: actual.count.value ?? -1
             })
           } catch (error) {
-            throw new Error(`${shape}/${JSON.stringify(descriptor.scope)}: ${String(error)}`)
+            throw new Error(`${profile}/${JSON.stringify(descriptor.scope)}: ${String(error)}`)
           }
         }
       }

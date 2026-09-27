@@ -32,7 +32,7 @@ function staged(mode: string, path: string): string {
 }
 
 function emitStdoutChunk(process: ChildProcess, chunk: string): void {
-  const stdout = Reflect.get(process, 'stdout')
+  const stdout = process.stdout
   if (!(stdout instanceof EventEmitter)) {
     throw new Error('Test process stdout is not an EventEmitter')
   }
