@@ -4,13 +4,6 @@ import type { JiraBoard, JiraField, JiraSiteSelection } from '../../../../shared
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import {
@@ -19,6 +12,13 @@ import {
   type RuntimeJiraSettings
 } from '@/runtime/runtime-jira-client'
 import { SearchableSetting } from './SearchableSetting'
+import {
+  boardOptionValue,
+  boardSelectionOptionValue,
+  buildJiraBoardOptions,
+  buildJiraTeamFieldOptions
+} from './jira-settings-combobox-options'
+import { SETTINGS_COMBOBOX_NONE, SettingsCombobox } from './SettingsCombobox'
 import { getTasksPaneSearchKeywords } from './tasks-search'
 
 type JiraBoardSettingsProps = {
@@ -26,9 +26,8 @@ type JiraBoardSettingsProps = {
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }
 
-function boardSelectionValue(board: Pick<JiraBoard, 'siteId' | 'id'>): string {
-  return `${encodeURIComponent(board.siteId)}:${encodeURIComponent(board.id)}`
-}
+// Why: the picker queries Jira by name, so every keystroke must not become a request.
+const BOARD_SEARCH_DEBOUNCE_MS = 300
 
 function isTeamFieldSupported(field: JiraField): boolean {
   return (
@@ -55,13 +54,19 @@ export function JiraBoardSettings({
     [settings.activeRuntimeEnvironmentId]
   )
   const selectedBoard = settings.defaultJiraBoard
-  const fieldSiteId = selectedBoard?.siteId
+  // Why: the custom-field list is site-scoped, not board-scoped. Keying it off the
+  // selected board left the Team field disabled whenever no board was chosen —
+  // including every case where the board list failed to load.
+  const fieldSiteSelection: JiraSiteSelection | undefined = selectedBoard?.siteId ?? selectedSiteId
   const [boards, setBoards] = useState<JiraBoard[]>([])
   const [fields, setFields] = useState<JiraField[]>([])
   const [boardsLoading, setBoardsLoading] = useState(false)
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
+  const [boardQuery, setBoardQuery] = useState('')
+  const [appliedBoardQuery, setAppliedBoardQuery] = useState('')
+  const [teamFieldQuery, setTeamFieldQuery] = useState('')
   const [teamValueDraft, setTeamValueDraft] = useState(settings.jiraTeamValue)
 
   useEffect(() => {
@@ -69,11 +74,19 @@ export function JiraBoardSettings({
   }, [settings.jiraTeamValue])
 
   useEffect(() => {
+    const timer = setTimeout(
+      () => setAppliedBoardQuery(boardQuery.trim()),
+      BOARD_SEARCH_DEBOUNCE_MS
+    )
+    return () => clearTimeout(timer)
+  }, [boardQuery])
+
+  useEffect(() => {
     let cancelled = false
     setBoardsLoading(true)
     setLoadError(null)
     void checkJiraConnection()
-    void jiraListBoards(runtimeSettings, selectedSiteId)
+    void jiraListBoards(runtimeSettings, selectedSiteId, appliedBoardQuery || undefined)
       .then((nextBoards) => {
         if (!cancelled) {
           setBoards(nextBoards)
@@ -93,16 +106,16 @@ export function JiraBoardSettings({
     return () => {
       cancelled = true
     }
-  }, [checkJiraConnection, retryNonce, runtimeSettings, selectedSiteId])
+  }, [appliedBoardQuery, checkJiraConnection, retryNonce, runtimeSettings, selectedSiteId])
 
   useEffect(() => {
     let cancelled = false
-    if (!fieldSiteId) {
+    if (!fieldSiteSelection) {
       setFields([])
       return
     }
     setFieldsLoading(true)
-    void jiraListCustomFields(runtimeSettings, fieldSiteId)
+    void jiraListCustomFields(runtimeSettings, fieldSiteSelection)
       .then((nextFields) => {
         if (!cancelled) {
           setFields(nextFields.filter(isTeamFieldSupported))
@@ -122,11 +135,41 @@ export function JiraBoardSettings({
     return () => {
       cancelled = true
     }
-  }, [fieldSiteId, retryNonce, runtimeSettings])
+  }, [fieldSiteSelection, retryNonce, runtimeSettings])
 
+  const boardOptions = useMemo(
+    () => [
+      {
+        value: SETTINGS_COMBOBOX_NONE,
+        label: translate(
+          'auto.components.settings.JiraBoardSettings.useListView',
+          'No default board (use issue list)'
+        )
+      },
+      ...buildJiraBoardOptions(
+        boards,
+        selectedBoard,
+        translate('auto.components.settings.JiraBoardSettings.unnamedBoard', 'Board {{value0}}', {
+          value0: selectedBoard?.boardId ?? ''
+        })
+      )
+    ],
+    [boards, selectedBoard]
+  )
+  const showFieldSiteNames = new Set(fields.map((field) => field.siteId)).size > 1
+  const teamFieldOptions = useMemo(
+    () => [
+      {
+        value: SETTINGS_COMBOBOX_NONE,
+        label: translate('auto.components.settings.JiraBoardSettings.noTeamField', 'No Team field')
+      },
+      ...buildJiraTeamFieldOptions(fields, teamFieldQuery, showFieldSiteNames)
+    ],
+    [fields, showFieldSiteNames, teamFieldQuery]
+  )
   const selectedBoardValue = selectedBoard
-    ? `${encodeURIComponent(selectedBoard.siteId)}:${encodeURIComponent(selectedBoard.boardId)}`
-    : '__no-board__'
+    ? boardSelectionOptionValue(selectedBoard)
+    : SETTINGS_COMBOBOX_NONE
 
   const saveTeamValue = (): void => {
     const normalized = teamValueDraft.trim()
@@ -154,91 +197,108 @@ export function JiraBoardSettings({
                 'Default board'
               )}
             </Label>
-            <Select
+            <SettingsCombobox
+              id="tasks-jira-default-board"
               value={selectedBoardValue}
               onValueChange={(value) => {
-                if (value === '__no-board__') {
+                if (value === SETTINGS_COMBOBOX_NONE) {
                   updateSettings({ defaultJiraBoard: null })
                   return
                 }
-                const board = boards.find((candidate) => boardSelectionValue(candidate) === value)
+                const board = boards.find((candidate) => boardOptionValue(candidate) === value)
                 if (!board) {
                   return
                 }
                 const siteChanged = board.siteId !== selectedBoard?.siteId
                 updateSettings({
-                  defaultJiraBoard: { boardId: board.id, siteId: board.siteId },
+                  defaultJiraBoard: {
+                    boardId: board.id,
+                    siteId: board.siteId,
+                    name: board.name
+                  },
                   ...(siteChanged ? { jiraTeamFieldId: '', jiraTeamValue: '' } : {})
                 })
               }}
-            >
-              <SelectTrigger id="tasks-jira-default-board" disabled={boardsLoading}>
-                <SelectValue
-                  placeholder={translate(
-                    'auto.components.settings.JiraBoardSettings.chooseBoard',
-                    'Choose a board'
-                  )}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__no-board__">
-                  {translate(
-                    'auto.components.settings.JiraBoardSettings.useListView',
-                    'No default board (use issue list)'
-                  )}
-                </SelectItem>
-                {boards.map((board) => (
-                  <SelectItem key={boardSelectionValue(board)} value={boardSelectionValue(board)}>
-                    {boards.some((candidate) => candidate.siteId !== board.siteId)
-                      ? `${board.name} · ${board.siteName}`
-                      : board.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={boardOptions}
+              placeholder={translate(
+                'auto.components.settings.JiraBoardSettings.chooseBoard',
+                'Choose a board'
+              )}
+              searchPlaceholder={translate(
+                'auto.components.settings.JiraBoardSettings.searchBoards',
+                'Search boards by name...'
+              )}
+              emptyMessage={
+                boardsLoading
+                  ? translate(
+                      'auto.components.settings.JiraBoardSettings.loadingBoards',
+                      'Loading boards...'
+                    )
+                  : translate(
+                      'auto.components.settings.JiraBoardSettings.noBoardsMatch',
+                      'No boards match this search.'
+                    )
+              }
+              disabled={boardsLoading && boards.length === 0}
+              onSearchChange={setBoardQuery}
+            />
             <p className="text-xs text-muted-foreground">
               {translate(
                 'auto.components.settings.JiraBoardSettings.defaultBoardHelp',
-                'The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter.'
+                'The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter. Search to find a board on a Jira site with many.'
               )}
             </p>
+            {!boardsLoading && !loadError && boards.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {appliedBoardQuery
+                  ? translate(
+                      'auto.components.settings.JiraBoardSettings.noBoardsForSearch',
+                      'Jira returned no boards matching this search.'
+                    )
+                  : translate(
+                      'auto.components.settings.JiraBoardSettings.noBoardsReturned',
+                      'Jira returned no boards for this site. Check that the account can see a board.'
+                    )}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="tasks-jira-team-field">
               {translate('auto.components.settings.JiraBoardSettings.teamField', 'Team field')}
             </Label>
-            <Select
-              value={settings.jiraTeamFieldId || '__no-field__'}
+            <SettingsCombobox
+              id="tasks-jira-team-field"
+              value={settings.jiraTeamFieldId || SETTINGS_COMBOBOX_NONE}
               onValueChange={(value) => {
                 updateSettings({
-                  jiraTeamFieldId: value === '__no-field__' ? '' : value,
+                  jiraTeamFieldId: value === SETTINGS_COMBOBOX_NONE ? '' : value,
                   jiraTeamValue: ''
                 })
               }}
-            >
-              <SelectTrigger id="tasks-jira-team-field" disabled={fieldsLoading || !fieldSiteId}>
-                <SelectValue
-                  placeholder={translate(
-                    'auto.components.settings.JiraBoardSettings.chooseTeamField',
-                    'Choose a custom field'
-                  )}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__no-field__">
-                  {translate(
-                    'auto.components.settings.JiraBoardSettings.noTeamField',
-                    'No Team field'
-                  )}
-                </SelectItem>
-                {fields.map((field) => (
-                  <SelectItem key={field.id} value={field.id}>
-                    {field.name} ({field.id})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={teamFieldOptions}
+              placeholder={translate(
+                'auto.components.settings.JiraBoardSettings.chooseTeamField',
+                'Choose a custom field'
+              )}
+              searchPlaceholder={translate(
+                'auto.components.settings.JiraBoardSettings.searchTeamFields',
+                'Search fields by name or ID...'
+              )}
+              emptyMessage={
+                fieldsLoading
+                  ? translate(
+                      'auto.components.settings.JiraBoardSettings.loadingTeamFields',
+                      'Loading custom fields...'
+                    )
+                  : translate(
+                      'auto.components.settings.JiraBoardSettings.noTeamFieldsMatch',
+                      'No custom fields match this search.'
+                    )
+              }
+              disabled={fieldsLoading || !fieldSiteSelection}
+              onSearchChange={setTeamFieldQuery}
+            />
             <p className="text-xs text-muted-foreground">
               {translate(
                 'auto.components.settings.JiraBoardSettings.teamFieldHelp',

@@ -7,6 +7,7 @@ import {
   AssignableUsers,
   BoardIdentifier,
   BoardIssuePage,
+  BoardListQuery,
   Connect,
   CreateIssue,
   IssueComment,
@@ -197,8 +198,8 @@ export const JIRA_METHODS = [
   }),
   defineMethod({
     name: 'jira.listBoards',
-    params: SiteSelection,
-    handler: async (params, { runtime }) => runtime.jiraListBoards(params?.siteId)
+    params: BoardListQuery,
+    handler: async (params, { runtime }) => runtime.jiraListBoards(params?.siteId, params?.name)
   }),
   defineMethod({
     name: 'jira.listCustomFields',
