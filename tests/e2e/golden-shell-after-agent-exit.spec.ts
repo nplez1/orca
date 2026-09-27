@@ -7,6 +7,7 @@ import {
 } from './helpers/golden-stub-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForRestoredTerminalInputReady } from './helpers/restored-terminal-input-readiness'
+import { openNewTabMenu } from './helpers/terminal-tab-menu'
 import {
   focusActiveTerminalInput,
   waitForActivePanePtyId,
@@ -38,7 +39,7 @@ test('opens a clean live shell after an agent exits', async ({ orcaPage }) => {
   await waitForTerminalOutput(orcaPage, GOLDEN_STUB_EXIT_MARKER, 15_000)
 
   const tabsBeforeShell = await orcaPage.locator('[data-testid="sortable-tab"]').count()
-  await orcaPage.getByRole('button', { name: 'New tab', exact: true }).click({ force: true })
+  await openNewTabMenu(orcaPage)
   await orcaPage
     .getByRole('menuitem', { name: /New Terminal/i })
     .first()

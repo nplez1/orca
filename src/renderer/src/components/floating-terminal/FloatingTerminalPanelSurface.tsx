@@ -192,6 +192,8 @@ export function renderFloatingTerminalPanelSurface({
               onPinFile={pinFile}
               tabBarOrder={tabBarOrder}
               tabStripChrome="floating-panel"
+              // Why: the floating window controls already own the agent launch; the tab bar keeps only the create menu (with its agent entries).
+              showDefaultAgentQuickLaunch={false}
             />
           </FloatingWorkspaceTabDragContext>
           <FloatingTerminalWindowControls

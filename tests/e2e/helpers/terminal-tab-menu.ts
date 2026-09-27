@@ -4,6 +4,20 @@ import { getActiveTabId } from './store'
 
 export const SORTABLE_TAB = '[data-testid="sortable-tab"]'
 
+/**
+ * Opens the tab bar's create menu. With a launchable default agent the "+" is a split
+ * button whose menu lives behind the chevron; without one the "+" itself is the trigger.
+ * Clicking the primary control would launch the agent instead of opening the menu.
+ */
+export async function openNewTabMenu(scope: Page | Locator): Promise<void> {
+  const menuTrigger = scope.getByTestId('new-tab-menu-trigger').first()
+  if ((await menuTrigger.count()) > 0) {
+    await menuTrigger.click({ force: true })
+    return
+  }
+  await scope.getByTestId('new-tab-button').first().click({ force: true })
+}
+
 // Why: split groups and hidden worktrees keep extra tab bars mounted, so the "+" has to come from
 // the active group's strip; the pre-layout titlebar fallback has no strip to scope to.
 async function activeTabBarRoot(page: Page): Promise<Locator> {
@@ -31,7 +45,7 @@ export async function createTerminalTabFromMenu(page: Page): Promise<string> {
   const tabsBefore = await tabBar.locator(SORTABLE_TAB).count()
   const activeBefore = await getActiveTabId(page)
 
-  await tabBar.getByRole('button', { name: 'New tab', exact: true }).click()
+  await openNewTabMenu(tabBar)
   await page
     .getByRole('menuitem', { name: /New Terminal/i })
     .first()
