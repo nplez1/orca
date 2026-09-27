@@ -1,13 +1,12 @@
 import React from 'react'
 import { SortableContext } from '@dnd-kit/sortable'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { QuickLaunchAgentMenuItems } from './QuickLaunchButton'
@@ -23,7 +22,7 @@ import type { TabBarItemProjection } from './use-tab-bar-item-projection'
 import type { TabBarItem } from './tab-bar-item-model'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { TabBarStaticCreateMenu } from './tab-bar-static-create-menu'
-import { TabBarDefaultAgentButton } from './TabBarDefaultAgentButton'
+import { TabBarNewTabButton } from './TabBarNewTabButton'
 import ClientHostedBrowserTabRows from './ClientHostedBrowserTabRows'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -53,6 +52,7 @@ export function renderTabBarSurface({
     worktreeId,
     terminalOnly = false,
     showAgentLaunchItems = true,
+    showDefaultAgentQuickLaunch = true,
     onNewTerminalTab,
     onOpenEntry,
     tabStripChrome = 'default'
@@ -210,23 +210,19 @@ export function renderTabBarSurface({
         // Why: modal would disable body pointer events, making the Mobile Emulator "Hide" re-enable toast unclickable.
         modal={false}
       >
-        <DropdownMenuTrigger asChild>
-          <button
-            className="ml-2 my-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            title={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
-            // Why: aria-label matches the tooltip so E2E can locate the "+" via getByRole('button', { name: 'New tab' }).
-            aria-label={translate('auto.components.tab.bar.TabBar.b1a132357f', 'New tab')}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </DropdownMenuTrigger>
+        <TabBarNewTabButton
+          worktreeId={worktreeId}
+          agentLaunchEnabled={showDefaultAgentQuickLaunch}
+          isMenuOpen={newTabMenuOpen}
+          onLaunchAgent={launchDefaultAgent}
+          onOpenMenu={() => setNewTabMenuOpen(true)}
+        />
         <DropdownMenuContent
           align="start"
           sideOffset={6}
           className="w-72 max-w-[calc(100vw-1rem)] rounded-[11px] border-border/80 p-1 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
           onCloseAutoFocus={(event) => {
-            // Why: Radix restores focus to the "+" trigger on close, stealing it from the freshly-mounted terminal.
+            // Why: Radix restores focus to the menu trigger on close, stealing it from the freshly-mounted terminal.
             event.preventDefault()
             runPendingNewTabMenuFocusAfterClose()
           }}
@@ -287,9 +283,6 @@ export function renderTabBarSurface({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {showAgentLaunchItems ? (
-        <TabBarDefaultAgentButton worktreeId={worktreeId} onLaunchAgent={launchDefaultAgent} />
-      ) : null}
     </div>
   )
 }

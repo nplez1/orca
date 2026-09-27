@@ -25,6 +25,8 @@ export type TabBarProps = {
   onOpenEntry?: (args: TabCreateEntryArgs) => Promise<void>
   terminalOnly?: boolean
   showAgentLaunchItems?: boolean
+  /** Floating panels hide the tab bar's agent quick launch; their window controls own one. */
+  showDefaultAgentQuickLaunch?: boolean
   onNewFileTab?: () => void
   onOpenFileTab?: () => void
   newTabMenuOrder?: 'default' | 'markdown-first'
