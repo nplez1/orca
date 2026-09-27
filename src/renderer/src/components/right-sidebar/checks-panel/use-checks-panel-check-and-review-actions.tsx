@@ -9,6 +9,7 @@ import {
 } from '../../pr-checks-fix-prompt'
 
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
+import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
 import { openChecksPanelHostedReviewUrl } from '../checks-panel-hosted-review-click-routing'
 import { isMacPlatform } from '../../terminal-pane/terminal-link-open-hints'
@@ -99,16 +100,18 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
                   check,
                   projectRef: gitLabProjectRefRef.current
                 })
-              : await fetchPRCheckDetails(
-                  repo.path,
-                  {
-                    checkRunId: check.checkRunId,
-                    workflowRunId: check.workflowRunId,
-                    checkName: check.name,
-                    url: check.url,
-                    prRepo: pr?.prRepo ?? null
-                  },
-                  { repoId: repo.id }
+              : await loadCheckDetailsWithProviderFallback(check, () =>
+                  fetchPRCheckDetails(
+                    repo.path,
+                    {
+                      checkRunId: check.checkRunId,
+                      workflowRunId: check.workflowRunId,
+                      checkName: check.name,
+                      url: check.url,
+                      prRepo: pr?.prRepo ?? null
+                    },
+                    { repoId: repo.id }
+                  )
                 )
             if (details) {
               checkRunDetailsByCheckKey[getCheckDetailsPromptKey(check, index)] = details

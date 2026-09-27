@@ -18949,5 +18949,75 @@
   },
   "common": {
     "retry": "Retry"
+  },
+  "checkBuild": {
+    "title": "Build",
+    "number": "Number",
+    "triggeredBy": "Triggered by",
+    "queued": "Queued",
+    "estimated": "Estimated",
+    "parameters": "Parameters",
+    "commits": "Commits"
+  },
+  "jenkins": {
+    "settings": {
+      "sectionTitle": "CI providers",
+      "sectionDescription": "Connect build servers so Orca can show what a pipeline stage is doing without leaving the review.",
+      "search": {
+        "title": "Jenkins Integration",
+        "description": "Add Jenkins servers to read build stages and timing in the Checks panel.",
+        "keyword": {
+          "jenkins": "jenkins",
+          "integration": "integration",
+          "ci": "ci",
+          "build": "build",
+          "stages": "stages"
+        }
+      },
+      "unavailable": "Jenkins servers cannot be managed here.",
+      "connectedVersion": "Connected to Jenkins {{value0}}",
+      "connected": "Connected",
+      "testFailed": "Could not reach this Jenkins server.",
+      "statusUnknown": "Unknown",
+      "statusNone": "Not configured",
+      "statusCount": "{{value0}} configured",
+      "card": {
+        "description": "Read build stages, status and timing for checks that link to Jenkins."
+      },
+      "add": "Add server",
+      "noToken": "no token saved",
+      "test": "Test",
+      "edit": "Edit {{value0}}",
+      "remove": "Remove {{value0}}",
+      "saveFailed": "Could not save this Jenkins server.",
+      "editTitle": "Edit Jenkins server",
+      "addTitle": "Add Jenkins server",
+      "description": "Orca reads build stages and timing from this server for checks that link to it. The token is stored encrypted when your OS keychain is available.",
+      "label": "Name",
+      "labelPlaceholder": "Build server",
+      "baseUrl": "Server URL",
+      "baseUrlPlaceholder": "https://ci.example.com/jenkins",
+      "baseUrlHint": "Include the path Jenkins is served under, if it is not at the root.",
+      "username": "Username",
+      "apiToken": "API token",
+      "tokenKeep": "Leave blank to keep the saved token",
+      "apiTokenHint": "Create one in Jenkins under your user profile → Configure → API Token.",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "buildDetails": {
+      "unknownServer": "this Jenkins server",
+      "notConfigured": "Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to see build details.",
+      "unauthorized": "Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.",
+      "forbidden": "The saved Jenkins account cannot read this job on {{value0}}.",
+      "notFound": "This Jenkins build is no longer available. Build retention may have pruned it.",
+      "unreachable": "Could not reach {{value0}}. Build details are read from this machine, so a Jenkins on another network stays out of reach.",
+      "timeout": "{{value0}} did not respond in time.",
+      "failed": "Jenkins could not return this build.",
+      "timedOut": "Timed out loading this Jenkins build."
+    }
+  },
+  "checkDetails": {
+    "duration": "Duration"
   }
 }

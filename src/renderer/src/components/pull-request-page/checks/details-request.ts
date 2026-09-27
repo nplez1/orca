@@ -1,5 +1,6 @@
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { withGitHubCheckDetailsTimeout } from '@/runtime/github-check-details-timeout'
+import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import {
   beginGitHubChecksTabDetails,
   settleGitHubChecksTabDetails,
@@ -43,31 +44,33 @@ export function requestPullRequestCheckDetails(args: {
     )
   }
   args.setChecksState((current) => beginGitHubChecksTabDetails(current, args.key, requestId))
-  const detailsRequest = withGitHubCheckDetailsTimeout((signal) =>
-    args.runtimeHost
-      ? callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.prCheckDetails>>>(
-          { kind: 'environment', environmentId: args.runtimeHost.environmentId },
-          'github.prCheckDetails',
-          {
-            repo: getGitHubRuntimeRepoId(args.sourceContext, args.repoId ?? args.item.repoId),
+  const detailsRequest = loadCheckDetailsWithProviderFallback(args.check, () =>
+    withGitHubCheckDetailsTimeout((signal) =>
+      args.runtimeHost
+        ? callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.prCheckDetails>>>(
+            { kind: 'environment', environmentId: args.runtimeHost.environmentId },
+            'github.prCheckDetails',
+            {
+              repo: getGitHubRuntimeRepoId(args.sourceContext, args.repoId ?? args.item.repoId),
+              checkRunId: args.check.checkRunId,
+              workflowRunId: args.check.workflowRunId,
+              checkName: args.check.name,
+              url: args.check.url,
+              prRepo: args.prRepo
+            },
+            { timeoutMs: 30_000, signal }
+          )
+        : window.api.gh.prCheckDetails({
+            repoPath: args.repoPath ?? '',
+            repoId: args.repoId ?? undefined,
+            sourceContext: args.sourceContext,
             checkRunId: args.check.checkRunId,
             workflowRunId: args.check.workflowRunId,
             checkName: args.check.name,
             url: args.check.url,
             prRepo: args.prRepo
-          },
-          { timeoutMs: 30_000, signal }
-        )
-      : window.api.gh.prCheckDetails({
-          repoPath: args.repoPath ?? '',
-          repoId: args.repoId ?? undefined,
-          sourceContext: args.sourceContext,
-          checkRunId: args.check.checkRunId,
-          workflowRunId: args.check.workflowRunId,
-          checkName: args.check.name,
-          url: args.check.url,
-          prRepo: args.prRepo
-        })
+          })
+    )
   )
   void detailsRequest
     .then((details) => {

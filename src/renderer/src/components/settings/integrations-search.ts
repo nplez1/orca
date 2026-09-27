@@ -221,5 +221,19 @@ export const getIntegrationsPaneSearchEntries = createLocalizedCatalog(() => [
         'disconnect'
       )
     ]
+  },
+  {
+    title: translate('jenkins.settings.search.title', 'Jenkins Integration'),
+    description: translate(
+      'jenkins.settings.search.description',
+      'Add Jenkins servers to read build stages and timing in the Checks panel.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('jenkins.settings.search.keyword.jenkins', 'jenkins'),
+      ...translateSearchKeyword('jenkins.settings.search.keyword.integration', 'integration'),
+      ...translateSearchKeyword('jenkins.settings.search.keyword.ci', 'ci'),
+      ...translateSearchKeyword('jenkins.settings.search.keyword.build', 'build'),
+      ...translateSearchKeyword('jenkins.settings.search.keyword.stages', 'stages')
+    ]
   }
 ])
