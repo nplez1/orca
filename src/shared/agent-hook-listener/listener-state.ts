@@ -26,7 +26,7 @@ import {
   deletePaneScopedSetEntry,
   movePaneScopedMapEntries,
   movePaneScopedSetEntries
-} from './pane-scoped-cache-entries'
+} from './pane-scoped-cache-keys'
 
 /** Per-listener-instance caches needing per-PTY teardown; Orca's main process and the relay each get their own, never shared. */
 export type HookListenerState = {

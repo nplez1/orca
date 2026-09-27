@@ -13771,7 +13771,8 @@
             }
           },
           "fileExplorerOperationOwner": {
-            "unresolved": "Couldn't determine which host owns this workspace. Check the connection and try again."
+            "unresolved": "Couldn't determine which host owns this workspace. Check the connection and try again.",
+            "listUnavailable": "Files are unavailable for this workspace — check the connection and try again."
           },
           "useFileDeletion": {
             "72691dfebc": "Failed to {{value0}} '{{value1}}'.",
@@ -14000,7 +14001,14 @@
           "FileExplorerNameFilter": {
             "26fb73c6e3": "Find files",
             "4d5a6b2a49": "Clear file filter",
-            "7a9fb1e6aa": "Contents"
+            "7a9fb1e6aa": "Contents",
+            "projectionBudget": "The filtered file list is too large to display — add more of the name to narrow it down",
+            "projectionFailed": "Could not build the filtered file list",
+            "updating": "Updating file list",
+            "updateFailed": "File search is unavailable — showing previous results when available",
+            "indexing": "Indexing files…",
+            "searching": "Searching files…",
+            "liveScanComplete": "Complete results from a full scan — the file index is still building"
           },
           "FileExplorerViewSwitch": {
             "c4e9a2b713": "Names",

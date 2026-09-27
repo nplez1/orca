@@ -26,25 +26,34 @@ import type {
   FileUploadSession,
   TerminalArtifactAccessOptions
 } from './types'
-import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
-import type { DirEntry, FsChangeEvent } from '../../shared/filesystem-entry-types'
+import type { FsChangeEvent } from '../../shared/filesystem-entry-types'
 import { routeSshFilesystemWatchNotification } from './ssh-filesystem-watch-notifications'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
 import { isWindowsRemoteHost, type RemoteHostPlatform } from '../ssh/ssh-remote-platform'
 import {
   probeSshQuickOpenSearchCapability,
-  probeSshRangedReadCapability
+  probeSshRangedReadCapability,
+  probeSshWorkspacePathSearchCapability
 } from './ssh-filesystem-provider-capabilities'
+import { searchSshWorkspacePathNameFilter } from './ssh-filesystem-path-search'
+import type {
+  WorkspacePathSearchCapabilityDescriptor,
+  WorkspacePathSearchRequest,
+  WorkspacePathSearchResponse
+} from '../../shared/workspace-path-search-contract'
 import { readSshFileRange } from './ssh-filesystem-range-read'
 import {
   readSshTerminalArtifact,
   writeSshTerminalArtifact
 } from './ssh-filesystem-terminal-artifact'
 import { readSshDocPreviewFile } from './ssh-filesystem-doc-preview'
+import { SshFilesystemProviderCrud } from './ssh-filesystem-provider-crud'
 const WORKSPACE_SPACE_SCAN_TIMEOUT_MS = 130_000
-export class SshFilesystemProvider implements IFilesystemProvider {
+export class SshFilesystemProvider
+  extends SshFilesystemProviderCrud
+  implements IFilesystemProvider
+{
   private connectionId: string
-  private mux: SshChannelMultiplexer
   private watchListeners = new Map<string, WatchRegistration>()
   private unsubscribeNotifications: (() => void) | null = null
   private tempDirPromise: Promise<string> | null = null
@@ -59,8 +68,8 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     private readonly rawTransfer?: SshRawTransferOptions,
     hostPlatform?: RemoteHostPlatform
   ) {
+    super(mux)
     this.connectionId = connectionId
-    this.mux = mux
 
     if (createSftp) {
       // Why: system SSH has raw single-file transfer but no ssh2 SFTP channel;
@@ -96,10 +105,6 @@ export class SshFilesystemProvider implements IFilesystemProvider {
 
   getConnectionId(): string {
     return this.connectionId
-  }
-
-  async readDir(dirPath: string): Promise<DirEntry[]> {
-    return (await this.mux.request('fs.readDir', { dirPath })) as DirEntry[]
   }
 
   async readFile(filePath: string, limits?: FileReadLimits): Promise<FileReadResult> {
@@ -185,10 +190,6 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     return this.tempDirPromise
   }
 
-  async writeFile(filePath: string, content: string): Promise<void> {
-    await this.mux.request('fs.writeFile', { filePath, content })
-  }
-
   async writeFileBase64(filePath: string, contentBase64: string): Promise<void> {
     await this.writeFileBase64Chunk(filePath, contentBase64, false)
   }
@@ -223,10 +224,6 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     return readSshPathExistenceBatch(this.mux, filePaths, (path) => this.stat(path))
   }
 
-  async stat(filePath: string): Promise<FileStat> {
-    return (await this.mux.request('fs.stat', { filePath })) as FileStat
-  }
-
   async lstat(filePath: string): Promise<FileStat> {
     try {
       return (await this.mux.request('fs.lstat', { filePath })) as FileStat
@@ -259,51 +256,6 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     )) as WorkspaceSpaceDirectoryScanResult
   }
 
-  async deletePath(targetPath: string, recursive?: boolean): Promise<void> {
-    await this.mux.request('fs.deletePath', { targetPath, recursive })
-  }
-
-  async createFile(filePath: string): Promise<void> {
-    await this.mux.request('fs.createFile', { filePath })
-  }
-
-  async createDir(dirPath: string): Promise<void> {
-    await this.mux.request('fs.createDir', { dirPath })
-  }
-
-  async createDirNoClobber(dirPath: string): Promise<void> {
-    await this.mux.request('fs.createDirNoClobber', { dirPath })
-  }
-
-  async rename(oldPath: string, newPath: string): Promise<void> {
-    await this.mux.request('fs.rename', { oldPath, newPath })
-  }
-
-  async renameNoClobber(oldPath: string, newPath: string): Promise<void> {
-    try {
-      await this.mux.request('fs.renameNoClobber', { oldPath, newPath })
-    } catch (err) {
-      if (isMethodNotFoundError(err)) {
-        // Why: falling back to raw fs.rename can silently clobber the target on
-        // older relays. Fail closed and let reconnect deploy the safe relay.
-        throw new Error('Remote safe rename is unavailable. Reconnect the SSH target and retry.')
-      }
-      throw err
-    }
-  }
-
-  async copy(source: string, destination: string): Promise<void> {
-    await this.mux.request('fs.copy', { source, destination })
-  }
-
-  async realpath(filePath: string): Promise<string> {
-    return (await this.mux.request('fs.realpath', { filePath })) as string
-  }
-
-  async search(opts: SearchOptions): Promise<SearchResult> {
-    return (await this.mux.request('fs.search', opts)) as SearchResult
-  }
-
   async listFiles(
     rootPath: string,
     options?: Parameters<IFilesystemProvider['listFiles']>[1]
@@ -332,6 +284,21 @@ export class SshFilesystemProvider implements IFilesystemProvider {
 
   supportsQuickOpenSearch = (options: { signal?: AbortSignal } = {}): Promise<boolean> =>
     probeSshQuickOpenSearchCapability(this.mux, options.signal)
+
+  workspacePathSearchCapability(options?: {
+    signal?: AbortSignal
+  }): Promise<WorkspacePathSearchCapabilityDescriptor | null> {
+    return probeSshWorkspacePathSearchCapability(this.mux, options?.signal)
+  }
+
+  searchWorkspacePathNameFilter(
+    rootPath: string,
+    request: WorkspacePathSearchRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<WorkspacePathSearchResponse | null> {
+    return searchSshWorkspacePathNameFilter(this.mux, rootPath, request, options?.signal)
+  }
+
   async watch(
     rootPath: string,
     callback: (events: FsChangeEvent[]) => void,

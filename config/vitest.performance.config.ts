@@ -4,6 +4,10 @@ import { defineConfig } from 'vitest/config'
 import baseConfig from './vitest.config'
 
 const contracts = [
+  'src/shared/workspace-path-search-performance-contract.test.ts',
+  'src/main/workspace-path-index/workspace-path-index-performance-contract.test.ts',
+  'src/main/workspace-path-index/workspace-path-index-build-lane.test.ts',
+  'src/main/workspace-path-index/workspace-path-index-admission-scheduler.test.ts',
   'src/main/sqlite/sync-database.test.ts',
   'src/main/runtime/orchestration/db/row-column-lists.test.ts',
   'src/relay/fs-path-metadata-symlink-concurrency.test.ts',

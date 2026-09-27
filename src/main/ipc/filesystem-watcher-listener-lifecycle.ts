@@ -83,7 +83,7 @@ export function addInFlightLocalInstallListener(
 function cleanupInFlightLocalInstallsForSender(senderId: number): void {
   for (const token of watcherLifecycleState.inFlightLocalInstalls.values()) {
     token.listeners.delete(senderId)
-    if (token.listeners.size === 0) {
+    if (token.listeners.size === 0 && token.indexConsumers.size === 0) {
       token.cancelled = true
       // Why: abort so a pending native/forked subscription stops early (matches closeLocalWatcherForWorktreePath / closeAllWatchers).
       token.abortController.abort()
@@ -193,7 +193,7 @@ function cleanupLocalWatchersForSender(senderId: number): void {
       continue
     }
     watchedRoot.listeners.delete(senderId)
-    if (watchedRoot.listeners.size === 0) {
+    if (watchedRoot.listeners.size === 0 && watchedRoot.indexConsumers.size === 0) {
       // Cancel any pending grace-period teardown for this root.
       const pending = watcherLifecycleState.pendingTeardowns.get(key)
       if (pending) {

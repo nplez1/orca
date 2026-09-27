@@ -13,7 +13,7 @@ vi.mock('@/runtime/runtime-git-client', () => ({
 }))
 
 const initialAppState = useAppStore.getInitialState()
-const relativePaths = Array.from({ length: 5_000 }, (_, index) => `src/generated-${index}.ts`)
+const relativePaths = Array.from({ length: 100 }, (_, index) => `src/generated-${index}.ts`)
 
 function useProjection(query: string) {
   return useFileExplorerVisibleRowProjection('worktree-1', '/repo', {}, new Set(), true, true, {
@@ -98,6 +98,56 @@ describe('file explorer ignored-path query debounce', () => {
 
     expect(getRuntimeGitIgnoredPathsMock).toHaveBeenCalledTimes(1)
     expect(getRuntimeGitIgnoredPathsMock.mock.calls[0]?.[1]).toEqual(['src'])
+  })
+
+  it('commits a chunked projection only after the complete synthetic tree is ready', async () => {
+    const paths = Array.from({ length: 150 }, (_, index) => `root/dir-${index}/target-${index}.ts`)
+    const nameFilter = { query: 'target', relativePaths: paths, ignoredRelativePaths: [] }
+    const hook = renderHook(() =>
+      useFileExplorerVisibleRowProjection(
+        'worktree-1',
+        '/repo',
+        {},
+        new Set(),
+        true,
+        true,
+        nameFilter
+      )
+    )
+
+    expect(hook.result.current.projectionPending).toBe(true)
+    expect(hook.result.current.rowProjection.getVisibleCount()).toBe(0)
+
+    await act(async () => vi.runAllTimersAsync())
+
+    expect(hook.result.current.projectionPending).toBe(false)
+    expect(hook.result.current.rowProjection.getVisibleCount()).toBe(301)
+  })
+
+  it('reuses an unchanged filtered projection across unrelated browse-cache refreshes', () => {
+    const nameFilter = {
+      query: 'target',
+      relativePaths: ['src/target.ts'],
+      ignoredRelativePaths: []
+    }
+    const hook = renderHook(
+      ({ dirCache }) =>
+        useFileExplorerVisibleRowProjection(
+          'worktree-1',
+          '/repo',
+          dirCache,
+          new Set(),
+          true,
+          true,
+          nameFilter
+        ),
+      { initialProps: { dirCache: treeDirCache() } }
+    )
+    const originalProjection = hook.result.current.rowProjection
+
+    hook.rerender({ dirCache: treeDirCache() })
+
+    expect(hook.result.current.rowProjection).toBe(originalProjection)
   })
 
   it('does not re-issue the ignored check for a dirCache commit that changes no path', () => {

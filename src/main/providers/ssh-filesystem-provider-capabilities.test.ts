@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   probeSshQuickOpenSearchCapability,
-  probeSshRangedReadCapability
+  probeSshRangedReadCapability,
+  probeSshWorkspacePathSearchCapability
 } from './ssh-filesystem-provider-capabilities'
+import {
+  RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
+  WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
+} from '../../shared/workspace-path-search-capability'
 import { JsonRpcErrorCode } from '../ssh/relay-protocol'
 
 describe('SSH Quick Open capability probe', () => {
@@ -124,9 +129,49 @@ describe('SSH filesystem capability document', () => {
     expect(mux.request).toHaveBeenCalledTimes(2)
   })
 
+  it('reads and caches the name-filter descriptor from the shared capability document', async () => {
+    const mux = {
+      request: vi.fn().mockResolvedValue({
+        [WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY]:
+          RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
+      })
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This document fixture only exercises the shared capability request.
+    await expect(probeSshWorkspacePathSearchCapability(mux as never)).resolves.toEqual(
+      RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The same mux is reused to prove its answer is cached.
+    await expect(probeSshWorkspacePathSearchCapability(mux as never)).resolves.toEqual(
+      RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
+    )
+    expect(mux.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('isolates name-filter capability answers by provider incarnation', async () => {
+    const capableMux = {
+      request: vi.fn().mockResolvedValue({
+        [WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY]:
+          RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
+      })
+    }
+    const legacyMux = { request: vi.fn().mockResolvedValue({ rangedReadVersion: 1 }) }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The capability probe only invokes request on this mux double.
+    await expect(probeSshWorkspacePathSearchCapability(capableMux as never)).resolves.toMatchObject(
+      {
+        matcherVersion: 1
+      }
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The legacy mux only implements the request method used by probing.
+    await expect(probeSshWorkspacePathSearchCapability(legacyMux as never)).resolves.toBeNull()
+    expect(capableMux.request).toHaveBeenCalledTimes(1)
+    expect(legacyMux.request).toHaveBeenCalledTimes(1)
+  })
+
   it('treats a non-object response as no capabilities', async () => {
     const mux = { request: vi.fn().mockResolvedValue('yes') }
     await expect(probeSshRangedReadCapability(mux as never)).resolves.toBe(false)
     await expect(probeSshQuickOpenSearchCapability(mux as never)).resolves.toBe(false)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This primitive response only exercises the probe's non-object guard.
+    await expect(probeSshWorkspacePathSearchCapability(mux as never)).resolves.toBeNull()
   })
 })

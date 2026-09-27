@@ -1,5 +1,4 @@
 import { stat } from 'node:fs/promises'
-import type { Event as WatcherEvent } from '@parcel/watcher'
 import type { FsChangeEvent, FsChangedPayload } from '../../shared/filesystem-entry-types'
 import {
   WATCH_BATCH_MAX_WAIT_MS,
@@ -10,7 +9,7 @@ import { MAX_BATCHED_WATCHER_EVENTS, queueWatcherEvents } from './filesystem-wat
 import { WATCHER_IGNORE_DIRS, buildParcelWatcherIgnoreOptions } from './filesystem-watcher-ignore'
 import type { WatchedRoot } from './filesystem-watcher-wsl'
 import { subscribeViaWatcherProcess } from './parcel-watcher-process'
-import { normalizeWatcherEventPath } from './filesystem-watcher-paths'
+import { coalesceEvents } from './filesystem-watcher-event-coalescing'
 import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
 import {
   retainLocalWatcherPhysicalFailure,
@@ -18,59 +17,22 @@ import {
 } from './filesystem-watcher-listener-lifecycle'
 import { cancelLocalBatchFlush, createDebouncedBatch } from './filesystem-watcher-batch-control'
 import { invalidateQuickOpenPathInventory } from './quick-open-path-inventory'
+import {
+  beginLocalWorkspacePathIndexReconciliation,
+  completeLocalWorkspacePathIndexReconciliation
+} from '../workspace-path-index/workspace-path-index-runtime'
+import {
+  isWorkspacePathIndexPolicyEvent,
+  isWorkspacePathIndexPolicyPath,
+  needsWorkspacePathIndexReconciliation,
+  reconcileLocalWorkspacePathIndexEvents
+} from './filesystem-watcher-path-index-reconciliation'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 
 // Why: matches the watcher subprocess budget in parcel-watcher-event-delivery.ts.
 const DIRECTORY_STAT_CONCURRENCY = 8
 
-// ── Event coalescing ─────────────────────────────────────────────────
-// Why: keep the last event per path in a flush window; delete→create emits both (delete cleans the subtree, create refreshes the parent), create→delete is dropped (§4.4).
-function coalesceEvents(
-  raw: WatcherEvent[]
-): { type: 'create' | 'update' | 'delete'; path: string }[] {
-  const lastByPath = new Map<string, { type: 'create' | 'update' | 'delete'; index: number }>()
-  const deleteBeforeCreate = new Set<string>()
-
-  for (let i = 0; i < raw.length; i++) {
-    const evt = raw[i]
-    const p = normalizeWatcherEventPath(evt.path)
-    const prev = lastByPath.get(p)
-
-    if (prev) {
-      // delete followed by create → emit both
-      if (prev.type === 'delete' && evt.type === 'create') {
-        deleteBeforeCreate.add(p)
-      }
-      // create followed by delete → net no-op, remove both
-      if (prev.type === 'create' && evt.type === 'delete') {
-        lastByPath.delete(p)
-        deleteBeforeCreate.delete(p)
-        continue
-      }
-    }
-
-    lastByPath.set(p, { type: evt.type, index: i })
-
-    // Why: drop the stale delete when a later event supersedes delete→create, else output has a spurious delete for a file that still exists (§4.4).
-    if (evt.type !== 'create' && deleteBeforeCreate.has(p)) {
-      deleteBeforeCreate.delete(p)
-    }
-  }
-
-  const result: { type: 'create' | 'update' | 'delete'; path: string }[] = []
-
-  // Emit delete events first for paths that have delete→create
-  for (const p of deleteBeforeCreate) {
-    result.push({ type: 'delete', path: p })
-  }
-
-  // Emit the last event for each path
-  for (const [p, entry] of lastByPath) {
-    result.push({ type: entry.type, path: p })
-  }
-
-  return result
-}
+// ── Event coalescing ────────────────────────────────────────────────
 
 // ── Stat helper for isDirectory ──────────────────────────────────────
 
@@ -119,13 +81,17 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
   root.batch.firstEventAt = 0
 
   try {
-    if ((rawEvents.length === 0 && !overflowed) || root.listeners.size === 0) {
+    if (
+      (rawEvents.length === 0 && !overflowed) ||
+      (root.listeners.size === 0 && root.indexConsumers.size === 0)
+    ) {
       return
     }
 
     if (overflowed || rawEvents.length > MAX_BATCHED_WATCHER_EVENTS) {
       // Why: an overflow means events were lost, so the cached path set can no longer be trusted.
-      invalidateQuickOpenPathInventory(root.rootPath)
+      invalidateQuickOpenPathInventory(root.rootPath, 'watcher-overflow', rawEvents.length)
+      root.batch.indexReconciliationMarked = false
       // Why: deletion storms can be too large to coalesce/stat per path; one overflow asks the renderer for the same conservative refresh.
       if (!root.batch.cancelled) {
         emitOverflowPayload(root)
@@ -134,11 +100,7 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
     }
 
     const coalesced = coalesceEvents(rawEvents)
-    // Why: only create/delete change which paths exist; an update must not drop a warm index.
-    if (coalesced.some((event) => event.type !== 'update')) {
-      invalidateQuickOpenPathInventory(root.rootPath)
-    }
-
+    // Why: membership changes reconcile targeted paths; content saves stay off the index lane.
     // Why: a full batch is up to MAX_BATCHED_WATCHER_EVENTS paths; unbounded stat() would swamp
     // libuv's 4-thread pool, which also serves git reads and persistence writes.
     const events: FsChangeEvent[] = await mapWithConcurrency(
@@ -159,8 +121,44 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
       }
     )
 
-    if (root.batch.cancelled || root.listeners.size === 0) {
+    if (root.batch.cancelled || (root.listeners.size === 0 && root.indexConsumers.size === 0)) {
       return
+    }
+
+    const indexEvents = events.filter(needsWorkspacePathIndexReconciliation)
+    if (indexEvents.some(isWorkspacePathIndexPolicyEvent)) {
+      invalidateQuickOpenPathInventory(root.rootPath, 'ignore-policy-change', indexEvents.length)
+      root.batch.indexReconciliationMarked = false
+    } else if (indexEvents.length > 0) {
+      const finishReconciliation =
+        root.batch.events.length === 0 &&
+        !root.batch.overflowed &&
+        !root.batch.flushQueued &&
+        !root.batch.timer
+      root.indexReconciliationPromise = root.indexReconciliationPromise
+        .then(() =>
+          reconcileLocalWorkspacePathIndexEvents(
+            root.rootPath,
+            indexEvents,
+            finishReconciliation,
+            root.indexReconciliationController.signal,
+            root.eventSequence
+          )
+        )
+        .catch(() => undefined)
+      if (finishReconciliation) {
+        root.batch.indexReconciliationMarked = false
+      }
+    } else if (root.batch.indexReconciliationMarked) {
+      const finishReconciliation =
+        root.batch.events.length === 0 &&
+        !root.batch.overflowed &&
+        !root.batch.flushQueued &&
+        !root.batch.timer
+      if (finishReconciliation) {
+        completeLocalWorkspacePathIndexReconciliation(root.rootPath)
+        root.batch.indexReconciliationMarked = false
+      }
     }
 
     const payload: FsChangedPayload = {
@@ -237,7 +235,12 @@ export async function createLocalWatcher(
   const root: WatchedRoot = {
     subscription: null!,
     listeners: new Map(),
+    indexConsumers: new Set(),
     batch: createDebouncedBatch(),
+    eventSequence: 0,
+    indexReconciliationPromise: Promise.resolve(),
+    indexReconciliationController: new AbortController(),
+    indexCoverageTimer: null,
     rootPath
   }
 
@@ -252,6 +255,12 @@ export async function createLocalWatcher(
     }
 
     const markWatcherInterrupted = (): void => {
+      invalidateQuickOpenPathInventory(
+        root.rootPath,
+        'watcher-interruption',
+        root.batch.events.length
+      )
+      root.batch.indexReconciliationMarked = false
       root.batch.overflowed = true
       scheduleLocalBatchFlush(root)
     }
@@ -261,6 +270,7 @@ export async function createLocalWatcher(
       rootPath,
       (err, events) => {
         if (err) {
+          invalidateQuickOpenPathInventory(root.rootPath, 'watcher-error')
           // Why: treat watcher errors as overflow so the renderer conservatively refreshes rather than trusting possibly-invalid caches (§7.2, §7.3).
           console.error(`[filesystem-watcher] error for ${rootKey}:`, err)
           emitOverflowPayload(root)
@@ -278,6 +288,15 @@ export async function createLocalWatcher(
 
         if (root.batch.cancelled) {
           return
+        }
+        root.eventSequence += events?.length ?? 0
+        const relevantEvents = events?.filter(
+          (watcherEvent) =>
+            watcherEvent.type !== 'update' || isWorkspacePathIndexPolicyPath(watcherEvent.path)
+        )
+        if (!root.batch.indexReconciliationMarked && (relevantEvents?.length ?? 0) > 0) {
+          root.batch.indexReconciliationMarked = true
+          beginLocalWorkspacePathIndexReconciliation(root.rootPath, relevantEvents?.length ?? 0)
         }
         queueWatcherEvents(root.batch, events)
         scheduleLocalBatchFlush(root)
