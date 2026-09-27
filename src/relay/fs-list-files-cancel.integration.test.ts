@@ -10,7 +10,7 @@
  *   - identical concurrent requests coalesce into one scan.
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import * as path from 'node:path'
 import { tmpdir } from 'node:os'
@@ -21,30 +21,40 @@ const { fakeListFiles } = vi.hoisted(() => {
     signal: AbortSignal | undefined
     resolve: (files: string[]) => void
   }
+  type FakeScanOptions = {
+    signal?: AbortSignal
+    searchMode?: string
+    searchQuery?: string
+    maxResults?: number
+    includeIgnoredFiles?: boolean
+    includeDotfiles?: boolean
+    onSearchResult?: (result: { paths: string[]; totalCount: number }, complete: boolean) => void
+  }
   const scans: ScanRecord[] = []
   const fakeListFiles = Object.assign(
-    vi.fn(
-      (
-        rootPath: string,
-        _excludes: readonly string[] = [],
-        options: { signal?: AbortSignal } = {}
-      ) =>
-        new Promise<string[]>((resolve, reject) => {
-          scans.push({ rootPath, signal: options.signal, resolve })
-          options.signal?.addEventListener(
-            'abort',
-            () =>
-              // Mirror the real scanners: surface the abort reason (e.g. the
-              // "superseded" error) so the dispatcher reports it to the host.
-              reject(
-                options.signal?.reason instanceof Error
-                  ? options.signal.reason
-                  : new Error('File listing cancelled')
-              ),
-            { once: true }
-          )
-        })
-    ),
+    vi.fn((rootPath: string, _excludes: readonly string[] = [], options: FakeScanOptions = {}) => {
+      if (options.searchMode === 'name-filter') {
+        // Mirrors the fixture below: one file, so an exact count and a one-row page agree.
+        const result = { paths: ['src/app.ts'], totalCount: 1 }
+        options.onSearchResult?.(result, true)
+        return Promise.resolve(result.paths)
+      }
+      return new Promise<string[]>((resolve, reject) => {
+        scans.push({ rootPath, signal: options.signal, resolve })
+        options.signal?.addEventListener(
+          'abort',
+          () =>
+            // Mirror the real scanners: surface the abort reason (e.g. the
+            // "superseded" error) so the dispatcher reports it to the host.
+            reject(
+              options.signal?.reason instanceof Error
+                ? options.signal.reason
+                : new Error('File listing cancelled')
+            ),
+          { once: true }
+        )
+      })
+    }),
     { scans }
   )
   return { fakeListFiles }
@@ -66,6 +76,8 @@ import { RelayDispatcher } from './dispatcher'
 import { RelayContext } from './context'
 import { FsHandler } from './fs-handler'
 import { LIST_FILES_SUPERSEDED_MESSAGE } from './fs-list-files-scan-coordinator'
+import { parseWorkspacePathSearchWireResponse } from '../shared/workspace-path-search-wire-response'
+import type { WorkspacePathSearchRequest } from '../shared/workspace-path-search-contract'
 
 async function flushPipe(): Promise<void> {
   // The in-memory pipe defers each hop with setImmediate; a few macrotask
@@ -114,6 +126,42 @@ describe('Integration: cancellable fs.listFiles (#7721)', () => {
     dispatcher.dispose()
     fsHandler.dispose()
     await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  it('serves exact structured path search without changing fs.listFiles arrays', async () => {
+    mkdirSync(path.join(tmpDir, 'src'), { recursive: true })
+    writeFileSync(path.join(tmpDir, 'src', 'app.ts'), '')
+    const identity = {
+      query: 'src app',
+      consumer: { consumerId: 'search-1', sequence: 1 },
+      owner: {
+        executionHost: { provider: 'ssh', incarnationId: 'provider-1' },
+        authorizedCanonicalRoot: tmpDir
+      },
+      generationId: null,
+      mode: 'name-filter' as const,
+      scope: {
+        pathSet: 'included' as const,
+        includeDotfiles: true,
+        includeIgnoredFiles: false,
+        excludePathSegments: []
+      },
+      pageBudget: { maxPaths: 32, maxSerializedBytes: 200_000 }
+    }
+    const request: WorkspacePathSearchRequest = { identity, correlationId: 'search-1' }
+    const response = await mux.request('fs.searchPaths', { rootPath: tmpDir, request })
+    const result = parseWorkspacePathSearchWireResponse(response, identity)
+
+    expect(result).toMatchObject({
+      rows: [{ relativePath: 'src/app.ts' }],
+      retainedCount: 1,
+      count: { value: 1, provenance: 'exact-snapshot' },
+      state: { coverage: 'complete', countProvenance: 'exact-snapshot' }
+    })
+    const files = mux.request('fs.listFiles', { rootPath: '/legacy/array' })
+    await flushPipe()
+    fakeListFiles.scans.at(-1)?.resolve(['src/array.ts'])
+    await expect(files).resolves.toEqual(['src/array.ts'])
   })
 
   it('serves fs.readDir while a full-tree scan is in flight', async () => {

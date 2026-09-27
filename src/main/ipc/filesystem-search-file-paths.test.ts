@@ -179,9 +179,9 @@ describe('searchQuickOpenFilePaths', () => {
     await flushMicrotasks()
     child.stdout!.emit(
       'data',
-      `${Array.from({ length: 20_002 }, (_, index) => `data/payload-${index}.bin`).join('\n')}\n`
+      `${Array.from({ length: 20_002 }, (_, index) => `data/payload-${index}.bin`).join('\0')}\0`
     )
-    child.stdout!.emit('data', 'src/a/b/drover.eve_schema\n')
+    child.stdout!.emit('data', 'src/a/b/drover.eve_schema\0')
     child.emit('close', 0, null)
 
     await expect(promise).resolves.toEqual({
@@ -193,16 +193,18 @@ describe('searchQuickOpenFilePaths', () => {
 
   it('counts every name-filter match while returning a bounded sorted page', async () => {
     const child = createMockProcess()
+    const onQueryMetrics = vi.fn()
     wslAwareSpawnMock.mockReturnValue(child)
     const promise = searchQuickOpenFilePaths('/repo', {} as Store, {
       query: 'target',
       limit: 2,
-      mode: 'name-filter'
+      mode: 'name-filter',
+      onQueryMetrics
     })
     await flushMicrotasks()
     child.stdout!.emit(
       'data',
-      'src/target-d.ts\nsrc/target-c.ts\nsrc/other.ts\nsrc/target-a.ts\nsrc/target-b.ts\n'
+      'src/target-d.ts\0src/target-c.ts\0src/other.ts\0src/target-a.ts\0src/target-b.ts\0'
     )
     child.emit('close', 0, null)
 
@@ -211,6 +213,15 @@ describe('searchQuickOpenFilePaths', () => {
       totalCount: 4,
       truncated: true
     })
+    expect(onQueryMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathsConsidered: 5,
+        candidates: 5,
+        verifications: 5,
+        queryGenerationDurationMs: expect.any(Number),
+        queryPathsDurationMs: expect.any(Number)
+      })
+    )
   })
 
   it('kills the host scan when a superseded query aborts', async () => {

@@ -16,7 +16,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   runtimeEnvironmentSupportsCapability: vi.fn(async () => false),
-  callRuntimeRpc: vi.fn(async () => ({}))
+  callRuntimeRpc: vi.fn(async () => ({})),
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 vi.mock('@/lib/workspace-browser-tab-open', () => ({

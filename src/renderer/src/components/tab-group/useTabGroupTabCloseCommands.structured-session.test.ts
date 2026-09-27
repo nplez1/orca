@@ -71,7 +71,8 @@ vi.mock('@/runtime/remote-browser-tab-ownership', () => ({
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: mocks.callRuntimeRpc,
-  getActiveRuntimeTarget: () => ({ kind: 'local' })
+  getActiveRuntimeTarget: () => ({ kind: 'local' }),
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 vi.mock('@/runtime/structured-agent-session-close', () => ({

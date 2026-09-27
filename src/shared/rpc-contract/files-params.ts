@@ -2,18 +2,41 @@ import { PATH_EXISTENCE_BATCH_MAX } from '../path-existence-batch'
 import { z } from 'zod'
 import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from '../quick-open-path-search'
 import { RUNTIME_NAVIGATION_TARGETS } from '../runtime-navigation'
+import { WORKSPACE_PATH_SEARCH_LOCAL_EXPLORER_MAX_PAGE_PATHS } from '../workspace-path-search-contract'
 import { FileOpen, WorktreeSelector } from './files-target-params'
 
 export const FilePathsExist = WorktreeSelector.extend({
   relativePaths: z.array(z.string()).max(PATH_EXISTENCE_BATCH_MAX)
 })
 
-export const FilePathSearch = WorktreeSelector.extend({
+const FilePathSearchQuickOpen = WorktreeSelector.extend({
   query: z.string().max(QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS).default(''),
   limit: z.number().int().positive().max(32).default(16),
   excludePaths: z.array(z.string()).optional(),
   mode: z.literal('quick-open').optional()
 })
+
+const FilePathSearchNameFilter = WorktreeSelector.extend({
+  query: z.string().max(QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS),
+  limit: z.number().int().positive().max(WORKSPACE_PATH_SEARCH_LOCAL_EXPLORER_MAX_PAGE_PATHS),
+  excludePaths: z.array(z.string()).optional(),
+  mode: z.literal('name-filter'),
+  scope: z.object({
+    pathSet: z.enum(['included', 'all']),
+    includeDotfiles: z.boolean(),
+    includeIgnoredFiles: z.boolean(),
+    excludePathSegments: z.array(z.array(z.string()))
+  }),
+  maxPageSerializedBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(16 * 1024 * 1024),
+  correlationId: z.string().min(1).max(128).optional()
+})
+
+/** Legacy mode keeps its original 32-row ceiling; larger pages require explicit name-filter opt-in. */
+export const FilePathSearch = z.union([FilePathSearchQuickOpen, FilePathSearchNameFilter])
 
 export const ResolveTerminalPath = WorktreeSelector.extend({
   pathText: z

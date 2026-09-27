@@ -17,30 +17,39 @@ import {
 export type WebRuntimeResultCaller = <TResult>(
   method: string,
   params?: unknown,
-  timeoutMs?: number
+  timeoutMs?: number,
+  signal?: AbortSignal
 ) => Promise<TResult>
 
 export type WebRuntimeEnvelopeCaller = <TResult>(
   method: string,
   params?: unknown,
-  timeoutMs?: number
+  timeoutMs?: number,
+  signal?: AbortSignal
 ) => Promise<RuntimeRpcResponse<TResult>>
 
 export async function callRuntimeEnvelope<TResult = unknown>(
   method: string,
   params?: unknown,
-  timeoutMs?: number
+  timeoutMs?: number,
+  signal?: AbortSignal
 ): Promise<RuntimeRpcResponse<TResult>> {
   const environment = requireActiveEnvironment()
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     return manuallyDisconnectedResponse(environment)
   }
-  const response = await runtimeCallQueuePool.enqueue(environment.id, method, () => {
-    if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
-      return Promise.resolve(manuallyDisconnectedResponse(environment))
-    }
-    return getClientForEnvironment(environment).call(method, params, { timeoutMs })
-  })
+  const response = await runtimeCallQueuePool.enqueue(
+    environment.id,
+    method,
+    () => {
+      if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
+        return Promise.resolve(manuallyDisconnectedResponse(environment))
+      }
+      return getClientForEnvironment(environment).call(method, params, { timeoutMs, signal })
+    },
+    0,
+    signal
+  )
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     return manuallyDisconnectedResponse(environment)
   }
@@ -74,9 +83,10 @@ export async function callEnvironmentEnvelope<TResult = unknown>(
 export async function callRuntimeResult<TResult>(
   method: string,
   params?: unknown,
-  timeoutMs?: number
+  timeoutMs?: number,
+  signal?: AbortSignal
 ): Promise<TResult> {
-  const response = await callRuntimeEnvelope(method, params, timeoutMs)
+  const response = await callRuntimeEnvelope(method, params, timeoutMs, signal)
   if (!response.ok) {
     // Why keep the code: callers classify recoverable host failures by token, and the message alone
     // (e.g. "Parent selector was not found.") carries none.

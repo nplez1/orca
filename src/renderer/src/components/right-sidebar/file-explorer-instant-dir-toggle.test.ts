@@ -82,6 +82,7 @@ function renderRow(node: TreeNode, toggleDir: (worktreeId: string, dirPath: stri
       selectRowWithModifiers: (target, _event, onReplaceClick) => onReplaceClick(target),
       moveSelection: vi.fn(),
       inlineInput: null,
+      canActivateFilteredResults: true,
       startRename: vi.fn(),
       requestDelete: vi.fn(),
       requestDeleteAll: vi.fn(),

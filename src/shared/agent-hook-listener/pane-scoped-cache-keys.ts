@@ -1,6 +1,7 @@
-// Why its own module: these are pure key-shape helpers over a paneKey and its `\0`
-// sub-keys, with no dependency on HookListenerState — the listener state file keeps
-// the state-specific cache operations.
+/**
+ * Pane-scoped cache-key maintenance. Pane-scoped entries are stored raw under the pane key and
+ * scoped under `${paneKey}\0…`, so a pane move/clear has to touch both forms of the same key.
+ */
 
 export function deletePaneScopedCacheEntry(map: Map<string, unknown>, paneKey: string): void {
   map.delete(paneKey)

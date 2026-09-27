@@ -20,7 +20,8 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: mocks.callRuntimeRpc,
-  runtimeEnvironmentSupportsCapability: vi.fn(async () => false)
+  runtimeEnvironmentSupportsCapability: vi.fn(async () => false),
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 vi.mock('@/lib/workspace-browser-tab-open', () => ({

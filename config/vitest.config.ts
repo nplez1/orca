@@ -4,6 +4,10 @@ import { UNIT_INCLUDE, UNIT_EXCLUDE } from './scripts/ci-unit-files.mjs'
 import TimingSequencer from './scripts/ci-unit-sequencer.mjs'
 
 const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 } : {}
+// Why: concurrent real watcher scans starve the child canary and leave Vitest's console RPC pending at worker teardown.
+const ipcTestWorkerOptions = process.argv.some((argument) => argument.includes('src/main/ipc/'))
+  ? { maxWorkers: 4 }
+  : {}
 
 export default defineConfig({
   define: {
@@ -42,6 +46,7 @@ export default defineConfig({
     testTimeout: 30_000,
     // Why: Windows process and shell startup are slower under full-suite load;
     // macOS/Linux keep Vitest's default worker parallelism.
-    ...windowsTestWorkerOptions
+    ...windowsTestWorkerOptions,
+    ...ipcTestWorkerOptions
   }
 })

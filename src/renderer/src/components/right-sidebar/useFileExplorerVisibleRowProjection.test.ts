@@ -6,11 +6,22 @@ import {
 } from './useFileExplorerVisibleRowProjection'
 import { getEffectiveFileExplorerIgnoredPaths } from './use-file-explorer-ignored-paths'
 import {
+  createNameFilteredFileExplorerProjection,
+  createNameFilteredFileExplorerProjectionInChunks,
   FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES,
+  getFileExplorerNameFilterEmptyMessageKind,
   getFileExplorerNameFilterExpandedPaths,
   getFileExplorerNameFilterIgnoredQueryRelativePaths,
-  getFileExplorerNameFilterTokens
+  getFileExplorerNameFilterProjectionEstimatedBytes,
+  getFileExplorerNameFilterTokens,
+  MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES,
+  shouldBuildNameFilterProjectionInChunks
 } from './file-explorer-name-filter-projection'
+import type {
+  WorkspacePathSearchResponse,
+  WorkspacePathSearchRowClassificationFlags
+} from '../../../../shared/workspace-path-search-contract'
+import { getUtf8ByteLength } from '../../../../shared/utf8-byte-limits'
 
 function row(relativePath: string, isDirectory = false, depth?: number): TreeNode {
   return {
@@ -45,7 +56,128 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function makeStructuredPathPage(paths: string[], query = 'file'): WorkspacePathSearchResponse {
+  const scope = {
+    pathSet: 'all' as const,
+    includeDotfiles: true,
+    includeIgnoredFiles: true,
+    excludePathSegments: []
+  }
+  const flags: WorkspacePathSearchRowClassificationFlags[] = paths.map(() => 0)
+  return {
+    requestIdentity: {
+      query,
+      consumer: { consumerId: 'consumer-1', sequence: 1 },
+      owner: {
+        executionHost: { provider: 'local', incarnationId: 'host-1' },
+        authorizedCanonicalRoot: '/repo'
+      },
+      generationId: null,
+      mode: 'name-filter',
+      scope,
+      pageBudget: { maxPaths: 5_000, maxSerializedBytes: 1_000_000 }
+    },
+    generationId: 'generation-1',
+    scopeFingerprint: JSON.stringify(scope),
+    scopeRuleVersion: 'live-path-search-v1',
+    rows: paths.map((relativePath) => ({ relativePath })),
+    rowClassificationFlags: flags,
+    retainedCount: paths.length,
+    state: {
+      coverage: 'complete',
+      freshness: 'no-known-gap',
+      countProvenance: 'exact-snapshot',
+      searchComplete: true
+    },
+    count: { value: paths.length, provenance: 'exact-snapshot' }
+  }
+}
+
 describe('file explorer visible row projection', () => {
+  it('only reports no match for complete no-known-gap exact snapshot states', () => {
+    const complete = makeStructuredPathPage([])
+    const partial: WorkspacePathSearchResponse = {
+      ...complete,
+      state: {
+        coverage: 'partial',
+        freshness: 'unknown',
+        countProvenance: 'legacy',
+        searchComplete: false
+      },
+      count: { value: null, provenance: 'legacy' }
+    }
+
+    expect(
+      getFileExplorerNameFilterEmptyMessageKind({
+        hasNameFilter: true,
+        hasLoadError: false,
+        truncated: false,
+        workspacePathSearch: complete
+      })
+    ).toBe('no-match')
+    expect(
+      getFileExplorerNameFilterEmptyMessageKind({
+        hasNameFilter: true,
+        hasLoadError: false,
+        truncated: false,
+        workspacePathSearch: partial
+      })
+    ).toBe('partial-scan')
+  })
+
+  it('projects structured host pages with the same tree order as the legacy projection', () => {
+    const paths = ['src/FileExplorer.tsx', 'docs/FileExplorer.tsx']
+    const options = {
+      ignoredSet: new Set<string>(),
+      showDotfiles: true,
+      showGitIgnoredFiles: true,
+      worktreePath: '/repo'
+    }
+    const structuredProjection = createNameFilteredFileExplorerProjection({
+      ...options,
+      nameFilter: {
+        query: 'file',
+        relativePaths: paths,
+        workspacePathSearch: makeStructuredPathPage(paths)
+      }
+    })
+    const legacyProjection = createNameFilteredFileExplorerProjection({
+      ...options,
+      nameFilter: { query: 'file', relativePaths: paths }
+    })
+
+    expect(structuredProjection.getVisibleSlice(0, 10)).toEqual(
+      legacyProjection.getVisibleSlice(0, 10)
+    )
+  })
+
+  it('trusts host matching but still rejects paths outside the workspace boundary', () => {
+    const paths = [
+      '../outside.ts',
+      '/absolute/target.ts',
+      '\\\\absolute\\\\target.ts',
+      'trailing/',
+      'src/not-matching-this-query.ts'
+    ]
+    const source = makeStructuredPathPage(paths)
+    const projection = createNameFilteredFileExplorerProjection({
+      ignoredSet: new Set(),
+      nameFilter: {
+        query: 'file',
+        relativePaths: paths,
+        workspacePathSearch: source
+      },
+      showDotfiles: true,
+      showGitIgnoredFiles: true,
+      worktreePath: '/repo'
+    })
+
+    expect(projection.getVisibleSlice(0, 10).map((entry) => entry.relativePath)).toEqual([
+      'src',
+      'src/not-matching-this-query.ts'
+    ])
+  })
+
   it('keeps dotfiles and ignored files visible when toggles are on', () => {
     const projection = createVisibleFileExplorerRowProjection(
       input({
@@ -333,6 +465,141 @@ describe('file explorer visible row projection', () => {
       'src/index.ts',
       'collapsed'
     ])
+  })
+
+  it('chunks large filtered projections and accounts for ancestor-row bytes before commit', async () => {
+    const paths = Array.from({ length: 150 }, (_, index) => `root/dir-${index}/target-${index}.ts`)
+    const nameFilter = { query: 'target', relativePaths: paths }
+    const controller = new AbortController()
+
+    expect(shouldBuildNameFilterProjectionInChunks(paths)).toBe(true)
+    const projection = await createNameFilteredFileExplorerProjectionInChunks({
+      ignoredSet: new Set(),
+      nameFilter,
+      showDotfiles: true,
+      showGitIgnoredFiles: true,
+      worktreePath: '/repo',
+      signal: controller.signal
+    })
+
+    expect(projection.getVisibleCount()).toBe(301)
+    expect(getFileExplorerNameFilterProjectionEstimatedBytes(projection)).toBeGreaterThan(
+      paths.length * 100
+    )
+    expect(getFileExplorerNameFilterProjectionEstimatedBytes(projection)).toBeLessThan(
+      MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES
+    )
+  })
+
+  it('preserves natural sibling order and directory promotion across shared prefixes', async () => {
+    const nameFilter = {
+      query: 'a',
+      relativePaths: ['a', 'a/10.ts', 'a.ts', 'a/2.ts']
+    }
+    const options = {
+      ignoredSet: new Set<string>(),
+      nameFilter,
+      showDotfiles: true,
+      showGitIgnoredFiles: true,
+      worktreePath: '/repo'
+    }
+    const synchronous = createNameFilteredFileExplorerProjection(options)
+    const chunked = await createNameFilteredFileExplorerProjectionInChunks({
+      ...options,
+      worktreePath: '/repo/chunked',
+      signal: new AbortController().signal
+    })
+    const visibleRowFields = (projection: typeof synchronous) =>
+      projection.getVisibleSlice(0, 10).map(({ relativePath, name, depth, isDirectory }) => ({
+        relativePath,
+        name,
+        depth,
+        isDirectory
+      }))
+
+    expect(visibleRowFields(chunked)).toEqual(visibleRowFields(synchronous))
+    expect(chunked.getVisibleSlice(0, 10).map((row) => row.relativePath)).toEqual([
+      'a',
+      'a/2.ts',
+      'a/10.ts',
+      'a.ts'
+    ])
+    expect(chunked.getRowAtIndex(0)?.isDirectory).toBe(true)
+  })
+
+  it('keeps a deep shared-prefix projection in sub-frame chunks with one complete result', async () => {
+    const sharedPrefix = Array.from({ length: 64 }, (_, index) => `shared-${index}`).join('/')
+    const paths = Array.from(
+      { length: 5_000 },
+      (_, index) => `${sharedPrefix}/target-${index.toString().padStart(5, '0')}.ts`
+    )
+    const chunkDurations: number[] = []
+    const projection = await createNameFilteredFileExplorerProjectionInChunks({
+      ignoredSet: new Set(),
+      nameFilter: {
+        query: 'target',
+        relativePaths: paths,
+        workspacePathSearch: makeStructuredPathPage(paths, 'target')
+      },
+      showDotfiles: true,
+      showGitIgnoredFiles: true,
+      worktreePath: '/repo',
+      signal: new AbortController().signal,
+      onChunkDuration: (milliseconds) => chunkDurations.push(milliseconds)
+    })
+
+    expect(chunkDurations.length).toBeGreaterThan(1)
+    expect(Math.max(...chunkDurations)).toBeLessThan(16)
+    expect(projection.getVisibleCount()).toBe(paths.length + 64)
+    expect(projection.getRowAtIndex(projection.getVisibleCount() - 1)?.relativePath).toBe(
+      paths.at(-1)
+    )
+    const rows = projection.getVisibleSlice(0, projection.getVisibleCount() - 1)
+    const exactBytes = rows.reduce(
+      (total, row) =>
+        total +
+        getUtf8ByteLength(row.name) +
+        getUtf8ByteLength(row.path) +
+        getUtf8ByteLength(row.relativePath) +
+        64,
+      0
+    )
+    expect(getFileExplorerNameFilterProjectionEstimatedBytes(projection)).toBe(exactBytes)
+  })
+
+  it('rejects an ancestor-heavy projection before it can exceed the byte bound', async () => {
+    const paths = Array.from(
+      { length: 8 },
+      (_, index) => `branch-${index}/${'deep/'.repeat(2_000)}target-${index}.ts`
+    )
+
+    await expect(
+      createNameFilteredFileExplorerProjectionInChunks({
+        ignoredSet: new Set(),
+        nameFilter: { query: 'target', relativePaths: paths },
+        showDotfiles: true,
+        showGitIgnoredFiles: true,
+        worktreePath: '/repo',
+        signal: new AbortController().signal
+      })
+    ).rejects.toThrow('projection byte budget')
+  })
+
+  it('cancels a chunked filtered projection before publishing partial rows', async () => {
+    const paths = Array.from({ length: 150 }, (_, index) => `root/dir-${index}/target-${index}.ts`)
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      createNameFilteredFileExplorerProjectionInChunks({
+        ignoredSet: new Set(),
+        nameFilter: { query: 'target', relativePaths: paths },
+        showDotfiles: true,
+        showGitIgnoredFiles: true,
+        worktreePath: '/repo',
+        signal: controller.signal
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('keeps same-worktree ignored paths while an expanded-folder query is loading', () => {

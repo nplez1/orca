@@ -20,7 +20,8 @@ vi.mock('@/runtime/runtime-rpc-client', async () => {
   return {
     getActiveRuntimeTarget,
     callRuntimeRpc: mocks.call,
-    runtimeEnvironmentSupportsCapability: mocks.supports
+    runtimeEnvironmentSupportsCapability: mocks.supports,
+    subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
   }
 })
 

@@ -58,7 +58,7 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
 
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
-  const { files, loading, loadError, truncated } = useRuntimeFileListForWorktree({
+  const { files, loading, searching, loadError, truncated } = useRuntimeFileListForWorktree({
     enabled: visible,
     worktreeId: activeWorktreeId,
     query: deferredQuery
@@ -162,7 +162,7 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
               </div>
             )
           })()
-        ) : filtered.length === 0 ? (
+        ) : searching ? null : filtered.length === 0 ? (
           <CommandEmpty>
             {translate('auto.components.QuickOpen.74e2e1b3e4', 'No matching files.')}
           </CommandEmpty>
@@ -220,7 +220,7 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
       </div>
       {/* Accessibility: announce result count changes */}
       <div aria-live="polite" className="sr-only">
-        {deferredQuery.trim()
+        {deferredQuery.trim() && !searching
           ? translate('auto.components.QuickOpen.b227d88520', '{{value0}} files found', {
               value0: filtered.length
             })

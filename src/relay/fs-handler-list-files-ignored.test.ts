@@ -31,6 +31,14 @@ function staged(mode: string, path: string): string {
   return `${mode} ${SHA1} 0\t${path}`
 }
 
+function emitStdoutChunk(process: ChildProcess, chunk: string): void {
+  const stdout = process.stdout
+  if (!(stdout instanceof EventEmitter)) {
+    throw new Error('Test process stdout is not an EventEmitter')
+  }
+  stdout.emit('data', chunk)
+}
+
 function createMockProcess(): ChildProcess {
   const p = new EventEmitter() as unknown as ChildProcess
   ;(p as unknown as Record<string, unknown>).stdout = new EventEmitter()
@@ -84,6 +92,24 @@ describe('relay quick open ignored file listing', () => {
     if (kind === 'invalid') {
       expect(child.kill).toHaveBeenCalled()
     }
+  })
+
+  it('marks name-filter counts partial when ripgrep reports incomplete coverage', async () => {
+    const proc = createMockProcess()
+    spawnMock.mockReturnValue(proc)
+    const onSearchResult = vi.fn()
+    const scan = listFilesWithRg('/remote/root', [], {
+      maxResults: 8,
+      searchQuery: 'src app',
+      searchMode: 'name-filter',
+      onSearchResult
+    })
+
+    emitStdoutChunk(proc, 'src/app.ts\0')
+    proc.emit('close', 2, null)
+
+    await expect(scan).resolves.toEqual(['src/app.ts'])
+    expect(onSearchResult).toHaveBeenCalledWith({ paths: ['src/app.ts'], totalCount: 1 }, false)
   })
 
   it('uses one broad rg pass for unbounded listings and keeps blocklists/excludes', async () => {

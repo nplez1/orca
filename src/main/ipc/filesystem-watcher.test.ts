@@ -53,6 +53,13 @@ import { stat } from 'node:fs/promises'
 import { subscribe as subscribeParcelWatcher } from '@parcel/watcher'
 import { createWslWatcher } from './filesystem-watcher-wsl'
 import { resetWatcherChildRegistryForTest } from './parcel-watcher-child-registry'
+import { createDebouncedBatch } from './filesystem-watcher-batch-control'
+import {
+  subscribeLocalPathIndexWatcher,
+  unsubscribeLocalPathIndexWatcher
+} from './filesystem-watcher-local-subscription'
+import { getLocalWatcherRoot } from './filesystem-watcher-paths'
+import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
 import { acquireWatcherRemovalGate } from './watcher-removal-gate'
 import { WATCH_BATCH_TRAILING_MS } from '../../shared/filesystem-watch-batch-window'
 
@@ -89,6 +96,32 @@ describe('registerFilesystemWatcherHandlers', () => {
       handlers[channel] = handler
     })
     registerFilesystemWatcherHandlers()
+    await closeAllWatchers()
+  })
+
+  it('reuses the registry watcher for the index without a renderer listener', async () => {
+    const rootPath = '/workspace/index-only'
+    watcherLifecycleState.localWatchersClosed = false
+    const { key } = getLocalWatcherRoot(rootPath)
+    watcherLifecycleState.watchedRoots.set(key, {
+      subscription: { unsubscribe: vi.fn(async () => undefined) },
+      listeners: new Map(),
+      indexConsumers: new Set(),
+      batch: createDebouncedBatch(),
+      eventSequence: 0,
+      indexReconciliationPromise: Promise.resolve(),
+      indexReconciliationController: new AbortController(),
+      indexCoverageTimer: null,
+      rootPath
+    })
+
+    await expect(subscribeLocalPathIndexWatcher(rootPath)).resolves.toBe(true)
+
+    expect(watcherLifecycleState.watchedRoots.get(key)?.listeners.size).toBe(0)
+    expect(watcherLifecycleState.watchedRoots.get(key)?.indexConsumers).toContain(
+      'workspace-path-index'
+    )
+    unsubscribeLocalPathIndexWatcher(rootPath)
     await closeAllWatchers()
   })
 

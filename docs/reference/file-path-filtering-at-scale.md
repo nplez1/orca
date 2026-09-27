@@ -1,192 +1,181 @@
 # File-path filtering at scale
 
-The Explore pane's name filter and Quick Open (Cmd+P) both search a workspace's file
-paths. Both are bounded by `QUICK_OPEN_LISTING_MAX_RESULTS` (20 001) today, in a way that
-can report "No files match this filter" for a file that exists. This page is the contract
-for how path search behaves on large workspaces and across host versions.
+The Explore name filter is a strict path search; Quick Open (Cmd+P) is a separate fuzzy path
+search. Both return bounded pages, but only a complete host-side scan or a complete, fresh index
+snapshot can support an exact empty result.
 
-## The defect
+## Search contract
 
-Two independent failures produced silently empty results on a large repository:
+- Explore matching is whitespace-tokenized, locale-lowercased substring-AND over normalized
+  relative paths. A match in a directory segment also matches its descendants. It is not fuzzy,
+  basename-only, regex, or content search.
+- Quick Open keeps its fuzzy `QuickOpenPathRanker`; changing the name-filter rollout switch does
+  not change Quick Open matching or ranking.
+- Name-filter pages are ordered with `compareFileNames`. The host counts every match and retains
+  only a bounded page (normally at most 5,000 files, further limited by serialized-byte and
+  transport budgets). The tree's directory-first sibling order is a separate projection.
+- `QUICK_OPEN_LISTING_MAX_RESULTS` remains 20,001 for unscoped listings. It is not a filter scan
+  limit and must not be raised to compensate for a missing index.
+- A complete scan counts the whole authorized scope; only display retention is bounded. A zero
+  count is definitive only when coverage is complete, freshness is `no-known-gap`, and the count
+  provenance is `exact-snapshot`. A partial page is never described as “no files match.”
 
-1. The Explore name filter gated its projection on `resolvedQuery === query`. A local
-   listing is unscoped, so `resolvedQuery` is `undefined` and every local query resolved
-   to `[]`. (Fixed; see "Already landed".)
-2. **Filtered search used a truncated full listing.** Locally, filtering ran off
-   `listQuickOpenFiles(..., maxResults: QUICK_OPEN_LISTING_MAX_RESULTS)`, which stops the
-   ripgrep walk at 20 001 paths **in ripgrep's unsorted traversal order**
-   (`src/main/ipc/filesystem-list-files.ts`). Whether any given file is inside that prefix
-   is arbitrary, and the Explore pane never rendered the `truncated` flag, so a file past
-   the prefix read as "no files match". Quick Open renders "(results truncated)"; the
-   filter did not.
+## Execution-host support
 
-## The contract
+Enumeration and matching belong to the host that owns the filesystem. A remote disconnect never
+causes a client-local substitute search.
 
-A filter must never claim more than it knows.
+| Host/workspace route                      | Path index                                                     | Name-filter behavior                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local native repository/worktree          | Yes, in the local main-process worker                          | The Files view acquires a lease; a query also ensures initialization. A complete fresh generation answers in memory while it fits the root budget; a catalog too large to hold resident is spilled to a host-local, checksummed, versioned disk representation and scanned exactly in bounded blocks. Missing, stale, unsupported, over-budget-and-unspilled, or corrupt index work falls back to the cancellable full live scan. |
+| Local folder workspace                    | Yes, when served through local `fs:searchFilePaths`            | Same authorized-root index and exact live-scan fallback as a local repository; a Git repository is not required for path enumeration.                                                                                                                                                                                                                                                                                             |
+| WSL path served by the local Windows host | Yes, using host-side discovery through the WSL-aware scanner   | Index freshness uses WSL-specific validation. The WSL watcher polls only two directory levels, so a deep change is not immediately visible to the watcher. Validation and a live scan are recovery paths; deep-path freshness is a declared limitation, not a guarantee of immediate notification.                                                                                                                                |
+| SSH filesystem                            | No client-side index                                           | A negotiated name-filter request is scanned by the SSH execution host's relay. A legacy relay may only provide a bounded listing, which remains partial/unknown rather than an exact empty result.                                                                                                                                                                                                                                |
+| Remote runtime host                       | No persistent path catalog in the current runtime search route | `files.searchPaths` runs the bounded scan on that runtime host. Older peers use the existing capability/legacy fallback and preserve partial provenance.                                                                                                                                                                                                                                                                          |
+| Remote folder context                     | No local-client index                                          | Uses the execution host's runtime or SSH path above; it is never read from the desktop client as a substitute.                                                                                                                                                                                                                                                                                                                    |
 
-- The **search scans and counts everything**; only the **display retains a bounded page**.
-  Dropping is a rendering bound reported to the user, never a search bound implied to be
-  complete.
-- "No files match" may be shown **only** when the host scanned the whole workspace and
-  returned zero matches. A truncated listing renders a partial-scan message instead.
-- A user reaches a match outside the retained page by **narrowing the query** — not by
-  paging. Paging over a mutating filesystem needs snapshot tokens and host-side caches,
-  which is the memory this design exists to avoid.
+The local index is a name-filter fast path, not a claim that every host has the same index. Quick Open
+fuzzy queries remain on their existing search route. Remote work stays owned by the remote
+execution host.
 
-"A filter must not drop results" is not implementable literally: a one-character query can
-match 300 000 paths. The contract above is the implementable form.
+## Index lifecycle and snapshot semantics
 
-## Design
+The local service is keyed by authorized root, host identity, listing-policy version, fold version,
+and requested scope. A lease or a name-filter query may start a background build; the query does
+not wait for discovery. Ordinary local unscoped listing can also request a warm build. **Opening
+Explorer attempts to acquire a lease; it does not promise that discovery has finished before the
+first keystroke.** A cold, unavailable, or rebuilding index therefore falls back to live search.
 
-Matching belongs to the **execution host** — the main process locally, the relay over SSH,
-the runtime environment over RPC. That is already true for SSH (`fs:listFiles` forwards
-`searchQuery`) and runtime environments (`files.searchPaths`); the gap is local-only:
-`fs:listFiles`'s local branch ignores `args.searchQuery`, and the renderer's
-`searchRuntimeFilePaths` returns `{ files: [], truncated: false }` when there is no
-`connectionId`.
+The catalog tracks path-set coverage separately from freshness. Its included/all scopes, dotfile
+and ignored-file visibility, exclusions, count, classification flags, and rows belong to one
+published generation. Watcher updates are reconciled as bounded deltas; incomplete updates do not
+silently become exact empty results. Native watcher-suppressed high-churn directories are
+reconciled in the background rather than added to the watcher's event stream.
 
-One mechanism, two matchers:
+| Coverage                   | Freshness / count provenance                                             | Meaning and UI rule                                                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `complete`                 | `no-known-gap` / `exact-snapshot`                                        | Full requested scope is represented and current by the host's freshness rules. Exact count and a definitive empty state are permitted.                                                                      |
+| `complete`                 | `dirty`, `reconciling`, or `provisional` / `last-known` or `provisional` | The generation covers the scope, but current membership is uncertain. Its rows/count are only a last-known preview. Local name-filter IPC uses the full live scan instead of treating it as a fresh answer. |
+| `partial` or `unavailable` | Any non-authoritative freshness / `provisional`, `sentinel`, or `legacy` | Coverage or authority is insufficient. Do not show “no files match”; use the supported host's live scan, or a partial/unavailable state when no complete scan is available.                                 |
+| Any coverage               | `failed`, `disconnected`, or `unknown` / non-exact                       | No authoritative current answer is available. A disconnect is not evidence of process death and never authorizes local fallback.                                                                            |
 
-| Pane | Matcher | Semantics | Retention |
-| --- | --- | --- | --- |
-| Quick Open | `QuickOpenPathRanker` (`src/shared/quick-open-path-search.ts`) | fuzzy subsequence over the path, scored | top ~50 |
-| Explore name filter | name-filter matcher (substring-AND on the lowercased relative path, the semantics of `relativePathMatchesNameFilter`) | strict substring tokens | sorted page, ~5 000 |
+Native local roots are validated every five minutes with a fifteen-minute freshness deadline; WSL
+roots are validated every minute with a two-minute deadline. High-churn scopes receive targeted
+reconciliation every minute. If a watcher gap, overflow, failed reconciliation, or freshness
+deadline makes the snapshot uncertain, the system downgrades freshness and records the reason.
 
-Do **not** point the Explore filter at the fuzzy ranker: substring-AND is the pane's
-documented behavior, and it needs a sorted page for the tree, not a score heap.
+## Budgets and admission
 
-The host scan is what `searchQuickOpenFilePaths` (`src/main/ipc/filesystem-search-file-paths.ts`)
-already implements: one ripgrep pass, lines streamed through the 64 KB-bounded
-`QuickOpenSubprocessPathAccumulator`, a per-line matcher that **counts every match** and
-retains only the bounded page. Note that its single `--no-ignore-vcs` pass is a deliberate
-superset of the full listing's `primary` + `ignoredPass` pair, not an oversight.
+The index admission defaults are **256 MiB per root** and **512 MiB per host**, including retained
+catalogs and build reservations, plus a measured **480 MiB host build-peak reservation**. Reservations
+are admitted before allocation; root or host budget refusal does not truncate the index into a false
+complete snapshot. These budgets are independent of `QUICK_OPEN_LISTING_MAX_RESULTS`.
 
-Delivery is request/response with the existing `requestToken` + `AbortSignal` cancellation;
-a superseded keystroke kills the prior scan host- and relay-side. Results are sorted with
-`compareFileNames` so the page is stable.
+A 1M-path root is now admitted under the defaults, but not necessarily resident. Degradation follows
+the plan §4.6 order:
 
-Memory is bounded independently of repository size: rg's stdout buffer, the retained page
-(via `createQuickOpenListingBudget` / `retainQuickOpenPath` in
-`src/shared/quick-open-listing-limits.ts`), one integer match count, and the renderer's
-synthetic tree over the retained page. At the retention bound the host **degrades** —
-returns the sorted page, the exact total, and `truncated: true` — it does not fail.
+1. **Drop optional acceleration.** Incomplete or over-budget trigram postings are discarded before
+   abandoning catalog coverage. A missing posting never means “no match.”
+2. **Spill a resident catalog to disk.** Before evicting a READY generation for another root, the
+   service asks the worker to spill it: version-1 prefix blocks in checksummed build runs merged in
+   natural order, published atomically as a host-local `.wpc` file. A spilled generation is still one
+   exact generation — same count, page, scope, and ordering as the oracle — but a query is an exact
+   O(N) block scan and is much slower (measured ~0.5 s realistic / ~2.4 s adversarial warm p95 at 1M
+   vs ~0.1–0.25 s resident). It does not reuse a whole-catalog cache; the 2 MiB decoded-block LRU is
+   bounded active decoding for resident prefix blocks only.
+3. **Live scan.** If the index cannot be admitted or storage fails, the existing bounded, cancellable
+   live scan runs with a visible reason. Corruption and storage exhaustion are rebuild/live-scan
+   conditions, never a successful empty result.
 
-### Warm path inventory (local)
+Measured capacities, spill file sizes, and the resident-vs-spilled p95 matrix are in
+[`workspace-path-index-matrix-phase6b.json`](../perf/workspace-path-index-matrix-phase6b.json) and its
+[summary](../perf/workspace-path-index-matrix-phase6b.md); the on-disk format is in
+[`workspace-path-catalog-block-format.md`](./workspace-path-catalog-block-format.md). These values are
+measurements, not constants; consult the artifacts rather than copying them into this page. The 480
+MiB build-peak reservation is a measured bound and must be re-probed on other hardware and under
+multi-root pressure.
 
-A name filter only needs file names, so the walk — not the match — is the entire cost, and
-paying it per keystroke is what made the pane slower than the Contents tab. The main process
-keeps a per-root path inventory (`src/main/ipc/quick-open-path-inventory.ts`): `included` (the
-Contents-tab scope, gitignore-aware) and `all` (the `--no-ignore-vcs` superset a pane showing
-gitignored files needs). It is warmed off the interactive path when the pane loads its
-unscoped listing, and answers `fs:searchFilePaths` name-filter queries from memory.
+The warm-query acceptance targets were revised on 2026-09-27 to a measured per-class × per-size
+matrix for the host exact-match scan: p95, worst of the realistic and adversarial profiles,
+`1.2 ×` measured p95 rounded up to 5 ms, never below the original §2 band floor (25 ms through
+500k, 60 ms at 1M). Every other §2 target and the §2 measurement contract still apply.
 
-The scan scope must match the display scope: `showGitIgnoredFiles: false` searches `included`
-(the same set the Contents tab scans), `true` searches `all`. There is no third, always-
-superset scope — that is what made a name filter walk a much larger tree than a content search.
+| Paths | broad-1-char | no-match | selective-3 | multi-token | long-path | unicode | extension | directory | slash |
+| ----: | -----------: | -------: | ----------: | ----------: | --------: | ------: | --------: | --------: | ----: |
+|  100k |           25 |       25 |          30 |          25 |        30 |      25 |        30 |        25 |    25 |
+|  300k |           60 |       25 |          80 |          45 |        95 |      25 |        80 |        40 |    50 |
+|  500k |          110 |       25 |         120 |          70 |       140 |      25 |       115 |        60 |    75 |
+|    1M |          225 |       60 |         265 |         135 |       280 |      60 |       220 |       115 |   150 |
 
-Freshness is honest by construction: the local watcher drops the entry when the path set
-changes and a debounced build re-warms it, a TTL covers events the host never sees, and a query
-that finds the entry stale or rebuilding returns "not warmed" so the caller scans live. A
-missing or over-budget entry is **never** reported as "no matches". The budget is separate from
-`QUICK_OPEN_LISTING_MAX_RESULTS` (a listing OOM bound): crossing it drops the cache with a log
-line and degrades to the live scan, rather than truncating.
+Closing the remaining gap is follow-up work (typed-array/SIMD broad scanning, worker-parallel
+scans); search coverage and exact counts were never traded to reach these numbers.
 
-Because the inventory already knows which paths git ignores, the host returns that subset on
-the matched page and the pane skips its own per-keystroke `git check-ignore` (measured ~0.9s
-over 5 000 paths) for the filtered view.
+A refused or over-budget index that cannot spill falls back to the complete live scan on supported
+local routes.
 
-### What happens to the 20 001 bound
+## Fallback and feature switch
 
-It stays. It is an OOM bound from the memory-hardening work (#10179 / #10299), aliased by
-`QUICK_OPEN_READDIR_MAX_FILES` (the readdir fallback throws past it), clamped by the relay
-via `resolveQuickOpenResultLimit`, and used by the runtime file command path. Raising it
-also re-introduces the renderer cost that motivated scoped search: fuzzy-ranking the whole
-retained array per keystroke.
+The internal kill switch follows Orca's established `ORCA_DISABLE_*` environment convention:
 
-It applies to **unscoped** listings only — browse mode, an empty Quick Open query, legacy
-host inventories, the readdir fallback. A filtered query takes the scoped path with its own
-smaller cap, which is how a user escapes the ceiling.
+```sh
+ORCA_DISABLE_WORKSPACE_PATH_INDEX=1
+```
 
-### Wire compatibility
+When unset, the index is enabled by default in all builds, including internal/development builds. When set to
+`1`, local name-filter queries take the complete cancellable live-scan route only: no index ensure,
+build/warm, or lease acquisition occurs. Local unscoped listing still works, and Quick Open's
+fuzzy matcher is unchanged. Other values do not disable the index. Remote hosts continue to use
+their own negotiated search route because the local index switch does not transfer filesystem
+authority to the client.
 
-Per [`remote-wire-compatibility.md`](./remote-wire-compatibility.md):
+With the switch enabled, an indexed answer is used only when its coverage is complete, freshness
+is `no-known-gap`, and its count is exact. Otherwise the local handler uses a complete live scan
+when it can. Degradation/cache-miss reasons include `missing`, `building`, `expired`,
+`over-budget`, `failed`, `uncovered-scope`, `classification-pending`, `interrupted`,
+`disconnected`, `transport-budget`, `unsupported`, and `feature-disabled`; cancellation and
+revoked authorization stop rather than launch a substitute scan. Not every reason applies to every
+host route. If the live scan itself fails or is cancelled, it does not become a successful empty
+answer.
 
-- **Local IPC** is same-version on both sides; a structured return
-  (`{ files, totalCount, truncated }`) is fine.
-- **Runtime RPC**: `files.searchPaths` already carries `mode: 'quick-open'` and a
-  `quickOpenSearchVersion` field. A new `mode: 'name-filter'` is a new optional field
-  (Rule 1). An old host ignores `mode`, returns quick-open results with a version below the
-  new one, and the client falls back to the existing `searchLegacyQuickOpenInventory`
-  chain, surfacing the existing "update your host" message at the end of that chain.
-- **SSH/relay**: `fs-handler-list-files.ts` is already `searchQuery`-aware; the matcher mode
-  is added the same way, with the same capability fallback. **No new stream opcode**, so
-  Rule 2 does not apply.
-- An old host keeps serving the 20 001-bounded inventory; the client must render the
-  partial-scan message for it rather than a false empty.
+## Development diagnostics and shadow checks
 
-## Staging
+In an unpackaged development host, the main-process summary API is:
 
-1. **Local, both panes — LANDED.** `fs:searchFilePaths` serves a local query-scoped search
-   (`searchQuickOpenFilePaths` with a matcher mode) as
-   `{ files, totalCount, truncated }`; `searchRuntimeFilePaths` uses it for a local workspace;
-   `useRuntimeFileListForWorktree` takes the scoped path for a local workspace once the query
-   is non-empty (browse mode with an empty query keeps the unscoped listing, so Quick Open
-   still shows files before you type) and carries `totalCount` to both panes; the Explore pane
-   shows a partial-result notice. Runtime environments and legacy inventories also report
-   `totalCount`, which their replies already carried.
-2. **Remote hosts, exact name-filter totals.** `mode: 'name-filter'` on runtime RPC and relay,
-   with version negotiation and the legacy fallback chain, so SSH and remote runtime
-   environments answer a substring query with an exact total rather than a fuzzy page. Until
-   then SSH reports `truncated` without a count, and the pane renders the partial-scan message
-   instead of a number.
-3. **Local warm inventory — LANDED.** A host-side path inventory keyed by authorized root,
-   warmed when the pane loads, invalidated by the local watcher and re-warmed on a debounce,
-   with its own path/byte budget and a live-scan fallback past it. It answers the local name
-   filter in memory and carries the ignored subset so the pane can drop its own
-   `git check-ignore`. Remote hosts keep the live scan (and the check-ignore) until they grow an
-   equivalent host-side inventory.
+```js
+await window.api.fs.getWorkspacePathSearchDiagnosticsSummary()
+```
 
-`QUICK_OPEN_LISTING_MAX_RESULTS` is untouched by all three stages. The inventory budget is
-separate and deliberately larger — it bounds a cache, not a listing.
+It returns numeric aggregate counts for queries served by `ordered-scan`, `trigram-postings`,
+`matching-id-bitset`, `disk-block-scan`, `live-scan`, or `legacy-search`; cache-miss and fallback
+reasons (including `spill-unavailable`); admission refusals; and freshness downgrades. It contains no paths, query text, workspace identifiers, or
+correlation IDs. `window.api.fs.exportWorkspacePathSearchInstrumentation()` retains the bounded
+per-event detail (hashed workspace identity, numeric counts/timings, and strategy/reason values).
+The renderer timing hook remains available as `window.__orcaWorkspacePathSearchTimings()`.
+Diagnostics IPC is rejected in packaged builds; its in-memory records are bounded and reset when
+the process restarts.
 
-## Tests that prove it
+The fixture-only shadow harness at
+[`workspace-path-search-shadow-harness.ts`](../../src/shared/__fixtures__/workspace-path-search-shadow-harness.ts)
+compares sampled catalog answers with the straightforward oracle in tests. Its default sample rate
+is 1%; `ORCA_WORKSPACE_PATH_SEARCH_SHADOW_SAMPLE_RATE` configures it for dev/test runs. It is not
+imported by production search code. Mismatch diagnostics contain only hashed fixture/query IDs and
+numeric counts; they never replace or modify the result returned by the index path.
 
-- **The regression test for this bug**: a tmpdir with ~25 000 files where the target name is
-  placed last in traversal order; assert a query-scoped local search finds it although the
-  unscoped 20 001 listing does not. This is a real-filesystem test, not a 300 000-file
-  fixture.
-- Matcher unit tests: exact `totalCount` past the retention bound, deterministic sort,
-  `truncated` semantics, and `no-match` only when the scan was complete.
-- UI test: `truncated && files.length === 0` renders the partial-scan message, never "No
-  files match this filter".
-- Protocol test: a stubbed old host that strips `mode` drives the client down the legacy
-  inventory fallback.
-- Cancellation: a superseded keystroke kills the prior rg (the pattern already exists for
-  `fs:search`).
-- Inventory scope: in a real git repo a `.gitignore`d file is absent from `included` and present
-  in `all`; the local `fs:searchFilePaths` search excludes it with `includeIgnoredFiles: false`
-  and includes it by default.
-- Inventory honesty: a query before any warm returns "not warmed", not "no matches"; an
-  invalidated entry stops answering until its debounced rebuild lands; the budget predicate
-  flips on both path count and retained bytes.
-- Renderer: the pane issues no `git check-ignore` while a name filter is active and the host
-  supplied the ignored subset.
+## Wire compatibility
 
-## Already landed
+Remote clients and hosts may be on different versions. Runtime `files.searchPaths` and SSH relay
+name-filter requests use existing optional capability negotiation; older peers stay on the
+legacy path and must preserve partial/count provenance. No client-local scan is used to cover a
+remote disconnect. The matching contract and response state remain conservative for unknown
+future values; see [`remote-wire-compatibility.md`](./remote-wire-compatibility.md).
 
-- **Query-scoped local search.** `NameFilterPathMatcher` (substring-AND, exact `totalCount`,
-  a lexicographically-first bounded page so the tree stays a stable sorted prefix) beside
-  `QuickOpenPathRanker`; `searchQuickOpenFilePaths` takes `mode`; `fs:searchFilePaths` exposes
-  it to the window, with the same `requestToken` cancellation registry as `fs:listFiles`.
-- **Both panes use it.** A local non-empty query searches on the host: Quick Open keeps its
-  fuzzy matcher and renders the host's truncation flag, the Explore filter asks for
-  `name-filter` with a 5 000-path page.
-- **Honest presentation.** `getFileExplorerNameFilterEmptyMessageKind` — a truncated listing
-  never claims "no files match", it renders the partial-scan message. When the host counted
-  matches, the pane says "Showing the first N of M matches".
-- **Warm local inventory.** `src/main/ipc/quick-open-path-inventory.ts`, warmed from the pane's
-  unscoped listing, invalidated on watcher flush and shutdown, with a budget fallback. The name
-  filter's scan scope follows `showGitIgnoredFiles`, so turning ignored files off makes it scan
-  exactly what the Contents tab scans.
-- `retainQuickOpenPath` and the readdir fallback are untouched, so the unscoped listing keeps
-  its OOM bound.
+## Verification pointers
+
+The relevant coverage includes local IPC fallback/switch tests, relay and runtime capability tests,
+worker/service freshness and admission tests, catalog/oracle equivalence tests, disk-spill
+format/corruption/cancellation and build-run merge tests, the opt-in 1M spilled oracle suite
+(`ORCA_RUN_PATH_SEARCH_SCALE=1 workspace-path-catalog-spill-scale.test.ts`), and the structural
+performance contracts. Run the perf artifact harness described in
+[`workspace-path-search-scale.md`](../../src/shared/__fixtures__/workspace-path-search-scale.md)
+when measuring a new build; keep raw performance outputs in `docs/perf/` rather than this stable
+contract page.

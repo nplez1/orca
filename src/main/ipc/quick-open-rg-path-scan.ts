@@ -35,10 +35,20 @@ export function scanRipgrepPaths(args: {
   authorizedRootPath: string
   excludePathPrefixes: readonly string[]
   localGitOptions: { wslDistro?: string }
-  onPath: (path: string) => boolean
+  onPath?: (path: string) => boolean
+  onPathBatch?: (paths: readonly string[]) => Promise<boolean>
+  batchSize?: number
+  batchByteLimit?: number
+  timeoutMilliseconds?: number
   signal?: AbortSignal
   wslDistroForOutput?: string
 }): Promise<void> {
+  if (!args.onPath && !args.onPathBatch) {
+    return Promise.reject(new TypeError('Path scan requires a consumer'))
+  }
+  if (args.onPath && args.onPathBatch) {
+    return Promise.reject(new TypeError('Path scan accepts only one consumer'))
+  }
   if (args.signal?.aborted) {
     return Promise.reject(fileListingCancellationError(args.signal))
   }
@@ -48,6 +58,11 @@ export function scanRipgrepPaths(args: {
       finish(error)
     }, Boolean(args.wslDistroForOutput))
     const pathAccumulator = new QuickOpenSubprocessPathAccumulator(0)
+    const batchSize = Math.max(1, Math.floor(args.batchSize ?? 256))
+    const batchByteLimit = Math.max(1, Math.floor(args.batchByteLimit ?? 512 * 1024))
+    const pendingBatch: string[] = []
+    let pendingBatchBytes = 0
+    let batchFlush: Promise<void> | null = null
     let done = false
     let stopRequested = false
     let parseablePathCount = 0
@@ -71,6 +86,7 @@ export function scanRipgrepPaths(args: {
       return
     }
     let timer: ReturnType<typeof setTimeout>
+    const timeoutMilliseconds = Math.max(1, args.timeoutMilliseconds ?? 10_000)
 
     const processLine = (rawLine: string): void => {
       const translated =
@@ -85,13 +101,23 @@ export function scanRipgrepPaths(args: {
         return
       }
       parseablePathCount++
-      if (
-        shouldIncludeQuickOpenPath(relPath) &&
-        !shouldExcludeQuickOpenRelPath(relPath, args.excludePathPrefixes)
-      ) {
-        if (!args.onPath(relPath)) {
-          stopRequested = true
+      if (args.onPathBatch) {
+        const pathBytes = Buffer.byteLength(relPath, 'utf8')
+        if (pendingBatch.length > 0 && pendingBatchBytes + pathBytes > batchByteLimit) {
+          startBatchFlush()
         }
+        pendingBatch.push(relPath)
+        pendingBatchBytes += pathBytes
+        if (pendingBatch.length >= batchSize || pendingBatchBytes >= batchByteLimit) {
+          startBatchFlush()
+        }
+      } else if (
+        shouldIncludeQuickOpenPath(relPath) &&
+        !shouldExcludeQuickOpenRelPath(relPath, args.excludePathPrefixes) &&
+        args.onPath &&
+        !args.onPath(relPath)
+      ) {
+        stopRequested = true
       }
     }
     const cleanup = (): void => {
@@ -116,6 +142,88 @@ export function scanRipgrepPaths(args: {
         reject(error)
       } else {
         resolve()
+      }
+    }
+    const flushPendingBatch = async (): Promise<void> => {
+      while (pendingBatch.length > 0 && !done) {
+        const batch = pendingBatch.splice(0, batchSize)
+        pendingBatchBytes -= batch.reduce((sum, path) => sum + Buffer.byteLength(path, 'utf8'), 0)
+        if (args.onPathBatch && !(await args.onPathBatch(batch))) {
+          stopRequested = true
+          killSpawnedRipgrepProcess(child)
+          finish()
+          return
+        }
+      }
+    }
+    const startBatchFlush = (): void => {
+      if (!args.onPathBatch || batchFlush || done) {
+        return
+      }
+      child.stdout!.pause()
+      const flush = flushPendingBatch()
+      batchFlush = flush
+      void flush
+        .catch((error: unknown) => {
+          killSpawnedRipgrepProcess(child)
+          finish(toScanError(error))
+        })
+        .finally(() => {
+          if (batchFlush === flush) {
+            batchFlush = null
+          }
+          if (!done && !stopRequested) {
+            if (args.timeoutMilliseconds !== undefined) {
+              armTimeout()
+            }
+            child.stdout!.resume()
+          }
+        })
+    }
+    const finishClosedScan = async (
+      code: number | null,
+      signal: NodeJS.Signals | null
+    ): Promise<void> => {
+      if (batchFlush) {
+        await batchFlush
+      }
+      if (done) {
+        return
+      }
+      // Why before the unavailable check: classifyNativeLauncherExit treats any code above 2 as a
+      // broken install, and this code is 97 -- so checking second makes this branch dead.
+      if (isRipgrepMissingCwdExit(code)) {
+        pathAccumulator.clear()
+        finish(ripgrepMissingCwdError(args.authorizedRootPath))
+        return
+      }
+      if (
+        isRipgrepUnavailableExit(child, code, signal, {
+          classifyNativeLauncherExit: true
+        })
+      ) {
+        unavailableExitObserved = true
+        finish(new RipgrepUnavailableError())
+        return
+      }
+      if (signal) {
+        finish(new Error(`rg killed by ${signal}`))
+        return
+      }
+      if (!filenameDecoder.finish()) {
+        return
+      }
+      const trailingPath = pathAccumulator.finish()
+      if (trailingPath) {
+        processLine(trailingPath)
+      }
+      await flushPendingBatch()
+      if (!done) {
+        finish(
+          code === 0 || code === 1 || (code === 2 && parseablePathCount > 0)
+            ? undefined
+            : new Error(`rg exited with code ${code}`)
+        )
       }
     }
     const handleStdoutData = (chunk: Buffer | string): void => {
@@ -166,41 +274,12 @@ export function scanRipgrepPaths(args: {
         })
     }
     const handleClose = (code: number | null, signal: NodeJS.Signals | null): void => {
-      // Why before the unavailable check: classifyNativeLauncherExit treats any code above 2 as a
-      // broken install, and this code is 97 -- so checking second makes this branch dead.
-      if (isRipgrepMissingCwdExit(code)) {
-        pathAccumulator.clear()
-        finish(ripgrepMissingCwdError(args.authorizedRootPath))
-        return
-      }
-      if (
-        isRipgrepUnavailableExit(child, code, signal, {
-          classifyNativeLauncherExit: true
-        })
-      ) {
-        unavailableExitObserved = true
-        finish(new RipgrepUnavailableError())
-        return
-      }
-      if (signal) {
-        finish(new Error(`rg killed by ${signal}`))
-        return
-      }
-      if (!filenameDecoder.finish()) {
-        return
-      }
-      const trailingPath = pathAccumulator.finish()
-      if (trailingPath) {
-        processLine(trailingPath)
-      }
-      finish(
-        code === 0 || code === 1 || (code === 2 && parseablePathCount > 0)
-          ? undefined
-          : new Error(`rg exited with code ${code}`)
-      )
+      void finishClosedScan(code, signal).catch((error: unknown) => finish(toScanError(error)))
     }
     const handleAbort = (): void => {
       pathAccumulator.clear()
+      pendingBatch.length = 0
+      pendingBatchBytes = 0
       killSpawnedRipgrepProcess(child)
       finish(fileListingCancellationError(args.signal))
     }
@@ -210,13 +289,21 @@ export function scanRipgrepPaths(args: {
     child.once('error', handleError)
     child.once('close', handleClose)
     args.signal?.addEventListener('abort', handleAbort, { once: true })
-    timer = setTimeout(() => {
-      pathAccumulator.clear()
-      killSpawnedRipgrepProcess(child)
-      finish(new Error('rg file-path search timed out'))
-    }, 10_000)
+    const armTimeout = (): void => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        pathAccumulator.clear()
+        killSpawnedRipgrepProcess(child)
+        finish(new Error('rg file-path search timed out'))
+      }, timeoutMilliseconds)
+    }
+    armTimeout()
     if (args.signal?.aborted) {
       handleAbort()
     }
   })
+}
+
+function toScanError(error: unknown): Error {
+  return error instanceof Error ? error : new Error('Path batch consumer failed')
 }

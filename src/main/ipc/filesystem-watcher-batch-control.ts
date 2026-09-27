@@ -9,6 +9,7 @@ export type DebouncedBatch = {
   flushInFlight: boolean
   flushQueued: boolean
   cancelled: boolean
+  indexReconciliationMarked: boolean
 }
 
 export function createDebouncedBatch(): DebouncedBatch {
@@ -19,7 +20,8 @@ export function createDebouncedBatch(): DebouncedBatch {
     firstEventAt: 0,
     flushInFlight: false,
     flushQueued: false,
-    cancelled: false
+    cancelled: false,
+    indexReconciliationMarked: false
   }
 }
 
@@ -32,6 +34,12 @@ export function cancelLocalBatchFlush(root: WatchedRoot): void {
     root.batch.timer = null
   }
   root.batch.events = []
+  root.batch.indexReconciliationMarked = false
+  root.indexReconciliationController.abort()
+  if (root.indexCoverageTimer) {
+    clearTimeout(root.indexCoverageTimer)
+    root.indexCoverageTimer = null
+  }
   root.batch.overflowed = false
   root.batch.firstEventAt = 0
 }

@@ -1,6 +1,9 @@
+import { z } from 'zod'
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import { isMethodNotFoundError } from '../ssh/ssh-filesystem-stream-reader'
 import { waitForSshCapabilityProbe } from './ssh-capability-probe-waiter'
+import { WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY } from '../../shared/workspace-path-search-capability'
+import type { WorkspacePathSearchCapabilityDescriptor } from '../../shared/workspace-path-search-contract'
 
 /** `null` means the host has no capability document at all: it predates
  *  `fs.getCapabilities`, or answered with something that is not an object.
@@ -67,4 +70,31 @@ export function probeSshPathExistenceBatchCapability(mux: SshChannelMultiplexer)
   return readSshFsCapabilities(mux).then(
     (capabilities) => capabilities?.pathExistenceBatchVersion === 1
   )
+}
+
+export function probeSshWorkspacePathSearchCapability(
+  mux: SshChannelMultiplexer,
+  signal?: AbortSignal
+): Promise<WorkspacePathSearchCapabilityDescriptor | null> {
+  return readSshFsCapabilities(mux, signal).then((capabilities) =>
+    readWorkspacePathSearchDescriptor(capabilities?.[WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY])
+  )
+}
+
+const WorkspacePathSearchDescriptorSchema = z.object({
+  matcherVersion: z.literal(1),
+  supportedScopes: z.array(z.enum(['included', 'all'])),
+  supportsDotfileVisibility: z.boolean(),
+  supportsIgnoredFileVisibility: z.boolean(),
+  supportsExcludePathSegments: z.boolean(),
+  maxPagePaths: z.number().int().positive(),
+  maxPageSerializedBytes: z.number().int().positive(),
+  freshnessMetadata: z.boolean()
+})
+
+function readWorkspacePathSearchDescriptor(
+  value: unknown
+): WorkspacePathSearchCapabilityDescriptor | null {
+  const parsed = WorkspacePathSearchDescriptorSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
 }

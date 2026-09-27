@@ -43,6 +43,7 @@ export function useFileExplorerKeys(opts: {
   inlineInput: InlineInput | null
   selectedPaths: Set<string>
   selectedNode: TreeNode | null
+  canActivateRows: boolean
   activateNode: (node: TreeNode) => void
   moveSelection: (targetPath: string, mode: SelectionMode) => void
   toggleDir: (worktreeId: string, dirPath: string) => void
@@ -69,6 +70,11 @@ export function useFileExplorerKeys(opts: {
   selectedPathsRef.current = opts.selectedPaths
   const selectedNodeRef = useRef(opts.selectedNode)
   selectedNodeRef.current = opts.selectedNode
+  const canActivateRowsRef = useRef(opts.canActivateRows)
+  // Why: this ref feeds the key handler; sync it after commit instead of mutating it during render.
+  useEffect(() => {
+    canActivateRowsRef.current = opts.canActivateRows
+  }, [opts.canActivateRows])
   const startRenameRef = useRef(opts.startRename)
   startRenameRef.current = opts.startRename
   const requestDeleteRef = useRef(opts.requestDelete)
@@ -211,7 +217,9 @@ export function useFileExplorerKeys(opts: {
             selectedNodeRef.current
           if (node) {
             e.preventDefault()
-            activateNodeRef.current(node)
+            if (canActivateRowsRef.current) {
+              activateNodeRef.current(node)
+            }
             return
           }
         }
@@ -223,7 +231,9 @@ export function useFileExplorerKeys(opts: {
         if (node) {
           if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
             e.preventDefault()
-            startRenameRef.current(node)
+            if (canActivateRowsRef.current) {
+              startRenameRef.current(node)
+            }
             return
           }
           const wantsDelete = keybindingMatchesAction(

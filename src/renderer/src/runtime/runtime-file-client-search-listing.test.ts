@@ -13,6 +13,7 @@ import {
   fsPathExists,
   fsSearch,
   fsListFiles,
+  fsSearchFilePaths,
   fsCancelListFiles,
   runtimeEnvironmentCall,
   runtimeEnvironmentSubscribe,
@@ -204,6 +205,48 @@ describe('runtime file client', () => {
       maxResults: 3,
       searchQuery: 'target'
     })
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('routes direct SSH Explorer filters through the negotiated main-process path-search surface', async () => {
+    fsSearchFilePaths.mockResolvedValue({
+      files: ['src/app.ts'],
+      totalCount: null,
+      truncated: true
+    })
+
+    await expect(
+      searchRuntimeFilePaths(
+        {
+          settings: { activeRuntimeEnvironmentId: null },
+          worktreeId: 'wt-1',
+          worktreePath: '/remote/repo',
+          connectionId: 'ssh-1'
+        },
+        {
+          query: 'src app',
+          limit: 5_000,
+          mode: 'name-filter',
+          includeIgnoredFiles: false,
+          requestToken: 'ssh-filter-1',
+          correlationId: 'ssh-filter-correlation'
+        }
+      )
+    ).resolves.toMatchObject({ files: ['src/app.ts'], totalCount: null, truncated: true })
+
+    expect(fsSearchFilePaths).toHaveBeenCalledWith({
+      rootPath: '/remote/repo',
+      connectionId: 'ssh-1',
+      query: 'src app',
+      limit: 5_000,
+      mode: 'name-filter',
+      excludePaths: undefined,
+      includeIgnoredFiles: false,
+      includeDotfiles: undefined,
+      requestToken: 'ssh-filter-1',
+      correlationId: 'ssh-filter-correlation'
+    })
+    expect(fsListFiles).not.toHaveBeenCalled()
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
   })
 

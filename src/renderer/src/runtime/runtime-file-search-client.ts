@@ -1,6 +1,8 @@
 import type { SearchOptions, SearchResult } from '../../../shared/code-search-types'
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
+import { validateWorkspacePathSearchQuery } from '../../../shared/workspace-path-search-contract'
 import type { RuntimeFileListResult } from '../../../shared/runtime-types'
 import {
   buildExcludePathPrefixes,
@@ -16,6 +18,7 @@ import {
   searchLegacyQuickOpenInventory
 } from './runtime-legacy-quick-open-inventory'
 import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { searchRuntimeNameFilterPaths } from './runtime-workspace-path-search-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
 const QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE =
@@ -93,6 +96,8 @@ export async function searchRuntimeFilePaths(
     signal?: AbortSignal
     mode?: PathSearchMode
     includeIgnoredFiles?: boolean
+    includeDotfiles?: boolean
+    correlationId?: WorkspacePathSearchCorrelationId
   }
 ): Promise<FilePathSearchResult> {
   const target = getActiveRuntimeTarget(context.settings)
@@ -111,7 +116,26 @@ export async function searchRuntimeFilePaths(
         mode: args.mode,
         excludePaths: args.excludePaths,
         includeIgnoredFiles: args.includeIgnoredFiles,
-        requestToken: args.requestToken
+        requestToken: args.requestToken,
+        ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId })
+      })
+    }
+    if (args.mode === 'name-filter') {
+      const validated = validateWorkspacePathSearchQuery(args.query, 'remote')
+      if (!validated.ok || !validated.query.trim()) {
+        throw new Error('Remote filename filter query is too large or invalid')
+      }
+      return window.api.fs.searchFilePaths({
+        rootPath: context.worktreePath,
+        connectionId: context.connectionId,
+        query: validated.query,
+        limit,
+        mode: 'name-filter',
+        excludePaths: args.excludePaths,
+        includeIgnoredFiles: args.includeIgnoredFiles,
+        includeDotfiles: args.includeDotfiles,
+        requestToken: args.requestToken,
+        correlationId: args.correlationId
       })
     }
     const files = await window.api.fs.listFiles({
@@ -129,6 +153,17 @@ export async function searchRuntimeFilePaths(
   }
   const worktreeSelector = toRuntimeWorktreeSelector(context.worktreeId)
   const limit = args.limit ?? 32
+  if (args.mode === 'name-filter') {
+    return searchRuntimeNameFilterPaths(context, target, {
+      query: args.query,
+      limit,
+      excludePaths: args.excludePaths,
+      signal: args.signal,
+      includeIgnoredFiles: args.includeIgnoredFiles,
+      includeDotfiles: args.includeDotfiles,
+      correlationId: args.correlationId
+    })
+  }
   if (hasCachedLegacyQuickOpenInventory(target, worktreeSelector, context.worktreePath)) {
     return searchLegacyQuickOpenInventory({
       target,

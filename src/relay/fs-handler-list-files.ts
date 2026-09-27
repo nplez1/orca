@@ -16,12 +16,7 @@ import { RipgrepFilenameDecoder } from '../shared/ripgrep-filename-decoder'
  */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { fileListingCancellationError } from '../shared/file-listing-cancellation'
-import {
-  buildRgArgsForQuickOpen,
-  normalizeQuickOpenRgLine,
-  shouldExcludeQuickOpenRelPath,
-  shouldIncludeQuickOpenPath
-} from '../shared/quick-open-filter'
+import { buildRgArgsForQuickOpen } from '../shared/quick-open-filter'
 import {
   absorbPendingRipgrepSpawnError,
   classifyRipgrepLaunchFailure,
@@ -32,7 +27,9 @@ import {
   ripgrepMissingCwdError,
   RipgrepUnavailableError
 } from '../shared/ripgrep-process-availability'
-import { QuickOpenPathRanker } from '../shared/quick-open-path-search'
+import { createQuickOpenListLineProcessor } from './quick-open-list-line-processor'
+import type { QuickOpenListQueryOptions } from './quick-open-list-query-pass'
+import { createQuickOpenListMatcher } from './quick-open-list-query-pass'
 import { buildRelayCommandEnv } from './relay-command-env'
 import {
   pathRipgrepCommand,
@@ -45,9 +42,17 @@ export const LIST_FILES_TIMEOUT_MS = 25_000
 export function listFilesWithRg(
   rootPath: string,
   excludePathPrefixes: readonly string[] = [],
-  options: { signal?: AbortSignal; maxResults?: number; searchQuery?: string } = {}
+  options: QuickOpenListQueryOptions & { signal?: AbortSignal; maxResults?: number } = {}
 ): Promise<string[]> {
-  const { signal, maxResults, searchQuery } = options
+  const {
+    signal,
+    maxResults,
+    searchQuery,
+    searchMode,
+    includeIgnoredFiles,
+    includeDotfiles = true,
+    onSearchResult
+  } = options
   if (signal?.aborted) {
     return Promise.reject(fileListingCancellationError(signal))
   }
@@ -70,27 +75,14 @@ export function listFilesWithRg(
       forceSlashSeparator: true
     })
 
-    const processLine = (rawLine: string, attemptRanker: QuickOpenPathRanker | null): boolean => {
-      const relPath = normalizeQuickOpenRgLine(rawLine, { kind: 'cwd-relative' })
-      if (relPath === null) {
-        return false
-      }
-      // Why: correctness backstop. The rg globs prune most blocklisted dirs,
-      // but a glob edge case could still surface e.g. a .git/ or .npm/ hit.
-      const excluded = shouldExcludeQuickOpenRelPath(relPath, excludePathPrefixes)
-      if (!shouldIncludeQuickOpenPath(relPath) || excluded) {
-        return true
-      }
-      if (attemptRanker) {
-        attemptRanker.consider(relPath)
-        return true
-      }
-      files.add(relPath)
-      if (maxResults !== undefined && files.size >= maxResults) {
-        finishAtLimit()
-      }
-      return true
-    }
+    const processLine = createQuickOpenListLineProcessor({
+      excludePathPrefixes,
+      searchMode,
+      includeDotfiles,
+      maxResults,
+      files,
+      onLimit: () => finishAtLimit()
+    })
 
     const runPassOnce = (args: string[]): Promise<void> =>
       new Promise((passResolve, passReject) => {
@@ -98,8 +90,7 @@ export function listFilesWithRg(
         if (done || signal?.aborted) {
           return passResolve()
         }
-        const attemptRanker =
-          searchQuery === undefined ? null : new QuickOpenPathRanker(searchQuery, maxResults ?? 16)
+        const attemptMatcher = createQuickOpenListMatcher({ searchQuery, searchMode, maxResults })
         const filenameDecoder = new RipgrepFilenameDecoder((error) => {
           killSpawnedRipgrepProcess(child)
           rejectPass(error)
@@ -152,14 +143,16 @@ export function listFilesWithRg(
           cleanup()
           passReject(error instanceof Error ? error : new Error(String(error)))
         }
-        const resolvePass = (): void => {
+        const resolvePass = (complete = true): void => {
           if (passDone) {
             return
           }
           passDone = true
           cleanup()
-          if (attemptRanker) {
-            rankedPaths = attemptRanker.result().paths
+          if (attemptMatcher) {
+            const result = attemptMatcher.result()
+            rankedPaths = result.paths
+            onSearchResult?.(result, complete)
           }
           passResolve()
         }
@@ -210,7 +203,7 @@ export function listFilesWithRg(
           let start = 0
           let idx = passBuf.indexOf('\0', start)
           while (idx !== -1) {
-            if (processLine(passBuf.substring(start, idx), attemptRanker)) {
+            if (processLine(passBuf.substring(start, idx), attemptMatcher)) {
               passFileCount++
             }
             if (done) {
@@ -260,7 +253,7 @@ export function listFilesWithRg(
           }
           // Flush residual line only on clean exit.
           if (passBuf) {
-            if (processLine(passBuf, attemptRanker)) {
+            if (processLine(passBuf, attemptMatcher)) {
               passFileCount++
             }
           }
@@ -269,8 +262,10 @@ export function listFilesWithRg(
           // (e.g. EACCES on .ssh), but rg also returns 2 for fatal errors
           // (bad flag, invalid glob). Only trust exit 2 when rg emitted at
           // least one parseable path — otherwise treat it as a real failure.
-          if (code === 0 || code === 1 || (code === 2 && passFileCount > 0)) {
+          if (code === 0 || code === 1) {
             resolvePass()
+          } else if (code === 2 && passFileCount > 0) {
+            resolvePass(searchMode !== 'name-filter')
           } else {
             rejectPass(new Error(`rg exited with code ${code}`))
           }
@@ -327,11 +322,13 @@ export function listFilesWithRg(
 
     // Without a result budget, the broader pass already contains every primary path.
     const passes =
-      searchQuery !== undefined || maxResults === undefined
-        ? runPass(ignoredPass)
-        : runPass(primary).then(() =>
-            files.size < maxResults ? runPass(ignoredPass) : Promise.resolve()
-          )
+      searchQuery !== undefined
+        ? runPass(includeIgnoredFiles === false ? primary : ignoredPass)
+        : maxResults === undefined
+          ? runPass(ignoredPass)
+          : runPass(primary).then(() =>
+              files.size < maxResults ? runPass(ignoredPass) : Promise.resolve()
+            )
 
     passes
       .then(() => {

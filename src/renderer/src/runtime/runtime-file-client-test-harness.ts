@@ -3,6 +3,7 @@ import type { Mock } from 'vitest'
 import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
 import { clearLegacyQuickOpenInventoryCacheForTests } from './runtime-legacy-quick-open-inventory'
+import { clearRuntimeWorkspacePathSearchCapabilityCacheForTests } from './runtime-workspace-path-search-capability'
 import {
   FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY,
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
@@ -45,6 +46,7 @@ export const fsDeletePath: PreloadStub = vi.fn()
 export const fsStat: PreloadStub = vi.fn()
 export const fsPathExists: PreloadStub = vi.fn()
 export const fsSearch: PreloadStub = vi.fn()
+export const fsSearchFilePaths: PreloadStub = vi.fn()
 export const fsListFiles: PreloadStub = vi.fn()
 export const fsCancelListFiles: PreloadStub = vi.fn()
 export const fsDownloadFile: PreloadStub = vi.fn()
@@ -67,6 +69,7 @@ export function installRuntimeFileClientEnvironment(): void {
     delete (globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__
     clearRuntimeCompatibilityCacheForTests()
     clearLegacyQuickOpenInventoryCacheForTests()
+    clearRuntimeWorkspacePathSearchCapabilityCacheForTests()
     replaceRuntimeEnvironmentRevisions([])
     fsReadFile.mockReset()
     fsReadFileChunk.mockReset()
@@ -80,6 +83,7 @@ export function installRuntimeFileClientEnvironment(): void {
     fsStat.mockReset()
     fsPathExists.mockReset()
     fsSearch.mockReset()
+    fsSearchFilePaths.mockReset()
     fsListFiles.mockReset()
     fsCancelListFiles.mockReset()
     fsCancelListFiles.mockResolvedValue(undefined)
@@ -128,6 +132,7 @@ export function installRuntimeFileClientEnvironment(): void {
           stat: fsStat,
           pathExists: fsPathExists,
           search: fsSearch,
+          searchFilePaths: fsSearchFilePaths,
           listFiles: fsListFiles,
           cancelListFiles: fsCancelListFiles,
           downloadFile: fsDownloadFile,

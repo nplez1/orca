@@ -66,7 +66,7 @@ export const filePathSearchModuleMock = {
 }
 
 export const electronMock = {
-  app: { getPath: () => '/orca-test-user-data' },
+  app: { getPath: () => '/orca-test-user-data', isPackaged: false },
   BrowserWindow: { fromWebContents: fromWebContentsMock },
   dialog: { showSaveDialog: showSaveDialogMock, showOpenDialog: showOpenDialogMock },
   ipcMain: { handle: handleMock },
@@ -278,6 +278,7 @@ export function localFileHandleMock(
 /** Resets every filesystem IPC mock and reinstalls the defaults every suite starts from. */
 export function resetFilesystemIpcMocks(): void {
   handlers.clear()
+  electronMock.app.isPackaged = false
   for (const mock of ALL_MOCKS) {
     mock.mockReset()
   }

@@ -30,6 +30,7 @@ type UseFileExplorerNodeCommandsParams = {
   rowExpandedPaths: Set<string>
   selectedPaths: Set<string>
   selectedNode: TreeNode | null
+  canActivateFilteredResults: boolean
   selectRowWithModifiers: (
     node: TreeNode,
     event: React.MouseEvent<HTMLButtonElement>,
@@ -67,6 +68,7 @@ export function useFileExplorerNodeCommands({
   rowExpandedPaths,
   selectedPaths,
   selectedNode,
+  canActivateFilteredResults,
   selectRowWithModifiers,
   moveSelection,
   inlineInput,
@@ -92,9 +94,11 @@ export function useFileExplorerNodeCommands({
   // already uses, without the keyboard path re-implementing symlink handling.
   const activateNode = useCallback(
     (node: TreeNode) => {
-      void handleClick(node)
+      if (canActivateFilteredResults) {
+        void handleClick(node)
+      }
     },
-    [handleClick]
+    [canActivateFilteredResults, handleClick]
   )
   useFileExplorerKeys({
     containerRef,
@@ -105,6 +109,7 @@ export function useFileExplorerNodeCommands({
     selectedPaths,
     selectedNode,
     activateNode,
+    canActivateRows: canActivateFilteredResults,
     moveSelection,
     toggleDir,
     startRename,
@@ -135,9 +140,13 @@ export function useFileExplorerNodeCommands({
         fromRenameHotspot: isRenameHotspotTarget(event.target),
         clickCount: event.detail
       })
-      selectRowWithModifiers(node, event, (target) => handleClick(target, dirToggle))
+      selectRowWithModifiers(node, event, (target) => {
+        if (canActivateFilteredResults) {
+          handleClick(target, dirToggle)
+        }
+      })
     },
-    [handleClick, selectRowWithModifiers]
+    [canActivateFilteredResults, handleClick, selectRowWithModifiers]
   )
   const handleCollapseFolderSubtree = useCallback(
     (node: TreeNode) => {

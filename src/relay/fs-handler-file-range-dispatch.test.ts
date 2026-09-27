@@ -7,6 +7,10 @@ import { RelayContext } from './context'
 import { RelayDispatcher } from './dispatcher'
 import { encodeJsonRpcFrame, RelayErrorCode } from './protocol'
 import { FileRangeReadRequestError, MAX_FILE_RANGE_READ_BYTES } from '../shared/file-range-read'
+import {
+  RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
+  WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
+} from '../shared/workspace-path-search-capability'
 
 /** Minimal dispatcher: this suite only needs the registered request handlers.
  *  The full harness lives in fs-handler.test.ts, which is at its line budget. */
@@ -151,7 +155,9 @@ describe('fs.getCapabilities', () => {
   it('advertises ranged reads without dropping the existing capability', async () => {
     await expect(underTest.call('fs.getCapabilities', {})).resolves.toMatchObject({
       quickOpenSearchVersion: 1,
-      rangedReadVersion: 1
+      rangedReadVersion: 1,
+      [WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY]:
+        RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
     })
   })
 })

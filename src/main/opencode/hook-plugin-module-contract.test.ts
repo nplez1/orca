@@ -39,7 +39,8 @@ describe('OpenCode status plugin module contract', () => {
     'ORCA_PANE_KEY',
     'ORCA_AGENT_HOOK_ENDPOINT',
     'ORCA_AGENT_HOOK_PORT',
-    'ORCA_AGENT_HOOK_TOKEN'
+    'ORCA_AGENT_HOOK_TOKEN',
+    'ORCA_OPENCODE_AGENT'
   ] as const
 
   let tempDir: string
@@ -59,6 +60,7 @@ describe('OpenCode status plugin module contract', () => {
     delete process.env.ORCA_OPENCODE_PLUGIN_API
     delete process.env.ORCA_OPENCODE_AGENT
     delete process.env.ORCA_AGENT_HOOK_ENDPOINT
+    delete process.env.ORCA_OPENCODE_AGENT
     process.env.ORCA_AGENT_HOOK_PORT = '59999'
     process.env.ORCA_AGENT_HOOK_TOKEN = 'test-token'
   })
