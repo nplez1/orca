@@ -71,7 +71,10 @@ export function useFileExplorerKeys(opts: {
   const selectedNodeRef = useRef(opts.selectedNode)
   selectedNodeRef.current = opts.selectedNode
   const canActivateRowsRef = useRef(opts.canActivateRows)
-  canActivateRowsRef.current = opts.canActivateRows
+  // Why: this ref feeds the key handler; sync it after commit instead of mutating it during render.
+  useEffect(() => {
+    canActivateRowsRef.current = opts.canActivateRows
+  }, [opts.canActivateRows])
   const startRenameRef = useRef(opts.startRename)
   startRenameRef.current = opts.startRename
   const requestDeleteRef = useRef(opts.requestDelete)

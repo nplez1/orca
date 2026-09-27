@@ -36,7 +36,11 @@ export function useFileExplorerNameFilter({
 }): UseFileExplorerNameFilterResult {
   const [nameFilterQuery, setNameFilterQueryState] = useState('')
   const nameFilterQueryRef = useRef(nameFilterQuery)
-  nameFilterQueryRef.current = nameFilterQuery
+  // Why: the ref must mirror state for back-to-back imperative updates, but writing it during render
+  // is a render-phase mutation; sync it after commit instead.
+  useEffect(() => {
+    nameFilterQueryRef.current = nameFilterQuery
+  }, [nameFilterQuery])
   const [queryInputAt, setQueryInputAt] = useState(0)
   const setNameFilterQuery = useCallback<Dispatch<SetStateAction<string>>>((nextValue) => {
     const nextQuery =

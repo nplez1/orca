@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, createElement } from 'react'
+import { act, createElement, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
@@ -194,7 +194,12 @@ function HookProbe({
   queryLimit?: number
   worktreeId: string | null
 }): null {
-  onState(useRuntimeFileListForWorktree({ enabled, worktreeId, query, queryMode, queryLimit }))
+  const state = useRuntimeFileListForWorktree({ enabled, worktreeId, query, queryMode, queryLimit })
+  // Why: report from an effect — React may replay or discard render work, so a prop callback must
+  // never run during render.
+  useEffect(() => {
+    onState(state)
+  }, [onState, state])
   return null
 }
 
