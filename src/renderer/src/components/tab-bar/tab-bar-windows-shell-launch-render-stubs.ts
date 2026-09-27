@@ -141,3 +141,22 @@ export function stubDropdownMenu(): Record<string, unknown> {
     }
   }
 }
+
+// Tooltip is Radix context-dependent, and the menu-row probe invokes components
+// directly; it must render an inert descriptor like the dropdown primitives.
+export function stubTooltip(): Record<string, unknown> {
+  return {
+    Tooltip: function Tooltip(props: { children?: unknown }) {
+      return { type: 'Tooltip', props }
+    },
+    TooltipTrigger: function TooltipTrigger(props: { children?: unknown }) {
+      return { type: 'TooltipTrigger', props }
+    },
+    TooltipContent: function TooltipContent(props: { children?: unknown }) {
+      return { type: 'TooltipContent', props }
+    },
+    TooltipProvider: function TooltipProvider(props: { children?: unknown }) {
+      return { type: 'TooltipProvider', props }
+    }
+  }
+}
