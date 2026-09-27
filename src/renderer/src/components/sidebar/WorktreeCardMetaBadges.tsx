@@ -4,7 +4,12 @@ import { cn } from '@/lib/utils'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { MetaIconBadge } from './WorktreeCardMetadataControls'
-import { getReviewLabel, ReviewIcon } from './worktree-review-helpers'
+import { getReviewLabel, ReviewIconWithMergeMarker } from './worktree-review-helpers'
+import {
+  getHostedReviewMergeReadiness,
+  hostedReviewMergeVerdictLabel
+} from '@/components/hosted-review-merge-readiness'
+import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import type {
   WorktreeCardMetaBadgesProps,
   WorktreeCardMetaBadgesRootProps
@@ -13,6 +18,12 @@ import { translate } from '@/i18n/i18n'
 
 function hasComment(comment: string | null): boolean {
   return (comment ?? '').trim().length > 0
+}
+
+// Why: this badge has no tooltip, so the marker's meaning would otherwise ride on colour alone.
+function getMergeVerdictSuffix(review: WorktreeCardPrDisplay): string {
+  const verdict = hostedReviewMergeVerdictLabel(getHostedReviewMergeReadiness(review))
+  return verdict ? ` · ${verdict}` : ''
 }
 
 export function hasWorktreeCardDetails({
@@ -143,13 +154,17 @@ export const WorktreeCardMetaBadges = React.forwardRef<
       )}
       {review && (
         <MetaIconBadge
-          label={translate(
-            'auto.components.sidebar.WorktreeCardMeta.3ea2702e62',
-            'Linked {{value0}} #{{value1}}',
-            { value0: getReviewLabel(review), value1: review.number }
-          )}
+          label={
+            translate(
+              'auto.components.sidebar.WorktreeCardMeta.3ea2702e62',
+              'Linked {{value0}} #{{value1}}',
+              { value0: getReviewLabel(review), value1: review.number }
+            ) + getMergeVerdictSuffix(review)
+          }
         >
-          <ReviewIcon review={review} />
+          {/* Why: this card style keeps its review glyph in the metadata row, so the merge
+              marker has to ride here rather than in the status lane. */}
+          <ReviewIconWithMergeMarker review={review} className="size-3.5" variant="provider" />
         </MetaIconBadge>
       )}
     </div>
