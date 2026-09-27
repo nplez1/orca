@@ -46,7 +46,15 @@ export function buildJiraTeamFieldOptions(
   const matches = normalized
     ? fields.filter((field) => `${field.name} ${field.id}`.toLowerCase().includes(normalized))
     : fields
-  return matches.map((field) => ({
+  // Why: with every site selected the same field id can arrive from two sites; the
+  // setting stores a single id, so keep the first and avoid duplicate option values.
+  const byId = new Map<string, JiraField>()
+  for (const field of matches) {
+    if (!byId.has(field.id)) {
+      byId.set(field.id, field)
+    }
+  }
+  return [...byId.values()].map((field) => ({
     value: field.id,
     label: showSiteNames
       ? `${field.name} (${field.id}) · ${field.siteName}`

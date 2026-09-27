@@ -1,13 +1,7 @@
 import { useRef, useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from '@/components/ui/command'
+import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
@@ -49,6 +43,9 @@ export function SettingsCombobox({
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const selected = options.find((option) => option.value === value)
+  // Why: cmdk only renders CommandEmpty when it holds no items, and the permanent
+  // "none" row is always an item — so the picker owns its own empty state.
+  const hasSelectableOption = options.some((option) => option.value !== SETTINGS_COMBOBOX_NONE)
 
   const handleOpenChange = (nextOpen: boolean): void => {
     setOpen(nextOpen)
@@ -93,7 +90,6 @@ export function SettingsCombobox({
             onValueChange={(query) => onSearchChange?.(query)}
           />
           <CommandList>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
             {options.map((option) => (
               <CommandItem
                 key={option.value}
@@ -112,6 +108,11 @@ export function SettingsCombobox({
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
               </CommandItem>
             ))}
+            {hasSelectableOption ? null : (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                {emptyMessage}
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

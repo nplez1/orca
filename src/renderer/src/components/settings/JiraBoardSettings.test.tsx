@@ -233,6 +233,23 @@ describe('JiraBoardSettings', () => {
     )
   })
 
+  it('says no boards match instead of rendering an empty list', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListBoards.mockResolvedValue([])
+    mocks.jiraListCustomFields.mockResolvedValue(fields)
+    const settings = createGlobalSettingsFixture({
+      defaultJiraBoard: null,
+      jiraTeamFieldId: '',
+      jiraTeamValue: ''
+    })
+
+    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
+    await user.click(screen.getByRole('combobox', { name: 'Default board' }))
+    // The permanent "No default board" row keeps the list non-empty, so the picker has
+    // to render its own empty state.
+    expect(await screen.findByText('No boards match this search.')).not.toBeNull()
+  })
+
   it('names a saved board that the fetched page does not contain', async () => {
     mocks.jiraListBoards.mockResolvedValue([])
     mocks.jiraListCustomFields.mockResolvedValue(fields)
