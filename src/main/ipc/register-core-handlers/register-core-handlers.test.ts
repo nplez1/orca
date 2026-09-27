@@ -55,6 +55,7 @@ const {
   registerLinearHandlersMock,
   registerJiraHandlersMock,
   registerBitbucketHandlersMock,
+  registerJenkinsHandlersMock,
   registerGitLabHandlersMock,
   registerHostedReviewHandlersMock,
   registerExportHandlersMock,
@@ -127,6 +128,7 @@ const {
   registerLinearHandlersMock: vi.fn(),
   registerJiraHandlersMock: vi.fn(),
   registerBitbucketHandlersMock: vi.fn(),
+  registerJenkinsHandlersMock: vi.fn(),
   registerGitLabHandlersMock: vi.fn(),
   registerHostedReviewHandlersMock: vi.fn(),
   registerExportHandlersMock: vi.fn(),
@@ -412,6 +414,10 @@ vi.mock('../bitbucket', () => ({
   registerBitbucketHandlers: registerBitbucketHandlersMock
 }))
 
+vi.mock('../jenkins', () => ({
+  registerJenkinsHandlers: registerJenkinsHandlersMock
+}))
+
 vi.mock('../gitlab', () => ({
   registerGitLabHandlers: registerGitLabHandlersMock
 }))
@@ -489,6 +495,7 @@ describe('registerCoreHandlers', () => {
     registerSpeechHandlersMock.mockReset()
     registerSkillsHandlersMock.mockReset()
     registerSkillDeleteIpcHandlersMock.mockReset()
+    registerJenkinsHandlersMock.mockReset()
     registerWorkspaceSpaceHandlersMock.mockReset()
     registerWorkspacePortHandlersMock.mockReset()
     registerLocalhostWorktreeLabelHandlersMock.mockReset()

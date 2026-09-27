@@ -100,6 +100,22 @@ export function formatCheckTimestamp(input: string | null | undefined): string |
   })
 }
 
+/** Elapsed time between two provider timestamps, or null when either is missing or unparseable. */
+export function getCheckDurationMs(
+  startedAt: string | null | undefined,
+  completedAt: string | null | undefined
+): number | null {
+  if (!startedAt || !completedAt) {
+    return null
+  }
+  const started = new Date(startedAt).getTime()
+  const completed = new Date(completedAt).getTime()
+  if (Number.isNaN(started) || Number.isNaN(completed) || completed < started) {
+    return null
+  }
+  return completed - started
+}
+
 export function getFailedChecksForDetails(checks: PRCheckDetail[]): PRCheckDetail[] {
   return checks.filter(isFailedCheck)
 }
