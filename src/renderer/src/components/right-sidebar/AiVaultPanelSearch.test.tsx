@@ -155,7 +155,7 @@ describe('AiVaultPanelSearch', () => {
     })
     expect(store.markFeatureTipsSeen).toHaveBeenCalledWith(['agent-session-search'])
     expect(store.updateSettingsOrThrow).toHaveBeenCalledWith({
-      aiVaultSearch: { enabled: true, historyDays: null }
+      aiVaultSearch: { contentEnabled: true, historyDays: null }
     })
     expect(search.retry).toHaveBeenCalled()
   })

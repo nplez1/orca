@@ -25,6 +25,20 @@ vi.mock('./grok-fetcher', () => ({ fetchGrokRateLimits: vi.fn() }))
 vi.mock('./grok-auth', () => ({ readGrokAuthSession: vi.fn(() => ({ status: 'missing' })) }))
 vi.mock('./cursor-fetcher', () => ({ fetchCursorRateLimits: vi.fn() }))
 vi.mock('./cursor-auth', () => ({ readCursorAuthSession: vi.fn() }))
+// Why: upstream's other providers ride the shared harness, which resets each of their mocks.
+vi.mock('./deepseek/deepseek-fetcher', () => ({ fetchDeepSeekRateLimits: vi.fn() }))
+vi.mock('./fireworks/fireworks-fetcher', () => ({ fetchFireworksRateLimits: vi.fn() }))
+vi.mock('./copilot/copilot-fetcher', () => ({ fetchCopilotRateLimits: vi.fn() }))
+vi.mock('./copilot/copilot-gh-credentials', () => ({
+  resolveGhCopilotCredentials: vi.fn(async () => ({ status: 'gh-missing' })),
+  refreshCopilotGhCredentials: vi.fn(async () => ({ status: 'gh-missing' })),
+  readCopilotGhCredentialsForCycle: vi.fn(() => null),
+  getCachedCopilotGhCredentials: vi.fn(() => null)
+}))
+vi.mock('../deepseek/deepseek-api-key-store', () => ({ hasDeepSeekApiKey: vi.fn(() => false) }))
+vi.mock('../fireworks/fireworks-credentials-store', () => ({
+  hasFireworksCredentials: vi.fn(() => false)
+}))
 vi.mock('../minimax/minimax-cookie-store', () => ({ hasMiniMaxSessionCookie: vi.fn(() => false) }))
 
 type JwtSegment = Record<string, unknown>

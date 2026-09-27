@@ -64,7 +64,12 @@ function localRoot(unsubscribe = vi.fn(async () => {})) {
   return {
     subscription: { unsubscribe },
     listeners: new Map(),
+    indexConsumers: new Set<string>(),
+    eventSequence: 0,
     batch: createDebouncedBatch(),
+    indexReconciliationPromise: Promise.resolve(),
+    indexReconciliationController: new AbortController(),
+    indexCoverageTimer: null,
     rootPath: '/folder'
   }
 }

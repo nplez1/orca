@@ -71,6 +71,7 @@ function visibleWithHideDefault(
       hideAutomationGeneratedWorkspaces: false,
       hideCliCreatedWorkspaces: false,
       hideDetachedHeadWorkspaces: false,
+      hiddenWorkspaceStatusIds: [],
       hideWorkspacesFromOtherDevices: false,
       pairedDeviceIdsByEnvironment: new Map(),
       repoMap: new Map(repos.map((repo) => [repo.id, repo])),
