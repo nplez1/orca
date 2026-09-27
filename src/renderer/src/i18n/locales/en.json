@@ -3760,6 +3760,10 @@
           "TabBarQuickCommandHostLoadStatus": {
             "82e294f3ca": "Host unavailable",
             "7c129b08ff": "Loading host…"
+          },
+          "TabBarNewTabButton": {
+            "729bccd8bd": "More options",
+            "6417e68a08": "Hold for all new tab options"
           }
         }
       },

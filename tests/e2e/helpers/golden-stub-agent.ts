@@ -2,6 +2,7 @@ import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect } from '@stablyai/playwright-test'
 import { focusActiveTerminalInput, waitForTerminalOutput } from './terminal'
+import { openNewTabMenu } from './terminal-tab-menu'
 import type { BuiltInWindowsTerminalShell } from '../../../src/shared/windows-terminal-shell'
 
 export const GOLDEN_STUB_READY_MARKER = 'GOLDEN_STUB_AGENT_READY'
@@ -53,7 +54,7 @@ export async function launchGoldenStubAgentFromNewTab(
   page: Page,
   menuItemName: RegExp = /^Codex(?:\s|$)/i
 ): Promise<void> {
-  await page.getByRole('button', { name: 'New tab', exact: true }).click({ force: true })
+  await openNewTabMenu(page)
   const launchOption = page.getByRole('menuitem', { name: menuItemName }).first()
   await expect(launchOption).toBeVisible({ timeout: 15_000 })
   await launchOption.click({ force: true })
