@@ -243,6 +243,90 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-27** — onto upstream `27b823f934` (206 commits), from the released tip `2ca7d38b4f`
+  (np.13 released). **116 commits replayed**, plus this sync's two fix commits on top
+  (`c4a09ba325`, `1c7a5ceb85`): **92 byte-identical by `range-diff`, 24 adapted, none dropped,
+  none added.** Twenty-two of the 116 stopped on a conflict, across 40 distinct files; every hunk
+  classified as an additive union or a re-seat of the fork's intent onto upstream's refactor, so no
+  convergence question went to the fork owner this time.
+  - **Rate-limits providers, unioned onto upstream's `service/` split.** Upstream added a `cursor`
+    provider to every enumeration the fork adds `deepseek`/`fireworks` to, and both sides added a
+    money readout (`credits`/`allowance`). `service-types.ts`'s moved `FetchAllCyclePrepared`
+    (from `#33`) took upstream's `SettledProviderResult` and `cursorResultPromise`.
+  - **Two "upstream built the same thing" re-seats, both kept on the fork's subsystem.**
+    `appearance-status-bar-provider-toggles.ts` (the fork's delegation) took upstream's
+    `getCursorStatusBarToggleSearchEntry()`, and `status-bar-default-on-migrations.ts` took
+    upstream's Cursor one-shot migration. That left upstream's
+    `ui-slice-hydration-status-bar-items.ts` with no importer; it is deleted so the next sync
+    conflicts instead of silently missing a new default-on provider.
+  - **`#19` re-seated onto upstream's flattened mixin chain.** Upstream deleted
+    `orca-runtime-structured-agent-session-launch-tui.ts` and re-homed its methods, so
+    `OrcaRuntimeWithSetupRunnerState` now sits directly above `OrcaRuntimeWithGetWorktreePs`.
+  - **The explorer path index (`#20`, `#34`) met upstream's reworked watcher and worker queue.**
+    `worker-thread-request-queue.ts` unions upstream's abort-signal support with the fork's
+    concurrent registry; `worker-thread-concurrent-request-registry.ts` (new here) was adapted to
+    upstream's `WorkerRequestTransport`; `filesystem-watcher-local-subscription.ts` unions
+    upstream's sender lifetime with the fork's sender-less `indexConsumerId` consumer. Upstream
+    moved the three SSH pending-install tests into the fork's own new
+    `filesystem-watcher-pending-ssh-install.test.ts`, so that duplicate file is deleted and
+    upstream's rewritten copies stay in `filesystem-watcher.test.ts`.
+  - **`local(identity)` re-applied onto surfaces upstream rewrote.** The ZCode hook test now derives
+    its directory from `HOME_DIRECTORY_NAME`; `wsl-managed-cli`'s new fixture uses
+    `orca-np.exe`/`orca-np-dev`; `daemon-host-relocation.test.ts` no longer hardcodes `Orca`;
+    `ORCA_CLI_COMMAND` keeps the fork's `orca-np` literal. **Flagged for the owner:** upstream's
+    `getWslCliCommandName` still names the managed WSL launcher `orca-ide` while `ORCA_CLI_COMMAND`
+    is `orca-np`, and the fork's own `65a6f58639` says `orca-ide` "no longer names the installed
+    command" — those two may want to converge.
+  - **Measured ratchets, never chosen:** `DIRECT_IMPORTER_PIN` 152 → 148 → 147 and
+    `UNHIDDEN_SPAWNER_PIN` 61 → 60, each taken from the failing test's own message after the
+    allowlist settled.
+  - **The traps, all found by a gate and none behind a conflict marker.** Upstream's new surfaces
+    are where this sync actually cost work:
+    1. **`pnpm tc`**: the DeepSeek doc-comment opener torn off by a union in `rate-limit-types.ts`
+       (the same trap as 2026-09-25); a fork-added `isUsageEmptyState` literal missing upstream's
+       `cursor` key; and `zcode` added to `AgentHookSource`, which the fork's `DESCENDANT_PROVIDERS`
+       `Record` enumerates by design, so a new provider is a compile error rather than a gap.
+    2. **A failing test, not a type error — nine surfaces upstream added or rewrote after this
+       fork's base:** the new session-search feature tip read the pre-rename `enabled` consent
+       field (a real bug: the resolved settings object only has `contentEnabled`, so the tip was
+       always offered and enabling it wrote `contentEnabled: false`); the new DNS probe-admission
+       test mocked `execFileSync`, which this fork replaced with the async `runProcess` probe; the
+       new filesystem-watcher root double omitted fields `#34` made required, crashing
+       `cancelLocalBatchFlush`; the Cursor and Copilot providers joined the shared rate-limit
+       harness, so the older service suites needed their mocks; the new WSL-CLI fixture, the ZCode
+       hook test, the updater feed test, and the new `default-branch-folder-project-root` options
+       literal all needed the fork's names; and `AiVaultPanelSearch.test.tsx` expected the literal
+       `enabled` write.
+    3. **A skipped commit's tail.** `#34` moved the SSH pending-install tests, so upstream's
+       rewritten copies and the moved file had to be reconciled rather than both kept.
+  - Verified: `pnpm tc` clean at the tip; `range-diff` pairing all 116 patches with 92 `=` and 24
+    `!`; the pre-sync-tip lost-content diff reduced to the five files this sync deliberately adapted
+    (`worker-thread-concurrent-request-registry.ts`, `appearance-status-bar-provider-toggles.ts`,
+    `visible-worktree-kind-filters.ts`, `status-bar-default-on-migrations.ts`, `descendant-events.ts`),
+    none of which upstream touched; the derived localization catalog regenerated with **no diff** and
+    both verifiers green; the fork's builder config loads and all five update-feed references still
+    name `nplez1/orca`; and the full `pnpm test` run reports **95,555 passing, 4 failing** — all four
+    environmental (Playwright browsers for the `mobile-web-app-*` render suites, the uninstalled
+    `cloud/` workspace's `pg`, and the `.cross-version-checkouts` tag), the documented set.
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports **36 findings
+    (27 design-system) across 1,273 changed files** with `ORCA_CODE_QUALITY_BASE=upstream/main` —
+    identical in kind and count to the 2026-09-25 entry. All ten flagged files were checked: eight
+    are byte-identical to the released np.13 tip, and the two that differ
+    (`detected-scan-failure-authority.test.ts`, `use-worktree-jump-palette-worktrees.ts`) carry the
+    same assertions text that the released tip already had. The one finding this sync did add — a
+    stale `repoMap` dependency left in the jump palette's `emptyQueryVisibleWorktrees` memo — was
+    removed, which is what brings the count back to 36.
+  - **E2E stayed green.** The two scheduled failures the fork's `#36` repaired stay repaired (the
+    New-tab locator and the ungrouped host-status spec), and `golden-core-flows`, `tabs`,
+    `tab-create-entry-file-paths`, `golden-tab-bar-agent-launch`, `golden-shell-after-agent-exit`,
+    `terminal-attention` and `terminal-tab-switch-visual-restore` all pass on a clean rebuild of the
+    rebased tree. `runtime-host-status-recovery` passes the recovery and host-card assertions this
+    fork touches and then fails at `launchPairedWebClient` with "HUB runtime did not provide a paired
+    web client URL" — the same failure the unmodified spec hits on upstream `27b823f934` and on the
+    pre-sync tip in this environment, where no `out/web` bundle is built. The `known-failure-titles`
+    ratchet and its two contract suites are untouched (`21/21` pass), so a genuinely new scheduled
+    failure still fails the run.
+
 - **2026-09-25 — released as `v1.4.197-np.12`** from `c80bbf6aba` (workflow run 36121027339,
   signed and notarized), then **`v1.4.197-np.13`** from `227953323b` (run 36173876959) carrying the
   two `local(agents)` follow-ups below. One commit landed on the remote's `nplez1/main` while the sync
