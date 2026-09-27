@@ -5,6 +5,17 @@ import type { RuntimeUploadFileStreamRequest } from '../../shared/runtime-upload
 import type { SearchResult } from '../../shared/code-search-types'
 import type { FilePathSearchResult } from '../../shared/file-path-search-result'
 import type { PathSearchMode } from '../../shared/quick-open-path-search'
+import type {
+  WorkspacePathSearchCorrelationId,
+  WorkspacePathSearchDiagnosticsSummary,
+  WorkspacePathSearchInstrumentationEvent
+} from '../../shared/workspace-path-search-instrumentation'
+
+type WorkspacePathSearchInstrumentationExportRecord = {
+  correlationId: WorkspacePathSearchCorrelationId
+  workspaceIdentityHash: string
+  events: readonly WorkspacePathSearchInstrumentationEvent[]
+}
 import type { FsChangedPayload } from '../../shared/filesystem-entry-types'
 import type {
   ImportItemResult,
@@ -142,13 +153,31 @@ export const fsApi = {
   }): Promise<string[]> => ipcRenderer.invoke('fs:listFiles', args),
   searchFilePaths: (args: {
     rootPath: string
+    connectionId?: string
     excludePaths?: string[]
     requestToken?: string
     query: string
     limit?: number
     mode?: PathSearchMode
     includeIgnoredFiles?: boolean
+    includeDotfiles?: boolean
+    correlationId?: WorkspacePathSearchCorrelationId
+    consumerId?: string
+    consumerSequence?: number
   }): Promise<FilePathSearchResult> => ipcRenderer.invoke('fs:searchFilePaths', args),
+  acquireQuickOpenPathInventoryLease: (args: {
+    rootPath: string
+    includeIgnoredFiles: boolean
+    correlationId?: WorkspacePathSearchCorrelationId
+  }): Promise<{ leaseId: string | null }> =>
+    ipcRenderer.invoke('fs:acquireQuickOpenPathInventoryLease', args),
+  releaseQuickOpenPathInventoryLease: (args: { leaseId: string }): Promise<void> =>
+    ipcRenderer.invoke('fs:releaseQuickOpenPathInventoryLease', args),
+  exportWorkspacePathSearchInstrumentation: (): Promise<
+    WorkspacePathSearchInstrumentationExportRecord[]
+  > => ipcRenderer.invoke('fs:exportWorkspacePathSearchInstrumentation'),
+  getWorkspacePathSearchDiagnosticsSummary: (): Promise<WorkspacePathSearchDiagnosticsSummary> =>
+    ipcRenderer.invoke('fs:getWorkspacePathSearchDiagnosticsSummary'),
   cancelListFiles: (args: { requestToken: string }): Promise<void> =>
     ipcRenderer.invoke('fs:cancelListFiles', args),
   search: (args: {

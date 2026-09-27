@@ -1,8 +1,14 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
-import type { ClaudeAccountSelectionTarget } from '../../claude-accounts/runtime-selection'
+import type {
+  ClaudeAccountSelectionTarget,
+  NormalizedClaudeAccountSelectionTarget
+} from '../../claude-accounts/runtime-selection'
 import type { KimiHomeResolution } from '../../kimi/kimi-runtime-home'
-import type { CodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
+import type {
+  CodexAccountSelectionTarget,
+  NormalizedCodexAccountSelectionTarget
+} from '../../codex-accounts/runtime-selection'
 import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
 
 export type {
@@ -197,4 +203,43 @@ export function isSameUsageWindow(
     return a === b
   }
   return a.usedPercent === b.usedPercent && a.resetsAt === b.resetsAt
+}
+
+/** Everything one fetch-all cycle resolved before any provider request is issued; the application step re-checks every generation against the live service. */
+export type FetchAllCyclePrepared = {
+  claudeTarget: NormalizedClaudeAccountSelectionTarget
+  claudeGeneration: number
+  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
+  claudeProvenance: string
+  codexTarget: NormalizedCodexAccountSelectionTarget
+  previousState: InternalRateLimitState
+  codexFetchGated: boolean
+  codexStateBeforeFetch: ProviderRateLimits | null
+  codexProvenance: string | null
+  codexGeneration: number
+  opencodeConfigChanged: boolean
+  opencodeGeneration: number
+  miniMaxConfigChanged: boolean
+  miniMaxGeneration: number
+  deepSeekConfigChanged: boolean
+  deepSeekGeneration: number
+  fireworksConfigChanged: boolean
+  fireworksGeneration: number
+  copilotConfigChanged: boolean
+  copilotGeneration: number
+  claudeFetchGated: boolean
+  results: [
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>
+  ]
+  grokResultPromise: Promise<
+    { status: 'fulfilled'; value: ProviderRateLimits } | { status: 'rejected'; reason: unknown }
+  >
 }

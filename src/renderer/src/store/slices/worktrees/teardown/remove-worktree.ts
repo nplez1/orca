@@ -41,6 +41,10 @@ import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-
 import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
+import {
+  buildPreservedBranchCleanup,
+  buildWorktreeRemovalSuccessResult
+} from './worktree-removal-result'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -258,19 +262,16 @@ export function createRemoveWorktree(
       clearSessionCommitDraftForWorktree(worktreeId)
       const { preservedBranch, remoteBranchCleanup } = removalResult ?? {}
       const cleanup = preservedBranch
-        ? {
+        ? buildPreservedBranchCleanup({
             worktreeId,
-            branchName: preservedBranch.branchName,
-            expectedHead: preservedBranch.head,
-            ...(hostId ? { hostId } : {}),
-            ...(removalRoute?.runtimeEnvironmentId
-              ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
-              : {})
-          }
+            preservedBranch,
+            hostId,
+            runtimeEnvironmentId: removalRoute?.runtimeEnvironmentId
+          })
         : null
-      if (preservedBranch) {
-        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup!), {
-          cleanup: cleanup!,
+      if (cleanup) {
+        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup), {
+          cleanup,
           target
         })
       }
@@ -285,22 +286,7 @@ export function createRemoveWorktree(
         })
       }
       pruneHostedReviewLinkMutationGenerations([worktreeId])
-      // Why: this rebuilds the result as a literal, so every field a caller reads has to be named
-      // here — `remoteBranchCleanup` is optional in the type, so omitting it typechecks and then
-      // silently reports nothing about a remote branch the user asked to delete.
-      return preservedBranch && cleanup
-        ? {
-            ok: true as const,
-            ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
-            preservedBranch: {
-              ...preservedBranch,
-              ...(cleanup.hostId ? { hostId: cleanup.hostId } : {}),
-              ...(cleanup.runtimeEnvironmentId
-                ? { runtimeEnvironmentId: cleanup.runtimeEnvironmentId }
-                : {})
-            }
-          }
-        : { ok: true as const, ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}) }
+      return buildWorktreeRemovalSuccessResult({ preservedBranch, cleanup, remoteBranchCleanup })
     } catch (err) {
       // Why: git refusing a non-force delete for dirty/untracked files is a handled user decision, not an app error.
       console.warn('Failed to remove worktree:', err)

@@ -78,13 +78,17 @@ export async function installLocalWatcher(
   const liveListeners = new Map(
     Array.from(cancelToken.listeners.entries()).filter(([, listener]) => !listener.isDestroyed())
   )
-  if (cancelToken.cancelled || liveListeners.size === 0) {
+  if (
+    cancelToken.cancelled ||
+    (liveListeners.size === 0 && cancelToken.indexConsumers.size === 0)
+  ) {
     cancelLocalBatchFlush(root)
     void trackDetachedLocalUnsubscribe(rootKey, root)
     return 'cancelled'
   }
 
   root.listeners = liveListeners
+  root.indexConsumers = new Set(cancelToken.indexConsumers)
   watcherLifecycleState.watchedRoots.set(rootKey, root)
   for (const listener of liveListeners.values()) {
     registerWatcherSenderCleanup(listener)

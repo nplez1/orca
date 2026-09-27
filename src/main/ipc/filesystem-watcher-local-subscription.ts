@@ -6,6 +6,7 @@ import {
   watcherLifecycleState
 } from './filesystem-watcher-lifecycle-state'
 import { getLocalWatcherRoot } from './filesystem-watcher-paths'
+import type { WatchedRoot } from './filesystem-watcher-wsl'
 import {
   addInFlightLocalInstallListener,
   addLocalWatchListener,
@@ -18,8 +19,11 @@ import { cancelLocalBatchFlush } from './filesystem-watcher-batch-control'
 import { scheduleLocalCapacityRetry } from './filesystem-watcher-local-capacity'
 import { installLocalWatcher } from './filesystem-watcher-local-install'
 import { evictQuickOpenPathInventory } from './quick-open-path-inventory'
+import { scheduleLocalWorkspacePathIndexCoverage } from './filesystem-watcher-path-index-coverage'
 
 // ── Subscribe / Unsubscribe ──────────────────────────────────────────
+
+const LOCAL_PATH_INDEX_CONSUMER_ID = 'workspace-path-index'
 
 export async function subscribeLocalWatcher(
   worktreePath: string,
@@ -40,10 +44,55 @@ export async function subscribeLocalWatcher(
   }
 }
 
+export async function subscribeLocalPathIndexWatcher(worktreePath: string): Promise<boolean> {
+  if (watcherLifecycleState.localWatchersClosed) {
+    return false
+  }
+  const generation = watcherLifecycleState.localWatcherLifecycleGeneration
+  const finishInstall = beginWatcherInstall(worktreePath)
+  try {
+    await subscribeWhileRemovalAllowed(
+      worktreePath,
+      undefined,
+      generation,
+      LOCAL_PATH_INDEX_CONSUMER_ID
+    )
+  } finally {
+    finishInstall()
+  }
+  const { key } = getLocalWatcherRoot(worktreePath)
+  return (
+    watcherLifecycleState.watchedRoots.get(key)?.indexConsumers.has(LOCAL_PATH_INDEX_CONSUMER_ID) ??
+    false
+  )
+}
+
+export function unsubscribeLocalPathIndexWatcher(worktreePath: string): void {
+  const { key: rootKey } = getLocalWatcherRoot(worktreePath)
+  const inFlight = watcherLifecycleState.inFlightLocalInstalls.get(rootKey)
+  if (inFlight) {
+    inFlight.indexConsumers.delete(LOCAL_PATH_INDEX_CONSUMER_ID)
+    inFlight.cancelled = inFlight.listeners.size === 0 && inFlight.indexConsumers.size === 0
+    if (inFlight.cancelled) {
+      inFlight.abortController.abort()
+    }
+  }
+  const root = watcherLifecycleState.watchedRoots.get(rootKey)
+  if (!root) {
+    return
+  }
+  root.indexConsumers.delete(LOCAL_PATH_INDEX_CONSUMER_ID)
+  scheduleLocalWorkspacePathIndexCoverage(root)
+  if (root.listeners.size === 0 && root.indexConsumers.size === 0) {
+    scheduleLocalWatcherTeardown(rootKey, root)
+  }
+}
+
 async function subscribeWhileRemovalAllowed(
   worktreePath: string,
-  sender: WebContents,
-  generation: number
+  sender: WebContents | undefined,
+  generation: number,
+  indexConsumerId?: string
 ): Promise<void> {
   if (
     watcherLifecycleState.localWatchersClosed ||
@@ -52,7 +101,7 @@ async function subscribeWhileRemovalAllowed(
     return
   }
   const { key: rootKey, path: rootPath } = getLocalWatcherRoot(worktreePath)
-  if (sender.isDestroyed()) {
+  if (sender?.isDestroyed()) {
     return
   }
 
@@ -76,7 +125,13 @@ async function subscribeWhileRemovalAllowed(
     for (const listener of capacityRetryListeners) {
       addLocalWatchListener(rootKey, listener)
     }
-    addLocalWatchListener(rootKey, sender)
+    if (sender) {
+      addLocalWatchListener(rootKey, sender)
+    }
+    if (indexConsumerId) {
+      root.indexConsumers.add(indexConsumerId)
+      scheduleLocalWorkspacePathIndexCoverage(root)
+    }
     return
   }
 
@@ -85,8 +140,14 @@ async function subscribeWhileRemovalAllowed(
     const inFlight = watcherLifecycleState.inFlightLocalInstalls.get(rootKey)
     const canJoinInstall = inFlight && !inFlight.abortController.signal.aborted
     if (canJoinInstall) {
-      // Why: an unwatch may cancel an install while another renderer awaits the same root; a new live listener keeps it alive.
-      addInFlightLocalInstallListener(inFlight, sender)
+      // Why: an unwatch may cancel an install while another consumer awaits the same root; a new consumer keeps it alive.
+      if (sender) {
+        addInFlightLocalInstallListener(inFlight, sender)
+      }
+      if (indexConsumerId) {
+        inFlight.indexConsumers.add(indexConsumerId)
+        inFlight.cancelled = false
+      }
       for (const listener of capacityRetryListeners) {
         addInFlightLocalInstallListener(inFlight, listener)
       }
@@ -105,7 +166,12 @@ async function subscribeWhileRemovalAllowed(
       const retryListeners = new Map(
         capacityRetryListeners.map((listener) => [listener.id, listener])
       )
-      retryListeners.set(sender.id, sender)
+      if (sender) {
+        retryListeners.set(sender.id, sender)
+      }
+      if (indexConsumerId) {
+        await subscribeWhileRemovalAllowed(worktreePath, sender, generation, indexConsumerId)
+      }
       for (const listener of retryListeners.values()) {
         if (!listener.isDestroyed()) {
           await subscribeWhileRemovalAllowed(worktreePath, listener, generation)
@@ -122,17 +188,21 @@ async function subscribeWhileRemovalAllowed(
         const retryListeners = new Map(
           capacityRetryListeners.map((listener) => [listener.id, listener])
         )
-        retryListeners.set(sender.id, sender)
+        if (sender) {
+          retryListeners.set(sender.id, sender)
+        }
         scheduleLocalCapacityRetry(rootKey, worktreePath, retryListeners, subscribeLocalWatcher)
       }
     }
-    if (
-      result === 'installed' &&
-      watcherLifecycleState.watchedRoots.has(rootKey) &&
-      !sender.isDestroyed() &&
-      (!inFlight || inFlight.listeners.has(sender.id))
-    ) {
-      addLocalWatchListener(rootKey, sender)
+    if (result === 'installed' && watcherLifecycleState.watchedRoots.has(rootKey)) {
+      const installedRoot = watcherLifecycleState.watchedRoots.get(rootKey)
+      if (sender && !sender.isDestroyed() && (!inFlight || inFlight.listeners.has(sender.id))) {
+        addLocalWatchListener(rootKey, sender)
+      }
+      if (indexConsumerId && installedRoot) {
+        installedRoot.indexConsumers.add(indexConsumerId)
+        scheduleLocalWorkspacePathIndexCoverage(installedRoot)
+      }
     }
     return
   }
@@ -140,13 +210,16 @@ async function subscribeWhileRemovalAllowed(
   const cancelToken: LocalWatcherInstallToken = {
     cancelled: false,
     listeners: new Map(),
+    indexConsumers: new Set(indexConsumerId ? [indexConsumerId] : []),
     abortController: new AbortController()
   }
   watcherLifecycleState.inFlightLocalInstalls.set(rootKey, cancelToken)
   for (const listener of capacityRetryListeners) {
     addInFlightLocalInstallListener(cancelToken, listener)
   }
-  addInFlightLocalInstallListener(cancelToken, sender)
+  if (sender) {
+    addInFlightLocalInstallListener(cancelToken, sender)
+  }
   const installPromise = installLocalWatcher(
     rootKey,
     rootPath,
@@ -182,7 +255,7 @@ export function unsubscribeLocalWatcher(worktreePath: string, senderId: number):
   const inFlight = watcherLifecycleState.inFlightLocalInstalls.get(rootKey)
   if (inFlight) {
     inFlight.listeners.delete(senderId)
-    inFlight.cancelled = inFlight.listeners.size === 0
+    inFlight.cancelled = inFlight.listeners.size === 0 && inFlight.indexConsumers.size === 0
     // Why: last normal disconnect must abort the pending native/forked install (same early-cancel as closeLocalWatcherForWorktreePath).
     if (inFlight.cancelled) {
       inFlight.abortController.abort()
@@ -197,31 +270,35 @@ export function unsubscribeLocalWatcher(worktreePath: string, senderId: number):
   root.listeners.delete(senderId)
 
   // Defer teardown when the last subscriber leaves so rapid worktree switches reuse the native watcher.
-  if (root.listeners.size === 0) {
-    if (root.batch.timer) {
-      clearTimeout(root.batch.timer)
-      // Why: a cleared handle can't be refresh()ed; null it so a grace-window re-subscribe arms a fresh window.
-      root.batch.timer = null
-    }
-    // Why: duplicate unwatch calls for a root would leak overwritten grace timers; keep just one.
-    if (watcherLifecycleState.pendingTeardowns.has(rootKey)) {
+  if (root.listeners.size === 0 && root.indexConsumers.size === 0) {
+    scheduleLocalWatcherTeardown(rootKey, root)
+  }
+}
+
+function scheduleLocalWatcherTeardown(rootKey: string, root: WatchedRoot): void {
+  if (root.batch.timer) {
+    clearTimeout(root.batch.timer)
+    // Why: a cleared handle can't be refresh()ed; null it so a grace-window re-subscribe arms a fresh window.
+    root.batch.timer = null
+  }
+  // Why: duplicate unwatch calls for a root would leak overwritten grace timers; keep just one.
+  if (watcherLifecycleState.pendingTeardowns.has(rootKey)) {
+    return
+  }
+
+  const teardownTimer = setTimeout(() => {
+    watcherLifecycleState.pendingTeardowns.delete(rootKey)
+    // Re-check: a new listener may have arrived during the grace period.
+    const currentRoot = watcherLifecycleState.watchedRoots.get(rootKey)
+    if (!currentRoot || currentRoot.listeners.size > 0 || currentRoot.indexConsumers.size > 0) {
       return
     }
+    void trackDetachedLocalUnsubscribe(rootKey, currentRoot)
+    cancelLocalBatchFlush(currentRoot)
+    // Why: a workspace nobody is watching does not need a warm path index either.
+    evictQuickOpenPathInventory(currentRoot.rootPath)
+    watcherLifecycleState.watchedRoots.delete(rootKey)
+  }, WATCHER_TEARDOWN_GRACE_MS)
 
-    const teardownTimer = setTimeout(() => {
-      watcherLifecycleState.pendingTeardowns.delete(rootKey)
-      // Re-check: a new listener may have arrived during the grace period.
-      const currentRoot = watcherLifecycleState.watchedRoots.get(rootKey)
-      if (!currentRoot || currentRoot.listeners.size > 0) {
-        return
-      }
-      void trackDetachedLocalUnsubscribe(rootKey, currentRoot)
-      cancelLocalBatchFlush(currentRoot)
-      // Why: a workspace nobody is watching does not need a warm path index either.
-      evictQuickOpenPathInventory(currentRoot.rootPath)
-      watcherLifecycleState.watchedRoots.delete(rootKey)
-    }, WATCHER_TEARDOWN_GRACE_MS)
-
-    watcherLifecycleState.pendingTeardowns.set(rootKey, teardownTimer)
-  }
+  watcherLifecycleState.pendingTeardowns.set(rootKey, teardownTimer)
 }

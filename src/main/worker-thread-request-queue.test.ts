@@ -127,6 +127,30 @@ describe('WorkerThreadRequestQueue', () => {
     await expect(third).resolves.toMatchObject({ label: 'c' })
   })
 
+  it('delivers bounded concurrent work while a cooperative queued lane is active', async () => {
+    const workers: FakeWorker[] = []
+    const queue = makeQueue(workers)
+    const build = send(queue, 'build')
+    const query = queue.dispatchConcurrent((id) => ({ id, label: 'query' }), TIMEOUT_MS)
+    await Promise.resolve()
+
+    expect(workers).toHaveLength(1)
+    expect(labels(workers[0])).toEqual(['build', 'query'])
+    const queryRequest = workers[0]?.posted[1]
+    if (!queryRequest) {
+      throw new Error('concurrent request was not posted')
+    }
+    workers[0]?.emit('message', { id: queryRequest.id, label: queryRequest.label })
+    await expect(query).resolves.toMatchObject({ label: 'query' })
+    const buildRequest = workers[0]?.posted[0]
+    if (!buildRequest) {
+      throw new Error('queued build request was not posted')
+    }
+    workers[0]?.emit('message', { id: buildRequest.id, label: buildRequest.label })
+    await expect(build).resolves.toMatchObject({ label: 'build' })
+    queue.dispose()
+  })
+
   it('starts each deadline when the call is posted, not when it was queued', async () => {
     vi.useFakeTimers()
     const workers: FakeWorker[] = []

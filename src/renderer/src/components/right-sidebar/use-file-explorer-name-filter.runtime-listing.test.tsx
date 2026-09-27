@@ -2,9 +2,14 @@
 //
 // Why this file exists separately from use-file-explorer-name-filter.test.ts: that suite mocks
 // useRuntimeFileListForWorktree, so it can only assert the name filter against a hand-written
-// RuntimeFileListState. #21423 shipped a P0 through exactly that gap — the mock encoded a listing
+// RuntimeFileListState. #21423 shipped a P0 through exactly that gap — the mock encoded a result
 // shape local workspaces never produce, and the filter discarded every local result. These specs
-// mock only the IPC boundary so the filter runs against the listing the hook really returns.
+// mock only the IPC boundary so the filter runs against the answer the hook really returns.
+//
+// Why the local specs assert a host answer: a local name filter is served by the execution host's
+// worker-owned path index, so the hook no longer narrows a capped browse listing in the renderer.
+// The invariants #21423 and #22369 established still hold — a local query's answer is projected
+// rather than dropped, and one query at a time is ever shown as current.
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +23,7 @@ import { useFileExplorerNameFilter } from './use-file-explorer-name-filter'
 const listRuntimeFilesMock = vi.hoisted(() => vi.fn())
 const cancelRuntimeFileListMock = vi.hoisted(() => vi.fn())
 const searchRuntimeFilePathsMock = vi.hoisted(() => vi.fn())
+const searchFilePathsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/runtime/runtime-file-client', () => ({
   listRuntimeFiles: listRuntimeFilesMock,
@@ -94,6 +100,14 @@ async function settle(): Promise<void> {
   }
 }
 
+/** The scheduler dispatches on the next animation frame, so a typed query needs a frame tick. */
+async function advanceToDispatch(): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(16)
+  })
+  await settle()
+}
+
 function renderNameFilter(activeWorktreeId: string) {
   return renderHook(() => useFileExplorerNameFilter({ isFilesViewActive: true, activeWorktreeId }))
 }
@@ -103,93 +117,128 @@ beforeEach(() => {
   listRuntimeFilesMock.mockReset().mockResolvedValue(['packages/app/package.json', 'src/main.ts'])
   cancelRuntimeFileListMock.mockReset()
   searchRuntimeFilePathsMock.mockReset().mockResolvedValue({ files: [], truncated: false })
+  searchFilePathsMock.mockReset().mockResolvedValue({ files: [], truncated: false })
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { fs: { searchFilePaths: searchFilePathsMock } }
+  })
   seedWorkspaces()
 })
 
 afterEach(() => {
   cleanup()
+  Reflect.deleteProperty(window, 'api')
   useAppStore.setState(initialAppState, true)
 })
 
 describe('useFileExplorerNameFilter over the real runtime listing', () => {
-  // #21423 regression: a local workspace has no host-side path search, so the hook returns a
-  // complete listing the filter narrows itself. Discarding it left every query empty forever.
-  it('projects a settled local listing instead of dropping it', async () => {
-    const { result } = renderNameFilter(LOCAL_KEY)
-
-    await act(async () => {
-      result.current.setNameFilterQuery('package.')
+  // #21423 regression: the filter must never discard the answer a local workspace produces.
+  it('projects a settled local answer instead of dropping it', async () => {
+    vi.useFakeTimers()
+    searchFilePathsMock.mockResolvedValue({
+      files: ['packages/app/package.json'],
+      totalCount: 1,
+      truncated: false
     })
-    await settle()
+    try {
+      const { result } = renderNameFilter(LOCAL_KEY)
 
-    expect(listRuntimeFilesMock).toHaveBeenCalledTimes(1)
-    expect(result.current.nameFilterSource?.relativePaths).toEqual([
-      'packages/app/package.json',
-      'src/main.ts'
-    ])
+      await act(async () => {
+        result.current.setNameFilterQuery('package.')
+      })
+      await advanceToDispatch()
+
+      expect(searchFilePathsMock).toHaveBeenCalledTimes(1)
+      expect(searchFilePathsMock.mock.calls[0]?.[0]).toMatchObject({
+        query: 'package.',
+        mode: 'name-filter'
+      })
+      expect(result.current.nameFilterSource?.relativePaths).toEqual(['packages/app/package.json'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('keeps the local listing across query edits without refetching it', async () => {
-    const { result } = renderNameFilter(LOCAL_KEY)
-
-    await act(async () => {
-      result.current.setNameFilterQuery('pack')
+  it('answers each local query edit from the host without reusing a stale answer', async () => {
+    vi.useFakeTimers()
+    searchFilePathsMock.mockResolvedValue({
+      files: ['packages/app/package.json'],
+      totalCount: 1,
+      truncated: false
     })
-    await settle()
-    await act(async () => {
-      result.current.setNameFilterQuery('package.json')
-    })
-    await settle()
+    try {
+      const { result } = renderNameFilter(LOCAL_KEY)
 
-    expect(listRuntimeFilesMock).toHaveBeenCalledTimes(1)
-    expect(result.current.nameFilterSource?.relativePaths).toEqual([
-      'packages/app/package.json',
-      'src/main.ts'
-    ])
+      await act(async () => {
+        result.current.setNameFilterQuery('pack')
+      })
+      await advanceToDispatch()
+
+      searchFilePathsMock.mockResolvedValue({
+        files: ['packages/app/package.json'],
+        totalCount: 1,
+        truncated: false
+      })
+      await act(async () => {
+        result.current.setNameFilterQuery('package.json')
+      })
+      await advanceToDispatch()
+
+      // Why: a new query is a new host request; the pane must not re-serve the first answer.
+      expect(searchFilePathsMock.mock.calls.map((call) => call[0]?.query)).toEqual([
+        'pack',
+        'package.json'
+      ])
+      expect(result.current.nameFilterSource?.relativePaths).toEqual(['packages/app/package.json'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // The host answers one query at a time, so the previous answer must never be shown as the
-  // current one — it would name files that do not match what the user typed., so the previous answer must never be shown as the
   // current one — it would name files that do not match what the user typed.
   it('never projects the previous query answer after a remote query edit', async () => {
     vi.useFakeTimers()
-    searchRuntimeFilePathsMock.mockResolvedValue({ files: ['first/hit.ts'], truncated: false })
-    const projected: (readonly string[] | null | undefined)[] = []
+    searchFilePathsMock.mockResolvedValue({ files: ['first/hit.ts'], truncated: false })
+    const projected: {
+      paths: readonly string[] | null | undefined
+      previousResults: boolean | undefined
+    }[] = []
     try {
       const { result } = renderHook(() => {
         const filter = useFileExplorerNameFilter({
           isFilesViewActive: true,
           activeWorktreeId: REMOTE_KEY
         })
-        projected.push(filter.nameFilterSource?.relativePaths)
+        projected.push({
+          paths: filter.nameFilterSource?.relativePaths,
+          previousResults: filter.nameFilterSource?.previousResults
+        })
         return filter
       })
 
       await act(async () => {
         result.current.setNameFilterQuery('first')
       })
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120)
-      })
-      await settle()
+      await advanceToDispatch()
       expect(result.current.nameFilterSource?.relativePaths).toEqual(['first/hit.ts'])
 
-      searchRuntimeFilePathsMock.mockResolvedValue({ files: ['second/hit.ts'], truncated: false })
+      searchFilePathsMock.mockResolvedValue({ files: ['second/hit.ts'], truncated: false })
       const rendersBeforeEdit = projected.length
       await act(async () => {
         result.current.setNameFilterQuery('second')
       })
 
-      // Why: the render before the effect restarts the request is the one that can leak.
+      // Why: the render before the effect restarts the request is the one that can leak. Either
+      // the pane shows nothing yet, or it labels the answer as the previous one.
       expect(projected.length).toBeGreaterThan(rendersBeforeEdit)
-      for (const paths of projected.slice(rendersBeforeEdit)) {
-        expect(paths).toBeNull()
+      for (const render of projected.slice(rendersBeforeEdit)) {
+        expect(
+          render.paths === null || render.paths === undefined || render.previousResults === true
+        ).toBe(true)
       }
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120)
-      })
-      await settle()
+      await advanceToDispatch()
       expect(result.current.nameFilterSource?.relativePaths).toEqual(['second/hit.ts'])
     } finally {
       vi.useRealTimers()

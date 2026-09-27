@@ -12,6 +12,7 @@
     "src/main/ai-vault/session-scanner-opencode-sqlite-worker-entry.ts",
     "src/main/ai-vault/session-scanner-worker-entry.ts",
     "src/main/ports/port-scan-command-worker-entry.ts",
+    "src/main/workspace-path-index/workspace-path-index-worker-entry.ts",
     "src/main/ipc/parcel-watcher-process-entry.ts",
     "src/main/hang-watchdog/main-thread-hang-watchdog-entry.ts",
     "src/main/agent-hooks/managed-agent-hook-controls.ts",

@@ -31,6 +31,14 @@ function staged(mode: string, path: string): string {
   return `${mode} ${SHA1} 0\t${path}`
 }
 
+function emitStdoutChunk(process: ChildProcess, chunk: string): void {
+  const stdout = Reflect.get(process, 'stdout')
+  if (!(stdout instanceof EventEmitter)) {
+    throw new Error('Test process stdout is not an EventEmitter')
+  }
+  stdout.emit('data', chunk)
+}
+
 function createMockProcess(): ChildProcess {
   const p = new EventEmitter() as unknown as ChildProcess
   ;(p as unknown as Record<string, unknown>).stdout = new EventEmitter()
@@ -69,6 +77,24 @@ describe('relay quick open ignored file listing', () => {
     // test's launch-failure classifier probes.
     configureRelayBundledRipgrep(undefined)
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  })
+
+  it('marks name-filter counts partial when ripgrep reports incomplete coverage', async () => {
+    const proc = createMockProcess()
+    spawnMock.mockReturnValue(proc)
+    const onSearchResult = vi.fn()
+    const scan = listFilesWithRg('/remote/root', [], {
+      maxResults: 8,
+      searchQuery: 'src app',
+      searchMode: 'name-filter',
+      onSearchResult
+    })
+
+    emitStdoutChunk(proc, 'src/app.ts\n')
+    proc.emit('close', 2, null)
+
+    await expect(scan).resolves.toEqual(['src/app.ts'])
+    expect(onSearchResult).toHaveBeenCalledWith({ paths: ['src/app.ts'], totalCount: 1 }, false)
   })
 
   it('rg ignored pass includes ignored non-env files and keeps blocklists/excludes', async () => {

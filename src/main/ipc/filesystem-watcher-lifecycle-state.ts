@@ -10,6 +10,7 @@ import type { RemoteWatcherEventBatch } from './remote-watcher-event-batch'
 export type LocalWatcherInstallToken = {
   cancelled: boolean
   listeners: Map<number, WebContents>
+  indexConsumers: Set<string>
   abortController: AbortController
 }
 

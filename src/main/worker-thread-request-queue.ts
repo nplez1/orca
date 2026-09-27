@@ -1,13 +1,8 @@
+import type { TransferListItem } from 'node:worker_threads'
 import { LazyWorkerThreadHost, type WorkerThreadFactory } from './lazy-worker-thread-host'
+import { WorkerThreadConcurrentRequestRegistry } from './worker-thread-concurrent-request-registry'
 
-/**
- * FIFO one-at-a-time request half shared by every main-process worker-thread
- * client: per-call timeout armed at dispatch, respawn-on-fault capped so a
- * payload that reliably kills the worker cannot spin a crash loop, idle
- * teardown, and — the rule that matters — failing queued calls closed instead
- * of moving their work back onto the main thread. `LazyWorkerThreadHost` owns
- * the thread's lifetime; this owns which call a message belongs to.
- */
+/** FIFO request queue plus bounded out-of-band calls for workers that cooperatively yield. */
 
 export type WorkerThreadRequestQueueOptions<TRequest> = {
   factory: WorkerThreadFactory
@@ -28,6 +23,7 @@ export type WorkerThreadRequestQueueOptions<TRequest> = {
    * must not be killed for being slow.
    */
   isProgress?: (message: { id: number }) => boolean
+  transferList?: (request: TRequest) => readonly TransferListItem[]
   /** The client's own error subclass, so callers can tell "no worker" from a fault. */
   createUnavailableError: (message: string) => Error
   describeTimeout: (timeoutMs: number) => string
@@ -51,8 +47,10 @@ export class WorkerThreadRequestQueue<
 > {
   private active: PendingCall<TRequest, TResponse> | null = null
   private queue: PendingCall<TRequest, TResponse>[] = []
+  private readonly concurrentCalls: WorkerThreadConcurrentRequestRegistry<TRequest, TResponse>
   private consecutiveDeaths = 0
   private nextId = 1
+  private disposed = false
   private readonly host: LazyWorkerThreadHost<TResponse>
 
   constructor(private readonly options: WorkerThreadRequestQueueOptions<TRequest>) {
@@ -62,8 +60,18 @@ export class WorkerThreadRequestQueue<
       onMessage: (response) => this.onMessage(response),
       onError: (error) => this.onWorkerFault(error),
       onExit: (code) => this.onWorkerExit(code),
-      isIdle: () => !this.active && this.queue.length === 0,
+      isIdle: () => !this.active && this.queue.length === 0 && this.concurrentCalls.size === 0,
       onUnavailable: options.onUnavailable
+    })
+    this.concurrentCalls = new WorkerThreadConcurrentRequestRegistry({
+      ensureWorker: () => this.host.ensure(),
+      clearIdleTimer: () => this.host.clearIdleTimer(),
+      scheduleIdleTeardown: () => this.host.scheduleIdleTeardown(),
+      transferList: options.transferList,
+      isProgress: options.isProgress,
+      createUnavailableError: options.createUnavailableError,
+      describeTimeout: options.describeTimeout,
+      onTimeout: (error) => this.onWorkerFault(error)
     })
   }
 
@@ -75,6 +83,10 @@ export class WorkerThreadRequestQueue<
    */
   dispatch(buildRequest: (id: number) => TRequest, timeoutMs: number): Promise<TResponse> {
     return new Promise((resolve, reject) => {
+      if (this.disposed) {
+        reject(this.options.createUnavailableError('worker request queue is disposed'))
+        return
+      }
       // Built before the cap check so a rejection can name the dropped work;
       // the id it burns is only a correlation token, so a gap costs nothing.
       const request = buildRequest(this.nextId++)
@@ -99,6 +111,16 @@ export class WorkerThreadRequestQueue<
     })
   }
 
+  dispatchConcurrent(
+    buildRequest: (id: number) => TRequest,
+    timeoutMs: number
+  ): Promise<TResponse> {
+    if (!this.active && this.queue.length === 0 && this.concurrentCalls.size === 0) {
+      this.consecutiveDeaths = 0
+    }
+    return this.concurrentCalls.dispatch(buildRequest(this.nextId++), timeoutMs)
+  }
+
   private pump(): void {
     if (this.active || this.queue.length === 0) {
       return
@@ -115,7 +137,36 @@ export class WorkerThreadRequestQueue<
     this.active = call
     this.host.clearIdleTimer()
     this.armDeadline(call)
-    worker.postMessage(call.request)
+    worker.postMessage(call.request, this.options.transferList?.(call.request))
+  }
+
+  /** Send an out-of-band control message while a worker request is yielding. */
+  sendControlMessage(message: unknown): boolean {
+    const worker = this.host.current
+    if (!worker || this.disposed) {
+      return false
+    }
+    worker.postMessage(message)
+    return true
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return
+    }
+    this.disposed = true
+    this.host.destroy()
+    const error = this.options.createUnavailableError('worker request queue is disposed')
+    this.concurrentCalls.dispose(error)
+    const active = this.active
+    if (active) {
+      this.settle(active, () => active.reject(error))
+    }
+    const queued = this.queue
+    this.queue = []
+    for (const call of queued) {
+      this.settle(call, () => call.reject(error))
+    }
   }
 
   /**
@@ -131,6 +182,9 @@ export class WorkerThreadRequestQueue<
   }
 
   private onMessage(response: TResponse): void {
+    if (this.concurrentCalls.handleMessage(response)) {
+      return
+    }
     const call = this.active
     if (!call || call.request.id !== response.id) {
       return
@@ -155,7 +209,7 @@ export class WorkerThreadRequestQueue<
   private onWorkerExit(code: number): void {
     // A clean self-exit is not a death, but the stale handle must be dropped or
     // the next dispatch would post into the dead worker and stall to timeout.
-    if (code === 0 && !this.active && this.queue.length === 0) {
+    if (code === 0 && !this.active && this.queue.length === 0 && this.concurrentCalls.size === 0) {
       this.host.destroy()
       return
     }
@@ -165,6 +219,7 @@ export class WorkerThreadRequestQueue<
   private onWorkerFault(error: Error): void {
     const failed = this.active
     this.host.destroy()
+    this.concurrentCalls.failAll(error)
     this.consecutiveDeaths++
     if (failed) {
       this.settle(failed, () => failed.reject(error))

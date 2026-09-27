@@ -1,5 +1,7 @@
 import { sep } from 'node:path'
 import type { Store } from '../persistence'
+import type { WorkspacePathSearchQueryMetrics } from '../../shared/workspace-path-search-instrumentation'
+import { hasDotfileAncestry } from '../../shared/workspace-path-catalog'
 import { fileListingCancellationError } from '../../shared/file-listing-cancellation'
 import { buildExcludePathPrefixes, buildRgArgsForQuickOpen } from '../../shared/quick-open-filter'
 import {
@@ -40,6 +42,13 @@ export async function searchQuickOpenFilePaths(
      * the scan to the Contents-tab scope and skips the usually much larger ignored tree.
      */
     includeIgnoredFiles?: boolean
+    includeDotfiles?: boolean
+    onQueryMetrics?: (
+      metrics: Pick<
+        WorkspacePathSearchQueryMetrics,
+        'pathsConsidered' | 'candidates' | 'verifications'
+      > & { queryGenerationDurationMs: number; queryPathsDurationMs: number }
+    ) => void
   }
 ): Promise<QuickOpenFilePathSearchResult> {
   if (args.limit <= 0 || !args.query.trim() || isQuickOpenQueryTooLarge(args.query)) {
@@ -62,20 +71,44 @@ export async function searchQuickOpenFilePaths(
   const passArgs = args.includeIgnoredFiles === false ? primary : ignoredPass
   // Fresh ranker per attempt so a retry cannot double-count paths from the aborted scan.
   const scanOnce = async (): Promise<QuickOpenFilePathSearchResult> => {
+    const generationStartedAt = performance.now()
     const matcher = createPathSearchMatcher(args.mode, args.query, args.limit)
+    const queryGenerationDurationMs = performance.now() - generationStartedAt
+    let pathsConsidered = 0
+    let candidates = 0
+    let verifications = 0
+    const queryPathsStartedAt = performance.now()
     await scanRipgrepPaths({
       args: passArgs,
       authorizedRootPath,
       excludePathPrefixes,
       localGitOptions,
       onPath: (path) => {
+        if (
+          args.mode === 'name-filter' &&
+          args.includeDotfiles === false &&
+          hasDotfileAncestry(path)
+        ) {
+          return true
+        }
+        pathsConsidered += 1
+        candidates += 1
+        verifications += 1
         matcher.consider(path)
         return true
       },
       signal: args.signal,
       wslDistroForOutput
     })
+    const queryPathsDurationMs = performance.now() - queryPathsStartedAt
     const result = matcher.result()
+    args.onQueryMetrics?.({
+      pathsConsidered,
+      candidates,
+      verifications,
+      queryGenerationDurationMs,
+      queryPathsDurationMs
+    })
     return { ...result, truncated: result.totalCount > args.limit }
   }
   for (let attempt = 0; attempt < 2; attempt++) {

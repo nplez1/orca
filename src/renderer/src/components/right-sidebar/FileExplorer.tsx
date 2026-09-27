@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { useActiveWorktree, useRepoById } from '@/store/selectors'
 import { basename } from '@/lib/path'
@@ -72,7 +72,8 @@ function FileExplorerFiles(): React.JSX.Element {
     hasNameFilter,
     nameFilterFiles,
     nameFilterSource,
-    handleClearNameFilter
+    handleClearNameFilter,
+    reduceNameFilterPageLimit
   } = useFileExplorerNameFilter({ isFilesViewActive, activeWorktreeId })
 
   const handleSelectExplorerView = useCallback(
@@ -88,6 +89,8 @@ function FileExplorerFiles(): React.JSX.Element {
   )
   const {
     rowProjection,
+    projectionPending,
+    projectionError,
     ignoredByRelativePath,
     showGitIgnoredFiles,
     nameFilterExpandedPaths,
@@ -112,6 +115,11 @@ function FileExplorerFiles(): React.JSX.Element {
     [expanded, hasNameFilter, nameFilterExpandedPaths]
   )
   const visibleRowCount = rowProjection.getVisibleCount()
+  useEffect(() => {
+    if (projectionError === 'budget' && hasNameFilter) {
+      reduceNameFilterPageLimit()
+    }
+  }, [hasNameFilter, projectionError, reduceNameFilterPageLimit])
   const manualRefresh = useFileExplorerManualRefresh(tree.refreshTree)
   const canCollapseAll = isFilesViewActive && !hasNameFilter && expanded.size > 0
   const handleCollapseAll = useCallback(() => {
@@ -158,6 +166,11 @@ function FileExplorerFiles(): React.JSX.Element {
     activeFileId,
     openFiles,
     hasNameFilter,
+    canActivateFilteredResults:
+      !nameFilterFiles.previousResults &&
+      !nameFilterFiles.searching &&
+      !projectionPending &&
+      !projectionError,
     setNameFilterQuery,
     handleToggleNameFilterDir,
     tree,
@@ -245,11 +258,35 @@ function FileExplorerFiles(): React.JSX.Element {
               <SearchQueryRow {...searchPanel.queryRowProps} />
             </div>
           </div>
-          {explorerView === 'files' && hasNameFilter && nameFilterFiles.truncated ? (
-            <FileExplorerNameFilterTruncationNotice
-              shownCount={nameFilterFiles.files.length}
-              totalCount={nameFilterFiles.totalCount ?? null}
-            />
+          {explorerView === 'files' ? (
+            <div className="min-h-4">
+              {hasNameFilter ? (
+                <FileExplorerNameFilterTruncationNotice
+                  shownCount={nameFilterFiles.files.length}
+                  totalCount={nameFilterFiles.totalCount ?? null}
+                  truncated={!!nameFilterFiles.truncated}
+                  workspacePathSearch={nameFilterFiles.workspacePathSearch}
+                  isUpdating={
+                    !!nameFilterFiles.previousResults ||
+                    (nameFilterFiles.searching && nameFilterFiles.files.length > 0) ||
+                    projectionPending ||
+                    nameFilterSource?.workspacePathSearch?.state.freshness === 'dirty' ||
+                    nameFilterSource?.workspacePathSearch?.state.freshness === 'reconciling'
+                  }
+                  isIndexing={
+                    nameFilterSource?.workspacePathSearch?.degradationReason === 'missing' ||
+                    nameFilterSource?.workspacePathSearch?.degradationReason === 'building'
+                  }
+                  isSearching={
+                    nameFilterFiles.searching &&
+                    nameFilterFiles.loading &&
+                    !nameFilterFiles.previousResults
+                  }
+                  hasError={!!nameFilterFiles.loadError || !!projectionError}
+                  hasProjectionError={projectionError === 'budget'}
+                />
+              ) : null}
+            </div>
           ) : null}
         </FileExplorerQueryStrip>
         <div
@@ -272,6 +309,14 @@ function FileExplorerFiles(): React.JSX.Element {
             isFilesViewActive={isFilesViewActive}
             activeFileId={activeFileId}
             hasNameFilter={hasNameFilter}
+            canActivateFilteredResults={
+              !nameFilterFiles.previousResults &&
+              !nameFilterFiles.searching &&
+              !projectionPending &&
+              !projectionError
+            }
+            projectionPending={projectionPending}
+            projectionError={projectionError}
             nameFilterSource={nameFilterSource}
             nameFilterFiles={nameFilterFiles}
             handleExpandNameFilterDir={handleExpandNameFilterDir}
