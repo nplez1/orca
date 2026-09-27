@@ -16,7 +16,8 @@ function fixture() {
   roots.push(root)
   const resourcesPath = join(root, 'resources with spaces')
   mkdirSync(join(resourcesPath, 'bin'), { recursive: true })
-  writeFileSync(join(resourcesPath, 'bin', 'orca.exe'), 'fixture')
+  // Why: this fork ships the Windows launcher as orca-np.exe (see bundled-cli-launcher-path.ts).
+  writeFileSync(join(resourcesPath, 'bin', 'orca-np.exe'), 'fixture')
   return { isPackaged: true, resourcesPath, userDataPath: join(root, 'user data') }
 }
 
@@ -39,7 +40,7 @@ describe('managed WSL CLI provisioning', () => {
 
   it('provides nothing when the packaged CLI runtime is missing', () => {
     const host = fixture()
-    rmSync(join(host.resourcesPath, 'bin', 'orca.exe'))
+    rmSync(join(host.resourcesPath, 'bin', 'orca-np.exe'))
     expect(getManagedWslCliDir(host)).toBeNull()
   })
 
@@ -57,7 +58,7 @@ describe('managed WSL CLI provisioning', () => {
     writeFileSync(cliEntryPath, 'fixture')
     installFakeAppEnvironment({ getPath: () => host.userDataPath, getAppPath: () => appPath })
     const directory = getManagedWslCliDir({ ...host, isPackaged: false }) ?? ''
-    expect(readFileSync(join(directory, 'orca-dev'), 'utf8')).toContain(process.execPath)
+    expect(readFileSync(join(directory, 'orca-np-dev'), 'utf8')).toContain(process.execPath)
     const bridge = readFileSync(join(directory, 'orca-wsl-bridge.ps1'), 'utf8')
     expect(bridge.startsWith('\uFEFF')).toBe(true)
     expect(bridge).toContain(host.userDataPath)

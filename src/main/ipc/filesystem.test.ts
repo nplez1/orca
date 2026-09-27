@@ -668,7 +668,7 @@ describe('registerFilesystemHandlers', () => {
 
     await expect(
       handlers.get('fs:searchFilePaths')!(
-        { sender: { id: 1 } },
+        { sender: Object.assign(new EventEmitter(), { id: 1, isDestroyed: () => false }) },
         {
           rootPath: REPO_PATH,
           query: 'drover',
@@ -707,7 +707,7 @@ describe('registerFilesystemHandlers', () => {
 
     await expect(
       handlers.get('fs:searchFilePaths')!(
-        { sender: { id: 1 } },
+        { sender: Object.assign(new EventEmitter(), { id: 1, isDestroyed: () => false }) },
         {
           rootPath: REPO_PATH,
           query: 'target',

@@ -13,6 +13,7 @@ vi.mock('electron', () => ({ app: { getPath: () => hoisted.home } }))
 
 import { zcodeHookService } from './hook-service'
 import { getZCodeConfigPath, ZCODE_HOOK_EVENTS } from './hook-settings'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 
 type ManagedHookEntry = { type: string; command: string; timeout?: number }
 type ZCodeConfigFile = {
@@ -163,7 +164,7 @@ describe('ZCodeHookService', () => {
     zcodeHookService.install()
     const scriptPath = join(
       hoisted.home,
-      '.orca',
+      HOME_DIRECTORY_NAME,
       'agent-hooks',
       process.platform === 'win32' ? 'zcode-hook.cmd' : 'zcode-hook.sh'
     )

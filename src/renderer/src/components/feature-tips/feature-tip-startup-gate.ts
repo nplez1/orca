@@ -32,7 +32,7 @@ export function isSessionSearchFeatureTipCompleted(
   webClient: boolean
 ): boolean {
   // Why: the browser client cannot index transcripts, so there is nothing to turn on.
-  return webClient || resolveAiVaultSearchSettings(settings).enabled
+  return webClient || resolveAiVaultSearchSettings(settings).contentEnabled
 }
 
 /** Unseen tips whose feature the user has not already set up, in display order. */

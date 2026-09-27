@@ -12,14 +12,14 @@ import {
 } from './use-session-search-tip-setup'
 
 type Mocks = {
-  settings: { aiVaultSearch: { enabled: boolean; historyDays: null } }
+  settings: { aiVaultSearch: { contentEnabled: boolean; historyDays: null } }
   status: AiVaultSearchStatus | null
   updateSettingsOrThrow: () => Promise<void>
   showAiVaultSearch: () => void
 }
 
 const mocks = vi.hoisted((): Mocks => ({
-  settings: { aiVaultSearch: { enabled: false, historyDays: null } },
+  settings: { aiVaultSearch: { contentEnabled: false, historyDays: null } },
   status: null,
   updateSettingsOrThrow: async () => {},
   showAiVaultSearch: vi.fn()
@@ -61,7 +61,7 @@ const root = createRoot(container)
 
 afterEach(() => {
   act(() => root.render(null))
-  mocks.settings = { aiVaultSearch: { enabled: false, historyDays: null } }
+  mocks.settings = { aiVaultSearch: { contentEnabled: false, historyDays: null } }
   mocks.status = null
   dialogOpen = true
   vi.mocked(toast.success).mockClear()
@@ -78,7 +78,7 @@ const ready = (): AiVaultSearchStatus => ({
   phase: 'current',
   lastSweepCompletedAt: 1
 })
-const searchOn = { aiVaultSearch: { enabled: true, historyDays: null } }
+const searchOn = { aiVaultSearch: { contentEnabled: true, historyDays: null } }
 
 function render(): void {
   act(() => root.render(<Probe />))
@@ -92,7 +92,7 @@ describe('useSessionSearchTipSetup', () => {
     await act(async () => {
       await latest?.enable()
     })
-    mocks.settings = { aiVaultSearch: { enabled: true, historyDays: null } }
+    mocks.settings = { aiVaultSearch: { contentEnabled: true, historyDays: null } }
     mocks.status = { ...unavailableSessionSearchStatus(), enabled: true, phase: 'indexing' }
     render()
     expect(latest?.stage).toBe('indexing')
@@ -112,19 +112,19 @@ describe('useSessionSearchTipSetup', () => {
     await act(async () => {
       await latest?.enable()
     })
-    mocks.settings = { aiVaultSearch: { enabled: true, historyDays: null } }
+    mocks.settings = { aiVaultSearch: { contentEnabled: true, historyDays: null } }
     mocks.status = { ...unavailableSessionSearchStatus(), enabled: true, phase: 'indexing' }
     render()
     expect(latest?.stage).toBe('indexing')
 
-    mocks.settings = { aiVaultSearch: { enabled: false, historyDays: null } }
+    mocks.settings = { aiVaultSearch: { contentEnabled: false, historyDays: null } }
     mocks.status = unavailableSessionSearchStatus()
     render()
     expect(latest?.stage).toBe('offer')
   })
 
   it('shows progress for a build turned on from Settings', () => {
-    mocks.settings = { aiVaultSearch: { enabled: true, historyDays: null } }
+    mocks.settings = { aiVaultSearch: { contentEnabled: true, historyDays: null } }
     mocks.status = {
       ...unavailableSessionSearchStatus(),
       enabled: true,

@@ -13,7 +13,7 @@ function makeSettings(
       ...getDefaultVoiceSettings(),
       enabled: voiceEnabled
     },
-    aiVaultSearch: { enabled: sessionSearchEnabled, historyDays: null }
+    aiVaultSearch: { contentEnabled: sessionSearchEnabled, historyDays: null }
   }
 }
 

@@ -31,7 +31,7 @@ export function useSessionSearchTipSetup({
   dialogOpen: boolean
 }): SessionSearchTipSetup {
   const showAiVaultSearch = useAppStore((s) => s.showAiVaultSearch)
-  const searchEnabled = useAppStore((s) => resolveAiVaultSearchSettings(s.settings).enabled)
+  const searchEnabled = useAppStore((s) => resolveAiVaultSearchSettings(s.settings).contentEnabled)
   const [wasOpen, setWasOpen] = useState(dialogOpen)
   const [toastWhenReady, setToastWhenReady] = useState(false)
   const [readyToastStatus, setReadyToastStatus] = useState<AiVaultSearchStatus | null>(null)
@@ -79,7 +79,7 @@ export function useSessionSearchTipSetup({
       const store = useAppStore.getState()
       try {
         await store.updateSettingsOrThrow({
-          aiVaultSearch: { ...resolveAiVaultSearchSettings(store.settings), enabled: true }
+          aiVaultSearch: { ...resolveAiVaultSearchSettings(store.settings), contentEnabled: true }
         })
       } catch {
         toast.error(
