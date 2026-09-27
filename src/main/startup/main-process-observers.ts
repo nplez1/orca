@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, powerMonitor } from 'electron'
 import { arch as osArch, platform as osPlatform, release as osRelease } from 'node:os'
 import { join } from 'node:path'
 import { AgentAwakeService } from '../agent-awake-service'
@@ -10,6 +10,7 @@ import { initTelemetry, track } from '../telemetry/client'
 import { setCodexTrustGrantTelemetry } from '../codex/codex-trust-grant-telemetry'
 import { initObservability } from '../observability'
 import { installMainThreadStallProbe } from '../diagnostics/main-thread-stall-probe'
+import { installUiHangLifecycleObserver } from '../diagnostics/ui-hang-lifecycle-observer'
 import { setUiHangLogMeta } from '../diagnostics/ui-hang-log-sink'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
 import { recoverPendingSkillTransactions } from '../skills/skill-transaction-startup-recovery'
@@ -67,6 +68,11 @@ export function initializeMainProcessObservers(): void {
     platform: osPlatform(),
     arch: osArch(),
     osRelease: osRelease()
+  })
+  state.uninstallUiHangLifecycleObserver = installUiHangLifecycleObserver({
+    app,
+    powerMonitor,
+    isEnabled: () => store.getSettings().uiHangDiagnosticsEnabled === true
   })
   state.uninstallMainThreadStallProbe = installMainThreadStallProbe({
     isEnabled: () => store.getSettings().uiHangDiagnosticsEnabled === true,

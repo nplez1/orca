@@ -3,6 +3,10 @@ import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
 import { useAppStore } from '../store'
 import { isMac } from './app-window-chrome'
 import { selectWindowVisibilityActions } from './window-visibility-actions-selector'
+import {
+  recordUiHangLifecycleEvent,
+  recordUiHangOperation
+} from '@/lib/ui-hang-diagnostics/record-ui-hang-operation'
 
 /** Window-visibility reactions that must run app-wide, not per-surface. */
 export function useWindowVisibilityEffects(): void {
@@ -12,9 +16,16 @@ export function useWindowVisibilityEffects(): void {
   useEffect(() => {
     const handler = (): void => {
       if (document.visibilityState === 'visible') {
-        actions.refreshAllGitHub()
-        actions.bumpGitHubPRVisibleRefreshGeneration()
+        recordUiHangLifecycleEvent('document-visible')
+        const startedAtMs = performance.now()
+        try {
+          actions.refreshAllGitHub()
+          actions.bumpGitHubPRVisibleRefreshGeneration()
+        } finally {
+          recordUiHangOperation('window-visible-github-refresh', startedAtMs)
+        }
       } else {
+        recordUiHangLifecycleEvent('document-hidden')
         actions.reportVisibleGitHubPRRefreshCandidates([], Date.now())
       }
     }

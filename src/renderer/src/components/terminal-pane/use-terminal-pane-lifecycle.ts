@@ -13,6 +13,7 @@ import {
   type ReconcilableBinding
 } from './terminal-dead-session-reconcile'
 import type { UseTerminalPaneLifecycleDeps } from './terminal-pane-lifecycle-types'
+import { recordUiHangOperation } from '@/lib/ui-hang-diagnostics/record-ui-hang-operation'
 import { useTerminalPaneMountLifecycle } from './use-terminal-pane-mount-lifecycle'
 import { useTerminalPaneLifecycleRefs } from './use-terminal-pane-lifecycle-refs'
 
@@ -123,7 +124,12 @@ export function useTerminalPaneLifecycle(deps: UseTerminalPaneLifecycleDeps): vo
       const binding = deps.panePtyBindingsRef.current.get(activePane.id) as
         | (IDisposable & { sampleForegroundAgentOnFocus?: () => void })
         | undefined
-      binding?.sampleForegroundAgentOnFocus?.()
+      const startedAtMs = performance.now()
+      try {
+        binding?.sampleForegroundAgentOnFocus?.()
+      } finally {
+        recordUiHangOperation('foreground-agent-focus-sample', startedAtMs)
+      }
     }
     window.addEventListener('focus', onWindowFocus)
     return () => window.removeEventListener('focus', onWindowFocus)
