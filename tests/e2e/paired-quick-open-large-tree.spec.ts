@@ -10,7 +10,8 @@ import { createPairedQuickOpenLargeTreeFixture } from './helpers/paired-quick-op
 import type { PairedQuickOpenLargeTreeFixture } from './helpers/paired-quick-open-large-tree-fixture'
 import { waitForSessionReady } from './helpers/store'
 
-const QUICK_OPEN_SEARCH_DEBOUNCE_MS = 120
+/** One animation frame: the latest query dispatches on the next frame; there is no warm-query debounce. */
+const QUICK_OPEN_SEARCH_DISPATCH_FRAME_MS = 16
 
 async function activateWorktree(page: Page, repoPath: string, timeout = 60_000): Promise<string> {
   await expect
@@ -132,14 +133,18 @@ async function expectQuickOpenAndRuntimeHealthy(
           }
     )
 
-    // Why: control only the debounce; RPC deadlines and socket liveness stay on real time.
+    // Why: control only the dispatch frame; RPC deadlines and socket liveness stay on real time.
+    // The fixed 120 ms warm-query debounce this used to budget for is gone (plan §6.1): the latest
+    // query dispatches on the next frame, with the visible loading row delayed behind it.
     const pauseAt = await client.page.evaluate(() => Date.now() + 1_000)
     await client.page.clock.pauseAt(pauseAt)
     await input.fill(filename.slice(0, 8))
     await input.fill(filename.slice(0, 18))
     await input.fill(filename)
-    await expect(loading).toBeVisible()
-    await client.page.clock.runFor(QUICK_OPEN_SEARCH_DEBOUNCE_MS)
+    await client.page.clock.runFor(QUICK_OPEN_SEARCH_DISPATCH_FRAME_MS)
+    // Why: the replaced loading assertion pinned the debounce window, not this contract — an
+    // in-flight query must show neither a stale row nor a settled empty result (plan §3.7).
+    await expect(dialog).not.toContainText('No matching files.')
     await client.page.clock.resume()
     await expect(dialog.getByRole('option').filter({ hasText: filename })).toHaveCount(1, {
       timeout: 60_000

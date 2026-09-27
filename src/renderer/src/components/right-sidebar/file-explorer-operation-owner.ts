@@ -247,6 +247,14 @@ export function getFileExplorerOwnerUnresolvedMessage(): string {
   )
 }
 
+/** Why: a workspace with no listable path must read as unavailable, never as "no files match". */
+export function getFileExplorerListUnavailableMessage(): string {
+  return translate(
+    'auto.components.right.sidebar.fileExplorerOperationOwner.listUnavailable',
+    'Files are unavailable for this workspace — check the connection and try again.'
+  )
+}
+
 function operationOwnerFromHostId(hostId: ExecutionHostId): FileExplorerOperationOwner {
   const parsed = parseExecutionHostId(hostId)
   switch (parsed?.kind) {

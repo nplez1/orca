@@ -147,10 +147,20 @@ docs/**
 !docs/reference/ssh-reconnect-source-recovery.md
 !docs/reference/windows-setup-shell.md
 !docs/reference/windows-terminal-shell-selection.md
+!docs/reference/workspace-path-catalog-block-format.md
 !docs/reference/worktree-scan-fingerprint.md
 !docs/reference/wsl-command-execution.md
 !docs/reference/wsl-probe-failure-semantics.md
 !docs/reference/xterm-patch-regeneration.md
+
+# Path-index performance summaries are the durable review artifact; raw JSON samples and
+# ephemeral hand-off notes stay local.
+!docs/perf/
+!docs/perf/workspace-path-index-matrix.md
+!docs/perf/workspace-path-index-matrix-phase6a.md
+!docs/perf/workspace-path-index-matrix-phase6b.md
+!docs/perf/workspace-path-index-checkpoint-phase7.md
+!docs/perf/workspace-path-catalog-blocks-phase6b.md
 
 # Stably CLI (only docs/ are tracked)
 .stably/*

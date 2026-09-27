@@ -3,6 +3,7 @@ import type { RemoteServerUpdateSupport } from './remote-server-update'
 import type { RemoteRuntimeSharedConnectionDiagnostics } from './remote-runtime-shared-control-types'
 import type { RuntimeHostConnectionState } from './runtime-host-connection-state'
 import type { RuntimeCapability } from './protocol-version'
+import type { WorkspacePathSearchCapabilityDescriptor } from './workspace-path-search-contract'
 import type {
   RuntimeBrowserUnavailableReason,
   RuntimeDegradation
@@ -74,6 +75,8 @@ export type RuntimeStatus = {
   runtimeProtocolVersion?: number
   minCompatibleRuntimeClientVersion?: number
   capabilities?: RuntimeCapability[]
+  /** Optional descriptors are read only after the matching capability is advertised. */
+  pathSearchCapabilities?: Record<string, WorkspacePathSearchCapabilityDescriptor>
   /** Optional policy for clients that negotiated worktree.create-idempotency.v1. */
   worktreeCreateIdempotency?: {
     dedupeTtlMs: number

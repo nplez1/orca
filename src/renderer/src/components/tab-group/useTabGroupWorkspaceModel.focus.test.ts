@@ -89,7 +89,8 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
     activeRuntimeEnvironmentId
       ? { kind: 'environment', environmentId: activeRuntimeEnvironmentId }
       : { kind: 'local' },
-  runtimeEnvironmentSupportsCapability: mocks.runtimeEnvironmentSupportsCapability
+  runtimeEnvironmentSupportsCapability: mocks.runtimeEnvironmentSupportsCapability,
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 vi.mock('../../store/slices/browser-webview-cleanup', () => ({

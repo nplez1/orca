@@ -27,6 +27,9 @@ type FileExplorerFilesTreePaneProps = {
   isFilesViewActive: boolean
   activeFileId: string | null
   hasNameFilter: boolean
+  canActivateFilteredResults: boolean
+  projectionPending: boolean
+  projectionError: 'budget' | 'failed' | null
   nameFilterSource: FileExplorerNameFilterProjectionSource | null
   nameFilterFiles: RuntimeFileListState
   handleExpandNameFilterDir: (dirPath: string) => void
@@ -51,6 +54,9 @@ export function FileExplorerFilesTreePane({
   isFilesViewActive,
   activeFileId,
   hasNameFilter,
+  canActivateFilteredResults,
+  projectionPending,
+  projectionError,
   nameFilterSource,
   nameFilterFiles,
   handleExpandNameFilterDir,
@@ -116,33 +122,57 @@ export function FileExplorerFilesTreePane({
   // present. Without this, external file drops would have no target surface
   // when the tree is empty, still loading, or showing a read error.
   const isEmptyState = visibleRowCount === 0 && !inlineInput
-  const isNameFilterLoading = nameFilterSource?.relativePaths === null
+  const isNameFilterLoading = nameFilterSource?.relativePaths === null || projectionPending
+  const isQuietSearchPending =
+    !!nameFilterSource?.searching && !nameFilterFiles.loading && !projectionPending
   const isRootLoading = !rootCache || (!!displayRootPath && loadingDirPaths.has(displayRootPath))
-  const isLoading = isEmptyState && (hasNameFilter ? isNameFilterLoading : isRootLoading)
+  const isLoading =
+    isEmptyState &&
+    (hasNameFilter
+      ? isNameFilterLoading && (projectionPending || nameFilterFiles.loading)
+      : isRootLoading)
   const treeError = hasNameFilter
-    ? nameFilterFiles.loadError
+    ? projectionError === 'budget'
+      ? translate(
+          'auto.components.right.sidebar.FileExplorerNameFilter.projectionBudget',
+          'The filtered file list is too large to display — add more of the name to narrow it down'
+        )
+      : projectionError === 'failed'
+        ? translate(
+            'auto.components.right.sidebar.FileExplorerNameFilter.projectionFailed',
+            'Could not build the filtered file list'
+          )
+        : nameFilterFiles.loadError
     : displayRootPath
       ? (rootCache?.error ?? null)
       : rootError
-  const hasError = isEmptyState && !isLoading && treeError !== null
+  const hasError = isEmptyState && !isLoading && !!treeError
   const showTree = !isEmptyState
   const emptyMessageKind = getFileExplorerNameFilterEmptyMessageKind({
     hasNameFilter,
-    hasLoadError: !!nameFilterFiles.loadError,
-    truncated: !!nameFilterFiles.truncated
+    hasLoadError: !!nameFilterFiles.loadError || !!projectionError,
+    truncated: !!nameFilterFiles.truncated,
+    previousResults: !!nameFilterSource?.previousResults,
+    searching: !!nameFilterSource?.searching || projectionPending,
+    workspacePathSearch: nameFilterSource?.workspacePathSearch
   })
   const emptyMessage =
-    emptyMessageKind === 'partial-scan'
+    emptyMessageKind === 'stale'
       ? translate(
-          'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
-          'Only part of this workspace was searched — add more of the name to narrow it down'
+          'auto.components.right.sidebar.FileExplorerNameFilter.updating',
+          'Updating file list'
         )
-      : emptyMessageKind === 'no-match'
+      : emptyMessageKind === 'partial-scan'
         ? translate(
-            'auto.components.right.sidebar.FileExplorer.2f4483d6c4',
-            'No files match this filter'
+            'auto.components.right.sidebar.FileExplorer.filterScannedPartialWorkspace',
+            'Only part of this workspace was searched — add more of the name to narrow it down'
           )
-        : undefined
+        : emptyMessageKind === 'no-match'
+          ? translate(
+              'auto.components.right.sidebar.FileExplorer.2f4483d6c4',
+              'No files match this filter'
+            )
+          : undefined
 
   return (
     <ScrollArea
@@ -190,7 +220,7 @@ export function FileExplorerFilesTreePane({
         <FileExplorerTreeStatus
           isLoading={isLoading}
           error={hasError ? treeError : null}
-          isEmpty={isEmptyState && !isLoading && !hasError}
+          isEmpty={isEmptyState && !isLoading && !hasError && !isQuietSearchPending}
           emptyMessage={emptyMessage}
           scopedToFolder={!!displayRootPath && displayRootPath !== worktreePath}
         />
@@ -221,8 +251,16 @@ export function FileExplorerFilesTreePane({
           supportsFolderDownload={supportsFolderDownload}
           canOpenInOrcaBrowser={canOpenWorkspaceFileBrowserForPath}
           onClick={handleRowClick}
-          onDoubleClick={handleDoubleClick}
-          onViewFile={handleClick}
+          onDoubleClick={(node) => {
+            if (canActivateFilteredResults) {
+              handleDoubleClick(node)
+            }
+          }}
+          onViewFile={(node) => {
+            if (canActivateFilteredResults) {
+              handleClick(node)
+            }
+          }}
           onContextMenuSelect={preserveSelectionForContextMenu}
           onCopyPaths={copyPathsForNode}
           onStartNew={startNew}

@@ -1,146 +1,58 @@
-import { getRelativePathInsideRoot, joinPath, normalizeRelativePath } from '@/lib/path'
-import { compareFileNames } from '../../../../shared/file-name-sort'
-import {
-  FILE_NAME_FILTER_QUERY_MAX_BYTES,
-  isFileNameFilterQueryTooLarge,
-  pathMatchesFileNameFilterTokens,
-  splitFileNameFilterTokens
-} from '../../../../shared/file-name-filter-tokens'
-import type { FileExplorerOperationOwner, TreeNode } from './file-explorer-types'
+import type { TreeNode } from './file-explorer-types'
 import {
   createFileExplorerRowProjectionFromParts,
   type FileExplorerRowProjection
 } from './file-explorer-row-projection'
-import { isDotfileRelativePath } from './file-explorer-entries'
-import { splitPathSegments } from './path-tree'
-import { isPathIgnored } from './status-display'
+import {
+  getFileExplorerNameFilterTokens,
+  isFileExplorerNameFilterQueryTooLarge,
+  type FileExplorerNameFilterProjectionSource
+} from './file-explorer-name-filter-policy'
+import {
+  MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES,
+  cacheFilteredProjection,
+  getCachedFilteredProjection,
+  getFileExplorerNameFilterProjectionCacheKey,
+  projectionEstimatedBytesByObject
+} from './file-explorer-name-filter-projection-cache'
+import {
+  createProjectionAbortError,
+  createSyntheticTreePathRoot,
+  insertNameFilteredPath,
+  insertNameFilteredPathInChunks,
+  type NameFilteredPathInsertionState,
+  type SyntheticTreeEntry
+} from './file-explorer-name-filter-tree-nodes'
+import { getAcceptedNameFilterPath } from './file-explorer-name-filter-path-acceptance'
+import {
+  getDisplayRootChildren,
+  isInsideDisplayRoot
+} from './file-explorer-name-filter-projection-walk'
+import {
+  appendNameFilteredEntries,
+  getSingleSyntheticChild,
+  sortNameFilteredEntriesInChunks
+} from './file-explorer-name-filter-tree-sort'
 
-export type FileExplorerNameFilterProjectionSource = {
-  query: string
-  relativePaths: readonly string[] | null
-  operationOwner?: FileExplorerOperationOwner
-  /** Exact matches the host scanned; null when the listing was not query-scoped. */
-  totalCount?: number | null
-  /** True when the page is not the whole result set. */
-  truncated?: boolean
-  /**
-   * Subset of `relativePaths` the host already classified as gitignored. When present the pane
-   * must not re-ask git: a per-keystroke check-ignore over the matched page is otherwise paid
-   * for a purely cosmetic dim.
-   */
-  ignoredRelativePaths?: readonly string[]
-}
+export type { FileExplorerNameFilterProjectionSource }
 
-/**
- * Which message an empty filtered pane may show. A truncated listing never scanned the whole
- * workspace, so "no files match" is a claim we cannot make — only "not fully searched" is true.
- */
-export function getFileExplorerNameFilterEmptyMessageKind({
-  hasNameFilter,
-  hasLoadError,
-  truncated
-}: {
-  hasNameFilter: boolean
-  hasLoadError: boolean
-  truncated: boolean
-}): 'no-match' | 'partial-scan' | null {
-  if (!hasNameFilter || hasLoadError) {
-    return null
-  }
-  return truncated ? 'partial-scan' : 'no-match'
-}
+export { isFileExplorerNameFilterQueryTooLarge, getFileExplorerNameFilterTokens }
 
-export const FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES = FILE_NAME_FILTER_QUERY_MAX_BYTES
-
-/**
- * Bounded page the name filter keeps. Filters are usually narrow; when one is broad the host
- * still counts every match, and the pane reports the count instead of implying completeness.
- */
-export const FILE_EXPLORER_NAME_FILTER_MAX_RESULTS = 5_000
-
-export function getNextNameFilterCollapsedPaths(
-  collapsedPaths: ReadonlySet<string>,
-  dirPath: string,
-  isExpanded: boolean
-): Set<string> {
-  const next = new Set(collapsedPaths)
-  if (isExpanded) {
-    next.add(dirPath)
-  } else {
-    next.delete(dirPath)
-  }
-  return next
-}
-
-export function getNameFilterCollapsedPathsAfterExpand(
-  collapsedPaths: ReadonlySet<string>,
-  dirPath: string
-): Set<string> {
-  if (!collapsedPaths.has(dirPath)) {
-    return new Set(collapsedPaths)
-  }
-  const next = new Set(collapsedPaths)
-  next.delete(dirPath)
-  return next
-}
-
-export function isFileExplorerNameFilterQueryTooLarge(
-  query: string | undefined,
-  maxBytes = FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES
-): boolean {
-  return isFileNameFilterQueryTooLarge(query ?? '', maxBytes)
-}
-
-export function getFileExplorerNameFilterTokens(query: string | undefined): string[] {
-  if (isFileExplorerNameFilterQueryTooLarge(query)) {
-    return []
-  }
-  return splitFileNameFilterTokens(query ?? '')
-}
-
-export function getFileExplorerNameFilterIgnoredQueryRelativePaths(
-  source: FileExplorerNameFilterProjectionSource,
-  showDotfiles: boolean
-): string[] {
-  if (isFileExplorerNameFilterQueryTooLarge(source.query)) {
-    return []
-  }
-  if (source.relativePaths === null) {
-    return []
-  }
-  const tokens = getFileExplorerNameFilterTokens(source.query)
-  return source.relativePaths
-    .map((relativePath) => normalizeRelativePath(relativePath))
-    .filter(
-      (relativePath) =>
-        Boolean(relativePath) &&
-        (showDotfiles || !isDotfileRelativePath(relativePath)) &&
-        pathMatchesFileNameFilterTokens(relativePath, tokens)
-    )
-}
-
-type SyntheticTreeEntry = {
-  node: TreeNode
-  children: Map<string, SyntheticTreeEntry>
-}
-
-function createSyntheticNode(
-  worktreePath: string,
-  relativePath: string,
-  name: string,
-  depth: number,
-  isDirectory: boolean,
-  operationOwner: FileExplorerOperationOwner | undefined
-): TreeNode {
-  return {
-    name,
-    path: joinPath(worktreePath, relativePath),
-    relativePath,
-    isDirectory,
-    depth,
-    operationOwner
-  }
-}
+export {
+  FILE_EXPLORER_NAME_FILTER_MAX_RESULTS,
+  FILE_EXPLORER_NAME_FILTER_QUERY_MAX_BYTES,
+  getNameFilterCollapsedPathsAfterExpand,
+  getFileExplorerNameFilterEmptyMessageKind,
+  getFileExplorerNameFilterIgnoredQueryRelativePaths,
+  getNextNameFilterCollapsedPaths
+} from './file-explorer-name-filter-policy'
+export {
+  MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES,
+  getFileExplorerNameFilterProjectionCacheKey,
+  getFileExplorerNameFilterProjectionEstimatedBytes
+} from './file-explorer-name-filter-projection-cache'
+export { shouldBuildNameFilterProjectionInChunks } from './file-explorer-name-filter-tree-nodes'
+export { getFileExplorerNameFilterExpandedPaths } from './file-explorer-name-filter-projection-walk'
 
 /** Builds a filtered subtree for the display root while retaining worktree-relative paths on synthetic nodes. */
 export function createNameFilteredFileExplorerProjection({
@@ -160,123 +72,224 @@ export function createNameFilteredFileExplorerProjection({
   worktreePath: string
   displayRootPath?: string
 }): FileExplorerRowProjection {
+  const cacheKey = getFileExplorerNameFilterProjectionCacheKey({
+    collapsedPaths,
+    ignoredSet,
+    nameFilter,
+    showDotfiles,
+    showGitIgnoredFiles,
+    worktreePath
+  })
+  const cachedProjection = getCachedFilteredProjection(cacheKey)
+  if (cachedProjection) {
+    cacheFilteredProjection(cacheKey, cachedProjection)
+    return cachedProjection
+  }
   const visibleFlatRows: TreeNode[] = []
   const rowsByPath = new Map<string, TreeNode>()
   if (isFileExplorerNameFilterQueryTooLarge(nameFilter.query)) {
-    return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+    const projection = createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+    cacheFilteredProjection(cacheKey, projection)
+    return projection
   }
   const nameFilterTokens = getFileExplorerNameFilterTokens(nameFilter.query)
   if (nameFilterTokens.length === 0 || nameFilter.relativePaths === null) {
     // Why: empty queries use the normal explorer projection, and loading filters must not
     // fall back to a partial cached path list.
-    return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+    const projection = createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+    cacheFilteredProjection(cacheKey, projection)
+    return projection
   }
 
   const rootChildren = new Map<string, SyntheticTreeEntry>()
+  const insertionState: NameFilteredPathInsertionState = { relativePath: '', entries: [] }
+  const pathRoot = createSyntheticTreePathRoot(worktreePath)
+  const hostAppliedScope = nameFilter.workspacePathSearch !== undefined
+  let constructionBytes = 0
   for (const rawRelativePath of nameFilter.relativePaths) {
-    const relativePath = normalizeRelativePath(rawRelativePath)
-    if (
-      !relativePath ||
-      getRelativePathInsideRoot(joinPath(worktreePath, relativePath), displayRootPath) === null
-    ) {
-      continue
-    }
-    if (!showDotfiles && isDotfileRelativePath(relativePath)) {
-      continue
-    }
-    if (!showGitIgnoredFiles && isPathIgnored(ignoredSet, relativePath)) {
-      continue
-    }
-    if (!pathMatchesFileNameFilterTokens(relativePath, nameFilterTokens)) {
-      continue
-    }
-
-    const segments = splitPathSegments(relativePath)
-    let currentChildren = rootChildren
-    let currentRelativePath = ''
-    for (let index = 0; index < segments.length; index += 1) {
-      const name = segments[index]
-      currentRelativePath = currentRelativePath ? joinPath(currentRelativePath, name) : name
-      const isDirectory = index < segments.length - 1
-      let entry = currentChildren.get(name)
-      if (!entry) {
-        entry = {
-          node: createSyntheticNode(
-            worktreePath,
-            currentRelativePath,
-            name,
-            index,
-            isDirectory,
-            nameFilter.operationOwner
-          ),
-          children: new Map()
-        }
-        currentChildren.set(name, entry)
-      } else if (isDirectory && !entry.node.isDirectory) {
-        entry.node = { ...entry.node, isDirectory: true }
+    const acceptedPath = getAcceptedNameFilterPath({
+      rawRelativePath,
+      nameFilter,
+      nameFilterTokens,
+      hostAppliedScope,
+      ignoredSet,
+      showDotfiles,
+      showGitIgnoredFiles
+    })
+    if (acceptedPath) {
+      if (!isInsideDisplayRoot(worktreePath, acceptedPath.relativePath, displayRootPath)) {
+        continue
       }
-      currentChildren = entry.children
-    }
-  }
-
-  let displayChildren = rootChildren
-  const scope = getRelativePathInsideRoot(displayRootPath, worktreePath)
-  for (const segment of scope ? splitPathSegments(scope) : []) {
-    const entry = displayChildren.get(segment)
-    if (!entry) {
-      return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
-    }
-    displayChildren = entry.children
-  }
-  appendNameFilteredEntries(displayChildren.values(), visibleFlatRows, rowsByPath, collapsedPaths)
-  return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
-}
-
-function appendNameFilteredEntries(
-  entries: Iterable<SyntheticTreeEntry>,
-  visibleFlatRows: TreeNode[],
-  rowsByPath: Map<string, TreeNode>,
-  collapsedPaths?: ReadonlySet<string>
-): void {
-  const sortedEntries = Array.from(entries).sort((a, b) => {
-    if (a.node.isDirectory !== b.node.isDirectory) {
-      return a.node.isDirectory ? -1 : 1
-    }
-    return compareFileNames(a.node.name, b.node.name)
-  })
-  for (const entry of sortedEntries) {
-    visibleFlatRows.push(entry.node)
-    rowsByPath.set(entry.node.path, entry.node)
-    if (entry.children.size > 0 && !collapsedPaths?.has(entry.node.path)) {
-      appendNameFilteredEntries(
-        entry.children.values(),
-        visibleFlatRows,
-        rowsByPath,
-        collapsedPaths
+      insertNameFilteredPath(
+        rootChildren,
+        acceptedPath,
+        insertionState,
+        pathRoot,
+        nameFilter.operationOwner,
+        (estimatedBytes) => {
+          constructionBytes += estimatedBytes
+          if (constructionBytes > MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES) {
+            throw new Error('The filtered file tree exceeds its projection byte budget.')
+          }
+        }
       )
     }
   }
+
+  const displayChildren = getDisplayRootChildren(rootChildren, worktreePath, displayRootPath)
+  if (!displayChildren) {
+    return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+  }
+  appendNameFilteredEntries(displayChildren, visibleFlatRows, rowsByPath, collapsedPaths)
+  const projection = createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+  projectionEstimatedBytesByObject.set(projection, constructionBytes)
+  cacheFilteredProjection(cacheKey, projection)
+  return projection
 }
 
-export function getFileExplorerNameFilterExpandedPaths(
-  rowProjection: FileExplorerRowProjection,
-  nameFilterQuery: string
-): Set<string> {
-  if (
-    isFileExplorerNameFilterQueryTooLarge(nameFilterQuery) ||
-    getFileExplorerNameFilterTokens(nameFilterQuery).length === 0
-  ) {
-    return new Set()
+export async function createNameFilteredFileExplorerProjectionInChunks(args: {
+  collapsedPaths?: ReadonlySet<string>
+  ignoredSet: Set<string>
+  nameFilter: FileExplorerNameFilterProjectionSource
+  showDotfiles: boolean
+  showGitIgnoredFiles: boolean
+  worktreePath: string
+  displayRootPath?: string
+  signal: AbortSignal
+  onChunkDuration?: (milliseconds: number) => void
+}): Promise<FileExplorerRowProjection> {
+  const cacheKey = getFileExplorerNameFilterProjectionCacheKey(args)
+  const cachedProjection = getCachedFilteredProjection(cacheKey)
+  if (cachedProjection) {
+    cacheFilteredProjection(cacheKey, cachedProjection)
+    return cachedProjection
+  }
+  const queryTokens = getFileExplorerNameFilterTokens(args.nameFilter.query)
+  if (queryTokens.length === 0 || args.nameFilter.relativePaths === null) {
+    return createNameFilteredFileExplorerProjection(args)
   }
 
-  const expandedPaths = new Set<string>()
-  const count = rowProjection.getVisibleCount()
-  for (let index = 0; index < count - 1; index += 1) {
-    const row = rowProjection.getRowAtIndex(index)
-    const nextRow = rowProjection.getRowAtIndex(index + 1)
-    if (row?.isDirectory && nextRow && nextRow.depth > row.depth) {
-      expandedPaths.add(row.path)
+  const rootChildren = new Map<string, SyntheticTreeEntry>()
+  const insertionState: NameFilteredPathInsertionState = { relativePath: '', entries: [] }
+  const pathRoot = createSyntheticTreePathRoot(args.worktreePath)
+  const displayRootPath = args.displayRootPath ?? args.worktreePath
+  const hostAppliedScope = args.nameFilter.workspacePathSearch !== undefined
+  let constructionBytes = 0
+  let unitCount = 0
+  let chunkStartedAt = performance.now()
+  const yieldIfNeeded = (): Promise<void> | null => {
+    unitCount += 1
+    const elapsed = performance.now() - chunkStartedAt
+    if (unitCount < 2_048 && elapsed < 4) {
+      return null
+    }
+    if (args.signal.aborted) {
+      throw createProjectionAbortError()
+    }
+    args.onChunkDuration?.(elapsed)
+    return new Promise<void>((resolve) =>
+      setTimeout(() => {
+        unitCount = 0
+        chunkStartedAt = performance.now()
+        resolve()
+      }, 0)
+    )
+  }
+
+  for (const rawRelativePath of args.nameFilter.relativePaths) {
+    if (args.signal.aborted) {
+      throw createProjectionAbortError()
+    }
+    const acceptedPath = getAcceptedNameFilterPath({
+      rawRelativePath,
+      nameFilter: args.nameFilter,
+      nameFilterTokens: queryTokens,
+      hostAppliedScope,
+      ignoredSet: args.ignoredSet,
+      showDotfiles: args.showDotfiles,
+      showGitIgnoredFiles: args.showGitIgnoredFiles
+    })
+    if (acceptedPath) {
+      if (!isInsideDisplayRoot(args.worktreePath, acceptedPath.relativePath, displayRootPath)) {
+        continue
+      }
+      const pendingInsertion = insertNameFilteredPathInChunks({
+        rootChildren,
+        acceptedPath,
+        state: insertionState,
+        pathRoot,
+        operationOwner: args.nameFilter.operationOwner,
+        yieldIfNeeded,
+        signal: args.signal,
+        onNodeCreated: (estimatedBytes) => {
+          constructionBytes += estimatedBytes
+          if (constructionBytes > MAX_NAME_FILTER_PROJECTION_ESTIMATED_BYTES) {
+            throw new Error('The filtered file tree exceeds its projection byte budget.')
+          }
+        }
+      })
+      if (pendingInsertion) {
+        await pendingInsertion
+      }
+    }
+    const pause = yieldIfNeeded()
+    if (pause) {
+      await pause
     }
   }
-  return expandedPaths
+
+  const displayChildren = getDisplayRootChildren(rootChildren, args.worktreePath, displayRootPath)
+  if (!displayChildren) {
+    return createFileExplorerRowProjectionFromParts([], new Map())
+  }
+  const visibleFlatRows: TreeNode[] = []
+  const rowsByPath = new Map<string, TreeNode>()
+  type SortedTreeFrame = { entries: SyntheticTreeEntry[]; index: number }
+  const stack: SortedTreeFrame[] = [
+    {
+      entries: await sortNameFilteredEntriesInChunks(displayChildren, yieldIfNeeded),
+      index: 0
+    }
+  ]
+  while (stack.length > 0) {
+    if (args.signal.aborted) {
+      throw createProjectionAbortError()
+    }
+    const frame = stack.at(-1)
+    if (!frame) {
+      throw new Error('Synthetic tree traversal lost its active frame.')
+    }
+    const entry = frame.entries.at(frame.index)
+    if (!entry) {
+      stack.pop()
+      continue
+    }
+    frame.index += 1
+    visibleFlatRows.push(entry.node)
+    rowsByPath.set(entry.node.path, entry.node)
+    if (entry.children.size > 0 && !args.collapsedPaths?.has(entry.node.path)) {
+      const singleChild = getSingleSyntheticChild(entry.children)
+      stack.push({
+        entries: singleChild
+          ? [singleChild]
+          : await sortNameFilteredEntriesInChunks(entry.children, yieldIfNeeded),
+        index: 0
+      })
+    }
+    const pause = yieldIfNeeded()
+    if (pause) {
+      await pause
+    }
+  }
+
+  if (unitCount > 0) {
+    args.onChunkDuration?.(performance.now() - chunkStartedAt)
+  }
+  if (args.signal.aborted) {
+    throw createProjectionAbortError()
+  }
+  const projection = createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
+  projectionEstimatedBytesByObject.set(projection, constructionBytes)
+  cacheFilteredProjection(cacheKey, projection)
+  return projection
 }

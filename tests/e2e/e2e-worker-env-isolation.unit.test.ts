@@ -26,7 +26,14 @@ const MODULE_SCOPE_ENV_WRITE =
 // No file may write at module scope. The replacement is a fixture option, which reaches the app
 // launch without touching the worker every other spec shares.
 const SCANNED_EXTENSIONS = ['.ts', '.tsx']
-const IGNORED_DIRECTORIES = new Set(['node_modules', 'dist', 'out', 'build', '__fixtures__'])
+const IGNORED_DIRECTORIES = new Set([
+  'node_modules',
+  'dist',
+  'out',
+  'build',
+  '__fixtures__',
+  '.cross-version-checkouts'
+])
 
 function collectE2eFiles(root: string): string[] {
   const found: string[] = []

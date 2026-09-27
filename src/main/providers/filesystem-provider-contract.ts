@@ -6,6 +6,11 @@ import type {
 } from '../../shared/doc-preview-file-access'
 import type { DirEntry, FsChangeEvent } from '../../shared/filesystem-entry-types'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
+import type {
+  WorkspacePathSearchCapabilityDescriptor,
+  WorkspacePathSearchRequest,
+  WorkspacePathSearchResponse
+} from '../../shared/workspace-path-search-contract'
 
 export type FileStat = {
   size: number
@@ -109,6 +114,14 @@ export type IFilesystemProvider = {
     }
   ): Promise<string[]>
   supportsQuickOpenSearch?(options?: { signal?: AbortSignal }): Promise<boolean>
+  workspacePathSearchCapability?(options?: {
+    signal?: AbortSignal
+  }): Promise<WorkspacePathSearchCapabilityDescriptor | null>
+  searchWorkspacePathNameFilter?(
+    rootPath: string,
+    request: WorkspacePathSearchRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<WorkspacePathSearchResponse | null>
   scanWorkspaceSpace?(
     rootPath: string,
     options?: { signal?: AbortSignal }

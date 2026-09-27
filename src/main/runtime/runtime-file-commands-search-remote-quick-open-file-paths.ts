@@ -1,5 +1,5 @@
 // @ts-nocheck -- mechanically split class members.
-import { RuntimeFileCommandsWithSearchLocalRuntimeFiles } from './runtime-file-commands-search-local-runtime-files'
+import { RuntimeFileCommandsWithWorkspacePathSearch } from './runtime-file-commands-workspace-path-search'
 import type { IFilesystemProvider } from '../providers/types'
 import {
   MOBILE_FILE_READ_MAX_BYTES,
@@ -7,7 +7,7 @@ import {
 } from './runtime-file-commands-mobile-file-list-limit'
 import { QuickOpenPathRanker } from '../../shared/quick-open-path-search'
 
-export class RuntimeFileCommandsWithSearchRemoteQuickOpenFilePaths extends RuntimeFileCommandsWithSearchLocalRuntimeFiles {
+export class RuntimeFileCommandsWithSearchRemoteQuickOpenFilePaths extends RuntimeFileCommandsWithWorkspacePathSearch {
   protected async searchRemoteQuickOpenFilePaths(
     rootPath: string,
     // `null` is "remote and currently unreachable": quick open reports no matches rather than

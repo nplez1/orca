@@ -19,6 +19,9 @@ import {
 } from './web-runtime-session'
 import { isMissingPathError, resolveRuntimeFilePath } from './web-runtime-worktree-catalog'
 import { noopUnsubscribe } from './web-storage'
+import { searchWebWorkspaceNameFilter } from './web-workspace-path-search'
+
+const workspacePathSearchControllers = new Map<string, AbortController>()
 
 export function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
   return {
@@ -108,12 +111,63 @@ export function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
       )
       return result.files.map((entry) => entry.relativePath)
     },
-    cancelListFiles: async () => {
-      // Why: paired-web lists files over runtime RPC with its own timeout; there's no host-side scan to abort here.
+    acquireQuickOpenPathInventoryLease: async () => ({ leaseId: null }),
+    releaseQuickOpenPathInventoryLease: async () => {},
+    exportWorkspacePathSearchInstrumentation: async () => [],
+    getWorkspacePathSearchDiagnosticsSummary: async () => ({
+      queriesServed: 0,
+      strategies: {
+        'ordered-scan': 0,
+        'trigram-postings': 0,
+        'matching-id-bitset': 0,
+        'disk-block-scan': 0,
+        'live-scan': 0,
+        'legacy-search': 0
+      },
+      cacheMissReasons: {},
+      fallbackReasons: {},
+      admissionRefusals: 0,
+      freshnessDowngrades: 0
+    }),
+    cancelListFiles: async ({ requestToken }) => {
+      workspacePathSearchControllers.get(requestToken)?.abort()
+      workspacePathSearchControllers.delete(requestToken)
     },
-    searchFilePaths: async ({ rootPath, query, limit, excludePaths, mode }) => {
+    searchFilePaths: async ({
+      rootPath,
+      query,
+      limit,
+      excludePaths,
+      mode,
+      includeIgnoredFiles,
+      includeDotfiles,
+      correlationId,
+      requestToken
+    }) => {
       // Why: a paired web client only has remote files, so path search always goes to the host.
       const file = await resolveRuntimeFilePath(rootPath)
+      if (mode === 'name-filter') {
+        const controller = new AbortController()
+        if (requestToken) {
+          workspacePathSearchControllers.set(requestToken, controller)
+        }
+        try {
+          return await searchWebWorkspaceNameFilter({
+            worktree: { id: file.worktree.id, path: file.worktree.path },
+            query,
+            limit: limit ?? 32,
+            excludePaths,
+            includeIgnoredFiles,
+            includeDotfiles,
+            correlationId,
+            signal: controller.signal
+          })
+        } finally {
+          if (requestToken && workspacePathSearchControllers.get(requestToken) === controller) {
+            workspacePathSearchControllers.delete(requestToken)
+          }
+        }
+      }
       const result = await callRuntimeResult<{
         files: { relativePath: string }[]
         totalCount: number

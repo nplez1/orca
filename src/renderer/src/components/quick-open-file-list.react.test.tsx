@@ -8,6 +8,7 @@ import type { ProjectGroup } from '../../../shared/project-group-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
 import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listing-limits'
+import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { useRuntimeFileListForWorktree, type RuntimeFileListState } from './quick-open-file-list'
@@ -16,6 +17,7 @@ import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from './quick-open-search'
 const listRuntimeFilesMock = vi.hoisted(() => vi.fn())
 const cancelRuntimeFileListMock = vi.hoisted(() => vi.fn())
 const searchRuntimeFilePathsMock = vi.hoisted(() => vi.fn())
+const searchFilePathsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/runtime/runtime-file-client', () => ({
   listRuntimeFiles: listRuntimeFilesMock,
@@ -25,6 +27,52 @@ vi.mock('@/runtime/runtime-file-client', () => ({
 
 const initialAppState = useAppStore.getInitialState()
 const roots: Root[] = []
+
+function makeStructuredNameFilterResult(
+  query: string,
+  correlationId: string,
+  includeDotfiles = true
+): FilePathSearchResult {
+  const scope = {
+    pathSet: 'all' as const,
+    includeDotfiles,
+    includeIgnoredFiles: true,
+    excludePathSegments: []
+  }
+  const files = ['src/target.ts']
+  return {
+    files,
+    totalCount: 1,
+    truncated: false,
+    workspacePathSearch: {
+      requestIdentity: {
+        query,
+        consumer: { consumerId: correlationId, sequence: 1 },
+        owner: {
+          executionHost: { provider: 'runtime', incarnationId: 'environment:env-1' },
+          authorizedCanonicalRoot: '/srv/remote'
+        },
+        generationId: null,
+        mode: 'name-filter',
+        scope,
+        pageBudget: { maxPaths: 5_000, maxSerializedBytes: 100_000 }
+      },
+      generationId: 'generation-1',
+      scopeFingerprint: JSON.stringify(scope),
+      scopeRuleVersion: 'live-path-search-v1',
+      rows: files.map((relativePath) => ({ relativePath })),
+      rowClassificationFlags: [0],
+      retainedCount: 1,
+      state: {
+        coverage: 'complete',
+        freshness: 'no-known-gap',
+        countProvenance: 'exact-snapshot',
+        searchComplete: true
+      },
+      count: { value: 1, provenance: 'exact-snapshot' }
+    }
+  }
+}
 
 function makeProjectGroup(overrides: Partial<ProjectGroup> = {}): ProjectGroup {
   return {
@@ -155,6 +203,11 @@ beforeEach(() => {
   listRuntimeFilesMock.mockReset().mockResolvedValue(['packages/app/package.json'])
   cancelRuntimeFileListMock.mockReset()
   searchRuntimeFilePathsMock.mockReset().mockResolvedValue({ files: [], truncated: false })
+  searchFilePathsMock.mockReset().mockResolvedValue({ files: [], truncated: false })
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { fs: { searchFilePaths: searchFilePathsMock } }
+  })
 })
 
 afterEach(async () => {
@@ -164,6 +217,7 @@ afterEach(async () => {
     })
   }
   roots.length = 0
+  Reflect.deleteProperty(window, 'api')
   useAppStore.setState(initialAppState, true)
 })
 
@@ -268,7 +322,7 @@ describe('useRuntimeFileListForWorktree', () => {
         query: 'remote-folder',
         worktreeId: workspaceKey
       })
-      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await act(async () => vi.advanceTimersByTimeAsync(16))
 
       expect(searchRuntimeFilePathsMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -379,7 +433,7 @@ describe('useRuntimeFileListForWorktree', () => {
     expect(cancelRuntimeFileListMock).not.toHaveBeenCalled()
   })
 
-  it('searches the owning runtime after the query debounce without listing all paths', async () => {
+  it('dispatches the owning runtime query on the next frame without listing all paths', async () => {
     vi.useFakeTimers()
     const states: RuntimeFileListState[] = []
     seedRemoteWorktree()
@@ -397,7 +451,7 @@ describe('useRuntimeFileListForWorktree', () => {
       })
 
       expect(searchRuntimeFilePathsMock).not.toHaveBeenCalled()
-      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await act(async () => vi.advanceTimersByTimeAsync(16))
       await flushEffects()
 
       expect(searchRuntimeFilePathsMock).toHaveBeenCalledWith(
@@ -472,7 +526,7 @@ describe('useRuntimeFileListForWorktree', () => {
         query: 'target',
         worktreeId: 'wt-remote'
       })
-      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await act(async () => vi.advanceTimersByTimeAsync(16))
       await flushEffects()
       expect(states.at(-1)?.files).toEqual(['src/target.ts'])
 
@@ -511,7 +565,161 @@ describe('useRuntimeFileListForWorktree', () => {
     expect(states.at(-1)?.files).toEqual(['src/existing.ts'])
   })
 
-  it('aborts superseded runtime queries and ignores stale replies', async () => {
+  it('coalesces queries queued before the next frame to the latest value', async () => {
+    vi.useFakeTimers()
+    seedRemoteWorktree()
+    const root = await renderProbe({
+      enabled: true,
+      onState: () => {},
+      query: 's',
+      worktreeId: 'wt-remote'
+    })
+
+    try {
+      for (const query of ['sr', 'src', 'src/target']) {
+        await act(async () => {
+          root.render(
+            createElement(HookProbe, {
+              enabled: true,
+              onState: () => {},
+              query,
+              worktreeId: 'wt-remote'
+            })
+          )
+        })
+      }
+      expect(searchRuntimeFilePathsMock).not.toHaveBeenCalled()
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledTimes(1)
+      expect(searchRuntimeFilePathsMock.mock.calls[0]?.[1].query).toBe('src/target')
+    } finally {
+      await act(async () => root.unmount())
+      vi.useRealTimers()
+    }
+  })
+
+  it('rejects a structured reply whose query fence differs from the current request', async () => {
+    vi.useFakeTimers()
+    seedRemoteWorktree()
+    const states: RuntimeFileListState[] = []
+    searchRuntimeFilePathsMock.mockImplementation((_context, args) =>
+      makeStructuredNameFilterResult('different-query', args.correlationId)
+    )
+
+    try {
+      await renderProbe({
+        enabled: true,
+        onState: (state) => states.push(state),
+        query: 'target',
+        queryMode: 'name-filter',
+        queryLimit: 5_000,
+        worktreeId: 'wt-remote'
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      await flushEffects()
+
+      expect(states.at(-1)).toMatchObject({
+        files: [],
+        loadError: 'The file search response did not match the current workspace request.'
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('rejects a structured reply whose visibility scope differs from the current request', async () => {
+    vi.useFakeTimers()
+    seedRemoteWorktree()
+    const states: RuntimeFileListState[] = []
+    searchRuntimeFilePathsMock.mockImplementation((_context, args) =>
+      makeStructuredNameFilterResult(args.query, args.correlationId, false)
+    )
+
+    try {
+      await renderProbe({
+        enabled: true,
+        onState: (state) => states.push(state),
+        query: 'target',
+        queryMode: 'name-filter',
+        queryLimit: 5_000,
+        worktreeId: 'wt-remote'
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      await flushEffects()
+
+      expect(states.at(-1)?.loadError).toBe(
+        'The file search response did not match the current workspace request.'
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports an unavailable workspace instead of claiming no matches', async () => {
+    // Regression: a typed filter with no resolvable worktree path skipped the listing effect, so
+    // loadError stayed null and the empty pane read as "No files match this filter" for a
+    // workspace the host never listed.
+    useAppStore.setState({
+      folderWorkspaces: [],
+      projectGroups: [],
+      repos: [],
+      worktreesByRepo: {}
+    } as Partial<AppState>)
+    const states: RuntimeFileListState[] = []
+
+    await renderProbe({
+      enabled: true,
+      onState: (state) => states.push(state),
+      query: 'target',
+      queryMode: 'name-filter',
+      queryLimit: 5_000,
+      worktreeId: 'wt-missing'
+    })
+    await flushEffects()
+
+    expect(states.at(-1)).toMatchObject({
+      files: [],
+      loadError:
+        "Couldn't determine which host owns this workspace. Check the connection and try again."
+    })
+  })
+
+  it('consumes a structured response as one fenced generation', async () => {
+    vi.useFakeTimers()
+    seedRemoteWorktree()
+    const states: RuntimeFileListState[] = []
+    searchRuntimeFilePathsMock.mockImplementation((_context, args) =>
+      makeStructuredNameFilterResult(args.query, args.correlationId)
+    )
+
+    try {
+      await renderProbe({
+        enabled: true,
+        onState: (state) => states.push(state),
+        query: 'target',
+        queryMode: 'name-filter',
+        queryLimit: 5_000,
+        worktreeId: 'wt-remote'
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      await flushEffects()
+
+      expect(states.at(-1)).toMatchObject({
+        files: ['src/target.ts'],
+        totalCount: 1,
+        truncated: false,
+        workspacePathSearch: {
+          generationId: 'generation-1',
+          retainedCount: 1,
+          count: { value: 1, provenance: 'exact-snapshot' }
+        }
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('coalesces a replacement behind the in-flight query and ignores the obsolete reply', async () => {
     vi.useFakeTimers()
     seedRemoteWorktree()
     const states: RuntimeFileListState[] = []
@@ -538,7 +746,7 @@ describe('useRuntimeFileListForWorktree', () => {
         query: 'tar',
         worktreeId: 'wt-remote'
       })
-      await act(async () => vi.advanceTimersByTimeAsync(120))
+      await act(async () => vi.advanceTimersByTimeAsync(16))
       const firstSignal = searchRuntimeFilePathsMock.mock.calls[0]?.[1].signal as AbortSignal
 
       await act(async () => {
@@ -551,19 +759,22 @@ describe('useRuntimeFileListForWorktree', () => {
           })
         )
       })
-      expect(firstSignal.aborted).toBe(true)
-      await act(async () => vi.advanceTimersByTimeAsync(120))
+      expect(firstSignal.aborted).toBe(false)
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        resolveFirst({ files: ['src/stale-target.ts'], truncated: true })
+        await Promise.resolve()
+      })
+      expect(states.at(-1)?.files).toEqual([])
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledTimes(2)
 
       await act(async () => {
         resolveSecond({ files: ['src/target.ts'], truncated: false })
         await Promise.resolve()
       })
       expect(states.at(-1)?.files).toEqual(['src/target.ts'])
-
-      await act(async () => {
-        resolveFirst({ files: ['src/stale-target.ts'], truncated: true })
-        await Promise.resolve()
-      })
       expect(states.at(-1)).toMatchObject({
         files: ['src/target.ts'],
         truncated: false
@@ -573,107 +784,62 @@ describe('useRuntimeFileListForWorktree', () => {
     }
   })
 
-  it('never renders the previous listing once the remote query changes', async () => {
+  it('rejects an old response when a query returns to the same request key', async () => {
     vi.useFakeTimers()
     seedRemoteWorktree()
     const states: RuntimeFileListState[] = []
-    searchRuntimeFilePathsMock.mockResolvedValue({
-      files: ['src/tar.ts'],
-      totalCount: 1,
-      truncated: true
-    })
+    let resolveFirst!: (value: { files: string[]; truncated: boolean }) => void
+    let resolveLatest!: (value: { files: string[]; truncated: boolean }) => void
+    searchRuntimeFilePathsMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveLatest = resolve
+          })
+      )
 
     try {
       const root = await renderProbe({
         enabled: true,
         onState: (state) => states.push(state),
         query: 'tar',
+        queryMode: 'name-filter',
         worktreeId: 'wt-remote'
       })
-      await act(async () => vi.advanceTimersByTimeAsync(120))
-      await flushEffects()
-      expect(states.at(-1)).toMatchObject({ files: ['src/tar.ts'], truncated: true })
-
-      const rendersBeforeChange = states.length
-      await act(async () => {
-        root.render(
-          createElement(HookProbe, {
-            enabled: true,
-            onState: (state: RuntimeFileListState) => states.push(state),
-            query: 'target',
-            worktreeId: 'wt-remote'
-          })
-        )
-      })
-
-      // Why: the render before the effect restarts the request is the one that can leak.
-      expect(states.length).toBeGreaterThan(rendersBeforeChange)
-      for (const state of states.slice(rendersBeforeChange)) {
-        expect(state).toMatchObject({ files: [], loading: true, truncated: false })
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      for (const query of ['target', 'tar']) {
+        await act(async () => {
+          root.render(
+            createElement(HookProbe, {
+              enabled: true,
+              onState: (state) => states.push(state),
+              query,
+              queryMode: 'name-filter',
+              worktreeId: 'wt-remote'
+            })
+          )
+        })
       }
+      await act(async () => {
+        resolveFirst({ files: ['src/obsolete.tar.ts'], truncated: false })
+        await Promise.resolve()
+      })
+      expect(states.at(-1)?.files).toEqual([])
+      await act(async () => vi.advanceTimersByTimeAsync(16))
+      expect(searchRuntimeFilePathsMock).toHaveBeenCalledTimes(2)
+      await act(async () => {
+        resolveLatest({ files: ['src/current.tar.ts'], truncated: false })
+        await Promise.resolve()
+      })
+      expect(states.at(-1)?.files).toEqual(['src/current.tar.ts'])
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('reports the new remote query as loading after the previous one failed', async () => {
-    vi.useFakeTimers()
-    seedRemoteWorktree()
-    const states: RuntimeFileListState[] = []
-    searchRuntimeFilePathsMock.mockRejectedValue(new Error('scan failed'))
-
-    try {
-      const root = await renderProbe({
-        enabled: true,
-        onState: (state) => states.push(state),
-        query: 'tar',
-        worktreeId: 'wt-remote'
-      })
-      await act(async () => vi.advanceTimersByTimeAsync(120))
-      await flushEffects()
-      expect(states.at(-1)).toMatchObject({ files: [], loading: false, loadError: 'scan failed' })
-
-      const rendersBeforeChange = states.length
-      await act(async () => {
-        root.render(
-          createElement(HookProbe, {
-            enabled: true,
-            onState: (state: RuntimeFileListState) => states.push(state),
-            query: 'target',
-            worktreeId: 'wt-remote'
-          })
-        )
-      })
-
-      expect(states.length).toBeGreaterThan(rendersBeforeChange)
-      for (const state of states.slice(rendersBeforeChange)) {
-        expect(state).toMatchObject({ files: [], loading: true })
-      }
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('keeps the unscoped local listing while the query is empty', async () => {
-    const workspaceKey = folderWorkspaceKey('folder-workspace-1')
-    useAppStore.setState({
-      folderWorkspaces: [makeFolderWorkspace()],
-      projectGroups: [makeProjectGroup()],
-      repos: [],
-      worktreesByRepo: {}
-    } as Partial<AppState>)
-    const states: RuntimeFileListState[] = []
-
-    await renderProbe({
-      enabled: true,
-      onState: (state) => states.push(state),
-      query: '',
-      worktreeId: workspaceKey
-    })
-    await waitForListRuntimeFilesCall()
-    await flushEffects()
-    expect(states.at(-1)?.files).toEqual(['packages/app/package.json'])
-
-    expect(searchRuntimeFilePathsMock).not.toHaveBeenCalled()
   })
 })
