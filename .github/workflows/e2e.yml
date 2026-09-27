@@ -185,8 +185,29 @@ jobs:
           pnpm exec playwright test --config tests/playwright.config.ts --project=electron-headless --test-list=ci-shards/selected.txt --list --reporter=json > ci-shards/selected-discovery.json
           node config/scripts/ci-e2e-shard-plan.mjs --verify ci-shards/assignment.json ci-shards/selected-discovery.json
 
+      # Why: this fork inherits upstream's scheduled failures — the same titles fail in stablyai/orca's
+      # own scheduled runs, and they are tracked in stablyai's Linear issues. There the verdict step
+      # below owns this shard's result, so the inherited red set stops emailing while a failure that is
+      # not recorded as known still fails the run. Upstream keeps Playwright's exit code and its policy
+      # of leaving those tests enabled.
       - name: Run E2E tests (${{ matrix.shard_name }})
-        run: xvfb-run --auto-servernum bash .github/scripts/e2e-with-window-manager.sh env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay" pnpm run test:e2e --test-list=ci-shards/selected.txt
+        id: run-e2e
+        continue-on-error: ${{ github.repository != 'stablyai/orca' }}
+        run: |
+          if [ "${{ github.repository }}" != "stablyai/orca" ]; then
+            # Why the absolute path: Playwright resolves a relative reporter output name against
+            # the config file's directory (tests/), not the workspace root.
+            export PLAYWRIGHT_JSON_OUTPUT_NAME="$GITHUB_WORKSPACE/ci-shards/report.json"
+            REPORT_ARGS=(--reporter=list,json)
+          fi
+          xvfb-run --auto-servernum bash .github/scripts/e2e-with-window-manager.sh env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay" pnpm run test:e2e --test-list=ci-shards/selected.txt "${REPORT_ARGS[@]}"
+
+      # Why the report is the verdict's input, not Playwright's exit code: a known title that fails
+      # must not fail the run, and a missing report must, so a crashed or timed-out run cannot pass
+      # as green.
+      - name: Verdict on known failures (${{ matrix.shard_name }})
+        if: ${{ github.repository != 'stablyai/orca' && steps.run-e2e.outcome != 'skipped' }}
+        run: node local/check-e2e-known-failure-titles.mjs ci-shards/report.json local/e2e-known-failure-titles.json
 
       - name: Upload E2E shard assignment
         if: always()
@@ -206,9 +227,11 @@ jobs:
 
       # Why: Playwright retains traces/screenshots only on failure. Uploading
       # them as an artifact makes post-mortem debugging on CI possible without
-      # re-running locally.
+      # re-running locally. This reads the step outcome rather than
+      # `failure()`, because a fork quarantines known failures without failing the
+      # step's conclusion.
       - name: Upload Playwright traces
-        if: failure()
+        if: steps.run-e2e.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-${{ matrix.shard_name }}
