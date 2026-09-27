@@ -143,7 +143,6 @@ export function useWorktreeJumpPaletteWorktrees({
       kindFilteredWorktrees,
       pairedDeviceIdsByEnvironment,
       ptyIdsByTabId,
-      repoMap,
       showSleepingWorkspaces,
       tabsByWorktree,
       worktreeIdsWithLiveAgent,
