@@ -654,6 +654,29 @@ Fork-only helper scripts live in `local/`:
 
 - `local/branch-status.mjs` — live status of every branch (SHAs, fork presence, own delta, PR).
 
+#### `local(ci)`: the scheduled E2E known-failure ratchet
+
+Upstream's scheduled E2E is red in upstream's own repository — the same handful of titles fail on every
+run and are tracked in stablyai's Linear issues, and their triage policy is to leave those tests enabled.
+A fork inherits both the tests and the red, so this fork ratchets instead of emailing twice a day:
+`local/e2e-known-failure-titles.json` records the titles observed failing in scheduled runs, and
+`local/check-e2e-known-failure-titles.mjs` reads the shard's Playwright JSON report and fails the run only
+for a failure that is **not** recorded. Every entry carries how many of the sampled runs hit it and whether
+the same title failed in an upstream scheduled run, so the list never claims more attribution than it has.
+
+What it deliberately does not do:
+
+- The PR lane (`changed-e2e`) is untouched: a pull request still fails on any spec it runs.
+- A title outside the list still fails the run, which is the point — that is how the tab-bar
+  quick-launch regression reached this fork.
+- A missing or unreadable report fails the verdict, so a crashed or timed-out run cannot pass as green.
+- Upstream is untouched: the wiring is guarded on `github.repository` there, and Playwright's exit code
+  stays in charge.
+
+Maintenance is the honest part of a ratchet: prune an entry once it stops failing, and the verdict notes
+the recorded titles that passed in its shard (a notice, not a warning — they are intermittent, so one
+passing shard is not a fix).
+
 ### `local(hooks)`: refuse fork-only commits on a PR branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is

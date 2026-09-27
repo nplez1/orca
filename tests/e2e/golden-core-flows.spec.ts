@@ -312,7 +312,7 @@ async function waitForTerminalPaneManager(page: Page): Promise<void> {
 
 async function createTerminalTabThroughMenu(page: Page): Promise<void> {
   const tabIdsBefore = await renderedTabIds(page)
-  await page.getByRole('button', { name: 'New tab' }).click({ force: true })
+  await page.getByRole('button', { name: 'New tab', exact: true }).click({ force: true })
   const newTerminalMenuItem = page.getByRole('menuitem', { name: /New Terminal/i }).first()
   await newTerminalMenuItem.click({ force: true })
   await expect.poll(() => countRenderedTabs(page), { timeout: 5_000 }).toBe(tabIdsBefore.length + 1)

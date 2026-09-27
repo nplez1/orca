@@ -47,6 +47,7 @@ export function TabBarDefaultAgentButton({
   const agentLabel = getAgentCatalog().find((entry) => entry.id === agent)?.label ?? agent
   const isLaunchPending =
     isAgentSessionHandleProvider(agent) && structuredLaunchStatusByAgent[agent] === 'pending'
+  // Why: this label may name a new tab; the "+" button owns the exact "New tab" name E2E matches.
   const label = translate(
     'auto.components.tab.bar.TabBarDefaultAgentButton.2a0cbdc8a1',
     'Open {{value0}} in a new tab',

@@ -75,6 +75,19 @@ async function statusEvidence(page: Page, environmentId?: string) {
   }, environmentId)
 }
 
+/**
+ * Why: this fork's "Group by branch" setting defaults on and merges the master rows below —
+ * one worktree per host — into a single card that shows one host, while this spec asserts a
+ * card per host. Turn it off on each paired renderer so the sidebar keeps the ungrouped shape
+ * the upstream contract is written against; the merged card itself is covered by the sidebar
+ * branch-group tests.
+ */
+async function disableBranchGrouping(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.__store?.getState().setMergeSameBranchWorkspaces(false)
+  })
+}
+
 async function expectWorkspaceHostAppearance(
   page: Page,
   disconnected: boolean,
@@ -124,6 +137,7 @@ for (const topology of ['desktop', 'headless'] as const) {
           }, testRepoPath))
       proxy = await interruptibleHost(offer)
       client = await launchPairedElectronClient(offer, testInfo, 'Direct host')
+      await disableBranchGrouping(client.page)
       proxy.setOnline(false)
       const offlineId = await client.page.evaluate(async (pairingCode) => {
         const { environment } = await window.api.runtimeEnvironments.addFromPairingCode({
@@ -150,6 +164,7 @@ for (const topology of ['desktop', 'headless'] as const) {
       await expect(client.page.getByText('Recovering host', { exact: true }).first()).toBeVisible()
       await client.page.screenshot({ path: testInfo.outputPath(`${topology}-recovered.png`) })
       browser = await launchPairedWebClient(electronApp, proxy.offer)
+      await disableBranchGrouping(browser.page)
       await expect
         .poll(() => statusEvidence(browser!.page), { timeout: 30_000 })
         .toMatchObject({ verification: 'verified', transport: 'ready' })
