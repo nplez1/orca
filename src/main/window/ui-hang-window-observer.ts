@@ -6,8 +6,11 @@
 // Listener lifetime follows the window: like every other observer installed in createMainWindow,
 // these die with the window and are not explicitly removed.
 
-import type { UiHangSurface } from '../../shared/ui-hang-diagnostics-types'
-import { recordMainUiHangSample } from '../diagnostics/ui-hang-log-sink'
+import type { UiHangLifecycleEvent, UiHangSurface } from '../../shared/ui-hang-diagnostics-types'
+import {
+  recordMainUiHangSample,
+  recordUiHangLifecycleMarker
+} from '../diagnostics/ui-hang-log-sink'
 
 /** Only the setting this observer reads, so tests can supply a stub store. */
 export type UiHangSettingsSource = {
@@ -16,7 +19,10 @@ export type UiHangSettingsSource = {
 
 /** The slice of BrowserWindow this observer needs, so tests can drive it without Electron. */
 export type UiHangObservableWindow = {
-  on(event: 'unresponsive' | 'responsive', listener: () => void): unknown
+  on(
+    event: 'unresponsive' | 'responsive' | 'focus' | 'blur' | 'show' | 'hide',
+    listener: () => void
+  ): unknown
   isDestroyed(): boolean
   isVisible(): boolean
 }
@@ -66,4 +72,22 @@ export function installUiHangWindowObserver(options: {
 
   window.on('unresponsive', onUnresponsive)
   window.on('responsive', onResponsive)
+  const lifecycleEvents: Record<'focus' | 'blur' | 'show' | 'hide', UiHangLifecycleEvent> = {
+    focus: 'window-focus',
+    blur: 'window-blur',
+    show: 'window-show',
+    hide: 'window-hide'
+  }
+  const recordLifecycle = (event: 'focus' | 'blur' | 'show' | 'hide'): (() => void) => {
+    const lifecycleEvent = lifecycleEvents[event]
+    return () => {
+      if (isEnabled()) {
+        recordUiHangLifecycleMarker(lifecycleEvent, 'main')
+      }
+    }
+  }
+  window.on('focus', recordLifecycle('focus'))
+  window.on('blur', recordLifecycle('blur'))
+  window.on('show', recordLifecycle('show'))
+  window.on('hide', recordLifecycle('hide'))
 }
