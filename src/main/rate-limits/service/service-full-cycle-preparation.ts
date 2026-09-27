@@ -13,51 +13,7 @@ import { fetchMiniMaxRateLimits } from '../minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
 import { fetchOpenCodeGoUsage } from '../opencode-go-usage-source-selection'
 import { RateLimitServiceFetchPolicy } from './service-fetch-policy'
-import type { SettledProviderResult } from './service-sibling-provider-result'
-import type {
-  ClaudeRuntimeAuthPreparation,
-  InternalRateLimitState,
-  NormalizedClaudeAccountSelectionTarget,
-  NormalizedCodexAccountSelectionTarget,
-  ProviderRateLimits
-} from './service-types'
-
-export type FetchAllCyclePrepared = {
-  claudeTarget: NormalizedClaudeAccountSelectionTarget
-  claudeGeneration: number
-  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
-  claudeProvenance: string
-  codexTarget: NormalizedCodexAccountSelectionTarget
-  previousState: InternalRateLimitState
-  codexFetchGated: boolean
-  codexStateBeforeFetch: ProviderRateLimits | null
-  codexProvenance: string | null
-  codexGeneration: number
-  opencodeConfigChanged: boolean
-  opencodeGeneration: number
-  miniMaxConfigChanged: boolean
-  miniMaxGeneration: number
-  deepSeekConfigChanged: boolean
-  deepSeekGeneration: number
-  fireworksConfigChanged: boolean
-  fireworksGeneration: number
-  copilotConfigChanged: boolean
-  copilotGeneration: number
-  claudeFetchGated: boolean
-  results: [
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>
-  ]
-  grokResultPromise: Promise<SettledProviderResult>
-  cursorResultPromise: Promise<SettledProviderResult>
-}
+import type { FetchAllCyclePrepared, ProviderRateLimits } from './service-types'
 
 export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServiceFetchPolicy {
   protected async prepareFetchAllCycle(

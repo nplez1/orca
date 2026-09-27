@@ -153,8 +153,8 @@ export class RuntimeJiraCommands {
     return getProjectStatusOrder(projectKey, siteId)
   }
 
-  jiraListBoards(siteId?: JiraSiteSelection): ReturnType<typeof listBoards> {
-    return listBoards(siteId)
+  jiraListBoards(siteId?: JiraSiteSelection, name?: string): ReturnType<typeof listBoards> {
+    return listBoards(siteId, name)
   }
 
   jiraListCustomFields(siteId?: JiraSiteSelection): ReturnType<typeof listCustomFields> {
