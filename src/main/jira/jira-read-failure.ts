@@ -1,15 +1,22 @@
 import type { JiraSiteSelection } from '../../shared/jira-types'
+import { acquire, release } from './request-queue'
 
 export type JiraIssueSearchFailure = {
   error: unknown
   auth: boolean
 }
 
-/** Run against one signal that trips on the caller's abort or the request deadline. */
+/**
+ * Run against one signal that trips on the caller's abort or the request deadline.
+ *
+ * `timeoutMessage` replaces the transport's abort error when the deadline (not the
+ * caller) fired, so a stalled read reaches the user as what it is.
+ */
 export async function withJiraDeadline<T>(
   signal: AbortSignal | undefined,
   timeoutMs: number,
-  run: (deadlineSignal: AbortSignal) => Promise<T>
+  run: (deadlineSignal: AbortSignal) => Promise<T>,
+  timeoutMessage?: string
 ): Promise<T> {
   const controller = new AbortController()
   const abort = (): void => controller.abort()
@@ -17,13 +24,48 @@ export async function withJiraDeadline<T>(
   if (signal?.aborted) {
     controller.abort()
   }
-  const timer = setTimeout(abort, timeoutMs)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    abort()
+  }, timeoutMs)
   try {
     return await run(controller.signal)
+  } catch (error) {
+    if (timedOut && timeoutMessage) {
+      throw new Error(timeoutMessage)
+    }
+    throw error
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', abort)
   }
+}
+
+/**
+ * Deadline-wrapped run that holds one shared Jira pool slot, released on every path.
+ *
+ * Why: a read that backs a settings select must end. Without the deadline a stalled
+ * request keeps its slot and leaves the select disabled with nothing to retry.
+ */
+export function withJiraQueuedDeadline<T>(
+  description: string,
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  return withJiraDeadline(
+    undefined,
+    timeoutMs,
+    async (signal) => {
+      await acquire(signal)
+      try {
+        return await run(signal)
+      } finally {
+        release()
+      }
+    },
+    `Jira ${description} request timed out.`
+  )
 }
 
 export function settleJiraSummaryRead<T>(read: Promise<T>, signal: AbortSignal): Promise<T> {
