@@ -43,12 +43,24 @@ jobs:
       - name: Install Electron package binary for tests
         run: node config/scripts/install-electron-package-binary.mjs
 
+      # Why: this fork owns the shard's verdict in the step below, because Vitest 4/5 fails a run
+      # whose tests all passed when a worker's console RPC is in flight as that worker closes
+      # (vitest-dev/vitest#11153) — a coin flip at shard 8 for every branch. Upstream keeps the
+      # exit code, so the guard and the report arguments are both fork-only.
       - name: Test shard
+        id: run-unit-shard
+        continue-on-error: ${{ github.repository != 'stablyai/orca' }}
         env:
           ORCA_BALANCE_UNIT_SHARDS: '1'
           ORCA_BACKGROUND_LAUNCH: '1'
         run: |
+          set -o pipefail
+          mkdir -p ci-shards
           export ORCA_SHARD_SOURCE_SHA="$(git rev-parse HEAD)"
+          REPORT_ARGS=()
+          if [ "${{ github.repository }}" != "stablyai/orca" ]; then
+            REPORT_ARGS=(--reporter=default --reporter=json --outputFile.json=ci-shards/unit-report.json)
+          fi
           pnpm exec vitest run --config config/vitest.config.ts \
             --exclude=src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts \
             --exclude=src/main/daemon/shell-ready.test.ts \
@@ -70,7 +82,15 @@ jobs:
             --exclude=tests/e2e/relay-region-compatibility.unit.test.ts \
             --exclude=tests/e2e/relay-region-correction.unit.test.ts \
             --exclude=tests/e2e/cross-version-wire/** \
-            --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+            "${REPORT_ARGS[@]}" \
+            --shard=${{ matrix.shard }}/${{ matrix.shard_total }} 2>&1 | tee ci-shards/unit-shard.log
+
+      # Why the report is the verdict's input, not Vitest's exit code: one tolerated teardown race
+      # must not fail the shard, while a test failure, another unhandled error, or a missing report
+      # still must, so a crashed or timed-out run cannot pass as green.
+      - name: Verdict on the unit shard
+        if: ${{ github.repository != 'stablyai/orca' && steps.run-unit-shard.outcome != 'skipped' }}
+        run: node local/check-unit-shard-verdict.mjs ci-shards/unit-report.json ci-shards/unit-shard.log "${{ steps.run-unit-shard.outcome }}"
 
       - name: Upload unit shard assignment
         if: always()
