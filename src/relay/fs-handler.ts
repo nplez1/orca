@@ -1,4 +1,5 @@
 import { pathsExistOnRelay } from './fs-path-existence'
+import { searchRelayNameFilterPaths } from './fs-handler-name-filter-search'
 import { tmpdir } from 'node:os'
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import type { RelayContext } from './context'
@@ -44,6 +45,10 @@ import {
   readAuthorizedDocPreviewFile,
   type DocPreviewFileAccessRequest
 } from '../shared/doc-preview-file-access'
+import {
+  RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
+  WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
+} from '../shared/workspace-path-search-capability'
 
 export class FsHandler {
   private dispatcher: RelayDispatcher
@@ -105,8 +110,13 @@ export class FsHandler {
     this.dispatcher.onRequest('fs.getCapabilities', async () => ({
       quickOpenSearchVersion: 1,
       rangedReadVersion: 1,
-      pathExistenceBatchVersion: 1
+      pathExistenceBatchVersion: 1,
+      [WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY]:
+        RELAY_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
     }))
+    this.dispatcher.onRequest('fs.searchPaths', (p, context) =>
+      searchRelayNameFilterPaths(p, context)
+    )
     this.dispatcher.onRequest('fs.listFiles', (p, c) => this.listFiles(p, c))
     this.dispatcher.onRequest('fs.workspaceSpaceScan', (p, c) => this.workspaceSpaceScan(p, c))
     this.dispatcher.onRequest('fs.watch', (p, context) =>

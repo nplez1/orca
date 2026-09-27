@@ -329,6 +329,11 @@ describe.skipIf(process.platform !== 'darwin')('parallel native builds', () => {
     await sleep(300)
     build.releaseExit()
     await waitFor(() => build.events().some(({ event }) => event === 'completed'))
+    await sleep(3_000)
+    build.child.stdout.resume()
+
+    const result = await build.closed
+    expect(result).toMatchObject({ code: 0, signal: null })
     const accepted = Math.max(
       ...build
         .events()
@@ -336,11 +341,6 @@ describe.skipIf(process.platform !== 'darwin')('parallel native builds', () => {
         .map(({ line }) => line)
     )
     expect(accepted).toBeGreaterThan(0)
-    await sleep(3_000)
-    build.child.stdout.resume()
-
-    const result = await build.closed
-    expect(result).toMatchObject({ code: 0, signal: null })
     const delivered = [...result.output.matchAll(/^\[computer\] line (\d+) /gm)].map((match) =>
       Number(match[1])
     )

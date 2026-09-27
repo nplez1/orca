@@ -23,6 +23,10 @@ import {
   browserUnavailableMessage
 } from '../../shared/runtime-types'
 import { MOBILE_WEB_BUNDLE_CAPABILITY } from '../../shared/mobile-web-bundle/mobile-web-bundle-capability'
+import {
+  RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
+  WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
+} from '../../shared/workspace-path-search-capability'
 import { loadBundledMobileWebBundle } from './bundled-mobile-web-bundle'
 import { runtimeTerminalDegradation } from './native-terminal-availability'
 import { isWindowsProcessStartTimeAvailable } from '../windows/windows-process-table'
@@ -145,6 +149,10 @@ export class OrcaRuntimeWithGetStatus extends OrcaRuntimeWithGetRuntimeId {
       // Why: headless orca serve cannot create/stream BrowserViews, so clients
       // must not treat browser panes as supported just because runtime RPC is up.
       capabilities,
+      pathSearchCapabilities: {
+        [WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY]:
+          RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
+      },
       ...(degradations.length > 0 ? { degradations } : {}),
       worktreeCreateIdempotency: { dedupeTtlMs: WORKTREE_CREATE_RESULT_TTL_MS },
       ...(windowsProcessStartTimeAvailable ? { windowsProcessStartTimeAvailable } : {}),

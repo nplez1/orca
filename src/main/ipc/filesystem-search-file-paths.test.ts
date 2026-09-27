@@ -138,11 +138,13 @@ describe('searchQuickOpenFilePaths', () => {
 
   it('counts every name-filter match while returning a bounded sorted page', async () => {
     const child = createMockProcess()
+    const onQueryMetrics = vi.fn()
     wslAwareSpawnMock.mockReturnValue(child)
     const promise = searchQuickOpenFilePaths('/repo', {} as Store, {
       query: 'target',
       limit: 2,
-      mode: 'name-filter'
+      mode: 'name-filter',
+      onQueryMetrics
     })
     await flushMicrotasks()
     child.stdout!.emit(
@@ -156,6 +158,15 @@ describe('searchQuickOpenFilePaths', () => {
       totalCount: 4,
       truncated: true
     })
+    expect(onQueryMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathsConsidered: 5,
+        candidates: 5,
+        verifications: 5,
+        queryGenerationDurationMs: expect.any(Number),
+        queryPathsDurationMs: expect.any(Number)
+      })
+    )
   })
 
   it('kills the host scan when a superseded query aborts', async () => {

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   handlers,
+  electronMock,
   store,
   dirEntry,
   REPO_PATH,
@@ -75,6 +76,9 @@ vi.mock(
 )
 
 import { registerFilesystemHandlers } from './filesystem'
+import { clearQuickOpenPathInventories } from './quick-open-path-inventory'
+import { hasLocalWorkspacePathIndex } from '../workspace-path-index/workspace-path-index-runtime'
+import { WORKSPACE_PATH_INDEX_DISABLE_ENV } from '../workspace-path-index/workspace-path-index-feature-switch'
 import {
   registerWorktreeRootsForRepo,
   invalidateAuthorizedRootsCache
@@ -83,6 +87,7 @@ import {
 describe('registerFilesystemHandlers', () => {
   beforeEach(() => {
     resetFilesystemIpcMocks()
+    clearQuickOpenPathInventories()
     // Reset module-level auth cache so each test starts with a fresh dirty
     // flag — prevents stale worktree data from a prior test's cache rebuild.
     invalidateAuthorizedRootsCache()
@@ -565,7 +570,109 @@ describe('registerFilesystemHandlers', () => {
     })
   })
 
-  it('fs:searchFilePaths returns a bounded local page with the exact match count', async () => {
+  it('exports instrumentation only from an unpackaged development host', async () => {
+    registerFilesystemHandlers(store as never)
+    const exportRecords = handlers.get('fs:exportWorkspacePathSearchInstrumentation')
+    const diagnosticsSummary = handlers.get('fs:getWorkspacePathSearchDiagnosticsSummary')
+
+    expect(exportRecords?.(null, undefined)).toEqual([])
+    expect(diagnosticsSummary?.(null, undefined)).toMatchObject({
+      queriesServed: 0,
+      strategies: { 'ordered-scan': 0, 'live-scan': 0 },
+      admissionRefusals: 0,
+      freshnessDowngrades: 0
+    })
+    electronMock.app.isPackaged = true
+    expect(() => exportRecords?.(null, undefined)).toThrow(
+      'Workspace path search diagnostics are available only in development.'
+    )
+    expect(() => diagnosticsSummary?.(null, undefined)).toThrow(
+      'Workspace path search diagnostics are available only in development.'
+    )
+  })
+
+  it('acquires and releases an authorized local path-inventory lease without listing files', async () => {
+    registerFilesystemHandlers(store as never)
+    const lifecycleListeners: (() => void)[] = []
+    const sender = {
+      id: 21,
+      once: (_event: string, listener: () => void) => lifecycleListeners.push(listener),
+      isDestroyed: () => false
+    }
+    const acquire = handlers.get('fs:acquireQuickOpenPathInventoryLease')
+    const release = handlers.get('fs:releaseQuickOpenPathInventoryLease')
+
+    const result = await acquire?.({ sender }, { rootPath: REPO_PATH, includeIgnoredFiles: false })
+    expect(result).toMatchObject({ leaseId: expect.any(String) })
+    if (
+      result === null ||
+      typeof result !== 'object' ||
+      !('leaseId' in result) ||
+      typeof result.leaseId !== 'string'
+    ) {
+      throw new Error('lease acquisition did not return a lease ID')
+    }
+    await release?.({ sender }, { leaseId: result.leaseId })
+    expect(lifecycleListeners).toHaveLength(2)
+  })
+
+  it('uses only complete live scans when the path-index kill switch is set', async () => {
+    const previous = process.env[WORKSPACE_PATH_INDEX_DISABLE_ENV]
+    process.env[WORKSPACE_PATH_INDEX_DISABLE_ENV] = '1'
+    searchQuickOpenFilePathsMock.mockResolvedValue({
+      paths: ['src/target.ts'],
+      totalCount: 1,
+      truncated: false
+    })
+    try {
+      registerFilesystemHandlers(store as never)
+      const lease = await handlers.get('fs:acquireQuickOpenPathInventoryLease')?.(
+        { sender: { id: 22, isDestroyed: () => false } },
+        { rootPath: REPO_PATH, includeIgnoredFiles: true }
+      )
+      expect(lease).toEqual({ leaseId: null })
+
+      await expect(
+        handlers.get('fs:searchFilePaths')!(
+          { sender: { id: 22 } },
+          { rootPath: REPO_PATH, query: 'target', mode: 'name-filter' }
+        )
+      ).resolves.toMatchObject({ files: ['src/target.ts'], totalCount: 1, truncated: false })
+      expect(searchQuickOpenFilePathsMock).toHaveBeenCalledOnce()
+      expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
+        REPO_PATH,
+        store,
+        expect.objectContaining({ mode: 'name-filter' })
+      )
+      expect(hasLocalWorkspacePathIndex(REPO_PATH)).toBe(false)
+      expect(
+        handlers.get('fs:getWorkspacePathSearchDiagnosticsSummary')?.(null, undefined)
+      ).toMatchObject({
+        strategies: { 'live-scan': 1 },
+        fallbackReasons: { 'feature-disabled': 1 }
+      })
+
+      searchQuickOpenFilePathsMock.mockClear()
+      await handlers.get('fs:searchFilePaths')!(null, {
+        rootPath: REPO_PATH,
+        query: 'trgt',
+        mode: 'quick-open'
+      })
+      expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
+        REPO_PATH,
+        store,
+        expect.objectContaining({ mode: 'quick-open' })
+      )
+    } finally {
+      if (previous === undefined) {
+        delete process.env[WORKSPACE_PATH_INDEX_DISABLE_ENV]
+      } else {
+        process.env[WORKSPACE_PATH_INDEX_DISABLE_ENV] = previous
+      }
+    }
+  })
+
+  it('routes a cold index through a complete live search fallback', async () => {
     searchQuickOpenFilePathsMock.mockResolvedValue({
       paths: ['src/a/b/drover.eve_schema'],
       totalCount: 3,
@@ -577,29 +684,53 @@ describe('registerFilesystemHandlers', () => {
       handlers.get('fs:searchFilePaths')!(
         { sender: { id: 1 } },
         {
-          rootPath: '/home/user/repo',
+          rootPath: REPO_PATH,
           query: 'drover',
           limit: 5_000,
           mode: 'name-filter',
-          requestToken: 'token-1'
+          requestToken: 'token-1',
+          consumerId: 'renderer-window',
+          consumerSequence: 7
         }
       )
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       files: ['src/a/b/drover.eve_schema'],
       totalCount: 3,
-      truncated: true
+      truncated: true,
+      workspacePathSearch: {
+        requestIdentity: {
+          consumer: { consumerId: 'renderer-window', sequence: 7 }
+        },
+        rows: [{ relativePath: 'src/a/b/drover.eve_schema' }],
+        count: { value: 3, provenance: 'exact-snapshot' },
+        state: {
+          coverage: 'complete',
+          freshness: 'no-known-gap',
+          countProvenance: 'exact-snapshot',
+          searchComplete: true
+        },
+        degradationReason: 'uncovered-scope'
+      }
     })
 
-    expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
-      '/home/user/repo',
-      store,
-      expect.objectContaining({
-        query: 'drover',
-        limit: 5_000,
-        mode: 'name-filter',
-        signal: expect.any(AbortSignal)
-      })
-    )
+    expect(searchQuickOpenFilePathsMock).toHaveBeenCalledOnce()
+  })
+
+  it('fs:searchFilePaths rejects malformed renderer consumer identities', async () => {
+    registerFilesystemHandlers(store as never)
+
+    await expect(
+      handlers.get('fs:searchFilePaths')!(
+        { sender: { id: 1 } },
+        {
+          rootPath: REPO_PATH,
+          query: 'target',
+          mode: 'name-filter',
+          consumerId: 'renderer-window',
+          consumerSequence: 1.5
+        }
+      )
+    ).rejects.toThrow('consumer identity is invalid')
   })
 
   it('fs:searchFilePaths clamps a caller limit to the shared listing ceiling', async () => {

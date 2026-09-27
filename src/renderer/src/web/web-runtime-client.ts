@@ -90,7 +90,7 @@ export class WebRuntimeClient {
   call(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number }
+    options?: { timeoutMs?: number; signal?: AbortSignal }
   ): Promise<RuntimeRpcResponse<unknown>> {
     return method === 'status.get' && this.statusOwner
       ? this.statusOwner.refresh(options)

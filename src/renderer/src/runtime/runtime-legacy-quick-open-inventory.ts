@@ -4,7 +4,11 @@ import {
   buildExcludePathPrefixes,
   shouldExcludeQuickOpenRelPath
 } from '../../../shared/quick-open-filter'
-import { QuickOpenPathRanker } from '../../../shared/quick-open-path-search'
+import {
+  NameFilterPathMatcher,
+  QuickOpenPathRanker,
+  type PathSearchMode
+} from '../../../shared/quick-open-path-search'
 import { callRuntimeRpc, type RuntimeClientTarget } from './runtime-rpc-client'
 import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
@@ -170,6 +174,7 @@ export async function searchLegacyQuickOpenInventory(args: {
   worktreePath: string | null | undefined
   excludePaths: string[] | undefined
   signal?: AbortSignal
+  mode?: PathSearchMode
 }): Promise<FilePathSearchResult> {
   const result = await loadLegacyQuickOpenInventory(
     args.target,
@@ -181,16 +186,21 @@ export async function searchLegacyQuickOpenInventory(args: {
     args.worktreePath ?? result.rootPath,
     args.excludePaths
   )
-  const ranker = new QuickOpenPathRanker(args.query, args.limit)
+  const ranker =
+    args.mode === 'name-filter'
+      ? new NameFilterPathMatcher(args.query, args.limit)
+      : new QuickOpenPathRanker(args.query, args.limit)
   for (const entry of result.files) {
     if (!shouldExcludeQuickOpenRelPath(entry.relativePath, excludePrefixes)) {
       ranker.consider(entry.relativePath)
     }
   }
   const matches = ranker.result()
-  return {
-    files: matches.paths,
-    totalCount: matches.totalCount,
-    truncated: result.truncated || matches.totalCount > args.limit
-  }
+  return args.mode === 'name-filter'
+    ? { files: matches.paths, totalCount: null, truncated: true }
+    : {
+        files: matches.paths,
+        totalCount: matches.totalCount,
+        truncated: result.truncated || matches.totalCount > args.limit
+      }
 }

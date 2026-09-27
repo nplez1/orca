@@ -1,150 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
-import { isDotfileRelativePath } from './file-explorer-entries'
-import type { DirCache, TreeNode } from './file-explorer-types'
+import type { DirCache } from './file-explorer-types'
 import {
   createFileExplorerRowProjectionFromParts,
   type FileExplorerRowProjection
 } from './file-explorer-row-projection'
-import { buildIgnoredSet, isPathIgnored } from './status-display'
+import { buildIgnoredSet } from './status-display'
 import {
-  createNameFilteredFileExplorerProjection,
   getFileExplorerNameFilterExpandedPaths,
   getFileExplorerNameFilterIgnoredQueryRelativePaths,
   type FileExplorerNameFilterProjectionSource
 } from './file-explorer-name-filter-projection'
+import {
+  createVisibleFileExplorerRowProjection,
+  getFileExplorerIgnoredQueryRelativePaths,
+  useContentStableRelativePaths
+} from './file-explorer-visible-row-projection-build'
 import { useFileExplorerIgnoredPaths } from './use-file-explorer-ignored-paths'
+import { useFileExplorerChunkedProjection } from './use-file-explorer-chunked-projection'
+import { recordRendererPathSearchCommit } from './file-explorer-name-filter-timing'
+
+export {
+  createVisibleFileExplorerRowProjection,
+  getFileExplorerIgnoredQueryRelativePaths
+} from './file-explorer-visible-row-projection-build'
 
 const EMPTY_RELATIVE_PATHS: string[] = []
-
-type VisibleFileExplorerRowProjectionOptions = {
-  ignoredSet: Set<string>
-  nameFilter?: FileExplorerNameFilterProjectionSource | null
-  nameFilterCollapsedPaths?: ReadonlySet<string> | null
-  showDotfiles: boolean
-  showGitIgnoredFiles: boolean
-}
-
-type VisibleFileExplorerRowProjectionInput = {
-  dirCache: Record<string, DirCache>
-  expanded: Set<string>
-  worktreePath: string | null
-}
-
-export function getFileExplorerIgnoredQueryRelativePaths(
-  input: VisibleFileExplorerRowProjectionInput,
-  showDotfiles: boolean
-): string[] {
-  const { dirCache, expanded, worktreePath } = input
-  if (!worktreePath) {
-    return []
-  }
-
-  const relativePaths: string[] = []
-  const visitChildren = (parentPath: string): void => {
-    const cached = dirCache[parentPath]
-    if (!cached?.children) {
-      return
-    }
-    for (const row of cached.children) {
-      if (!showDotfiles && isDotfileRelativePath(row.relativePath)) {
-        continue
-      }
-      relativePaths.push(row.relativePath)
-      if (row.isDirectory && expanded.has(row.path)) {
-        visitChildren(row.path)
-      }
-    }
-  }
-  visitChildren(worktreePath)
-  return relativePaths
-}
-
-export function createVisibleFileExplorerRowProjection(
-  input: VisibleFileExplorerRowProjectionInput,
-  options: VisibleFileExplorerRowProjectionOptions
-): FileExplorerRowProjection {
-  const { dirCache, expanded, worktreePath } = input
-  const visibleFlatRows: TreeNode[] = []
-  const rowsByPath = new Map<string, TreeNode>()
-  if (!worktreePath) {
-    return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
-  }
-  if (options.nameFilter) {
-    return createNameFilteredFileExplorerProjection({
-      collapsedPaths: options.nameFilterCollapsedPaths ?? undefined,
-      ignoredSet: options.ignoredSet,
-      nameFilter: options.nameFilter,
-      showDotfiles: options.showDotfiles,
-      showGitIgnoredFiles: options.showGitIgnoredFiles,
-      worktreePath
-    })
-  }
-
-  const shouldHideRow = (row: TreeNode): boolean => {
-    if (!options.showDotfiles && isDotfileRelativePath(row.relativePath)) {
-      return true
-    }
-    return !options.showGitIgnoredFiles && isPathIgnored(options.ignoredSet, row.relativePath)
-  }
-
-  const visitChildren = (parentPath: string): void => {
-    const cached = dirCache[parentPath]
-    if (!cached?.children) {
-      return
-    }
-    for (const row of cached.children) {
-      if (shouldHideRow(row)) {
-        continue
-      }
-      visibleFlatRows.push(row)
-      rowsByPath.set(row.path, row)
-      if (row.isDirectory && expanded.has(row.path)) {
-        visitChildren(row.path)
-      }
-    }
-  }
-  visitChildren(worktreePath)
-
-  return createFileExplorerRowProjectionFromParts(visibleFlatRows, rowsByPath)
-}
-
-function relativePathListsEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) {
-    return false
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {
-      return false
-    }
-  }
-  return true
-}
-
-/**
- * Holds the array identity while its contents are unchanged.
- *
- * Why: a tree refresh commits dirCache once per read wave, and every commit
- * rebuilds this list. Each new identity would re-issue the uncancellable git
- * check-ignore over the whole visible tree — the remote round trips the wave cap
- * exists to bound.
- */
-function useContentStableRelativePaths(relativePaths: string[], enabled: boolean): string[] {
-  // Why: filters need fresh identities per keystroke and must not evict the tree signature.
-  const prevRef = useRef<string[] | null>(null)
-  const prev = prevRef.current
-  // Why publish `stable`, not `relativePaths`: the ref must hold what this hook actually
-  // returned. Publishing the input instead leaves the ref one commit behind, so a wave of
-  // content-equal arrays flips identity on every render — the churn this hook exists to stop.
-  const stable =
-    enabled && prev && relativePathListsEqual(prev, relativePaths) ? prev : relativePaths
-  // Why write-in-effect: render must stay pure (react-doctor); the first commit of a new
-  // list loses stability, never staleness.
-  useEffect(() => {
-    prevRef.current = stable
-  }, [stable])
-  return stable
-}
+const EMPTY_FILTERED_PROJECTION = createFileExplorerRowProjectionFromParts([], new Map())
 
 export function useFileExplorerVisibleRowProjection(
   activeWorktreeId: string | null,
@@ -157,6 +39,8 @@ export function useFileExplorerVisibleRowProjection(
   nameFilterCollapsedPaths: ReadonlySet<string> | null = null
 ): {
   rowProjection: FileExplorerRowProjection
+  projectionPending: boolean
+  projectionError: 'budget' | 'failed' | null
   ignoredByRelativePath: Set<string>
   showGitIgnoredFiles: boolean
   nameFilterExpandedPaths: Set<string>
@@ -189,8 +73,7 @@ export function useFileExplorerVisibleRowProjection(
       worktreePath
     ]
   )
-  // Why: the name-filter list is debounced per keystroke, so it must keep a fresh
-  // identity; only the dirCache-derived list needs stability across wave commits.
+  // Why: filtered pages change per query; only browse-cache paths need wave stability.
   const relativePaths = useContentStableRelativePaths(rebuiltRelativePaths, !nameFilter)
   const canLoadIgnoredPaths =
     activeRepoSupportsGit &&
@@ -212,21 +95,19 @@ export function useFileExplorerVisibleRowProjection(
       ),
     [effectiveIgnoredPaths, hostIgnoredPaths, hostProvidesIgnoredPaths]
   )
-  const rowProjection = useMemo(
+  const projectionArgs = useMemo(
     () =>
-      createVisibleFileExplorerRowProjection(
-        { dirCache, expanded, worktreePath },
-        {
-          ignoredSet,
-          nameFilter,
-          nameFilterCollapsedPaths,
-          showDotfiles,
-          showGitIgnoredFiles
-        }
-      ),
+      nameFilter && worktreePath
+        ? {
+            collapsedPaths: nameFilterCollapsedPaths ?? undefined,
+            ignoredSet,
+            nameFilter,
+            showDotfiles,
+            showGitIgnoredFiles,
+            worktreePath
+          }
+        : null,
     [
-      dirCache,
-      expanded,
       ignoredSet,
       nameFilter,
       nameFilterCollapsedPaths,
@@ -235,6 +116,71 @@ export function useFileExplorerVisibleRowProjection(
       worktreePath
     ]
   )
+  const projectionContextKey = JSON.stringify({
+    owner: nameFilter?.operationOwner,
+    scope: nameFilter?.scopeIdentity,
+    root: worktreePath,
+    showDotfiles,
+    showGitIgnoredFiles
+  })
+  const {
+    filteredProjection,
+    projectionPending,
+    projectionError: currentProjectionError
+  } = useFileExplorerChunkedProjection({ nameFilter, projectionArgs, projectionContextKey })
+  const lastFilteredProjectionRef = useRef<{
+    contextKey: string
+    projection: FileExplorerRowProjection
+  } | null>(null)
+  useLayoutEffect(() => {
+    if (!nameFilter) {
+      lastFilteredProjectionRef.current = null
+    }
+  }, [nameFilter])
+  const ordinaryProjection = useMemo(
+    () =>
+      nameFilter
+        ? EMPTY_FILTERED_PROJECTION
+        : createVisibleFileExplorerRowProjection(
+            { dirCache, expanded, worktreePath },
+            {
+              ignoredSet,
+              showDotfiles,
+              showGitIgnoredFiles
+            }
+          ),
+    [dirCache, expanded, ignoredSet, nameFilter, showDotfiles, showGitIgnoredFiles, worktreePath]
+  )
+  const previousFilteredProjection =
+    lastFilteredProjectionRef.current?.contextKey === projectionContextKey
+      ? lastFilteredProjectionRef.current.projection
+      : null
+  const rowProjection = nameFilter
+    ? (filteredProjection ?? previousFilteredProjection ?? EMPTY_FILTERED_PROJECTION)
+    : ordinaryProjection
+  useLayoutEffect(() => {
+    if (filteredProjection) {
+      lastFilteredProjectionRef.current = {
+        contextKey: projectionContextKey,
+        projection: filteredProjection
+      }
+    }
+    if (
+      nameFilter?.correlationId &&
+      !nameFilter.previousResults &&
+      !nameFilter.searching &&
+      !projectionPending
+    ) {
+      recordRendererPathSearchCommit(nameFilter.correlationId)
+    }
+  }, [
+    filteredProjection,
+    projectionContextKey,
+    nameFilter?.correlationId,
+    nameFilter?.previousResults,
+    nameFilter?.searching,
+    projectionPending
+  ])
   const nameFilterExpandedPaths = useMemo(
     () => getFileExplorerNameFilterExpandedPaths(rowProjection, nameFilter?.query ?? ''),
     [nameFilter?.query, rowProjection]
@@ -249,6 +195,8 @@ export function useFileExplorerVisibleRowProjection(
 
   return {
     rowProjection,
+    projectionPending,
+    projectionError: currentProjectionError,
     ignoredByRelativePath,
     showGitIgnoredFiles,
     nameFilterExpandedPaths,

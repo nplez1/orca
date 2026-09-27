@@ -1,3 +1,5 @@
+import type { WorkspacePathSearchResponse } from './workspace-path-search-contract'
+
 /**
  * Reply of a query-scoped path search. The host counts every match it scanned and returns
  * a bounded page, so a caller can report a partial result honestly instead of implying the
@@ -13,4 +15,6 @@ export type FilePathSearchResult = {
    * Undefined means the host could not classify them, and the caller must resolve it itself.
    */
   ignoredFiles?: string[]
+  /** Present for negotiated runtime/relay searches and legacy partial fallbacks. */
+  workspacePathSearch?: WorkspacePathSearchResponse
 }

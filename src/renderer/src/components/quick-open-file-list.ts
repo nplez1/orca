@@ -1,9 +1,17 @@
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: quick-open file lists are fetched over local or SSH runtime IPC, so loading/error/results track the request lifecycle. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { createBrowserUuid } from '@/lib/browser-uuid'
-import { isQuickOpenRemoteQueryTooLarge } from '@/components/quick-open-search'
+import {
+  isQuickOpenQueryTooLarge,
+  isQuickOpenRemoteQueryTooLarge
+} from '@/components/quick-open-search'
 import type { PathSearchMode } from '../../../shared/quick-open-path-search'
+import type { RuntimeFileListState } from './runtime-file-list-state'
+import { createRuntimePathSearchScheduler } from './runtime-path-search-scheduler'
+import { startRuntimeUnscopedFileListing } from './runtime-file-listing-fallback'
+import { resolveRuntimeFileListDerivedState } from './runtime-file-list-derived-state'
+import { useRuntimePathSearchSchedulerLifecycle } from './use-runtime-path-search-scheduler-lifecycle'
+import { NO_LISTING, scheduleRuntimeFilePathSearch } from './runtime-path-search-request'
 import { getRuntimeFileListTarget } from './runtime-file-list-scan-target'
 
 export {
@@ -16,18 +24,6 @@ export type {
   NestedWorktreeExcludeRequest,
   RuntimeFileListTarget
 } from './runtime-file-list-scan-target'
-import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listing-limits'
-import {
-  cancelRuntimeFileList,
-  listRuntimeFiles,
-  searchRuntimeFilePaths
-} from '@/runtime/runtime-file-client'
-import { debounceRuntimeFileRequest } from '@/runtime/runtime-file-request-debounce'
-import { splitFileNameFilterTokens } from '../../../shared/file-name-filter-tokens'
-import {
-  nextCappedLocalListing,
-  type CappedLocalListing
-} from '@/components/quick-open-capped-local-listing'
 import { useAppStore } from '@/store'
 import { useWorktreesForRepo } from '@/store/selectors'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
@@ -37,41 +33,7 @@ import {
   getFileExplorerOperationRoute
 } from '@/components/right-sidebar/file-explorer-operation-owner'
 
-export type RuntimeFileListState = {
-  files: string[]
-  loading: boolean
-  loadError: string | null
-  truncated?: boolean
-  /** Exact match count a query-scoped host search scanned; null for an unscoped listing. */
-  totalCount?: number | null
-  /**
-   * Subset of `files` the host already knows are gitignored, when it answered from its path
-   * inventory. Undefined means the caller must resolve ignored status itself.
-   */
-  ignoredFiles?: string[]
-  operationOwner?: FileExplorerOperationOwner
-}
-
-/** Files settled for one request key; local listings key without the query, so they answer every query. */
-type RuntimeFileListing = {
-  requestKey: string
-  files: string[]
-  totalCount: number | null
-  ignoredFiles?: string[]
-  truncated: boolean
-}
-
-const NO_LISTING: RuntimeFileListing = {
-  requestKey: '',
-  files: [],
-  totalCount: null,
-  truncated: false
-}
-
-export function cleanRuntimeFileListError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error)
-  return raw.replace(/^Error invoking remote method '[^']+':\s*Error:\s*/, '')
-}
+export type { RuntimeFileListState }
 
 export function useRuntimeFileListForWorktree({
   enabled,
@@ -79,8 +41,9 @@ export function useRuntimeFileListForWorktree({
   query,
   queryMode = 'quick-open',
   queryLimit = 32,
-  hostFilterWhenCapped = false,
-  includeIgnoredFiles
+  includeIgnoredFiles,
+  includeDotfiles = true,
+  queryInputAt
 }: {
   enabled: boolean
   worktreeId: string | null
@@ -89,10 +52,16 @@ export function useRuntimeFileListForWorktree({
   queryMode?: PathSearchMode
   /** Bounded page size for a query-scoped search. */
   queryLimit?: number
-  /** When a local listing hits its cap, re-list with `query` applied as the Explorer name filter on the host. */
+  /**
+   * Retained for the Explorer caller. A local typed query is always answered by the index-backed
+   * host path search, so the capped-listing host re-list this once gated is superseded.
+   */
   hostFilterWhenCapped?: boolean
-  /** Scope for a query-scoped search; the Explore pane passes its show-ignored setting. */
+  /** Scope for a query-scoped search; the Explore pane passes its visibility settings. */
   includeIgnoredFiles?: boolean
+  includeDotfiles?: boolean
+  /** Renderer-monotonic timestamp captured by the controlled input change handler. */
+  queryInputAt?: number
 }): RuntimeFileListState {
   const worktree = useAppStore((state) =>
     // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
@@ -101,12 +70,20 @@ export function useRuntimeFileListForWorktree({
   const worktreePath = worktree?.path ?? null
   const repoWorktrees = useWorktreesForRepo(worktree?.repoId ?? null)
   const [listing, setListing] = useState(NO_LISTING)
-  const [loadingRequest, setLoadingRequest] = useState({ requestKey: '', loading: false })
+  const [visibleLoadingRequestKey, setVisibleLoadingRequestKey] = useState('')
+  const [requestOutcome, setRequestOutcome] = useState({
+    requestKey: '',
+    correlationId: '',
+    pending: false
+  })
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [cappedLocalListing, setCappedLocalListing] = useState<CappedLocalListing | null>(null)
   const [listedOperationOwner, setListedOperationOwner] = useState<FileExplorerOperationOwner>({
     kind: 'unresolved'
   })
+  const [searchScheduler] = useState(createRuntimePathSearchScheduler)
+  const consumerIdRef = useRef<string | null>(null)
+  const consumerSequenceRef = useRef(0)
+  const loadingTimerRef = useRef<number | null>(null)
 
   const target = useMemo(
     () => getRuntimeFileListTarget(worktreeId, worktreePath, repoWorktrees),
@@ -143,171 +120,193 @@ export function useRuntimeFileListForWorktree({
     activeTargetStatus === 'connecting' ||
     activeTargetStatus === 'deploying-relay' ||
     activeTargetStatus === 'reconnecting'
-  const usesRuntimePathSearch =
-    (runtimeEnvironmentId !== null || connectionId !== undefined) && query !== undefined
-  const remoteQuery = usesRuntimePathSearch ? query.trim() : ''
-  const remoteQueryTooLarge = usesRuntimePathSearch && isQuickOpenRemoteQueryTooLarge(remoteQuery)
-  const listingKey = `${worktreePath ?? ''}\n${operationOwnerKey}\n${excludeRequest.key}\n${activeTargetStatus ?? ''}`
-  // Why: a capped listing can omit matches, so only then pay for a host scan per query.
-  const hostNameFilter =
-    hostFilterWhenCapped &&
-    runtimeEnvironmentId === null &&
-    connectionId === undefined &&
-    cappedLocalListing?.key === listingKey &&
-    !cappedLocalListing.hostFilterFailed
-      ? splitFileNameFilterTokens(query ?? '').join(' ')
-      : ''
-  const requestKey = `${listingKey}${usesRuntimePathSearch ? `\n${remoteQuery}` : ''}${hostNameFilter ? `\nname-filter\n${hostNameFilter}` : ''}`
-  // Why: the render between a request change and the effect that starts the next request must
-  // not show the previous listing, so a listing is only visible for the request that produced it.
-  const currentListing = listing.requestKey === requestKey ? listing : NO_LISTING
-  const startsRequest =
+  const usesRuntimeEnvironmentRpc = runtimeEnvironmentId !== null
+  const hasRemoteHost = usesRuntimeEnvironmentRpc || connectionId !== undefined
+  const trimmedQuery = query?.trim() ?? ''
+  // Why: a remote host cannot browse unscoped, but a local workspace can — keeping the unscoped
+  // listing until the user types is what lets Quick Open show files the moment it opens.
+  const usesRuntimePathSearch = query !== undefined && (hasRemoteHost || trimmedQuery.length > 0)
+  const remoteQuery = usesRuntimePathSearch ? trimmedQuery : ''
+  const remoteQueryTooLarge =
+    usesRuntimePathSearch &&
+    // Why: a local search never crosses the host's compact remote frame, so it gets the byte limit.
+    (hasRemoteHost
+      ? isQuickOpenRemoteQueryTooLarge(remoteQuery)
+      : isQuickOpenQueryTooLarge(remoteQuery))
+  // Why: mirrors the unscoped listing effect's guard so its first render already reads as loading.
+  const browseListingPending =
+    !usesRuntimePathSearch &&
     enabled &&
     target.canList &&
     operationRouteAvailable &&
-    !(usesRuntimePathSearch && (remoteQuery.length === 0 || remoteQueryTooLarge))
-  // Why: in that same gap the effect has not flipped loading yet, so fall back to whether this
-  // render is going to start a request — otherwise the empty listing reads as "no results".
-  const loading = loadingRequest.requestKey === requestKey ? loadingRequest.loading : startsRequest
-
+    Boolean(worktreeId) &&
+    Boolean(worktreePath)
+  const requestDisplayScopeKey = useMemo(
+    () =>
+      JSON.stringify({
+        worktreePath,
+        operationOwnerKey,
+        excludeKey: excludeRequest.key,
+        targetStatus: activeTargetStatus ?? '',
+        queryMode,
+        includeIgnoredFiles: includeIgnoredFiles ?? true,
+        includeDotfiles
+      }),
+    [
+      activeTargetStatus,
+      excludeRequest.key,
+      includeDotfiles,
+      includeIgnoredFiles,
+      operationOwnerKey,
+      queryMode,
+      worktreePath
+    ]
+  )
+  const {
+    requestScopeKey,
+    requestKey,
+    currentListing,
+    previousResults,
+    searching,
+    pathSearchEnabled,
+    querySchedulerScope,
+    loading,
+    visibleLoadError
+  } = resolveRuntimeFileListDerivedState({
+    listing,
+    queryMode,
+    usesRuntimePathSearch,
+    remoteQuery,
+    remoteQueryTooLarge,
+    requestDisplayScopeKey,
+    queryLimit,
+    requestOutcome,
+    visibleLoadingRequestKey,
+    browseListingPending,
+    enabled,
+    targetCanList: target.canList,
+    operationRouteAvailable,
+    loadError
+  })
+  useRuntimePathSearchSchedulerLifecycle({
+    searchScheduler,
+    querySchedulerScope,
+    loadingTimerRef,
+    setVisibleLoadingRequestKey
+  })
   useEffect(() => {
-    if (!enabled) {
-      setCappedLocalListing(null)
-      setLoadingRequest({ requestKey, loading: false })
-      setListedOperationOwner({ kind: 'unresolved' })
+    if (!pathSearchEnabled || !worktreeId || !worktreePath) {
       return
     }
+    scheduleRuntimeFilePathSearch({
+      searchScheduler,
+      requestKey,
+      requestScopeKey,
+      requestDisplayScopeKey,
+      worktreeId,
+      worktreePath,
+      remoteQuery,
+      queryInputAt,
+      queryMode,
+      queryLimit,
+      connectionId,
+      runtimeEnvironmentId,
+      usesRuntimeEnvironmentRpc,
+      includeIgnoredFiles,
+      includeDotfiles,
+      excludePaths: excludeRequest.paths.length > 0 ? excludeRequest.paths : undefined,
+      consumerIdRef,
+      consumerSequenceRef,
+      operationOwnerRef,
+      loadingTimerRef,
+      setRequestOutcome,
+      setLoadError,
+      setVisibleLoadingRequestKey,
+      setListing,
+      setListedOperationOwner
+    })
+  }, [
+    connectionId,
+    excludeRequest,
+    includeDotfiles,
+    includeIgnoredFiles,
+    operationOwnerKey,
+    pathSearchEnabled,
+    queryInputAt,
+    queryLimit,
+    queryMode,
+    remoteQuery,
+    requestDisplayScopeKey,
+    requestKey,
+    requestScopeKey,
+    runtimeEnvironmentId,
+    searchScheduler,
+    usesRuntimeEnvironmentRpc,
+    worktreeId,
+    worktreePath
+  ])
 
+  useEffect(() => {
+    if (usesRuntimePathSearch) {
+      return
+    }
+    if (!enabled) {
+      setListedOperationOwner({ kind: 'unresolved' })
+      setVisibleLoadingRequestKey('')
+      return
+    }
     if (!target.canList || !worktreeId || !worktreePath || !operationRouteAvailable) {
       setListing(NO_LISTING)
       setListedOperationOwner({ kind: 'unresolved' })
       setLoadError(!operationRouteAvailable ? getFileExplorerOwnerUnresolvedMessage() : null)
-      setLoadingRequest({ requestKey, loading: false })
+      setVisibleLoadingRequestKey('')
       return
     }
 
-    let cancelled = false
-    setLoadError(null)
-
-    if (usesRuntimePathSearch && (remoteQuery.length === 0 || remoteQueryTooLarge)) {
-      setListing(NO_LISTING)
-      setLoadingRequest({ requestKey, loading: false })
-      setListedOperationOwner(operationOwnerRef.current)
-      return
-    }
-
-    setLoadingRequest({ requestKey, loading: true })
-
-    const excludePaths = excludeRequest.paths.length > 0 ? excludeRequest.paths : undefined
-    const requestToken = createBrowserUuid()
-    const requestAbortController = new AbortController()
-    const requestOperationOwner = operationOwnerRef.current
-    const requestContext = {
-      settings: { activeRuntimeEnvironmentId: runtimeEnvironmentId },
+    return startRuntimeUnscopedFileListing({
+      requestKey,
+      requestScopeKey,
+      requestDisplayScopeKey,
       worktreeId,
       worktreePath,
-      connectionId
-    }
-
-    const listFiles = (nameFilter?: string) =>
-      listRuntimeFiles(requestContext, {
-        rootPath: worktreePath,
-        excludePaths,
-        requestToken,
-        maxResults: QUICK_OPEN_LISTING_MAX_RESULTS,
-        ...(nameFilter ? { nameFilter } : {}),
-        signal: requestAbortController.signal
-      }).then((files) => ({
-        // #12547: naming the cap is what makes a full page readable as "there is more". Reporting
-        // false unconditionally is what made the truncation silent — the host bounds the scan to
-        // the cap it is given, so a full page means there are more paths behind it.
-        files,
-        // Why: an unfiltered local listing counts nothing; only a query-scoped host search does.
-        totalCount: null,
-        truncated: files.length >= QUICK_OPEN_LISTING_MAX_RESULTS
-      }))
-    const request = usesRuntimePathSearch
-      ? debounceRuntimeFileRequest(120, requestAbortController.signal, () =>
-          searchRuntimeFilePaths(requestContext, {
-            query: remoteQuery,
-            limit: queryLimit,
-            mode: queryMode,
-            excludePaths,
-            includeIgnoredFiles,
-            ...(connectionId ? { requestToken } : {}),
-            signal: requestAbortController.signal
-          })
-        )
-      : hostNameFilter
-        ? debounceRuntimeFileRequest(120, requestAbortController.signal, () =>
-            listFiles(hostNameFilter)
-          )
-        : listFiles()
-
-    void request
-      .then((result) => {
-        if (!cancelled) {
-          setListing({ requestKey, ...result })
-          setListedOperationOwner(requestOperationOwner)
-          if (!usesRuntimePathSearch && !hostNameFilter) {
-            setCappedLocalListing((current) =>
-              nextCappedLocalListing(current, listingKey, result.truncated)
-            )
-          }
-        }
-      })
-      .catch((error) => {
-        if (!cancelled && hostNameFilter) {
-          // Why: a failed host scan falls back to filtering the capped listing, not an error.
-          setCappedLocalListing((current) => current && { ...current, hostFilterFailed: true })
-        } else if (!cancelled) {
-          setListing(NO_LISTING)
-          setLoadError(cleanRuntimeFileListError(error))
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingRequest({ requestKey, loading: false })
-        }
-      })
-
-    return () => {
-      cancelled = true
-      requestAbortController.abort()
-      // Why #7721: switching workspaces (or closing the palette) must abort
-      // the previous full-tree scan host- and relay-side. Over SSH, abandoned
-      // scans otherwise stack up and starve fs.readDir/fs.stat past their
-      // 30s timeout ("Could not load files for this workspace").
-      cancelRuntimeFileList(requestContext, requestToken)
-    }
+      runtimeEnvironmentId,
+      connectionId,
+      excludePaths: excludeRequest.paths.length > 0 ? excludeRequest.paths : undefined,
+      operationOwnerRef,
+      setListing,
+      setListedOperationOwner,
+      setLoadError,
+      setVisibleLoadingRequestKey
+    })
   }, [
+    connectionId,
     enabled,
     excludeRequest,
-    connectionId,
-    includeIgnoredFiles,
     operationOwnerKey,
     operationRouteAvailable,
-    queryLimit,
-    queryMode,
+    requestDisplayScopeKey,
     requestKey,
-    hostNameFilter,
-    listingKey,
+    requestScopeKey,
     runtimeEnvironmentId,
     target.canList,
+    usesRuntimePathSearch,
     worktreeId,
-    worktreePath,
-    remoteQuery,
-    remoteQueryTooLarge,
-    usesRuntimePathSearch
+    worktreePath
   ])
 
   return {
     files: currentListing.files,
-    loading: loading || connectionPending,
-    loadError,
-    truncated: currentListing.truncated,
-    totalCount: currentListing.totalCount,
+    loading: (loading && !previousResults) || connectionPending,
+    searching,
+    previousResults,
+    resultQuery: currentListing.query,
+    correlationId: currentListing.correlationId,
+    workspacePathSearch: currentListing.workspacePathSearch,
+    scopeIdentity: currentListing.displayScopeKey,
+    loadError: visibleLoadError,
+    truncated: previousResults ? false : currentListing.truncated,
+    totalCount: previousResults ? null : currentListing.totalCount,
     ignoredFiles: currentListing.ignoredFiles,
-    operationOwner: listedOperationOwner
+    operationOwner: currentListing.operationOwner ?? listedOperationOwner
   }
 }

@@ -1,9 +1,9 @@
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { PreservedBranchCleanup } from '../../../../../../shared/preserved-branch-cleanup'
 import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import { showPreservedBranchToast } from '@/components/sidebar/preserved-branch-toast'
 import type { getActiveRuntimeTarget } from '../../../../runtime/runtime-rpc-client'
+import { buildPreservedBranchCleanup } from './worktree-removal-result'
 import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 
 export type PreservedBranchToastWorktree = Parameters<typeof showPreservedBranchToast>[1]
@@ -32,13 +32,12 @@ export function finalizePreservedBranchRemoval(
   if (!preservedBranch) {
     return null
   }
-  const cleanup: PreservedBranchCleanup = {
+  const cleanup = buildPreservedBranchCleanup({
     worktreeId: options.worktreeId,
-    branchName: preservedBranch.branchName,
-    expectedHead: preservedBranch.head,
-    ...(options.hostId ? { hostId: options.hostId } : {}),
-    ...(options.runtimeEnvironmentId ? { runtimeEnvironmentId: options.runtimeEnvironmentId } : {})
-  }
+    preservedBranch,
+    hostId: options.hostId,
+    runtimeEnvironmentId: options.runtimeEnvironmentId
+  })
   preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup), {
     cleanup,
     target: options.target
