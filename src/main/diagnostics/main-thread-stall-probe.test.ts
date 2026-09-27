@@ -1,21 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { recordMock, drainSpawnsMock, setAttributionMock } = vi.hoisted(() => ({
+const {
+  recordMock,
+  drainSpawnsMock,
+  setAttributionMock,
+  getLifecycleMarkersMock,
+  clearLifecycleMarkersMock
+} = vi.hoisted(() => ({
   recordMock: vi.fn(),
   drainSpawnsMock: vi.fn(),
-  setAttributionMock: vi.fn()
+  setAttributionMock: vi.fn(),
+  getLifecycleMarkersMock: vi.fn(),
+  clearLifecycleMarkersMock: vi.fn()
 }))
 
-vi.mock('./ui-hang-log-sink', () => ({ recordMainUiHangSample: recordMock }))
+vi.mock('./ui-hang-log-sink', () => ({
+  recordMainUiHangSample: recordMock,
+  getUiHangLifecycleMarkers: getLifecycleMarkersMock,
+  clearUiHangLifecycleMarkers: clearLifecycleMarkersMock
+}))
 vi.mock('./main-thread-churn-probe', () => ({
   drainSubprocessSpawnStats: drainSpawnsMock,
   setSubprocessSpawnAttributionEnabled: setAttributionMock
 }))
 
-const { installMainThreadStallProbe } = await import('./main-thread-stall-probe')
+const { installMainThreadStallProbe, MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS } =
+  await import('./main-thread-stall-probe')
 
 function createHarness(enabled = true) {
-  const clocks = { monotonic: 0, wall: 0 }
+  const clocks = { monotonic: 0, wall: 0, cpuUser: 0, cpuSystem: 0 }
   const listeners: (() => void)[] = []
   let isEnabled = enabled
   const dispose = installMainThreadStallProbe({
@@ -27,6 +40,7 @@ function createHarness(enabled = true) {
     isVisible: () => true,
     now: () => clocks.monotonic,
     wallNow: () => clocks.wall,
+    cpuUsage: () => ({ user: clocks.cpuUser, system: clocks.cpuSystem }),
     tickMs: 500,
     stallThresholdMs: 250
   })
@@ -47,6 +61,9 @@ beforeEach(() => {
   drainSpawnsMock.mockReset()
   drainSpawnsMock.mockReturnValue({})
   setAttributionMock.mockClear()
+  getLifecycleMarkersMock.mockReset()
+  getLifecycleMarkersMock.mockReturnValue([])
+  clearLifecycleMarkersMock.mockClear()
   vi.useFakeTimers()
 })
 
@@ -59,14 +76,72 @@ describe('installMainThreadStallProbe', () => {
     const { clocks, dispose } = createHarness()
     clocks.monotonic = 800
     clocks.wall = 800
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(500 + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
     expect(recordMock).toHaveBeenCalledWith({
       signal: 'main-stall',
       durationMs: 300,
       surface: 'main',
       visible: true,
-      capturedAtMs: 800
+      capturedAtMs: 800,
+      wallDurationMs: 800,
+      intervalStartedAtWallMs: 0,
+      intervalEndedAtWallMs: 800,
+      lifecycle: [],
+      processCpuUserMs: 0,
+      processCpuSystemMs: 0
     })
+    dispose()
+  })
+
+  it('adds CPU time and lifecycle events from the measured interval', () => {
+    const marker = { event: 'window-focus', source: 'main', occurredAtWallMs: 750 }
+    getLifecycleMarkersMock.mockReturnValue([marker])
+    const { clocks, dispose } = createHarness()
+    clocks.monotonic = 800
+    clocks.wall = 800
+    clocks.cpuUser = 150_000
+    clocks.cpuSystem = 20_000
+    vi.advanceTimersByTime(500 + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
+
+    expect(recordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wallDurationMs: 800,
+        intervalStartedAtWallMs: 0,
+        intervalEndedAtWallMs: 800,
+        processCpuUserMs: 150,
+        processCpuSystemMs: 20,
+        lifecycle: [marker]
+      })
+    )
+    dispose()
+  })
+
+  it('waits briefly so lifecycle events queued behind the stall can be correlated', () => {
+    const { clocks, dispose } = createHarness()
+    clocks.monotonic = 800
+    clocks.wall = 800
+    vi.advanceTimersByTime(500)
+    expect(recordMock).not.toHaveBeenCalled()
+
+    const lateMarker = { event: 'window-focus', source: 'main', occurredAtWallMs: 850 }
+    getLifecycleMarkersMock.mockReturnValue([lateMarker])
+    vi.advanceTimersByTime(MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
+
+    expect(recordMock).toHaveBeenCalledWith(expect.objectContaining({ lifecycle: [lateMarker] }))
+    expect(getLifecycleMarkersMock).toHaveBeenCalledWith(0, 900)
+    dispose()
+  })
+
+  it('cancels deferred stall writes when logging is disabled', () => {
+    const { clocks, dispose, setEnabled } = createHarness()
+    clocks.monotonic = 800
+    clocks.wall = 800
+    vi.advanceTimersByTime(500)
+
+    setEnabled(false)
+    vi.advanceTimersByTime(MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
+
+    expect(recordMock).not.toHaveBeenCalled()
     dispose()
   })
 
@@ -77,7 +152,7 @@ describe('installMainThreadStallProbe', () => {
     const { clocks, dispose } = createHarness()
     clocks.monotonic = 800
     clocks.wall = 800
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(500 + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
     expect(recordMock).toHaveBeenCalledWith(
       expect.objectContaining({
         signal: 'main-stall',
@@ -91,7 +166,7 @@ describe('installMainThreadStallProbe', () => {
     const { clocks, dispose } = createHarness()
     clocks.monotonic = 800
     clocks.wall = 800
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(500 + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
     expect(recordMock.mock.calls[0][0]).not.toHaveProperty('spawns')
     dispose()
   })
@@ -135,7 +210,7 @@ describe('installMainThreadStallProbe', () => {
 
     clocks.monotonic = 61_300
     clocks.wall = 61_300
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(500 + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
     expect(recordMock).toHaveBeenCalledTimes(1)
     dispose()
   })

@@ -102,6 +102,8 @@ export const mainProcessState = {
   unsubscribeSystemResumeBroadcast: null as (() => void) | null,
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the state object's per-field nullable pattern; assigned in observers and read with an optional call.
   uninstallMainThreadStallProbe: null as (() => void) | null,
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the state object's per-field nullable pattern; assigned during observer installation and read with an optional call.
+  uninstallUiHangLifecycleObserver: null as (() => void) | null,
   watcherShutdownPromise: null as Promise<void> | null,
   watcherShutdownDone: false,
   automations: null as AutomationService | null,
