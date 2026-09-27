@@ -5,6 +5,13 @@
 // different event loops, and a divergence between the two detectors would make their records
 // impossible to compare.
 
+export type StallInterval = {
+  monotonicStartedAtMs: number
+  monotonicEndedAtMs: number
+  wallStartedAtMs: number
+  wallEndedAtMs: number
+}
+
 export type StallDetectorConfig = {
   tickMs: number
   /** Ignore gaps below this; sustained small gaps are jank, not a hang worth logging. */
@@ -13,7 +20,7 @@ export type StallDetectorConfig = {
   now: () => number
   /** Wall clock (`Date.now()`), which always advances through system sleep. */
   wallNow: () => number
-  onStall: (durationMs: number, capturedAtMs: number) => void
+  onStall: (durationMs: number, capturedAtMs: number, interval: StallInterval) => void
 }
 
 export type StallDetector = {
@@ -31,6 +38,8 @@ export function createStallDetector(config: StallDetectorConfig): StallDetector 
     tick: () => {
       const tickMonotonic = config.now()
       const tickWall = config.wallNow()
+      const monotonicStartedAtMs = lastMonotonic
+      const wallStartedAtMs = lastWall
       const monotonicGapMs = tickMonotonic - lastMonotonic
       const wallGapMs = tickWall - lastWall
       lastMonotonic = tickMonotonic
@@ -42,7 +51,12 @@ export function createStallDetector(config: StallDetectorConfig): StallDetector 
       if (stallMs < config.stallThresholdMs) {
         return
       }
-      config.onStall(stallMs, tickMonotonic)
+      config.onStall(stallMs, tickMonotonic, {
+        monotonicStartedAtMs,
+        monotonicEndedAtMs: tickMonotonic,
+        wallStartedAtMs,
+        wallEndedAtMs: tickWall
+      })
     }
   }
 }

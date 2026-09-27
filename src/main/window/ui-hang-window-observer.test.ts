@@ -2,9 +2,15 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UiHangObservableWindow } from './ui-hang-window-observer'
 
-const { recordMock } = vi.hoisted(() => ({ recordMock: vi.fn() }))
+const { recordMock, recordLifecycleMock } = vi.hoisted(() => ({
+  recordMock: vi.fn(),
+  recordLifecycleMock: vi.fn()
+}))
 
-vi.mock('../diagnostics/ui-hang-log-sink', () => ({ recordMainUiHangSample: recordMock }))
+vi.mock('../diagnostics/ui-hang-log-sink', () => ({
+  recordMainUiHangSample: recordMock,
+  recordUiHangLifecycleMarker: recordLifecycleMock
+}))
 
 const { installUiHangWindowObserver } = await import('./ui-hang-window-observer')
 
@@ -28,9 +34,34 @@ function createHarness(enabled = true) {
 
 beforeEach(() => {
   recordMock.mockClear()
+  recordLifecycleMock.mockClear()
 })
 
 describe('installUiHangWindowObserver', () => {
+  it('records allowlisted window lifecycle events while logging is enabled', () => {
+    const { emitter } = createHarness()
+    emitter.emit('focus')
+    emitter.emit('blur')
+    emitter.emit('show')
+    emitter.emit('hide')
+
+    expect(recordLifecycleMock.mock.calls.map((call) => call[0])).toEqual([
+      'window-focus',
+      'window-blur',
+      'window-show',
+      'window-hide'
+    ])
+    expect(recordLifecycleMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('does not record lifecycle events while logging is off', () => {
+    const { emitter } = createHarness(false)
+    emitter.emit('focus')
+    emitter.emit('blur')
+
+    expect(recordLifecycleMock).not.toHaveBeenCalled()
+  })
+
   it('pairs unresponsive with the recovered duration', () => {
     const { emitter, setClock } = createHarness()
     emitter.emit('unresponsive')

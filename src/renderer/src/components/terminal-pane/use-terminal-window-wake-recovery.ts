@@ -6,6 +6,7 @@ import { presentPaneViewport } from '@/lib/pane-manager/pane-webgl-renderer'
 import { recordTerminalFreezeBreadcrumb } from './terminal-freeze-breadcrumbs'
 import type { IDisposable } from '@xterm/xterm'
 import { activePaneIsCoveredByNativeChat } from './native-chat-covered-pane'
+import { recordUiHangOperation } from '@/lib/ui-hang-diagnostics/record-ui-hang-operation'
 
 type UseTerminalWindowWakeRecoveryArgs = {
   isVisible: boolean
@@ -65,53 +66,69 @@ export function useTerminalWindowWakeRecovery({
       clearGlyphAtlases: boolean,
       source: 'focus' | 'visibilitychange' | 'system-resumed'
     ): void => {
-      // Why: the decisive crumb for a post-wake garble report — which trigger
-      // fired and whether it wiped the atlas. If the report shows a stale pane
-      // but NO wake crumb near the unlock time, the trigger never fired (the
-      // unlock-screen gap); a crumb with clearGlyphAtlases=false means the light
-      // path ran but may not have healed a corrupted atlas. Silent (memory ring).
-      // Source is in the kind so distinct triggers don't coalesce into one
-      // entry (focus and resume often fire together); repeats of the same
-      // source still fold, which is the noise control we want.
-      recordTerminalFreezeBreadcrumb(`wake-recovery:${source}`, { clearGlyphAtlases })
-      // Focus and visibility often fire together; keep one immediate recovery and one settled RAF pass.
-      if (wakeRecoveryFrameId !== null) {
-        // Why: a pending settled pass may only upgrade in strength — a plain
-        // focus that lands after a genuine wake must not skip its atlas clear.
-        settledClearGlyphAtlases ||= clearGlyphAtlases
-        return
-      }
-      const manager = managerRef.current
-      if (!manager) {
-        return
-      }
-      recoverVisibleTerminalWindowWake({
-        manager,
-        isActive: isActiveRef.current,
-        isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(manager),
-        clearGlyphAtlases
-      })
-      if (typeof requestAnimationFrame !== 'function') {
-        reassertPanePtySizes()
-        return
-      }
-      settledClearGlyphAtlases = clearGlyphAtlases
-      wakeRecoveryFrameId = requestAnimationFrame(() => {
-        wakeRecoveryFrameId = null
-        const clearGlyphAtlasesOnSettle = settledClearGlyphAtlases
-        settledClearGlyphAtlases = false
-        const settledManager = managerRef.current
-        if (!settledManager || !isVisibleRef.current) {
+      const operation =
+        source === 'focus'
+          ? 'terminal-focus-recovery'
+          : source === 'visibilitychange'
+            ? 'terminal-visibility-recovery'
+            : 'terminal-system-resume-recovery'
+      const startedAtMs = performance.now()
+      try {
+        // Why: the decisive crumb for a post-wake garble report — which trigger
+        // fired and whether it wiped the atlas. If the report shows a stale pane
+        // but NO wake crumb near the unlock time, the trigger never fired (the
+        // unlock-screen gap); a crumb with clearGlyphAtlases=false means the light
+        // path ran but may not have healed a corrupted atlas. Silent (memory ring).
+        // Source is in the kind so distinct triggers don't coalesce into one
+        // entry (focus and resume often fire together); repeats of the same
+        // source still fold, which is the noise control we want.
+        recordTerminalFreezeBreadcrumb(`wake-recovery:${source}`, { clearGlyphAtlases })
+        // Focus and visibility often fire together; keep one immediate recovery and one settled RAF pass.
+        if (wakeRecoveryFrameId !== null) {
+          // Why: a pending settled pass may only upgrade in strength — a plain
+          // focus that lands after a genuine wake must not skip its atlas clear.
+          settledClearGlyphAtlases ||= clearGlyphAtlases
+          return
+        }
+        const manager = managerRef.current
+        if (!manager) {
           return
         }
         recoverVisibleTerminalWindowWake({
-          manager: settledManager,
+          manager,
           isActive: isActiveRef.current,
-          isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(settledManager),
-          clearGlyphAtlases: clearGlyphAtlasesOnSettle
+          isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(manager),
+          clearGlyphAtlases
         })
-        reassertPanePtySizes()
-      })
+        if (typeof requestAnimationFrame !== 'function') {
+          reassertPanePtySizes()
+          return
+        }
+        settledClearGlyphAtlases = clearGlyphAtlases
+        wakeRecoveryFrameId = requestAnimationFrame(() => {
+          const settledStartedAtMs = performance.now()
+          try {
+            wakeRecoveryFrameId = null
+            const clearGlyphAtlasesOnSettle = settledClearGlyphAtlases
+            settledClearGlyphAtlases = false
+            const settledManager = managerRef.current
+            if (!settledManager || !isVisibleRef.current) {
+              return
+            }
+            recoverVisibleTerminalWindowWake({
+              manager: settledManager,
+              isActive: isActiveRef.current,
+              isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(settledManager),
+              clearGlyphAtlases: clearGlyphAtlasesOnSettle
+            })
+            reassertPanePtySizes()
+          } finally {
+            recordUiHangOperation('terminal-settled-recovery', settledStartedAtMs)
+          }
+        })
+      } finally {
+        recordUiHangOperation(operation, startedAtMs)
+      }
     }
     // Why: plain refocus (alt-tab, devtools) is frequent and often lands while
     // an agent streams; wiping the shared glyph atlas then provokes xterm's

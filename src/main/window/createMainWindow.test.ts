@@ -49,6 +49,12 @@ import {
   withPlatform
 } from './createMainWindow-test-harness'
 
+function emitWindowEvent(handlers: ((...args: any[]) => void)[] | undefined): void {
+  for (const handler of handlers ?? []) {
+    handler()
+  }
+}
+
 describe('createMainWindow', () => {
   beforeEach(() => {
     resetMainWindowMocks()
@@ -491,11 +497,11 @@ describe('createMainWindow', () => {
     expect(webContents.setBackgroundThrottling).toHaveBeenCalledWith(true)
     expect(webContents.setBackgroundThrottling).not.toHaveBeenCalledWith(false)
     expect(windowHandlers.get('restore')).toHaveLength(1)
-    expect(windowHandlers.get('show')).toHaveLength(1)
-    expect(windowHandlers.get('focus')).toHaveLength(1)
+    expect(windowHandlers.get('show')).toHaveLength(2)
+    expect(windowHandlers.get('focus')).toHaveLength(2)
 
-    windowHandlers.get('show')?.[0]?.()
-    windowHandlers.get('restore')?.[0]?.()
+    emitWindowEvent(windowHandlers.get('show'))
+    emitWindowEvent(windowHandlers.get('restore'))
 
     expect(webContents.invalidate).toHaveBeenCalledTimes(2)
     // Why: the size nudge must never run inside the show/restore dispatch itself.
@@ -517,7 +523,7 @@ describe('createMainWindow', () => {
     // Why: focus covers occlusion-uncover with invalidate only — no setSize
     // jiggle that would resize terminals on every window focus.
     const setSizeCalls = browserWindowInstance.setSize.mock.calls.length
-    windowHandlers.get('focus')?.[0]?.()
+    emitWindowEvent(windowHandlers.get('focus'))
     expect(webContents.invalidate).toHaveBeenCalledTimes(4)
     expect(browserWindowInstance.setSize).toHaveBeenCalledTimes(setSizeCalls)
   })
@@ -639,7 +645,7 @@ describe('createMainWindow', () => {
 
     withPlatform('darwin', () => createMainWindow(null))
 
-    windowHandlers.get('show')?.[0]?.()
+    emitWindowEvent(windowHandlers.get('show'))
     expect(webContents.invalidate).toHaveBeenCalledTimes(1)
 
     // Why: the delayed second repaint must also stay setSize-free on Tahoe.
@@ -687,7 +693,7 @@ describe('createMainWindow', () => {
 
     withPlatform('darwin', () => createMainWindow(null))
 
-    windowHandlers.get('show')?.[0]?.()
+    emitWindowEvent(windowHandlers.get('show'))
     vi.advanceTimersByTime(300)
 
     expect(webContents.invalidate).toHaveBeenCalledTimes(2)

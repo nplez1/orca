@@ -10,9 +10,42 @@ export type UiHangSource = 'renderer' | 'main'
  * is the same measurement on the main process, where a blocked event loop freezes IPC and
  * terminal input even though the renderer keeps painting. `window-unresponsive`/
  * `window-responsive` are Electron's coarse window signals, where only the `responsive`
- * record carries the recovered duration.
+ * record carries the recovered duration. `handler` records time a bounded focus/resume operation.
  */
-export type UiHangSignal = 'stall' | 'main-stall' | 'window-unresponsive' | 'window-responsive'
+export type UiHangSignal =
+  | 'stall'
+  | 'main-stall'
+  | 'window-unresponsive'
+  | 'window-responsive'
+  | 'handler'
+  | 'lifecycle'
+
+/** Bounded operation names used to attribute focus/resume work without recording user content. */
+export type UiHangLifecycleEvent =
+  | 'app-focus'
+  | 'window-focus'
+  | 'window-blur'
+  | 'window-show'
+  | 'window-hide'
+  | 'document-visible'
+  | 'document-hidden'
+  | 'system-suspend'
+  | 'system-resume'
+
+export type UiHangLifecycleMarker = {
+  event: UiHangLifecycleEvent
+  source: UiHangSource
+  occurredAtWallMs: number
+}
+
+export type UiHangOperation =
+  | 'window-focus-invalidate'
+  | 'window-visible-github-refresh'
+  | 'terminal-focus-recovery'
+  | 'terminal-visibility-recovery'
+  | 'terminal-system-resume-recovery'
+  | 'terminal-settled-recovery'
+  | 'foreground-agent-focus-sample'
 
 /** Which document produced the sample. Only local desktop windows emit these. */
 export type UiHangSurface = 'main' | 'popout' | 'webview'
@@ -33,7 +66,7 @@ export type UiHangSpawnAttribution = Record<
  */
 export type UiHangSample = {
   signal: UiHangSignal
-  /** Milliseconds the UI thread was blocked; 0 when the signal carries no duration. */
+  /** Milliseconds blocked or spent in the named handler; 0 when the signal has no duration. */
   durationMs: number
   surface: UiHangSurface
   /** Whether the emitting document/window was visible at capture. */
@@ -42,6 +75,21 @@ export type UiHangSample = {
   capturedAtMs: number
   /** Present on `main-stall` records when spawns blocked the main thread; omit when empty. */
   spawns?: UiHangSpawnAttribution
+  /** Present on `handler` records; a bounded label with no user or terminal content. */
+  operation?: UiHangOperation
+  /** Main-thread stall interval timing; wall time includes sleep/wake behavior. */
+  wallDurationMs?: number
+  intervalStartedAtWallMs?: number
+  intervalEndedAtWallMs?: number
+  /** Process CPU consumed in the measured main-thread interval. */
+  processCpuUserMs?: number
+  processCpuSystemMs?: number
+  /** Bounded focus/visibility/power events near a main-thread stall. */
+  lifecycle?: UiHangLifecycleMarker[]
+  /** Wall-clock timestamp captured in the renderer for cross-process correlation. */
+  capturedAtWallMs?: number
+  /** Present on `lifecycle` samples; allowlisted lifecycle transition name. */
+  lifecycleEvent?: UiHangLifecycleEvent
 }
 
 /** NDJSON line written to `logs/ui-hangs.ndjson`. */

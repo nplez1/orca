@@ -165,7 +165,10 @@ export function createMainWindow(
     // Why: preserve hidden-window power savings; stable native sizing and frame-only invalidation
     // make wake recovery independent of the throttled viewport.
     mainWindow.webContents.setBackgroundThrottling(true)
-    installMacosVisibilityRepaint(mainWindow)
+    installMacosVisibilityRepaint(
+      mainWindow,
+      () => store?.getSettings().uiHangDiagnosticsEnabled === true
+    )
   }
 
   // Why: a focus-preserving wake fires no focus/visibility events; relay resume so terminal wake recovery runs and force a repaint so stale compositor surfaces recover.

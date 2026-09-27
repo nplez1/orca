@@ -20,10 +20,13 @@ vi.mock('../observability/logs-directory', () => ({
 }))
 
 const {
+  clearUiHangLifecycleMarkers,
   closeUiHangLogSink,
   getUiHangDiagnosticsStatus,
+  getUiHangLifecycleMarkers,
   normalizeUiHangSample,
   recordMainUiHangSample,
+  recordUiHangLifecycleMarker,
   recordRendererUiHangSample,
   setUiHangLogMeta
 } = await import('./ui-hang-log-sink')
@@ -35,6 +38,7 @@ beforeEach(() => {
   consentMock.mockReset()
   consentMock.mockReturnValue(allowed)
   setUiHangLogMeta(null)
+  clearUiHangLifecycleMarkers()
   closeUiHangLogSink()
 })
 
@@ -58,6 +62,77 @@ describe('normalizeUiHangSample', () => {
     ).toBeNull()
     expect(
       normalizeUiHangSample({ signal: 'stall', surface: 'main', durationMs: 1, capturedAtMs: -1 })
+    ).toBeNull()
+  })
+
+  it('accepts renderer lifecycle markers only with an allowlisted name and wall timestamp', () => {
+    expect(
+      normalizeUiHangSample({
+        signal: 'lifecycle',
+        lifecycleEvent: 'document-hidden',
+        surface: 'main',
+        durationMs: 0,
+        capturedAtMs: 100,
+        capturedAtWallMs: 200,
+        visible: false
+      })
+    ).toMatchObject({
+      signal: 'lifecycle',
+      lifecycleEvent: 'document-hidden',
+      capturedAtWallMs: 200
+    })
+    expect(
+      normalizeUiHangSample({
+        signal: 'lifecycle',
+        lifecycleEvent: 'terminal-output',
+        surface: 'main',
+        durationMs: 0,
+        capturedAtMs: 100,
+        capturedAtWallMs: 200,
+        visible: false
+      })
+    ).toBeNull()
+    expect(
+      normalizeUiHangSample({
+        signal: 'lifecycle',
+        lifecycleEvent: 'document-hidden',
+        surface: 'main',
+        durationMs: 0,
+        capturedAtMs: 100,
+        visible: false
+      })
+    ).toBeNull()
+  })
+
+  it('accepts only bounded operation labels on handler records', () => {
+    expect(
+      normalizeUiHangSample({
+        signal: 'handler',
+        operation: 'terminal-focus-recovery',
+        surface: 'main',
+        durationMs: 42,
+        capturedAtMs: 7,
+        visible: true
+      })
+    ).toMatchObject({ signal: 'handler', operation: 'terminal-focus-recovery' })
+    expect(
+      normalizeUiHangSample({
+        signal: 'handler',
+        operation: 'terminal-content',
+        surface: 'main',
+        durationMs: 42,
+        capturedAtMs: 7,
+        visible: true
+      })
+    ).toBeNull()
+    expect(
+      normalizeUiHangSample({
+        signal: 'handler',
+        surface: 'main',
+        durationMs: 42,
+        capturedAtMs: 7,
+        visible: true
+      })
     ).toBeNull()
   })
 
@@ -92,6 +167,19 @@ describe('normalizeUiHangSample', () => {
   })
 })
 
+describe('UI-hang lifecycle markers', () => {
+  it('keeps a bounded recent timeline and returns only markers near the stall window', () => {
+    for (let index = 0; index < 70; index++) {
+      recordUiHangLifecycleMarker('window-focus', 'main', index * 1_000)
+    }
+
+    const markers = getUiHangLifecycleMarkers(60_000, 65_000)
+    expect(markers).toHaveLength(21)
+    expect(markers[0]?.occurredAtWallMs).toBe(45_000)
+    expect(markers.at(-1)?.occurredAtWallMs).toBe(65_000)
+  })
+})
+
 describe('recordRendererUiHangSample', () => {
   it('writes the build/session header as the first line when meta is set', () => {
     setUiHangLogMeta({
@@ -115,6 +203,25 @@ describe('recordRendererUiHangSample', () => {
       osRelease: '24.0.0'
     })
     expect(pushMock.mock.calls[1][0]).toMatchObject({ type: 'ui-hang', signal: 'stall' })
+  })
+
+  it('keeps renderer lifecycle events in memory instead of writing each transition', () => {
+    expect(
+      recordRendererUiHangSample({
+        signal: 'lifecycle',
+        lifecycleEvent: 'document-hidden',
+        surface: 'main',
+        durationMs: 0,
+        capturedAtMs: 25,
+        capturedAtWallMs: 2_000,
+        visible: false
+      })
+    ).toBe(true)
+
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(getUiHangLifecycleMarkers(1_000, 2_000)).toEqual([
+      { event: 'document-hidden', source: 'renderer', occurredAtWallMs: 2_000 }
+    ])
   })
 
   it('writes a framed record for a valid sample', () => {

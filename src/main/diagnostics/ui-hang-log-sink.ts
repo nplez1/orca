@@ -15,9 +15,12 @@ import { createLocalFileSink, type LocalFileSink } from '../observability/local-
 import { getUiHangLogFilePath } from '../observability/logs-directory'
 import type {
   UiHangDiagnosticsStatus,
+  UiHangLifecycleEvent,
+  UiHangLifecycleMarker,
   UiHangLogMeta,
   UiHangLogMetaRecord,
   UiHangLogRecord,
+  UiHangOperation,
   UiHangSample,
   UiHangSignal,
   UiHangSource,
@@ -29,12 +32,37 @@ const MAX_BYTES = 5 * 1024 * 1024
 const MAX_FILES = 5
 // Anything longer than this is a suspended/partitioned process, not a UI hang worth charting.
 const MAX_DURATION_MS = 30 * 60 * 1000
+const MAX_UI_HANG_LIFECYCLE_MARKERS = 64
+const MAX_STALL_LIFECYCLE_MARKERS = 24
+const UI_HANG_LIFECYCLE_LOOKBACK_MS = 15_000
 
 const SIGNALS: ReadonlySet<string> = new Set<UiHangSignal>([
   'stall',
   'main-stall',
   'window-unresponsive',
-  'window-responsive'
+  'window-responsive',
+  'handler',
+  'lifecycle'
+])
+const LIFECYCLE_EVENTS: ReadonlySet<string> = new Set<UiHangLifecycleEvent>([
+  'app-focus',
+  'window-focus',
+  'window-blur',
+  'window-show',
+  'window-hide',
+  'document-visible',
+  'document-hidden',
+  'system-suspend',
+  'system-resume'
+])
+const OPERATIONS: ReadonlySet<string> = new Set<UiHangOperation>([
+  'window-focus-invalidate',
+  'window-visible-github-refresh',
+  'terminal-focus-recovery',
+  'terminal-visibility-recovery',
+  'terminal-system-resume-recovery',
+  'terminal-settled-recovery',
+  'foreground-agent-focus-sample'
 ])
 const SURFACES: ReadonlySet<string> = new Set<UiHangSurface>(['main', 'popout', 'webview'])
 
@@ -45,6 +73,16 @@ function isUiHangSignal(value: unknown): value is UiHangSignal {
 function isUiHangSurface(value: unknown): value is UiHangSurface {
   return typeof value === 'string' && SURFACES.has(value)
 }
+
+function isUiHangOperation(value: unknown): value is UiHangOperation {
+  return typeof value === 'string' && OPERATIONS.has(value)
+}
+
+function isUiHangLifecycleEvent(value: unknown): value is UiHangLifecycleEvent {
+  return typeof value === 'string' && LIFECYCLE_EVENTS.has(value)
+}
+
+const uiHangLifecycleMarkers: UiHangLifecycleMarker[] = []
 
 let sink: LocalFileSink | null = null
 let logMeta: UiHangLogMeta | null = null
@@ -102,12 +140,47 @@ export function normalizeUiHangSample(input: unknown): UiHangSample | null {
   if (typeof capturedAtMs !== 'number' || !Number.isFinite(capturedAtMs) || capturedAtMs < 0) {
     return null
   }
+  const operation = 'operation' in input ? input.operation : undefined
+  const lifecycleEvent = 'lifecycleEvent' in input ? input.lifecycleEvent : undefined
+  const capturedAtWallMs = 'capturedAtWallMs' in input ? input.capturedAtWallMs : undefined
+  if (
+    capturedAtWallMs !== undefined &&
+    (typeof capturedAtWallMs !== 'number' ||
+      !Number.isFinite(capturedAtWallMs) ||
+      capturedAtWallMs <= 0)
+  ) {
+    return null
+  }
+  if (signal === 'handler' && !isUiHangOperation(operation)) {
+    return null
+  }
+  if (signal === 'lifecycle') {
+    if (
+      !isUiHangLifecycleEvent(lifecycleEvent) ||
+      typeof capturedAtWallMs !== 'number' ||
+      !Number.isFinite(capturedAtWallMs) ||
+      capturedAtWallMs <= 0
+    ) {
+      return null
+    }
+    return {
+      signal,
+      durationMs: 0,
+      surface,
+      visible: visible === true,
+      capturedAtMs,
+      lifecycleEvent,
+      capturedAtWallMs
+    }
+  }
   return {
     signal,
     durationMs: Math.max(0, Math.min(MAX_DURATION_MS, durationMs)),
     surface,
     visible: visible === true,
-    capturedAtMs
+    capturedAtMs,
+    ...(signal === 'handler' && isUiHangOperation(operation) ? { operation } : {}),
+    ...(typeof capturedAtWallMs === 'number' ? { capturedAtWallMs } : {})
   }
 }
 
@@ -145,6 +218,42 @@ function writeRecord(source: UiHangSource, sample: UiHangSample): void {
  * Ingest one renderer sample over IPC. Returns whether it was accepted, which is enough for
  * the renderer to stay fire-and-forget. No-op while local diagnostics are refused.
  */
+export function recordUiHangLifecycleMarker(
+  event: UiHangLifecycleEvent,
+  source: UiHangSource,
+  occurredAtWallMs = Date.now()
+): void {
+  if (
+    !isUiHangLifecycleEvent(event) ||
+    !Number.isFinite(occurredAtWallMs) ||
+    occurredAtWallMs <= 0
+  ) {
+    return
+  }
+  uiHangLifecycleMarkers.push({ event, source, occurredAtWallMs })
+  if (uiHangLifecycleMarkers.length > MAX_UI_HANG_LIFECYCLE_MARKERS) {
+    uiHangLifecycleMarkers.shift()
+  }
+}
+
+export function getUiHangLifecycleMarkers(
+  intervalStartedAtWallMs: number,
+  intervalEndedAtWallMs: number
+): UiHangLifecycleMarker[] {
+  return uiHangLifecycleMarkers
+    .filter(
+      (marker) =>
+        marker.occurredAtWallMs >= intervalStartedAtWallMs - UI_HANG_LIFECYCLE_LOOKBACK_MS &&
+        marker.occurredAtWallMs <= intervalEndedAtWallMs
+    )
+    .slice(-MAX_STALL_LIFECYCLE_MARKERS)
+    .map((marker) => ({ ...marker }))
+}
+
+export function clearUiHangLifecycleMarkers(): void {
+  uiHangLifecycleMarkers.length = 0
+}
+
 export function recordRendererUiHangSample(input: unknown): boolean {
   if (!isUiHangLogAllowed()) {
     return false
@@ -152,6 +261,16 @@ export function recordRendererUiHangSample(input: unknown): boolean {
   const sample = normalizeUiHangSample(input)
   if (!sample) {
     return false
+  }
+  if (sample.signal === 'lifecycle') {
+    if (
+      !isUiHangLifecycleEvent(sample.lifecycleEvent) ||
+      typeof sample.capturedAtWallMs !== 'number'
+    ) {
+      return false
+    }
+    recordUiHangLifecycleMarker(sample.lifecycleEvent, 'renderer', sample.capturedAtWallMs)
+    return true
   }
   writeRecord('renderer', sample)
   return true

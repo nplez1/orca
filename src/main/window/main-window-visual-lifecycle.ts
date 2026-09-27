@@ -1,7 +1,49 @@
 import { ipcMain, type BrowserWindow } from 'electron'
+import { recordMainUiHangSample } from '../diagnostics/ui-hang-log-sink'
 import { isMacosTahoeOrNewer } from './macos-tahoe-release'
 
 const activeRepaintJiggles = new WeakSet<BrowserWindow>()
+const MIN_FOCUS_INVALIDATION_LOG_INTERVAL_MS = 1_000
+let lastFocusInvalidationLoggedAtMs = Number.NEGATIVE_INFINITY
+
+type FocusRepaintWindow = Pick<BrowserWindow, 'isDestroyed' | 'isVisible'> & {
+  webContents: Pick<BrowserWindow['webContents'], 'isDestroyed' | 'invalidate'>
+}
+
+export function invalidateMainWindowOnFocus(
+  window: FocusRepaintWindow,
+  isUiHangLoggingEnabled: boolean
+): void {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) {
+    return
+  }
+  const now = isUiHangLoggingEnabled ? performance.now() : null
+  const startedAtMs =
+    now !== null && now - lastFocusInvalidationLoggedAtMs >= MIN_FOCUS_INVALIDATION_LOG_INTERVAL_MS
+      ? now
+      : null
+  try {
+    window.webContents.invalidate()
+  } finally {
+    if (startedAtMs !== null) {
+      try {
+        const capturedAtMs = performance.now()
+        lastFocusInvalidationLoggedAtMs = capturedAtMs
+        recordMainUiHangSample({
+          signal: 'handler',
+          operation: 'window-focus-invalidate',
+          durationMs: Math.max(0, capturedAtMs - startedAtMs),
+          surface: 'main',
+          visible: !window.isDestroyed() && window.isVisible(),
+          capturedAtMs
+        })
+      } catch {
+        // Diagnostics must never interfere with window focus.
+      }
+    }
+  }
+}
+
 export function forceRepaint(window: BrowserWindow): void {
   // Why: webContents can be destroyed a beat before the BrowserWindow during close, and this runs from timers/focus events in that gap.
   if (window.isDestroyed() || window.webContents.isDestroyed()) {
@@ -48,7 +90,10 @@ export function forceRepaint(window: BrowserWindow): void {
   }, 0)
 }
 
-export function installMacosVisibilityRepaint(window: BrowserWindow): void {
+export function installMacosVisibilityRepaint(
+  window: BrowserWindow,
+  isUiHangLoggingEnabled: () => boolean = () => false
+): void {
   let delayedRepaintTimer: ReturnType<typeof setTimeout> | null = null
   const repaintAfterVisibilityTransition = (): void => {
     forceRepaint(window)
@@ -85,9 +130,13 @@ export function installMacosVisibilityRepaint(window: BrowserWindow): void {
   window.on('show', repaintAfterVisibilityTransition)
   // Why: occlusion-uncover can fire only focus; invalidate without resizing terminals on Cmd+Tab.
   window.on('focus', () => {
-    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-      window.webContents.invalidate()
+    let loggingEnabled = false
+    try {
+      loggingEnabled = isUiHangLoggingEnabled()
+    } catch {
+      // A settings read must not block window focus.
     }
+    invalidateMainWindowOnFocus(window, loggingEnabled)
   })
   window.on('closed', () => {
     clearDelayedRepaint()
