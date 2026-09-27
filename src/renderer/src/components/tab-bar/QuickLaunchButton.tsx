@@ -17,6 +17,7 @@ import {
 } from '../../../../shared/tui-agent-selection'
 import { translate } from '@/i18n/i18n'
 import { useStructuredAgentLaunchStatus } from '@/lib/structured-agent-session-launch'
+import { resolveLaunchableDefaultAgent } from './use-tab-bar-default-agent'
 
 export type QuickLaunchAgentMenuItemsProps = {
   worktreeId: string
@@ -183,7 +184,12 @@ function QuickLaunchAgentMenuItemsInner({
   )
 
   const enabledDetectedIds = detectedIds ? filterEnabledTuiAgents(detectedIds, disabledAgents) : []
-  const agents = detectedIds ? orderAgents(defaultAgent, enabledDetectedIds) : []
+  const launchableDefaultAgent = resolveLaunchableDefaultAgent(
+    defaultAgent,
+    detectedIds,
+    disabledAgents
+  )
+  const agents = detectedIds ? orderAgents(launchableDefaultAgent, enabledDetectedIds) : []
 
   return (
     <>
@@ -206,7 +212,7 @@ function QuickLaunchAgentMenuItemsInner({
         const isStructuredLaunchPending =
           isAgentSessionHandleProvider(agent) && structuredLaunchStatusByAgent[agent] === 'pending'
         const showsDefaultAgentShortcut =
-          newAgentShortcut !== null && defaultAgent !== 'blank' && agent === defaultAgent
+          newAgentShortcut !== null && agent === launchableDefaultAgent
         return (
           <DropdownMenuItem
             key={agent}
