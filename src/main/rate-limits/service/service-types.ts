@@ -1,9 +1,16 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
-import type { ClaudeAccountSelectionTarget } from '../../claude-accounts/runtime-selection'
+import type {
+  ClaudeAccountSelectionTarget,
+  NormalizedClaudeAccountSelectionTarget
+} from '../../claude-accounts/runtime-selection'
 import type { KimiHomeResolution } from '../../kimi/kimi-runtime-home'
-import type { CodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
+import type {
+  CodexAccountSelectionTarget,
+  NormalizedCodexAccountSelectionTarget
+} from '../../codex-accounts/runtime-selection'
 import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
+import type { SettledProviderResult } from './service-sibling-provider-result'
 
 export type {
   CodexRateLimitResetResult,
@@ -128,6 +135,47 @@ export const INACTIVE_FETCH_DEBOUNCE_MS = 60 * 1000 // 60 seconds — debounce f
 // account the moment the switcher opens.
 export const INACTIVE_CODEX_PROBE_STAGGER_MS = 2_000
 export const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
+
+// Why: the snapshot one fetch-all cycle hands to its apply step; lives with the other
+// service contracts so the cycle module holds execution, not shape.
+export type FetchAllCyclePrepared = {
+  claudeTarget: NormalizedClaudeAccountSelectionTarget
+  claudeGeneration: number
+  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
+  claudeProvenance: string
+  codexTarget: NormalizedCodexAccountSelectionTarget
+  previousState: InternalRateLimitState
+  codexFetchGated: boolean
+  codexStateBeforeFetch: ProviderRateLimits | null
+  codexProvenance: string | null
+  codexGeneration: number
+  opencodeConfigChanged: boolean
+  opencodeGeneration: number
+  miniMaxConfigChanged: boolean
+  miniMaxGeneration: number
+  deepSeekConfigChanged: boolean
+  deepSeekGeneration: number
+  fireworksConfigChanged: boolean
+  fireworksGeneration: number
+  copilotConfigChanged: boolean
+  copilotGeneration: number
+  claudeFetchGated: boolean
+  results: [
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>
+  ]
+  grokResultPromise: Promise<SettledProviderResult>
+  cursorResultPromise: Promise<SettledProviderResult>
+  zcodeResultPromise: Promise<SettledProviderResult>
+  antigravityResultPromise: Promise<SettledProviderResult>
+}
 
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
 export type InternalRateLimitState = {

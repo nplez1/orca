@@ -1307,6 +1307,9 @@
           "f92fbf11aa": "Not configured",
           "fe4d378dc4": "Verified"
         },
+        "JiraBoardSettings": {
+          "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter."
+        },
         "ManageSessionsSection": {
           "9c940434af": "Switch back to the local runtime to restart or kill local daemon sessions.",
           "a06ababda0": "killAll",

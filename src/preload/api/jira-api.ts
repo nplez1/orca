@@ -87,7 +87,7 @@ export type JiraApi = {
     projectKey: string
     siteId?: string
   }) => Promise<JiraProjectStatusOrder>
-  listBoards: (args?: { siteId?: JiraSiteSelection }) => Promise<JiraBoard[]>
+  listBoards: (args?: { siteId?: JiraSiteSelection; name?: string }) => Promise<JiraBoard[]>
   listCustomFields: (args?: { siteId?: JiraSiteSelection }) => Promise<JiraField[]>
   getBoardOverview: (args: { boardId: string; siteId: string }) => Promise<JiraBoardOverview>
   listBoardIssues: (args: JiraBoardIssuePageRequest) => Promise<JiraBoardIssuePage>

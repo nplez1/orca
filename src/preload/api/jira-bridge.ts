@@ -95,7 +95,7 @@ export const jiraApi = {
     projectKey: string
     siteId?: string
   }): Promise<JiraProjectStatusOrder> => ipcRenderer.invoke('jira:getProjectStatusOrder', args),
-  listBoards: (args?: { siteId?: JiraSiteSelection }): Promise<JiraBoard[]> =>
+  listBoards: (args?: { siteId?: JiraSiteSelection; name?: string }): Promise<JiraBoard[]> =>
     ipcRenderer.invoke('jira:listBoards', args),
   listCustomFields: (args?: { siteId?: JiraSiteSelection }): Promise<JiraField[]> =>
     ipcRenderer.invoke('jira:listCustomFields', args),
