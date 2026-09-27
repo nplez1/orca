@@ -17,10 +17,15 @@ import {
   setSubprocessSpawnAttributionEnabled,
   type SubprocessSpawnStats
 } from './main-thread-churn-probe'
-import { recordMainUiHangSample } from './ui-hang-log-sink'
+import {
+  clearUiHangLifecycleMarkers,
+  getUiHangLifecycleMarkers,
+  recordMainUiHangSample
+} from './ui-hang-log-sink'
 
 export const MAIN_THREAD_STALL_TICK_MS = 500
 export const MAIN_THREAD_STALL_THRESHOLD_MS = 250
+export const MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS = 100
 
 export type MainThreadStallProbeOptions = {
   /** Read live so the Debug Options toggle applies without a restart. */
@@ -34,6 +39,8 @@ export type MainThreadStallProbeOptions = {
   stallThresholdMs?: number
   /** Injectable for tests; defaults to the shared main-process spawn collector. */
   drainSpawns?: () => Record<string, SubprocessSpawnStats>
+  /** Injectable for tests; returns cumulative process CPU time in microseconds. */
+  cpuUsage?: () => NodeJS.CpuUsage
 }
 
 /** Installs a setting-gated main-thread stall probe. Returns a disposer. */
@@ -41,15 +48,21 @@ export function installMainThreadStallProbe(options: MainThreadStallProbeOptions
   const tickMs = options.tickMs ?? MAIN_THREAD_STALL_TICK_MS
   const isVisible = options.isVisible ?? ((): boolean => true)
   const drainSpawns = options.drainSpawns ?? drainSubprocessSpawnStats
+  const readCpuUsage = options.cpuUsage ?? (() => process.cpuUsage())
   let stopInterval: (() => void) | null = null
+  const pendingStallWrites = new Set<ReturnType<typeof setTimeout>>()
 
   const stop = (): void => {
-    if (!stopInterval) {
-      return
+    if (stopInterval) {
+      stopInterval()
+      stopInterval = null
+      setSubprocessSpawnAttributionEnabled(false)
     }
-    stopInterval()
-    stopInterval = null
-    setSubprocessSpawnAttributionEnabled(false)
+    for (const timer of pendingStallWrites) {
+      clearTimeout(timer)
+    }
+    pendingStallWrites.clear()
+    clearUiHangLifecycleMarkers()
   }
 
   const sync = (): void => {
@@ -64,26 +77,56 @@ export function installMainThreadStallProbe(options: MainThreadStallProbeOptions
     // Why a fresh detector per start: a stopped interval accumulates an unbounded gap, and the
     // first tick after re-enabling would otherwise be logged as one huge fake stall.
     let drainedSpawns: Record<string, SubprocessSpawnStats> = {}
+    let previousCpuUsage: NodeJS.CpuUsage | null = null
+    let cpuUsageDelta: { userMs: number; systemMs: number } | null = null
+    try {
+      previousCpuUsage = readCpuUsage()
+    } catch {
+      // CPU timing is supplementary; a failed snapshot must not disable stall detection.
+    }
     const detector = createStallDetector({
       tickMs,
       stallThresholdMs: options.stallThresholdMs ?? MAIN_THREAD_STALL_THRESHOLD_MS,
       now: options.now ?? ((): number => performance.now()),
       wallNow: options.wallNow ?? ((): number => Date.now()),
-      onStall: (durationMs, capturedAtMs) => {
-        try {
-          recordMainUiHangSample({
-            signal: 'main-stall',
-            durationMs,
-            surface: 'main',
-            visible: isVisible(),
-            capturedAtMs,
-            // Why non-empty only: an empty attribution object would read as "measured nothing"
-            // rather than "no spawns in this window".
-            ...(Object.keys(drainedSpawns).length > 0 ? { spawns: drainedSpawns } : {})
-          })
-        } catch {
-          // Best-effort telemetry.
-        }
+      onStall: (durationMs, capturedAtMs, interval) => {
+        // Why defer this rare write: queued focus/visibility IPC can arrive just after the main
+        // loop recovers; let it enter the bounded timeline before snapshotting stall context.
+        const timer = setTimeout(() => {
+          pendingStallWrites.delete(timer)
+          if (!options.isEnabled()) {
+            return
+          }
+          try {
+            recordMainUiHangSample({
+              signal: 'main-stall',
+              durationMs,
+              surface: 'main',
+              visible: isVisible(),
+              capturedAtMs,
+              wallDurationMs: interval.wallEndedAtMs - interval.wallStartedAtMs,
+              intervalStartedAtWallMs: interval.wallStartedAtMs,
+              intervalEndedAtWallMs: interval.wallEndedAtMs,
+              lifecycle: getUiHangLifecycleMarkers(
+                interval.wallStartedAtMs,
+                interval.wallEndedAtMs + MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS
+              ),
+              ...(cpuUsageDelta
+                ? {
+                    processCpuUserMs: cpuUsageDelta.userMs,
+                    processCpuSystemMs: cpuUsageDelta.systemMs
+                  }
+                : {}),
+              // Why non-empty only: an empty attribution object would read as "measured nothing"
+              // rather than "no spawns in this window".
+              ...(Object.keys(drainedSpawns).length > 0 ? { spawns: drainedSpawns } : {})
+            })
+          } catch {
+            // Best-effort telemetry.
+          }
+        }, MAIN_STALL_LIFECYCLE_CORRELATION_GRACE_MS)
+        timer.unref?.()
+        pendingStallWrites.add(timer)
       }
     })
     // Why drain every tick, not only on a stall: the blocking code prevents this callback from
@@ -91,6 +134,19 @@ export function installMainThreadStallProbe(options: MainThreadStallProbeOptions
     // (plus at most one healthy tick), and nothing accumulates unbounded between stalls.
     const tick = (): void => {
       drainedSpawns = drainSpawns()
+      cpuUsageDelta = null
+      try {
+        const currentCpuUsage = readCpuUsage()
+        if (previousCpuUsage) {
+          cpuUsageDelta = {
+            userMs: Math.max(0, currentCpuUsage.user - previousCpuUsage.user) / 1_000,
+            systemMs: Math.max(0, currentCpuUsage.system - previousCpuUsage.system) / 1_000
+          }
+        }
+        previousCpuUsage = currentCpuUsage
+      } catch {
+        previousCpuUsage = null
+      }
       detector.tick()
     }
     const timer = setInterval(tick, tickMs)
