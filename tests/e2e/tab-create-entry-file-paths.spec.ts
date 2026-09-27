@@ -18,7 +18,7 @@ test('new-tab file results prioritize the filename and reveal the full path on h
   await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
 
-  const newTab = orcaPage.getByRole('button', { name: 'New tab' })
+  const newTab = orcaPage.getByRole('button', { name: 'New tab', exact: true })
   // Why: aria-controls is only set after results exist, so it cannot be the
   // open-state locator. aria-autocomplete is always on this input and is not
   // translated copy.
