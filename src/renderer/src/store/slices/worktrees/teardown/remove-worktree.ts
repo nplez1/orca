@@ -9,7 +9,6 @@ import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-contro
 import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { readIpcErrorDetail } from '@/lib/ipc-error'
 import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/archive-hook-removal-gate'
-import { showPreservedBranchToast } from '@/components/sidebar/preserved-branch-toast'
 import {
   resolveWorktreeOperationRouteResult,
   resolveWorktreeOperationRouteResultForHost,
@@ -28,11 +27,10 @@ import {
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
 } from '../../../../../../shared/worktree/removal'
-import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
 import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
-import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
+import { finalizePreservedBranchRemoval } from './preserved-branch-removal-completion'
 import {
   isRuntimeRepoNotFoundError,
   isRuntimeSelectorNotFoundError
@@ -257,51 +255,32 @@ export function createRemoveWorktree(
       })
       // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
       clearSessionCommitDraftForWorktree(worktreeId)
-      const { preservedBranch, remoteBranchCleanup } = removalResult ?? {}
-      const cleanup = preservedBranch
-        ? {
-            worktreeId,
-            branchName: preservedBranch.branchName,
-            expectedHead: preservedBranch.head,
-            ...(hostId ? { hostId } : {}),
-            ...(removalRoute?.runtimeEnvironmentId
-              ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
-              : {})
-          }
-        : null
-      if (preservedBranch) {
-        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup!), {
-          cleanup: cleanup!,
-          target
-        })
-      }
-      if (preservedBranch && options?.suppressPreservedBranchToast !== true) {
-        showPreservedBranchToast(removalResult, worktreeBeforeRemoval, (branch, expectedHead) => {
-          void get().forceDeletePreservedBranch(worktreeId, branch, expectedHead, {
+      const preservedBranch = finalizePreservedBranchRemoval(removalResult, {
+        worktreeId,
+        hostId,
+        runtimeEnvironmentId: removalRoute?.runtimeEnvironmentId,
+        target,
+        worktreeBeforeRemoval,
+        suppressToast: options?.suppressPreservedBranchToast === true,
+        onForceDelete: (branchName, expectedHead) => {
+          void get().forceDeletePreservedBranch(worktreeId, branchName, expectedHead, {
             ...(hostId ? { hostId } : {}),
             ...(removalRoute?.runtimeEnvironmentId
               ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
               : {})
           })
-        })
-      }
+        }
+      })
       pruneHostedReviewLinkMutationGenerations([worktreeId])
+      const remoteBranchCleanup = removalResult?.remoteBranchCleanup
       // Why: this rebuilds the result as a literal, so every field a caller reads has to be named
       // here — `remoteBranchCleanup` is optional in the type, so omitting it typechecks and then
       // silently reports nothing about a remote branch the user asked to delete.
-      return preservedBranch && cleanup
-        ? {
-            ok: true as const,
-            ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
-            preservedBranch: {
-              ...preservedBranch,
-              ...(cleanup.hostId ? { hostId: cleanup.hostId } : {}),
-              ...(cleanup.runtimeEnvironmentId
-                ? { runtimeEnvironmentId: cleanup.runtimeEnvironmentId }
-                : {})
-            }
-          }
-        : { ok: true as const, ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}) }
+      return {
+        ok: true as const,
+        ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
+        ...(preservedBranch ? { preservedBranch } : {})
+      }
     } catch (err) {
       // Why: git refusing a non-force delete for dirty/untracked files is a handled user decision, not an app error.
       console.warn('Failed to remove worktree:', err)

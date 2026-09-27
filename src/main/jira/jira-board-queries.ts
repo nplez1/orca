@@ -11,18 +11,30 @@ import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
+import { withJiraQueuedDeadline } from './jira-read-failure'
 import {
   asFiniteNumber,
   asIdentifier,
   asRecord,
   asString,
   fetchPagedRecords,
+  getPageItems,
+  type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
 
 const JIRA_AGILE_API = '/rest/agile/1.0'
 const BOARD_PAGE_SIZE = 50
 const BOARD_ISSUE_PAGE_SIZE = 100
+// Why: a stalled settings read left these selects disabled with no way to retry.
+const BOARD_SETTINGS_READ_TIMEOUT_MS = 30_000
+
+function readBoardSettings<T>(
+  description: string,
+  read: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  return withJiraQueuedDeadline(description, BOARD_SETTINGS_READ_TIMEOUT_MS, read)
+}
 
 function mapBoard(value: unknown, siteId: string, siteName: string): JiraBoard | null {
   const board = asRecord(value)
@@ -96,39 +108,42 @@ function getSingleClient(siteId: string) {
   return entries[0]
 }
 
-export async function listBoards(siteId?: JiraSiteSelection | null): Promise<JiraBoard[]> {
+export async function listBoards(
+  siteId?: JiraSiteSelection | null,
+  name?: string
+): Promise<JiraBoard[]> {
   const entries = getClients(siteId)
   if (entries.length === 0) {
     return []
   }
+  const query = name?.trim() ?? ''
   const boardsBySite = await Promise.all(
-    entries.map(async (entry) => {
-      await acquire()
-      try {
-        const records = await fetchPagedRecords(
-          entry,
-          'values',
-          (startAt, maxResults) => {
-            const params = new URLSearchParams({
-              startAt: String(startAt),
-              maxResults: String(maxResults)
-            })
-            return `${JIRA_AGILE_API}/board?${params.toString()}`
-          },
-          BOARD_PAGE_SIZE
-        )
-        return records
-          .map((board) => mapBoard(board, entry.site.id, entry.site.displayName))
-          .filter((board): board is JiraBoard => board !== null)
-      } catch (error) {
-        if (isAuthError(error)) {
-          clearToken(entry.site.id)
+    entries.map((entry) =>
+      readBoardSettings('board list', async (signal) => {
+        try {
+          const params = new URLSearchParams({ maxResults: String(BOARD_PAGE_SIZE) })
+          if (query) {
+            params.set('name', query)
+          }
+          // Why: a large self-hosted site can serve thousands of boards; paging all
+          // of them took ~74s and still missed the board being picked. One page plus
+          // the server-side name filter is what makes the settings select usable.
+          const response = await jiraRequest<JiraPagedResponse<JiraRecord>>(
+            entry,
+            `${JIRA_AGILE_API}/board?${params.toString()}`,
+            { signal }
+          )
+          return getPageItems(response, 'values')
+            .map((board) => mapBoard(board, entry.site.id, entry.site.displayName))
+            .filter((board): board is JiraBoard => board !== null)
+        } catch (error) {
+          if (isAuthError(error)) {
+            clearToken(entry.site.id)
+          }
+          throw error
         }
-        throw error
-      } finally {
-        release()
-      }
-    })
+      })
+    )
   )
   return boardsBySite.flat().sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -139,22 +154,23 @@ export async function listCustomFields(siteId?: JiraSiteSelection | null): Promi
     return []
   }
   const fieldsBySite = await Promise.all(
-    entries.map(async (entry) => {
-      await acquire()
-      try {
-        const fields = await jiraRequest<unknown>(entry, `${apiBasePath(entry.site)}/field`)
-        return (Array.isArray(fields) ? fields : [])
-          .map((field) => mapField(field, entry.site.id, entry.site.displayName))
-          .filter((field): field is JiraField => field !== null)
-      } catch (error) {
-        if (isAuthError(error)) {
-          clearToken(entry.site.id)
+    entries.map((entry) =>
+      readBoardSettings('custom fields', async (signal) => {
+        try {
+          const fields = await jiraRequest<unknown>(entry, `${apiBasePath(entry.site)}/field`, {
+            signal
+          })
+          return (Array.isArray(fields) ? fields : [])
+            .map((field) => mapField(field, entry.site.id, entry.site.displayName))
+            .filter((field): field is JiraField => field !== null)
+        } catch (error) {
+          if (isAuthError(error)) {
+            clearToken(entry.site.id)
+          }
+          throw error
         }
-        throw error
-      } finally {
-        release()
-      }
-    })
+      })
+    )
   )
   return fieldsBySite.flat().sort((a, b) => a.name.localeCompare(b.name))
 }

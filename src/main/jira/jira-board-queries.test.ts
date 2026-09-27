@@ -73,6 +73,35 @@ function issueRecord(teamValue: unknown = undefined) {
   }
 }
 
+async function expectSettingsReadTimeout(read: () => Promise<unknown>): Promise<void> {
+  vi.useFakeTimers()
+  try {
+    jiraRequestMock.mockImplementation(
+      (_entry: unknown, _path: unknown, init: RequestInit | undefined) =>
+        new Promise<never>((_resolve, reject) => {
+          const signal = init?.signal
+          if (!signal) {
+            reject(new Error('Expected a Jira settings request to be abortable.'))
+            return
+          }
+          signal.addEventListener('abort', () => reject(new Error('Jira request aborted')), {
+            once: true
+          })
+        })
+    )
+    const pendingRead = read()
+    const rejection = expect(pendingRead).rejects.toThrow('request timed out')
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await rejection
+    expect(acquireMock).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(releaseMock).toHaveBeenCalledOnce()
+  } finally {
+    vi.useRealTimers()
+  }
+}
+
 describe('Jira board queries', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -83,22 +112,19 @@ describe('Jira board queries', () => {
     releaseMock.mockImplementation(() => {})
   })
 
-  it('lists accessible boards across every page and includes the Jira site identity', async () => {
-    jiraRequestMock
-      .mockResolvedValueOnce({
-        startAt: 0,
-        maxResults: 1,
-        total: 2,
-        isLast: false,
-        values: [{ id: 42, name: 'Payments', type: 'scrum' }]
-      })
-      .mockResolvedValueOnce({
-        startAt: 1,
-        maxResults: 1,
-        total: 2,
-        isLast: true,
-        values: [{ id: 43, name: 'Payments Archive', type: 'kanban' }]
-      })
+  it('reads one board page with the site identity instead of paging the whole site', async () => {
+    // A large self-hosted site answers `total: 5000+`; paging it took ~74s and still
+    // missed the board being picked, so the read must stop after the first page.
+    jiraRequestMock.mockResolvedValueOnce({
+      startAt: 0,
+      maxResults: 50,
+      total: 5000,
+      isLast: false,
+      values: [
+        { id: 42, name: 'Payments', type: 'scrum' },
+        { id: 43, name: 'Payments Archive', type: 'kanban' }
+      ]
+    })
     const { listBoards } = await import('./jira-board-queries')
 
     await expect(listBoards('site-1')).resolves.toEqual([
@@ -118,9 +144,43 @@ describe('Jira board queries', () => {
       }
     ])
     expect(jiraRequestMock.mock.calls.map((call) => call[1])).toEqual([
-      '/rest/agile/1.0/board?startAt=0&maxResults=50',
-      '/rest/agile/1.0/board?startAt=1&maxResults=50'
+      '/rest/agile/1.0/board?maxResults=50'
     ])
+  })
+
+  it('filters boards by name server-side when the picker searches', async () => {
+    jiraRequestMock.mockResolvedValueOnce({
+      startAt: 0,
+      maxResults: 50,
+      isLast: true,
+      values: [{ id: 37169, name: 'Ps Nebulite Scrum Board', type: 'scrum' }]
+    })
+    const { listBoards } = await import('./jira-board-queries')
+
+    await expect(listBoards('site-1', '  Nebulite  ')).resolves.toEqual([
+      {
+        id: '37169',
+        name: 'Ps Nebulite Scrum Board',
+        type: 'scrum',
+        siteId: 'site-1',
+        siteName: 'Example Jira'
+      }
+    ])
+    expect(jiraRequestMock.mock.calls[0][1]).toBe(
+      '/rest/agile/1.0/board?maxResults=50&name=Nebulite'
+    )
+  })
+
+  it('times out a stalled board list read and releases its request slot', async () => {
+    const { listBoards } = await import('./jira-board-queries')
+
+    await expectSettingsReadTimeout(() => listBoards('site-1'))
+  })
+
+  it('times out a stalled custom-field read and releases its request slot', async () => {
+    const { listCustomFields } = await import('./jira-board-queries')
+
+    await expectSettingsReadTimeout(() => listCustomFields('site-1'))
   })
 
   it('lists custom fields with their schema types and omits standard fields', async () => {

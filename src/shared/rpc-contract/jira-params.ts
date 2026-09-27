@@ -14,6 +14,16 @@ export const SiteSelection = z
   })
   .optional()
 
+// Why: a site can expose thousands of boards, so the settings picker filters them
+// by name server-side instead of paging the whole list. `name` is additive: older
+// clients that send only siteId keep the unfiltered first page.
+export const BoardListQuery = z
+  .object({
+    siteId: OptionalString,
+    name: OptionalString
+  })
+  .optional()
+
 export const Connect = z.object({
   siteUrl: requiredString('Site URL is required'),
   // Self-hosted PAT auth needs no email; connect() enforces it for Cloud.

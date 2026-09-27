@@ -115,6 +115,9 @@ export type JiraBoard = {
 export type JiraBoardSelection = {
   boardId: string
   siteId: string
+  // Why: a large Jira site returns only the first page of boards, so the settings
+  // picker keeps the chosen board's name to render the setting it is showing.
+  name?: string
 }
 
 export type JiraBoardColumn = {

@@ -11,10 +11,15 @@ import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-t
 
 export async function jiraListBoards(
   settings: RuntimeJiraSettings,
-  siteId?: JiraSiteSelection | null
+  siteId?: JiraSiteSelection | null,
+  name?: string
 ): Promise<JiraBoard[]> {
   const target = getJiraRuntimeTarget(settings)
-  const args = siteId ? { siteId } : undefined
+  const trimmedName = name?.trim()
+  const args =
+    siteId || trimmedName
+      ? { ...(siteId ? { siteId } : {}), ...(trimmedName ? { name: trimmedName } : {}) }
+      : undefined
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraBoard[]>(target, 'jira.listBoards', args, { timeoutMs: 30_000 })
     : window.api.jira.listBoards(args)

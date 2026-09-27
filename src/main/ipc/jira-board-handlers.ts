@@ -10,11 +10,22 @@ function normalizeBoardSiteSelection(value: unknown): JiraSiteSelection | undefi
   return siteId ? siteId : undefined
 }
 
+function normalizeBoardName(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const name = value.trim()
+  return name ? name : undefined
+}
+
 /** Registers the Jira board and custom-field IPC handlers. */
 export function registerJiraBoardHandlers(): void {
-  ipcMain.handle('jira:listBoards', async (_event, args?: { siteId?: JiraSiteSelection }) => {
-    return listBoards(normalizeBoardSiteSelection(args?.siteId))
-  })
+  ipcMain.handle(
+    'jira:listBoards',
+    async (_event, args?: { siteId?: JiraSiteSelection; name?: string }) => {
+      return listBoards(normalizeBoardSiteSelection(args?.siteId), normalizeBoardName(args?.name))
+    }
+  )
 
   ipcMain.handle('jira:listCustomFields', async (_event, args?: { siteId?: JiraSiteSelection }) => {
     return listCustomFields(normalizeBoardSiteSelection(args?.siteId))
