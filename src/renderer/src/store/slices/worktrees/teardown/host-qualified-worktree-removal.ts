@@ -25,10 +25,11 @@ import {
 import { translate } from '@/i18n/i18n'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { purgeOrphanedRuntimeSshProjects } from './orphaned-runtime-ssh-project-purge'
-import { showPreservedBranchToast } from '@/components/sidebar/preserved-branch-toast'
 
-import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
-import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
+import {
+  finalizePreservedBranchRemoval,
+  type PreservedBranchToastWorktree
+} from './preserved-branch-removal-completion'
 import { worktreeHostMatchOptions, worktreeMatchesHost } from '../listing/worktree-host-ownership'
 import {
   dropConfirmedHostRow,
@@ -39,7 +40,7 @@ import {
 
 export { prepareHostScopedRemovalCompletion, preservesSameIdRendererState }
 
-type PreservedBranchWorktree = Parameters<typeof showPreservedBranchToast>[1]
+type PreservedBranchWorktree = PreservedBranchToastWorktree
 type RemoveWorktreeSliceResult = Awaited<ReturnType<WorktreeSlice['removeWorktree']>>
 
 /** Route at the confirmed host when there is one, else the ordinary active-host route. */
@@ -233,34 +234,24 @@ export async function completeSameIdHostScopedRemoval(args: {
   if (!args.rowAlreadyDropped) {
     dropConfirmedHostRow(set, worktreeId, requiredExecutionHostId)
   }
-  const preservedBranch = removalResult?.preservedBranch
+  const preservedBranch = finalizePreservedBranchRemoval(removalResult, {
+    worktreeId,
+    hostId: requiredExecutionHostId,
+    runtimeEnvironmentId: removalRoute?.runtimeEnvironmentId,
+    target,
+    worktreeBeforeRemoval,
+    suppressToast: suppressPreservedBranchToast,
+    onForceDelete: (branchName, expectedHead) => {
+      void get().forceDeletePreservedBranch(worktreeId, branchName, expectedHead, {
+        hostId: requiredExecutionHostId,
+        ...(removalRoute?.runtimeEnvironmentId
+          ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
+          : {})
+      })
+    }
+  })
   if (!preservedBranch) {
     return { ok: true as const }
   }
-  const runtimeEnvironment = removalRoute?.runtimeEnvironmentId
-    ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
-    : {}
-  const cleanup = {
-    worktreeId,
-    branchName: preservedBranch.branchName,
-    expectedHead: preservedBranch.head,
-    hostId: requiredExecutionHostId,
-    ...runtimeEnvironment
-  }
-  preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup), {
-    cleanup,
-    target
-  })
-  if (!suppressPreservedBranchToast) {
-    showPreservedBranchToast(removalResult, worktreeBeforeRemoval, (branch, expectedHead) => {
-      void get().forceDeletePreservedBranch(worktreeId, branch, expectedHead, {
-        hostId: requiredExecutionHostId,
-        ...runtimeEnvironment
-      })
-    })
-  }
-  return {
-    ok: true as const,
-    preservedBranch: { ...preservedBranch, hostId: requiredExecutionHostId, ...runtimeEnvironment }
-  }
+  return { ok: true as const, preservedBranch }
 }
