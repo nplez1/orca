@@ -1,8 +1,8 @@
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { PreservedBranchCleanup } from '../../../../../../shared/preserved-branch-cleanup'
 import type {
-  PreservedWorktreeBranch,
-  RemoveWorktreeResult
+  RemoveWorktreeResult,
+  PreservedWorktreeBranch
 } from '../../../../../../shared/worktree/create-types'
 import type { RendererRemoveWorktreeResult } from '../../renderer-remove-worktree-result'
 
@@ -27,24 +27,15 @@ export function buildPreservedBranchCleanup(args: {
 }
 
 export function buildWorktreeRemovalSuccessResult(args: {
-  preservedBranch: PreservedWorktreeBranch | undefined
-  cleanup: PreservedBranchCleanup | null
+  preservedBranch: RemoveWorktreeResult['preservedBranch'] | null
   remoteBranchCleanup: RemoveWorktreeResult['remoteBranchCleanup']
 }): { ok: true } & RendererRemoveWorktreeResult {
-  const { preservedBranch, cleanup, remoteBranchCleanup } = args
+  const { preservedBranch, remoteBranchCleanup } = args
   // Why: `remoteBranchCleanup` is optional in the type, so omitting it typechecks and then
   // silently reports nothing about a remote branch the user asked to delete.
-  return preservedBranch && cleanup
-    ? {
-        ok: true,
-        ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
-        preservedBranch: {
-          ...preservedBranch,
-          ...(cleanup.hostId ? { hostId: cleanup.hostId } : {}),
-          ...(cleanup.runtimeEnvironmentId
-            ? { runtimeEnvironmentId: cleanup.runtimeEnvironmentId }
-            : {})
-        }
-      }
-    : { ok: true, ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}) }
+  return {
+    ok: true,
+    ...(remoteBranchCleanup ? { remoteBranchCleanup } : {}),
+    ...(preservedBranch ? { preservedBranch } : {})
+  }
 }

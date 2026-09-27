@@ -135,6 +135,46 @@ export const INACTIVE_FETCH_DEBOUNCE_MS = 60 * 1000 // 60 seconds — debounce f
 export const INACTIVE_CODEX_PROBE_STAGGER_MS = 2_000
 export const DEFERRED_STARTUP_ACTIVE_REFRESH_MS = 1000
 
+// Why: the snapshot one fetch-all cycle hands to its apply step; lives with the other
+// service contracts so the cycle module holds execution, not shape.
+export type FetchAllCyclePrepared = {
+  claudeTarget: NormalizedClaudeAccountSelectionTarget
+  claudeGeneration: number
+  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
+  claudeProvenance: string
+  codexTarget: NormalizedCodexAccountSelectionTarget
+  previousState: InternalRateLimitState
+  codexFetchGated: boolean
+  codexStateBeforeFetch: ProviderRateLimits | null
+  codexProvenance: string | null
+  codexGeneration: number
+  opencodeConfigChanged: boolean
+  opencodeGeneration: number
+  miniMaxConfigChanged: boolean
+  miniMaxGeneration: number
+  deepSeekConfigChanged: boolean
+  deepSeekGeneration: number
+  fireworksConfigChanged: boolean
+  fireworksGeneration: number
+  copilotConfigChanged: boolean
+  copilotGeneration: number
+  claudeFetchGated: boolean
+  results: [
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>,
+    PromiseSettledResult<ProviderRateLimits>
+  ]
+  grokResultPromise: Promise<
+    { status: 'fulfilled'; value: ProviderRateLimits } | { status: 'rejected'; reason: unknown }
+  >
+}
+
 // Why: inactive account arrays are derived from provider caches on demand in getState()/pushToRenderer().
 export type InternalRateLimitState = {
   claude: ProviderRateLimits | null
@@ -203,43 +243,4 @@ export function isSameUsageWindow(
     return a === b
   }
   return a.usedPercent === b.usedPercent && a.resetsAt === b.resetsAt
-}
-
-/** Everything one fetch-all cycle resolved before any provider request is issued; the application step re-checks every generation against the live service. */
-export type FetchAllCyclePrepared = {
-  claudeTarget: NormalizedClaudeAccountSelectionTarget
-  claudeGeneration: number
-  claudeAuthPreparation: ClaudeRuntimeAuthPreparation | undefined
-  claudeProvenance: string
-  codexTarget: NormalizedCodexAccountSelectionTarget
-  previousState: InternalRateLimitState
-  codexFetchGated: boolean
-  codexStateBeforeFetch: ProviderRateLimits | null
-  codexProvenance: string | null
-  codexGeneration: number
-  opencodeConfigChanged: boolean
-  opencodeGeneration: number
-  miniMaxConfigChanged: boolean
-  miniMaxGeneration: number
-  deepSeekConfigChanged: boolean
-  deepSeekGeneration: number
-  fireworksConfigChanged: boolean
-  fireworksGeneration: number
-  copilotConfigChanged: boolean
-  copilotGeneration: number
-  claudeFetchGated: boolean
-  results: [
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>
-  ]
-  grokResultPromise: Promise<
-    { status: 'fulfilled'; value: ProviderRateLimits } | { status: 'rejected'; reason: unknown }
-  >
 }
