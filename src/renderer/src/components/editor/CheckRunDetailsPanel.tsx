@@ -10,6 +10,7 @@ import { useCheckRunDetailsFixWithAI } from './check-run-details-fix-with-ai'
 import { formatCheckRunOutputForClipboard } from './check-run-clipboard-text'
 import { CheckRunAnnotations } from './CheckRunAnnotations'
 import { CheckRunJobs } from './CheckRunJobs'
+import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
 
 function formatCheckTimestamp(value: string | null | undefined): string | null {
@@ -302,6 +303,12 @@ export function CheckRunDetailsPanel({
                     />
                   )}
                 </div>
+              </section>
+            )}
+
+            {details?.build && (
+              <section className="rounded-md border border-border bg-background px-3 py-3">
+                <CheckBuildMetadata build={details.build} />
               </section>
             )}
 

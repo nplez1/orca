@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { getAttachedWorktreesForFolderWorkspace } from './folder-workspace-attached-worktrees'
 import { FolderWorkspacePrChecksRow } from './FolderWorkspacePrChecksRow'
 import type { ParentPrChecksRefreshOutcome, ParentPrChecksRow } from './parent-pr-checks-row-types'
@@ -171,19 +172,22 @@ export default function FolderWorkspacePrChecksPanel({
 
   const loadCheckDetails = useCallback(
     (row: ParentPrChecksRow, check: PRCheckDetail): Promise<PRCheckRunDetails | null> => {
-      if (!row.repo) {
+      const repo = row.repo
+      if (!repo) {
         return Promise.resolve(null)
       }
-      return fetchPRCheckDetails(
-        row.repo.path,
-        {
-          checkRunId: check.checkRunId,
-          workflowRunId: check.workflowRunId,
-          checkName: check.name,
-          url: check.url,
-          prRepo: row.githubRepository ?? null
-        },
-        { repoId: row.repo.id }
+      return loadCheckDetailsWithProviderFallback(check, () =>
+        fetchPRCheckDetails(
+          repo.path,
+          {
+            checkRunId: check.checkRunId,
+            workflowRunId: check.workflowRunId,
+            checkName: check.name,
+            url: check.url,
+            prRepo: row.githubRepository ?? null
+          },
+          { repoId: repo.id }
+        )
       )
     },
     [fetchPRCheckDetails]

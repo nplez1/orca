@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { checksPanelAsyncResultKey } from '../checks-panel-async-result-key'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
+import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
 
@@ -112,9 +113,9 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
   )
 
   const handleLoadCheckDetails = useCallback(
-    (check: PRCheckDetail) => {
+    async (check: PRCheckDetail) => {
       if (!repo) {
-        return Promise.resolve(null)
+        return null
       }
       if (check.gitlabJobId) {
         // Why: `settings` (not ownerSettings) is what fetched the job list, so the
@@ -127,16 +128,18 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
           projectRef: gitLabProjectRefRef.current
         })
       }
-      return fetchPRCheckDetails(
-        repo.path,
-        {
-          checkRunId: check.checkRunId,
-          workflowRunId: check.workflowRunId,
-          checkName: check.name,
-          url: check.url,
-          prRepo: pr?.prRepo ?? null
-        },
-        { repoId: repo.id }
+      return loadCheckDetailsWithProviderFallback(check, () =>
+        fetchPRCheckDetails(
+          repo.path,
+          {
+            checkRunId: check.checkRunId,
+            workflowRunId: check.workflowRunId,
+            checkName: check.name,
+            url: check.url,
+            prRepo: pr?.prRepo ?? null
+          },
+          { repoId: repo.id }
+        )
       )
     },
     [fetchPRCheckDetails, pr?.prRepo, repo, settings, gitLabProjectRefRef]

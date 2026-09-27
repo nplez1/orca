@@ -11,6 +11,7 @@ import {
 } from '@/components/github/pr-check-presentation'
 import type { CheckDetailsLoadState } from '@/components/github-checks-tab-state'
 import { translate } from '@/i18n/i18n'
+import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import { assignUniqueListKeys } from './details-list-keys'
 
@@ -120,6 +121,12 @@ export function CheckDetailsPanel({
                   className="mt-2 min-w-0 max-w-full overflow-hidden break-words text-[12px] leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
                 />
               )}
+            </div>
+          )}
+
+          {details?.build && (
+            <div className="min-w-0 rounded-md border border-border/40 bg-background/70 px-2.5 py-2">
+              <CheckBuildMetadata build={details.build} />
             </div>
           )}
 

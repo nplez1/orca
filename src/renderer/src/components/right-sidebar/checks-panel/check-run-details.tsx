@@ -5,9 +5,12 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { GitLabProjectRef } from '../../../../../shared/gitlab-types'
-import type { PRCheckDetail } from '../../../../../shared/github/check-types'
+import type { PRCheckDetail, PRCheckJob } from '../../../../../shared/github/check-types'
+import { visibleCheckSteps } from '../../../../../shared/check-step-visibility'
 import type { GitHubRepositoryIdentity } from '../../../../../shared/github/pull-request-types'
 import { CheckJobLogTail } from '../check-job-log-tail'
+import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
+import { resolveStepOutcome } from '@/components/editor/check-job-step-status'
 import { translate } from '@/i18n/i18n'
 import {
   type CheckDetailsLoadState,
@@ -15,9 +18,11 @@ import {
   formatCheckTimestamp,
   getCheckConclusion,
   getCheckDetailsStickySurfaceClass,
+  getCheckDurationMs,
   getCheckStatusLabel,
   isFailureState
 } from './check-details-model'
+import { CheckBuildMetadata, formatBuildDuration } from '@/components/check-build-metadata'
 
 function ViewFullCheckDetailsButton({
   onClick,
@@ -37,6 +42,34 @@ function ViewFullCheckDetailsButton({
       <PanelRight className="size-3" />
       {label}
     </Button>
+  )
+}
+
+/**
+ * One job's steps or CI stages.
+ *
+ * GitHub Actions keeps its compact failures-only list here; a stage list (Jenkins) shows every
+ * stage, because "which stage is running" has no other answer in this pane.
+ */
+function CheckJobSteps({ job }: { job: PRCheckJob }): React.JSX.Element | null {
+  const steps = visibleCheckSteps(job)
+  if (steps.length === 0) {
+    return null
+  }
+  return (
+    <div className="mt-1 grid gap-0.5 pl-2">
+      {steps.map((step) => (
+        <div
+          // Why not the index: a Jenkins stage list can repeat a stage name in a loop.
+          key={`${step.name}:${step.startedAt ?? ''}`}
+          className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"
+        >
+          <CheckStepOutcomeIcon outcome={resolveStepOutcome(step)} />
+          <span className="min-w-0 flex-1 truncate">{step.name}</span>
+          <span className="shrink-0">{step.conclusion ?? step.status}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -64,6 +97,7 @@ export function CheckRunDetails({
   const details = state?.details
   const startedAt = formatCheckTimestamp(details?.startedAt)
   const completedAt = formatCheckTimestamp(details?.completedAt)
+  const durationMs = getCheckDurationMs(details?.startedAt, details?.completedAt)
   const detailsStatusCheck: PRCheckDetail = {
     ...check,
     status: (details?.status as PRCheckDetail['status'] | undefined) ?? check.status,
@@ -164,6 +198,11 @@ export function CheckRunDetails({
                 {completedAt}
               </span>
             )}
+            {durationMs !== null && (
+              <span>
+                {translate('checkDetails.duration', 'Duration')} {formatBuildDuration(durationMs)}
+              </span>
+            )}
             {check.checkRunId && (
               <span className="font-mono">
                 {translate(
@@ -208,6 +247,8 @@ export function CheckRunDetails({
               </Button>
             </div>
           )}
+
+          <CheckBuildMetadata build={details?.build} className="border-t border-border/60 pt-2" />
 
           {hasOutput && (
             <div className="min-w-0">
@@ -313,24 +354,7 @@ export function CheckRunDetails({
                           )}
                       </span>
                     </div>
-                    {job.steps.length > 0 && (
-                      <div className="mt-1 grid gap-0.5 pl-2">
-                        {job.steps
-                          .filter((step) => {
-                            const state = step.conclusion ?? step.status
-                            return isFailureState(state)
-                          })
-                          .map((step) => (
-                            <div
-                              key={step.name}
-                              className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground"
-                            >
-                              <span className="min-w-0 flex-1 truncate">{step.name}</span>
-                              <span className="shrink-0">{step.conclusion ?? step.status}</span>
-                            </div>
-                          ))}
-                      </div>
-                    )}
+                    <CheckJobSteps job={job} />
                     {job.logTail && <CheckJobLogTail logTail={job.logTail} />}
                   </div>
                 ))}

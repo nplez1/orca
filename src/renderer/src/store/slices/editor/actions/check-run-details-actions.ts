@@ -11,6 +11,7 @@ import {
   type OpenCheckRunDetailsState
 } from '@/components/editor/check-run-details-tab'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
+import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { findWorktreeById, getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import type { OpenFile } from '../types/open-file'
@@ -179,16 +180,18 @@ export function createCheckRunDetailsActions(
               // Why: a fork MR's job lives in the source project, not the repo's own.
               projectRef: checkRunDetails.gitlabProjectRef ?? null
             })
-          : await get().fetchPRCheckDetails(
-              repo.path,
-              {
-                checkRunId: check.checkRunId,
-                workflowRunId: check.workflowRunId,
-                checkName: check.name,
-                url: check.url,
-                prRepo: checkRunDetails.githubRepository ?? null
-              },
-              { repoId: repo.id }
+          : await loadCheckDetailsWithProviderFallback(check, () =>
+              get().fetchPRCheckDetails(
+                repo.path,
+                {
+                  checkRunId: check.checkRunId,
+                  workflowRunId: check.workflowRunId,
+                  checkName: check.name,
+                  url: check.url,
+                  prRepo: checkRunDetails.githubRepository ?? null
+                },
+                { repoId: repo.id }
+              )
             )
         patch({
           details,

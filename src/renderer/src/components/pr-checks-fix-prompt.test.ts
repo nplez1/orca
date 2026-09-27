@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  PROMPT_FAILED_STEP_LIMIT,
   PROMPT_LOG_TAIL_LINES,
   PROMPT_LOG_TAIL_SCAN_CODE_UNITS,
   buildFixBrokenChecksPrompt,
   getCheckDetailsPromptKey,
+  getFailedStepsForCheck,
   truncateLogTailForPrompt
 } from './pr-checks-fix-prompt'
-import type { PRCheckDetail, PRCheckRunDetails } from '../../../shared/github/check-types'
+import type {
+  PRCheckDetail,
+  PRCheckRunDetails,
+  PRCheckStep
+} from '../../../shared/github/check-types'
 
 const failingCheck: PRCheckDetail = {
   name: 'unit',
@@ -247,5 +253,69 @@ describe('truncateLogTailForPrompt', () => {
     expect(truncateLogTailForPrompt(logTail)).toHaveLength(PROMPT_LOG_TAIL_SCAN_CODE_UNITS)
 
     expect(split).not.toHaveBeenCalled()
+  })
+})
+
+describe('getFailedStepsForCheck', () => {
+  const step = (name: string, conclusion: string): PRCheckStep => ({
+    name,
+    status: 'completed',
+    conclusion,
+    startedAt: null,
+    completedAt: null
+  })
+
+  const withSteps = (steps: PRCheckStep[]): PRCheckRunDetails => ({
+    name: 'check',
+    status: 'completed',
+    conclusion: 'failure',
+    url: null,
+    detailsUrl: null,
+    startedAt: null,
+    completedAt: null,
+    title: null,
+    summary: null,
+    text: null,
+    annotations: [],
+    jobs: [
+      {
+        id: null,
+        name: 'job',
+        status: null,
+        conclusion: null,
+        startedAt: null,
+        completedAt: null,
+        url: null,
+        logTail: null,
+        steps
+      }
+    ]
+  })
+
+  it('names the stages that went wrong when there is no log tail to offer', () => {
+    // Why: a Jenkins build has no console excerpt, so the stage list is the whole diagnosis.
+    expect(
+      getFailedStepsForCheck(
+        withSteps([step('Checkout', 'success'), step('Unit tests', 'failure')])
+      )
+    ).toEqual(['Unit tests'])
+  })
+
+  it('counts a stage waiting on a human as needing attention', () => {
+    expect(getFailedStepsForCheck(withSteps([step('Approve deploy', 'action_required')]))).toEqual([
+      'Approve deploy'
+    ])
+  })
+
+  it('deduplicates a repeated stage name and bounds the list', () => {
+    const repeated = Array.from({ length: 8 }, (_, index) => step(`Stage ${index % 2}`, 'failure'))
+    const steps = getFailedStepsForCheck(withSteps(repeated)) ?? []
+    expect(steps).toEqual(['Stage 0', 'Stage 1'])
+    expect(steps.length).toBeLessThanOrEqual(PROMPT_FAILED_STEP_LIMIT)
+  })
+
+  it('says nothing when every step passed or no details were loaded', () => {
+    expect(getFailedStepsForCheck(withSteps([step('Checkout', 'success')]))).toBeUndefined()
+    expect(getFailedStepsForCheck(undefined)).toBeUndefined()
   })
 })

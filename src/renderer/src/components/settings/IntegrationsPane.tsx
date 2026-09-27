@@ -5,6 +5,7 @@ import {
   GitHubIntegrationCard,
   GitLabIntegrationCard
 } from './source-control-integration-cards'
+import { JenkinsIntegrationCard } from './jenkins-integration-card'
 import { JiraIntegrationCard, LinearIntegrationCard } from './task-tracker-integration-cards'
 import { useIntegrationProviderStatusRefresh } from './use-integration-provider-status-refresh'
 import { translate } from '@/i18n/i18n'
@@ -51,6 +52,23 @@ export function IntegrationsPane(): React.JSX.Element {
         <div className="space-y-3">
           <LinearIntegrationCard />
           <JiraIntegrationCard />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">
+            {translate('jenkins.settings.sectionTitle', 'CI providers')}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'jenkins.settings.sectionDescription',
+              'Connect build servers so Orca can show what a pipeline stage is doing without leaving the review.'
+            )}
+          </p>
+        </div>
+        <div className="space-y-3">
+          <JenkinsIntegrationCard />
         </div>
       </section>
     </div>

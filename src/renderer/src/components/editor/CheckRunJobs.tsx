@@ -1,31 +1,20 @@
 import React from 'react'
-import { CheckCircle2, ChevronDown, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronDown, XCircle } from 'lucide-react'
+import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
 import { CheckJobLogTail } from '@/components/right-sidebar/check-job-log-tail'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
-import { resolveStepOutcome, summarizeJobSteps, type StepOutcome } from './check-job-step-status'
+import { rendersEveryStep } from '../../../../shared/check-step-visibility'
+import { resolveStepOutcome, summarizeJobSteps } from './check-job-step-status'
 import { formatJobsForClipboard } from './check-run-clipboard-text'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
-
-function StepOutcomeIcon({ outcome }: { outcome: StepOutcome }): React.JSX.Element {
-  switch (outcome) {
-    case 'success':
-      return <CheckCircle2 className="size-3.5 shrink-0 text-status-success" />
-    case 'failure':
-      return <XCircle className="size-3.5 shrink-0 text-destructive" />
-    case 'skipped':
-      return <MinusCircle className="size-3.5 shrink-0 text-muted-foreground/60" />
-    case 'pending':
-      return <CircleDashed className="size-3.5 shrink-0 text-muted-foreground" />
-  }
-}
 
 function StepRow({ step }: { step: PRCheckStep }): React.JSX.Element {
   const outcome = resolveStepOutcome(step)
   return (
     <div className="flex min-w-0 items-center gap-2 py-1 text-xs">
-      <StepOutcomeIcon outcome={outcome} />
+      <CheckStepOutcomeIcon outcome={outcome} />
       <span
         className={cn(
           'min-w-0 flex-1 truncate',
@@ -45,7 +34,13 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
   // Failures matter most, so surface them and collapse the passing/skipped noise
   // behind a one-line summary. With no failures there is nothing to prioritize,
   // so expand by default rather than hiding the job's only content.
-  const collapsible = [...breakdown.succeeded, ...breakdown.skipped, ...breakdown.pending]
+  // Why: a CI stage list is the job's content, not a drill-down — collapsing it would hide the
+  // stage that is still running, which is the whole reason to look.
+  const showsEveryStep = rendersEveryStep(job)
+  const collapsible = showsEveryStep
+    ? []
+    : [...breakdown.succeeded, ...breakdown.skipped, ...breakdown.pending]
+  const primarySteps = showsEveryStep ? job.steps : breakdown.failed
   const failedStepKey = breakdown.failed
     .map((step) => `${step.name}:${step.status ?? ''}:${step.conclusion ?? ''}`)
     .join('\0')
@@ -55,7 +50,7 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
   }, [breakdown.failed.length, failedStepKey])
 
   const summaryParts: string[] = []
-  if (breakdown.succeeded.length > 0) {
+  if (!showsEveryStep && breakdown.succeeded.length > 0) {
     summaryParts.push(
       `${breakdown.succeeded.length} ${translate(
         'auto.components.editor.CheckRunJobs.1c0a4d7e02',
@@ -63,7 +58,7 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
       )}`
     )
   }
-  if (breakdown.skipped.length > 0) {
+  if (!showsEveryStep && breakdown.skipped.length > 0) {
     summaryParts.push(
       `${breakdown.skipped.length} ${translate(
         'auto.components.editor.CheckRunJobs.2d3b8f1a55',
@@ -71,7 +66,7 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
       )}`
     )
   }
-  if (breakdown.pending.length > 0) {
+  if (!showsEveryStep && breakdown.pending.length > 0) {
     summaryParts.push(
       `${breakdown.pending.length} ${translate(
         'auto.components.editor.CheckRunJobs.3e6c9a2b71',
@@ -101,10 +96,10 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
         )}
       </div>
 
-      {breakdown.failed.length > 0 && (
+      {primarySteps.length > 0 && (
         <div className="mt-2 grid gap-0.5">
-          {breakdown.failed.map((step) => (
-            <StepRow key={step.name} step={step} />
+          {primarySteps.map((step) => (
+            <StepRow key={`${step.name}:${step.startedAt ?? ''}`} step={step} />
           ))}
         </div>
       )}
@@ -132,7 +127,7 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
           {showRest && (
             <div className="mt-0.5 grid gap-0.5 pl-5">
               {collapsible.map((step) => (
-                <StepRow key={step.name} step={step} />
+                <StepRow key={`${step.name}:${step.startedAt ?? ''}`} step={step} />
               ))}
             </div>
           )}
