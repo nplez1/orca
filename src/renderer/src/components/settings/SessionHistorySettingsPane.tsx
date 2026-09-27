@@ -92,7 +92,7 @@ export function SessionHistorySettingsPane({
   )
 
   function writePolicy(updates: Partial<typeof policy>): Promise<void> {
-    if (updates.enabled !== undefined) {
+    if (updates.contentEnabled !== undefined) {
       // Why: switching search proves the user found it; turning it off later must not re-offer the tip.
       markFeatureTipsSeen(['agent-session-search'])
     }
