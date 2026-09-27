@@ -243,8 +243,9 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
-- **2026-09-27** — onto upstream `27b823f934` (206 commits), from the released tip `2ca7d38b4f`
-  (np.13 released). **116 commits replayed**, plus this sync's two fix commits on top
+- **2026-09-27 — released as `v1.4.214-np.14`** from `fd69125d49` (workflow run 36342286779,
+  signed and notarized), onto upstream `27b823f934` (206 commits), from the released tip
+  `2ca7d38b4f` (np.13 released). **116 commits replayed**, plus this sync's two fix commits on top
   (`c4a09ba325`, `1c7a5ceb85`): **92 byte-identical by `range-diff`, 24 adapted, none dropped,
   none added.** Twenty-two of the 116 stopped on a conflict, across 40 distinct files; every hunk
   classified as an additive union or a re-seat of the fork's intent onto upstream's refactor, so no
