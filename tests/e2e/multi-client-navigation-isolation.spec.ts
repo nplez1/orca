@@ -307,7 +307,7 @@ test('shows only provider-backed creation actions in paired web', async ({
       )
       .toBe(true)
 
-    await client.getByRole('button', { name: 'New tab' }).first().click()
+    await client.getByRole('button', { name: 'New tab', exact: true }).first().click()
     await expect(client.getByRole('menuitem', { name: /New Terminal/i })).toBeVisible()
     await expect(client.getByRole('menuitem', { name: /New Browser Tab/i })).toBeVisible()
     await expect(client.getByRole('menuitem', { name: /New Markdown/i })).toBeVisible()

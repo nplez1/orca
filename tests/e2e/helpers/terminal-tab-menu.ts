@@ -31,7 +31,7 @@ export async function createTerminalTabFromMenu(page: Page): Promise<string> {
   const tabsBefore = await tabBar.locator(SORTABLE_TAB).count()
   const activeBefore = await getActiveTabId(page)
 
-  await tabBar.getByRole('button', { name: 'New tab' }).click()
+  await tabBar.getByRole('button', { name: 'New tab', exact: true }).click()
   await page
     .getByRole('menuitem', { name: /New Terminal/i })
     .first()
