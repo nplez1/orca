@@ -252,7 +252,10 @@ pnpm run sync:localization-runtime-catalog
   - **Rate-limits providers, unioned onto upstream's `service/` split.** Upstream added a `cursor`
     provider to every enumeration the fork adds `deepseek`/`fireworks` to, and both sides added a
     money readout (`credits`/`allowance`). `service-types.ts`'s moved `FetchAllCyclePrepared`
-    (from `#33`) took upstream's `SettledProviderResult` and `cursorResultPromise`.
+    (from `#33`) took upstream's `SettledProviderResult` and `cursorResultPromise`. Still only
+    covered per provider: no single test drives `cursor`, `deepseek` and `fireworks` together
+    through state → polling → result-policy, so the shared contract is the residual risk of this
+    sync's largest union.
   - **Two "upstream built the same thing" re-seats, both kept on the fork's subsystem.**
     `appearance-status-bar-provider-toggles.ts` (the fork's delegation) took upstream's
     `getCursorStatusBarToggleSearchEntry()`, and `status-bar-default-on-migrations.ts` took
@@ -273,10 +276,13 @@ pnpm run sync:localization-runtime-catalog
   - **`local(identity)` re-applied onto surfaces upstream rewrote.** The ZCode hook test now derives
     its directory from `HOME_DIRECTORY_NAME`; `wsl-managed-cli`'s new fixture uses
     `orca-np.exe`/`orca-np-dev`; `daemon-host-relocation.test.ts` no longer hardcodes `Orca`;
-    `ORCA_CLI_COMMAND` keeps the fork's `orca-np` literal. **Flagged for the owner:** upstream's
-    `getWslCliCommandName` still names the managed WSL launcher `orca-ide` while `ORCA_CLI_COMMAND`
-    is `orca-np`, and the fork's own `65a6f58639` says `orca-ide` "no longer names the installed
-    command" — those two may want to converge.
+    `ORCA_CLI_COMMAND` keeps the fork's `orca-np` literal. Upstream's new `getManagedWslCliDir`
+    named the managed launcher `orca-ide` (via `getWslCliCommandName`), which `WSL_MANAGED_CLI_PATH_RESTORE`
+    checks against `$ORCA_WSL_CLI_DIR/$ORCA_CLI_COMMAND` — so the managed dir was never added to
+    PATH and every WSL shell warned "Orca CLI unavailable". The launcher is now named by the new
+    `getManagedWslCliLauncherName` (`orca-np`/`orca-np-dev`, matching `ORCA_CLI_COMMAND`), while
+    `getWslCliCommandName` keeps upstream's `orca-ide` for the browser command, which resolves
+    through the guest registration.
   - **Measured ratchets, never chosen:** `DIRECT_IMPORTER_PIN` 152 → 148 → 147 and
     `UNHIDDEN_SPAWNER_PIN` 61 → 60, each taken from the failing test's own message after the
     allowlist settled.

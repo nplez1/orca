@@ -5,12 +5,24 @@ import { getAppEnvironment } from '../../shared/app-environment'
 import { windowsPowerShellPath } from '../../shared/child-process/windows-system-binary'
 import { writeShellWrapperFiles } from '../shell-wrapper-file-writer'
 import { getBundledLauncherPath, LINUX_CLI_COMMAND_NAME } from './bundled-cli-launcher-path'
-import { DEV_COMMAND_NAME } from './cli-install-constants'
+import { DEV_COMMAND_NAME, CLI_COMMAND_NAME } from './cli-install-constants'
 import { buildColocatedWslLauncher, buildWslBridgeScript } from './wsl-cli-scripts'
 
 /** Packaged builds share `orca-ide` with guest registration; dev builds get their own name. */
 export function getWslCliCommandName(isPackaged: boolean): string {
   return isPackaged ? LINUX_CLI_COMMAND_NAME : DEV_COMMAND_NAME
+}
+
+/**
+ * Name of the launcher written into the managed WSL CLI directory.
+ *
+ * Why it is not `getWslCliCommandName`: the WSL restore script exports PATH only when
+ * `$ORCA_WSL_CLI_DIR/$ORCA_CLI_COMMAND` is executable, so the managed launcher must carry the
+ * name the PTY env exports for this fork (`orca-np`), while `ORCA_CLI_COMMAND` and the browser
+ * command keep separate meanings upstream unified onto the guest-registration name (`orca-ide`).
+ */
+export function getManagedWslCliLauncherName(isPackaged: boolean): string {
+  return isPackaged ? CLI_COMMAND_NAME : DEV_COMMAND_NAME
 }
 
 let warnedMissingRuntime = false
@@ -43,7 +55,7 @@ export function getManagedWslCliDir(opts: {
   const digest = createHash('sha256').update(launcher).update(bridge).digest('hex').slice(0, 20)
   const directory = join(opts.userDataPath, 'wsl-managed-cli', digest)
   const files = [
-    [join(directory, getWslCliCommandName(opts.isPackaged)), launcher],
+    [join(directory, getManagedWslCliLauncherName(opts.isPackaged)), launcher],
     [join(directory, 'orca-wsl-bridge.ps1'), bridge]
   ] as const
   const ready =
