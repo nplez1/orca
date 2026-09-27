@@ -76,14 +76,16 @@ export async function fetchPagedRecords(
   entry: JiraClientForSite,
   key: JiraPageItemKey,
   pathForPage: (startAt: number, maxResults: number) => string,
-  maxResults = 100
+  maxResults = 100,
+  signal?: AbortSignal
 ): Promise<JiraRecord[]> {
   const records: JiraRecord[] = []
   let startAt = 0
   for (let guard = 0; guard < 100; guard += 1) {
     const response = await jiraRequest<JiraPagedResponse<JiraRecord>>(
       entry,
-      pathForPage(startAt, maxResults)
+      pathForPage(startAt, maxResults),
+      signal ? { signal } : undefined
     )
     const items = getPageItems(response, key)
     records.push(...items)
