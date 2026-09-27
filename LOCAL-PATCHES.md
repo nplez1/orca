@@ -677,6 +677,31 @@ Maintenance is the honest part of a ratchet: prune an entry once it stops failin
 the recorded titles that passed in its shard (a notice, not a warning — they are intermittent, so one
 passing shard is not a fix).
 
+#### `local(unit-ci)`: the Vitest worker teardown race
+
+Vitest 4 and 5 fail a run whose tests all passed when a worker's `onUserConsoleLog` RPC is still in
+flight as that worker closes (vitest-dev/vitest#11153). Every test passes, the only error is
+`EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`, and it
+names whichever worker was closing rather than the file that logged late. Upstream's position is that a
+repository's own late async work is at fault; the linked pull request only improves the message, and no
+released version fixes it. Measured here: about half of shard-8 runs, across unrelated branches, and not
+reproducible locally.
+`local/check-unit-shard-verdict.mjs` reads the shard's Vitest JSON report (what the tests did) plus the
+tee'd run log (which unhandled errors were raised) and tolerates exactly that one headline.
+
+What it deliberately does not do:
+
+- A test failure, a second unhandled error with any other headline, an unreadable or missing report, a
+  shard that ran no tests, and a failed shard with nothing to explain it all still fail. A crashed,
+  timed-out or genuinely red shard cannot pass as green.
+- Vitest's own count of unhandled errors is checked against the headlines read out of the log, so a log
+  format change fails closed rather than skipping errors it could not parse.
+- Upstream is untouched: the wiring is guarded on `github.repository` there, and Vitest's exit code
+  stays in charge.
+
+Remove this patch — the `continue-on-error`, the report arguments, the verdict step and the script —
+once Vitest closes #11153.
+
 ### `local(hooks)`: refuse fork-only commits on a PR branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
