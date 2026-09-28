@@ -128,7 +128,12 @@ export abstract class WorkspacePathIndexServiceSearch extends WorkspacePathIndex
     }
     return {
       ready: true,
-      response: withWorkspacePathSearchFreshness(result.response, entry.freshness)
+      response: withWorkspacePathSearchFreshness(
+        // Why: the pinned generation is the server's staleness guard, not part of the request as made —
+        // the response echoes the requested identity and reports the resolved generation in its own field.
+        { ...result.response, requestIdentity: args.identity },
+        entry.freshness
+      )
     }
   }
 

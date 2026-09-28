@@ -508,4 +508,51 @@ describe('WorkspacePathIndexService', () => {
     expect(await service.ensure(args)).toMatchObject({ ready: true })
     service.dispose()
   })
+
+  it('queries with the pinned generation but echoes the identity as the client sent it', async () => {
+    const pinnedGeneration = 'generation-pinned'
+    const queriedIdentities: WorkspacePathSearchFenceIdentity[] = []
+    const service = new WorkspacePathIndexService({
+      authorize: async (owner) => owner.authorizedCanonicalRoot,
+      build: async () => ({ generationId: pinnedGeneration, retainedBytes: 64 }),
+      query: async ({ identity: requestIdentity }) => {
+        queriedIdentities.push(requestIdentity)
+        return createCompleteWorkspacePathSearchResponse({
+          requestIdentity,
+          paths: ['src/target.ts'],
+          totalCount: 1,
+          generationId: requestIdentity.generationId ?? 'resolved'
+        })
+      }
+    })
+    const requested = identity()
+    const ensureArgs = {
+      owner: OWNER,
+      listingPolicyVersion: 'listing-v1',
+      foldVersion: 'fold-v1',
+      buildReservationBytes: 512,
+      correlationId: '123e4567-e89b-42d3-a456-426614174031'
+    }
+    await service.ensure(ensureArgs)
+    await settleBuild()
+    const result = await service.search({
+      identity: requested,
+      listingPolicyVersion: 'listing-v1',
+      foldVersion: 'fold-v1',
+      buildReservationBytes: 512,
+      correlationId: '123e4567-e89b-42d3-a456-426614174032'
+    })
+    expect(result.ready).toBe(true)
+    if (!result.ready) {
+      throw new Error('search did not answer from the index')
+    }
+    // Why: the pin keeps the catalog-generation guard live for the query itself...
+    expect(queriedIdentities.at(-1)?.generationId).toBe(pinnedGeneration)
+    // ...but a response never invents an identity the client did not send; the resolved generation
+    // travels in its own field, which is what the renderer fence recomputes against.
+    expect(result.response.requestIdentity).toBe(requested)
+    expect(result.response.requestIdentity.generationId).toBeNull()
+    expect(result.response.generationId).toBe(pinnedGeneration)
+    service.dispose()
+  })
 })

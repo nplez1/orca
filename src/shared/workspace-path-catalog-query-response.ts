@@ -4,7 +4,6 @@ import {
   type WorkspacePathCatalogMetadata
 } from './workspace-path-catalog'
 import { workspacePathCatalogOverlayScopeComplete } from './workspace-path-catalog-overlay'
-import { workspacePathSearchScopeFingerprint } from './workspace-path-catalog-query-policy'
 import type {
   WorkspacePathSearchFenceIdentity,
   WorkspacePathSearchResponse,
@@ -51,10 +50,9 @@ export function buildWorkspacePathSearchResponse(args: {
   const responseBase = {
     requestIdentity: identity,
     generationId,
-    scopeFingerprint: workspacePathSearchScopeFingerprint(
-      identity.scope,
-      metadata.scopeRuleVersion
-    ),
+    // Why: the wire fence and every other producer compare the fingerprint to plain JSON.stringify(scope);
+    // the rule version travels in its own `scopeRuleVersion` field.
+    scopeFingerprint: JSON.stringify(identity.scope),
     scopeRuleVersion: metadata.scopeRuleVersion,
     rows,
     rowClassificationFlags,
