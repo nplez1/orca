@@ -34,10 +34,7 @@ import { createWorkspacePathCatalogDecodedBlockReader } from './workspace-path-c
 import { workspacePathProvisionalPageBudgetExhausted } from './workspace-path-provisional-page-budget'
 import { buildWorkspacePathSearchResponse } from './workspace-path-catalog-query-response'
 
-export {
-  workspacePathCatalogJsonStringByteLength,
-  workspacePathSearchScopeFingerprint
-} from './workspace-path-catalog-query-policy'
+export { workspacePathCatalogJsonStringByteLength } from './workspace-path-catalog-query-policy'
 export {
   WORKSPACE_PATH_CATALOG_QUERY_CHUNK_MILLISECONDS,
   WORKSPACE_PATH_CATALOG_QUERY_CHUNK_PATHS,
