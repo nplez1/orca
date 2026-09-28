@@ -7,24 +7,9 @@ import {
 import {
   getWorkspacePathCatalogFoldedPath,
   WORKSPACE_PATH_CATALOG_FLAGS,
-  WORKSPACE_PATH_CATALOG_SCOPE_RULE_VERSION,
   type WorkspacePathCatalog
 } from './workspace-path-catalog'
 import { shouldExcludeQuickOpenRelPath } from './quick-open-filter'
-
-export function workspacePathSearchScopeFingerprint(
-  scope: WorkspacePathSearchScopeDescriptor,
-  scopeRuleVersion = WORKSPACE_PATH_CATALOG_SCOPE_RULE_VERSION
-): string {
-  const excludes = scope.excludePathSegments.map((segments) => segments.join('/')).sort()
-  return JSON.stringify({
-    pathSet: scope.pathSet,
-    includeDotfiles: scope.includeDotfiles,
-    includeIgnoredFiles: scope.includeIgnoredFiles,
-    excludePathSegments: excludes,
-    scopeRuleVersion
-  })
-}
 
 export function pathIsInWorkspaceCatalogScope(
   path: string,
