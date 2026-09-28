@@ -151,9 +151,17 @@ test.describe('SSH cold activation restore', () => {
       ).toEqual([])
       const afterReload = await readRemoteTerminalTabs(orcaPage, remote.worktreeId)
       expect(afterReload.map((tab) => tab.id).sort()).toEqual(expectedTabIds)
-      expect(afterReload.map((tab) => tab.ptyId).sort()).toEqual(
-        beforeReload.map((tab) => tab.ptyId).sort()
-      )
+      // Why: a restored tab reclaims its PTY a beat after it mounts, so the single read that used to
+      // be here failed whenever the last tab was still unbound — about one scheduled run in three.
+      await expect
+        .poll(
+          async () =>
+            (await readRemoteTerminalTabs(orcaPage, remote.worktreeId))
+              .map((tab) => tab.ptyId)
+              .sort(),
+          { timeout: 15_000, message: 'a restored SSH tab did not reclaim its PTY' }
+        )
+        .toEqual(beforeReload.map((tab) => tab.ptyId).sort())
 
       const firstTabId = beforeReload[0]?.id
       if (!firstTabId) {
