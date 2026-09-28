@@ -47,6 +47,8 @@ const DEMO_HEADER_PROPS = {
   executionHostScope: LOCAL_EXECUTION_HOST_ID,
   hostScopeOptions: [{ id: LOCAL_EXECUTION_HOST_ID, label: getLocalExecutionHostLabel() }],
   agents: AI_VAULT_AGENTS,
+  // Why: the demo shows every agent available; `agents` above is the selected subset.
+  availableAgents: AI_VAULT_AGENTS,
   group: DEFAULT_AI_VAULT_GROUP,
   hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
   sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT,
