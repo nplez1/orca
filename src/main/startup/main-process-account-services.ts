@@ -27,6 +27,7 @@ import { agentHookServer } from '../agent-hooks/server'
 import { setSystemCodexHomeHookSweepSuppressed } from '../codex/hook-service'
 import { isRealHomeCodexHookLaneUsable } from '../codex/codex-real-home-hook-install'
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
+import { isUsageProviderDisabled } from '../../shared/usage-provider-enablement'
 import { browserManager } from '../browser/browser-manager'
 import { mainProcessState as state } from './main-process-state'
 
@@ -41,7 +42,12 @@ export function initializeMainProcessAccountServices(): void {
   ) {
     throw new Error('Usage stores must be initialized before account services')
   }
-  state.rateLimits = new RateLimitService()
+  // Why the probe at construction: the service reads Grok's CLI auth file once
+  // while constructing, and a provider the user switched off must be skipped then.
+  state.rateLimits = new RateLimitService({
+    isUsageProviderDisabled: (providerId) =>
+      isUsageProviderDisabled(store.getSettings().disabledUsageProviders, providerId)
+  })
   state.codexRuntimeHome = new CodexRuntimeHomeService(store)
   void startCodexStateDbBackfillRecoveryInBackground(getOrcaManagedCodexHomePath())
   // Why: an incapable trust-grant host must fall back to the managed home for
@@ -96,6 +102,22 @@ export function initializeMainProcessAccountServices(): void {
     void syncAccountRuntimeTargets(updates, settings).catch((error) =>
       console.warn('[rate-limits] Failed to apply account runtime target:', error)
     )
+    // Why: enabling or disabling a provider must take effect without waiting for the
+    // next poll window, and a re-enabled Grok needs its CLI auth re-read.
+    if ('disabledUsageProviders' in updates) {
+      state.rateLimits?.initializeUsageProviderReads()
+      // Why: the gh probe result is cached, so a re-enabled Copilot must not wait
+      // for a restart before its next cycle sees the sign-in again.
+      if (!isUsageProviderDisabled(settings.disabledUsageProviders, 'copilot')) {
+        void refreshCopilotGhCredentials()
+      }
+      void state.rateLimits?.refresh().catch((error: unknown) => {
+        console.warn(
+          '[rate-limits] Failed to refresh after a provider enable/disable change:',
+          error
+        )
+      })
+    }
     // Why: these three pick the MiniMax host and quota bucket, so a stale snapshot from the
     // previous endpoint would otherwise sit in the status bar until the next poll.
     if (
@@ -159,7 +181,10 @@ export function initializeMainProcessAccountServices(): void {
   })
   // Why warmed at startup: the fetch cycle reads the probe synchronously, so kicking it
   // off here means the first cycle already knows about a usable GitHub CLI sign-in.
-  void refreshCopilotGhCredentials()
+  // Why gated: a disabled Copilot must not spawn the `gh auth status` probe at all.
+  if (!isUsageProviderDisabled(store.getSettings().disabledUsageProviders, 'copilot')) {
+    void refreshCopilotGhCredentials()
+  }
   state.rateLimits.setGeminiCliOAuthEnabledResolver(() => store.getSettings().geminiCliOAuthEnabled)
   state.rateLimits.setNetworkProxySettingsResolver(() => store.getSettings())
   state.keybindings = new KeybindingService({

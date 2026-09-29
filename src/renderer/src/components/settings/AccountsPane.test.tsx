@@ -221,4 +221,38 @@ describe('AccountsPane', () => {
     expect(markup).not.toMatch(/<button[^>]*>Forget token/)
     expect(markup.indexOf('accounts-fireworks')).toBeLessThan(markup.indexOf('accounts-copilot'))
   })
+
+  it('renders a per-provider enable switch for every provider section', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    for (const provider of [
+      'Claude',
+      'Codex',
+      'Gemini',
+      'OpenCode Go',
+      'MiniMax',
+      'DeepSeek',
+      'Fireworks.ai',
+      'GitHub Copilot',
+      'Grok (xAI)',
+      'Cursor'
+    ]) {
+      expect(markup).toContain(`aria-label="Let Orca query ${provider}"`)
+    }
+  })
+
+  it('suppresses a switched-off provider and shows the off notice', () => {
+    const markup = renderPane({
+      ...getDefaultSettings('/tmp'),
+      disabledUsageProviders: ['cursor', 'gemini']
+    })
+
+    expect(markup).toContain('Cursor is off.')
+    expect(markup).toContain('Gemini is off.')
+    // The provider's own controls are gone while it is switched off.
+    expect(markup).not.toContain('No Cursor sign-in found on this computer')
+    expect(markup).not.toContain('Use Gemini CLI credentials')
+    // A provider left enabled keeps its controls.
+    expect(markup).toContain('id="accounts-copilot"')
+  })
 })

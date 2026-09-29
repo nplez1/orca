@@ -39,6 +39,9 @@ import {
   providerAccountMatchesView
 } from './provider-account-visibility'
 import { Separator } from '../ui/separator'
+import type { DisableableUsageProviderId } from '../../../../shared/usage-provider-enablement'
+import { withUsageProviderDisabled } from '../../../../shared/usage-provider-enablement'
+import { UsageProviderSectionGate } from './ProviderUsageEnableSwitch'
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { CursorAccountsSection } from './CursorAccountsSection'
 import type {
@@ -228,6 +231,23 @@ export function AccountsPane({
     recordFeatureInteraction('usage-tracking')
   }
 
+  // Why: persisted disabled set is the source of truth; toggling rewrites the whole
+  // array so the canonical provider order and unknown-id filtering stay centralized.
+  const disabledUsageProviders = settings.disabledUsageProviders ?? []
+  const setUsageProviderEnabled = (
+    providerId: DisableableUsageProviderId,
+    enabled: boolean
+  ): void => {
+    recordFeatureInteraction('usage-tracking')
+    updateSettings({
+      disabledUsageProviders: withUsageProviderDisabled(
+        disabledUsageProviders,
+        providerId,
+        !enabled
+      )
+    })
+  }
+
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready
     // message, so the watcher stays open for the pane's lifetime; the local
@@ -329,6 +349,45 @@ export function AccountsPane({
     ...credentialSections.fireworks,
     ...credentialSections.copilot
   }
+  // Why: labels are read in render, not at module scope, so a language change
+  // without a reload still retranslates the master switch.
+  const usageProviderLabels: Record<DisableableUsageProviderId, string> = {
+    claude: translate('auto.components.settings.AccountsPane.26ef4b55be', 'Claude'),
+    codex: translate('auto.components.settings.AccountsPane.ef91cfa06b', 'Codex'),
+    gemini: translate('auto.components.settings.AccountsPane.0c64dc2a64', 'Gemini'),
+    'opencode-go': translate('auto.components.settings.AccountsPane.4ac10b4d08', 'OpenCode Go'),
+    minimax: translate('auto.components.settings.AccountsPane.5d63bbfbec', 'MiniMax'),
+    deepseek: translate(
+      'auto.components.settings.accounts.pane.deepseek.section.28c8b91c5d',
+      'DeepSeek'
+    ),
+    fireworks: translate(
+      'auto.components.settings.accounts.pane.fireworks.section.51bcc16ae3',
+      'Fireworks.ai'
+    ),
+    copilot: translate(
+      'auto.components.settings.accounts.pane.copilot.section.dc3eaf8d70',
+      'GitHub Copilot'
+    ),
+    grok: translate('auto.components.settings.GrokAccountsSection.a1b2c3d4e5', 'Grok (xAI)'),
+    cursor: translate('auto.components.settings.CursorAccountsSection.title', 'Cursor')
+  }
+  // Why: the switch sits above the provider's own header and, while off, its controls
+  // are not mounted at all — so no pane-triggered credential read can run.
+  const gateUsageProvider = (
+    providerId: DisableableUsageProviderId,
+    content: React.JSX.Element
+  ): React.JSX.Element => (
+    <UsageProviderSectionGate
+      key={providerId}
+      providerId={providerId}
+      providerLabel={usageProviderLabels[providerId]}
+      disabled={disabledUsageProviders.includes(providerId)}
+      onEnabledChange={(enabled) => setUsageProviderEnabled(providerId, enabled)}
+    >
+      {content}
+    </UsageProviderSectionGate>
+  )
   const visibleSections = [
     wslSupportedPlatform &&
     !isRemoteAccountScope &&
@@ -336,35 +395,35 @@ export function AccountsPane({
       ? renderAccountsLocationSection(model)
       : null,
     matchesSettingsSearch(searchQuery, getAccountsClaudeSearchEntries())
-      ? renderClaudeAccountsSection(model)
+      ? gateUsageProvider('claude', renderClaudeAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsCodexSearchEntries())
-      ? renderCodexAccountsSection(model)
+      ? gateUsageProvider('codex', renderCodexAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsGeminiSearchEntries())
-      ? renderGeminiAccountsSection(model)
+      ? gateUsageProvider('gemini', renderGeminiAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsOpencodeSearchEntries())
-      ? renderOpenCodeAccountsSection(model)
+      ? gateUsageProvider('opencode-go', renderOpenCodeAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries())
-      ? renderMiniMaxAccountsSection(model)
+      ? gateUsageProvider('minimax', renderMiniMaxAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsDeepSeekSearchEntries())
-      ? renderDeepSeekAccountsSection(model)
+      ? gateUsageProvider('deepseek', renderDeepSeekAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsFireworksSearchEntries())
-      ? renderFireworksAccountsSection(model)
+      ? gateUsageProvider('fireworks', renderFireworksAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsCopilotSearchEntries())
-      ? renderCopilotAccountsSection(model)
+      ? gateUsageProvider('copilot', renderCopilotAccountsSection(model))
       : null,
-    matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries()) ? (
-      <GrokAccountsSection key="grok" />
-    ) : null,
-    matchesSettingsSearch(searchQuery, getAccountsCursorSearchEntries()) ? (
-      <CursorAccountsSection key="cursor" />
-    ) : null
+    matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries())
+      ? gateUsageProvider('grok', <GrokAccountsSection />)
+      : null,
+    matchesSettingsSearch(searchQuery, getAccountsCursorSearchEntries())
+      ? gateUsageProvider('cursor', <CursorAccountsSection />)
+      : null
   ].filter(Boolean)
 
   return (

@@ -4,6 +4,8 @@ import type {
   ProviderRateLimits,
   RateLimitState
 } from '../../../shared/rate-limit-types'
+import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
+import { USAGE_PROVIDER_IDS } from '../../../shared/usage-provider-enablement'
 import {
   type ActiveRateLimitProvider,
   type InactiveCodexAccountInfo,
@@ -17,6 +19,7 @@ import {
   type FireworksRateLimitConfig,
   type CopilotRateLimitConfig,
   type GeminiCliOAuthEnabledResolver,
+  USAGE_PROVIDER_STATE_KEYS,
   type NormalizedCodexAccountSelectionTarget,
   type NormalizedClaudeAccountSelectionTarget,
   type InactiveClaudeAccountInfo,
@@ -40,7 +43,7 @@ export abstract class RateLimitServiceState {
     fireworks: null,
     copilot: null
   }
-  protected grokAuthConfigured = readGrokAuthSession().status === 'ok'
+  protected grokAuthConfigured = false
   // Why: the Cursor probe reads the macOS Keychain, so it cannot run synchronously
   // at construction the way Grok's auth-file probe does; each fetch cycle sets it.
   protected cursorAuthConfigured = false
@@ -134,7 +137,95 @@ export abstract class RateLimitServiceState {
   protected inactiveCodexAccountsGeneration = 0
   protected stateListeners = new Set<(state: RateLimitState) => void>()
 
-  constructor() {}
+  private readonly usageProviderDisabledProbe:
+    | ((providerId: DisableableUsageProviderId) => boolean)
+    | null = null
+
+  constructor(options?: {
+    isUsageProviderDisabled?: (providerId: DisableableUsageProviderId) => boolean
+  }) {
+    this.usageProviderDisabledProbe = options?.isUsageProviderDisabled ?? null
+    // Why read here, not in a field initializer: the probe must exist first, so a
+    // provider the user already switched off never has its CLI auth file read.
+    this.grokAuthConfigured = this.readGrokAuthConfiguredIfEnabled()
+  }
+
+  /** Re-evaluates the provider reads that depend on settings the constructor cannot see. */
+  initializeUsageProviderReads(): void {
+    this.grokAuthConfigured = this.readGrokAuthConfiguredIfEnabled()
+  }
+
+  protected isUsageProviderDisabled(providerId: DisableableUsageProviderId): boolean {
+    return this.usageProviderDisabledProbe?.(providerId) ?? false
+  }
+
+  protected disabledUsageProviderIds(): ReadonlySet<DisableableUsageProviderId> {
+    const disabled = new Set<DisableableUsageProviderId>()
+    for (const providerId of USAGE_PROVIDER_IDS) {
+      if (this.isUsageProviderDisabled(providerId)) {
+        disabled.add(providerId)
+      }
+    }
+    return disabled
+  }
+
+  /** A disabled provider must stop reporting a live credential presence. */
+  protected resetDisabledProviderCredentialFlags(
+    disabled: ReadonlySet<DisableableUsageProviderId>
+  ): void {
+    if (disabled.has('cursor')) {
+      this.cursorAuthConfigured = false
+    }
+    if (disabled.has('opencode-go')) {
+      this.openCodeGoApiKeyConfigured = false
+    }
+  }
+
+  /** Reads the Grok CLI auth file only while Grok is enabled, so a disabled provider has no local credential import. */
+  protected readGrokAuthConfiguredIfEnabled(): boolean {
+    if (this.isUsageProviderDisabled('grok')) {
+      return false
+    }
+    return readGrokAuthSession().status === 'ok'
+  }
+
+  /**
+   * State slots for switched-off providers. Spread last so it wins over the
+   * per-provider values a cycle computed, and so a prior reading cannot linger.
+   */
+  protected disabledUsageProviderStateOverrides(): Partial<InternalRateLimitState> {
+    const overrides: Partial<InternalRateLimitState> = {}
+    for (const providerId of this.disabledUsageProviderIds()) {
+      overrides[USAGE_PROVIDER_STATE_KEYS[providerId]] = null
+    }
+    return overrides
+  }
+
+  /** Hidden placeholder a disabled provider resolves to, so the cycle's result tuple stays typed without a network call. */
+  protected disabledUsageProviderSnapshot(provider: ActiveRateLimitProvider): ProviderRateLimits {
+    return {
+      provider,
+      session: null,
+      weekly: null,
+      ...(provider === 'opencode-go' ? { monthly: null } : {}),
+      ...(provider === 'gemini' || provider === 'cursor' ? { buckets: [] } : {}),
+      ...(provider === 'deepseek' || provider === 'fireworks' ? { credits: null } : {}),
+      ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
+      updatedAt: Date.now(),
+      error: null,
+      status: 'unavailable'
+    }
+  }
+
+  /** Runs the real fetch, or resolves a hidden snapshot when the user switched the provider off. */
+  protected fetchUnlessDisabled(
+    providerId: DisableableUsageProviderId,
+    load: () => Promise<ProviderRateLimits>
+  ): Promise<ProviderRateLimits> {
+    return this.isUsageProviderDisabled(providerId)
+      ? Promise.resolve(this.disabledUsageProviderSnapshot(providerId))
+      : load()
+  }
 
   onStateChange(listener: (state: RateLimitState) => void): () => void {
     this.stateListeners.add(listener)
