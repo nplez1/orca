@@ -4,7 +4,6 @@ import type {
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
   JiraBoard,
-  JiraField,
   JiraProjectStatusOrder,
   JiraSiteSelection
 } from '../../shared/jira-types'
@@ -97,8 +96,6 @@ export const jiraApi = {
   }): Promise<JiraProjectStatusOrder> => ipcRenderer.invoke('jira:getProjectStatusOrder', args),
   listBoards: (args?: { siteId?: JiraSiteSelection; name?: string }): Promise<JiraBoard[]> =>
     ipcRenderer.invoke('jira:listBoards', args),
-  listCustomFields: (args?: { siteId?: JiraSiteSelection }): Promise<JiraField[]> =>
-    ipcRenderer.invoke('jira:listCustomFields', args),
   getBoardOverview: (args: { boardId: string; siteId: string }): Promise<JiraBoardOverview> =>
     ipcRenderer.invoke('jira:getBoardOverview', args),
   listBoardIssues: (args: JiraBoardIssuePageRequest): Promise<JiraBoardIssuePage> =>

@@ -211,8 +211,6 @@ export function buildDefaultSettings(args: {
     defaultRepoSelection: null,
     defaultLinearTeamSelection: null,
     defaultJiraBoard: null,
-    jiraTeamFieldId: '',
-    jiraTeamValue: '',
     opencodeSessionCookie: '',
     opencodeWorkspaceId: '',
     opencodeGoApiKey: '',

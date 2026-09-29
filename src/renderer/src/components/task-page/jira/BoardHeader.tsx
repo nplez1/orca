@@ -1,8 +1,9 @@
 import type { TaskPageJiraBoardFilter } from '../../task-page-jira-board-model'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
 import { translate } from '@/i18n/i18n'
-import { LoaderCircle, RefreshCw } from 'lucide-react'
+import { LoaderCircle, RefreshCw, Search, X } from 'lucide-react'
 
 type TaskPageJiraBoardHeaderProps = {
   boardName?: string
@@ -12,11 +13,11 @@ type TaskPageJiraBoardHeaderProps = {
   filter: TaskPageJiraBoardFilter
   onFilterChange: (filter: TaskPageJiraBoardFilter) => void
   viewerAvailable: boolean
-  teamFilterReady: boolean
+  query: string
+  onQueryChange: (query: string) => void
   loading: boolean
   onRefresh: () => void
   onUseIssueList: () => void
-  onConfigureTeam: () => void
 }
 
 export function TaskPageJiraBoardHeader({
@@ -27,11 +28,11 @@ export function TaskPageJiraBoardHeader({
   filter,
   onFilterChange,
   viewerAvailable,
-  teamFilterReady,
+  query,
+  onQueryChange,
   loading,
   onRefresh,
-  onUseIssueList,
-  onConfigureTeam
+  onUseIssueList
 }: TaskPageJiraBoardHeaderProps): React.JSX.Element {
   return (
     <>
@@ -135,16 +136,6 @@ export function TaskPageJiraBoardHeader({
             </Button>
             <Button
               type="button"
-              variant={filter === 'team' ? 'secondary' : 'ghost'}
-              size="xs"
-              aria-pressed={filter === 'team'}
-              onClick={() => onFilterChange('team')}
-              disabled={!teamFilterReady}
-            >
-              {translate('auto.components.TaskPage.jiraTeamFilter', 'Team')}
-            </Button>
-            <Button
-              type="button"
               variant={filter === 'all' ? 'secondary' : 'ghost'}
               size="xs"
               aria-pressed={filter === 'all'}
@@ -153,9 +144,35 @@ export function TaskPageJiraBoardHeader({
               {translate('auto.components.TaskPage.jiraAllFilter', 'All')}
             </Button>
           </div>
-          {!teamFilterReady ? (
-            <Button type="button" variant="link" size="xs" onClick={onConfigureTeam}>
-              {translate('auto.components.TaskPage.jiraConfigureTeamFilter', 'Configure Team')}
+        </div>
+      </div>
+
+      <div className="border-b border-border/50 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <Input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder={translate(
+                'auto.components.TaskPage.jiraBoardIssueFilterPlaceholder',
+                'Filter issues by key, summary, or assignee'
+              )}
+              aria-label={translate(
+                'auto.components.TaskPage.jiraBoardIssueFilterLabel',
+                'Filter board issues'
+              )}
+            />
+          </div>
+          {query ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={translate('auto.components.TaskPage.b797bdd7c3', 'Clear search')}
+              onClick={() => onQueryChange('')}
+            >
+              <X className="size-4" />
             </Button>
           ) : null}
         </div>
