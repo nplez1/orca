@@ -142,6 +142,7 @@ export function EditorContent({
         details={details}
         loading={checkRunDetails.loading}
         error={checkRunDetails.error}
+        errorAction={checkRunDetails.errorAction ?? null}
         openUrl={details?.detailsUrl ?? details?.url ?? checkRunDetails.check.url}
         worktreeId={activeFile.worktreeId}
         onRefresh={() => {

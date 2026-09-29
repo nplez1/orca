@@ -1,27 +1,21 @@
 import type { WebContents } from 'electron'
 import { beginWatcherInstall } from './watcher-removal-gate'
 import type { LocalWatcherInstallToken } from './filesystem-watcher-lifecycle-state'
-import {
-  WATCHER_TEARDOWN_GRACE_MS,
-  watcherLifecycleState
-} from './filesystem-watcher-lifecycle-state'
+import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
 import { getLocalWatcherRoot } from './filesystem-watcher-paths'
-import type { WatchedRoot } from './filesystem-watcher-wsl'
 import {
   addInFlightLocalInstallListener,
   addLocalWatchListener,
   clearLocalCapacityRetry,
   rememberUnwatchableRoot,
   registerWatcherSenderCleanup,
-  takeLocalCapacityRetryListeners,
-  trackDetachedLocalUnsubscribe
+  takeLocalCapacityRetryListeners
 } from './filesystem-watcher-listener-lifecycle'
-import { cancelLocalBatchFlush } from './filesystem-watcher-batch-control'
 import { scheduleLocalCapacityRetry } from './filesystem-watcher-local-capacity'
 import { installLocalWatcher } from './filesystem-watcher-local-install'
 import { isCurrentWatcherSender } from './filesystem-watcher-sender-lifetime'
-import { evictQuickOpenPathInventory } from './quick-open-path-inventory'
 import { scheduleLocalWorkspacePathIndexCoverage } from './filesystem-watcher-path-index-coverage'
+import { scheduleLocalWatcherTeardown } from './filesystem-watcher-local-teardown'
 
 // ── Subscribe / Unsubscribe ──────────────────────────────────────────
 
@@ -302,32 +296,4 @@ export function unsubscribeLocalWatcher(worktreePath: string, senderId: number):
   if (root.listeners.size === 0 && root.indexConsumers.size === 0) {
     scheduleLocalWatcherTeardown(rootKey, root)
   }
-}
-
-function scheduleLocalWatcherTeardown(rootKey: string, root: WatchedRoot): void {
-  if (root.batch.timer) {
-    clearTimeout(root.batch.timer)
-    // Why: a cleared handle can't be refresh()ed; null it so a grace-window re-subscribe arms a fresh window.
-    root.batch.timer = null
-  }
-  // Why: duplicate unwatch calls for a root would leak overwritten grace timers; keep just one.
-  if (watcherLifecycleState.pendingTeardowns.has(rootKey)) {
-    return
-  }
-
-  const teardownTimer = setTimeout(() => {
-    watcherLifecycleState.pendingTeardowns.delete(rootKey)
-    // Re-check: a new listener may have arrived during the grace period.
-    const currentRoot = watcherLifecycleState.watchedRoots.get(rootKey)
-    if (!currentRoot || currentRoot.listeners.size > 0 || currentRoot.indexConsumers.size > 0) {
-      return
-    }
-    void trackDetachedLocalUnsubscribe(rootKey, currentRoot)
-    cancelLocalBatchFlush(currentRoot)
-    // Why: a workspace nobody is watching does not need a warm path index either.
-    evictQuickOpenPathInventory(currentRoot.rootPath)
-    watcherLifecycleState.watchedRoots.delete(rootKey)
-  }, WATCHER_TEARDOWN_GRACE_MS)
-
-  watcherLifecycleState.pendingTeardowns.set(rootKey, teardownTimer)
 }

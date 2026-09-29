@@ -19101,6 +19101,10 @@
     }
   },
   "checkDetails": {
-    "duration": "Duration"
+    "duration": "Duration",
+    "hiddenStages": "+{{value0}} more stages",
+    "failures": "Failures",
+    "openJenkinsSettings": "Open Jenkins settings",
+    "toggleStage": "Toggle stage steps"
   }
 }

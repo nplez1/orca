@@ -22,6 +22,7 @@ import {
   resetAiVaultSessionResultCacheForTest
 } from './ai-vault-session-result-cache'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { getAgentSessionIdsKey, resetAiVaultSessionIdsKeyForTest } from './ai-vault-session-ids'
 
 // In-app session creation bypasses the cache so the new session appears promptly.
 // Keep the budget at module scope so tab remounts cannot amplify full scans.
@@ -30,7 +31,7 @@ let lastForcedRescanAt = 0
 
 export function resetAiVaultForcedRescanThrottleForTest(): void {
   lastForcedRescanAt = 0
-  agentSessionIdsKeyBySnapshot = new WeakMap<object, string>()
+  resetAiVaultSessionIdsKeyForTest()
   resetAiVaultSessionResultCacheForTest()
 }
 
@@ -47,33 +48,6 @@ type AiVaultRefreshArgs = { force?: boolean; background?: boolean; reuseLoadedDe
 // merge, which is the bug this guard exists to prevent.
 function isMergedAiVaultHostScope(scope: ExecutionHostScope): boolean {
   return requestedExecutionHostScope(scope) === ALL_EXECUTION_HOSTS_SCOPE
-}
-
-// Why: this selector runs on every store write; index each immutable status snapshot once.
-// Why resettable: every production writer replaces the map, but test fixtures commonly
-// mutate `mockStoreState.agentStatusByPaneKey[key]` in place, which would keep serving the
-// key cached for the identity they mutated.
-let agentSessionIdsKeyBySnapshot = new WeakMap<object, string>()
-
-function getAgentSessionIdsKey(
-  agentStatusByPaneKey: Record<string, { providerSession?: { id?: string } | null }> | undefined
-): string {
-  if (!agentStatusByPaneKey) {
-    return ''
-  }
-  const cached = agentSessionIdsKeyBySnapshot.get(agentStatusByPaneKey)
-  if (cached !== undefined) {
-    return cached
-  }
-  const ids: string[] = []
-  for (const entry of Object.values(agentStatusByPaneKey)) {
-    if (entry.providerSession?.id) {
-      ids.push(entry.providerSession.id)
-    }
-  }
-  const key = ids.sort().join('\n')
-  agentSessionIdsKeyBySnapshot.set(agentStatusByPaneKey, key)
-  return key
 }
 
 export function useAiVaultSessionRefresh(
