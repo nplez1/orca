@@ -67,6 +67,8 @@ export const BROWSER_CLIENT_HOSTED_REMOTE_SETTINGS_TARGET_ID = 'browser-client-h
 export const BROWSER_SSH_WORKSPACE_ROUTING_SETTINGS_TARGET_ID = 'browser-ssh-workspace-routing'
 export const BROWSER_USER_AGENT_SETTINGS_TARGET_ID = 'browser-user-agent'
 export const GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID = 'general-global-worktree-visibility'
+/** Anchor for the Jenkins server card, so a failed check can deep-link to where its token is added. */
+export const JENKINS_INTEGRATION_SETTINGS_TARGET_ID = 'integrations-jenkins'
 
 export type SettingsNavigationTarget = {
   pane: SettingsNavTarget

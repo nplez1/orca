@@ -1,10 +1,13 @@
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../../shared/github/check-types'
+import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
 
 export type CheckDetailsLoadState = {
   requestId?: number
   loading: boolean
   details: PRCheckRunDetails | null
   error: string | null
+  /** Settings affordance for the error, when the failure is one the user can fix. */
+  errorAction?: CheckDetailsErrorAction | null
   /** Check state when the load failed or returned nothing, so a later state change can retry it. */
   errorAt?: { status: PRCheckDetail['status']; conclusion: PRCheckDetail['conclusion'] }
 }

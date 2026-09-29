@@ -1,12 +1,13 @@
 import React from 'react'
-import { LoaderCircle, PanelRight, RefreshCw } from 'lucide-react'
+import { LoaderCircle, PanelRight, RefreshCw, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { cn } from '@/lib/utils'
+import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { useAppStore } from '@/store'
 import type { GitLabProjectRef } from '../../../../../shared/gitlab-types'
 import type { PRCheckDetail, PRCheckJob } from '../../../../../shared/github/check-types'
-import { visibleCheckSteps } from '../../../../../shared/check-step-visibility'
+import { paneCheckSteps } from '../../../../../shared/check-step-visibility'
 import type { GitHubRepositoryIdentity } from '../../../../../shared/github/pull-request-types'
 import { CheckJobLogTail } from '../check-job-log-tail'
 import { CheckStepOutcomeIcon } from '@/components/check-step-outcome-icon'
@@ -48,20 +49,21 @@ function ViewFullCheckDetailsButton({
 /**
  * One job's steps or CI stages.
  *
- * GitHub Actions keeps its compact failures-only list here; a stage list (Jenkins) shows every
- * stage, because "which stage is running" has no other answer in this pane.
+ * GitHub Actions keeps its compact failures-only list here; a stage list (Jenkins) is reduced to
+ * the stages still moving and the ones that failed, capped, because a pipeline can list hundreds.
  */
 function CheckJobSteps({ job }: { job: PRCheckJob }): React.JSX.Element | null {
-  const steps = visibleCheckSteps(job)
-  if (steps.length === 0) {
+  const { steps, hiddenCount } = paneCheckSteps(job)
+  if (steps.length === 0 && hiddenCount === 0) {
     return null
   }
   return (
     <div className="mt-1 grid gap-0.5 pl-2">
       {steps.map((step) => (
         <div
-          // Why not the index: a Jenkins stage list can repeat a stage name in a loop.
-          key={`${step.name}:${step.startedAt ?? ''}`}
+          // Why the id: a Jenkins stage list can repeat a stage name in a loop, and duplicate
+          // React keys would make it drop or duplicate rows.
+          key={step.id ?? `${step.name}:${step.startedAt ?? ''}`}
           className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"
         >
           <CheckStepOutcomeIcon outcome={resolveStepOutcome(step)} />
@@ -69,6 +71,13 @@ function CheckJobSteps({ job }: { job: PRCheckJob }): React.JSX.Element | null {
           <span className="shrink-0">{step.conclusion ?? step.status}</span>
         </div>
       ))}
+      {hiddenCount > 0 && (
+        <div className="text-[11px] text-muted-foreground">
+          {translate('checkDetails.hiddenStages', '+{{value0}} more stages', {
+            value0: hiddenCount
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -94,6 +103,7 @@ export function CheckRunDetails({
   onRetry: () => void
 }): React.JSX.Element {
   const openCheckRunDetails = useAppStore((s) => s.openCheckRunDetails)
+  const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const details = state?.details
   const startedAt = formatCheckTimestamp(details?.startedAt)
   const completedAt = formatCheckTimestamp(details?.completedAt)
@@ -133,6 +143,7 @@ export function CheckRunDetails({
       details: state?.details ?? null,
       loading: state?.loading ?? false,
       error: state?.error ?? null,
+      errorAction: state?.errorAction ?? null,
       githubRepository: githubRepository ?? null,
       gitlabProjectRef: getGitLabProjectRef?.() ?? null
     })
@@ -224,27 +235,47 @@ export function CheckRunDetails({
           </div>
 
           {state?.error && (
-            <div role="alert" className="flex items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 break-words text-[12px] text-destructive">
+            <div role="alert" className="flex flex-col gap-1.5">
+              <span className="min-w-0 break-words text-[12px] text-destructive">
                 {state.error}
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                className="shrink-0"
-                disabled={state.loading}
-                aria-busy={state.loading}
-                onClick={onRetry}
-              >
-                <RefreshCw className={cn('size-3', state.loading && 'animate-spin')} />
-                {state.loading
-                  ? translate('githubChecks.retrying', 'Retrying…')
-                  : translate(
-                      'auto.components.right.sidebar.checks.panel.content.dcb3c546fe',
-                      'Retry'
-                    )}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {state.errorAction?.kind === 'open-jenkins-settings' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="shrink-0"
+                    onClick={() =>
+                      openSettingsTarget({
+                        pane: 'integrations',
+                        repoId: null,
+                        sectionId: JENKINS_INTEGRATION_SETTINGS_TARGET_ID
+                      })
+                    }
+                  >
+                    <Settings className="size-3" />
+                    {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="shrink-0"
+                  disabled={state.loading}
+                  aria-busy={state.loading}
+                  onClick={onRetry}
+                >
+                  <RefreshCw className={cn('size-3', state.loading && 'animate-spin')} />
+                  {state.loading
+                    ? translate('githubChecks.retrying', 'Retrying…')
+                    : translate(
+                        'auto.components.right.sidebar.checks.panel.content.dcb3c546fe',
+                        'Retry'
+                      )}
+                </Button>
+              </div>
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import type { GitLabProjectRef } from '../../../../shared/gitlab-types'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
 import type { GitHubRepositoryIdentity } from '../../../../shared/github/pull-request-types'
+import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
 
 export type OpenCheckRunDetailsState = {
   contextKey: string
@@ -9,6 +10,8 @@ export type OpenCheckRunDetailsState = {
   details: PRCheckRunDetails | null
   loading: boolean
   error: string | null
+  /** Settings affordance for the error, when the failure is one the user can fix. */
+  errorAction?: CheckDetailsErrorAction | null
   githubRepository?: GitHubRepositoryIdentity | null
   /** Why: fork/cross-project MR jobs live outside the repo's own project, so reloads need the pipeline's project. */
   gitlabProjectRef?: GitLabProjectRef | null
@@ -16,7 +19,13 @@ export type OpenCheckRunDetailsState = {
 
 export type CheckRunDetailsTabPatch = Pick<
   OpenCheckRunDetailsState,
-  'requestId' | 'details' | 'loading' | 'error' | 'githubRepository' | 'gitlabProjectRef'
+  | 'requestId'
+  | 'details'
+  | 'loading'
+  | 'error'
+  | 'errorAction'
+  | 'githubRepository'
+  | 'gitlabProjectRef'
 >
 
 let nextCheckRunDetailsRequestId = 0

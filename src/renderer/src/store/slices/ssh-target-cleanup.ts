@@ -1,8 +1,12 @@
 import type { AppState } from '../types'
 import type { SshConnectionState, SshTarget, SshTargetSummary } from '../../../../shared/ssh-types'
-import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 import { sanitizeSshTargetGeneration } from '../../../../shared/ssh-target-generation'
-import { resolveDirectSshTargetScope } from '../../lib/direct-ssh-target-scope'
+import {
+  collectSshTargetTerminalTabIds,
+  isSshTargetSessionId,
+  omitRemovedSshTargetRecovery,
+  omitRemovedSshTargetTabSessions
+} from './ssh-target-tab-sessions'
 
 export function sshConnectionStatesEqual(
   a: SshConnectionState | undefined,
@@ -74,77 +78,6 @@ export function collectHiddenSshTargetIds(targets: SshTargetSummary[]): Set<stri
 
 export function sshTargetHiddenIdsEqual(current: Set<string>, next: Set<string>): boolean {
   return current.size === next.size && [...next].every((targetId) => current.has(targetId))
-}
-
-function collectSshTargetTerminalTabIds(state: AppState, targetId: string): Set<string> {
-  const targetWorktreeIds = resolveDirectSshTargetScope({
-    targetId,
-    catalogRevision: 0,
-    repos: state.repos,
-    worktreesByRepo: state.worktreesByRepo,
-    detectedWorktreesByRepo: state.detectedWorktreesByRepo,
-    restoredRuntimeHostIdByWorkspaceSessionKey: state.restoredRuntimeHostIdByWorkspaceSessionKey
-  }).gitWorktreeIds
-  const tabIds = new Set<string>()
-  for (const worktrees of Object.values(state.worktreesByRepo)) {
-    for (const worktree of worktrees) {
-      if (!targetWorktreeIds.has(worktree.id)) {
-        continue
-      }
-      for (const tab of state.tabsByWorktree[worktree.id] ?? []) {
-        tabIds.add(tab.id)
-      }
-    }
-  }
-  return tabIds
-}
-
-function isSshTargetSessionId(sessionId: string, targetId: string): boolean {
-  return parseAppSshPtyId(sessionId)?.connectionId === targetId
-}
-
-// Why: a per-tab session map entry belongs to the removed target if the tab is
-// one of the target's, or the session id is an SSH pty id scoped to it. Shared
-// by the deferred-session and pending-reconnect cleanups so both drop the same
-// dead entries (an uncleared entry would keep a dead tab alive in the orphan
-// sweep, which now reads these maps as liveness — #9911).
-function isRemovedSshTargetTabSession(
-  tabId: string,
-  sessionId: string,
-  targetId: string,
-  targetTabIds: Set<string>
-): boolean {
-  return targetTabIds.has(tabId) || isSshTargetSessionId(sessionId, targetId)
-}
-
-function omitRemovedSshTargetTabSessions(
-  sessions: Record<string, string>,
-  targetId: string,
-  targetTabIds: Set<string>
-): { next: Record<string, string>; removed: boolean } {
-  const next: Record<string, string> = {}
-  let removed = false
-  for (const [tabId, sessionId] of Object.entries(sessions)) {
-    if (isRemovedSshTargetTabSession(tabId, sessionId, targetId, targetTabIds)) {
-      removed = true
-      continue
-    }
-    next[tabId] = sessionId
-  }
-  return { next, removed }
-}
-
-function omitRemovedSshTargetRecovery<T extends { authority: { targetId: string } }>(
-  entries: Record<string, T>,
-  targetId: string,
-  targetTabIds: ReadonlySet<string>
-): { next: Record<string, T>; removed: boolean } {
-  const next = Object.fromEntries(
-    Object.entries(entries).filter(
-      ([tabId, entry]) => !targetTabIds.has(tabId) && entry.authority.targetId !== targetId
-    )
-  )
-  return { next, removed: Object.keys(next).length !== Object.keys(entries).length }
 }
 
 function clearSshTargetTabPtyState(

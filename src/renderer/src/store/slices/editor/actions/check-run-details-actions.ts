@@ -12,6 +12,7 @@ import {
 } from '@/components/editor/check-run-details-tab'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
+import { checkDetailsErrorAction } from '@/lib/check-details-error-action'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { findWorktreeById, getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import type { OpenFile } from '../types/open-file'
@@ -35,6 +36,7 @@ export function createCheckRunDetailsActions(
         details: state.details,
         loading: state.loading,
         error: state.error,
+        errorAction: state.errorAction ?? null,
         githubRepository: state.githubRepository ?? null,
         gitlabProjectRef: state.gitlabProjectRef ?? null
       }
@@ -117,6 +119,8 @@ export function createCheckRunDetailsActions(
           details: state.details,
           loading: state.loading,
           error: state.error,
+          // Why always overwritten like `error`: a successful retry must not keep a stale button.
+          errorAction: state.errorAction ?? null,
           githubRepository,
           gitlabProjectRef
         }
@@ -127,6 +131,7 @@ export function createCheckRunDetailsActions(
           current.check.conclusion === nextCheckRunDetails.check.conclusion &&
           current.loading === nextCheckRunDetails.loading &&
           current.error === nextCheckRunDetails.error &&
+          (current.errorAction?.kind ?? null) === (nextCheckRunDetails.errorAction?.kind ?? null) &&
           current.details === nextCheckRunDetails.details &&
           isSameGitHubRepository(current.githubRepository ?? null, githubRepository) &&
           isSameGitLabProjectRef(current.gitlabProjectRef ?? null, gitlabProjectRef)
@@ -163,11 +168,12 @@ export function createCheckRunDetailsActions(
           error: translate(
             'auto.store.slices.editor.checkRunDetailsRepoUnavailable',
             'Repository details are unavailable for this check.'
-          )
+          ),
+          errorAction: null
         })
         return
       }
-      patch({ details: checkRunDetails.details, loading: true, error: null })
+      patch({ details: checkRunDetails.details, loading: true, error: null, errorAction: null })
       try {
         // Why: refreshing a GitLab job tab through the GitHub check-runs API returns
         // null and would blank the tab the user just asked to reload.
@@ -201,7 +207,8 @@ export function createCheckRunDetailsActions(
             : translate(
                 'auto.store.slices.editor.checkRunDetailsUnavailable',
                 'No details are available for this check.'
-              )
+              ),
+          errorAction: null
         })
       } catch (error) {
         patch({
@@ -213,7 +220,8 @@ export function createCheckRunDetailsActions(
               : translate(
                   'auto.store.slices.editor.checkRunDetailsLoadFailed',
                   'Failed to load check details.'
-                )
+                ),
+          errorAction: checkDetailsErrorAction(error)
         })
       }
     }
