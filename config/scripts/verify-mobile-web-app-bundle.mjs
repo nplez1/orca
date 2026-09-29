@@ -27,6 +27,11 @@ const manifestContract = join(
  * count would have failed first and named the count rather than the split that caused it. Written
  * as chunks + images + the document, a bundle at the chunk ceiling sits exactly at this one, so
  * the chunk ceiling always trips first and the failure says what actually grew.
+ *
+ * Why this is a touch tighter than a manifest's own list: `mobileWebAppBundleMaxChunks` counts the
+ * way the build's `chunkCount` does — every emitted script *except* the entry — so a manifest's
+ * assets are that count plus the entry, plus the images, plus the document. The margin above the
+ * sweep is what absorbs that, which is why the sweep has to keep being a measurement of this head.
  */
 export function mobileWebAppBundleMaxAssets(routeCount, imageCount) {
   return mobileWebAppBundleMaxChunks(routeCount) + imageCount + 1

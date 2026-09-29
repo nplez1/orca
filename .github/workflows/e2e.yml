@@ -209,21 +209,17 @@ jobs:
         continue-on-error: ${{ github.repository != 'stablyai/orca' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ci-shards/results.json
-        run: |
-          REPORT_ARGS=(--reporter=list,json)
-          if [ "${{ github.repository }}" != "stablyai/orca" ]; then
-            # Why the absolute path: Playwright resolves a relative reporter output name against
-            # the config file's directory (tests/), not the workspace root.
-            export PLAYWRIGHT_JSON_OUTPUT_NAME="$GITHUB_WORKSPACE/ci-shards/report.json"
-          fi
-          xvfb-run --auto-servernum bash .github/scripts/e2e-with-window-manager.sh env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay" pnpm run test:e2e --test-list=ci-shards/selected.txt "${REPORT_ARGS[@]}"
+        # Why one report for both readers: Playwright honours JSON_OUTPUT_FILE over
+        # JSON_OUTPUT_NAME when both are set, so a second name here would leave the verdict below
+        # reading a file nothing writes. This is also the file the failure summary reads.
+        run: xvfb-run --auto-servernum bash .github/scripts/e2e-with-window-manager.sh env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay" pnpm run test:e2e --test-list=ci-shards/selected.txt --reporter=list,json
 
       # Why the report is the verdict's input, not Playwright's exit code: a known title that fails
       # must not fail the run, and a missing report must, so a crashed or timed-out run cannot pass
       # as green.
       - name: Verdict on known failures (${{ matrix.shard_name }})
         if: ${{ github.repository != 'stablyai/orca' && steps.run-e2e.outcome != 'skipped' }}
-        run: node local/check-e2e-known-failure-titles.mjs ci-shards/report.json local/e2e-known-failure-titles.json
+        run: node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json
 
       - name: Summarize E2E failures
         if: always()
