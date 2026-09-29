@@ -97,14 +97,20 @@
         "setupHostExistingFolderPlaceholder": "/path/to/project/on/host",
         "setupHostExistingFolderTitle": "Set up {{value0}}",
         "setupKindFolder": "Folder",
-        "setupKindGit": "Git repo"
+        "setupKindGit": "Git repo",
+        "test": {
+          "fixture": {
+            "2e2c474573": "Local Mac",
+            "95a5e6b3bb": "Devbox"
+          }
+        }
       },
       "PullRequestPage": {
+        "3450247584": "Comment",
         "19f19560d5": "destructive",
         "1ff5d979df": "No one assigned",
         "2b4fdb880c": "Unmark viewed",
         "2e528e1c2d": "Viewed",
-        "3450247584": "Comment",
         "42c36d9166": "{{value0}} {{value1}} reaction{{value2}}",
         "4b960e5978": "Loading code context…",
         "50b8fb290f": "Mark viewed",
@@ -200,7 +206,12 @@
         "ActivityPrototypePage": {
           "770d458144": "Group by",
           "a472a14700": "More options",
-          "beb2c19173": "Unread"
+          "beb2c19173": "Unread",
+          "test": {
+            "fixtures": {
+              "43a827f6a7": "Claude"
+            }
+          }
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} hidden"
@@ -247,9 +258,9 @@
           "f0202f3a89": "Daily"
         },
         "AutomationsPage": {
+          "2695883141": "delete",
           "0329f9bef1": "Close · Esc",
           "0ae52dd760": "hermes",
-          "2695883141": "delete",
           "3e42a5cc1b": "SSH connection failed.",
           "53f06f0ad5": "Retry source",
           "587a4b205c": "Next",
@@ -291,12 +302,32 @@
         "HermesCronOutputView": {
           "88d48157fc": "default"
         },
+        "automations": {
+          "page": {
+            "fixtures": {
+              "104f70edd9": "Hermes",
+              "c1e6f01a35": "Nightly #1"
+            },
+            "test": {
+              "harness": {
+                "90edd9c380": "Refresh automations"
+              }
+            }
+          }
+        },
         "createDestination": {
           "stale": "{host} changed while this form was open. Choose it again before saving.",
           "unavailable": "That host cannot hold a new automation yet. Choose another host to create this one on."
         },
         "externalScope": {
           "unknownManager": "This external automation is no longer listed for any host in view."
+        }
+      },
+      "browser-pane": {
+        "markup": {
+          "errorAttach": "Could not attach the markup screenshot.",
+          "errorCapture": "Could not capture the page to draw on.",
+          "errorUnavailable": "Screenshot markup is not available on this page."
         }
       },
       "browser": {
@@ -322,6 +353,23 @@
           },
           "BrowserToolbarMenu": {
             "6aa42813e4": "Imported {{value0}} cookies from {{value1}}{{value2}}."
+          },
+          "stream": {
+            "remote": {
+              "remote": {
+                "browser": {
+                  "stream": {
+                    "lifecycle": {
+                      "test": {
+                        "harness": {
+                          "471387f8f8": "Example"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "profile": {
@@ -333,13 +381,6 @@
               }
             }
           }
-        }
-      },
-      "browser-pane": {
-        "markup": {
-          "errorAttach": "Could not attach the markup screenshot.",
-          "errorCapture": "Could not capture the page to draw on.",
-          "errorUnavailable": "Screenshot markup is not available on this page."
         }
       },
       "contextual": {
@@ -517,6 +558,17 @@
           },
           "FloatingTerminalWindowControls": {
             "1e502f1284": "Open"
+          },
+          "floating": {
+            "terminal": {
+              "panel": {
+                "test": {
+                  "fixtures": {
+                    "00cde6717e": "Mobile Emulator"
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -597,6 +649,9 @@
           }
         }
       },
+      "linear-issue-attribute-filter-dropdowns": {
+        "optionsFromTeam": "Options from {{team}}"
+      },
       "linear": {
         "api": {
           "key": {
@@ -614,9 +669,6 @@
             }
           }
         }
-      },
-      "linear-issue-attribute-filter-dropdowns": {
-        "optionsFromTeam": "Options from {{team}}"
       },
       "mobile": {
         "MobileHero": {
@@ -884,9 +936,9 @@
               },
               "empty": {
                 "state": {
+                  "3322603418": "Pull request status unavailable",
                   "13e1c7d5ed": "No {{value0}} found",
                   "2bdd7aaf2d": "GitHub status could not be refreshed. Existing cached data was preserved.",
-                  "3322603418": "Pull request status unavailable",
                   "3d4af82ff4": "Refreshing GitHub status for this branch",
                   "41252bc53f": "Branch not published",
                   "5b0cfae9a5": "Create a {{value0}} to start checks and review.",
@@ -1560,6 +1612,15 @@
           "e2b0ee267f": "stale"
         },
         "accounts": {
+          "pane": {
+            "copilot": {
+              "section": {
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
+                "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month."
+              }
+            }
+          },
           "search": {
             "d1d2ae383c": "Paste your opencode.ai session cookie for rate limit fetching."
           }
@@ -1622,6 +1683,16 @@
             "f2932bf22b": "detected",
             "f412abbba5": "claude",
             "ff8de8a2ad": "display"
+          }
+        },
+        "appearance": {
+          "search": {
+            "0b03f507c2": "언어",
+            "2fbe0c981b": "Langue",
+            "3a0e3a9fdc": "Idioma",
+            "5f4779d525": "言語",
+            "ab96f8a4b9": "語言",
+            "b6035a3def": "语言"
           }
         },
         "artifacts": {
@@ -1780,6 +1851,22 @@
           }
         },
         "terminal": {
+          "advanced": {
+            "platform": {
+              "search": {
+                "77faf8be39": "Ghostty",
+                "7d383cc610": "ghostty"
+              }
+            }
+          },
+          "pane": {
+            "appearance": {
+              "search": {
+                "1f4decdd74": "ghostty",
+                "e0cc1b7b47": "Ghostty"
+              }
+            }
+          },
           "windows": {
             "search": {
               "02c772582a": "linux",
@@ -2020,6 +2107,11 @@
             "compact": {
               "agents": {
                 "a128d7006b": "{{value0}} {{value1}} child {{value2}}"
+              }
+            },
+            "meta": {
+              "row": {
+                "5c970dfb3b": "sidebar"
               }
             }
           }
@@ -2498,6 +2590,19 @@
             "connectButton": "Connect",
             "connectingButton": "Connecting..."
           },
+          "remote": {
+            "runtime": {
+              "pty": {
+                "transport": {
+                  "test": {
+                    "harness": {
+                      "34e5ecd501": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "terminal": {
             "drop": {
               "handler": {
@@ -2589,6 +2694,19 @@
       }
     },
     "hooks": {
+      "ipc": {
+        "events": {
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {
+                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
+                }
+              }
+            }
+          }
+        }
+      },
       "useComposerState": {
         "attachSkipMissing": "No longer at its original path.",
         "attachSkipPermissionDenied": "Permission denied.",
@@ -2607,6 +2725,26 @@
       }
     },
     "lib": {
+      "agent": {
+        "background": {
+          "session": {
+            "test": {
+              "state": {
+                "d9fa6e0979": "Terminal 1"
+              }
+            }
+          }
+        },
+        "hibernation": {
+          "coordinator": {
+            "test": {
+              "fixture": {
+                "4499e360c7": "Agent"
+              }
+            }
+          }
+        }
+      },
       "browser": {
         "cookie": {
           "import": {
@@ -2646,12 +2784,49 @@
       }
     },
     "runtime": {
+      "fixtures": {
+        "web": {
+          "session": {
+            "terminal": {
+              "orphan": {
+                "recovery": {
+                  "regression": {
+                    "fixtures": {
+                      "f1eb7ee8e3": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "githubCheckDetailsTimeout": {
         "timedOut": "Timed out loading check details."
+      },
+      "host": {
+        "session": {
+          "mirror": {
+            "frame": {
+              "fixtures": {
+                "17e758e12c": "Codex"
+              }
+            }
+          }
+        }
       }
     },
     "store": {
       "slices": {
+        "github": {
+          "slice": {
+            "test": {
+              "harness": {
+                "28fd2d1802": "Test PR"
+              }
+            }
+          }
+        },
         "settings": {
           "faa8fb83dd": "Save or close unsaved editor tabs before switching servers."
         },
@@ -2670,7 +2845,27 @@
           "d1d78a7baa": "Git could not safely delete branch \"{{value0}}\"{{value1}}, so Orca kept it to avoid losing local commits.",
           "e50495aae6": "Force Delete Branch",
           "f4503ca505": "Open Settings > Git and try again.",
-          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits."
+          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits.",
+          "slice": {
+            "test": {
+              "fixtures": {
+                "e851268bd6": "Terminal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "web": {
+      "web": {
+        "preload": {
+          "api": {
+            "test": {
+              "harness": {
+                "225db77b97": "WebSocket"
+              }
+            }
+          }
         }
       }
     }

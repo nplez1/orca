@@ -50,30 +50,30 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
  * A chunk is emitted per distinct set of importers, not per route, so a route's marginal cost is
  * what it fails to share rather than what it weighs. Re-measured on this head by building
  * `routes.slice(0, n)` for every n, which is what the fence below is derived from rather than
- * fitted to. The spread it shows is 1 to 9: `pr` and `web` add one script each, `review` adds nine.
- * The root `./_layout.tsx` (the page's web sibling of the native root) sorts first; with it the
- * swept tree reads 69 scripts at 16 routes, the old 15 read 67 on the same head.
+ * fitted to. The spread it shows is 1 to 10: `pr` and `web` add one script each, `session` adds
+ * ten. The root `./_layout.tsx` (the page's web sibling of the native root) sorts first; with it
+ * the swept tree reads 73 scripts at 16 routes, the 15 without it read 71 here.
  *
  * This table is the fence's only input, so a route added to the tree stales it and the pins beside
  * the fence fail until it is re-measured. That is the point: the bound is re-derived, never bumped.
  */
 export const MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP = [
-  ['./_layout.tsx', 3],
-  ['./h/[hostId]/[...page].tsx', 7],
-  ['./h/[hostId]/accounts.tsx', 9],
+  ['./_layout.tsx', 2],
+  ['./h/[hostId]/[...page].tsx', 6],
+  ['./h/[hostId]/accounts.tsx', 8],
   ['./h/[hostId]/agent-history/[worktreeId].tsx', 13],
   ['./h/[hostId]/edit.tsx', 18],
-  ['./h/[hostId]/files/[worktreeId].tsx', 21],
-  ['./h/[hostId]/files/preview/[worktreeId].tsx', 28],
-  ['./h/[hostId]/history/[worktreeId].tsx', 30],
-  ['./h/[hostId]/index.tsx', 35],
-  ['./h/[hostId]/pr/[worktreeId].tsx', 36],
-  ['./h/[hostId]/review/[worktreeId].tsx', 45],
-  ['./h/[hostId]/session/[worktreeId].tsx', 54],
-  ['./h/[hostId]/source-control/[worktreeId].tsx', 59],
-  ['./h/[hostId]/tasks.tsx', 66],
-  ['./h/[hostId]/web.tsx', 67],
-  ['./h/_layout.tsx', 69]
+  ['./h/[hostId]/files/[worktreeId].tsx', 23],
+  ['./h/[hostId]/files/preview/[worktreeId].tsx', 31],
+  ['./h/[hostId]/history/[worktreeId].tsx', 33],
+  ['./h/[hostId]/index.tsx', 38],
+  ['./h/[hostId]/pr/[worktreeId].tsx', 39],
+  ['./h/[hostId]/review/[worktreeId].tsx', 47],
+  ['./h/[hostId]/session/[worktreeId].tsx', 57],
+  ['./h/[hostId]/source-control/[worktreeId].tsx', 62],
+  ['./h/[hostId]/tasks.tsx', 70],
+  ['./h/[hostId]/web.tsx', 71],
+  ['./h/_layout.tsx', 73]
 ]
 
 const sweptScripts = MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP.map(([, scripts]) => scripts)
@@ -88,11 +88,12 @@ export const MOBILE_WEB_APP_BUNDLE_ROUTE_SCRIPT_SPREAD = sweptScripts
  *
  * Measured, not chosen, and per head rather than cumulative: at 8, 10, 12 and 14 routes the head
  * that wrote the old `4r + 16` read 32, 43, 61 and 69, the head that first swept these prefixes
- * read 34, 44, 57 and 65, and this one reads 33, 43, 56 and 64. So one head has moved the count by
- * as much as four at a fixed route count with no route added (61 to 57), and the step that dropped
- * the page's second Zod moved it by one everywhere. Four is that worst step, which is what a shared
- * importer set moving between heads costs. Summing the steps instead would grow this number every
- * head and loosen the fence for free. A refactor inside four keeps building; anything past it
+ * read 34, 44, 57 and 65, and the head that most recently re-measured the table above reads 33,
+ * 39, 57 and 70. The fork sync between the last two moved the full tree by five with no route
+ * added — past this margin, which is exactly the re-measure the paragraph above asks for rather
+ * than a reason to raise it. Four stays the tolerance: it is what a shared importer set moving
+ * between two ordinary heads cost (61 to 57), and summing the steps instead would grow this
+ * number every head and loosen the fence for free. A refactor inside four keeps building; anything past it
  * re-measures the sweep.
  */
 export const MOBILE_WEB_APP_BUNDLE_SCRIPT_MARGIN = 4

@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join, posix as pathPosix } from 'node:path'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import {
   buildManagedCommandHook,
   createManagedCommandMatcher,
@@ -66,7 +67,7 @@ export function getDshManagedHooksPath(): string {
 export function getDshRemoteManagedHooksPath(remoteHome: string): string {
   return pathPosix.join(
     remoteHome.replace(/\/$/, ''),
-    '.orca',
+    HOME_DIRECTORY_NAME,
     'agent-hooks',
     DSH_MANAGED_HOOKS_FILE_NAME
   )

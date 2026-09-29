@@ -134,12 +134,10 @@ export function getWindowsManagedLifecycleHook(
 
 function getWindowsPowerShellLifecycleCommand(scriptPath: string): string {
   const scriptFileName = win32.basename(scriptPath)
-  // Why: runtime profile resolution keeps the managed entry portable across users (STA-3348).
   const quotedRelativePath = quotePowerShellLiteral(
     `${HOME_DIRECTORY_NAME}\\agent-hooks\\${scriptFileName}`
   )
-  // Why: compat consumers require neutral JSON even when the managed script is missing (#14818).
-  const innerCommand =
+  return (
     `$scriptPath = Join-Path $env:USERPROFILE ${quotedRelativePath}; ` +
     'if (Test-Path -LiteralPath $scriptPath -PathType Leaf) { & $scriptPath; exit $LASTEXITCODE }; ' +
     "[Console]::In.ReadToEnd() | Out-Null; Write-Output '{}'; exit 0"
