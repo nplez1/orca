@@ -60,6 +60,13 @@ export type JenkinsBuildCheckDetailsInput = {
   build: unknown
   /** `<build>/wfapi/describe` payload, or null when the job has no stages (freestyle). */
   stages: unknown
+  /**
+   * Per-stage `wfapi/describe` payloads, aligned with `stages.stages` by index.
+   *
+   * Null (or a short array) where a stage's detail was not fetched, so the stage still renders
+   * without its steps rather than being dropped.
+   */
+  stageDetails?: unknown[]
 }
 
 /** Jenkins results mapped to GitHub's conclusion vocabulary so the pane's classifier keeps working. */
@@ -117,30 +124,69 @@ const TERMINAL_STAGE_STATES = new Set([
   'SKIPPED'
 ])
 
-function readStage(raw: unknown): PRCheckStep | null {
-  const stage = asRecord(raw)
-  const name = readString(stage?.name)
-  if (!stage || !name) {
+/** A `wfapi/describe` node's own failure text, e.g. `script returned exit code 1`. */
+function readErrorMessage(raw: unknown): string | null {
+  return readString(asRecord(asRecord(raw)?.error)?.message)
+}
+
+function readStageNode(raw: unknown): PRCheckStep | null {
+  const node = asRecord(raw)
+  const name = readString(node?.name)
+  if (!node || !name) {
     return null
   }
-  const state = normalizeJenkinsState(stage.status)
-  const startedMs = readFiniteNumber(stage.startTimeMillis)
-  const durationMs = readFiniteNumber(stage.durationMillis)
+  const state = normalizeJenkinsState(node.status)
+  const startedMs = readFiniteNumber(node.startTimeMillis)
+  const durationMs = readFiniteNumber(node.durationMillis)
   const completedAt =
     state !== null && TERMINAL_STAGE_STATES.has(state) && startedMs !== null && durationMs !== null
       ? isoFromMs(startedMs + durationMs)
       : null
+  const errorMessage = readErrorMessage(node)
+  const id = readString(node.id)
   return {
+    ...(id ? { id } : {}),
     name,
     ...mapJenkinsStageState(state),
     startedAt: isoFromMs(startedMs),
-    completedAt
+    completedAt,
+    // Why omitted rather than null: only a failure has a message, and callers test truthiness.
+    ...(errorMessage ? { errorMessage } : {})
   }
 }
 
-function readStepList(stages: unknown): PRCheckStep[] {
+/** The steps a stage ran, from its own `wfapi/describe` (`stageFlowNodes`). */
+function readStageFlowNodes(detail: unknown): PRCheckStep[] {
+  return readArray(asRecord(detail)?.stageFlowNodes)
+    .map(readStageNode)
+    .filter((node): node is PRCheckStep => node !== null)
+}
+
+function readStage(raw: unknown, detail: unknown): PRCheckStep | null {
+  const stage = readStageNode(raw)
+  if (!stage) {
+    return null
+  }
+  // Why only when detail was fetched: an unfetched stage must stay a leaf, not look like an
+  // expanded stage that ran no steps.
+  const children = detail === null ? [] : readStageFlowNodes(detail)
+  // Why the deepest failure first: a stage's own message is often absent while the failing step
+  // carries the exit code that explains the build.
+  const errorMessage =
+    readErrorMessage(detail) ??
+    stage.errorMessage ??
+    children.find((child) => child.errorMessage)?.errorMessage ??
+    null
+  return {
+    ...stage,
+    ...(children.length > 0 ? { children } : {}),
+    ...(errorMessage ? { errorMessage } : {})
+  }
+}
+
+function readStepList(stages: unknown, stageDetails: unknown[] | undefined): PRCheckStep[] {
   return readArray(asRecord(stages)?.stages)
-    .map(readStage)
+    .map((stage, index) => readStage(stage, stageDetails?.[index] ?? null))
     .filter((stage): stage is PRCheckStep => stage !== null)
 }
 
@@ -149,7 +195,7 @@ export function jenkinsBuildToCheckRunDetails(
 ): PRCheckRunDetails {
   const build = asRecord(input.build)
   const workflow = asRecord(input.stages)
-  const steps = readStepList(input.stages)
+  const steps = readStepList(input.stages, input.stageDetails)
 
   const number = readFiniteNumber(build?.number)
   const building = build?.building === true

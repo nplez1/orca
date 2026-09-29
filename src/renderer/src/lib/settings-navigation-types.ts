@@ -69,6 +69,8 @@ export const BROWSER_USER_AGENT_SETTINGS_TARGET_ID = 'browser-user-agent'
 export const CODEX_TERMINAL_SERVER_ISOLATION_SETTINGS_TARGET_ID =
   'agents-codex-terminal-server-isolation'
 export const GLOBAL_WORKTREE_VISIBILITY_SETTINGS_TARGET_ID = 'general-global-worktree-visibility'
+/** Anchor for the Jenkins server card, so a failed check can deep-link to where its token is added. */
+export const JENKINS_INTEGRATION_SETTINGS_TARGET_ID = 'integrations-jenkins'
 
 export type SettingsNavigationTarget = {
   pane: SettingsNavTarget

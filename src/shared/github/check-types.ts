@@ -33,11 +33,23 @@ export type PRCheckAnnotation = {
 }
 
 export type PRCheckStep = {
+  /** Provider step/node id, unique within a job; the stable React key and trace identity. */
+  id?: string
   name: string
   status: string | null
   conclusion: string | null
   startedAt: string | null
   completedAt: string | null
+  /**
+   * Nested stages or steps below this one (a Jenkins stage's flow nodes).
+   *
+   * Why flat helpers must not recurse: `visibleCheckSteps` and `summarizeJobSteps` treat a job's
+   * steps as one flat list, so walking `children` there would double-count outcomes. Only the
+   * full-details tree renderer descends.
+   */
+  children?: PRCheckStep[]
+  /** Provider-reported failure text (Jenkins `stageFlowNodes[].error.message`), if any. */
+  errorMessage?: string | null
 }
 
 export type PRCheckJob = {

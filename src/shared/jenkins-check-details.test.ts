@@ -141,6 +141,51 @@ describe('jenkinsBuildToCheckRunDetails', () => {
     expect(job.steps[1].completedAt).toBe('2023-11-14T22:14:20.000Z')
   })
 
+  it('nests each stage’s steps and carries the failure text from its own detail', () => {
+    const details = jenkinsBuildToCheckRunDetails({
+      check,
+      location,
+      build: failedBuild,
+      stages: failedStages,
+      stageDetails: [
+        {
+          id: '3',
+          name: 'Checkout',
+          status: 'SUCCESS',
+          stageFlowNodes: [{ id: '4', name: 'Git', status: 'SUCCESS' }]
+        },
+        {
+          id: '7',
+          name: 'Test',
+          status: 'FAILED',
+          stageFlowNodes: [
+            {
+              id: '9',
+              name: 'Shell Script',
+              status: 'FAILED',
+              error: { message: 'script returned exit code 1' }
+            }
+          ]
+        },
+        // A stage whose detail was not fetched must stay a leaf, not look like an empty stage.
+        null
+      ]
+    })
+
+    const steps = details.jobs[0].steps
+    // The Jenkins node id survives so React keys stay unique even when a stage name repeats.
+    expect(steps[0].id).toBe('3')
+    expect(steps[1].id).toBe('7')
+    expect(steps[1].children?.[0].id).toBe('9')
+    expect(steps[0].children?.map((child) => child.name)).toEqual(['Git'])
+    expect(steps[1].children?.map((child) => child.name)).toEqual(['Shell Script'])
+    expect(steps[1].children?.[0].errorMessage).toBe('script returned exit code 1')
+    // The stage-level message lets the failure summary explain the build without walking children.
+    expect(steps[1].errorMessage).toBe('script returned exit code 1')
+    expect(steps[2].children).toBeUndefined()
+    expect(steps[2].errorMessage).toBeUndefined()
+  })
+
   it('reads a running build, including a stage paused for input', () => {
     const details = jenkinsBuildToCheckRunDetails({
       check: { ...check, status: 'in_progress', conclusion: 'pending' },
