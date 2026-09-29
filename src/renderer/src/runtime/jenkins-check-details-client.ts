@@ -5,6 +5,7 @@ import type {
   JenkinsBuildDetailsResult
 } from '../../../shared/jenkins-check-details'
 import { parseJenkinsBuildLocation } from '../../../shared/jenkins-urls'
+import { JenkinsCheckDetailsError } from '@/lib/check-details-error-action'
 
 /**
  * Jenkins build details for a check, picked by the check's own URL.
@@ -115,7 +116,13 @@ export async function loadJenkinsCheckDetails(
   if (result.reason === 'not-jenkins') {
     return null
   }
-  throw new Error(failureMessage(result.reason, result.serverUrl))
+  // Why typed: the reason decides whether the surface offers a Settings link, and the localized
+  // message alone cannot say that.
+  throw new JenkinsCheckDetailsError(
+    result.reason,
+    result.serverUrl,
+    failureMessage(result.reason, result.serverUrl)
+  )
 }
 
 /**

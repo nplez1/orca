@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { readIpcErrorMessage } from '@/lib/ipc-error'
 import { IntegrationCardDetails, IntegrationCardShell } from './integration-card-shell'
+import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import { cn } from '@/lib/utils'
 import { useIntegrationSubordinateRowClass } from './integration-card-presentation'
 import { JenkinsServerDialog } from './jenkins-server-dialog'
@@ -143,6 +144,7 @@ export function JenkinsIntegrationCard(): React.JSX.Element {
 
   return (
     <IntegrationCardShell
+      settingsSectionId={JENKINS_INTEGRATION_SETTINGS_TARGET_ID}
       icon={<Server className="size-5" />}
       name="Jenkins"
       description={translate(

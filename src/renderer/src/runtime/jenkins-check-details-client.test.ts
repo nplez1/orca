@@ -6,6 +6,7 @@ import {
   loadCheckDetailsWithProviderFallback,
   loadJenkinsCheckDetails
 } from './jenkins-check-details-client'
+import { JenkinsCheckDetailsError, checkDetailsErrorAction } from '@/lib/check-details-error-action'
 
 const buildDetails = vi.fn()
 
@@ -118,6 +119,31 @@ describe('loadJenkinsCheckDetails', () => {
     buildDetails.mockResolvedValue(undefined)
 
     await expect(loadJenkinsCheckDetails(check())).resolves.toBeNull()
+  })
+
+  it('carries the failure reason so a surface can offer settings', async () => {
+    buildDetails.mockResolvedValue({
+      ok: false,
+      reason: 'forbidden',
+      serverUrl: 'https://ci.example.com',
+      message: null
+    })
+
+    const thrown = await loadJenkinsCheckDetails(check()).catch((error: unknown) => error)
+    expect(thrown).toBeInstanceOf(JenkinsCheckDetailsError)
+    expect(checkDetailsErrorAction(thrown)).toEqual({ kind: 'open-jenkins-settings' })
+  })
+
+  it('offers no settings link for a failure the user cannot fix there', async () => {
+    buildDetails.mockResolvedValue({
+      ok: false,
+      reason: 'timeout',
+      serverUrl: 'https://ci.example.com',
+      message: null
+    })
+
+    const thrown = await loadJenkinsCheckDetails(check()).catch((error: unknown) => error)
+    expect(checkDetailsErrorAction(thrown)).toBeNull()
   })
 })
 

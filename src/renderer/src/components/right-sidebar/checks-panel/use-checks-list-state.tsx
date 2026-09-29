@@ -7,6 +7,7 @@ import type { GitHubRepositoryIdentity } from '../../../../../shared/github/pull
 import { sortChecksBySeverity } from '../../../../../shared/pr-check-severity-order'
 import { summarizeProviderChecks } from '../../../../../shared/provider-check-summary'
 import { createCheckRunDetailsRequestId } from '@/components/editor/check-run-details-tab'
+import { checkDetailsErrorAction } from '@/lib/check-details-error-action'
 import { translate } from '@/i18n/i18n'
 import { useCheckDetailsResize } from '../check-details-resize'
 import {
@@ -142,7 +143,8 @@ export function useChecksListState({
             error: translate(
               'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
               'No inline details are available for this check.'
-            )
+            ),
+            errorAction: null
           }
         }))
         return
@@ -156,7 +158,8 @@ export function useChecksListState({
             error: translate(
               'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
               'No inline details are available for this check.'
-            )
+            ),
+            errorAction: null
           }
         }))
         return
@@ -164,9 +167,16 @@ export function useChecksListState({
       const requestContextKey = checkDetailsContextKey
       const requestId = createCheckRunDetailsRequestId()
       const retryError = detailsByCheckKey[row.key]?.error ?? null
+      const retryErrorAction = detailsByCheckKey[row.key]?.errorAction ?? null
       setDetailsByCheckKey((current) => ({
         ...current,
-        [row.key]: { requestId, loading: true, details: null, error: retryError }
+        [row.key]: {
+          requestId,
+          loading: true,
+          details: null,
+          error: retryError,
+          errorAction: retryErrorAction
+        }
       }))
       if (resolvedWorktreeId) {
         patchOpenCheckRunDetails(resolvedWorktreeId, requestContextKey, row.check, {
@@ -174,6 +184,7 @@ export function useChecksListState({
           details: null,
           loading: true,
           error: retryError,
+          errorAction: retryErrorAction,
           githubRepository: githubRepository ?? null,
           gitlabProjectRef: getGitLabProjectRef?.() ?? null
         })
@@ -192,6 +203,7 @@ export function useChecksListState({
                     'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
                     'No inline details are available for this check.'
                   ),
+              errorAction: null,
               githubRepository: githubRepository ?? null,
               gitlabProjectRef: getGitLabProjectRef?.() ?? null
             })
@@ -215,6 +227,7 @@ export function useChecksListState({
                       'auto.components.right.sidebar.checks.panel.content.e15a8b77ef',
                       'No inline details are available for this check.'
                     ),
+                errorAction: null,
                 // Why: a detail-less result is only final for this status — re-arm the retry once the job moves on.
                 errorAt: details
                   ? undefined
@@ -231,12 +244,14 @@ export function useChecksListState({
                   'auto.components.right.sidebar.checks.panel.content.e45324fbed',
                   'Failed to load check details.'
                 )
+          const errorAction = checkDetailsErrorAction(err)
           if (resolvedWorktreeId) {
             patchOpenCheckRunDetails(resolvedWorktreeId, requestContextKey, row.check, {
               requestId,
               details: null,
               loading: false,
               error,
+              errorAction,
               githubRepository: githubRepository ?? null,
               gitlabProjectRef: getGitLabProjectRef?.() ?? null
             })
@@ -255,6 +270,7 @@ export function useChecksListState({
                 loading: false,
                 details: null,
                 error,
+                errorAction,
                 errorAt: { status: row.check.status, conclusion: row.check.conclusion }
               }
             }
@@ -297,6 +313,7 @@ export function useChecksListState({
         details: detailsState.details ?? null,
         loading: detailsState.loading ?? false,
         error: detailsState.error ?? null,
+        errorAction: detailsState.errorAction ?? null,
         githubRepository: githubRepository ?? null,
         gitlabProjectRef: getGitLabProjectRef?.() ?? null
       })

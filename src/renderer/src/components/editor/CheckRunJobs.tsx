@@ -9,6 +9,7 @@ import { rendersEveryStep } from '../../../../shared/check-step-visibility'
 import { resolveStepOutcome, summarizeJobSteps } from './check-job-step-status'
 import { formatJobsForClipboard } from './check-run-clipboard-text'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
+import { CheckStageTree } from './CheckStageTree'
 
 function StepRow({ step }: { step: PRCheckStep }): React.JSX.Element {
   const outcome = resolveStepOutcome(step)
@@ -96,42 +97,48 @@ function JobCard({ job, index }: { job: PRCheckJob; index: number }): React.JSX.
         )}
       </div>
 
-      {primarySteps.length > 0 && (
-        <div className="mt-2 grid gap-0.5">
-          {primarySteps.map((step) => (
-            <StepRow key={`${step.name}:${step.startedAt ?? ''}`} step={step} />
-          ))}
-        </div>
-      )}
-
-      {collapsible.length > 0 && (
-        <div className="mt-1">
-          <button
-            type="button"
-            onClick={() => setShowRest((value) => !value)}
-            className="flex w-full items-center gap-1.5 rounded py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-expanded={showRest}
-          >
-            <ChevronDown
-              className={cn(
-                'size-3.5 shrink-0 transition-transform',
-                showRest ? 'rotate-0' : '-rotate-90'
-              )}
-            />
-            <span>
-              {summaryParts.join(
-                translate('auto.components.editor.CheckRunJobs.5a8e1d4f23', ' · ')
-              )}
-            </span>
-          </button>
-          {showRest && (
-            <div className="mt-0.5 grid gap-0.5 pl-5">
-              {collapsible.map((step) => (
+      {showsEveryStep ? (
+        <CheckStageTree job={job} />
+      ) : (
+        <>
+          {primarySteps.length > 0 && (
+            <div className="mt-2 grid gap-0.5">
+              {primarySteps.map((step) => (
                 <StepRow key={`${step.name}:${step.startedAt ?? ''}`} step={step} />
               ))}
             </div>
           )}
-        </div>
+
+          {collapsible.length > 0 && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={() => setShowRest((value) => !value)}
+                className="flex w-full items-center gap-1.5 rounded py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-expanded={showRest}
+              >
+                <ChevronDown
+                  className={cn(
+                    'size-3.5 shrink-0 transition-transform',
+                    showRest ? 'rotate-0' : '-rotate-90'
+                  )}
+                />
+                <span>
+                  {summaryParts.join(
+                    translate('auto.components.editor.CheckRunJobs.5a8e1d4f23', ' · ')
+                  )}
+                </span>
+              </button>
+              {showRest && (
+                <div className="mt-0.5 grid gap-0.5 pl-5">
+                  {collapsible.map((step) => (
+                    <StepRow key={`${step.name}:${step.startedAt ?? ''}`} step={step} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {job.logTail && <CheckJobLogTail logTail={job.logTail} expanded={jobFailed} />}

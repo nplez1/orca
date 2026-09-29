@@ -120,6 +120,151 @@ describe('getJenkinsBuildDetails', () => {
     expect(headers.get('Accept')).toBe('application/json')
   })
 
+  it('reads each stage’s steps and failure text from its own describe link', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection)
+    route = (url) => {
+      if (url.includes('/execution/node/5/')) {
+        return json({ stageFlowNodes: [{ id: '6', name: 'Git', status: 'SUCCESS' }] })
+      }
+      if (url.includes('/execution/node/')) {
+        return json({
+          stageFlowNodes: [
+            { id: '9', name: 'Shell Script', status: 'FAILED', error: { message: 'exit 1' } }
+          ]
+        })
+      }
+      if (url.includes('wfapi/describe')) {
+        return json({
+          stages: [
+            {
+              id: '5',
+              name: 'Build',
+              status: 'SUCCESS',
+              _links: { self: { href: '/job/team/job/repo/12/execution/node/5/wfapi/describe' } }
+            },
+            {
+              id: '8',
+              name: 'Test',
+              status: 'FAILED',
+              _links: { self: { href: '/job/team/job/repo/12/execution/node/8/wfapi/describe' } }
+            }
+          ]
+        })
+      }
+      return json(buildBody())
+    }
+
+    const result = await details.getJenkinsBuildDetails({ url: check.url, check })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    const steps = result.details.jobs[0].steps
+    expect(steps[0].children?.map((child) => child.name)).toEqual(['Git'])
+    expect(steps[0].errorMessage).toBeUndefined()
+    expect(steps[1].children?.map((child) => child.name)).toEqual(['Shell Script'])
+    expect(steps[1].errorMessage).toBe('exit 1')
+    expect(
+      requests.some((request) => request.url.endsWith('/execution/node/8/wfapi/describe'))
+    ).toBe(true)
+  })
+
+  it('bounds how many stage details it fetches', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection)
+    route = (url) => {
+      if (url.includes('/execution/node/')) {
+        return json({ stageFlowNodes: [{ name: 'Step', status: 'SUCCESS' }] })
+      }
+      if (url.includes('wfapi/describe')) {
+        return json({
+          stages: Array.from({ length: 60 }, (_, index) => ({
+            id: String(index + 1),
+            name: `Stage ${index}`,
+            status: 'FAILED',
+            _links: {
+              self: { href: `/job/team/job/repo/12/execution/node/${index + 1}/wfapi/describe` }
+            }
+          }))
+        })
+      }
+      return json(buildBody())
+    }
+
+    const result = await details.getJenkinsBuildDetails({ url: check.url, check })
+
+    expect(result.ok).toBe(true)
+    expect(requests.filter((request) => request.url.includes('/execution/node/'))).toHaveLength(40)
+  })
+
+  it('returns what arrived when the stage fan-out outruns its time budget', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection)
+    route = (url) => {
+      if (url.includes('/execution/node/')) {
+        // A stage detail that never answers: the budget, not the request, must end the read.
+        return new Promise<Response>(() => {})
+      }
+      if (url.includes('wfapi/describe')) {
+        return json({
+          stages: [
+            {
+              id: '5',
+              name: 'Build',
+              status: 'FAILED',
+              _links: { self: { href: '/job/team/job/repo/12/execution/node/5/wfapi/describe' } }
+            }
+          ]
+        })
+      }
+      return json(buildBody())
+    }
+
+    vi.useFakeTimers()
+    try {
+      const pending = details.getJenkinsBuildDetails({ url: check.url, check })
+      await vi.advanceTimersByTimeAsync(4_000)
+      const result = await pending
+
+      expect(result.ok).toBe(true)
+      expect(result.ok && result.details.jobs[0].steps[0].children).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not follow a stage link outside the configured server', async () => {
+    const { connection, details } = await loadModules()
+    configureServer(connection)
+    route = (url) => {
+      if (url.includes('/execution/node/')) {
+        return json({ stageFlowNodes: [{ name: 'Stolen', status: 'SUCCESS' }] })
+      }
+      if (url.includes('wfapi/describe')) {
+        return json({
+          stages: [
+            {
+              id: '5',
+              name: 'Build',
+              status: 'SUCCESS',
+              _links: { self: { href: 'https://evil.example.com/steal' } }
+            }
+          ]
+        })
+      }
+      return json(buildBody())
+    }
+
+    const result = await details.getJenkinsBuildDetails({ url: check.url, check })
+
+    expect(result.ok).toBe(true)
+    expect(requests.every((request) => !request.url.startsWith('https://evil.example.com'))).toBe(
+      true
+    )
+  })
+
   it('asks for only the build fields it maps', async () => {
     const { connection, details } = await loadModules()
     configureServer(connection)

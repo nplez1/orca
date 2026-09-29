@@ -1,14 +1,19 @@
 import React from 'react'
-import { ExternalLink, LoaderCircle, RefreshCw } from 'lucide-react'
+import { ExternalLink, LoaderCircle, RefreshCw, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import { useAppStore } from '@/store'
+import { JENKINS_INTEGRATION_SETTINGS_TARGET_ID } from '@/lib/settings-navigation-types'
 import type { PRCheckDetail, PRCheckRunDetails } from '../../../../shared/github/check-types'
+import { rendersEveryStep } from '../../../../shared/check-step-visibility'
+import type { CheckDetailsErrorAction } from '@/lib/check-details-error-action'
 import { SourceControlFixSplitButton } from '@/components/right-sidebar/source-control-fix-split-button'
 import { translate } from '@/i18n/i18n'
 import { useCheckRunDetailsFixWithAI } from './check-run-details-fix-with-ai'
 import { formatCheckRunOutputForClipboard } from './check-run-clipboard-text'
 import { CheckRunAnnotations } from './CheckRunAnnotations'
+import { CheckFailureSummary } from './CheckFailureSummary'
 import { CheckRunJobs } from './CheckRunJobs'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
@@ -80,6 +85,7 @@ export function CheckRunDetailsPanel({
   details,
   loading,
   error,
+  errorAction,
   openUrl,
   worktreeId,
   onRefresh
@@ -88,10 +94,13 @@ export function CheckRunDetailsPanel({
   details: PRCheckRunDetails | null
   loading: boolean
   error: string | null
+  /** Settings affordance for the error, when the failure is one the user can fix. */
+  errorAction?: CheckDetailsErrorAction | null
   openUrl: string | null | undefined
   worktreeId: string | null
   onRefresh?: () => void
 }): React.JSX.Element {
+  const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const {
     canFixWithAI,
     disabledReason,
@@ -124,7 +133,11 @@ export function CheckRunDetailsPanel({
       return isFailureState(state)
     }) ?? []
   const jobs = failedJobs.length > 0 ? failedJobs : (details?.jobs ?? [])
-  const hasOutput = Boolean(details?.title || details?.summary || details?.text)
+  // Why not `title` alone: Jenkins' title is the build display name, which the header and build
+  // metadata already carry. A stage list (Jenkins) drops the box outright; other providers keep
+  // their output, including a check whose only output is a title.
+  const showsStageList = details?.jobs.some((job) => rendersEveryStep(job)) ?? false
+  const hasOutput = Boolean(details?.title || details?.summary || details?.text) && !showsStageList
   const hasAnnotations = (details?.annotations.length ?? 0) > 0
   const hasJobs = jobs.length > 0
   const outputClipboardText = details ? formatCheckRunOutputForClipboard(details) : ''
@@ -265,10 +278,29 @@ export function CheckRunDetailsPanel({
         ) : (
           <div className="grid gap-4">
             {error && (
-              <div role="alert" className="min-w-0 break-words text-sm text-destructive">
-                {error}
+              <div role="alert" className="flex flex-col items-start gap-2">
+                <span className="min-w-0 break-words text-sm text-destructive">{error}</span>
+                {errorAction?.kind === 'open-jenkins-settings' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openSettingsTarget({
+                        pane: 'integrations',
+                        repoId: null,
+                        sectionId: JENKINS_INTEGRATION_SETTINGS_TARGET_ID
+                      })
+                    }
+                  >
+                    <Settings className="size-3.5" />
+                    {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
+                  </Button>
+                )}
               </div>
             )}
+
+            {details && showsStageList && <CheckFailureSummary details={details} />}
 
             {hasOutput && (
               <section className="rounded-md border border-border bg-background">

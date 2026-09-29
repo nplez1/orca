@@ -21,6 +21,12 @@ const emptyAccountsState = {
   activeAccountIdsByRuntime: { host: null, wsl: {} }
 }
 
+const unlinkedZcodePlanStatus = {
+  apiKeyConfigured: false,
+  zcodeCliConfigured: false,
+  apiKeyProtection: null
+}
+
 function installWindowApi(): void {
   Object.defineProperty(window, 'api', {
     configurable: true,
@@ -36,6 +42,18 @@ function installWindowApi(): void {
       codexConfigSync: {
         status: () =>
           Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '/tmp/config.toml' })
+      },
+      // Why: the OpenCode Go section is mounted by the pane, so it reads this on mount too.
+      opencodeGoCredentials: {
+        getStatus: () => Promise.resolve({ apiKeyConfigured: false }),
+        saveApiKey: () => Promise.resolve({ apiKeyConfigured: false }),
+        clearApiKey: () => Promise.resolve({ apiKeyConfigured: false })
+      },
+      // Why: the GLM Coding Plan section is mounted by the pane and reads this on mount too.
+      zcodePlanCredentials: {
+        getStatus: () => Promise.resolve(unlinkedZcodePlanStatus),
+        saveApiKey: () => Promise.resolve(unlinkedZcodePlanStatus),
+        clearApiKey: () => Promise.resolve(unlinkedZcodePlanStatus)
       },
       grokAccounts: {
         getStatus: () =>

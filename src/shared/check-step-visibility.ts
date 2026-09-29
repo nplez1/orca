@@ -7,7 +7,7 @@ export function isFailedStepState(state: string | null | undefined): boolean {
 
 type SteppedJob = Pick<PRCheckJob, 'steps'> & Partial<Pick<PRCheckJob, 'stepRendering'>>
 
-/** Whether the job's steps are all worth listing, rather than only the ones that went wrong. */
+/** Whether the job's steps are a stage list rather than a GitHub-style drill-down. */
 export function rendersEveryStep(job: Partial<Pick<PRCheckJob, 'stepRendering'>>): boolean {
   return job.stepRendering === 'all'
 }
@@ -22,4 +22,47 @@ export function visibleCheckSteps(job: SteppedJob): PRCheckStep[] {
   return rendersEveryStep(job)
     ? job.steps
     : job.steps.filter((step) => isFailedStepState(step.conclusion ?? step.status))
+}
+
+/** How many steps the compact pane lists before it elides the rest. */
+export const CHECK_PANE_VISIBLE_STEP_LIMIT = 8
+
+/** A step that has not settled: queued, running, or waiting on a human. */
+export function isRunningStepState(step: Pick<PRCheckStep, 'status' | 'conclusion'>): boolean {
+  const state = step.conclusion ?? step.status
+  return (
+    state === null ||
+    state === 'pending' ||
+    state === 'action_required' ||
+    state === 'queued' ||
+    state === 'in_progress' ||
+    state === 'requested' ||
+    state === 'waiting'
+  )
+}
+
+export type PaneCheckSteps = {
+  steps: PRCheckStep[]
+  /** Steps held back by the limit, so the pane can say how many it is not showing. */
+  hiddenCount: number
+}
+
+/**
+ * The pane's compact step list.
+ *
+ * A stage list can run to hundreds of entries, so the pane keeps only what is still moving and
+ * what broke, capped — the full shape belongs on the details page. Running stages come first so a
+ * long run of earlier failures can never push the stage happening now out of view.
+ */
+export function paneCheckSteps(
+  job: SteppedJob,
+  limit = CHECK_PANE_VISIBLE_STEP_LIMIT
+): PaneCheckSteps {
+  if (!rendersEveryStep(job)) {
+    return { steps: visibleCheckSteps(job), hiddenCount: 0 }
+  }
+  const running = job.steps.filter((step) => isRunningStepState(step))
+  const failed = job.steps.filter((step) => isFailedStepState(step.conclusion ?? step.status))
+  const steps = limit >= 0 ? [...running, ...failed].slice(0, limit) : [...running, ...failed]
+  return { steps, hiddenCount: running.length + failed.length - steps.length }
 }
