@@ -235,7 +235,7 @@ export function isUsageEmptyState(
     pendingForBar('minimax', providers.minimax) ||
     pendingForBar('grok', providers.grok) ||
     pendingForBar('cursor', providers.cursor) ||
-    pendingForBar('zcode', providers.zcode) ||
+    (providers.zcode !== undefined && pendingForBar('zcode', providers.zcode)) ||
     pendingForBar('deepseek', providers.deepseek) ||
     pendingForBar('fireworks', providers.fireworks) ||
     pendingForBar('copilot', providers.copilot)

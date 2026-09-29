@@ -539,10 +539,10 @@ describe('the Phase C budget', () => {
         key
       ).toBeGreaterThanOrEqual(measured)
     }
-    // 1 to 9 per route, which is why four per route was a bound rather than a fit and why the
+    // 1 to 10 per route, which is why four per route was a bound rather than a fit and why the
     // envelope cannot be a line through the measurement either.
     expect(Math.min(...MOBILE_WEB_APP_BUNDLE_ROUTE_SCRIPT_SPREAD)).toBe(1)
-    expect(Math.max(...MOBILE_WEB_APP_BUNDLE_ROUTE_SCRIPT_SPREAD)).toBe(9)
+    expect(Math.max(...MOBILE_WEB_APP_BUNDLE_ROUTE_SCRIPT_SPREAD)).toBe(10)
   })
 
   it('sits exactly one margin over the swept tree and grants the worst route beyond it', () => {
@@ -567,7 +567,8 @@ describe('the Phase C budget', () => {
     // types mermaid lazily imports. Both frozen at the head that measured them, because this case
     // pins the discrimination and not either build's size.
     //
-    // 69 now sits just under the envelope: a sweep that falls further means re-measure, not raise.
+    // 69 was this tree's whole count at the head that measured it, and the re-measured sweep put
+    // the envelope further above it: what this case pins is the discrimination, not either size.
     const ROUTES = 14
     const WITH_ONE_ARTIFACT = 69
     const CHUNKED_ALONG_THE_ENGINE = 172
@@ -614,12 +615,14 @@ describe('the Phase C budget', () => {
   it('fails the build when the derived ceiling passes what the phone will accept', async () => {
     // The shell hands back null for a manifest over its own ceiling, so a derived ceiling above
     // that ships a green build no device can open. At the 42 images the tree carries, the envelope
-    // plus 42 plus the document crosses 256 at 32 routes, which Phase C reaches. The crossing came
+    // plus 42 plus the document crosses 256 at 30 routes, which Phase C reaches. The crossing came
     // in from 50 with the envelope: it grants the worst swept route to each one past the sweep,
     // where `4r + 16` granted four, so re-measuring a tree whose routes share more moves it out.
+    // This head's routes share less than the one before it — its worst marginal route costs ten
+    // scripts, not nine — so the last re-measure brought the crossing in from 32 to 30.
     expect(await readMobileWebBundleMaxAssets()).toBe(MOBILE_WEB_BUNDLE_MAX_ASSETS)
-    expect(assertAssetCeilingFitsShell(31, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toBe(251)
-    expect(() => assertAssetCeilingFitsShell(32, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toThrow(
+    expect(assertAssetCeilingFitsShell(29, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toBe(250)
+    expect(() => assertAssetCeilingFitsShell(30, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toThrow(
       /260 .*256/
     )
   })

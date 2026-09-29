@@ -144,6 +144,8 @@ function readGrokChildQuestion(
 const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | null> = {
   claude: null,
   codex: null,
+  qoder: null,
+  codebuddy: null,
   muse: null,
   grok: {
     readEvent: readGrokChildQuestion,
@@ -172,7 +174,8 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   hermes: null,
   devin: null,
   kimi: null,
-  zcode: null
+  zcode: null,
+  dsh: null
 }
 
 /** Providers whose normalizer already tracks its own descendants and derives the pane state

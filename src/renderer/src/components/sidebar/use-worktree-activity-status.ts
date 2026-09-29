@@ -79,7 +79,7 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
       hasUnconfirmed,
       hasLiveDone,
       hasRetainedDone,
-      hasRetainedFailed
+      hasRetainedFailed,
       setupRunning
     ]
   )

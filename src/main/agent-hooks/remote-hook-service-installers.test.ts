@@ -696,7 +696,7 @@ describe('remote hook service installers', () => {
     expect(settings.hooks.SessionEnd).toHaveLength(1)
     expect(settings.hooks.Notification).toHaveLength(1)
     expect(settings.hooks.TeammateIdle).toBeUndefined()
-    expect(fs.files.get('/home/dev/.orca/agent-hooks/qoder-hook.sh')).toContain('/hook/qoder')
+    expect(fs.files.get('/home/dev/.orca-np/agent-hooks/qoder-hook.sh')).toContain('/hook/qoder')
   })
 
   it('installs Droid and Copilot when running the aggregate remote installer (issue #7253)', async () => {

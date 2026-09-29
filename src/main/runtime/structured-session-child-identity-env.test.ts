@@ -130,7 +130,7 @@ describe('structuredSessionChildIdentityEnv', () => {
       expect(env.Path).toBe(`${join(RESOURCES, 'bin')};C:\\Windows`)
       expect(env.PATH).toBeUndefined()
       // The native launcher: `orca.cmd` refuses message bodies cmd.exe would mangle.
-      expect(env.ORCA_CLI_COMMAND).toBe(join(RESOURCES, 'bin', 'orca.exe'))
+      expect(env.ORCA_CLI_COMMAND).toBe(join(RESOURCES, 'bin', 'orca-np.exe'))
     })
 
     it('unpackaged, through the dev launcher dir', () => {
@@ -138,7 +138,7 @@ describe('structuredSessionChildIdentityEnv', () => {
       installFakeAppEnvironment({ isPackaged: () => false, getPath: () => USER_DATA })
       const env = structuredSessionChildIdentityEnv(SESSION_ID, { PATH: '/usr/bin' })
       expect(env.PATH).toBe(`${join(USER_DATA, 'cli', 'bin')}:/usr/bin`)
-      expect(env.ORCA_CLI_COMMAND).toBe(join(USER_DATA, 'cli', 'bin', 'orca-dev'))
+      expect(env.ORCA_CLI_COMMAND).toBe(join(USER_DATA, 'cli', 'bin', 'orca-np-dev'))
     })
   })
 
