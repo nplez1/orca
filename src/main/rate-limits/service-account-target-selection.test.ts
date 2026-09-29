@@ -612,6 +612,22 @@ describe('RateLimitService', () => {
       expect.arrayContaining([expect.objectContaining({ accountId: 'wsl-account-1' })])
     )
   })
+
+  it('refuses to redeem a Codex reset credit while Codex is switched off', async () => {
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'codex'
+    })
+
+    await expect(
+      service.consumeCodexRateLimitResetCredit({
+        idempotencyKey: '22222222-2222-4222-8222-222222222222',
+        target: { runtime: 'host', wslDistro: null },
+        codexHomePath: '/tmp/codex-home'
+      })
+    ).rejects.toThrow(/disabled/i)
+    expect(consumeCodexRateLimitResetCredit).not.toHaveBeenCalled()
+    expect(fetchCodexRateLimits).not.toHaveBeenCalled()
+  })
 })
 
 function inactiveCodexAccount(id: string, managedHomePath: string) {

@@ -182,8 +182,16 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
             status: 'error'
           } satisfies ProviderRateLimits)
 
-    const latestCodexHome = this.resolveCodexHome(codexTarget)
-    const latestClaudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
+    // Why: a disabled provider skips these late reads too — resolveCodexHome and the
+    // Claude auth preparation both touch local credential homes after the fetch.
+    const codexDisabled = this.isUsageProviderDisabled('codex')
+    const claudeDisabled = this.isUsageProviderDisabled('claude')
+    const latestCodexHome = codexDisabled
+      ? { skip: true, homePath: null }
+      : this.resolveCodexHome(codexTarget)
+    const latestClaudeAuthPreparation = claudeDisabled
+      ? undefined
+      : await this.claudeAuthPreparationResolver?.(claudeTarget)
     if (signal.aborted) {
       return
     }
@@ -191,14 +199,19 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     // Why: a finishing skip has no provenance, so an in-flight result must never be
     // applied as though the target had become the system default (#STA-4422).
     const shouldApplyCodex =
+      !codexDisabled &&
       !codexFetchGated &&
       !latestCodexHome.skip &&
       codexGeneration === this.codexFetchGeneration &&
       codexProvenance === this.getCodexProvenance(codexTarget, latestCodexHome.homePath)
     const codexBecameUnavailable =
-      !codexFetchGated && latestCodexHome.skip && codexGeneration === this.codexFetchGeneration
+      !codexDisabled &&
+      !codexFetchGated &&
+      latestCodexHome.skip &&
+      codexGeneration === this.codexFetchGeneration
     // Why: a gated cycle made no Claude attempt; applying its passthrough result would grow the failure streak and reset stale-policy clocks for free.
     const shouldApplyClaude =
+      !claudeDisabled &&
       !claudeFetchGated &&
       claudeGeneration === this.claudeFetchGeneration &&
       claudeProvenance === latestClaudeProvenance &&
@@ -273,7 +286,10 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         ? copilotConfigChanged
           ? copilot
           : this.applyStalePolicy(copilot, previousState.copilot)
-        : this.state.copilot
+        : this.state.copilot,
+      // Why: disabled wins over every value above, so Claude's live-session stale
+      // preservation cannot keep a switched-off provider's data on screen.
+      ...this.disabledUsageProviderStateOverrides()
     })
 
     const [grokSettled, cursorSettled, zcodeSettled] = await Promise.all([
@@ -314,7 +330,9 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       zcode:
         zcode.status === 'error' && !sameZcodeAccount
           ? zcode
-          : this.applyStalePolicy(zcode, previousState.zcode)
+          : this.applyStalePolicy(zcode, previousState.zcode),
+      // Why: disabled Grok/Cursor must not survive the stale policy above either.
+      ...this.disabledUsageProviderStateOverrides()
     })
   }
 }

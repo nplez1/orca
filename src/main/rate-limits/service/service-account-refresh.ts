@@ -115,6 +115,11 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     target: RateLimitRuntimeTarget
     codexHomePath: string | null
   }): Promise<CodexRateLimitResetResult> {
+    // Why: redeeming a reset credit reads ~/.codex and hits the usage endpoint,
+    // so a switched-off Codex must be refused here, not silently queried.
+    if (this.isUsageProviderDisabled('codex')) {
+      throw new Error('Codex is disabled in Settings, so its reset credit cannot be used.')
+    }
     const codexTarget = normalizeCodexAccountSelectionTarget(options.target)
     const codexHomePath = options.codexHomePath
     const scopedStateBeforeReset = this.getState()

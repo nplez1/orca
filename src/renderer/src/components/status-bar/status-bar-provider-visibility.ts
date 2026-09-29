@@ -1,5 +1,6 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { USAGE_PROVIDER_IDS } from '../../../../shared/usage-provider-enablement'
 import { hasCreditsData } from './provider-credits-format'
 
 export type UsageProviderSettings = Pick<
@@ -9,6 +10,8 @@ export type UsageProviderSettings = Pick<
   | 'opencodeSessionCookie'
   | 'geminiCliOAuthEnabled'
 > & {
+  /** Widened to string so any provider id (including Kimi/Antigravity) can be checked. */
+  disabledUsageProviders?: readonly string[]
   // Why: Antigravity has no separate persisted usage credential in Orca. The
   // checked status-bar item is the durable user signal; StatusBar only sets
   // this after PATH detection says the agent is available. Durability further
@@ -93,29 +96,29 @@ export function isProviderConfigured(
 export function hasUsageProviderSettings(
   settings: Partial<UsageProviderSettings> | null | undefined
 ): boolean {
-  return Boolean(
-    (settings?.codexManagedAccounts?.length ?? 0) > 0 ||
-    (settings?.claudeManagedAccounts?.length ?? 0) > 0 ||
-    settings?.geminiCliOAuthEnabled === true ||
-    Boolean(settings?.opencodeSessionCookie?.trim()) ||
-    settings?.opencodeGoApiKeyConfigured === true ||
-    // Antigravity's durable signal requires geminiCliOAuthEnabled, so it is
-    // already covered by the gemini term above.
-    settings?.minimaxCookieConfigured === true ||
-    settings?.minimaxApiKeyConfigured === true ||
-    settings?.grokAuthConfigured === true ||
-    settings?.cursorAuthConfigured === true ||
-    settings?.deepseekApiKeyConfigured === true ||
-    settings?.fireworksApiKeyConfigured === true ||
-    settings?.copilotTokenConfigured === true
+  if (!settings) {
+    return false
+  }
+  // Why: a switched-off provider's durable setup must not count, or the status
+  // bar keeps a pending bar for a provider the user explicitly disabled.
+  return USAGE_PROVIDER_IDS.some((providerId) =>
+    hasUsageProviderSettingsForProvider(providerId, settings)
   )
+}
+
+/** A provider the user switched off never shows a usage bar, however configured. */
+export function isUsageProviderDisabledForBar(
+  providerId: UsageProviderId,
+  settings: Partial<UsageProviderSettings> | null | undefined
+): boolean {
+  return settings?.disabledUsageProviders?.includes(providerId) ?? false
 }
 
 export function hasUsageProviderSettingsForProvider(
   providerId: UsageProviderId,
   settings: Partial<UsageProviderSettings> | null | undefined
 ): boolean {
-  if (!settings) {
+  if (!settings || isUsageProviderDisabledForBar(providerId, settings)) {
     return false
   }
   if (providerId === 'claude') {
@@ -182,6 +185,11 @@ export function getVisibleUsageProvider(
   provider: ProviderRateLimits | null | undefined,
   settings: Partial<UsageProviderSettings> | null | undefined
 ): ProviderRateLimits | null {
+  // Why: disabled must win over a live or in-flight snapshot, or a stale bar
+  // lingers until the next cycle lands an `unavailable` result.
+  if (isUsageProviderDisabledForBar(providerId, settings)) {
+    return null
+  }
   if (isProviderConfigured(provider)) {
     return provider
   }
@@ -206,20 +214,27 @@ export function isUsageEmptyState(
   const antigravitySnapshotPending =
     hasUsageProviderSettingsForProvider('antigravity', settings) &&
     isProviderSnapshotPending(providers.antigravity)
+  // Why: a disabled provider's null snapshot is not "pending" — it will never
+  // settle, so it must not hold the setup CTA back forever.
+  const pendingForBar = (
+    providerId: UsageProviderId,
+    provider: ProviderRateLimits | null | undefined
+  ): boolean =>
+    !isUsageProviderDisabledForBar(providerId, settings) && isProviderSnapshotPending(provider)
   if (
-    isProviderSnapshotPending(providers.claude) ||
-    isProviderSnapshotPending(providers.codex) ||
-    isProviderSnapshotPending(providers.gemini) ||
-    isProviderSnapshotPending(providers.opencodeGo) ||
-    isProviderSnapshotPending(providers.kimi) ||
+    pendingForBar('claude', providers.claude) ||
+    pendingForBar('codex', providers.codex) ||
+    pendingForBar('gemini', providers.gemini) ||
+    pendingForBar('opencode-go', providers.opencodeGo) ||
+    pendingForBar('kimi', providers.kimi) ||
     antigravitySnapshotPending ||
-    isProviderSnapshotPending(providers.minimax) ||
-    isProviderSnapshotPending(providers.grok) ||
-    isProviderSnapshotPending(providers.cursor) ||
-    (providers.zcode !== undefined && isProviderSnapshotPending(providers.zcode)) ||
-    isProviderSnapshotPending(providers.deepseek) ||
-    isProviderSnapshotPending(providers.fireworks) ||
-    isProviderSnapshotPending(providers.copilot)
+    pendingForBar('minimax', providers.minimax) ||
+    pendingForBar('grok', providers.grok) ||
+    pendingForBar('cursor', providers.cursor) ||
+    pendingForBar('zcode', providers.zcode) ||
+    pendingForBar('deepseek', providers.deepseek) ||
+    pendingForBar('fireworks', providers.fireworks) ||
+    pendingForBar('copilot', providers.copilot)
   ) {
     return false
   }

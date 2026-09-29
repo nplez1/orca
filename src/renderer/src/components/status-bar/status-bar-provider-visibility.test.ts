@@ -678,3 +678,55 @@ describe('isUsageEmptyState', () => {
     ).toBe(true)
   })
 })
+
+describe('disabled usage providers', () => {
+  it('hides a switched-off provider even when its snapshot is live', () => {
+    const live = provider('ok', {
+      session: { usedPercent: 42, windowMinutes: 300, resetsAt: null, resetDescription: null }
+    })
+    expect(
+      getVisibleUsageProvider(
+        'gemini',
+        live,
+        usageSettings({ geminiCliOAuthEnabled: true, disabledUsageProviders: ['gemini'] })
+      )
+    ).toBeNull()
+    // Why: the same snapshot stays visible while the provider is enabled.
+    expect(
+      getVisibleUsageProvider('gemini', live, usageSettings({ geminiCliOAuthEnabled: true }))
+    ).toBe(live)
+  })
+
+  it('does not treat a switched-off provider as configured setup', () => {
+    const settings = usageSettings({
+      geminiCliOAuthEnabled: true,
+      opencodeGoApiKeyConfigured: true,
+      disabledUsageProviders: ['gemini', 'opencode-go']
+    })
+    expect(hasUsageProviderSettingsForProvider('gemini', settings)).toBe(false)
+    expect(hasUsageProviderSettingsForProvider('opencode-go', settings)).toBe(false)
+    expect(hasUsageProviderSettings(settings)).toBe(false)
+  })
+
+  it('does not let a switched-off provider hold the setup CTA back', () => {
+    const settled = {
+      claude: provider('unavailable', { provider: 'claude' }),
+      codex: provider('unavailable', { provider: 'codex' }),
+      // A disabled provider never settles, so its null snapshot must not read as pending.
+      gemini: null,
+      opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
+      kimi: provider('unavailable', { provider: 'kimi' }),
+      antigravity: null,
+      grok: provider('unavailable', { provider: 'grok' }),
+      minimax: provider('unavailable', { provider: 'minimax' }),
+      cursor: provider('unavailable', { provider: 'cursor' }),
+      deepseek: provider('unavailable', { provider: 'deepseek' }),
+      fireworks: provider('unavailable', { provider: 'fireworks' }),
+      copilot: provider('unavailable', { provider: 'copilot' })
+    }
+    expect(isUsageEmptyState(settled, usageSettings())).toBe(false)
+    expect(isUsageEmptyState(settled, usageSettings({ disabledUsageProviders: ['gemini'] }))).toBe(
+      true
+    )
+  })
+})

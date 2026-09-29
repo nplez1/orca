@@ -28,6 +28,7 @@ import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
 import { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
 import { SkillCloudService } from '../skills/skill-cloud-service'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
+import { normalizeDisabledUsageProviders } from '../../shared/usage-provider-enablement'
 import {
   AgentStatusObservedPaneIdentities,
   recordObservedAgentStatusPaneIdentity
@@ -190,7 +191,15 @@ export function configureRuntimeServices(runtime: OrcaRuntimeService): void {
     )
   )
   runtime.setSkillCloudService(new SkillCloudService(app.getPath('userData')))
-  runtime.setAccountServices({ claudeAccounts, codexAccounts, rateLimits })
+  runtime.setAccountServices(
+    { claudeAccounts, codexAccounts, rateLimits },
+    {
+      // Why: a disabled Claude/Codex must not have its system-default identity read
+      // from ~/.claude or ~/.codex on every rate-limit state push.
+      disabledUsageProviders: () =>
+        new Set(normalizeDisabledUsageProviders(store.getSettings().disabledUsageProviders))
+    }
+  )
   runtime.setCommitMessageAgentEnvironmentResolvers({
     // Why: Codex hooks/auth live in Orca's managed runtime home even for the default path, so every launch must resolve CODEX_HOME via runtime-home.
     prepareForCodexLaunch: prepareCodexRuntimeHomeForLaunch,
