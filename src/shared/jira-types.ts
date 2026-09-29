@@ -91,15 +91,6 @@ export type JiraProjectStatusOrder = {
   statusIdsByColumn: string[][]
 }
 
-export type JiraField = {
-  id: string
-  name: string
-  schemaType?: string
-  customType?: string
-  siteId: string
-  siteName: string
-}
-
 export type JiraBoard = {
   id: string
   name: string
@@ -146,18 +137,12 @@ export type JiraBoardIssuePage = {
 export type JiraBoardIssuePageRequest = {
   boardId: string
   siteId: string
-  teamFieldId?: string
   startAt?: number
   maxResults?: number
 } & (
   | { scope: 'backlog'; pageToken?: string; sprintId?: never }
   | { scope: 'sprint'; pageToken?: string; sprintId: string }
 )
-
-export type JiraIssueTeamValue = {
-  key: string
-  label: string
-}
 
 export type JiraTransition = {
   id: string
@@ -180,7 +165,6 @@ export type JiraIssue = {
   assignee?: JiraUser
   reporter?: JiraUser
   priority?: JiraPriority
-  teamValue?: JiraIssueTeamValue
   updatedAt: string
   createdAt: string
 }

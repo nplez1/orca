@@ -5,6 +5,7 @@ import {
   getTaskPageJiraBoardTransitionTargets,
   getTaskPageJiraBoardViewerAccountId,
   groupTaskPageJiraBoardIssues,
+  issueMatchesTaskPageJiraBoardQuery,
   shouldShowJiraSiteSelector
 } from './task-page-jira-board-model'
 
@@ -67,33 +68,51 @@ describe('Jira board projection', () => {
     ).toBe('account-site-b')
   })
 
-  it('filters by the Jira viewer account, exact configured team value, or all issues', () => {
+  it('filters by the Jira viewer account or shows every issue', () => {
     const issues = [
-      issue('ABC-1', '1', {
-        assignee: { accountId: 'viewer-1', displayName: 'Ada' },
-        teamValue: { key: 'team-1', label: 'Payments' }
-      }),
-      issue('ABC-2', '2', {
-        assignee: { accountId: 'viewer-2', displayName: 'Grace' },
-        teamValue: { key: 'team-2', label: 'Platform' }
-      }),
+      issue('ABC-1', '1', { assignee: { accountId: 'viewer-1', displayName: 'Ada' } }),
+      issue('ABC-2', '2', { assignee: { accountId: 'viewer-2', displayName: 'Grace' } }),
       issue('ABC-3', '3')
     ]
 
-    expect(
-      filterTaskPageJiraBoardIssues(issues, 'me', 'viewer-1', 'team-1').map((item) => item.key)
-    ).toEqual(['ABC-1'])
-    expect(
-      filterTaskPageJiraBoardIssues(issues, 'team', 'viewer-1', 'team-2').map((item) => item.key)
-    ).toEqual(['ABC-2'])
-    expect(
-      filterTaskPageJiraBoardIssues(issues, 'team', 'viewer-1', '').map((item) => item.key)
-    ).toEqual([])
-    expect(filterTaskPageJiraBoardIssues(issues, 'all', null, '').map((item) => item.key)).toEqual([
+    expect(filterTaskPageJiraBoardIssues(issues, 'me', 'viewer-1').map((item) => item.key)).toEqual(
+      ['ABC-1']
+    )
+    expect(filterTaskPageJiraBoardIssues(issues, 'me', null).map((item) => item.key)).toEqual([])
+    expect(filterTaskPageJiraBoardIssues(issues, 'all', null).map((item) => item.key)).toEqual([
       'ABC-1',
       'ABC-2',
       'ABC-3'
     ])
+  })
+
+  it('matches the board filter query against key, summary, assignee, status, type, and labels', () => {
+    const issues = [
+      issue('ABC-1', '1', {
+        title: 'Move payments work',
+        assignee: { accountId: 'viewer-1', displayName: 'Ada Lovelace' },
+        labels: ['billing']
+      }),
+      issue('ABC-2', '2', { title: 'Polish board chrome' })
+    ]
+
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, '')).length).toBe(2)
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'abc-1'))).toEqual([
+      issues[0]
+    ])
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'PAYMENTS'))).toEqual([
+      issues[0]
+    ])
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'lovelace'))).toEqual([
+      issues[0]
+    ])
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'billing'))).toEqual([
+      issues[0]
+    ])
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'story'))).toHaveLength(
+      2
+    )
+    expect(issues.filter((item) => issueMatchesTaskPageJiraBoardQuery(item, 'missing'))).toEqual([])
   })
 
   it('maps each sprint issue to one configured status column and keeps unmapped issues visible', () => {

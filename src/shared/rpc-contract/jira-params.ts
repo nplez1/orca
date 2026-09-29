@@ -118,7 +118,6 @@ export const BoardIdentifier = z.object({
 const BoardIssuePageFields = {
   boardId: requiredString('Board ID is required'),
   siteId: requiredString('Site ID is required'),
-  teamFieldId: OptionalString,
   pageToken: OptionalString,
   startAt: OptionalFiniteNumber,
   maxResults: OptionalFiniteNumber

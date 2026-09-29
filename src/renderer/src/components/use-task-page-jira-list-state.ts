@@ -9,9 +9,19 @@ import type {
   JiraPrioritiesBySite
 } from './jira-issue-sorter'
 import { jiraListPriorities } from '@/runtime/runtime-jira-client'
+import {
+  loadJiraBoardViewPreferences,
+  updateJiraBoardViewPreferences
+} from './jira-board-view-storage'
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const { settings, jiraConnected, selectedJiraSiteId, taskSource, jiraTaskSourceContext } = model
-  const [jiraBoardViewMode, setJiraBoardViewMode] = useState<'board' | 'list'>('board')
+  const [jiraBoardViewMode, setJiraBoardViewModeState] = useState<'board' | 'list'>(
+    () => loadJiraBoardViewPreferences().viewMode
+  )
+  const setJiraBoardViewMode = useCallback((mode: 'board' | 'list') => {
+    setJiraBoardViewModeState(mode)
+    updateJiraBoardViewPreferences({ viewMode: mode })
+  }, [])
   // Jira tab state
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
   const [jiraLoading, setJiraLoading] = useState(false)
