@@ -243,15 +243,14 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
-- **2026-09-29 — prepared for the np.15 release** (the version and run number are written by the
-  workflow, so this entry records the sync and a follow-up commit records the build), onto upstream
-  `31012aeb09` (173 commits), from the tip `976844fac3` (np.14 released from `fd69125d49`, with
-  `#40`–`#42` landed on top of it). **129 published commits replayed**, plus one new
-  `local(terminal)` commit committed before the rebase and this sync's fix commit on top:
-  **107 byte-identical by `range-diff`, 22 adapted, none dropped, none added.** Sixteen of the 129
-  stopped on a conflict, across 37 distinct files; every hunk was an additive union, a re-seat of
-  the fork's intent onto upstream's refactor, or upstream deleting a file the fork had patched — so
-  no convergence question went to the fork owner this time either.
+- **2026-09-29 — released as `v1.4.214-np.15`** from `c8fa8feead` (workflow run 36563775496,
+  signed and notarized), onto upstream `31012aeb09` (173 commits), from the tip `976844fac3`
+  (np.14 released from `fd69125d49`, with `#40`–`#42` landed on top of it). **129 published commits
+  replayed**, plus one new `local(terminal)` commit committed before the rebase and this sync's two
+  fix commits on top: **107 byte-identical by `range-diff`, 22 adapted, none dropped, none added.**
+  Sixteen of the 129 stopped on a conflict, across 37 distinct files; every hunk was an additive
+  union, a re-seat of the fork's intent onto upstream's refactor, or upstream deleting a file the
+  fork had patched — so no convergence question went to the fork owner this time either.
   - **`local(terminal)`: a BEL inside a control string is not a bell.** Pi writes `ESC _ pi:c BEL`
     on every prompt repaint, and the detector tracked only OSC, so each repaint announced a phantom
     "Attention requested". APC/DCS/PM/SOS now all swallow a BEL. Deliberately *not* xterm-strict:
