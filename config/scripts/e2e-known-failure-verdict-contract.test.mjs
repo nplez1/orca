@@ -20,10 +20,13 @@ describe('known-failure verdict wiring', () => {
   it('keeps Playwright in charge upstream and hands a fork shard to the verdict', () => {
     const run = step('Run E2E tests (${{ matrix.shard_name }})')
     expect(run['continue-on-error']).toBe("${{ github.repository != 'stablyai/orca' }}")
-    expect(run.run).toContain('REPORT_ARGS=(--reporter=list,json)')
-    expect(run.run).toContain('PLAYWRIGHT_JSON_OUTPUT_NAME="$GITHUB_WORKSPACE/ci-shards/report.json"')
-    expect(run.run).toContain('"${REPORT_ARGS[@]}"')
-    expect(run.run).toContain('if [ "${{ github.repository }}" != "stablyai/orca" ]')
+    // Why this exact arrangement: Playwright honours PLAYWRIGHT_JSON_OUTPUT_FILE over
+    // PLAYWRIGHT_JSON_OUTPUT_NAME when both are set, so naming a second file would leave the
+    // verdict reading a report nothing writes. The step keeps upstream's own reporter argument and
+    // its own env var, and the fork only reads the file they produce.
+    expect(run.env.PLAYWRIGHT_JSON_OUTPUT_FILE).toBe('ci-shards/results.json')
+    expect(run.run).toContain('--reporter=list,json')
+    expect(run.run).not.toContain('PLAYWRIGHT_JSON_OUTPUT_NAME')
   })
 
   it('reads the report rather than the test step’s conclusion', () => {
@@ -32,7 +35,12 @@ describe('known-failure verdict wiring', () => {
       "${{ github.repository != 'stablyai/orca' && steps.run-e2e.outcome != 'skipped' }}"
     )
     expect(verdict.run).toBe(
-      'node local/check-e2e-known-failure-titles.mjs ci-shards/report.json local/e2e-known-failure-titles.json'
+      'node local/check-e2e-known-failure-titles.mjs ci-shards/results.json local/e2e-known-failure-titles.json'
+    )
+    // The one report both the verdict and upstream's failure summary read.
+    const summary = step('Summarize E2E failures')
+    expect(summary.run).toBe(
+      'node config/scripts/ci-e2e-failure-summary.mjs ci-shards/results.json'
     )
     const traces = step('Upload Playwright traces')
     expect(traces.if).toBe("steps.run-e2e.outcome == 'failure'")
