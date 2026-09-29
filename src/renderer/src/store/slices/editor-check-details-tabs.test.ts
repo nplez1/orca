@@ -323,6 +323,36 @@ describe('createEditorSlice conflict status reconciliation', () => {
     )
   })
 
+  it('keeps the same open-files state for a repeated check-details patch, including its error action', () => {
+    const store = createEditorTabsStore()
+    const check = {
+      name: 'verify',
+      status: 'completed' as const,
+      conclusion: 'failure' as const,
+      url: null,
+      checkRunId: 42
+    }
+    const errorAction = { kind: 'open-jenkins-settings' as const }
+    const patch = {
+      requestId: 3,
+      details: null,
+      loading: false,
+      error: 'The saved Jenkins account cannot read this job.',
+      errorAction
+    }
+
+    store.getState().openCheckRunDetails('wt-1', 'repo:99', check, patch)
+    const before = store.getState().openFiles
+    store.getState().patchOpenCheckRunDetails('wt-1', 'repo:99', check, patch)
+
+    // Why this matters: an unstable guard replaces the state on every poll tick and re-renders the tree.
+    expect(store.getState().openFiles).toBe(before)
+    expect(
+      store.getState().openFiles.find((file) => file.id === 'wt-1::check-details::check-run:42')
+        ?.checkRunDetails?.errorAction
+    ).toEqual(errorAction)
+  })
+
   it('ignores a stale check-details request after the tab context changes', () => {
     const store = createEditorTabsStore()
     const check = {

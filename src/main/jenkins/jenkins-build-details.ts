@@ -4,17 +4,134 @@ import {
   type JenkinsBuildDetailsFailureReason,
   type JenkinsBuildDetailsResult
 } from '../../shared/jenkins-check-details'
-import { parseJenkinsBuildLocation } from '../../shared/jenkins-urls'
-import { asRecord } from '../../shared/jenkins-payload'
+import { isJenkinsUrlUnderBase, parseJenkinsBuildLocation } from '../../shared/jenkins-urls'
+import {
+  asRecord,
+  normalizeJenkinsState,
+  readArray,
+  readString
+} from '../../shared/jenkins-payload'
 import { jenkinsGetJson, type JenkinsRequestFailure } from './jenkins-request'
 import { findJenkinsServerForUrl, readJenkinsServerToken } from './jenkins-server-store'
 
 /**
  * Read one Jenkins build as provider-neutral check details.
  *
- * Two GETs at most: `api/json` for the build, and `wfapi/describe` for the stage list. The second
- * is best-effort — a freestyle job has no stages, and an older server may not expose the endpoint.
+ * Three rounds of GETs: `api/json` for the build, `wfapi/describe` for the stage list, then one
+ * `wfapi/describe` per stage for its steps and failure text. Every round after the first is
+ * best-effort — a freestyle job has no stages, and a stage whose detail fails still renders.
  */
+
+/**
+ * Why a cap: a pipeline can have hundreds of stages, and the pane only lists the running and
+ * failed few. Failed and in-progress stages are fetched first, so the cap hides only the steps of
+ * a pipeline's later, passing stages — those render as leaves. Beyond the cap, a failure message
+ * is reachable only by opening the build in Jenkins.
+ */
+const MAX_STAGE_DETAIL_REQUESTS = 40
+/** Jenkins answers stage describes quickly, but a fan-out of hundreds would burst the server. */
+const STAGE_DETAIL_CONCURRENCY = 6
+/**
+ * How long the stage-detail fan-out may extend the read.
+ *
+ * Why a budget on top of the per-request timeout: the renderer gives up at 25s, so a slow server
+ * must not turn an otherwise-fine build into a timeout. Whatever arrived by the deadline is used.
+ */
+const STAGE_DETAIL_BUDGET_MS = 4_000
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let next = 0
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = next++
+      if (index >= items.length) {
+        return
+      }
+      await worker(items[index])
+    }
+  })
+  await Promise.all(runners)
+}
+
+type StageDetailTarget = { index: number; url: string; state: string | null }
+
+function readStageDetailTargets(
+  stagesBody: unknown,
+  buildUrl: string,
+  scopeUrl: string
+): {
+  targets: StageDetailTarget[]
+  total: number
+} {
+  const stages = readArray(asRecord(stagesBody)?.stages)
+  const targets: StageDetailTarget[] = []
+  stages.forEach((raw, index) => {
+    const stage = asRecord(raw)
+    const href = readString(asRecord(asRecord(stage?._links)?.self)?.href)
+    if (!href) {
+      return
+    }
+    let resolved: string
+    try {
+      resolved = new URL(href, buildUrl).toString()
+    } catch {
+      return
+    }
+    if (!isJenkinsUrlUnderBase(scopeUrl, resolved)) {
+      return
+    }
+    targets.push({ index, url: resolved, state: normalizeJenkinsState(stage?.status) })
+  })
+  return { targets, total: stages.length }
+}
+
+/** A stage whose detail the failure summary and tree want first: anything not a clean pass. */
+function isWorthFetchingFirst(state: string | null): boolean {
+  return state === null || (state !== 'SUCCESS' && state !== 'NOT_EXECUTED' && state !== 'SKIPPED')
+}
+
+async function readStageDetails(args: {
+  stagesBody: unknown
+  buildUrl: string
+  /** Bound for server-supplied hrefs: the configured server prefix, or the build's own origin. */
+  scopeUrl: string
+  request: Omit<Parameters<typeof jenkinsGetJson>[0], 'url'>
+}): Promise<unknown[] | undefined> {
+  const { targets, total } = readStageDetailTargets(args.stagesBody, args.buildUrl, args.scopeUrl)
+  if (targets.length === 0) {
+    return undefined
+  }
+  const prioritized = [
+    ...targets.filter((target) => isWorthFetchingFirst(target.state)),
+    ...targets.filter((target) => !isWorthFetchingFirst(target.state))
+  ].slice(0, MAX_STAGE_DETAIL_REQUESTS)
+
+  const details: unknown[] = Array.from({ length: total }, () => null)
+  const deadline = Date.now() + STAGE_DETAIL_BUDGET_MS
+  let budgetTimer: ReturnType<typeof setTimeout> | undefined
+  const budget = new Promise<void>((resolve) => {
+    budgetTimer = setTimeout(resolve, STAGE_DETAIL_BUDGET_MS)
+  })
+  try {
+    await Promise.race([
+      mapWithConcurrency(prioritized, STAGE_DETAIL_CONCURRENCY, async (target) => {
+        if (Date.now() >= deadline) {
+          return
+        }
+        const response = await jenkinsGetJson({ ...args.request, url: target.url })
+        details[target.index] = response.ok ? response.body : null
+      }),
+      budget
+    ])
+  } finally {
+    clearTimeout(budgetTimer)
+  }
+  return details
+}
 
 /** Only the fields the mapper reads, so a matrix build's `actions` cannot balloon the response. */
 const JENKINS_BUILD_TREE = [
@@ -130,13 +247,22 @@ export async function getJenkinsBuildDetails(args: {
     ...request,
     url: `${location.buildUrl}wfapi/describe`
   })
+  const stageDetails = stagesResponse.ok
+    ? await readStageDetails({
+        stagesBody: stagesResponse.body,
+        buildUrl: location.buildUrl,
+        scopeUrl: server?.baseUrl ?? location.serverUrl,
+        request
+      })
+    : undefined
   return {
     ok: true,
     details: jenkinsBuildToCheckRunDetails({
       check: args.check,
       location,
       build: buildResponse.body,
-      stages: stagesResponse.ok ? stagesResponse.body : null
+      stages: stagesResponse.ok ? stagesResponse.body : null,
+      ...(stageDetails ? { stageDetails } : {})
     })
   }
 }
