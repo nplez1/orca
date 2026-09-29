@@ -221,7 +221,21 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveMiniMaxConfig(): MiniMaxResolvedConfig {
+  // Why: a disabled provider must not read the credential store at all, so the
+  // empty config is returned before the resolver (and its disk read) runs.
+  protected resolveMiniMaxConfig(options?: { disabled?: boolean }): MiniMaxResolvedConfig {
+    if (options?.disabled) {
+      return {
+        config: {
+          sessionCookie: '',
+          groupId: '',
+          models: 'general',
+          endpoint: 'overseas',
+          apiKey: ''
+        },
+        error: null
+      }
+    }
     try {
       return {
         config: this.miniMaxConfigResolver?.() ?? {
@@ -260,7 +274,10 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+  protected resolveDeepSeekConfig(options?: { disabled?: boolean }): DeepSeekResolvedConfig {
+    if (options?.disabled) {
+      return { config: { apiKey: '' }, error: null }
+    }
     try {
       return { config: this.deepSeekConfigResolver?.() ?? { apiKey: '' }, error: null }
     } catch (error) {
@@ -268,7 +285,10 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveFireworksConfig(): FireworksResolvedConfig {
+  protected resolveFireworksConfig(options?: { disabled?: boolean }): FireworksResolvedConfig {
+    if (options?.disabled) {
+      return { config: { apiKey: '', accountIdOverride: null }, error: null }
+    }
     try {
       return {
         config: this.fireworksConfigResolver?.() ?? { apiKey: '', accountIdOverride: null },
@@ -279,7 +299,10 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveCopilotConfig(): CopilotResolvedConfig {
+  protected resolveCopilotConfig(options?: { disabled?: boolean }): CopilotResolvedConfig {
+    if (options?.disabled) {
+      return { config: { token: '', enterpriseSlug: '' }, error: null }
+    }
     try {
       return {
         config: this.copilotConfigResolver?.() ?? { token: '', enterpriseSlug: '' },

@@ -1,5 +1,6 @@
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import type { ZcodePlanSite } from '../../../shared/zcode-plan-sites'
+import type { DisableableUsageProviderId } from '../../../shared/usage-provider-enablement'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
 import type {
   ClaudeAccountSelectionTarget,
@@ -120,6 +121,23 @@ export type GeminiCliOAuthEnabledResolver = () => boolean
 
 /** Whether the user is actually showing Antigravity usage, so the `agy` probe is worth spawning. */
 export type AntigravityUsageEnabledResolver = () => boolean
+
+/** Disableable provider id → its slot in `InternalRateLimitState` (only OpenCode Go differs). */
+export const USAGE_PROVIDER_STATE_KEYS: Record<
+  DisableableUsageProviderId,
+  keyof InternalRateLimitState
+> = {
+  claude: 'claude',
+  codex: 'codex',
+  gemini: 'gemini',
+  'opencode-go': 'opencodeGo',
+  minimax: 'minimax',
+  deepseek: 'deepseek',
+  fireworks: 'fireworks',
+  copilot: 'copilot',
+  grok: 'grok',
+  cursor: 'cursor'
+}
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
   provider: ActiveRateLimitProvider

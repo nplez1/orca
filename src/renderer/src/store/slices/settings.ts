@@ -16,6 +16,7 @@ import { normalizeOpenInApplications } from '../../../../shared/open-in-applicat
 import { createSettingsSearchState, type SettingsSearchState } from './settings-search-state'
 import { isRuntimeCatalogListingStale } from './runtime-status-hydration'
 import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import { normalizeDisabledUsageProviders } from '../../../../shared/usage-provider-enablement'
 import {
   normalizeTuiAgentArgsRecord,
   normalizeTuiAgentEnvRecord
@@ -96,6 +97,11 @@ function normalizeSettingsUpdates(
   }
   if ('disabledTuiAgents' in updates) {
     sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
+  }
+  if ('disabledUsageProviders' in updates) {
+    sanitizedUpdates.disabledUsageProviders = normalizeDisabledUsageProviders(
+      updates.disabledUsageProviders
+    )
   }
   if ('agentDefaultArgs' in updates) {
     sanitizedUpdates.agentDefaultArgs = normalizeTuiAgentArgsRecord(updates.agentDefaultArgs)

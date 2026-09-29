@@ -27,10 +27,16 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     if (signal.aborted) {
       return null
     }
+    // Why: a disabled provider is neither polled nor read from local tooling; each
+    // gate below skips a credential read or substitutes a hidden snapshot.
+    const disabled = this.disabledUsageProviderIds()
+    this.resetDisabledProviderCredentialFlags(disabled)
     const claudeTarget = this.claudeFetchTarget
     // Why: capture before the resolver await so an account switch during it invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
-    const claudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
+    const claudeAuthPreparation = disabled.has('claude')
+      ? undefined
+      : await this.claudeAuthPreparationResolver?.(claudeTarget)
     if (signal.aborted) {
       return null
     }
@@ -40,36 +46,41 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const previousState = this.state
     // Why: a skipped Codex poll must not stop the other providers' cycle, so gate
     // only the Codex slot instead of returning early (#STA-4422).
-    const codexHome = this.resolveCodexHome(codexTarget)
-    const codexFetchGated = codexHome.skip
-    const codexHomePath = codexHome.homePath
+    // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
+    const codexHome = disabled.has('codex') ? null : this.resolveCodexHome(codexTarget)
+    const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
+    const codexHomePath = codexHome?.homePath ?? null
     const codexStateBeforeFetch =
       previousState.codex?.status === 'fetching' ? null : previousState.codex
     const codexProvenance = codexFetchGated
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
     const codexGeneration = this.codexFetchGeneration
-    const openCodeGoConfig = this.resolveOpenCodeGoConfig()
-    const cookie = openCodeGoConfig.sessionCookie
-    const workspaceIdOverride = openCodeGoConfig.workspaceIdOverride
-    const openCodeGoApiKey = openCodeGoConfig.apiKey
-    const openCodeGoApiKeyError = openCodeGoConfig.apiKeyError
-    const openCodeGoApiKeyReadSkipped = openCodeGoConfig.apiKeyReadSkipped
-    const miniMaxConfigResult = this.resolveMiniMaxConfig()
+    const openCodeGoConfig = disabled.has('opencode-go') ? null : this.resolveOpenCodeGoConfig()
+    const cookie = openCodeGoConfig?.sessionCookie ?? ''
+    const workspaceIdOverride = openCodeGoConfig?.workspaceIdOverride ?? ''
+    const openCodeGoApiKey = openCodeGoConfig?.apiKey ?? ''
+    const openCodeGoApiKeyError = openCodeGoConfig?.apiKeyError ?? null
+    const openCodeGoApiKeyReadSkipped = openCodeGoConfig?.apiKeyReadSkipped ?? false
+    const miniMaxConfigResult = this.resolveMiniMaxConfig({ disabled: disabled.has('minimax') })
     const miniMaxCookie = miniMaxConfigResult.config.sessionCookie
     const miniMaxGroupId = miniMaxConfigResult.config.groupId
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
-    const deepSeekConfigResult = this.resolveDeepSeekConfig()
+    const deepSeekConfigResult = this.resolveDeepSeekConfig({
+      disabled: disabled.has('deepseek')
+    })
     const deepSeekApiKey = deepSeekConfigResult.config.apiKey
-    const fireworksConfigResult = this.resolveFireworksConfig()
+    const fireworksConfigResult = this.resolveFireworksConfig({
+      disabled: disabled.has('fireworks')
+    })
     const fireworksApiKey = fireworksConfigResult.config.apiKey
     const fireworksAccountIdOverride = fireworksConfigResult.config.accountIdOverride
-    const copilotConfigResult = this.resolveCopilotConfig()
+    const copilotConfigResult = this.resolveCopilotConfig({ disabled: disabled.has('copilot') })
     // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
     // on the fetch critical path where its latency would stall every other provider.
-    const copilotGhResult = readCopilotGhCredentialsForCycle()
+    const copilotGhResult = disabled.has('copilot') ? null : readCopilotGhCredentialsForCycle()
     const copilotStoredCredentials =
       copilotConfigResult.config.token && copilotConfigResult.config.enterpriseSlug
         ? {
@@ -90,10 +101,12 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
     const copilotSource =
       'source' in copilotCredentials ? copilotCredentials.source : 'enterprise-billing'
-    const geminiCliOAuthEnabled = this.geminiCliOAuthEnabledResolver?.() ?? false
+    const geminiCliOAuthEnabled = disabled.has('gemini')
+      ? false
+      : (this.geminiCliOAuthEnabledResolver?.() ?? false)
     // Why: getState() is hot (renderer pushes + mobile snapshots); keep Grok's sync auth-file probe on fetch cycles instead.
-    const grokAuthReadResult = readGrokAuthSession()
-    this.grokAuthConfigured = grokAuthReadResult.status === 'ok'
+    const grokAuthReadResult = disabled.has('grok') ? null : readGrokAuthSession()
+    this.grokAuthConfigured = disabled.has('grok') ? false : grokAuthReadResult?.status === 'ok'
 
     // Discard stale data on config change — it belongs to a different session/workspace.
     // Digest, not the key: this string only has to change when the account does.
@@ -116,6 +129,20 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const miniMaxGeneration = this.minimaxFetchGeneration
 
+    const antigravityUsageEnabled = this.antigravityUsageEnabledResolver?.() ?? true
+
+    const zcodePlanConfigResult = this.resolveZcodePlanConfig()
+    const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
+    // Why digest, not the key: this string only has to change when the credential does.
+    const currentZcodeConfigHash = zcodePlanApiKey
+      ? `${zcodePlanConfigResult.config.site}|${createHash('sha256').update(zcodePlanApiKey).digest('hex')}`
+      : (zcodePlanConfigResult.error ?? '')
+    const zcodeConfigChanged = currentZcodeConfigHash !== this.lastZcodeConfigHash
+    if (zcodeConfigChanged) {
+      this.lastZcodeConfigHash = currentZcodeConfigHash
+      this.zcodeFetchGeneration += 1
+    }
+    const zcodeGeneration = this.zcodeFetchGeneration
     const zcodePlanCredential = zcodePlanApiKey
       ? {
           apiKey: zcodePlanApiKey,
@@ -178,20 +205,26 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       cursor: this.withFetchingStatus(previousState.cursor, 'cursor'),
       zcode: zcodeConfigChanged
         ? this.withFetchingStatus(null, 'zcode')
-        : this.withFetchingStatus(previousState.zcode, 'zcode')
+        : this.withFetchingStatus(previousState.zcode, 'zcode'),
+      // Why: a disabled provider holds no snapshot at all, so a prior reading cannot linger.
+      ...this.disabledUsageProviderStateOverrides()
     })
 
     // Why its own promise: the keychain read and the desktop state.vscdb read
     // (on its worker thread) are both async and must not delay other providers.
-    const cursorResultPromise = readCursorAuthSession()
-      .then((authReadResult) => {
-        this.cursorAuthConfigured = authReadResult.status === 'ok'
-        return fetchCursorRateLimits({ signal, authReadResult })
-      })
-      .then(
-        (value) => ({ status: 'fulfilled', value }) as const,
-        (reason) => ({ status: 'rejected', reason }) as const
-      )
+    const cursorResultPromise = disabled.has('cursor')
+      ? Promise.resolve(this.disabledUsageProviderSnapshot('cursor')).then(
+          (value) => ({ status: 'fulfilled', value }) as const
+        )
+      : readCursorAuthSession()
+          .then((authReadResult) => {
+            this.cursorAuthConfigured = authReadResult.status === 'ok'
+            return fetchCursorRateLimits({ signal, authReadResult })
+          })
+          .then(
+            (value) => ({ status: 'fulfilled', value }) as const,
+            (reason) => ({ status: 'rejected', reason }) as const
+          )
 
     const zcodeResultPromise = (
       zcodePlanConfigResult.error
@@ -214,13 +247,15 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
 
     const missingWslCodexHome =
       codexFetchGated || codexHomePath ? null : this.getMissingWslCodexHomeResult(codexTarget)
-    const grokResultPromise = fetchGrokRateLimits({
-      signal,
-      authReadResult: grokAuthReadResult
-    }).then(
-      (value) => ({ status: 'fulfilled', value }) as const,
-      (reason) => ({ status: 'rejected', reason }) as const
-    )
+    // Why: reading Grok's auth file is the credential import, so a disabled Grok never reaches it.
+    const grokResultPromise = grokAuthReadResult
+      ? fetchGrokRateLimits({ signal, authReadResult: grokAuthReadResult }).then(
+          (value) => ({ status: 'fulfilled', value }) as const,
+          (reason) => ({ status: 'rejected', reason }) as const
+        )
+      : Promise.resolve(this.disabledUsageProviderSnapshot('grok')).then(
+          (value) => ({ status: 'fulfilled', value }) as const
+        )
 
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
     const claudeFetchGated =
@@ -239,13 +274,15 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     ] = await Promise.allSettled([
       claudeFetchGated
         ? Promise.resolve(previousState.claude as ProviderRateLimits)
-        : fetchClaudeRateLimits({
-            authPreparation: claudeAuthPreparation,
-            allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
-            allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
-            networkProxySettings: this.networkProxySettingsResolver?.(),
-            signal
-          }),
+        : disabled.has('claude')
+          ? Promise.resolve(this.disabledUsageProviderSnapshot('claude'))
+          : fetchClaudeRateLimits({
+              authPreparation: claudeAuthPreparation,
+              allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
+              allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
+              networkProxySettings: this.networkProxySettingsResolver?.(),
+              signal
+            }),
       codexFetchGated
         ? Promise.resolve(previousState.codex as ProviderRateLimits)
         : (missingWslCodexHome ??
@@ -253,53 +290,63 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
             codexHomePath,
             signal
           })),
-      fetchGeminiRateLimits(geminiCliOAuthEnabled),
-      fetchOpenCodeGoUsage({
-        settingsApiKey: openCodeGoApiKey,
-        // Why here: the key can also come from the environment or OpenCode's
-        // own store, so presence is only known once the fetch resolves it.
-        onApiKeyResolved: (resolution) => {
-          // Why: a credential change mid-fetch bumps the generation; its stale presence must not win.
-          if (opencodeGeneration !== this.opencodeFetchGeneration) {
-            return
-          }
-          // An undecryptable or briefly unreadable saved key still counts, so the bar stays up.
-          this.openCodeGoApiKeyConfigured =
-            resolution.status === 'found' ||
-            openCodeGoApiKeyError !== null ||
-            openCodeGoApiKeyReadSkipped
-        },
-        cookie,
-        workspaceIdOverride: workspaceIdOverride || undefined,
-        networkProxySettings: this.networkProxySettingsResolver?.(),
-        signal
-      }),
+      this.fetchUnlessDisabled('gemini', () => fetchGeminiRateLimits(geminiCliOAuthEnabled)),
+      this.fetchUnlessDisabled('opencode-go', () =>
+        fetchOpenCodeGoUsage({
+          settingsApiKey: openCodeGoApiKey,
+          // Why here: the key can also come from the environment or OpenCode's
+          // own store, so presence is only known once the fetch resolves it.
+          onApiKeyResolved: (resolution) => {
+            // Why: a credential change mid-fetch bumps the generation; its stale presence must not win.
+            if (opencodeGeneration !== this.opencodeFetchGeneration) {
+              return
+            }
+            // An undecryptable or briefly unreadable saved key still counts, so the bar stays up.
+            this.openCodeGoApiKeyConfigured =
+              resolution.status === 'found' ||
+              openCodeGoApiKeyError !== null ||
+              openCodeGoApiKeyReadSkipped
+          },
+          cookie,
+          workspaceIdOverride: workspaceIdOverride || undefined,
+          networkProxySettings: this.networkProxySettingsResolver?.(),
+          signal
+        })
+      ),
       this.fetchKimiWithResolvedHome(),
-      miniMaxConfigResult.error
-        ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
-        : fetchMiniMaxRateLimits({
-            cookie: miniMaxCookie,
-            groupId: miniMaxGroupId,
-            models: miniMaxModels,
-            endpointMode: miniMaxEndpoint,
-            apiKey: miniMaxApiKey
-          }),
-      deepSeekConfigResult.error
-        ? Promise.resolve(this.getApiKeyCredentialError('deepseek', deepSeekConfigResult.error))
-        : fetchDeepSeekRateLimits({ apiKey: deepSeekApiKey }),
-      fireworksConfigResult.error
-        ? Promise.resolve(this.getApiKeyCredentialError('fireworks', fireworksConfigResult.error))
-        : fetchFireworksRateLimits({
-            apiKey: fireworksApiKey,
-            accountIdOverride: fireworksAccountIdOverride
-          }),
-      copilotConfigResult.error
-        ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
-        : fetchCopilotRateLimits({
-            token: copilotToken,
-            enterpriseSlug: copilotEnterpriseSlug,
-            source: copilotSource
-          })
+      disabled.has('minimax')
+        ? Promise.resolve(this.disabledUsageProviderSnapshot('minimax'))
+        : miniMaxConfigResult.error
+          ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
+          : fetchMiniMaxRateLimits({
+              cookie: miniMaxCookie,
+              groupId: miniMaxGroupId,
+              models: miniMaxModels,
+              endpointMode: miniMaxEndpoint,
+              apiKey: miniMaxApiKey
+            }),
+      disabled.has('deepseek')
+        ? Promise.resolve(this.disabledUsageProviderSnapshot('deepseek'))
+        : deepSeekConfigResult.error
+          ? Promise.resolve(this.getApiKeyCredentialError('deepseek', deepSeekConfigResult.error))
+          : fetchDeepSeekRateLimits({ apiKey: deepSeekApiKey }),
+      disabled.has('fireworks')
+        ? Promise.resolve(this.disabledUsageProviderSnapshot('fireworks'))
+        : fireworksConfigResult.error
+          ? Promise.resolve(this.getApiKeyCredentialError('fireworks', fireworksConfigResult.error))
+          : fetchFireworksRateLimits({
+              apiKey: fireworksApiKey,
+              accountIdOverride: fireworksAccountIdOverride
+            }),
+      disabled.has('copilot')
+        ? Promise.resolve(this.disabledUsageProviderSnapshot('copilot'))
+        : copilotConfigResult.error
+          ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
+          : fetchCopilotRateLimits({
+              token: copilotToken,
+              enterpriseSlug: copilotEnterpriseSlug,
+              source: copilotSource
+            })
     ])
 
     if (signal.aborted) {

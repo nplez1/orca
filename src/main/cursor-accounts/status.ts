@@ -14,6 +14,11 @@ function signedOut(error: string | null): CursorAccountStatus {
   }
 }
 
+/** Status reported without touching the Keychain when the user disabled Cursor. */
+export function disabledCursorAccountStatus(): CursorAccountStatus {
+  return signedOut(null)
+}
+
 export async function getCursorAccountStatus(): Promise<CursorAccountStatus> {
   const readResult = await readCursorAuthSession()
   if (readResult.status !== 'ok') {

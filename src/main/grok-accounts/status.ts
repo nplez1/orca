@@ -1,6 +1,11 @@
 import type { GrokAccountStatus } from '../../shared/rate-limit-types'
 import { isGrokAccessTokenFresh, readGrokAuthSession } from '../rate-limits/grok-auth'
 
+/** Status reported without touching ~/.grok/auth.json when the user disabled Grok. */
+export function disabledGrokAccountStatus(): GrokAccountStatus {
+  return { signedIn: false, email: null, teamId: null, tokenFresh: false, error: null }
+}
+
 export function getGrokAccountStatus(): GrokAccountStatus {
   const readResult = readGrokAuthSession()
   if (readResult.status === 'missing') {

@@ -219,6 +219,7 @@ export function buildDefaultSettings(args: {
     minimaxEndpoint: 'overseas',
     zcodePlanSite: 'zai',
     geminiCliOAuthEnabled: false,
+    disabledUsageProviders: [],
     agentCmdOverrides: {},
     agentDefaultArgs: { ...DEFAULT_TUI_AGENT_ARGS },
     agentDefaultEnv: { ...DEFAULT_TUI_AGENT_ENV },

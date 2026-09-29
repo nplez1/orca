@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getGrokAccountStatus } from './status'
+import { getGrokAccountStatus, disabledGrokAccountStatus } from './status'
 import { isGrokAccessTokenFresh, readGrokAuthSession } from '../rate-limits/grok-auth'
 
 vi.mock('../rate-limits/grok-auth', () => ({
@@ -65,5 +65,16 @@ describe('getGrokAccountStatus', () => {
     })
     expect(JSON.stringify(status)).not.toContain('secret-token')
     expect(JSON.stringify(status)).not.toContain('client-1')
+  })
+
+  it('reports unsigned status without reading the auth file when Grok is disabled', () => {
+    expect(disabledGrokAccountStatus()).toEqual({
+      signedIn: false,
+      email: null,
+      teamId: null,
+      tokenFresh: false,
+      error: null
+    })
+    expect(readGrokAuthSession).not.toHaveBeenCalled()
   })
 })

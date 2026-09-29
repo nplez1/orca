@@ -17,6 +17,7 @@ import type { CodexRateLimitResetOutcome, RateLimitState } from '../../shared/ra
 import type { CodexResetCreditExpectedScope } from '../../shared/codex-reset-credit-scope'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
+import type { DisableableUsageProviderId } from '../../shared/usage-provider-enablement'
 
 export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
@@ -30,6 +31,18 @@ export type AccountsSnapshot = {
   claude: ClaudeRateLimitAccountsState
   codex: CodexRateLimitAccountsState
   rateLimits: RateLimitState
+}
+
+type DisabledUsageProvidersResolver = () => ReadonlySet<DisableableUsageProviderId>
+
+// Why: a switched-off provider reports an empty roster; its stored accounts are
+// not listed, so the system-default identity in `~/.codex`/`~/.claude` is never read.
+function emptyClaudeAccountsState(): ClaudeRateLimitAccountsState {
+  return { accounts: [], activeAccountId: null, activeAccountIdsByRuntime: { host: null, wsl: {} } }
+}
+
+function emptyCodexAccountsState(): CodexRateLimitAccountsState {
+  return { accounts: [], activeAccountId: null, activeAccountIdsByRuntime: { host: null, wsl: {} } }
 }
 
 export type CodexRateLimitResetRpcResult = {
@@ -47,9 +60,14 @@ export type CodexRateLimitResetRpcResult = {
 export class RuntimeAccountController {
   private services: RuntimeAccountServices | null = null
   private commitMessageAgentEnvironment: CommitMessageAgentEnvironmentResolvers | null = null
+  private disabledUsageProviders: DisabledUsageProvidersResolver | null = null
 
-  setServices(services: RuntimeAccountServices): void {
+  setServices(
+    services: RuntimeAccountServices,
+    options?: { disabledUsageProviders?: DisabledUsageProvidersResolver }
+  ): void {
     this.services = services
+    this.disabledUsageProviders = options?.disabledUsageProviders ?? null
   }
 
   setCommitMessageAgentEnvironment(resolvers: CommitMessageAgentEnvironmentResolvers): void {
@@ -65,12 +83,21 @@ export class RuntimeAccountController {
   }
 
   getSnapshot(): AccountsSnapshot {
-    const { claudeAccounts, codexAccounts, rateLimits } = this.requireServices()
+    return this.listAccountsWithRateLimits(this.requireServices().rateLimits.getState())
+  }
+
+  private listAccountsWithRateLimits(rateLimits: RateLimitState): AccountsSnapshot {
+    const { claudeAccounts, codexAccounts } = this.requireServices()
+    const disabled = this.disabledUsageProviders?.()
     return {
       ...this.dataAccountsSnapshot(),
-      claude: claudeAccounts.listAccounts(),
-      codex: codexAccounts.listAccounts(),
-      rateLimits: rateLimits.getState()
+      claude:
+        disabled?.has('claude') === true
+          ? emptyClaudeAccountsState()
+          : claudeAccounts.listAccounts(),
+      codex:
+        disabled?.has('codex') === true ? emptyCodexAccountsState() : codexAccounts.listAccounts(),
+      rateLimits
     }
   }
 
@@ -192,12 +219,7 @@ export class RuntimeAccountController {
       ? getManagedDataAccountService().onChanged(() => listener(this.getSnapshot()))
       : () => {}
     const unsubscribeUsage = services.rateLimits.onStateChange((rateLimits) => {
-      listener({
-        ...this.dataAccountsSnapshot(),
-        claude: services.claudeAccounts.listAccounts(),
-        codex: services.codexAccounts.listAccounts(),
-        rateLimits
-      })
+      listener(this.listAccountsWithRateLimits(rateLimits))
     })
     return () => {
       unsubscribeData()

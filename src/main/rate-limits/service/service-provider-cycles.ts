@@ -10,6 +10,11 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     if (signal.aborted) {
       return
     }
+    // Why: a disabled provider is never polled; clear any prior reading and stop.
+    if (this.isUsageProviderDisabled('codex')) {
+      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
+      return
+    }
     const codexTarget = this.codexFetchTarget
     const codexGeneration = this.codexFetchGeneration
     const codexHome = this.resolveCodexHome(codexTarget)
@@ -84,6 +89,11 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     if (signal.aborted) {
       return
     }
+    // Why: a disabled provider is never polled; clear any prior reading and stop.
+    if (this.isUsageProviderDisabled('claude')) {
+      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
+      return
+    }
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
     if (!options?.force && this.shouldSkipAutomatedClaudeFetch(this.state.claude)) {
       return
@@ -146,6 +156,12 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
 
   protected async runFetchGrokOnlyCycle(signal: AbortSignal): Promise<void> {
     if (signal.aborted) {
+      return
+    }
+    // Why: a disabled provider is never polled; clear any prior reading and stop.
+    if (this.isUsageProviderDisabled('grok')) {
+      this.grokAuthConfigured = false
+      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
       return
     }
     const previousState = this.state
