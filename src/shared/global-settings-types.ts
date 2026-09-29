@@ -21,6 +21,7 @@ import type {
   CodexManagedAccount,
   CodexManagedAccountRuntimeSelection
 } from './managed-account-types'
+import type { DisableableUsageProviderId } from './usage-provider-enablement'
 import type { NotificationSettings } from './notification-settings-types'
 import type { CtrlTabOrderMode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
@@ -393,6 +394,9 @@ export type GlobalSettings = {
   minimaxEndpoint: MiniMaxEndpoint
   /** Extract OAuth credentials from the local Gemini CLI for rate-limit fetching. Off by default (explicit opt-in). */
   geminiCliOAuthEnabled: boolean
+  /** Usage providers the user switched off: Orca neither polls them nor reads their
+   *  local CLI/IDE credentials. Absent/empty means every provider is enabled. */
+  disabledUsageProviders?: DisableableUsageProviderId[]
   /** Per-agent CLI command overrides. A missing key means use the catalog default binary name. */
   agentCmdOverrides: Partial<Record<TuiAgent, string>>
   /** Custom CODEX_HOME for Codex session-history discovery (defaults to ~/.codex).

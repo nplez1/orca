@@ -9,6 +9,8 @@ import { fetchMiniMaxRateLimits } from './minimax/minimax-fetcher'
 import { fetchGrokRateLimits } from './grok-fetcher'
 import { fetchZcodeRateLimits } from './zcode-usage-fetcher'
 import { readGrokAuthSession } from './grok-auth'
+import { fetchCursorRateLimits } from './cursor-fetcher'
+import { readCursorAuthSession } from './cursor-auth'
 import { fetchOpenCodeGoUsage } from './opencode-go-usage-source-selection'
 import {
   deferred,
@@ -685,5 +687,33 @@ describe('RateLimitService', () => {
     expect(state.opencodeGo?.status).toBe('error')
     expect(state.opencodeGo?.session).toBeNull()
     expect(state.opencodeGo?.error).toBe('No workspace ID found')
+  })
+})
+
+describe('disabled usage providers', () => {
+  beforeEach(() => {
+    resetRateLimitProviderMocks()
+  })
+
+  it('does not fetch or read credentials for a switched-off provider', async () => {
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'gemini' || providerId === 'cursor'
+    })
+
+    await service.refresh()
+
+    expect(fetchGeminiRateLimits).not.toHaveBeenCalled()
+    expect(readCursorAuthSession).not.toHaveBeenCalled()
+    expect(fetchCursorRateLimits).not.toHaveBeenCalled()
+    expect(service.getState().gemini).toBeNull()
+    expect(service.getState().cursor).toBeNull()
+    // Why: an enabled provider in the same cycle still fetches normally.
+    expect(fetchOpenCodeGoUsage).toHaveBeenCalledTimes(1)
+  })
+
+  it('never reads the Grok CLI auth file when Grok is switched off', () => {
+    new RateLimitService({ isUsageProviderDisabled: (providerId) => providerId === 'grok' })
+
+    expect(readGrokAuthSession).not.toHaveBeenCalled()
   })
 })

@@ -12634,6 +12634,11 @@
           "noBoardsMatch": "No boards match this search.",
           "noBoardsForSearch": "Jira returned no boards matching this search.",
           "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board."
+        },
+        "ProviderUsageEnableSwitch": {
+          "8e832829e7": "Let Orca query {{value0}}",
+          "e3340ac4e1": "When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.",
+          "e9b8e0fc2e": "{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer."
         }
       },
       "right": {

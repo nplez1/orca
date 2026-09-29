@@ -9,6 +9,10 @@ import {
 
 export abstract class RateLimitServiceInactiveAccounts extends RateLimitServicePolling {
   async fetchInactiveClaudeAccountsOnOpen(): Promise<void> {
+    // Why: a switched-off Claude is never queried, not even for its inactive accounts.
+    if (this.isUsageProviderDisabled('claude')) {
+      return
+    }
     if (Date.now() - this.lastInactiveClaudeFetchAt < INACTIVE_FETCH_DEBOUNCE_MS) {
       return
     }
@@ -86,6 +90,10 @@ export abstract class RateLimitServiceInactiveAccounts extends RateLimitServiceP
   }
 
   async fetchInactiveCodexAccountsOnOpen(): Promise<void> {
+    // Why: a switched-off Codex is never queried, not even for its inactive accounts.
+    if (this.isUsageProviderDisabled('codex')) {
+      return
+    }
     if (Date.now() - this.lastInactiveCodexFetchAt < INACTIVE_FETCH_DEBOUNCE_MS) {
       return
     }

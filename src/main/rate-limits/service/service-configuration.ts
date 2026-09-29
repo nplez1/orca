@@ -139,17 +139,26 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
   getState(): RateLimitState {
     this.pruneInactiveClaudeState()
     this.pruneInactiveCodexState()
+    // Why: these presence flags come from credential files on disk, so a switched-off
+    // provider must report false without its store being touched.
+    const disabled = this.disabledUsageProviderIds()
     return {
       ...this.state,
+      // Why: a disabled provider's slot must read null on every push, not only the
+      // cycle that first observed the toggle, so mobile and the renderer agree.
+      ...this.disabledUsageProviderStateOverrides(),
       // Why: the cookie lives on the filesystem, not GlobalSettings; surface its presence so the renderer keeps the MiniMax bar across reloads.
-      minimaxCookieConfigured: hasMiniMaxSessionCookie(),
-      minimaxApiKeyConfigured: hasMiniMaxApiKey(),
-      opencodeGoApiKeyConfigured: this.openCodeGoApiKeyConfigured,
+      minimaxCookieConfigured: disabled.has('minimax') ? false : hasMiniMaxSessionCookie(),
+      minimaxApiKeyConfigured: disabled.has('minimax') ? false : hasMiniMaxApiKey(),
+      opencodeGoApiKeyConfigured: disabled.has('opencode-go')
+        ? false
+        : this.openCodeGoApiKeyConfigured,
       // Why: these credentials live on disk, so main is the only place that can tell the renderer a provider is set up before its first fetch lands.
-      deepseekApiKeyConfigured: hasDeepSeekApiKey(),
-      fireworksApiKeyConfigured: hasFireworksCredentials(),
-      copilotTokenConfigured:
-        hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
+      deepseekApiKeyConfigured: disabled.has('deepseek') ? false : hasDeepSeekApiKey(),
+      fireworksApiKeyConfigured: disabled.has('fireworks') ? false : hasFireworksCredentials(),
+      copilotTokenConfigured: disabled.has('copilot')
+        ? false
+        : hasCopilotCredentials() || getCachedCopilotGhCredentials()?.status === 'ok',
       grokAuthConfigured: this.grokAuthConfigured,
       cursorAuthConfigured: this.cursorAuthConfigured,
       claudeTarget: this.claudeFetchTarget,
