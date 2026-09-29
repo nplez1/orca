@@ -10,12 +10,13 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { DshHookService } from './hook-service'
 import { DSH_HOOK_EVENTS } from './hook-settings'
 
-// Why: getSharedManagedScriptPath() writes under homedir()/.orca and the patch layer
+// Why: getSharedManagedScriptPath() writes under homedir()/.orca-np and the patch layer
 // resolves via DSH_HOME ?? ~/.dsh. Point the home env at a temp dir and clear DSH_HOME so
-// install/remove never touches the real ~/.orca or a developer's own DSH home.
+// install/remove never touches the real ~/.orca-np or a developer's own DSH home.
 // Why both names: os.homedir() reads $HOME on POSIX and %USERPROFILE% on Windows, and this
 // file asserts the Windows script name too — setting only HOME would let a Windows run edit
 // the developer's real home.
@@ -54,9 +55,15 @@ afterEach(() => {
 })
 
 const configPath = (): string => join(home, '.dsh', 'cordis.patch.yml')
-const managedHooksPath = (): string => join(home, '.orca', 'agent-hooks', 'dsh-hooks.json')
+const managedHooksPath = (): string =>
+  join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'dsh-hooks.json')
 const scriptPath = (): string =>
-  join(home, '.orca', 'agent-hooks', process.platform === 'win32' ? 'dsh-hook.cmd' : 'dsh-hook.sh')
+  join(
+    home,
+    HOME_DIRECTORY_NAME,
+    'agent-hooks',
+    process.platform === 'win32' ? 'dsh-hook.cmd' : 'dsh-hook.sh'
+  )
 
 function readManagedHooks(): { hooks: Record<string, unknown[]> } {
   const parsed: { hooks: Record<string, unknown[]> } = JSON.parse(

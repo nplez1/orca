@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import type { SFTPWrapper } from 'ssh2'
 
 import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
 import {
   buildWindowsAgentHookCurlPostCommand,
@@ -213,7 +214,7 @@ export class DshHookService {
   /** Install on an SSH execution host, where DSH's shell contract is always POSIX. */
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
     const remoteConfigPath = getDshRemoteConfigPath(remoteHome)
-    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/dsh-hook.sh`
+    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/${HOME_DIRECTORY_NAME}/agent-hooks/dsh-hook.sh`
     const remoteManagedHooksPath = getDshRemoteManagedHooksPath(remoteHome)
     try {
       const body = (await readTextFileRemote(sftp, remoteConfigPath)) ?? ''

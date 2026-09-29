@@ -17,6 +17,7 @@
       "332dbfa497": "Workspace uploaded",
       "3443924e91": "automations",
       "4f08ae8311": "tasks",
+      "5096cbbc86": "Orca",
       "62ca9895a7": "space",
       "844eb0f4f4": "activity",
       "9f0152563e": "mobile",
@@ -96,7 +97,13 @@
         "setupHostExistingFolderPlaceholder": "/path/to/project/on/host",
         "setupHostExistingFolderTitle": "Set up {{value0}}",
         "setupKindFolder": "Folder",
-        "setupKindGit": "Git repo"
+        "setupKindGit": "Git repo",
+        "test": {
+          "fixture": {
+            "2e2c474573": "Local Mac",
+            "95a5e6b3bb": "Devbox"
+          }
+        }
       },
       "PullRequestPage": {
         "3450247584": "Comment",
@@ -181,6 +188,7 @@
         "d6d08c1650": "Select a project to see GitLab work items.",
         "duplicateIssueNumberPlaceholder": "Issue number",
         "f294c500ef": "No GitLab work matches this filter.",
+        "f51e254d35": "Try different search terms or JQL.",
         "fe28c9821f": "view"
       },
       "Terminal": {
@@ -199,7 +207,12 @@
         "ActivityPrototypePage": {
           "770d458144": "Group by",
           "a472a14700": "More options",
-          "beb2c19173": "Unread"
+          "beb2c19173": "Unread",
+          "test": {
+            "fixtures": {
+              "43a827f6a7": "Claude"
+            }
+          }
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} hidden"
@@ -236,7 +249,8 @@
           "ff5db28639": "existing"
         },
         "AutomationEditorDialogHeader": {
-          "4c8e1a72b9": "A recurring agent task"
+          "4c8e1a72b9": "A recurring agent task",
+          "6f309eef8d": "Orca"
         },
         "AutomationRunHistory": {
           "fdb3caa8fb": "known"
@@ -297,6 +311,19 @@
         "HermesCronOutputView": {
           "88d48157fc": "default"
         },
+        "automations": {
+          "page": {
+            "fixtures": {
+              "104f70edd9": "Hermes",
+              "c1e6f01a35": "Nightly #1"
+            },
+            "test": {
+              "harness": {
+                "90edd9c380": "Refresh automations"
+              }
+            }
+          }
+        },
         "createDestination": {
           "stale": "{host} changed while this form was open. Choose it again before saving.",
           "unavailable": "That host cannot hold a new automation yet. Choose another host to create this one on."
@@ -335,6 +362,23 @@
           },
           "BrowserToolbarMenu": {
             "6aa42813e4": "Imported {{value0}} cookies from {{value1}}{{value2}}."
+          },
+          "stream": {
+            "remote": {
+              "remote": {
+                "browser": {
+                  "stream": {
+                    "lifecycle": {
+                      "test": {
+                        "harness": {
+                          "471387f8f8": "Example"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "profile": {
@@ -523,6 +567,17 @@
           },
           "FloatingTerminalWindowControls": {
             "1e502f1284": "Open"
+          },
+          "floating": {
+            "terminal": {
+              "panel": {
+                "test": {
+                  "fixtures": {
+                    "00cde6717e": "Mobile Emulator"
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -649,6 +704,9 @@
           }
         },
         "slides": {
+          "HomeSlide": {
+            "5d94e8ddcc": "Orca"
+          },
           "WorktreeListSlide": {
             "c5ad56786d": "spinner"
           }
@@ -678,6 +736,7 @@
         "OnboardingFlow": {
           "35bbaf5ae0": "notifications",
           "984338477a": "theme",
+          "a249f81538": "Orca",
           "a5e5da02f7": "integrations",
           "c47e1bd149": "agent",
           "ff92d15436": "Orca will notify you know when agents are done or need help."
@@ -1073,6 +1132,7 @@
       "settings": {
         "AccountsPane": {
           "0023cc336e": "Paste either the raw token value (e.g.",
+          "0c64dc2a64": "Gemini CLI (legacy)",
           "15e831350e": "Configure MiniMax usage tracking from platform.minimax.io.",
           "1fd1b1b6b4": "Cookie not set",
           "338820326a": ") or the full cookie header (e.g.",
@@ -1582,6 +1642,15 @@
           "keyRequired": "GLM Coding Plan API key is required."
         },
         "accounts": {
+          "pane": {
+            "copilot": {
+              "section": {
+                "06fb320a51": "Detected from your GitHub CLI sign-in. Paste a token to override it.",
+                "5a193f1da9": "The slug is the <slug> in github.com/enterprises/<slug>. Saving with the token field blank keeps your stored token, so the slug can be edited on its own. Forget token clears the slug as well.",
+                "d0f786b0e5": "The token needs the “Enterprise billing” read permission. Orca cannot reuse the token the gh CLI stores, because that one cannot read these billing endpoints. Orca then refreshes the AI credits your enterprise consumes each month."
+              }
+            }
+          },
           "search": {
             "d1d2ae383c": "Paste your opencode.ai session cookie for rate limit fetching."
           }
@@ -1653,6 +1722,16 @@
             "f412abbba5": "claude",
             "ff457e1e7b": "daemon",
             "ff8de8a2ad": "display"
+          }
+        },
+        "appearance": {
+          "search": {
+            "0b03f507c2": "언어",
+            "2fbe0c981b": "Langue",
+            "3a0e3a9fdc": "Idioma",
+            "5f4779d525": "言語",
+            "ab96f8a4b9": "語言",
+            "b6035a3def": "语言"
           }
         },
         "artifacts": {
@@ -1811,6 +1890,22 @@
           }
         },
         "terminal": {
+          "advanced": {
+            "platform": {
+              "search": {
+                "77faf8be39": "Ghostty",
+                "7d383cc610": "ghostty"
+              }
+            }
+          },
+          "pane": {
+            "appearance": {
+              "search": {
+                "1f4decdd74": "ghostty",
+                "e0cc1b7b47": "Ghostty"
+              }
+            }
+          },
           "windows": {
             "search": {
               "02c772582a": "linux",
@@ -2055,6 +2150,11 @@
               "agents": {
                 "a128d7006b": "{{value0}} {{value1}} child {{value2}}"
               }
+            },
+            "meta": {
+              "row": {
+                "5c970dfb3b": "sidebar"
+              }
             }
           }
         }
@@ -2296,6 +2396,7 @@
           },
           "ResourceUsageStatusSegment": {
             "1b24a32d3a": "Memory",
+            "288a4dd177": "Orca",
             "4bb076fa89": "Kill",
             "6449a95c78": "How much of this machine's physical RAM the Orca-tracked processes are sitting on.",
             "6d9793d4bc": "Resource Manager - Terminals",
@@ -2542,6 +2643,19 @@
             "connectButton": "Connect",
             "connectingButton": "Connecting..."
           },
+          "remote": {
+            "runtime": {
+              "pty": {
+                "transport": {
+                  "test": {
+                    "harness": {
+                      "34e5ecd501": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "terminal": {
             "drop": {
               "handler": {
@@ -2645,6 +2759,15 @@
                 }
               }
             }
+          },
+          "terminal": {
+            "create": {
+              "test": {
+                "harness": {
+                  "94ec7b52f7": "The workspace is not connected to a remote Orca host."
+                }
+              }
+            }
           }
         }
       },
@@ -2666,6 +2789,26 @@
       }
     },
     "lib": {
+      "agent": {
+        "background": {
+          "session": {
+            "test": {
+              "state": {
+                "d9fa6e0979": "Terminal 1"
+              }
+            }
+          }
+        },
+        "hibernation": {
+          "coordinator": {
+            "test": {
+              "fixture": {
+                "4499e360c7": "Agent"
+              }
+            }
+          }
+        }
+      },
       "browser": {
         "cookie": {
           "import": {
@@ -2711,12 +2854,49 @@
       }
     },
     "runtime": {
+      "fixtures": {
+        "web": {
+          "session": {
+            "terminal": {
+              "orphan": {
+                "recovery": {
+                  "regression": {
+                    "fixtures": {
+                      "f1eb7ee8e3": "Terminal"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "githubCheckDetailsTimeout": {
         "timedOut": "Timed out loading check details."
+      },
+      "host": {
+        "session": {
+          "mirror": {
+            "frame": {
+              "fixtures": {
+                "17e758e12c": "Codex"
+              }
+            }
+          }
+        }
       }
     },
     "store": {
       "slices": {
+        "github": {
+          "slice": {
+            "test": {
+              "harness": {
+                "28fd2d1802": "Test PR"
+              }
+            }
+          }
+        },
         "settings": {
           "faa8fb83dd": "Save or close unsaved editor tabs before switching servers."
         },
@@ -2735,7 +2915,27 @@
           "d1d78a7baa": "Git could not safely delete branch \"{{value0}}\"{{value1}}, so Orca kept it to avoid losing local commits.",
           "e50495aae6": "Force Delete Branch",
           "f4503ca505": "Open Settings > Git and try again.",
-          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits."
+          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits.",
+          "slice": {
+            "test": {
+              "fixtures": {
+                "e851268bd6": "Terminal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "web": {
+      "web": {
+        "preload": {
+          "api": {
+            "test": {
+              "harness": {
+                "225db77b97": "WebSocket"
+              }
+            }
+          }
         }
       }
     }
@@ -3028,6 +3228,9 @@
     "findPath": "Find a folder…",
     "finishEditing": "Save or cancel the preset to continue creating your workspace.",
     "pathHelp": "One repository-relative directory per line. Spaces within a path are preserved."
+  },
+  "tray": {
+    "activityWaiting": "Orca - activity waiting"
   },
   "worktreeJumpPalette": {
     "filter": {

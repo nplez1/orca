@@ -12,7 +12,7 @@ import {
 const DEV_CLI_BIN_FIRST = /^[^:;]*[\\/]cli[\\/]bin[:;]/
 const DEV_CLI_BIN_DIR = /^[^:;]*[\\/]cli[\\/]bin$/
 // The dev launcher by absolute path: a login shell's profile cannot reorder it behind a global.
-const DEV_CLI_LAUNCHER = /^[^:;]*[\\/]cli[\\/]bin[\\/]orca-dev$/
+const DEV_CLI_LAUNCHER = /^[^:;]*[\\/]cli[\\/]bin[\\/]orca-np-dev$/
 
 describe('buildCodexStructuredChildEnvironment', () => {
   it('keeps shell exports while pinned launch values win', () => {

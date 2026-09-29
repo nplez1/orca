@@ -33,9 +33,9 @@ export function createLoginShellHarness(): LoginShellHarness {
   for (const dir of [home, globalBin, appCliBin]) {
     mkdirSync(dir, { recursive: true })
   }
-  writeStub(join(globalBin, 'orca'), 'global')
-  writeStub(join(appCliBin, 'orca'), 'app')
-  writeStub(join(appCliBin, 'orca-dev'), 'app')
+  writeStub(join(globalBin, 'orca-np'), 'global')
+  writeStub(join(appCliBin, 'orca-np'), 'app')
+  writeStub(join(appCliBin, 'orca-np-dev'), 'app')
   const prependGlobal = `export PATH="${globalBin}:$PATH"\n`
   writeFileSync(join(home, '.zprofile'), prependGlobal)
   writeFileSync(join(home, '.bash_profile'), prependGlobal)
