@@ -322,6 +322,28 @@ describe('TaskPageJiraBoard', () => {
     expect(mocks.jiraGetBoardOverview).toHaveBeenCalled()
   })
 
+  it('washes a blocker card and labels its severity', async () => {
+    const blocker = issue('ABC-5', '1', {
+      priority: { id: 'blocker', name: 'Blocker' }
+    })
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        Promise.resolve({
+          issues: request.scope === 'backlog' ? [] : [blocker],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 1,
+          isLast: true
+        })
+    )
+    renderBoard()
+
+    const card = await screen.findByRole('button', { name: /ABC-5 title/ })
+    expect(card.className).toContain('bg-severity-blocker/10')
+    expect(card.className).toContain('border-severity-blocker/40')
+    expect(screen.getAllByText('Blocker').length).toBeGreaterThan(0)
+  })
+
   it('opens the backlog instead of an empty sprint view for boards without active sprints', async () => {
     mocks.jiraGetBoardOverview.mockResolvedValue({
       board: { id: '42', name: 'Triage', type: 'kanban', siteId: 'site-1', siteName: 'Example' },
