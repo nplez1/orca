@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, JSX } from 'react'
 import type {
   JiraBoardColumn,
@@ -27,10 +27,13 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
+import {
+  loadJiraBoardViewPreferences,
+  updateJiraBoardViewPreferences
+} from '../../jira-board-view-storage'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Jira board update failed.'
@@ -56,15 +59,19 @@ export function TaskPageJiraBoard({
   onIssueMoved: (issue: JiraIssue) => void
 }): JSX.Element {
   const board = useTaskPageJiraBoard(model, selection)
-  const openSettingsPage = useAppStore((state) => state.openSettingsPage)
-  const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
   const [draggingIssueKey, setDraggingIssueKey] = useState<string | null>(null)
   const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null)
   const [movingIssueKey, setMovingIssueKey] = useState<string | null>(null)
   const [pendingIssue, setPendingIssue] = useState<JiraIssue | null>(null)
   const [pendingTransitions, setPendingTransitions] = useState<JiraTransition[]>([])
   const [transitionSaving, setTransitionSaving] = useState(false)
-  const [activeView, setActiveView] = useState<'sprint' | 'backlog'>('sprint')
+  const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
+    () => loadJiraBoardViewPreferences().activeView
+  )
+  const setActiveView = useCallback((view: 'sprint' | 'backlog') => {
+    setActiveViewState(view)
+    updateJiraBoardViewPreferences({ activeView: view })
+  }, [])
   const legacyRuntimeFallbackApplied = useRef(false)
   const providerSettings = model.jiraTaskSourceContext ?? model.settings
   const filteredColumns = useMemo(
@@ -90,15 +97,6 @@ export function TaskPageJiraBoard({
     )
     onUseIssueList()
   }, [board.runtimeBoardUnavailable, onUseIssueList])
-
-  const openJiraBoardSettings = (): void => {
-    openSettingsPage()
-    openSettingsTarget({
-      pane: 'tasks',
-      repoId: null,
-      sectionId: 'tasks-jira-board'
-    })
-  }
 
   const applyTransition = async (issue: JiraIssue, transition: JiraTransition): Promise<void> => {
     setTransitionSaving(true)
@@ -183,11 +181,11 @@ export function TaskPageJiraBoard({
         filter={board.filter}
         onFilterChange={board.setFilter}
         viewerAvailable={board.meFilterReady}
-        teamFilterReady={board.teamFilterReady}
+        query={board.query}
+        onQueryChange={board.setQuery}
         loading={board.overviewLoading || board.sprintLoading || board.backlogLoading}
         onRefresh={board.refresh}
         onUseIssueList={onUseIssueList}
-        onConfigureTeam={openJiraBoardSettings}
       />
 
       {board.overviewError ? (

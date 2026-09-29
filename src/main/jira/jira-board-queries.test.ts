@@ -56,7 +56,7 @@ function makeServerEntry(): JiraClientForSite {
   }
 }
 
-function issueRecord(teamValue: unknown = undefined) {
+function issueRecord() {
   return {
     id: '1001',
     key: 'ABC-1',
@@ -67,8 +67,7 @@ function issueRecord(teamValue: unknown = undefined) {
       status: { id: '3', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
       labels: [],
       created: '2026-09-01T00:00:00.000Z',
-      updated: '2026-09-02T00:00:00.000Z',
-      customfield_10001: teamValue
+      updated: '2026-09-02T00:00:00.000Z'
     }
   }
 }
@@ -177,37 +176,6 @@ describe('Jira board queries', () => {
     await expectSettingsReadTimeout(() => listBoards('site-1'))
   })
 
-  it('times out a stalled custom-field read and releases its request slot', async () => {
-    const { listCustomFields } = await import('./jira-board-queries')
-
-    await expectSettingsReadTimeout(() => listCustomFields('site-1'))
-  })
-
-  it('lists custom fields with their schema types and omits standard fields', async () => {
-    jiraRequestMock.mockResolvedValueOnce([
-      { id: 'summary', name: 'Summary', custom: false },
-      {
-        id: 'customfield_10001',
-        name: 'Delivery Team',
-        custom: true,
-        schema: { type: 'option', custom: 'select' }
-      }
-    ])
-    const { listCustomFields } = await import('./jira-board-queries')
-
-    await expect(listCustomFields('site-1')).resolves.toEqual([
-      {
-        id: 'customfield_10001',
-        name: 'Delivery Team',
-        schemaType: 'option',
-        customType: 'select',
-        siteId: 'site-1',
-        siteName: 'Example Jira'
-      }
-    ])
-    expect(jiraRequestMock.mock.calls[0]?.[1]).toBe('/rest/api/3/field')
-  })
-
   it('loads board columns and only requests active sprints for Scrum boards', async () => {
     jiraRequestMock
       .mockResolvedValueOnce({ id: 42, name: 'Payments', type: 'scrum' })
@@ -274,14 +242,14 @@ describe('Jira board queries', () => {
     expect(jiraRequestMock).toHaveBeenCalledTimes(2)
   })
 
-  it('reads a board-filter backlog page and maps the configured team field', async () => {
+  it('reads a board-filter backlog page', async () => {
     jiraRequestMock.mockResolvedValueOnce({
       startAt: 100,
       maxResults: 25,
       total: 130,
       isLast: false,
       nextPageToken: 'next-page',
-      issues: [issueRecord({ id: 'team-1', name: 'Payments' })]
+      issues: [issueRecord()]
     })
     const { listBoardIssues } = await import('./jira-board-queries')
 
@@ -290,7 +258,6 @@ describe('Jira board queries', () => {
         boardId: '42',
         siteId: 'site-1',
         scope: 'backlog',
-        teamFieldId: 'customfield_10001',
         startAt: 100,
         pageToken: 'previous-page',
         maxResults: 25
@@ -303,8 +270,7 @@ describe('Jira board queries', () => {
       issues: [
         {
           key: 'ABC-1',
-          status: { id: '3', name: 'In Progress' },
-          teamValue: { key: 'team-1', label: 'Payments' }
+          status: { id: '3', name: 'In Progress' }
         }
       ]
     })
@@ -312,7 +278,6 @@ describe('Jira board queries', () => {
     expect(url).toContain('/rest/software/1.0/board/42/backlog?')
     expect(url).toContain('nextPageToken=previous-page')
     expect(url).toContain('maxResults=25')
-    expect(url).toContain('customfield_10001')
   })
 
   it('uses offset pagination for self-hosted Jira backlogs', async () => {
@@ -346,7 +311,7 @@ describe('Jira board queries', () => {
       maxResults: 100,
       isLast: false,
       nextPageToken: 'next-sprint-page',
-      issues: [issueRecord('Payments')]
+      issues: [issueRecord()]
     })
     const { listBoardIssues } = await import('./jira-board-queries')
 
@@ -356,7 +321,6 @@ describe('Jira board queries', () => {
         siteId: 'site-1',
         scope: 'sprint',
         sprintId: '87',
-        teamFieldId: 'customfield_10001',
         pageToken: 'previous-sprint-page',
         startAt: 100
       })
@@ -364,7 +328,7 @@ describe('Jira board queries', () => {
       startAt: 100,
       nextPageToken: 'next-sprint-page',
       isLast: false,
-      issues: [{ teamValue: { key: 'Payments', label: 'Payments' } }]
+      issues: [{ key: 'ABC-1' }]
     })
     expect(String(jiraRequestMock.mock.calls[0]?.[1])).toContain(
       '/rest/software/1.0/board/42/sprint/87/issue?'

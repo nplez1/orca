@@ -31,8 +31,7 @@ export type { RuntimeJiraSettings } from './runtime-jira-target'
 export {
   jiraGetBoardOverview,
   jiraListBoardIssues,
-  jiraListBoards,
-  jiraListCustomFields
+  jiraListBoards
 } from './runtime-jira-board-client'
 
 export type JiraConnectResult = { ok: true; viewer: JiraViewer } | { ok: false; error: string }

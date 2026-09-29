@@ -16,10 +16,6 @@ export const getTasksPaneSearchKeywords = createLocalizedCatalog(() => [
     'auto.components.settings.tasks.search.jiraBoard',
     'board sprint backlog'
   ),
-  ...translateSearchKeyword(
-    'auto.components.settings.tasks.search.jiraTeamField',
-    'team custom field'
-  ),
   ...translateSearchKeyword('auto.components.settings.tasks.search.44083ae418', 'display'),
   ...translateSearchKeyword('auto.components.settings.tasks.search.58cda6f9c0', 'hide'),
   ...translateSearchKeyword('auto.components.settings.tasks.search.setup', 'setup'),

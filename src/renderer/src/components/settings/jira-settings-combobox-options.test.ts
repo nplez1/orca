@@ -1,30 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { JiraBoard, JiraField } from '../../../../shared/jira-types'
-import {
-  boardOptionValue,
-  buildJiraBoardOptions,
-  buildJiraTeamFieldOptions
-} from './jira-settings-combobox-options'
+import type { JiraBoard } from '../../../../shared/jira-types'
+import { boardOptionValue, buildJiraBoardOptions } from './jira-settings-combobox-options'
 
 const boards: JiraBoard[] = [
   { id: '42', name: 'Payments', type: 'scrum', siteId: 'site-1', siteName: 'Example Jira' }
-]
-
-const fields: JiraField[] = [
-  {
-    id: 'customfield_21400',
-    name: 'Team',
-    schemaType: 'any',
-    siteId: 'site-1',
-    siteName: 'Example Jira'
-  },
-  {
-    id: 'customfield_20801',
-    name: 'Assigned Team',
-    schemaType: 'option',
-    siteId: 'site-1',
-    siteName: 'Example Jira'
-  }
 ]
 
 describe('jira settings combobox options', () => {
@@ -63,28 +42,6 @@ describe('jira settings combobox options', () => {
     expect(
       buildJiraBoardOptions(boards, { boardId: '42', siteId: 'site-1', name: 'Payments' }, 'x')
     ).toEqual([{ value: 'site-1:42', label: 'Payments' }])
-  })
-
-  it('matches team fields by name or id and keeps one option per field id', () => {
-    expect(buildJiraTeamFieldOptions(fields, 'assigned', false)).toEqual([
-      { value: 'customfield_20801', label: 'Assigned Team (customfield_20801)' }
-    ])
-    expect(buildJiraTeamFieldOptions(fields, 'customfield_21400', false)).toEqual([
-      { value: 'customfield_21400', label: 'Team (customfield_21400)' }
-    ])
-    expect(
-      buildJiraTeamFieldOptions(
-        [...fields, { ...fields[0], siteId: 'site-2', siteName: 'Other Jira' }],
-        '',
-        true
-      )
-    ).toEqual([
-      { value: 'customfield_21400', label: 'Team (customfield_21400) · Example Jira' },
-      {
-        value: 'customfield_20801',
-        label: 'Assigned Team (customfield_20801) · Example Jira'
-      }
-    ])
   })
 
   it('derives the same value from a board and from a saved selection', () => {

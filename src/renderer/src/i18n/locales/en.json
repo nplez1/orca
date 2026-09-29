@@ -2460,9 +2460,9 @@
         "jiraSprintView": "Sprint",
         "jiraFilterLabel": "Filter",
         "jiraMeFilter": "Me",
-        "jiraTeamFilter": "Team",
         "jiraAllFilter": "All",
-        "jiraConfigureTeamFilter": "Configure Team",
+        "jiraBoardIssueFilterPlaceholder": "Filter issues by key, summary, or assignee",
+        "jiraBoardIssueFilterLabel": "Filter board issues",
         "jiraReturnToBoard": "Return to board",
         "jiraTaskSettings": "Jira task settings",
         "jiraChooseTransition": "Choose a status change",
@@ -10895,8 +10895,7 @@
             "apiKey": "api key",
             "skill": "skill",
             "connect": "connect",
-            "jiraBoard": "board sprint backlog",
-            "jiraTeamField": "team custom field"
+            "jiraBoard": "board sprint backlog"
           }
         },
         "terminal": {
@@ -12623,28 +12622,18 @@
         },
         "JiraBoardSettings": {
           "title": "Jira board view",
-          "description": "Choose a default board and the Jira custom field used by the Team filter in Tasks.",
+          "description": "Choose the default Jira board shown in Tasks.",
           "defaultBoard": "Default board",
           "chooseBoard": "Choose a board",
           "useListView": "No default board (use issue list)",
           "defaultBoardHelp": "The board applies its saved filter. Scrum boards show active-sprint status columns; backlog follows the board filter.",
-          "teamField": "Team field",
-          "chooseTeamField": "Choose a custom field",
-          "noTeamField": "No Team field",
-          "teamFieldHelp": "Text, number, single-select, and Jira Team custom fields are supported.",
-          "teamValue": "Team value",
-          "teamValuePlaceholder": "Exact value from the selected Jira field",
-          "teamValueHelp": "Issues match this Jira field value exactly. For option and Jira Team values, enter the ID.",
           "retry": "Retry",
           "unnamedBoard": "Board {{value0}}",
           "searchBoards": "Search boards by name...",
           "loadingBoards": "Loading boards...",
           "noBoardsMatch": "No boards match this search.",
           "noBoardsForSearch": "Jira returned no boards matching this search.",
-          "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board.",
-          "searchTeamFields": "Search fields by name or ID...",
-          "loadingTeamFields": "Loading custom fields...",
-          "noTeamFieldsMatch": "No custom fields match this search."
+          "noBoardsReturned": "Jira returned no boards for this site. Check that the account can see a board."
         }
       },
       "right": {
