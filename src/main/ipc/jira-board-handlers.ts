@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { JiraBoardIssuePageRequest, JiraSiteSelection } from '../../shared/jira-types'
-import { getBoardOverview, listBoardIssues, listBoards, listCustomFields } from '../jira/issues'
+import { getBoardOverview, listBoardIssues, listBoards } from '../jira/issues'
 
 function normalizeBoardSiteSelection(value: unknown): JiraSiteSelection | undefined {
   if (typeof value !== 'string') {
@@ -26,10 +26,6 @@ export function registerJiraBoardHandlers(): void {
       return listBoards(normalizeBoardSiteSelection(args?.siteId), normalizeBoardName(args?.name))
     }
   )
-
-  ipcMain.handle('jira:listCustomFields', async (_event, args?: { siteId?: JiraSiteSelection }) => {
-    return listCustomFields(normalizeBoardSiteSelection(args?.siteId))
-  })
 
   ipcMain.handle(
     'jira:getBoardOverview',
@@ -60,8 +56,7 @@ export function registerJiraBoardHandlers(): void {
     return listBoardIssues({
       ...args,
       boardId: args.boardId.trim(),
-      siteId: args.siteId.trim(),
-      ...(typeof args.teamFieldId === 'string' ? { teamFieldId: args.teamFieldId.trim() } : {})
+      siteId: args.siteId.trim()
     })
   })
 }

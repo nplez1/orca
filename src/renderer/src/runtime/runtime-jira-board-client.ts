@@ -3,7 +3,6 @@ import type {
   JiraBoardIssuePage,
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
-  JiraField,
   JiraSiteSelection
 } from '../../../shared/jira-types'
 import { callRuntimeRpc } from './runtime-rpc-client'
@@ -23,17 +22,6 @@ export async function jiraListBoards(
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraBoard[]>(target, 'jira.listBoards', args, { timeoutMs: 30_000 })
     : window.api.jira.listBoards(args)
-}
-
-export async function jiraListCustomFields(
-  settings: RuntimeJiraSettings,
-  siteId?: JiraSiteSelection | null
-): Promise<JiraField[]> {
-  const target = getJiraRuntimeTarget(settings)
-  const args = siteId ? { siteId } : undefined
-  return target.kind === 'environment'
-    ? callRuntimeRpc<JiraField[]>(target, 'jira.listCustomFields', args, { timeoutMs: 30_000 })
-    : window.api.jira.listCustomFields(args)
 }
 
 export async function jiraGetBoardOverview(

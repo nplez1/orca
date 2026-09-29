@@ -7,6 +7,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
+import { getJiraPrioritySurfaceTone } from '@/components/task-page-jira-priority-tone'
 
 export type TaskPageJiraIssueSection = {
   key: string
@@ -107,6 +109,7 @@ function JiraIssueRow({
     showSiteContext && issue.siteName
       ? `${issue.siteName} / ${issue.project.key}`
       : issue.project.key
+  const prioritySurface = getJiraPrioritySurfaceTone(issue.priority)
 
   return (
     // Why: the row contains action buttons, so a native button wrapper would
@@ -127,8 +130,10 @@ function JiraIssueRow({
         }
       }}
       className={cn(
-        'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]',
-        selected && 'bg-accent'
+        'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]',
+        prioritySurface.base,
+        prioritySurface.hover,
+        selected && prioritySurface.selected
       )}
     >
       <span className="block truncate font-mono text-[12px] text-muted-foreground max-md:!hidden">
@@ -153,10 +158,7 @@ function JiraIssueRow({
           >
             <span className="truncate">{issue.status.name}</span>
           </span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            {issue.priority?.name ??
-              translate('auto.components.TaskPage.713179dfdc', 'No priority')}
-          </span>
+          <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0" />
           <span className="min-w-0 truncate text-[11px] text-muted-foreground">
             {issue.assignee?.displayName ??
               translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
@@ -193,9 +195,10 @@ function JiraIssueRow({
         </span>
       </div>
 
-      <span className="block truncate text-[12px] text-muted-foreground max-md:!hidden">
-        {issue.priority?.name ?? translate('auto.components.TaskPage.713179dfdc', 'No priority')}
-      </span>
+      <TaskPageJiraPriorityBadge
+        priority={issue.priority}
+        className="max-md:!hidden justify-self-start"
+      />
 
       <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground max-lg:!hidden">
         {issue.assignee?.avatarUrl ? (

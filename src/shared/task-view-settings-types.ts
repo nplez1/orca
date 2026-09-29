@@ -19,8 +19,4 @@ export type TaskViewSettings = {
   defaultLinearTeamSelection: string[] | null
   /** Optional Jira board for the Jira Tasks board view. */
   defaultJiraBoard: JiraBoardSelection | null
-  /** Jira custom field used by the Tasks view's Team filter. */
-  jiraTeamFieldId: string
-  /** Exact Jira team field value used by the Tasks view's Team filter. */
-  jiraTeamValue: string
 }

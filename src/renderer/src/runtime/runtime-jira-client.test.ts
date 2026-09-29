@@ -6,7 +6,6 @@ import {
   jiraGetBoardOverview,
   jiraListBoardIssues,
   jiraListBoards,
-  jiraListCustomFields,
   jiraGetIssue,
   jiraIssueComments,
   jiraListAssignableUsers,
@@ -32,7 +31,6 @@ const jiraSearchUsersLocal = vi.fn()
 const jiraProjectUsersLocal = vi.fn()
 const jiraCreateIssueLocal = vi.fn()
 const jiraListBoardsLocal = vi.fn()
-const jiraListCustomFieldsLocal = vi.fn()
 const jiraGetBoardOverviewLocal = vi.fn()
 const jiraListBoardIssuesLocal = vi.fn()
 const jiraReadStatusLocal = vi.fn()
@@ -49,7 +47,6 @@ beforeEach(() => {
   jiraProjectUsersLocal.mockReset()
   jiraCreateIssueLocal.mockReset()
   jiraListBoardsLocal.mockReset()
-  jiraListCustomFieldsLocal.mockReset()
   jiraGetBoardOverviewLocal.mockReset()
   jiraListBoardIssuesLocal.mockReset()
   jiraReadStatusLocal.mockReset()
@@ -69,7 +66,6 @@ beforeEach(() => {
         listAssignableUsersForProject: jiraProjectUsersLocal,
         createIssue: jiraCreateIssueLocal,
         listBoards: jiraListBoardsLocal,
-        listCustomFields: jiraListCustomFieldsLocal,
         getBoardOverview: jiraGetBoardOverviewLocal,
         listBoardIssues: jiraListBoardIssuesLocal
       },
@@ -406,13 +402,11 @@ describe('runtime Jira client search bounds', () => {
       boardId: '42',
       siteId: 'site-1',
       scope: 'backlog' as const,
-      teamFieldId: 'customfield_10001',
       pageToken: 'cursor-1',
       startAt: 100,
       maxResults: 100
     }
     jiraListBoardsLocal.mockResolvedValue([{ id: '42', name: 'Payments' }])
-    jiraListCustomFieldsLocal.mockResolvedValue([{ id: 'customfield_10001', name: 'Team' }])
     jiraGetBoardOverviewLocal.mockResolvedValue({
       board: { id: '42' },
       columns: [],
@@ -427,12 +421,10 @@ describe('runtime Jira client search bounds', () => {
     })
 
     await jiraListBoards(null, 'site-1')
-    await jiraListCustomFields(null, 'site-1')
     await jiraGetBoardOverview(null, '42', 'site-1')
     await jiraListBoardIssues(null, issuePage)
 
     expect(jiraListBoardsLocal).toHaveBeenCalledWith({ siteId: 'site-1' })
-    expect(jiraListCustomFieldsLocal).toHaveBeenCalledWith({ siteId: 'site-1' })
     expect(jiraGetBoardOverviewLocal).toHaveBeenCalledWith(selection)
     expect(jiraListBoardIssuesLocal).toHaveBeenCalledWith(issuePage)
 

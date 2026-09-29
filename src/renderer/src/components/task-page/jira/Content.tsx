@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import { LoaderCircle } from 'lucide-react'
@@ -51,6 +51,10 @@ export function TaskPageJiraContent({
   } = model
   const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
+  const boardSelectionRef = useRef<string | null>(null)
+  const jiraBoardSelectionKey = defaultJiraBoard
+    ? `${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`
+    : null
   const notifyJiraIssueMoved = (issue: JiraIssue): void => {
     if (
       selectedJiraIssue?.key === issue.key &&
@@ -61,8 +65,14 @@ export function TaskPageJiraContent({
   }
 
   useEffect(() => {
-    setJiraBoardViewMode('board')
-  }, [defaultJiraBoard?.boardId, defaultJiraBoard?.siteId, setJiraBoardViewMode])
+    // Why: only a genuine board change forces the board view; the first resolved
+    // selection must not clobber a restored issue-list preference.
+    const previousSelectionKey = boardSelectionRef.current
+    boardSelectionRef.current = jiraBoardSelectionKey
+    if (previousSelectionKey !== null && previousSelectionKey !== jiraBoardSelectionKey) {
+      setJiraBoardViewMode('board')
+    }
+  }, [jiraBoardSelectionKey, setJiraBoardViewMode])
 
   if (taskSource !== 'jira') {
     return <TaskPageLinearContent model={model} />

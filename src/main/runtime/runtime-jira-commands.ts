@@ -19,7 +19,6 @@ import {
   listBoardIssues,
   listBoards,
   listCreateFields,
-  listCustomFields,
   listIssueTypes,
   listIssues,
   listPriorities,
@@ -155,10 +154,6 @@ export class RuntimeJiraCommands {
 
   jiraListBoards(siteId?: JiraSiteSelection, name?: string): ReturnType<typeof listBoards> {
     return listBoards(siteId, name)
-  }
-
-  jiraListCustomFields(siteId?: JiraSiteSelection): ReturnType<typeof listCustomFields> {
-    return listCustomFields(siteId)
   }
 
   jiraGetBoardOverview(boardId: string, siteId: string): ReturnType<typeof getBoardOverview> {

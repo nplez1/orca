@@ -202,11 +202,6 @@ export const JIRA_METHODS = [
     handler: async (params, { runtime }) => runtime.jiraListBoards(params?.siteId, params?.name)
   }),
   defineMethod({
-    name: 'jira.listCustomFields',
-    params: SiteSelection,
-    handler: async (params, { runtime }) => runtime.jiraListCustomFields(params?.siteId)
-  }),
-  defineMethod({
     name: 'jira.getBoardOverview',
     params: BoardIdentifier,
     handler: async (params, { runtime }) =>

@@ -4,13 +4,12 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createGlobalSettingsFixture } from '../../../../shared/global-settings-test-fixture'
-import type { JiraBoard, JiraField } from '../../../../shared/jira-types'
+import type { JiraBoard } from '../../../../shared/jira-types'
 import { JiraBoardSettings } from './JiraBoardSettings'
 
 const mocks = vi.hoisted(() => ({
   checkJiraConnection: vi.fn().mockResolvedValue(undefined),
-  jiraListBoards: vi.fn(),
-  jiraListCustomFields: vi.fn()
+  jiraListBoards: vi.fn()
 }))
 
 vi.mock('@/store', () => ({
@@ -28,35 +27,11 @@ vi.mock('@/store', () => ({
 }))
 
 vi.mock('@/runtime/runtime-jira-client', () => ({
-  jiraListBoards: (...args: unknown[]) => mocks.jiraListBoards(...args),
-  jiraListCustomFields: (...args: unknown[]) => mocks.jiraListCustomFields(...args)
+  jiraListBoards: (...args: unknown[]) => mocks.jiraListBoards(...args)
 }))
 
 const boards: JiraBoard[] = [
   { id: '42', name: 'Payments', type: 'scrum', siteId: 'site-1', siteName: 'Example Jira' }
-]
-const fields: JiraField[] = [
-  {
-    id: 'customfield_10000',
-    name: 'Jira Team',
-    schemaType: 'team',
-    siteId: 'site-1',
-    siteName: 'Example Jira'
-  },
-  {
-    id: 'customfield_10001',
-    name: 'Delivery Team',
-    schemaType: 'option',
-    siteId: 'site-1',
-    siteName: 'Example Jira'
-  },
-  {
-    id: 'customfield_10002',
-    name: 'Team notes',
-    schemaType: 'array',
-    siteId: 'site-1',
-    siteName: 'Example Jira'
-  }
 ]
 
 afterEach(() => {
@@ -65,18 +40,13 @@ afterEach(() => {
 })
 
 describe('JiraBoardSettings', () => {
-  it('loads the configured site boards and the site custom fields', async () => {
+  it('loads the configured site boards and saves the picked default board', async () => {
     const user = userEvent.setup()
     const updateSettings = vi.fn()
     mocks.jiraListBoards.mockResolvedValue(boards)
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: null,
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
+    const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
-    const { rerender, container } = render(
+    const { container } = render(
       <JiraBoardSettings settings={settings} updateSettings={updateSettings} />
     )
     await waitFor(() =>
@@ -91,134 +61,31 @@ describe('JiraBoardSettings', () => {
     await user.click(screen.getByRole('combobox', { name: 'Default board' }))
     await user.click(await screen.findByRole('option', { name: 'Payments' }))
     expect(updateSettings).toHaveBeenCalledWith({
-      defaultJiraBoard: { boardId: '42', siteId: 'site-1', name: 'Payments' },
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
-
-    const selectedSettings = createGlobalSettingsFixture({
-      defaultJiraBoard: { boardId: '42', siteId: 'site-1' },
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
-    rerender(<JiraBoardSettings settings={selectedSettings} updateSettings={updateSettings} />)
-    await waitFor(() =>
-      expect(mocks.jiraListCustomFields).toHaveBeenCalledWith(
-        { activeRuntimeEnvironmentId: selectedSettings.activeRuntimeEnvironmentId },
-        'site-1'
-      )
-    )
-    await user.click(screen.getByRole('combobox', { name: 'Team field' }))
-    await user.click(
-      await screen.findByRole('option', { name: 'Delivery Team (customfield_10001)' })
-    )
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      jiraTeamFieldId: 'customfield_10001',
-      jiraTeamValue: ''
+      defaultJiraBoard: { boardId: '42', siteId: 'site-1', name: 'Payments' }
     })
   })
 
-  it('saves an exact team field value without persisting whitespace', async () => {
-    const user = userEvent.setup()
-    const updateSettings = vi.fn()
-    mocks.jiraListBoards.mockResolvedValue(boards)
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: { boardId: '42', siteId: 'site-1' },
-      jiraTeamFieldId: 'customfield_10001',
-      jiraTeamValue: ''
-    })
-    render(<JiraBoardSettings settings={settings} updateSettings={updateSettings} />)
-
-    const teamValue = await screen.findByRole('textbox', { name: 'Team value' })
-    await user.type(teamValue, ' Payments ')
-    await user.keyboard('{Enter}')
-
-    expect(updateSettings).toHaveBeenCalledWith({ jiraTeamValue: 'Payments' })
-  })
-
-  it('does not expose array custom fields as a Team filter field', async () => {
-    const user = userEvent.setup()
-    mocks.jiraListBoards.mockResolvedValue(boards)
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: { boardId: '42', siteId: 'site-1' },
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
-
-    await user.click(await screen.findByRole('combobox', { name: 'Team field' }))
-
-    expect(screen.queryByRole('option', { name: 'Team notes (customfield_10002)' })).toBeNull()
-    expect(screen.getByRole('option', { name: 'Delivery Team (customfield_10001)' })).not.toBeNull()
-    expect(screen.getByRole('option', { name: 'Jira Team (customfield_10000)' })).not.toBeNull()
-  })
-
-  it('keeps the Team field usable while no default board is selected', async () => {
-    const user = userEvent.setup()
-    mocks.jiraListBoards.mockResolvedValue([])
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: null,
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
-
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
-
-    await waitFor(() =>
-      expect(mocks.jiraListCustomFields).toHaveBeenCalledWith(
-        { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId },
-        'site-1'
-      )
-    )
-    const teamField = screen.getByRole('combobox', { name: 'Team field' })
-    await waitFor(() => expect(teamField.hasAttribute('disabled')).toBe(false))
-    await user.click(teamField)
-
-    expect(
-      await screen.findByRole('option', { name: 'Jira Team (customfield_10000)' })
-    ).not.toBeNull()
-    // An empty board list must say so; a silent empty dropdown is what made this
-    // look like a disabled field.
-    await screen.findByText(
-      'Jira returned no boards for this site. Check that the account can see a board.'
-    )
-  })
-
-  it('re-enables both selectors and offers retry when Jira metadata reads fail', async () => {
+  it('re-enables the selector and offers retry when the board list read fails', async () => {
     mocks.jiraListBoards.mockRejectedValue(new Error('Jira board list request timed out.'))
-    mocks.jiraListCustomFields.mockRejectedValue(new Error('Jira custom fields request timed out.'))
     const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: { boardId: '42', siteId: 'site-1' },
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
+      defaultJiraBoard: { boardId: '42', siteId: 'site-1' }
     })
 
     render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
 
     await screen.findByRole('alert')
-    await waitFor(() => {
+    await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Default board' }).hasAttribute('disabled')).toBe(
         false
       )
-      expect(screen.getByRole('combobox', { name: 'Team field' }).hasAttribute('disabled')).toBe(
-        false
-      )
-    })
+    )
     expect(screen.getByRole('button', { name: 'Retry' })).not.toBeNull()
   })
 
   it('searches boards by name on the server instead of paging the whole site', async () => {
     const user = userEvent.setup()
     mocks.jiraListBoards.mockResolvedValue(boards)
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: null,
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
+    const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
     render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
     await user.click(screen.getByRole('combobox', { name: 'Default board' }))
@@ -236,12 +103,7 @@ describe('JiraBoardSettings', () => {
   it('says no boards match instead of rendering an empty list', async () => {
     const user = userEvent.setup()
     mocks.jiraListBoards.mockResolvedValue([])
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
-    const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: null,
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
-    })
+    const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
     render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
     await user.click(screen.getByRole('combobox', { name: 'Default board' }))
@@ -252,11 +114,8 @@ describe('JiraBoardSettings', () => {
 
   it('names a saved board that the fetched page does not contain', async () => {
     mocks.jiraListBoards.mockResolvedValue([])
-    mocks.jiraListCustomFields.mockResolvedValue(fields)
     const settings = createGlobalSettingsFixture({
-      defaultJiraBoard: { boardId: '37169', siteId: 'site-1', name: 'Ps Nebulite Scrum Board' },
-      jiraTeamFieldId: '',
-      jiraTeamValue: ''
+      defaultJiraBoard: { boardId: '37169', siteId: 'site-1', name: 'Ps Nebulite Scrum Board' }
     })
 
     render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)

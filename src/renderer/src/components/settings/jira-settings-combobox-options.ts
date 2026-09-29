@@ -1,4 +1,4 @@
-import type { JiraBoard, JiraBoardSelection, JiraField } from '../../../../shared/jira-types'
+import type { JiraBoard, JiraBoardSelection } from '../../../../shared/jira-types'
 import type { SettingsComboboxOption } from './SettingsCombobox'
 
 export function boardOptionValue(board: Pick<JiraBoard, 'siteId' | 'id'>): string {
@@ -35,29 +35,4 @@ export function buildJiraBoardOptions(
     }
   }
   return options
-}
-
-export function buildJiraTeamFieldOptions(
-  fields: JiraField[],
-  query: string,
-  showSiteNames: boolean
-): SettingsComboboxOption[] {
-  const normalized = query.trim().toLowerCase()
-  const matches = normalized
-    ? fields.filter((field) => `${field.name} ${field.id}`.toLowerCase().includes(normalized))
-    : fields
-  // Why: with every site selected the same field id can arrive from two sites; the
-  // setting stores a single id, so keep the first and avoid duplicate option values.
-  const byId = new Map<string, JiraField>()
-  for (const field of matches) {
-    if (!byId.has(field.id)) {
-      byId.set(field.id, field)
-    }
-  }
-  return [...byId.values()].map((field) => ({
-    value: field.id,
-    label: showSiteNames
-      ? `${field.name} (${field.id}) · ${field.siteName}`
-      : `${field.name} (${field.id})`
-  }))
 }

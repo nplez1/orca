@@ -2,6 +2,8 @@ import type { DragEvent, JSX } from 'react'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import { getJiraStatusTone } from '../../task-page-jira-status-tone'
+import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
+import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 
@@ -44,6 +46,7 @@ function JiraBoardCard({
   onDragStart: (issue: JiraIssue, event: DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
 }): JSX.Element {
+  const prioritySurface = getJiraPrioritySurfaceTone(issue.priority)
   return (
     <div
       role="button"
@@ -66,9 +69,12 @@ function JiraBoardCard({
         }
       }}
       className={cn(
-        'cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        prioritySurface.border,
+        prioritySurface.base,
+        prioritySurface.hover,
         !updating && 'cursor-grab active:cursor-grabbing',
-        selected && 'bg-accent',
+        selected && prioritySurface.selected,
         dragging && 'opacity-50',
         updating && 'cursor-wait opacity-70'
       )}
@@ -98,7 +104,9 @@ function JiraBoardCard({
           {issue.assignee?.displayName ??
             translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
         </span>
-        {issue.priority?.name ? <span className="shrink-0">{issue.priority.name}</span> : null}
+        {issue.priority?.name ? (
+          <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0 text-[10px]" />
+        ) : null}
       </div>
     </div>
   )

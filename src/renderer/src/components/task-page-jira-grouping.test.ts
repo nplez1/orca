@@ -165,6 +165,54 @@ describe('Jira issue status grouping', () => {
     expect(warn).toHaveBeenCalledWith('[jira] Failed to load project status order:', error)
   })
 
+  it('marks blocker tasks with a severity chip and a red surface wash', () => {
+    render(
+      React.createElement(
+        TooltipProvider,
+        null,
+        React.createElement(TaskPageJiraIssueList, {
+          formatUpdatedAt: () => 'today',
+          getStatusTone: () => 'border-border',
+          issues: [
+            jiraIssue('ALP-1', 'Blocker issue', '1', 'To Do', { priority: 'Blocker' }),
+            jiraIssue('ALP-2', 'Critical issue', '1', 'To Do', { priority: 'Critical' }),
+            jiraIssue('ALP-3', 'Major issue', '1', 'To Do', { priority: 'Major' }),
+            jiraIssue('ALP-4', 'Unranked issue', '1', 'To Do')
+          ],
+          onOpenIssue: vi.fn(),
+          onStartWorkspace: vi.fn(),
+          selectedIssue: null,
+          showSiteContext: false,
+          statusOrder: null
+        })
+      )
+    )
+
+    const blockerRow = screen.getByText('Blocker issue').closest('[role="button"]')
+    expect(blockerRow?.className).toContain('bg-severity-blocker/10')
+    expect(blockerRow?.className).toContain('hover:bg-severity-blocker/15')
+
+    const majorRow = screen.getByText('Major issue').closest('[role="button"]')
+    expect(majorRow?.className).not.toContain('bg-severity-blocker/10')
+    expect(majorRow?.className).toContain('hover:bg-accent')
+
+    // Critical shares the blocker's red chip but must not inherit the surface wash — the
+    // wash is the only thing telling the two tiers apart.
+    const criticalRow = screen.getByText('Critical issue').closest('[role="button"]')
+    expect(criticalRow?.className).not.toContain('bg-severity-blocker/10')
+    expect(criticalRow?.className).toContain('hover:bg-accent')
+
+    const chip = (name: string): Element | null =>
+      screen.getAllByText(name)[0]?.closest('[data-severity]') ?? null
+    expect(chip('Blocker')?.getAttribute('data-severity')).toBe('blocker')
+    expect(chip('Blocker')?.className).toContain('text-severity-blocker')
+    expect(chip('Critical')?.getAttribute('data-severity')).toBe('critical')
+    expect(chip('Critical')?.className).toContain('text-severity-blocker')
+    expect(chip('Major')?.getAttribute('data-severity')).toBe('major')
+    expect(chip('Major')?.className).toContain('text-severity-major')
+    expect(chip('No priority')?.getAttribute('data-severity')).toBe('standard')
+  })
+
   it('collapses and expands a status group through its accessible trigger', async () => {
     const user = userEvent.setup()
     render(
