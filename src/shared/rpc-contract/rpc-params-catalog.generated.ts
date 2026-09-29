@@ -916,7 +916,6 @@ export const RPC_PARAMS_BY_METHOD = {
   'jira.listBoardIssues': BoardIssuePage,
   'jira.listBoards': BoardListQuery,
   'jira.listCreateFields': ProjectIssueTypeFields,
-  'jira.listCustomFields': SiteSelection,
   'jira.listIssueTypes': ProjectIssueTypes,
   'jira.listIssues': ListIssues,
   'jira.listPriorities': SiteSelection,

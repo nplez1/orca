@@ -4,8 +4,9 @@ import type {
   JiraIssue,
   JiraTransition
 } from '../../../shared/jira-types'
+import type { JiraBoardFilter } from '../../../shared/jira-board-view-preferences'
 
-export type TaskPageJiraBoardFilter = 'me' | 'team' | 'all'
+export type TaskPageJiraBoardFilter = JiraBoardFilter
 
 export function shouldShowJiraSiteSelector(
   jiraConnected: boolean,
@@ -35,18 +36,31 @@ export function getTaskPageJiraBoardViewerAccountId(
 export function filterTaskPageJiraBoardIssues(
   issues: readonly JiraIssue[],
   filter: TaskPageJiraBoardFilter,
-  viewerAccountId: string | null,
-  teamValue: string
+  viewerAccountId: string | null
 ): JiraIssue[] {
   if (filter === 'all') {
     return [...issues]
   }
-  if (filter === 'me') {
-    return viewerAccountId
-      ? issues.filter((issue) => issue.assignee?.accountId === viewerAccountId)
-      : []
+  return viewerAccountId
+    ? issues.filter((issue) => issue.assignee?.accountId === viewerAccountId)
+    : []
+}
+
+/** Case-insensitive substring match over the fields a board card shows. */
+export function issueMatchesTaskPageJiraBoardQuery(issue: JiraIssue, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) {
+    return true
   }
-  return teamValue ? issues.filter((issue) => issue.teamValue?.key === teamValue) : []
+  const haystacks = [
+    issue.key,
+    issue.title,
+    issue.assignee?.displayName ?? '',
+    issue.status.name,
+    issue.issueType.name,
+    ...issue.labels
+  ]
+  return haystacks.some((value) => value.toLowerCase().includes(needle))
 }
 
 export function groupTaskPageJiraBoardIssues(

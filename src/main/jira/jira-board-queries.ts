@@ -4,11 +4,10 @@ import type {
   JiraBoardIssuePage,
   JiraBoardOverview,
   JiraBoardIssuePageRequest,
-  JiraField,
   JiraSiteSelection
 } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
-import { apiBasePath, jiraRequest } from './authenticated-request'
+import { jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
 import { withJiraQueuedDeadline } from './jira-read-failure'
@@ -46,23 +45,6 @@ function mapBoard(value: unknown, siteId: string, siteName: string): JiraBoard |
     id,
     name: asString(board.name, `Board ${id}`),
     type: asString(board.type, 'unknown'),
-    siteId,
-    siteName
-  }
-}
-
-function mapField(value: unknown, siteId: string, siteName: string): JiraField | null {
-  const field = asRecord(value)
-  const id = asString(field.id)
-  if (!id || field.custom !== true) {
-    return null
-  }
-  const schema = asRecord(field.schema)
-  return {
-    id,
-    name: asString(field.name, id),
-    schemaType: asString(schema.type) || undefined,
-    customType: asString(schema.custom) || undefined,
     siteId,
     siteName
   }
@@ -148,33 +130,6 @@ export async function listBoards(
   return boardsBySite.flat().sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export async function listCustomFields(siteId?: JiraSiteSelection | null): Promise<JiraField[]> {
-  const entries = getClients(siteId)
-  if (entries.length === 0) {
-    return []
-  }
-  const fieldsBySite = await Promise.all(
-    entries.map((entry) =>
-      readBoardSettings('custom fields', async (signal) => {
-        try {
-          const fields = await jiraRequest<unknown>(entry, `${apiBasePath(entry.site)}/field`, {
-            signal
-          })
-          return (Array.isArray(fields) ? fields : [])
-            .map((field) => mapField(field, entry.site.id, entry.site.displayName))
-            .filter((field): field is JiraField => field !== null)
-        } catch (error) {
-          if (isAuthError(error)) {
-            clearToken(entry.site.id)
-          }
-          throw error
-        }
-      })
-    )
-  )
-  return fieldsBySite.flat().sort((a, b) => a.name.localeCompare(b.name))
-}
-
 export async function getBoardOverview(
   boardId: string,
   siteId: string
@@ -240,9 +195,6 @@ export async function listBoardIssues(
     100
   )
   const fields = [...ISSUE_LIST_FIELDS]
-  if (request.teamFieldId && !fields.includes(request.teamFieldId)) {
-    fields.push(request.teamFieldId)
-  }
   const params = new URLSearchParams({
     maxResults: String(maxResults),
     fields: fields.join(',')
@@ -277,9 +229,7 @@ export async function listBoardIssues(
       isLast?: boolean
       nextPageToken?: string
     }>(entry, path)
-    const issues = (response.issues ?? []).map((issue) =>
-      mapJiraIssue(entry.site, issue, undefined, request.teamFieldId)
-    )
+    const issues = (response.issues ?? []).map((issue) => mapJiraIssue(entry.site, issue))
     const responseStartAt = asFiniteNumber(response.startAt) ?? startAt
     const total = asFiniteNumber(response.total)
     const nextPageToken = asString(response.nextPageToken) || null
