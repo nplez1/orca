@@ -243,6 +243,132 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-09-29 — prepared for the np.15 release** (the version and run number are written by the
+  workflow, so this entry records the sync and a follow-up commit records the build), onto upstream
+  `31012aeb09` (173 commits), from the tip `976844fac3` (np.14 released from `fd69125d49`, with
+  `#40`–`#42` landed on top of it). **129 published commits replayed**, plus one new
+  `local(terminal)` commit committed before the rebase and this sync's fix commit on top:
+  **107 byte-identical by `range-diff`, 22 adapted, none dropped, none added.** Sixteen of the 129
+  stopped on a conflict, across 37 distinct files; every hunk was an additive union, a re-seat of
+  the fork's intent onto upstream's refactor, or upstream deleting a file the fork had patched — so
+  no convergence question went to the fork owner this time either.
+  - **`local(terminal)`: a BEL inside a control string is not a bell.** Pi writes `ESC _ pi:c BEL`
+    on every prompt repaint, and the detector tracked only OSC, so each repaint announced a phantom
+    "Attention requested". APC/DCS/PM/SOS now all swallow a BEL. Deliberately *not* xterm-strict:
+    xterm keeps those four open until ST, and Pi never sends one, so xterm's rule would pin the
+    string and drop every later real bell. This commit leads the sync so the replayed series stays
+    a linear patch series; it is not upstream-bound.
+  - **Rate-limit providers unioned on every enumeration again.** Upstream's `zcode` joined the
+    provider union, the five status-item migrations, the service state/polling/preparation and the
+    bar's pending chain, in the same places `deepseek`/`fireworks`/`copilot` already sit. The
+    `zcode` field is *optional* on `UsageProviderSnapshots`, so its pending probe keeps upstream's
+    `providers.zcode !== undefined` guard: an absent slice is not a pending one, and without that
+    guard the setup CTA is held back forever.
+  - **Upstream's junk-test purge deleted eleven files the fork had patched.** `#23815` removed 101
+    test files, four of which is `DESCENDANT_PROVIDERS`' peers here
+    (`orchestration-timeout*-cli.test.ts`, `claude-session-end-install.test.ts`,
+    `SourceControl.host-context-boundary.test.ts`, `windows-pty-native-capability-workflow.test.mjs`)
+    plus `track-community-prs.yaml`. All were `local(identity)` or `local(build)` string
+    re-points, so the deletions are taken and the fork's change goes with them.
+  - **The status bar is where upstream and the fork both keep adding providers.**
+    `appearance-status-bar-search.ts` took upstream's `getZcodeStatusBarToggleSearchEntry()` into
+    the fork's `appearance-status-bar-provider-toggles.ts` delegation, and
+    `status-bar-default-on-migrations.ts` took upstream's ZCode one-shot migration. The order that
+    matters is the migration list's: this fork's providers stay contiguous (`deepseek`,
+    `fireworks`, `cursor`, `copilot`) with upstream's `zcode` after them, which is what
+    `ui-hydration-workspace-preferences.test.ts` asserts.
+  - **`#27` re-seated onto upstream's restructured worktree create.** The trust preflight and its
+    terminal now sit inside the fork's `if (startup && sequencedStartup)` guard, with upstream's
+    new `qoder` preset added inside it, and `#19`'s `setup` status kept ahead of upstream's
+    `hasRetainedFailed` — a live setup outranks a retained verdict, which is upstream's own rule
+    for live work.
+  - **Two workflow files, both upstream-rewritten under a fork-owned verdict.** `e2e.yml` and
+    `unit-tests.yml` keep upstream's new steps (the failure summary, the shard-selection artifact,
+    the `.index`/`.count` matrix) *and* the fork's verdict wiring. Their JSON reports were
+    reconciled rather than duplicated: Playwright honours `PLAYWRIGHT_JSON_OUTPUT_FILE` over
+    `PLAYWRIGHT_JSON_OUTPUT_NAME` when both are set (measured on 1.63.0), so the e2e step keeps
+    upstream's env var and its own `--reporter=list,json` and the fork's verdict now reads the same
+    `ci-shards/results.json` the failure summary does — the fork's second output name is gone, and
+    with it the `if repository != stablyai/orca` shell guard the run step no longer needs. The
+    unit-shard step keeps its report arguments inside that guard, because upstream added no
+    reporter of its own there. Both verdict contract suites were updated to pin the *interaction*
+    and both pass. `e2e.yml`'s `Summarize E2E failures` step and the `unit-tests.yml`
+    tee/mkdir/pipefail lines stay unguarded on purpose: upstream's shard lane already creates
+    `ci-shards/` for its download-artifact step, and `pipefail` preserves Vitest's exit code, so
+    neither changes what upstream's lane decides.
+  - **`local(identity)` re-applied onto nine new surfaces.** Upstream's CLI-identity suites pin
+    `orca`/`orca-dev`/`orca.exe`; the fork ships `orca-np`/`orca-np-dev`/`orca-np.exe`, and the
+    login-shell harness stubs the app's launcher by that name, so its bare-name arm models the
+    fork's own command rather than upstream's. The new dsh hook service hardcoded `.orca` for its
+    remote script and managed-hooks path where claude/devin/droid/gemini/copilot/cursor use
+    `HOME_DIRECTORY_NAME` — an SSH install wrote into an official install's directory.
+  - **Measured, never chosen:** the mobile page's Phase C sweep. This head cuts the swept tree into
+    73 chunks against the 69 the table recorded, past the four the fence gives a refactor, so
+    `MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP` was re-derived by building `routes.slice(0, n)` for every
+    n rather than the envelope raised. Its worst marginal route now costs ten scripts (was nine),
+    which moves in the route count at which the derived asset ceiling passes the shell's 256 from
+    32 to 30. `DIRECT_IMPORTER_PIN` and `UNHIDDEN_SPAWNER_PIN` needed nothing this time: the
+    purge-superseded pin was dropped by upstream, and the allowlist fixture only lost
+    `macos-tailscale-dns-diagnostic.ts` to a `runProcess` migration the gates saw.
+  - **The traps, all found by a gate and none behind a conflict marker:**
+    1. **`pnpm tc`**: the replayed `local(identity)` patch tore
+       `getWindowsPowerShellLifecycleCommand` apart — the merge kept upstream's
+       `const innerCommand =` opener and the base's closing paren, leaving no `return` (`innerCommand`
+       was dead, so only the shape was wrong); a missing comma after `hasRetainedFailed` in
+       `use-worktree-activity-status`'s dep array; and three providers upstream added to
+       `AgentHookSource` (`qoder`, `codebuddy`, `dsh`) that the fork's `DESCENDANT_PROVIDERS`
+       `Record` enumerates by design, so a new provider is a compile error rather than a gap.
+    2. **A failing suite, not a type error — eleven surfaces upstream added or rewrote after this
+       fork's base:** the ZCode fetcher joined the shared rate-limit harness, so the DeepSeek and
+       Fireworks suites needed its mock the way Cursor's already had it; the Jenkins panel suite's
+       `@/i18n/i18n` mock predated the localized catalog reading `i18n` off that module; and the
+       nine CLI-identity suites above needed the fork's launcher names.
+    3. **A file the purge left in the fork's tree.** `windows-pty-native-capability-workflow.test.mjs`
+       and `track-community-prs.yaml` conflicted as modify/delete; both are taken as deleted, not
+       re-added.
+  - Verified: `pnpm tc` clean at the tip; `range-diff` pairing all 129 patches with 107 `=` and 22
+    `!` (every `!` reviewed — six are context-only shifts under upstream's new lines); the
+    pre-sync-tip lost-content diff reduced to the four files this sync deliberately adapted
+    (`appearance-status-bar-provider-toggles.ts`, `status-bar-default-on-migrations.ts` and the two
+    `terminal-bell-detector` files of the new `local(terminal)` commit), none of which upstream
+    touched in this range; the derived localization catalog regenerated and both verifiers green;
+    the fork's builder config loads and all five update-feed references still name `nplez1/orca`;
+    and the full `pnpm test` run reports **98,196 passing, 1 failing** — a 30s timeout in
+    `release-checkout.unit.test.ts` under full-suite load that passes 10/10 in isolation, in the
+    same cross-version lane the previous entry records as environmental; the uninstalled `cloud/`
+    workspace's `pg` keeps `relay-region-correction.unit.test.ts` red, as documented.
+  - **Pre-existing, not from this sync:** `pnpm run check:code-quality:changed` reports **36 findings
+    (27 design-system) across 1,326 changed files** with `ORCA_CODE_QUALITY_BASE=upstream/main` —
+    identical in kind and count to the last two entries. All nine flagged files were checked and
+    every one is byte-identical to the released np.14 tip.
+  - **Base drift, re-measured:** the seven PR-bound branches now sit **975 commits behind**
+    `upstream/main` (from `560c42e1d1`), the five deliberately-left ones **1069 behind** (from
+    `615b1370fb`) — see [BRANCHES.md](./BRANCHES.md).
+  - **Left open, by name:**
+    - *Which module added the five chunks* the mobile page's sweep grew by. The re-measure is the
+      documented response to drift past the margin, but it is a measurement, not a diagnosis: a
+      shared importer set moving is the known cause and the split is still inside both budgets, so
+      nobody has yet named the module that moved. Worth one pass before the next sync re-measures
+      again.
+    - *`local(identity)` and the remaining `~/.orca` readers.* `local(identity)` renames the *home*
+      directory (`~/.orca` → `~/.orca-np`) only where this patch already reached. Upstream has
+      since added home-scoped stores that still hardcode `.orca`: `jira/site-credential-store.ts`,
+      `jenkins/jenkins-server-store.ts`, `bitbucket/credential-store.ts`,
+      `credentials/secure-credential-store.ts`, `agent-hooks/managed-hook-install-lock.ts`,
+      `floating-workspace-launch-directory.ts` — plus the remote hook paths in
+      `muse/hook-service.ts`, `muse/hook-settings.ts` and `zcode/hook-service.ts`. None is a
+      regression from this sync and no gate flags them, because each writes and reads the same
+      path. The reason not to sweep them into a sync is that several of those paths hold **on-disk
+      state** — credentials, a lock file, the managed-hooks directory — so re-pointing them is a
+      data migration that orphans what is already there, not a constant swap. Per-store triage
+      before any of them moves: unreachable in a fork build, a live write whose reader already
+      moved, or a migration that has to be designed.
+    - *The intermediate commits of this series are not self-consistent about the derived catalog.*
+      `en-runtime-required.json` conflicted twice and was resolved by taking one side and
+      regenerating at the tip (the runbook's procedure), so `runtime-required-catalog.test.ts`
+      cross-checks `en.json` only at the tip. Nothing gates a mid-series commit, but a `git bisect`
+      that lands there would see it.
+
 - **2026-09-27 — released as `v1.4.214-np.14`** from `fd69125d49` (workflow run 36342286779,
   signed and notarized), onto upstream `27b823f934` (206 commits), from the released tip
   `2ca7d38b4f` (np.13 released). **116 commits replayed**, plus this sync's two fix commits on top
