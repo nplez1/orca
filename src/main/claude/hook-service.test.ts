@@ -82,7 +82,7 @@ describe('getWindowsManagedLifecycleHook', () => {
     gitBashAvailableMock.value = false
     try {
       expect(getWindowsManagedLifecycleHook(SAFE_SCRIPT_PATH).command).toBe(
-        'C:/Users/alice/.orca/agent-hooks/claude-hook.cmd'
+        'C:/Users/alice/.orca-np/agent-hooks/claude-hook.cmd'
       )
     } finally {
       gitBashAvailableMock.value = true
