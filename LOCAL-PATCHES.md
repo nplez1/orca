@@ -191,6 +191,35 @@ change beyond the status-bar badge — inherent in calling a shell agent work ra
 of the fold. If the stats change is unwanted, the alternative is to keep upstream's evidence split
 and strip only the `workingMode` from the published payloads.
 
+### `local(skills)`: re-track the three agent skills the internal move removed
+
+Upstream moved its agent skills out of the tree on 2026-04-29 (`c85f487ebf`, "chore: move agent
+skills to internal delivery", PR #1254): it deleted `.agents/skills/**`, gitignored the directory, and
+a setup hook keyed on `$ORCA_INTERNAL_DEV_SETUP` now symlinks the private copies back in. That env var
+is set only by stablyai's internal tooling and silently no-ops for everyone else, so a fork worktree
+gets no skills at all.
+
+This patch re-tracks the three that are useful and safe outside the org, restored byte-for-byte from
+`c85f487ebf^`:
+
+- `.agents/skills/electron/SKILL.md` — CDP/`playwright-cli` validation of a running Electron app. Its
+  Orca launch line additionally carries `ORCA_BACKGROUND_LAUNCH=1`, matching the repo AGENTS.md rule
+  that agent-launched apps must not steal focus or reveal a test window (the skill predates it).
+- `.agents/skills/react-useeffect/**` — 4 files of `useEffect` guidance.
+- `.agents/skills/typescript/**` — 49 files of TypeScript perf/tsconfig/error patterns.
+
+`auto-pr-merge`, `auto-review-fix` and `auto-submit` are deliberately **not** restored: they encode
+stablyai's PR/merge policy (`--admin` merge, sequential review-agent loops) that this fork does not
+follow.
+
+Why `git add -f` and not an un-ignore rule: `.agents/skills/` stays ignored, so the internal hook can
+still drop machine-local symlinks beside these files without them showing up as untracked. Only the
+three directories above are force-tracked.
+
+Scope: a fresh checkout of `nplez1/main` carries the skills; a worktree branched before this commit
+gets them on its next sync. The `electron` skill's runtime dependency is `@playwright/cli`
+(`npm i -g @playwright/cli`, which provides the `playwright-cli` binary).
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream
