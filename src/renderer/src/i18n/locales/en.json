@@ -14190,6 +14190,12 @@
             "searching": "Searching…",
             "noResults": "No people found",
             "you": "You"
+          },
+          "IssueComments": {
+            "title": "Comments",
+            "retry": "Retry",
+            "empty": "No comments yet.",
+            "unknownAuthor": "Unknown"
           }
         }
       },

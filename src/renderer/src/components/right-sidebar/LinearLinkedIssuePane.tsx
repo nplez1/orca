@@ -1,15 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LinearIssueTextEditor } from '@/components/LinearIssueTextEditor'
+import { LinearIssueCommentFooter } from '@/components/LinearItemDrawer'
 import { LinearIssueEditRows } from '@/components/linear-issue-edit-rows'
 import { useLinearIssueWorkspaceDetail } from '@/components/linear-issue-workspace-detail-state'
 import { useAppStore } from '@/store'
-import type { LinearIssue } from '../../../../shared/linear/issue-types'
+import type { LinearComment, LinearIssue } from '../../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import { translate } from '@/i18n/i18n'
+import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type LinearLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'linear' }>
+
+function linearCommentView(comment: LinearComment): IssueCommentView {
+  return {
+    id: comment.id,
+    authorName:
+      comment.user?.displayName ??
+      translate('auto.components.right.sidebar.IssueComments.unknownAuthor', 'Unknown'),
+    authorAvatarUrl: comment.user?.avatarUrl,
+    createdAt: comment.createdAt,
+    body: comment.body
+  }
+}
 
 /** Linear issue detail for the pane: compact property rows plus the shared
  *  title/description editor, reusing the Task view's Linear hydration hook. */
@@ -116,7 +131,21 @@ function LinearLinkedIssueDetail({
             sourceContext={sourceContext}
           />
         </div>
+        <section className="border-t border-border/40 p-3">
+          <IssueCommentThread
+            comments={detail.comments.map(linearCommentView)}
+            loading={detail.commentsLoading}
+            error={detail.commentsError}
+            onRetry={() => void detail.retryComments()}
+          />
+        </section>
       </div>
+      <LinearIssueCommentFooter
+        issueId={detail.displayed.id}
+        workspaceId={detail.displayed.workspaceId}
+        onCommentAdded={detail.handleCommentAdded}
+        sourceContext={sourceContext}
+      />
     </div>
   )
 }

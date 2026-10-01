@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import { GHCommentComposer } from '@/components/github-item-dialog/discuss-item/gh-comment-composer'
 import { GHEditSection } from '@/components/github-item-dialog/edit-item-fields/gh-edit-section'
+import type { PRComment } from '../../../../shared/github/comment-types'
+import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { useGitHubItemDialogDetails } from '@/components/github-item-dialog/load-item-details/use-github-item-dialog-details'
 import { lookupGitHubWorkItemForSource } from '@/lib/github-work-item-source-lookup'
 import { useAppStore } from '@/store'
@@ -14,6 +17,16 @@ import { IssuePaneMessage } from './IssuePaneMessage'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type GithubLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'github' }>
+
+function githubCommentView(comment: PRComment): IssueCommentView {
+  return {
+    id: String(comment.id),
+    authorName: comment.author,
+    authorAvatarUrl: comment.authorAvatarUrl,
+    createdAt: comment.createdAt,
+    body: comment.body
+  }
+}
 
 type GithubPaneWorktree = Pick<
   Worktree,
@@ -147,7 +160,14 @@ function GithubLinkedIssueDetail({
   repoId: string
   sourceContext: TaskSourceContext | null
 }): React.JSX.Element {
-  const { details, displayWorkItem, invalidateCurrentDetailsCache } = useGitHubItemDialogDetails({
+  const {
+    details,
+    displayWorkItem,
+    invalidateCurrentDetailsCache,
+    appendOptimisticComment,
+    loading,
+    error
+  } = useGitHubItemDialogDetails({
     workItem,
     repoPath,
     effectiveRepoId: repoId,
@@ -172,39 +192,59 @@ function GithubLinkedIssueDetail({
   }, [workItemId, resolvedState, workItemLabels])
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
-      <div className="p-2">
-        <GHEditSection
-          item={resolved}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
+        <div className="p-2">
+          <GHEditSection
+            item={resolved}
+            repoPath={repoPath}
+            repoId={repoId}
+            sourceContext={sourceContext}
+            projectOrigin={undefined}
+            localState={localState}
+            localLabels={localLabels}
+            onStateChange={setLocalState}
+            onLabelsChange={setLocalLabels}
+            onMutated={invalidateCurrentDetailsCache}
+            assignees={details?.assignees ?? []}
+            onUse={() => {}}
+            layout="rows"
+          />
+        </div>
+        <div className="border-t border-border/40 p-3">
+          {details?.body?.trim() ? (
+            <CommentMarkdown
+              content={details.body}
+              variant="document"
+              className="text-[13px] leading-relaxed"
+            />
+          ) : (
+            <p className="text-xs italic text-muted-foreground">
+              {translate(
+                'auto.components.right.sidebar.IssuePane.noDescription',
+                'No description provided.'
+              )}
+            </p>
+          )}
+        </div>
+        <section className="border-t border-border/40 p-3">
+          <IssueCommentThread
+            comments={(details?.comments ?? []).map(githubCommentView)}
+            loading={loading}
+            error={error}
+            onRetry={invalidateCurrentDetailsCache}
+          />
+        </section>
+      </div>
+      <div className="flex-none border-t border-border/60 bg-background px-3 py-3">
+        <GHCommentComposer
           repoPath={repoPath}
           repoId={repoId}
           sourceContext={sourceContext}
-          projectOrigin={undefined}
-          localState={localState}
-          localLabels={localLabels}
-          onStateChange={setLocalState}
-          onLabelsChange={setLocalLabels}
-          onMutated={invalidateCurrentDetailsCache}
-          assignees={details?.assignees ?? []}
-          onUse={() => {}}
-          layout="rows"
+          issueNumber={workItem.number}
+          itemType="issue"
+          onCommentAdded={appendOptimisticComment}
         />
-      </div>
-      <div className="border-t border-border/40 p-3">
-        {details?.body?.trim() ? (
-          <CommentMarkdown
-            content={details.body}
-            variant="document"
-            className="text-[13px] leading-relaxed"
-          />
-        ) : (
-          <p className="text-xs italic text-muted-foreground">
-            {translate(
-              'auto.components.right.sidebar.IssuePane.noDescription',
-              'No description provided.'
-            )}
-          </p>
-        )}
       </div>
     </div>
   )

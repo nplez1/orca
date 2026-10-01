@@ -26,11 +26,17 @@ vi.mock('@/components/github-item-dialog/load-item-details/use-github-item-dialo
   useGitHubItemDialogDetails: () => ({
     details: null,
     displayWorkItem: null,
-    invalidateCurrentDetailsCache: () => {}
+    invalidateCurrentDetailsCache: () => {},
+    appendOptimisticComment: () => {},
+    loading: false,
+    error: null
   })
 }))
 vi.mock('@/components/github-item-dialog/edit-item-fields/gh-edit-section', () => ({
   GHEditSection: () => null
+}))
+vi.mock('@/components/github-item-dialog/discuss-item/gh-comment-composer', () => ({
+  GHCommentComposer: () => null
 }))
 vi.mock('@/components/sidebar/CommentMarkdown', () => ({ default: () => null }))
 vi.mock('@/i18n/i18n', () => ({

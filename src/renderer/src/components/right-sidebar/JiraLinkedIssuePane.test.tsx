@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira-types'
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   jiraListTransitions: vi.fn(),
   jiraUpdateIssue: vi.fn(),
   jiraSearchUsers: vi.fn(),
+  jiraAddIssueComment: vi.fn(),
   patchJiraIssue: vi.fn(),
   viewerAccountId: 'u-bob'
 }))
@@ -34,12 +35,18 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListPriorities: (...args: unknown[]) => mocks.jiraListPriorities(...args),
   jiraListTransitions: (...args: unknown[]) => mocks.jiraListTransitions(...args),
   jiraUpdateIssue: (...args: unknown[]) => mocks.jiraUpdateIssue(...args),
-  jiraSearchUsers: (...args: unknown[]) => mocks.jiraSearchUsers(...args)
+  jiraSearchUsers: (...args: unknown[]) => mocks.jiraSearchUsers(...args),
+  jiraAddIssueComment: (...args: unknown[]) => mocks.jiraAddIssueComment(...args)
 }))
 
-vi.mock('@/components/sidebar/CommentMarkdown', () => ({ default: () => null }))
+vi.mock('@/components/sidebar/CommentMarkdown', () => ({
+  default: ({ content }: { content: string }) => <div>{content}</div>
+}))
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback?: string) => fallback ?? _key
+}))
+vi.mock('@/i18n/relative-time-format', () => ({
+  formatUiRelativeTimeFromDate: () => 'now'
 }))
 
 const linkedIssue = {
@@ -100,5 +107,36 @@ describe('JiraLinkedIssuePane', () => {
     expect(screen.getByText('Blocker')).toBeTruthy()
     expect(screen.getByText('bug, ui')).toBeTruthy()
     expect(screen.getByLabelText('Issue title')).toBeTruthy()
+  })
+
+  it('posts a comment and shows it in the thread', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([])
+    mocks.jiraAddIssueComment.mockResolvedValue({ ok: true, id: 'c1' })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+      </TooltipProvider>
+    )
+
+    expect(await screen.findByText('No comments yet.')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('Add a Jira comment...'), {
+      target: { value: 'Looks good to me' }
+    })
+    fireEvent.click(screen.getByText('Comment'))
+
+    await waitFor(() =>
+      expect(mocks.jiraAddIssueComment).toHaveBeenCalledWith(
+        null,
+        'ABC-1',
+        'Looks good to me',
+        'site-1'
+      )
+    )
+    expect(await screen.findByText('Looks good to me')).toBeTruthy()
   })
 })

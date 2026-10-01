@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { useJiraIssueWorkspaceDetail } from '@/components/jira-issue-workspace-detail-state'
+import { JiraIssueCommentComposer } from '@/components/jira-issue-workspace-content'
 import { jiraSearchUsers } from '@/runtime/runtime-jira-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,10 +10,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
-import type { JiraIssue, JiraUser } from '../../../../shared/jira-types'
+import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { IssueAssigneeCombobox, type IssueAssigneeOption } from './IssueAssigneeCombobox'
+import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
@@ -22,6 +24,18 @@ type JiraLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'jira' }>
 
 function jiraUserOption(user: JiraUser): IssueAssigneeOption {
   return { id: user.accountId, label: user.displayName, avatarUrl: user.avatarUrl }
+}
+
+function jiraCommentView(comment: JiraComment): IssueCommentView {
+  return {
+    id: comment.id,
+    authorName:
+      comment.user?.displayName ??
+      translate('auto.components.right.sidebar.IssueComments.unknownAuthor', 'Unknown'),
+    authorAvatarUrl: comment.user?.avatarUrl,
+    createdAt: comment.createdAt,
+    body: comment.body
+  }
 }
 
 function jiraStatusToneClass(categoryKey: string): string {
@@ -92,67 +106,85 @@ export function JiraLinkedIssuePane({
           />
         )
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
-          <div className="space-y-0.5 p-2">
-            <JiraStatusRow displayed={displayed} detail={detail} />
-            <IssueAssigneeCombobox
-              label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
-              roster={detail.users.map(jiraUserOption)}
-              selected={displayed.assignee ? [jiraUserOption(displayed.assignee)] : []}
-              isSelf={viewerAccountId ? (option) => option.id === viewerAccountId : undefined}
-              search={searchAssignees}
-              pending={detail.pendingField === 'assignee'}
-              onSelect={(option) =>
-                void detail.mutateIssue(
-                  'assignee',
-                  { assigneeAccountId: option.id },
-                  {
-                    assignee: {
-                      accountId: option.id,
-                      displayName: option.label,
-                      avatarUrl: option.avatarUrl ?? undefined
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
+            <div className="space-y-0.5 p-2">
+              <JiraStatusRow displayed={displayed} detail={detail} />
+              <IssueAssigneeCombobox
+                label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
+                roster={detail.users.map(jiraUserOption)}
+                selected={displayed.assignee ? [jiraUserOption(displayed.assignee)] : []}
+                isSelf={viewerAccountId ? (option) => option.id === viewerAccountId : undefined}
+                search={searchAssignees}
+                pending={detail.pendingField === 'assignee'}
+                onSelect={(option) =>
+                  void detail.mutateIssue(
+                    'assignee',
+                    { assigneeAccountId: option.id },
+                    {
+                      assignee: {
+                        accountId: option.id,
+                        displayName: option.label,
+                        avatarUrl: option.avatarUrl ?? undefined
+                      }
                     }
-                  }
-                )
-              }
-              onUnassign={() =>
-                void detail.mutateIssue(
-                  'assignee',
-                  { assigneeAccountId: null },
-                  { assignee: undefined }
-                )
-              }
-            />
-            <JiraPriorityRow displayed={displayed} detail={detail} />
-            <JiraLabelsRow displayed={displayed} detail={detail} />
-          </div>
-
-          <section className="border-t border-border/40 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <JiraIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">
-                {displayed.issueType.name}
-              </span>
-              <span className="min-w-0 truncate text-xs text-muted-foreground">
-                {displayed.project.key}
-              </span>
-            </div>
-            {displayed.description?.trim() ? (
-              <CommentMarkdown
-                content={displayed.description}
-                variant="document"
-                className="text-[13px] leading-relaxed"
+                  )
+                }
+                onUnassign={() =>
+                  void detail.mutateIssue(
+                    'assignee',
+                    { assigneeAccountId: null },
+                    { assignee: undefined }
+                  )
+                }
               />
-            ) : (
-              <p className="text-xs italic text-muted-foreground">
-                {translate(
-                  'auto.components.JiraIssueWorkspace.c4889a47e4',
-                  'No description provided.'
-                )}
-              </p>
-            )}
-          </section>
-        </div>
+              <JiraPriorityRow displayed={displayed} detail={detail} />
+              <JiraLabelsRow displayed={displayed} detail={detail} />
+            </div>
+
+            <section className="border-t border-border/40 p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <JiraIcon className="size-3 shrink-0 text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground">
+                  {displayed.issueType.name}
+                </span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
+                  {displayed.project.key}
+                </span>
+              </div>
+              {displayed.description?.trim() ? (
+                <CommentMarkdown
+                  content={displayed.description}
+                  variant="document"
+                  className="text-[13px] leading-relaxed"
+                />
+              ) : (
+                <p className="text-xs italic text-muted-foreground">
+                  {translate(
+                    'auto.components.JiraIssueWorkspace.c4889a47e4',
+                    'No description provided.'
+                  )}
+                </p>
+              )}
+            </section>
+
+            <section className="border-t border-border/40 p-3">
+              <IssueCommentThread
+                comments={detail.comments.map(jiraCommentView)}
+                loading={detail.commentsLoading}
+                error={detail.commentsError}
+                onRetry={detail.retryComments}
+              />
+            </section>
+          </div>
+          <JiraIssueCommentComposer
+            commentDraft={detail.commentDraft}
+            setCommentDraft={detail.setCommentDraft}
+            commentSubmitting={detail.commentSubmitting}
+            canSubmitComment={detail.canSubmitComment}
+            handleSubmitComment={() => void detail.handleSubmitComment()}
+          />
+        </>
       )}
     </div>
   )
