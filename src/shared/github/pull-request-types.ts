@@ -62,6 +62,13 @@ export type PRInfo = {
   mergeQueueRequired?: boolean | null
   mergeMethodSettings?: GitHubPRMergeMethodSettings
   mergeStateStatus?: string | null
+  /**
+   * GitHub's answer to whether *this* viewer may waive branch protection on this review
+   * (`PullRequest.viewerCanMergeAsAdmin`). Absent when GitHub was not asked or did not answer, and
+   * absent must read as "unknown", never as "cannot". `reviewDecision` says a review is required;
+   * this says whether that requirement actually gates the person looking at it.
+   */
+  viewerCanMergeAsAdmin?: boolean
   /** GitHub-registered stack metadata. Absent for ordinary dependent PR chains. */
   stack?: GitHubPRStack
   // Why: check-runs are keyed by the PR head commit, not the mutable branch name.

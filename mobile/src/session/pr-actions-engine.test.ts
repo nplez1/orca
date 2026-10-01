@@ -60,6 +60,31 @@ describe('PrActionsEngine — scoped busy clear (overlapping actions)', () => {
   })
 })
 
+describe('PrActionsEngine — an admin bypass is carried only when the caller asks for one', () => {
+  it('forwards the confirmed bypass to the merge mutation', async () => {
+    const mergePR = vi.fn(async (): Promise<GitHubPrMutationOutcome> => ({ ok: true }))
+    const engine = makeEngine({ mergePR })
+
+    await engine.merge('squash', true)
+
+    expect(mergePR).toHaveBeenCalledWith({
+      prNumber: 1,
+      method: 'squash',
+      prRepo: undefined,
+      bypassBranchProtection: true
+    })
+  })
+
+  it('omits the bypass when the sidebar did not confirm one', async () => {
+    const mergePR = vi.fn(async (): Promise<GitHubPrMutationOutcome> => ({ ok: true }))
+    const engine = makeEngine({ mergePR })
+
+    await engine.merge('squash')
+
+    expect(mergePR).toHaveBeenCalledWith({ prNumber: 1, method: 'squash', prRepo: undefined })
+  })
+})
+
 describe('PrActionsEngine — transport-rejection-normalized outcomes settle cleanly', () => {
   it('routes a { ok:false } outcome to error and clears busy', async () => {
     const onChange = vi.fn()

@@ -81,9 +81,12 @@ export function useMobilePrActions(input: PrActionsInput) {
     clearError: useCallback(() => engine.clearError(), [engine]),
     clearBlocked: useCallback(() => engine.clearBlocked(), [engine]),
     merge: useCallback(
-      (method?: Parameters<PrActionsEngine['merge']>[0]) => {
+      (
+        method?: Parameters<PrActionsEngine['merge']>[0],
+        bypassBranchProtection?: Parameters<PrActionsEngine['merge']>[1]
+      ) => {
         if (ready) {
-          void engine.merge(method)
+          void engine.merge(method, bypassBranchProtection)
         }
       },
       [engine, ready]

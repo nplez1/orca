@@ -67,10 +67,17 @@ describe('registerGitHubHandlers', () => {
       }
     )
 
-    expect(mergePRMock).toHaveBeenCalledWith('/workspace/repo', 42, 'squash', 'openclaw-2', {
-      owner: 'acme',
-      repo: 'orca'
-    })
+    expect(mergePRMock).toHaveBeenCalledWith(
+      '/workspace/repo',
+      42,
+      'squash',
+      'openclaw-2',
+      {
+        owner: 'acme',
+        repo: 'orca'
+      },
+      { bypassBranchProtection: false }
+    )
   })
 
   it('threads SSH connectionId through pull request auto-merge', async () => {

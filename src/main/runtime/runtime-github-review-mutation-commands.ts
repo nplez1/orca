@@ -135,7 +135,8 @@ export class RuntimeGitHubReviewMutationCommands {
     repoSelector: string,
     prNumber: number,
     method?: 'merge' | 'squash' | 'rebase',
-    prRepo?: GitHubOwnerRepo | null
+    prRepo?: GitHubOwnerRepo | null,
+    bypassBranchProtection = false
   ): Promise<Awaited<ReturnType<typeof mergePR>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
     return mergePR(
@@ -144,7 +145,8 @@ export class RuntimeGitHubReviewMutationCommands {
       method,
       repo.connectionId ?? null,
       prRepo ?? null,
-      ...this.deps.getLocalGitArgs(repo)
+      ...this.deps.getLocalGitArgs(repo),
+      { bypassBranchProtection }
     )
   }
 

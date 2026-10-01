@@ -16,12 +16,71 @@ describe('presentGitHubPRMergeState', () => {
   it('blocks direct merge when approval is required or changes are requested', () => {
     expect(presentGitHubPRMergeState(pr({ reviewDecision: 'REVIEW_REQUIRED' }))).toMatchObject({
       label: 'Approval required',
-      directMergeAvailable: false
+      directMergeAvailable: false,
+      adminBypassRequired: false
     })
     expect(presentGitHubPRMergeState(pr({ reviewDecision: 'CHANGES_REQUESTED' }))).toMatchObject({
       label: 'Changes requested',
-      directMergeAvailable: false
+      directMergeAvailable: false,
+      adminBypassRequired: false
     })
+  })
+
+  it('offers the merge, with a required confirmation, when the viewer may waive the review gate', () => {
+    const waivable: Partial<GitHubPRMergeStateInput> = {
+      viewerCanMergeAsAdmin: true,
+      // Why false, not merely not-true: an unknown queue is not permission to skip one.
+      mergeQueueRequired: false
+    }
+    expect(
+      presentGitHubPRMergeState(pr({ ...waivable, reviewDecision: 'REVIEW_REQUIRED' }))
+    ).toMatchObject({
+      // The label stays honest: GitHub does require a review, and still reports it.
+      label: 'Approval required',
+      directMergeAvailable: true,
+      adminBypassRequired: true
+    })
+    expect(
+      presentGitHubPRMergeState(pr({ ...waivable, reviewDecision: 'CHANGES_REQUESTED' }))
+        .adminBypassRequired
+    ).toBe(true)
+  })
+
+  it('does not reach for a bypass where one cannot help', () => {
+    const bypassable: Partial<GitHubPRMergeStateInput> = {
+      viewerCanMergeAsAdmin: true,
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeQueueRequired: false
+    }
+    // A draft or closed pull request has nothing to merge at all.
+    expect(
+      presentGitHubPRMergeState(pr({ ...bypassable, state: 'draft' })).adminBypassRequired
+    ).toBe(false)
+    // Conflicts are not a branch-protection rule.
+    expect(
+      presentGitHubPRMergeState(pr({ ...bypassable, mergeable: 'CONFLICTING' })).adminBypassRequired
+    ).toBe(false)
+    // Why: the one flag that carries a bypass to GitHub also skips the merge queue, so neither a
+    // base branch that requires the queue nor one whose queue status is unknown is bypass-merged.
+    for (const mergeQueueRequired of [true, null, undefined] as const) {
+      expect(
+        presentGitHubPRMergeState(pr({ ...bypassable, mergeQueueRequired })).adminBypassRequired
+      ).toBe(false)
+    }
+    // Why: BLOCKED can mean required checks are failing, which the bypass confirmation never covers.
+    expect(
+      presentGitHubPRMergeState(pr({ ...bypassable, mergeStateStatus: 'BLOCKED' }))
+        .adminBypassRequired
+    ).toBe(false)
+    // Nothing to waive once the review gate is satisfied.
+    expect(
+      presentGitHubPRMergeState(pr({ viewerCanMergeAsAdmin: true, reviewDecision: 'APPROVED' }))
+        .adminBypassRequired
+    ).toBe(false)
+    // Unknown privilege is not permission: an unanswered probe keeps the gate closed.
+    expect(
+      presentGitHubPRMergeState(pr({ reviewDecision: 'REVIEW_REQUIRED' })).adminBypassRequired
+    ).toBe(false)
   })
 
   it('uses the merge-queue label for auto-merge when a queue is required', () => {

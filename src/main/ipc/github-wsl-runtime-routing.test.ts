@@ -552,7 +552,8 @@ describe('registerGitHubHandlers', () => {
       'squash',
       null,
       prRepo,
-      localGitOptions
+      localGitOptions,
+      { bypassBranchProtection: false }
     )
     expect(setPRAutoMergeMock).toHaveBeenCalledWith(
       '/workspace/repo',

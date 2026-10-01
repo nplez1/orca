@@ -140,6 +140,7 @@ export type GithubPullRequestApi = {
     args: GitHubRepoSelectorArgs & {
       prNumber: number
       method?: 'merge' | 'squash' | 'rebase'
+      bypassBranchProtection?: boolean
       prRepo?: GitHubOwnerRepo | null
     }
   ) => Promise<{ ok: true } | { ok: false; error: string }>

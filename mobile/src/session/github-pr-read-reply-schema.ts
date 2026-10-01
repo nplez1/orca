@@ -80,6 +80,7 @@ export const hostedReviewForBranchSchema = z
     updatedAt: prText('updatedAt'),
     mergeable: salvagedOptional('mergeable', z.enum(MERGEABLE_STATE)),
     reviewDecision: salvagedOptional('reviewDecision', z.enum(REVIEW_DECISION).nullable()),
+    viewerCanMergeAsAdmin: prFlag('viewerCanMergeAsAdmin'),
     autoMergeEnabled: prFlag('autoMergeEnabled'),
     autoMergeAllowed: prNullableFlag('autoMergeAllowed'),
     mergeStateStatus: prNullableText('mergeStateStatus'),
@@ -98,6 +99,11 @@ export const hostedReviewForBranchSchema = z
           updatedAt: review.updatedAt ?? '',
           mergeable: review.mergeable ?? 'UNKNOWN',
           reviewDecision: review.reviewDecision,
+          // Why: optional members are spread in, never assigned, so a wire that omits this one keeps
+          // it absent instead of publishing an explicit `undefined` the recorded state never had.
+          ...(review.viewerCanMergeAsAdmin === undefined
+            ? {}
+            : { viewerCanMergeAsAdmin: review.viewerCanMergeAsAdmin }),
           autoMergeEnabled: review.autoMergeEnabled,
           autoMergeAllowed: review.autoMergeAllowed,
           mergeStateStatus: review.mergeStateStatus,
@@ -124,6 +130,7 @@ const pullRequestSchema = z
     updatedAt: prText('updatedAt'),
     mergeable: salvagedOptional('mergeable', z.enum(MERGEABLE_STATE)),
     reviewDecision: salvagedOptional('reviewDecision', z.enum(REVIEW_DECISION).nullable()),
+    viewerCanMergeAsAdmin: prFlag('viewerCanMergeAsAdmin'),
     autoMergeEnabled: prFlag('autoMergeEnabled'),
     autoMergeAllowed: prNullableFlag('autoMergeAllowed'),
     mergeQueueRequired: prNullableFlag('mergeQueueRequired'),
@@ -144,6 +151,9 @@ const pullRequestSchema = z
           updatedAt: pr.updatedAt ?? '',
           mergeable: pr.mergeable ?? 'UNKNOWN',
           reviewDecision: pr.reviewDecision,
+          ...(pr.viewerCanMergeAsAdmin === undefined
+            ? {}
+            : { viewerCanMergeAsAdmin: pr.viewerCanMergeAsAdmin }),
           autoMergeEnabled: pr.autoMergeEnabled,
           autoMergeAllowed: pr.autoMergeAllowed,
           mergeQueueRequired: pr.mergeQueueRequired,
@@ -221,6 +231,7 @@ const workItemSchema = z
     baseRefName: prText('baseRefName'),
     headSha: prText('headSha'),
     reviewDecision: salvagedOptional('reviewDecision', z.enum(REVIEW_DECISION).nullable()),
+    viewerCanMergeAsAdmin: prFlag('viewerCanMergeAsAdmin'),
     reviewRequests: prUserList('reviewRequests'),
     latestReviews: prReviewList('latestReviews'),
     assignees: prUserList('assignees'),
@@ -249,6 +260,9 @@ const workItemSchema = z
           baseRefName: item.baseRefName,
           headSha: item.headSha,
           reviewDecision: item.reviewDecision,
+          ...(item.viewerCanMergeAsAdmin === undefined
+            ? {}
+            : { viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin }),
           reviewRequests: item.reviewRequests ?? [],
           latestReviews: item.latestReviews,
           assignees: item.assignees ?? [],

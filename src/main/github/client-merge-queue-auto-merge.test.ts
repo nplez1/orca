@@ -343,8 +343,11 @@ describe('GitHub GraphQL rate-limit guard', () => {
       error: 'This pull request requires review approval before it can be merged.'
     })
 
-    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(3)
+    // Why 4: the REST stack probe, the PR lookup, repository merge metadata, and the
+    // viewer-scoped bypass probe an unmet review gate triggers.
+    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(4)
     expect(ghExecFileAsyncMock.mock.calls[2]?.[0]).toContain('graphql')
+    expect(ghExecFileAsyncMock.mock.calls[3]?.[0]).toContain('graphql')
   })
 
   it('detects merge queues once per base branch and blocks direct merges', async () => {

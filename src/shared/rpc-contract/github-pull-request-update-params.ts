@@ -20,6 +20,13 @@ export const UpdatePr = RepoSelector.extend({
 export const MergePr = RepoSelector.extend({
   prNumber: z.number().int().positive(),
   method: z.enum(['merge', 'squash', 'rebase']).optional(),
+  /**
+   * Set only after the user confirms the bypass a review gate's admin privilege allows. Optional, so
+   * a client that predates the confirmation still merges exactly as it did. The host treats this as
+   * the caller's intent, not as proof a dialog was shown, and re-checks GitHub's own
+   * `viewerCanMergeAsAdmin` before it lets the flag reach `gh pr merge --admin`.
+   */
+  bypassBranchProtection: z.boolean().optional(),
   prRepo: SlugRepo.nullable().optional()
 })
 

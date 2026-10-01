@@ -41,6 +41,11 @@ export type HostedReviewInfo = {
   autoMergeAllowed?: boolean | null
   mergeQueueRequired?: boolean | null
   mergeStateStatus?: string | null
+  /**
+   * GitHub's answer to whether *this* viewer may waive branch protection on this review. Absent
+   * means GitHub was not asked or did not answer; readers must treat it as "unknown".
+   */
+  viewerCanMergeAsAdmin?: boolean
   headSha?: string
   /** GitHub repository that owns the PR; absent on older runtimes and other providers. */
   githubRepository?: GitHubRepositoryIdentity

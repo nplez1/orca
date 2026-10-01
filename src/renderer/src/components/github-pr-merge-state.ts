@@ -5,7 +5,15 @@ import type {
   PRState,
   ProviderCheckSummary
 } from '../../../shared/github/pull-request-types'
-import { canEnableGitHubPRAutoMerge } from '../../../shared/github/pull-request-auto-merge-availability'
+import {
+  autoMergeActionWhenDirectMergeAvailable,
+  resolveGitHubPRAutoMergeAction,
+  type GitHubPRAutoMergeAction
+} from '@/components/github-pr-auto-merge-action'
+import {
+  gitHubPRAdminBypassTooltip,
+  shouldOfferGitHubPRAdminBypass
+} from '@/components/github-pr-admin-bypass'
 import { translate } from '@/i18n/i18n'
 
 export type GitHubPRMergeStateInput = {
@@ -13,17 +21,13 @@ export type GitHubPRMergeStateInput = {
   mergeable?: PRMergeableState
   mergeStateStatus?: string | null
   reviewDecision?: PRReviewDecision | null
+  /** GitHub's viewer-scoped answer to whether this account may waive branch protection. */
+  viewerCanMergeAsAdmin?: boolean
   checksStatus?: CheckStatus
   checksSummary?: ProviderCheckSummary
   autoMergeEnabled?: boolean
   autoMergeAllowed?: boolean | null
   mergeQueueRequired?: boolean | null
-}
-
-export type GitHubPRAutoMergeAction = {
-  kind: 'enable' | 'disable'
-  label: string
-  tooltip: string
 }
 
 export type GitHubPRMergeStatePresentation = {
@@ -32,6 +36,13 @@ export type GitHubPRMergeStatePresentation = {
   tooltip: string
   directMergeAvailable: boolean
   autoMergeAction: GitHubPRAutoMergeAction | null
+  /**
+   * True when GitHub says this merge is reachable only by waiving branch protection, so the surface
+   * must confirm before merging and pass `bypassBranchProtection` when it does. Surfaces must not
+   * merge on this flag without showing the user what it skips; the host cannot verify that a caller
+   * asked first, so this is a UI contract rather than an enforced one.
+   */
+  adminBypassRequired: boolean
 }
 
 const MUTED_TONE = 'border-border/60 bg-background/70 text-muted-foreground'
@@ -55,26 +66,9 @@ function hasFullMergeMetadata(item: GitHubPRMergeStateInput): boolean {
   return item.mergeable !== undefined || item.mergeStateStatus !== undefined
 }
 
-// Why: GitHub rejects enabling auto-merge on a conflicting PR, so offering it
-// there only yields an error toast. Repos can also disable auto-merge entirely,
-// so suppress the action when GitHub explicitly reports that setting is off.
-function canEnableAutoMerge(item: GitHubPRMergeStateInput): boolean {
-  return canEnableGitHubPRAutoMerge(item)
-}
-
-// Why: when GitHub already allows a direct merge, offering "Enable auto-merge"
-// only yields a "clean status" rejection. Keep the Disable action so users can
-// still turn off an existing auto-merge request; merge-queue "Merge when ready"
-// paths set directMergeAvailable=false and never reach here.
-function autoMergeActionWhenDirectMergeAvailable(
-  autoMergeAction: GitHubPRAutoMergeAction | null
-): GitHubPRAutoMergeAction | null {
-  return autoMergeAction?.kind === 'disable' ? autoMergeAction : null
-}
-
 function passedChecksMergePresentation(
   autoMergeAction: GitHubPRAutoMergeAction | null
-): GitHubPRMergeStatePresentation {
+): GitHubPRMergeStateCore {
   return {
     label: translate('auto.components.github.pr.merge.state.a5b66afb58', 'Checks passed'),
     tone: SUCCESS_TONE,
@@ -87,49 +81,30 @@ function passedChecksMergePresentation(
   }
 }
 
+/** The verdict before the viewer's own bypass privilege is taken into account. */
+type GitHubPRMergeStateCore = Omit<GitHubPRMergeStatePresentation, 'adminBypassRequired'>
+
 export function presentGitHubPRMergeState(
   item: GitHubPRMergeStateInput
 ): GitHubPRMergeStatePresentation {
-  const autoMergeAction =
-    item.state !== 'open'
-      ? null
-      : item.autoMergeEnabled === true
-        ? {
-            kind: 'disable' as const,
-            label: translate(
-              'auto.components.github.pr.merge.state.48d75ae118',
-              'Disable auto-merge'
-            ),
-            tooltip: translate(
-              'auto.components.github.pr.merge.state.62703b1dc4',
-              'GitHub auto-merge is enabled for this pull request'
-            )
-          }
-        : item.mergeQueueRequired === true
-          ? {
-              kind: 'enable' as const,
-              label: translate(
-                'auto.components.github.pr.merge.state.b169f943e1',
-                'Merge when ready'
-              ),
-              tooltip: translate(
-                'auto.components.github.pr.merge.state.331ebe1170',
-                'Add this pull request to the GitHub merge queue'
-              )
-            }
-          : canEnableAutoMerge(item)
-            ? {
-                kind: 'enable' as const,
-                label: translate(
-                  'auto.components.github.pr.merge.state.4ab19a62ef',
-                  'Enable auto-merge'
-                ),
-                tooltip: translate(
-                  'auto.components.github.pr.merge.state.8f6cb3772f',
-                  'Merge this pull request automatically once requirements are met'
-                )
-              }
-            : null
+  const core = presentGitHubPRMergeStateCore(item)
+  if (!shouldOfferGitHubPRAdminBypass(item, core.directMergeAvailable)) {
+    return { ...core, adminBypassRequired: false }
+  }
+  // Why: the label stays "Approval required" — it is still true, and GitHub still reports
+  // `REVIEW_REQUIRED`. What changes is that the merge is reachable, because this viewer is allowed
+  // to waive the rule; leaving it unreachable was the bug. The tooltip says so, or an enabled merge
+  // button beside an unmet requirement would look like a bug of its own.
+  return {
+    ...core,
+    tooltip: gitHubPRAdminBypassTooltip(item),
+    directMergeAvailable: true,
+    adminBypassRequired: true
+  }
+}
+
+function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRMergeStateCore {
+  const autoMergeAction = resolveGitHubPRAutoMergeAction(item)
 
   if (item.state === 'merged') {
     return {

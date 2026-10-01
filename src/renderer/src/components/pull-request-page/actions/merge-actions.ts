@@ -15,6 +15,7 @@ import type { TaskSourceContext } from '../../../../../shared/task-source-contex
 import type { PullRequestPageProjectOrigin } from '../page-types'
 import { translate } from '@/i18n/i18n'
 import type { GitHubPRMergeStatePresentation } from '@/components/github-pr-merge-state'
+import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 
 export async function changePullRequestState(args: {
   canMutateState: boolean
@@ -114,6 +115,11 @@ export async function mergePullRequest(args: {
   sourceContext?: TaskSourceContext | null
   prRepo: GitHubOwnerRepo | null
   mergeTarget: RuntimeClientTarget
+  /**
+   * From the merge presentation: GitHub says this merge is reachable only by waiving branch
+   * protection, so the confirmation has to say so before the flag is sent.
+   */
+  adminBypassRequired: boolean
   confirm: (options: {
     title: string
     description: string
@@ -127,17 +133,26 @@ export async function mergePullRequest(args: {
     return
   }
   const label = GITHUB_PR_MERGE_METHOD_LABELS[args.method]
-  const confirmed = await args.confirm({
-    title: translate('auto.components.PullRequestPage.eec3706a6a', '{{value0}} PR #{{value1}}?', {
-      value0: label,
-      value1: args.item.number
-    }),
-    description: translate(
-      'auto.components.PullRequestPage.a63b3c159c',
-      'This will update the pull request on GitHub.'
-    ),
-    confirmLabel: label
-  })
+  const bypassBranchProtection = args.adminBypassRequired
+  const confirmed = await args.confirm(
+    bypassBranchProtection
+      ? buildGitHubPRAdminBypassConfirmation()
+      : {
+          title: translate(
+            'auto.components.PullRequestPage.eec3706a6a',
+            '{{value0}} PR #{{value1}}?',
+            {
+              value0: label,
+              value1: args.item.number
+            }
+          ),
+          description: translate(
+            'auto.components.PullRequestPage.a63b3c159c',
+            'This will update the pull request on GitHub.'
+          ),
+          confirmLabel: label
+        }
+  )
   if (!confirmed) {
     return
   }
@@ -152,6 +167,7 @@ export async function mergePullRequest(args: {
               repo: getGitHubRuntimeRepoId(args.sourceContext, args.repoId ?? args.item.repoId),
               prNumber: args.item.number,
               method: args.method,
+              ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
               prRepo: args.prRepo
             },
             { timeoutMs: 30_000 }
@@ -162,6 +178,7 @@ export async function mergePullRequest(args: {
             sourceContext: args.sourceContext,
             prNumber: args.item.number,
             method: args.method,
+            ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
             prRepo: args.prRepo
           })
     if (!result.ok) {

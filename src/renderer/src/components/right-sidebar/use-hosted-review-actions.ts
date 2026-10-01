@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
-import type { GitHubPRAutoMergeAction } from '@/components/github-pr-merge-state'
+import type { GitHubPRAutoMergeAction } from '@/components/github-pr-auto-merge-action'
 import type { HostedReviewInfo } from '../../../../shared/hosted-review'
 import type { GitHubPRMergeMethod, PRInfo } from '../../../../shared/github/pull-request-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -12,6 +12,7 @@ import {
 } from './hosted-review-github-actions'
 import { translate } from '@/i18n/i18n'
 import { buildGitHubPRStackMergeConfirmation } from './github-pr-stack-confirmation'
+import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import { useReadyHostedReviewAction } from './use-ready-hosted-review-action'
 
 export type HostedReviewActionInfo = Pick<
@@ -22,6 +23,7 @@ export type HostedReviewActionInfo = Pick<
     Pick<
       HostedReviewInfo,
       | 'reviewDecision'
+      | 'viewerCanMergeAsAdmin'
       | 'autoMergeEnabled'
       | 'autoMergeAllowed'
       | 'mergeQueueRequired'
@@ -38,6 +40,7 @@ export function useHostedReviewActions({
   reviewLabel,
   defaultMergeMethod,
   autoMergeAction,
+  adminBypassRequired,
   onRefreshReview
 }: {
   review: HostedReviewActionInfo
@@ -48,6 +51,8 @@ export function useHostedReviewActions({
   reviewLabel: string
   defaultMergeMethod: GitHubPRMergeMethod
   autoMergeAction: GitHubPRAutoMergeAction | null
+  /** Set by the merge presentation when GitHub says only an admin bypass reaches this merge. */
+  adminBypassRequired: boolean
   onRefreshReview: () => Promise<void>
 }): {
   merging: boolean
@@ -92,6 +97,15 @@ export function useHostedReviewActions({
           return
         }
       }
+      // Why: GitHub gates its own bypass behind an acknowledgement, and the one flag that carries a
+      // bypass also skips a merge queue — so the user sees what the merge waives, or it is not sent.
+      const bypassBranchProtection = !isGitLab && adminBypassRequired
+      if (bypassBranchProtection) {
+        const confirmed = await confirm(buildGitHubPRAdminBypassConfirmation())
+        if (!confirmed) {
+          return
+        }
+      }
       setMerging(true)
       setActionError(null)
       try {
@@ -106,7 +120,8 @@ export function useHostedReviewActions({
               repo,
               prNumber: review.number,
               method,
-              prRepo: githubPR?.prRepo ?? null
+              prRepo: githubPR?.prRepo ?? null,
+              bypassBranchProtection
             })
         if (!result.ok) {
           setActionError(result.error)
@@ -121,6 +136,7 @@ export function useHostedReviewActions({
     },
     [
       confirm,
+      adminBypassRequired,
       githubPR?.prRepo,
       githubPR?.mergeQueueRequired,
       githubPR?.stack,

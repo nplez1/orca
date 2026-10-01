@@ -12,6 +12,9 @@ export function hostedReviewInfoFromGitHubPRInfo(pr: PRInfo): HostedReviewInfo {
     updatedAt: pr.updatedAt,
     mergeable: pr.mergeable,
     ...(pr.reviewDecision !== undefined ? { reviewDecision: pr.reviewDecision } : {}),
+    ...(pr.viewerCanMergeAsAdmin !== undefined
+      ? { viewerCanMergeAsAdmin: pr.viewerCanMergeAsAdmin }
+      : {}),
     ...(pr.autoMergeEnabled !== undefined ? { autoMergeEnabled: pr.autoMergeEnabled } : {}),
     ...(pr.autoMergeAllowed !== undefined ? { autoMergeAllowed: pr.autoMergeAllowed } : {}),
     ...(pr.mergeQueueRequired !== undefined ? { mergeQueueRequired: pr.mergeQueueRequired } : {}),
