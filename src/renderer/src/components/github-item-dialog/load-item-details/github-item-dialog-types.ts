@@ -43,6 +43,6 @@ export type GitHubItemDialogEditSectionProps = {
   onUse: (item: GitHubWorkItem) => void
   onOpenOrUse?: (item: GitHubWorkItem) => void
   attachedWorkspaceLabel?: string | null
-  /** `horizontal`: compact pill strip for the non-issue drawer/header; `top-columns`: labeled columns above the issue page body. */
-  layout?: 'horizontal' | 'top-columns'
+  /** `horizontal`: compact pill strip for the non-issue drawer/header; `top-columns`: labeled columns above the issue page body; `pills`: bare pill row for the right-sidebar Issue pane, which has no workspace CTA; `rows`: compact vertical property rows for the narrow Issue pane. */
+  layout?: 'horizontal' | 'top-columns' | 'pills' | 'rows'
 }

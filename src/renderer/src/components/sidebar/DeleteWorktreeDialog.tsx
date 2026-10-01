@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store'
 import { useAllWorktrees } from '@/store/selectors'
-import { runWorktreeDeletesInParallel } from './delete-worktree-flow'
 import { getWorktreeDeleteErrorToShow } from './worktree-delete-error-display'
 import { useDeleteWorktreeDialogActions } from './use-delete-worktree-dialog-actions'
 import { useDeleteRemoteBranchChoice } from './use-delete-remote-branch-choice'
@@ -120,11 +119,15 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   const repoMap = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos])
   const isBatchDelete = worktreeIds.length > 1
   const isFolderWorkspaceDelete = !isBatchDelete && getIsFolderWorkspaceDelete(repoMap, worktree)
+  const folderWorkspaceDeleteCount = useMemo(
+    () => countFolderWorkspaceDeletes(repoMap, worktrees),
+    [repoMap, worktrees]
+  )
   const deleteCopy = getDeleteWorktreeDialogCopy({
     isBatchDelete,
     worktree,
     worktreeCount: worktrees.length,
-    folderWorkspaceDeleteCount: countFolderWorkspaceDeletes(repoMap, worktrees),
+    folderWorkspaceDeleteCount,
     isFolderWorkspaceDelete
   })
   const deleteStateByWorktreeId = useAppStore((s) => s.deleteStateByWorktreeId)

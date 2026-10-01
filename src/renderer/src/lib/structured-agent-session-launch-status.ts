@@ -1,7 +1,9 @@
+import { useSyncExternalStore } from 'react'
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import { structuredLaunchesHoldingIdentity } from './structured-agent-session-launch-holders'
 import {
   structuredLaunchIdentity,
+  subscribeStructuredAgentLaunchStatus,
   type StructuredAgentLaunchStatus
 } from './structured-agent-session-launch-registry'
 
@@ -20,4 +22,16 @@ export function getStructuredAgentLaunchStatus(
     return 'idle'
   }
   return states.some((state) => state.visibilityUnknown) ? 'unknown' : 'pending'
+}
+
+/** The pair's launch status, re-rendering the caller as the registry changes. */
+export function useStructuredAgentLaunchStatus(
+  worktreeId: string,
+  agent: AgentSessionHandleProvider
+): ReturnType<typeof getStructuredAgentLaunchStatus> {
+  return useSyncExternalStore(
+    subscribeStructuredAgentLaunchStatus,
+    () => getStructuredAgentLaunchStatus(worktreeId, agent),
+    () => 'idle'
+  )
 }

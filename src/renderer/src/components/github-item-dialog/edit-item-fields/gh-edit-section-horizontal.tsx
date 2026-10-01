@@ -12,9 +12,7 @@ import type { GitHubAssignableUser } from '../../../../../shared/github/pull-req
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import type { TaskPageGitHubCloseAction } from '@/components/task-page-github-status-actions'
 import { translate } from '@/i18n/i18n'
-import { GHEditSectionStatusPopover } from './gh-edit-section-status-popover'
-import { GHEditSectionAssigneesPill } from './gh-edit-section-assignees'
-import { GHEditSectionLabelsPill } from './gh-edit-section-labels'
+import { GHEditSectionPills } from './gh-edit-section-pills'
 
 export function GHEditSectionHorizontal({
   item,
@@ -89,42 +87,37 @@ export function GHEditSectionHorizontal({
 }): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
-      <GHEditSectionStatusPopover
+      <GHEditSectionPills
         item={item}
-        variant="pill"
         localState={localState}
-        isPending={isStatePending}
+        localLabels={localLabels}
+        localAssignees={localAssignees}
+        repoLabels={repoLabels}
+        repoAssignees={repoAssignees}
+        repositoryLabelsUrl={repositoryLabelsUrl}
+        isStatePending={isStatePending}
+        isAssigneesPending={isAssigneesPending}
+        isLabelsPending={isLabelsPending}
         statusPopoverOpen={statusPopoverOpen}
+        assigneePopoverOpen={assigneePopoverOpen}
+        labelPopoverOpen={labelPopoverOpen}
         duplicatePickerOpen={duplicatePickerOpen}
         duplicateSearch={duplicateSearch}
         duplicateError={duplicateError}
         duplicatePickerTitle={duplicatePickerTitle}
         filteredDuplicateCandidates={filteredDuplicateCandidates}
         directDuplicateTarget={directDuplicateTarget}
-        onOpenChange={onStatusOpenChange}
+        onStatusOpenChange={onStatusOpenChange}
+        onAssigneeOpenChange={onAssigneeOpenChange}
+        onLabelOpenChange={onLabelOpenChange}
         onStateChange={onStateChange}
         onDuplicateSearchChange={onDuplicateSearchChange}
         onDuplicateSearchSubmit={onDuplicateSearchSubmit}
         onCloseAsDuplicate={onCloseAsDuplicate}
         onBackFromDuplicate={onBackFromDuplicate}
         onOpenDuplicatePicker={onOpenDuplicatePicker}
-      />
-      <GHEditSectionLabelsPill
-        localLabels={localLabels}
-        repoLabels={repoLabels}
-        repositoryLabelsUrl={repositoryLabelsUrl}
-        isPending={isLabelsPending}
-        popoverOpen={labelPopoverOpen}
-        onPopoverOpenChange={onLabelOpenChange}
-        onToggle={onLabelToggle}
-      />
-      <GHEditSectionAssigneesPill
-        localAssignees={localAssignees}
-        repoAssignees={repoAssignees}
-        isPending={isAssigneesPending}
-        popoverOpen={assigneePopoverOpen}
-        onPopoverOpenChange={onAssigneeOpenChange}
-        onToggle={onAssigneeToggle}
+        onAssigneeToggle={onAssigneeToggle}
+        onLabelToggle={onLabelToggle}
       />
       <div className="ml-auto flex min-w-0 items-center gap-2">
         {attachedWorkspaceLabel ? (

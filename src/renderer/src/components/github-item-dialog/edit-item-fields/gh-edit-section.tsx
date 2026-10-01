@@ -25,6 +25,8 @@ import {
 } from './gh-edit-section-mutations'
 import { GHEditSectionTopColumns } from './gh-edit-section-top-columns'
 import { GHEditSectionHorizontal } from './gh-edit-section-horizontal'
+import { GHEditSectionPills } from './gh-edit-section-pills'
+import { GHEditSectionRows } from './gh-edit-section-rows'
 import { useGitHubDuplicateIssueCandidates } from '@/components/github/github-duplicate-issue-candidates'
 
 export function GHEditSection(props: GitHubItemDialogEditSectionProps): React.JSX.Element | null {
@@ -368,6 +370,18 @@ function GHEditSectionItem({
 
   if (layout === 'top-columns') {
     return <GHEditSectionTopColumns {...layoutProps} />
+  }
+
+  if (layout === 'pills') {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-3 py-2.5">
+        <GHEditSectionPills {...layoutProps} />
+      </div>
+    )
+  }
+
+  if (layout === 'rows') {
+    return <GHEditSectionRows {...layoutProps} />
   }
 
   return (
