@@ -172,9 +172,16 @@ export function sanitizeWorkspaceCleanupDismissals(
   return out
 }
 
-export function sanitizeHydratedActiveView(value: PersistedUIState['activeView']): TopLevelView {
+export function sanitizeHydratedActiveView(
+  value: PersistedUIState['activeView'],
+  dashboardEnabled = true
+): TopLevelView {
   // Why: older data (pre-activeView) or a view a different build doesn't have falls back to terminal rather than rendering nothing.
   if (!isTopLevelView(value)) {
+    return 'terminal'
+  }
+  // Why: a profile can turn the dashboard off after persisting it as the active view; don't restore into a view whose sidebar entry is hidden.
+  if (value === 'dashboard' && !dashboardEnabled) {
     return 'terminal'
   }
   return value

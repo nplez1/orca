@@ -45,7 +45,6 @@ import { getRegisteredWorktreeRootsRevision } from '../../registered-worktree-ro
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
 
-
 const WORKTREE_LIST_ALL_CONCURRENCY = 8
 
 // Why always marked: the desktop renderer ships with this main process, so it reads the marker.

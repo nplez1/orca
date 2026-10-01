@@ -101,9 +101,6 @@ export type UISlicePreferences = {
   setWorkspaceBoardColumnWidth: (width: number) => void
   syncTaskStatusFromWorkspaceBoard: boolean
   setSyncTaskStatusFromWorkspaceBoard: (enabled: boolean) => void
-  /** Transient: the in-window Agent Dashboard companion drawer is open. Not persisted. */
-  agentDashboardDrawerOpen: boolean
-  setAgentDashboardDrawerOpen: (open: boolean) => void
   statusBarItems: StatusBarItem[]
   toggleStatusBarItem: (item: StatusBarItem) => void
   statusBarVisible: boolean

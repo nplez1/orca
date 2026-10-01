@@ -291,8 +291,6 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
         return { statusBarItems: updated }
       }),
 
-    agentDashboardDrawerOpen: false,
-    setAgentDashboardDrawerOpen: (open) => set({ agentDashboardDrawerOpen: open }),
     statusBarVisible: true,
     setStatusBarVisible: (v) => {
       window.api.ui.set({ statusBarVisible: v }).catch(console.error)

@@ -214,8 +214,8 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   treat a missing entry as proof the host was removed, so a filtered list would have rendered a
   hidden host's live workspaces as orphans. Fork PRs of this shape should keep the flag on the row.
 - **Verified:** typecheck, changed-code gate (0 findings), max-lines ratchet, localization extraction
-  + catalog, rpc-params catalog; 34,326 tests across the touched suites (487 in the files this PR
-  adds or changes).
+  - catalog, rpc-params catalog; 34,326 tests across the touched suites (487 in the files this PR
+    adds or changes).
 - **Note:** the `$electron` skill `AGENTS.md` names for rendered-UI checks is not installed in this
   worktree, so the new section's layout has no live screenshot. PR body says so under Visual Proof.
 
@@ -234,11 +234,11 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
   comment on the PR, or their Discord (https://discord.gg/fzjDKHxv8Q), is the proportionate nudge.
 - **Do not open the other PRs yet.** A first-time contributor filing eight PRs into a queue that is
   not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move. The
-  PR-bound branches are *not* current — see § Base drift for the measured distance — so whoever opens
+  PR-bound branches are _not_ current — see § Base drift for the measured distance — so whoever opens
   one rebases it first, parent-first for the three-deep chain.
 - **The release line works end to end.** Apple Developer Program is approved; `v1.4.197-np.6` was the
   first build signed with a Developer ID, notarized and stapled (`spctl` reports
-  *accepted, source=Notarized Developer ID*). What remains unproven is **self-update**: one release
+  _accepted, source=Notarized Developer ID_). What remains unproven is **self-update**: one release
   cannot demonstrate it, so publish a second trivial one and watch a machine move on its own.
 - **Resolved since this file was written:** the identity question (shipped as **Orca NP** — its own
   bundle id, data directory, home directory and CLI; see LOCAL-PATCHES.md § local(identity)), version

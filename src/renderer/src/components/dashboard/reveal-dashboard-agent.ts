@@ -3,7 +3,7 @@ import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import type { DashboardRevealAgentArgs } from '../../../../shared/dashboard-snapshot'
 
 /**
- * Click-to-focus from either Agent Dashboard surface (pop-out relay or in-window drawer).
+ * Click-to-focus from the Agent Dashboard (workspace jump or terminal preview).
  *
  * Why the workspace dispatcher rather than a bare `setActiveWorktree`: only the shared
  * sequence switches the view back to terminal, resumes sleeping agent sessions, and seeds a

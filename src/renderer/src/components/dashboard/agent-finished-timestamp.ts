@@ -8,7 +8,7 @@ import type { DashboardAgentRow } from './useDashboardData'
 /**
  * The moment an agent last entered `done`, or null if it never finished (still
  * working / idle without a prior completion). Shared by the left worktree
- * sidebar and the pop-out dashboard so both time from the SAME event: a finished
+ * sidebar and the Agent Dashboard so both time from the SAME event: a finished
  * agent reads "N since it finished", an active one falls through to its start.
  */
 export function lastEnteredDoneAt(

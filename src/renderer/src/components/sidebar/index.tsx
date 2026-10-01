@@ -29,7 +29,6 @@ const RemoveFolderDialog = lazyWithRetry(() => import('./RemoveFolderDialog'))
 const WorktreeVisibilityDialog = lazyWithRetry(() => import('./WorktreeVisibilityDialog'))
 const OrcaYamlTrustDialog = lazyWithRetry(() => import('./OrcaYamlTrustDialog'))
 const ForgetSshWorkspaceDialog = lazyWithRetry(() => import('./ForgetSshWorkspaceDialog'))
-const AgentDashboardSidebarHost = lazyWithRetry(() => import('./AgentDashboardSidebarHost'))
 
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
@@ -56,9 +55,6 @@ function Sidebar({
   const startupWorktreeRefreshCompleted = useAppStore((s) => s.startupWorktreeRefreshCompleted)
   const settings = useAppStore((s) => s.settings)
   const sidebarBody = useAppStore((s) => s.sidebarBody ?? 'workspaces')
-  const showAgentDashboard = settings?.experimentalAgentDashboardPopout === true
-  const agentDashboardDrawerOpen = useAppStore((s) => s.agentDashboardDrawerOpen)
-  const setAgentDashboardDrawerOpen = useAppStore((s) => s.setAgentDashboardDrawerOpen)
   const agentReadFilter = useAppStore((s) => s.agentsReadFilter)
   const setAgentReadFilter = useAppStore((s) => s.setAgentsReadFilter)
   const agentGroupBy = useAppStore((s) => s.agentsGroupBy)
@@ -130,12 +126,6 @@ function Sidebar({
       closeWorkspaceBoard()
     }
   }, [closeWorkspaceBoard, sidebarOpen, workspaceBoardRenderedOpen])
-
-  useEffect(() => {
-    if (!showAgentDashboard && agentDashboardDrawerOpen) {
-      setAgentDashboardDrawerOpen(false)
-    }
-  }, [agentDashboardDrawerOpen, setAgentDashboardDrawerOpen, showAgentDashboard])
 
   const { containerRef, onResizeStart, isResizing } = useSidebarResize<HTMLDivElement>({
     isOpen: sidebarOpen,
@@ -264,17 +254,6 @@ function Sidebar({
           onOpenChange={handleWorkspaceBoardOpenChange}
           onMenuOpenChange={setWorkspaceBoardMenuOpen}
         />
-      ) : null}
-      {showAgentDashboard ? (
-        <React.Suspense fallback={null}>
-          <AgentDashboardSidebarHost
-            sidebarOpen={sidebarOpen}
-            workspaceBoardOpen={workspaceBoardOpen}
-            closeWorkspaceBoard={closeWorkspaceBoard}
-            leftSidebarStyle={leftSidebarStyle}
-            statusBarVisible={statusBarVisible}
-          />
-        </React.Suspense>
       ) : null}
     </TooltipProvider>
   )
