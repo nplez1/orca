@@ -25,7 +25,7 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
   await waitForSessionReady(orcaPage)
   const worktreeId = await waitForActiveWorktree(orcaPage)
   const panes = await orcaPage.evaluate(
-    ({ baseTime, paneCount, worktreeId }): BurstPane[] => {
+    async ({ baseTime, paneCount, worktreeId }): Promise<BurstPane[]> => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is unavailable')
@@ -37,15 +37,10 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
           activate: false,
           id: 'agent-dashboard-burst-tab'
         })
-      store.setState({
-        agentDashboardDrawerOpen: false,
-        settings: {
-          ...store.getState().settings,
-          experimentalAgentDashboardPopout: true,
-          experimentalAgentDashboardMode: 'drawer',
-          experimentalAgentDashboardShowIdle: true,
-          tabAutoGenerateTitle: false
-        }
+      await store.getState().updateSettings({
+        experimentalAgentDashboardPopout: true,
+        experimentalAgentDashboardShowIdle: true,
+        tabAutoGenerateTitle: false
       })
       const seeded: BurstPane[] = []
       for (let index = 0; index < paneCount; index += 1) {
@@ -104,7 +99,7 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
 
   const interactionStartedAt = performance.now()
   await dashboardButton.click()
-  await orcaPage.locator('[data-agent-dashboard-sheet]').waitFor({ state: 'visible' })
+  await orcaPage.locator('[data-agent-dashboard-page]').waitFor({ state: 'visible' })
   const interactionElapsedMs = performance.now() - interactionStartedAt
   const statusPublicationsAtVisible = await orcaPage.evaluate(() => {
     const probe = (

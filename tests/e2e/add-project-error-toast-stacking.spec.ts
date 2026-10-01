@@ -153,16 +153,15 @@ for (const theme of ['dark', 'light'] as const) {
 
       await page.evaluate(async () => {
         await window.__store?.getState().updateSettings({ experimentalAgentDashboardPopout: true })
+        window.__store?.getState().openAgentDashboardPage()
       })
-      await page.evaluate(() => window.__store?.getState().setAgentDashboardDrawerOpen(true))
-      await expect(page.locator('[data-agent-dashboard-sheet]')).toBeVisible()
-      await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0)
+      await expect(page.locator('[data-agent-dashboard-page]')).toBeVisible()
       await expect(toaster).toHaveCSS('z-index', '40')
       await page.screenshot({
         path: testInfo.outputPath(`nonmodal-drawer-${theme}.png`),
         animations: 'disabled'
       })
-      await page.evaluate(() => window.__store?.getState().setAgentDashboardDrawerOpen(false))
+      await page.evaluate(() => window.__store?.getState().closeAgentDashboardPage())
       // Scroll-lock is also used by selects and menus and must not by itself lift notifications.
       await page.evaluate(() => document.body.setAttribute('data-scroll-locked', '1'))
       await expect(toaster).toHaveCSS('z-index', '40')

@@ -40,13 +40,13 @@ A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`,
 
 Set these on `nplez1/orca` → Settings → Secrets and variables → Actions. Never in the repo.
 
-| Secret | What it is |
-|---|---|
-| `MAC_CERTS` | base64 of the exported `.p12` — `base64 -i cert.p12 \| pbcopy` |
-| `MAC_CERTS_PASSWORD` | the password you set when exporting the `.p12` |
-| `APPLE_ID` | the Apple Account email you enrolled with |
+| Secret                        | What it is                                                           |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `MAC_CERTS`                   | base64 of the exported `.p12` — `base64 -i cert.p12 \| pbcopy`       |
+| `MAC_CERTS_PASSWORD`          | the password you set when exporting the `.p12`                       |
+| `APPLE_ID`                    | the Apple Account email you enrolled with                            |
 | `APPLE_APP_SPECIFIC_PASSWORD` | from account.apple.com → Sign-In & Security → App-specific passwords |
-| `APPLE_TEAM_ID` | Membership details in the developer portal |
+| `APPLE_TEAM_ID`               | Membership details in the developer portal                           |
 
 The certificate must be **Developer ID Application**, created from a CSR generated in Keychain
 Access and exported **with its private key**. `config/scripts/verify-macos-release-env.mjs` fails the
@@ -69,13 +69,13 @@ is nothing else to change.
 
 1. **Back up Orca state first.** The fork build shares `~/Library/Application Support/Orca` and
    `~/.orca` with official Orca — same bundle id, same Keychain identity, same CLI shim — so a
-   fork-build bug can damage state you depend on. Installing it also *replaces* official Orca rather
+   fork-build bug can damage state you depend on. Installing it also _replaces_ official Orca rather
    than sitting beside it.
 2. **Copy the artifact by `scp` or USB, not a browser.** Only browser/Mail/AirDrop downloads get the
    quarantine bit; a direct copy needs no Gatekeeper override. Notarized builds avoid this anyway,
    but it costs nothing.
 3. Confirm the installed version, e.g. `defaults read /Applications/Orca.app/Contents/Info.plist
-   CFBundleShortVersionString`, and that `/usr/local/bin/orca` resolves.
+CFBundleShortVersionString`, and that `/usr/local/bin/orca` resolves.
 
 ## Step 4 — prove the update path
 

@@ -6,16 +6,14 @@ import type { Page } from '@stablyai/playwright-test'
 // CDP, so this run can never take the desktop's focus away from the user.
 test.use({ orcaAppExtraEnv: { ORCA_BACKGROUND_LAUNCH: '1' } })
 
-const SHEET = '[data-agent-dashboard-sheet]'
+const DASHBOARD_PAGE = '[data-agent-dashboard-page]'
 const ENTRY = 'button[data-contextual-tour-target="agents-sidebar"]'
-const SETTINGS_MENU_LABEL = 'Agent Dashboard settings'
 
 function dashboardEntry(page: Page) {
   return page.locator(ENTRY)
 }
 
-test('the sidebar entry tracks and toggles whichever dashboard surface is showing', async ({
-  electronApp,
+test('the sidebar entry is a first-class dashboard view with a back-stack entry', async ({
   orcaPage
 }) => {
   await waitForSessionReady(orcaPage)
@@ -27,60 +25,36 @@ test('the sidebar entry tracks and toggles whichever dashboard surface is showin
     }
     await store.getState().updateSettings({
       experimentalAgentDashboardPopout: true,
-      experimentalAgentDashboardMode: 'in-window',
       experimentalAgentDashboardShowIdle: true
     })
   })
 
   const entry = dashboardEntry(orcaPage)
   await expect(entry).toBeVisible()
-  await expect(entry).toHaveAttribute('aria-pressed', 'false')
+  await expect(entry).not.toHaveAttribute('aria-current', 'page')
   const unselectedBackground = await entry.evaluate(
     (element) => getComputedStyle(element).backgroundColor
   )
   expect(unselectedBackground).toBe('rgba(0, 0, 0, 0)')
 
-  // In-window: the entry is selected exactly while the drawer is showing.
   await entry.click()
-  await expect(orcaPage.locator(SHEET)).toBeVisible()
-  await expect(entry).toHaveAttribute('aria-pressed', 'true')
+  await expect(orcaPage.locator(DASHBOARD_PAGE)).toBeVisible()
+  await expect(entry).toHaveAttribute('aria-current', 'page')
   await expect(entry).toHaveAttribute('data-current', 'true')
   // The selected state has to be visible, not just announced to assistive tech.
   expect(await entry.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
     unselectedBackground
   )
+  // Switching to the dashboard records a back-stack entry, like Tasks/Automations.
+  expect(
+    await orcaPage.evaluate(() =>
+      window.__store?.getState().worktreeNavHistory.includes('dashboard')
+    )
+  ).toBe(true)
 
-  await entry.click()
-  await expect(orcaPage.locator(SHEET)).toBeHidden()
-  await expect(entry).toHaveAttribute('aria-pressed', 'false')
+  // The board's close control returns to the previous view and unselects the entry.
+  await orcaPage.getByRole('button', { name: 'Close dashboard' }).click()
+  await expect(orcaPage.locator(DASHBOARD_PAGE)).toBeHidden()
+  await expect(entry).not.toHaveAttribute('aria-current', 'page')
   await expect(entry).not.toHaveAttribute('data-current', 'true')
-
-  // Pop-out: switching from the board's own settings menu hands the board to
-  // the second window, and the entry follows it there.
-  await entry.click()
-  await expect(orcaPage.locator(SHEET)).toBeVisible()
-  const popoutWindowPromise = electronApp.waitForEvent('window')
-  await orcaPage.getByRole('button', { name: SETTINGS_MENU_LABEL }).click()
-  await orcaPage.getByRole('radio', { name: 'Pop-out' }).click()
-
-  const popout = await popoutWindowPromise
-  const popoutSettings = popout.getByRole('button', { name: SETTINGS_MENU_LABEL })
-  await expect(popoutSettings).toBeVisible()
-  await expect(entry).toHaveAttribute('aria-pressed', 'true')
-
-  // The pop-out is the only place the mode can be changed back, so it must
-  // offer the same menu — and choosing In-window must return the board to the
-  // main window rather than dropping it.
-  const popoutClosed = popout.waitForEvent('close')
-  await popoutSettings.click()
-  await popout.getByRole('radio', { name: 'In-window' }).click()
-  await popoutClosed
-
-  await expect(orcaPage.locator(SHEET)).toBeVisible()
-  await expect(entry).toHaveAttribute('aria-pressed', 'true')
-
-  // Still a toggle: the entry hides the in-window board it just restored.
-  await entry.click()
-  await expect(orcaPage.locator(SHEET)).toBeHidden()
-  await expect(entry).toHaveAttribute('aria-pressed', 'false')
 })

@@ -48,7 +48,7 @@ git merge-tree --write-tree --name-only origin/nplez1/main upstream/main | head 
 --repo nplez1/orca --limit 5` for the last published version.
 
 If the fork's own `main` is stale (it is the base for PR branches, and `git rebase origin/main` in
-LOCAL-PATCHES means *that* branch), it is fast-forwarded to upstream at push time in Step 4, not now.
+LOCAL-PATCHES means _that_ branch), it is fast-forwarded to upstream at push time in Step 4, not now.
 Nothing on the remote changes until verification passes.
 
 ## Step 1 — rebase
@@ -59,7 +59,7 @@ git merge --ff-only origin/nplez1/main   # the released tip; fast-forward if the
 GIT_EDITOR=true git rebase upstream/main
 ```
 
-Replay order is by commit date, so commits that arrived through a fork merge can land *after* the
+Replay order is by commit date, so commits that arrived through a fork merge can land _after_ the
 commits that refined them. That is expected; see the traps in Step 2.
 
 ## Step 2 — resolve conflicts
@@ -84,7 +84,7 @@ survive until you `git add`, so this works at any point in the rebase.
 - **Substantial — stop and report before resolving.** Signals:
   - upstream rewrote the same function or file we did (grok-events.ts: upstream reimplemented our
     `stop_cancelled` fix, 104 → 229 lines);
-  - an add/add collision on a file *we* also introduced (ai-vault-search-all-hosts.ts: base 0 lines,
+  - an add/add collision on a file _we_ also introduced (ai-vault-search-all-hosts.ts: base 0 lines,
     upstream 318, ours 193 — two independent multi-host engines);
   - the other side is not upstream at all but our own older variant, because the rebase linearised a
     hand-resolved fork merge (see below);
@@ -100,14 +100,14 @@ before resolving. Convergence decisions so far are recorded in LOCAL-PATCHES.md 
    commit.** `b1daf0ca58` had resolved six things by hand (the grok/copilot union in
    listener-state.ts, `workingMode: 'monitoring'`, the pi `pi.events` binding, the legacy-adapter
    test helpers, duplicated `StopCancelled` entries). A linear rebase replays only the parents, so
-   all of it vanished, and later commits then *looked* like they were removing features. Step 3's
+   all of it vanished, and later commits then _looked_ like they were removing features. Step 3's
    pre-sync-tip diff is what catches this; resolve any file it flags by taking the old tip's
    content. Only one merge existed in the sync range, which is why this is tractable — if the fork
    starts merging more often, consider `--rebase-merges` or keep the line linear.
 2. **A skipped commit may carry more than the one thing upstream superseded.** We skipped
    `ae84a327e7` because upstream had implemented its grok half; it also carried the child-waiting
    fact, the pane-visible assertions and the `StopCancelled` de-duplication. Restore what upstream
-   does *not* supersede before continuing.
+   does _not_ supersede before continuing.
 3. **Renames replay onto files upstream is still editing.** `codex-subagent-roster` →
    `agent-descendant-roster`: apply the rename mapping to upstream's version, longest identifiers
    first (`getOrCreateCodexSubagentRoster` before `CodexSubagentRoster`).
@@ -129,7 +129,7 @@ before resolving. Convergence decisions so far are recorded in LOCAL-PATCHES.md 
    `session-parse-cache-persistence.ts` 2 → 3 for the rows it invalidated, while this fork had
    already shipped 3 for the Copilot cwd move, so an upgrading fork install crossed no boundary and
    would have replayed rows the fix had just made wrong. Since schema 2 the `appVersion` equality
-   gate is gone, so the version number is the *only* compatibility signal — a collision is not
+   gate is gone, so the version number is the _only_ compatibility signal — a collision is not
    detectable any other way, and upstream's own test for its bump writes the previous version, so
    it cannot see the fork's copy. **When both sides bump a persisted-format version in one sync,
    the merged file takes the higher number**, even though the two reasons look compatible.
@@ -164,7 +164,7 @@ marker showed.
 
 Then get a second look from a different model before pushing — the Kimi K3 pass in the session that
 did this one caught the convergence cost. Ask it to review the conflict resolutions that changed
-*behaviour*, not the mechanical renames.
+_behaviour_, not the mechanical renames.
 
 ## Step 4 — push
 

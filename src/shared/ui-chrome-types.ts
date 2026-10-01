@@ -22,9 +22,6 @@ export type FloatingTerminalCwdRequest = {
   requireTrusted?: boolean
 }
 
-/** Presentation mode for the experimental Agent Dashboard. */
-export type AgentDashboardMode = 'in-window' | 'popout'
-
 /** What clicking an Agent Dashboard card does: jump to the agent's workspace in
  *  Orca, or open the live terminal preview dialog first. */
 export type AgentDashboardCardClickAction = 'workspace' | 'preview'
@@ -131,3 +128,4 @@ export type TopLevelView =
   | 'skills'
   | 'artifacts'
   | 'mobile'
+  | 'dashboard'

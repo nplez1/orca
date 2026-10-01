@@ -97,7 +97,13 @@ function renderBoard(
     ...(cardClickAction ? { cardClickAction } : {}),
     ...snapshotOptions
   }
-  render(<AgentKanbanBoard snapshot={snapshot} onRevealAgent={onRevealAgent ?? vi.fn()} />)
+  render(
+    <AgentKanbanBoard
+      snapshot={snapshot}
+      onAckAgent={ackAgent}
+      onRevealAgent={onRevealAgent ?? vi.fn()}
+    />
+  )
 }
 
 const ackAgent = vi.fn(async () => {})
@@ -106,12 +112,11 @@ describe('AgentKanbanBoard', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en')
     localStorage.clear()
+    // Why: the reduced-motion guard reads matchMedia; stub it so the board renders deterministically.
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     )
-    // The board relays seen-acks through the dashboard preload API.
-    ;(window as unknown as { api: unknown }).api = { dashboard: { ackAgent } }
   })
   afterEach(() => {
     cleanup()
@@ -260,12 +265,20 @@ describe('AgentKanbanBoard', () => {
     vi.useFakeTimers()
     vi.setSystemTime(100_000)
 
-    const { rerender } = render(<AgentKanbanBoard snapshot={{ generatedAt: 1, cards: [] }} />)
+    const { rerender } = render(
+      <AgentKanbanBoard
+        snapshot={{ generatedAt: 1, cards: [] }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
+      />
+    )
     expect(vi.getTimerCount()).toBe(0)
 
     rerender(
       <AgentKanbanBoard
         snapshot={{ generatedAt: 2, cards: [card({ startedAt: 0, finishedAt: null })] }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
       />
     )
     const initialNow = screen.getByTestId('card').dataset.now
@@ -332,6 +345,8 @@ describe('AgentKanbanBoard', () => {
     const { rerender } = render(
       <AgentKanbanBoard
         snapshot={{ generatedAt: 1, cards: [agent], showIdle: true, cardClickAction: 'preview' }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
       />
     )
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('false')
@@ -343,14 +358,24 @@ describe('AgentKanbanBoard', () => {
     // follow the card to its new bucket instead of closing.
     const moved = { ...agent, bucket: 'working' as const, dotState: 'working' as const }
     rerender(
-      <AgentKanbanBoard snapshot={{ generatedAt: 2, cards: [moved], cardClickAction: 'preview' }} />
+      <AgentKanbanBoard
+        snapshot={{ generatedAt: 2, cards: [moved], cardClickAction: 'preview' }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
+      />
     )
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('true')
     expect(screen.getByTestId('terminal-dialog').dataset.bucket).toBe('working')
 
     // Even a vanished card (pane closed) keeps the dialog up — the user
     // dismisses it explicitly, but stale live routing is cleared.
-    rerender(<AgentKanbanBoard snapshot={{ generatedAt: 3, cards: [] }} />)
+    rerender(
+      <AgentKanbanBoard
+        snapshot={{ generatedAt: 3, cards: [] }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
+      />
+    )
     expect(screen.getByTestId('terminal-dialog').dataset.open).toBe('true')
     expect(screen.getByTestId('terminal-dialog').dataset.ptyId).toBeUndefined()
   })
@@ -358,7 +383,11 @@ describe('AgentKanbanBoard', () => {
   it('relays a seen-ack when a dialog opens and when the open agent changes state', () => {
     const agent = card({ paneKey: 'pk-ack', bucket: 'done', unseen: true })
     const { rerender } = render(
-      <AgentKanbanBoard snapshot={{ generatedAt: 1, cards: [agent], cardClickAction: 'preview' }} />
+      <AgentKanbanBoard
+        snapshot={{ generatedAt: 1, cards: [agent], cardClickAction: 'preview' }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
+      />
     )
     // unseen comes straight from the snapshot (the shared ack map).
     expect(screen.getByTestId('card').dataset.unseen).toBe('true')
@@ -376,6 +405,8 @@ describe('AgentKanbanBoard', () => {
           showIdle: true,
           cardClickAction: 'preview'
         }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
       />
     )
     expect(screen.getByTestId('card').dataset.unseen).toBe('false')
@@ -392,6 +423,8 @@ describe('AgentKanbanBoard', () => {
           showIdle: true,
           cardClickAction: 'preview'
         }}
+        onAckAgent={ackAgent}
+        onRevealAgent={vi.fn()}
       />
     )
     expect(ackAgent).toHaveBeenCalledWith('pk-ack')

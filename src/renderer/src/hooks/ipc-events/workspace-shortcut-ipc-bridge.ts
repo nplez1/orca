@@ -58,31 +58,10 @@ export function registerWorkspaceShortcutIpcBridge(unsubs: (() => void)[]): void
     )
   }
 
-  if (window.api.ui.onOpenAgentDashboardDrawer) {
-    unsubs.push(
-      window.api.ui.onOpenAgentDashboardDrawer(() => {
-        const store = useAppStore.getState()
-        // Why: main sends this only when the mode setting moved the board back
-        // in-window — it never presents a board from behind the settings view
-        // or with the experiment off, matching the toggle shortcut.
-        if (
-          store.settings?.experimentalAgentDashboardPopout !== true ||
-          store.activeView === 'settings'
-        ) {
-          return
-        }
-        store.setSidebarOpen(true)
-        store.setAgentDashboardDrawerOpen(true)
-      })
-    )
-  }
-
   if (window.api.ui.onToggleAgentDashboard) {
     unsubs.push(
       window.api.ui.onToggleAgentDashboard(() => {
-        toggleAgentDashboardFromShortcut(useAppStore.getState(), () => {
-          void window.api.dashboard.openPopout()
-        })
+        toggleAgentDashboardFromShortcut(useAppStore.getState())
       })
     )
   }

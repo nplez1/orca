@@ -22,7 +22,7 @@ State is detected from the terminal's OSC title sequence and agent hooks, which 
 
 ## Agent dashboard
 
-Turn on **Settings → Experimental → Agent Dashboard**. Orca adds an **Agent Dashboard** entry in the left sidebar: a kanban of agents across worktrees.
+Turn on **Settings → Experimental → Agent Dashboard**. Orca adds an **Agent Dashboard** entry in the left sidebar that opens a kanban of agents across worktrees as a full view in the main area, like Tasks and Automations — it is part of back/forward navigation.
 
 You can assign a keyboard shortcut to **Toggle Agent Dashboard** under [Settings → Shortcuts](/docs/settings#shortcuts). It has no default binding, and works while a terminal, editor, or browser tab has focus.
 
@@ -31,17 +31,13 @@ You can assign a keyboard shortcut to **Toggle Agent Dashboard** under [Settings
 - **Needs You** — waiting on a permission or question
 - **Working** — actively running
 - **Done** — finished sessions you may still want to review
-- **Idle** — quiet agents that have not reported completion for about 30 minutes. **Hidden by default** on the board; enable **Show idle agents** from the dashboard **board settings** control (gear) on the in-window or pop-out surface — not from global Experimental settings. In-window and pop-out stay in sync.
+- **Idle** — quiet agents that have not reported completion for about 30 minutes. **Hidden by default** on the board; enable **Show idle agents** from the dashboard **board settings** control (gear) — not from global Experimental settings.
 
 Dashboard cards show a host badge for SSH workspaces and paired [Remote Orca Servers](/docs/remote-servers). Hover or focus the badge to see the saved host name, such as **SSH host · devbox** or **Remote Orca host · build-host**. Local workspaces do not show a host badge.
 
-### Open as
-
-**In-window** board beside the sidebar, or **Pop-out** in a separate window.
-
 ### Clicking a card
 
-By default a click jumps straight to that agent's workspace and focuses its pane. Set **Clicking a card** to **Preview** (dashboard **board settings** gear, or **Settings → Experimental → Agent Dashboard**) to open the live terminal preview first — it has its own **Open worktree** button for the same jump. Both surfaces share the setting.
+By default a click jumps straight to that agent's workspace and focuses its pane. Set **Clicking a card** to **Preview** (dashboard **board settings** gear, or **Settings → Experimental → Agent Dashboard**) to open the live terminal preview first — it has its own **Open worktree** button for the same jump. The board settings and the Experimental pane share the setting.
 
 ### Search and filters
 

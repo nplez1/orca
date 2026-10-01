@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { tmpdir } from 'node:os'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -105,8 +105,6 @@ import Sidebar from './index'
 function setSidebarState(settings: GlobalSettings, statusBarVisible = true): void {
   mocks.state = {
     activeModal: null,
-    agentDashboardDrawerOpen: false,
-    setAgentDashboardDrawerOpen: vi.fn(),
     fetchAllWorktrees: vi.fn(),
     repos: [],
     // The toolchain banner indexes this map. The real store always has one.
@@ -227,22 +225,5 @@ describe('Sidebar', () => {
     }
 
     expect(fetchAllWorktrees).not.toHaveBeenCalled()
-  })
-
-  it('closes the dashboard drawer when the dashboard experiment is disabled', async () => {
-    setSidebarState({
-      ...getDefaultSettings(tmpdir()),
-      experimentalAgentDashboardPopout: false
-    })
-    const setAgentDashboardDrawerOpen = vi.fn()
-    mocks.state = {
-      ...mocks.state,
-      agentDashboardDrawerOpen: true,
-      setAgentDashboardDrawerOpen
-    }
-
-    render(sidebarElement())
-
-    await waitFor(() => expect(setAgentDashboardDrawerOpen).toHaveBeenCalledWith(false))
   })
 })

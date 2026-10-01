@@ -30,7 +30,7 @@ export function replayPreviewConnectionSnapshot(args: {
   if (snapshot.data) {
     args.write(snapshot.data, false)
   }
-  // Why as bytes: the popout xterm must parse the same restore its mirror scans.
+  // Why as bytes: the preview xterm must parse the same restore its mirror scans.
   args.write(buildKittyKeyboardRestore(provenFlags), false)
   if (snapshot.pendingEscapeTailAnsi) {
     args.write(snapshot.pendingEscapeTailAnsi, false)

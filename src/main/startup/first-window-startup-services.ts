@@ -74,11 +74,10 @@ function startService(
     .finally(() => {
       resolveEarlyReady()
     })
-  const settledReady = Promise.race([ready, failOpen])
-    .finally(() => {
-      settled = true
-      resolveEarlyReady()
-    })
+  const settledReady = Promise.race([ready, failOpen]).finally(() => {
+    settled = true
+    resolveEarlyReady()
+  })
 
   return {
     ready: settledReady,
@@ -97,11 +96,7 @@ function startService(
   function isAgentHookServerStartup(
     startup: StartupServiceStart
   ): startup is AgentHookServerStartup {
-    return (
-      typeof startup === 'object' &&
-      startup !== null &&
-      'statusCacheHydrationReady' in startup
-    )
+    return typeof startup === 'object' && startup !== null && 'statusCacheHydrationReady' in startup
   }
 }
 

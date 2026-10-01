@@ -44,29 +44,29 @@ the **first painted provisional page**, and `recon` is the restart to a fresh re
 means the payload was hardlinked (already on disk, no new bytes); `encode` means a resident catalog
 had to be compacted and re-encoded.
 
-| Fixture                  | Storage | Cold build | First scope | Write | Payload | Form  | Load p50/p95 | Prov. page p50/p95 | Recon |
-| ------------------------ | ------- | ---------: | ----------: | ----: | ------: | ----- | -----------: | ------------------ | ----: |
-| realistic 100k           | resident |    2,735 ms |    1,752 ms |  935 ms |  7.2 MB | encode | 16.9/17.4 ms | **142/147 ms** | 2,771 ms |
-| realistic 500k           | spilled  |   22,492 ms |    8,483 ms |   10 ms | 35.8 MB | link   | 17.1/18.9 ms | 571/591 ms | 23,063 ms |
-| realistic 1M             | spilled  |   45,338 ms |   16,582 ms |   12 ms | 71.7 MB | link   | 17.8/35.4 ms | 1,158/1,198 ms | 46,353 ms |
-| adversarial 100k         | resident |    4,706 ms |    3,211 ms | 2,125 ms | 56.6 MB | encode | 16.7/17.3 ms | 407/414 ms | 5,061 ms |
-| adversarial 500k         | spilled  |   32,439 ms |   13,244 ms |   13 ms | 283.0 MB | link   | 16.8/17.4 ms | 1,896/1,910 ms | 33,674 ms |
-| adversarial 1M           | spilled  |   65,246 ms |   26,122 ms |   15 ms | 566.0 MB | link   | 17.3/31.9 ms | 3,790/3,812 ms | 68,200 ms |
+| Fixture          | Storage  | Cold build | First scope |    Write |  Payload | Form   | Load p50/p95 | Prov. page p50/p95 |     Recon |
+| ---------------- | -------- | ---------: | ----------: | -------: | -------: | ------ | -----------: | ------------------ | --------: |
+| realistic 100k   | resident |   2,735 ms |    1,752 ms |   935 ms |   7.2 MB | encode | 16.9/17.4 ms | **142/147 ms**     |  2,771 ms |
+| realistic 500k   | spilled  |  22,492 ms |    8,483 ms |    10 ms |  35.8 MB | link   | 17.1/18.9 ms | 571/591 ms         | 23,063 ms |
+| realistic 1M     | spilled  |  45,338 ms |   16,582 ms |    12 ms |  71.7 MB | link   | 17.8/35.4 ms | 1,158/1,198 ms     | 46,353 ms |
+| adversarial 100k | resident |   4,706 ms |    3,211 ms | 2,125 ms |  56.6 MB | encode | 16.7/17.3 ms | 407/414 ms         |  5,061 ms |
+| adversarial 500k | spilled  |  32,439 ms |   13,244 ms |    13 ms | 283.0 MB | link   | 16.8/17.4 ms | 1,896/1,910 ms     | 33,674 ms |
+| adversarial 1M   | spilled  |  65,246 ms |   26,122 ms |    15 ms | 566.0 MB | link   | 17.3/31.9 ms | 3,790/3,812 ms     | 68,200 ms |
 
 Supporting numbers: directory validation is 0.30–0.94 ms p50 (it reads the whole 24-byte-entry
-directory), and the load *inside* the worker is 1.8–3.3 ms p50 — the rest of the 17 ms load is worker
+directory), and the load _inside_ the worker is 1.8–3.3 ms p50 — the rest of the 17 ms load is worker
 spawn, which a restart pays anyway.
 
 ### What the baseline numbers said
 
 - **Load is not the problem.** Restoring a validated catalog object is ~17 ms wall everywhere,
-  ~10× inside the proposed 200 ms target. The 1M-path target for *loading* is met with wide margin.
+  ~10× inside the proposed 200 ms target. The 1M-path target for _loading_ is met with wide margin.
 - **Answering is the problem.** The proposed target is for "a clearly provisional page", and a
   restored snapshot is always `disk-spilled`, so the page costs a full spilled scan of the payload:
   142 ms at 100k realistic, 571 ms at 500k, 1.16 s at 1M realistic, and 3.8 s at 1M adversarial. The
   200 ms target holds only at ~100k realistic paths and is missed by 2×–19× above that.
 - **Write cost depends entirely on shape.** A spilled generation checkpoints by hardlink: 10–15 ms
-  and *zero* incremental bytes, because the `.wpc` already exists and the per-PID spill directory
+  and _zero_ incremental bytes, because the `.wpc` already exists and the per-PID spill directory
   would have been cleaned up anyway. A resident generation needs a compaction plus re-encode, which
   measured 935 ms (realistic 100k, 34% of the build) and 2,125 ms (adversarial 100k, 45% of the build).
 - **Disk per checkpoint** equals the payload: 7.2–56.6 MB for the resident 100k roots, 35.8 MB to
@@ -76,7 +76,7 @@ spawn, which a restart pays anyway.
   provisional answers did not measurably slow it.
 - **Restart semantics.** What the user gains is a labeled last-known page at 142 ms–3.8 s instead of
   either 1.8–26 s of silence (first scope) or 2.7–65 s of silence (all scopes). The gain is real and
-  sized 6–14×, but the page is a *slow, degraded* page, not the ≤200 ms one the plan proposed.
+  sized 6–14×, but the page is a _slow, degraded_ page, not the ≤200 ms one the plan proposed.
 
 ## Verdict: IMPLEMENT WITH LIMITS
 
@@ -128,18 +128,18 @@ payload. `prov. p50/p95` below is input-to-provisional-page for the shipped poli
 100k cells have no checkpoint at all under that policy, so they are shown from the opt-in run and
 marked.
 
-| Fixture          | Storage  | Prov. page p50/p95 before | Prov. page p50/p95 after | Blocks read | Reply state                     |
-| ---------------- | -------- | ------------------------: | -----------------------: | ----------: | ------------------------------- |
-| realistic 100k   | resident |          142 / 147 ms [1] |      19.4 / 20.1 ms [1]  |          20 | partial, no total, provisional  |
-| realistic 500k   | spilled  |                571 / 591 ms |          19.0 / 20.0 ms |          20 | partial, no total, provisional  |
-| realistic 1M     | spilled  |            1,158 / 1,198 ms |          19.7 / 28.3 ms |          20 | partial, no total, provisional  |
-| adversarial 100k | resident |          407 / 414 ms [1] |      44.3 / 44.8 ms [1]  |          20 | partial, no total, provisional  |
-| adversarial 500k | spilled  |            1,896 / 1,910 ms |          43.2 / 48.6 ms |          20 | partial, no total, provisional  |
-| adversarial 1M   | spilled  |            3,790 / 3,812 ms |          45.0 / 48.9 ms |          20 | partial, no total, provisional  |
+| Fixture          | Storage  | Prov. page p50/p95 before | Prov. page p50/p95 after | Blocks read | Reply state                    |
+| ---------------- | -------- | ------------------------: | -----------------------: | ----------: | ------------------------------ |
+| realistic 100k   | resident |          142 / 147 ms [1] |       19.4 / 20.1 ms [1] |          20 | partial, no total, provisional |
+| realistic 500k   | spilled  |              571 / 591 ms |           19.0 / 20.0 ms |          20 | partial, no total, provisional |
+| realistic 1M     | spilled  |          1,158 / 1,198 ms |           19.7 / 28.3 ms |          20 | partial, no total, provisional |
+| adversarial 100k | resident |          407 / 414 ms [1] |       44.3 / 44.8 ms [1] |          20 | partial, no total, provisional |
+| adversarial 500k | spilled  |          1,896 / 1,910 ms |           43.2 / 48.6 ms |          20 | partial, no total, provisional |
+| adversarial 1M   | spilled  |          3,790 / 3,812 ms |           45.0 / 48.9 ms |          20 | partial, no total, provisional |
 
 [1] Resident roots are not checkpointed by default, so there is no page to measure; these rows come
 from the opt-in campaign (`ORCA_PATH_INDEX_CHECKPOINT_RESIDENT=1`) and exist only to show what the
-bounded page costs *when* a resident root is checkpointed on purpose.
+bounded page costs _when_ a resident root is checkpointed on purpose.
 
 The same campaign re-run under the opt-in reproduced every spilled cell within noise, which is the
 repeat-run evidence for these numbers: realistic 500k 19.6 / 26.2 ms, realistic 1M 21.4 / 27.7 ms,
@@ -156,10 +156,10 @@ which is the number the baseline table recorded (it excluded the compaction).
 
 | Fixture          | Storage  | Write before | Write after (shipped default)   | Write after (opt-in round trip / writer-only) | Payload (MiB) | Checkpoint bytes (MiB) | Live spill bytes (MiB) |
 | ---------------- | -------- | -----------: | ------------------------------- | --------------------------------------------: | ------------: | ---------------------: | ---------------------: |
-| realistic 100k   | resident |       935 ms | **refused, 0.13 ms, 0 B**       |                            1,804 / 940 ms |           7.2 |                    7.2 |                    0.0 |
+| realistic 100k   | resident |       935 ms | **refused, 0.13 ms, 0 B**       |                                1,804 / 940 ms |           7.2 |                    7.2 |                    0.0 |
 | realistic 500k   | spilled  |        10 ms | 10.9 ms (hardlink, 0 new bytes) |                                12.1 / 11.8 ms |          35.8 |                   34.1 |                   71.7 |
 | realistic 1M     | spilled  |        12 ms | 11.9 ms (hardlink, 0 new bytes) |                                12.7 / 12.2 ms |          71.7 |                   71.7 |                  143.4 |
-| adversarial 100k | resident |     2,125 ms | **refused, 0.02 ms, 0 B**       |                            4,796 / 2,173 ms |          56.6 |                   56.6 |                    0.0 |
+| adversarial 100k | resident |     2,125 ms | **refused, 0.02 ms, 0 B**       |                              4,796 / 2,173 ms |          56.6 |                   56.6 |                    0.0 |
 | adversarial 500k | spilled  |        13 ms | 16.4 ms (hardlink, 0 new bytes) |                                12.1 / 11.7 ms |         283.0 |                  283.0 |                  566.0 |
 | adversarial 1M   | spilled  |        15 ms | 13.9 ms (hardlink, 0 new bytes) |                                12.8 / 12.2 ms |         566.0 |                  566.0 |                1,132.0 |
 
@@ -172,7 +172,7 @@ this process's live spill bytes):
 - Six such checkpoints (3.4 GB) still fit the 4 GiB host cap; the seventh evicts the oldest whole
   checkpoint first. Live spills are never reclaimed by the checkpoint path, so a root refused at the
   cap simply keeps the live-scan/rebuild route with no provisional page and no correctness loss.
-- `Checkpoint bytes` and `Live spill bytes` above are *apparent* bytes: a hardlinked checkpoint is the
+- `Checkpoint bytes` and `Live spill bytes` above are _apparent_ bytes: a hardlinked checkpoint is the
   spill file's inode, so the real bytes are the smaller of the two columns, not their sum. Admission
   counts a hardlink at zero marginal bytes for exactly that reason.
 - The default policy now spends **0 bytes and ~0.1 ms** on a resident root instead of 935–2,125 ms of

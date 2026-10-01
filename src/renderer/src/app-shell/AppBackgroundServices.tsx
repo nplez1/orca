@@ -1,5 +1,3 @@
-import { Suspense } from 'react'
-import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { AgentHibernationGate } from '../components/AgentHibernationGate'
 import { AiVaultTabTitleSyncGate } from '../components/AiVaultTabTitleSyncGate'
 import RetainedAgentsSyncGate from '../components/dashboard/RetainedAgentsSyncGate'
@@ -9,17 +7,12 @@ import { useAppStore } from '../store'
 import { StructuredAgentSessionAttentionBridge } from '../components/native-chat/StructuredAgentSessionAttentionBridge'
 import { StructuredAgentSessionStatusBridge } from '../components/native-chat/StructuredAgentSessionStatusBridge'
 
-const DashboardPopoutBridge = lazy(() => import('../components/dashboard/DashboardPopoutBridge'))
-
 /**
  * App-level gates that render nothing. Each lives here rather than inside the surface that
  * needs it so its high-churn store subscriptions stay out of the App render tree.
  */
 export function AppBackgroundServices(): React.JSX.Element {
   const workspaceSessionReady = useAppStore((s) => s.workspaceSessionReady)
-  const dashboardPopoutEnabled = useAppStore(
-    (s) => s.settings?.experimentalAgentDashboardPopout === true
-  )
 
   return (
     <>
@@ -29,11 +22,6 @@ export function AppBackgroundServices(): React.JSX.Element {
       {/* Why: leaf-mounted retention sync keeps agent-status subscriptions out of the App render tree. */}
       <RetainedAgentsSyncGate />
       <AiVaultTabTitleSyncGate />
-      {dashboardPopoutEnabled ? (
-        <Suspense fallback={null}>
-          <DashboardPopoutBridge />
-        </Suspense>
-      ) : null}
       <AgentHibernationGate />
       <StructuredAgentSessionStatusBridge />
       {/* Why here and not in the chat pane: a backgrounded chat has no mounted pane, and that is
