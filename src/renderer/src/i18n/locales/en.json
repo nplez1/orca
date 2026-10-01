@@ -1715,6 +1715,7 @@
       },
       "LinearItemDrawer": {
         "04008e6c46": "Start workspace from issue",
+        "e6cd6f6d3e": "Estimate",
         "a4fcc57522": "No comments yet.",
         "fde849b2b6": "Comments",
         "9dc54172db": "Close · Esc",
@@ -13528,6 +13529,7 @@
             "0314901467": "Source Control",
             "06219e4cb1": "Search",
             "8bc2bbc3a0": "Explorer",
+            "issue": "Issue",
             "45b78f03bc": "side",
             "34af8aadf5": "top",
             "9fffaf17c1": "Toggle right sidebar ({{value0}})",
@@ -14159,6 +14161,35 @@
             "sourceMissing": "Transcript is no longer available",
             "metadataMatch": "Match in session metadata",
             "sourceActionsUnavailable": "The transcript source is unavailable."
+          },
+          "IssuePane": {
+            "providerGithub": "GitHub",
+            "providerLinear": "Linear",
+            "providerJira": "Jira",
+            "providerGitlab": "GitLab",
+            "refresh": "Refresh issue",
+            "openIn": "Open in {{value0}}",
+            "unavailable": "Couldn't load this {{value0}} issue.",
+            "retry": "Retry",
+            "noIssue": "No issue is linked to this workspace.",
+            "noDescription": "No description provided.",
+            "status": "Status",
+            "priority": "Priority",
+            "labels": "Labels",
+            "noLabels": "None",
+            "save": "Save",
+            "filterLabels": "Filter labels",
+            "noLabelsFound": "No labels found",
+            "title": "Issue title"
+          },
+          "IssueAssignee": {
+            "label": "Assignee",
+            "assignees": "Assignees",
+            "unassigned": "Unassigned",
+            "search": "Search people",
+            "searching": "Searching…",
+            "noResults": "No people found",
+            "you": "You"
           }
         }
       },

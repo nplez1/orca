@@ -27,6 +27,8 @@ import {
 } from './gh-edit-section-mutations'
 import { GHEditSectionTopColumns } from './gh-edit-section-top-columns'
 import { GHEditSectionHorizontal } from './gh-edit-section-horizontal'
+import { GHEditSectionPills } from './gh-edit-section-pills'
+import { GHEditSectionRows } from './gh-edit-section-rows'
 import { useGitHubDuplicateIssueCandidates } from '@/components/github/github-duplicate-issue-candidates'
 
 export function GHEditSection({
@@ -61,8 +63,8 @@ export function GHEditSection({
   onUse: (item: GitHubWorkItem) => void
   onOpenOrUse?: (item: GitHubWorkItem) => void
   attachedWorkspaceLabel?: string | null
-  /** `horizontal`: compact pill strip for the non-issue drawer/header; `top-columns`: labeled columns above the issue page body. */
-  layout?: 'horizontal' | 'top-columns'
+  /** `horizontal`: compact pill strip for the non-issue drawer/header; `top-columns`: labeled columns above the issue page body; `pills`: bare pill row for the right-sidebar Issue pane, which has no workspace CTA; `rows`: compact vertical property rows for the narrow Issue pane. */
+  layout?: 'horizontal' | 'top-columns' | 'pills' | 'rows'
 }): React.JSX.Element | null {
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false)
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
@@ -359,6 +361,18 @@ export function GHEditSection({
 
   if (layout === 'top-columns') {
     return <GHEditSectionTopColumns {...layoutProps} />
+  }
+
+  if (layout === 'pills') {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-3 py-2.5">
+        <GHEditSectionPills {...layoutProps} />
+      </div>
+    )
+  }
+
+  if (layout === 'rows') {
+    return <GHEditSectionRows {...layoutProps} />
   }
 
   return (
