@@ -272,11 +272,13 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
-- **2026-10-01 — sync onto upstream `a5601375d4`** (166 commits), from the released tip `5065084bf1`
-  (np.15 released from `c8fa8feead`, with `#44`–`#47` landed on top of it). **140 commits replayed**,
-  then this sync's one fix commit on top: **105 byte-identical by `range-diff`, 34 adapted, none
-  dropped, none added.** New tip `546e94bf16`; the re-seat fixes landed as `883aa7d5f1`.
-  No merge commits were in the replay range, so the `--rebase-merges` trap did not apply this time.
+- **2026-10-01 — released as `v1.4.214-np.16`** from `b5dddf0421` (workflow run 36886007740,
+  signed and notarized), onto upstream `a5601375d4` (166 commits), from the released tip
+  `5065084bf1` (np.15 released from `c8fa8feead`, with `#44`–`#47` landed on top of it). **140
+  commits replayed**, then this sync's three fix commits on top: **105 byte-identical by
+  `range-diff`, 34 adapted, none dropped, none added.** The replayed tip is `546e94bf16`; the
+  re-seat fixes landed as `883aa7d5f1`, `e32ee8446e` and `b5dddf0421`. No merge commits were in the
+  replay range, so the `--rebase-merges` trap did not apply this time.
 
   - **A fork-owner decision finally settled upstream's source-grep purges.** Upstream is retiring
     whole classes of test that assert on production source text, and this sync's range brought four
@@ -375,9 +377,17 @@ pnpm run sync:localization-runtime-catalog
     update-feed references still name `nplez1/orca`; `check:max-lines-ratchet` OK (7 grandfathered
     suppressions, no new bypasses); `check:reliability-gates` passes for 140 gates; the rpc-params
     catalog verifies; and `ORCA_CODE_QUALITY_BASE=upstream/main pnpm run check:code-quality:changed`
-    reports **36 findings (27 design-system) across 1,459 changed files** — identical in kind and
-    count to the previous three entries, with **all nine flagged files byte-identical to the
-    released np.15 tip**.
+    reports **36 findings (27 design-system) across 1,464 changed files** — identical in kind and
+    count to the previous three entries, with all nine flagged files byte-identical to the released
+    np.15 tip.
+    - The full `pnpm test` run reports **99,812 passing, 105 failing**, and the three fix commits
+      above clear all but the environmental set. What remains, none of it from this sync:
+      `browser-manager-{tab-identity,viewport-ownership}` need `ORCA_BACKGROUND_LAUNCH=1` (41/41
+      pass with it); `tests/e2e/relay-region-correction.unit.test.ts` needs the uninstalled `cloud/`
+      workspace's `pg`; and **22 cases across seven `agent-session-*` files are red because upstream
+      is red there** — `src/main/native-chat/` and every file those suites load is byte-identical to
+      `a5601375d4`, so this fork cannot be the cause and the next sync should re-check before
+      assuming it is inherited.
 
   - **Left open, by name:**
     - _The projection cache key ignores the display root._
