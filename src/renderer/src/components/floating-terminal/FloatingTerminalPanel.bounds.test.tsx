@@ -159,6 +159,10 @@ vi.mock('@/components/ShortcutKeyCombo', async () => {
   return (await import('./floating-terminal-panel-component-stubs')).createShortcutKeyComboModule()
 })
 
+function isElementLike(value: unknown): value is { props: Record<string, unknown>; type: unknown } {
+  return typeof value === 'object' && value !== null && 'props' in value
+}
+
 describe('FloatingTerminalPanel close behavior', () => {
   beforeEach(setupFloatingTerminalPanelTest)
 
@@ -287,6 +291,19 @@ describe('FloatingTerminalPanel close behavior', () => {
     })
 
     expect(getMockedLocalStorage().setItem).not.toHaveBeenCalled()
+  })
+
+  it('renders the grab handle before the tab strip so tabs can never cover it', async () => {
+    const element = await renderPanel(true)
+    const titlebar = findByProp(element, 'data-floating-terminal-shortcut-surface')
+    const children = titlebar.props.children
+    const firstChild = Array.isArray(children) ? children[0] : undefined
+    const firstChildName =
+      isElementLike(firstChild) && typeof firstChild.type === 'function'
+        ? firstChild.type.name
+        : null
+
+    expect(firstChildName).toBe('FloatingTerminalTitlebarGrabHandle')
   })
 
   it('commits the last dragged bounds on pointer cancellation', async () => {
