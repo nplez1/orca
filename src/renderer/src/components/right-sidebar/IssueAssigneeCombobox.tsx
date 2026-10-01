@@ -105,7 +105,11 @@ export function IssueAssigneeCombobox({
   const [searchResults, setSearchResults] = useState<IssueAssigneeOption[] | null>(null)
   const [searching, setSearching] = useState(false)
   const searchRef = useRef(search)
-  searchRef.current = search
+  // Why: latest-callback ref written in an effect — React may replay or discard
+  // render work, so a render-time write could leak from UI that never commits.
+  useEffect(() => {
+    searchRef.current = search
+  }, [search])
   const selectedIds = useMemo(() => new Set(selected.map((option) => option.id)), [selected])
 
   useEffect(() => {
