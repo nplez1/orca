@@ -1,13 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, LoaderCircle, RefreshCw, Save, Send } from 'lucide-react'
+import { ArrowRight, LoaderCircle, RefreshCw, Send } from 'lucide-react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { JiraComment, JiraIssue } from '../../../shared/jira-types'
+import { JiraIssueTitleLabelsEditor } from './jira-issue-title-labels-editor'
 
 export type JiraIssueWorkspaceAction = {
   label: string
@@ -50,62 +50,15 @@ export function JiraIssueWorkspaceContent({
     <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_228px]">
       <div className="min-h-0 overflow-y-auto scrollbar-sleek">
         <section className="border-b border-border/40 px-4 py-4">
-          <div className="grid gap-2">
-            <label className="text-[11px] font-medium text-muted-foreground">
-              {translate('auto.components.JiraIssueWorkspace.444865b4a8', 'Title')}
-            </label>
-            <div className="flex gap-2">
-              <Input
-                value={titleDraft}
-                onChange={(event) => setTitleDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault()
-                    handleSaveTitle()
-                  }
-                }}
-                className="h-8 text-xs"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSaveTitle}
-                disabled={pendingField === 'title'}
-              >
-                {pendingField === 'title' ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-              </Button>
-            </div>
-            <label className="mt-2 text-[11px] font-medium text-muted-foreground">
-              {translate('auto.components.JiraIssueWorkspace.aee97b6913', 'Labels')}
-            </label>
-            <div className="flex gap-2">
-              <Input
-                value={labelsDraft}
-                onChange={(event) => setLabelsDraft(event.target.value)}
-                placeholder={translate(
-                  'auto.components.JiraIssueWorkspace.0f3c07a901',
-                  'backend, bug'
-                )}
-                className="h-8 text-xs"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSaveLabels}
-                disabled={pendingField === 'labels'}
-              >
-                {pendingField === 'labels' ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-              </Button>
-            </div>
-          </div>
+          <JiraIssueTitleLabelsEditor
+            titleDraft={titleDraft}
+            setTitleDraft={setTitleDraft}
+            labelsDraft={labelsDraft}
+            setLabelsDraft={setLabelsDraft}
+            handleSaveTitle={handleSaveTitle}
+            handleSaveLabels={handleSaveLabels}
+            pendingField={pendingField}
+          />
         </section>
 
         <section className="border-b border-border/40 px-4 py-4">
