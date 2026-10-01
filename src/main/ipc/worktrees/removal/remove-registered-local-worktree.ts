@@ -9,10 +9,8 @@ import {
   listWorktreesStrict as listGitWorktreesStrict,
   removeWorktree
 } from '../../../git/worktree'
-import { gitExecFileAsync } from '../../../git/runner'
 import { getConfiguredWorktreeIncludePaths } from '../../../git/worktree-include-file'
 import { getWorktreeSharedLinkPaths } from '../../../git/worktree-shared-directories'
-import { cleanupLocalOrphanedWorktreeDirectory } from '../../../local-orphaned-worktree-cleanup'
 import { recoverLocalWindowsWorktreeRemoval } from '../../../local-worktree-removal-recovery'
 import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentation'
 import { findRegisteredDeletableWorktree } from '../../../worktree-removal-safety'
@@ -34,14 +32,13 @@ import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import {
   preserveBranchHeadFallback,
-  preservedBranchCleanupByScope,
   rememberPreservedBranchCleanupTarget
 } from './preserved-branch-cleanup'
+import { cleanupOrphanedLocalWorktreeRemoval } from './orphaned-local-worktree-cleanup'
 import {
   removeWorktreeMetadataAndTransientState,
   stopPtysForDestructiveWorktreeRemoval
 } from './worktree-removal-ownership'
-import { preservedBranchCleanupScopeKey } from '../../../../shared/preserved-branch-cleanup'
 import {
   removesInBackground,
   startBackgroundWorktreeRemoval
@@ -148,6 +145,7 @@ export async function removeRegisteredLocalWorktree(
       localWorktreeGitOptions,
       hasLocalWorktreeGitOptions,
       deleteBranch,
+      deleteRemoteBranch,
       refreshedRegisteredWorktree,
       removalGate,
       checkoutDeleteSignal
@@ -193,6 +191,7 @@ async function finishLocalWorktreeRemoval({
   localWorktreeGitOptions,
   hasLocalWorktreeGitOptions,
   deleteBranch,
+  deleteRemoteBranch,
   refreshedRegisteredWorktree,
   removalGate,
   checkoutDeleteSignal
@@ -207,6 +206,7 @@ async function finishLocalWorktreeRemoval({
   localWorktreeGitOptions: LocalProjectWorktreeGitOptions
   hasLocalWorktreeGitOptions: boolean
   deleteBranch: boolean
+  deleteRemoteBranch: boolean
   refreshedRegisteredWorktree: GitWorktreeInfo
   removalGate: { finish: (removed: boolean) => Promise<void> }
   checkoutDeleteSignal?: AbortSignal
@@ -247,41 +247,16 @@ async function finishLocalWorktreeRemoval({
         removalCompleted = true
       } else if (isOrphanedWorktreeError(error)) {
         // If git no longer tracks this worktree, clean up the directory and metadata
-        console.warn(
-          `[worktrees] Orphaned worktree detected at ${canonicalWorktreePath}, cleaning up`
-        )
-        await cleanupLocalOrphanedWorktreeDirectory(
-          repo.path,
+        await cleanupOrphanedLocalWorktreeRemoval({
+          context,
           canonicalWorktreePath,
-          localWorktreeGitOptions,
-          (path) => runtime.closeFileWatchersForRemoval(path)
-        )
-        // Why: remove failed so git still tracks it (.git/worktrees/<name>); prune or the stale entry keeps its branch locked.
-        await gitExecFileAsync(['worktree', 'prune'], {
-          cwd: repo.path,
-          ...localWorktreeGitOptions
-        }).catch(() => {})
-        await cleanupUnusedWorktreePushTargetRemote(
-          repo.path,
-          args.worktreeId,
-          removedPushTarget,
-          store,
-          localWorktreeGitOptions
-        )
-        runtime.clearOptimisticReconcileToken(args.worktreeId)
-        removeWorktreeMetadataAndTransientState(
-          store,
-          args.worktreeId,
           removalHostId,
-          args.snapshotPruneBatchId
-        )
-        preservedBranchCleanupByScope.delete(
-          preservedBranchCleanupScopeKey({
-            worktreeId: args.worktreeId,
-            hostId: removalHostId
-          })
-        )
-        invalidateAuthorizedRootsCache()
+          removedPushTarget,
+          localWorktreeGitOptions,
+          repoPath: repo.path,
+          worktreeId: args.worktreeId,
+          snapshotPruneBatchId: args.snapshotPruneBatchId
+        })
         removalCompleted = true
         return {}
       } else {

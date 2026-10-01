@@ -117,6 +117,9 @@ async function finishInterruptedLocalWorktreeRemoval(
     // Why force: Git already deleted part of the checkout, which reads as local changes.
     force: true,
     deleteBranch: record.deleteBranch,
+    // Why false: the interrupted record keeps no remote-branch intent, and deleting a branch the
+    // user never asked for is worse than leaving it.
+    deleteRemoteBranch: false,
     target: { id: record.worktreeId }
   }
   const worktrees = await listWorktreesStrict(repo.path, localOptions)

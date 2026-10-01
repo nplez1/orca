@@ -113,6 +113,19 @@ async function performRemoveWorktree(
       : {}
   }
 
+  return deleteBranchOfRemovedWorktree(repoPath, branchName, branchHead, options)
+}
+
+function deleteBranchOfRemovedWorktree(
+  repoPath: string,
+  branchName: string,
+  branchHead: string,
+  options: RemoveWorktreeOptions
+): Promise<RemoveWorktreeResult> {
+  // Why its own span: branch cleanup can reach the network (`fetch --prune`), so a stall here reads as
+  // `git worktree remove` being slow unless it is timed separately.
+  // Why serialized per repo: concurrent removals in one repo race `packed-refs.lock` and the
+  // remote-tracking ref locks of `fetch --prune` (#2259); the checkout deletes above need not wait.
   return runKeyedSerializedOperation(branchCleanupQueueByRepo, repoPath, async () => {
     // Why: `git branch -d` deletes `branch.<name>.remote`/`.merge` along with the branch, so the
     // upstream has to be read while it still exists — before the branch cleanup below runs.

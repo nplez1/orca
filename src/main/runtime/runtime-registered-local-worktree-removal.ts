@@ -204,6 +204,7 @@ export type RuntimeLocalWorktreeRemovalFinishArgs = Pick<
   | 'localOptions'
   | 'force'
   | 'deleteBranch'
+  | 'deleteRemoteBranch'
   | 'closeWatchers'
   | 'preserveBranchHead'
   | 'finishRemoval'
