@@ -18,8 +18,6 @@ import {
   getFolderWorkspacePathStatusTitle
 } from './folder-workspace-path-status'
 import { toast } from 'sonner'
-import { isDetachedHeadWorkspace } from '@/components/sidebar/visible-worktrees'
-import { revealRepoInProjectFilter } from '@/components/sidebar/project-filter-reveal'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { findFolderWorkspaceOwner } from './folder-workspace-runtime-owner'
 import type { WorktreeStartupPayload } from '@/lib/worktree-startup-payload'
@@ -33,6 +31,10 @@ import {
   type WorktreeActivationSurfaceSelection
 } from './worktree-activation-surface-selection'
 import { gateAndReseedEmptyWorkspace } from './worktree-activation-gated-empty-reseed'
+import {
+  revealFolderWorkspaceInSidebar,
+  revealWorktreeInSidebarForActivation
+} from './worktree-activation-sidebar-reveal'
 
 /**
  * Shared activation sequence used by the worktree palette and add-repo/worktree dialogs.
@@ -165,12 +167,7 @@ export function activateAndRevealFolderWorkspace(
         seedUserDefaultSurface
       )
 
-  if (opts?.revealInSidebar !== false) {
-    state.revealWorktreeInSidebar(
-      workspaceKey,
-      opts?.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : undefined
-    )
-  }
+  revealFolderWorkspaceInSidebar(state, workspaceKey, opts)
 
   if (opts?.providesInitialSurface !== true) {
     ensureWebRuntimeWorktreeTerminalAfterWake(workspaceKey, {
@@ -286,39 +283,8 @@ export function activateAndRevealWorktree(
     useAppStore.getState().queueTabInitialCwd(primaryTabId, opts.initialCwd)
   }
 
-  // 5. Lift the sidebar filters hiding the target — reveal needs the card rendered, else it silently no-ops.
-  if (opts?.clearSidebarFilters !== false) {
-    revealRepoInProjectFilter(state, wt.repoId)
-    if (
-      state.hideAutomationGeneratedWorkspaces &&
-      wt.automationProvenance?.kind === 'created-by-automation'
-    ) {
-      state.setHideAutomationGeneratedWorkspaces(false)
-    }
-    if (state.hideCliCreatedWorkspaces && wt.cliProvenance?.kind === 'created-by-cli') {
-      state.setHideCliCreatedWorkspaces(false)
-    }
-    if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(wt)) {
-      state.setHideDetachedHeadWorkspaces(false)
-    }
-    if (wt.workspaceStatus && state.hiddenWorkspaceStatusIds.includes(wt.workspaceStatus)) {
-      state.setHiddenWorkspaceStatusIds(
-        state.hiddenWorkspaceStatusIds.filter((id) => id !== wt.workspaceStatus)
-      )
-    }
-  }
-
-  // 6. Reveal in sidebar
-  if (opts?.revealInSidebar !== false) {
-    if (opts?.sidebarRevealBehavior || opts?.executionHostId) {
-      state.revealWorktreeInSidebar(worktreeId, {
-        ...(opts.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : {}),
-        ...(opts.executionHostId ? { executionHostId: opts.executionHostId } : {})
-      })
-    } else {
-      state.revealWorktreeInSidebar(worktreeId)
-    }
-  }
+  // 5. Lift the sidebar filters hiding the target and reveal its row.
+  revealWorktreeInSidebarForActivation(state, worktreeId, wt, opts)
 
   if (
     opts?.notifyHostRuntime !== false &&

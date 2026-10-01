@@ -1,7 +1,7 @@
 import { RateLimitServiceFullCyclePreparation } from './service-full-cycle-preparation'
 import { deriveAntigravityRateLimits } from '../antigravity-usage-mirror'
+import { providerResultSnapshot } from './service-provider-result-snapshot'
 import { settleSiblingProviderResult } from './service-sibling-provider-result'
-import type { ProviderRateLimits } from './service-types'
 
 export abstract class RateLimitServiceFullCycleApplication extends RateLimitServiceFullCyclePreparation {
   protected async runFetchAllCycle(
@@ -52,135 +52,27 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       return
     }
 
-    const claude =
-      claudeResult.status === 'fulfilled'
-        ? claudeResult.value
-        : ({
-            provider: 'claude',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              claudeResult.reason instanceof Error ? claudeResult.reason.message : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const claude = providerResultSnapshot('claude', claudeResult)
 
-    const codex =
-      codexResult.status === 'fulfilled'
-        ? codexResult.value
-        : ({
-            provider: 'codex',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              codexResult.reason instanceof Error ? codexResult.reason.message : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const codex = providerResultSnapshot('codex', codexResult)
 
-    const gemini =
-      geminiResult.status === 'fulfilled'
-        ? geminiResult.value
-        : ({
-            provider: 'gemini',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              geminiResult.reason instanceof Error ? geminiResult.reason.message : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const gemini = providerResultSnapshot('gemini', geminiResult)
 
     // Why: Antigravity can only borrow a *successful* Gemini read; a Gemini failure is not an Antigravity failure.
     const antigravity = deriveAntigravityRateLimits(gemini)
 
-    const opencodeGo =
-      opencodeGoResult.status === 'fulfilled'
-        ? opencodeGoResult.value
-        : ({
-            provider: 'opencode-go',
-            session: null,
-            weekly: null,
-            monthly: null,
-            updatedAt: Date.now(),
-            error:
-              opencodeGoResult.reason instanceof Error
-                ? opencodeGoResult.reason.message
-                : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    // Why the fallback: OpenCode Go reports its monthly window slot explicitly even when empty.
+    const opencodeGo = providerResultSnapshot('opencode-go', opencodeGoResult, { monthly: null })
 
-    const kimi =
-      kimiResult.status === 'fulfilled'
-        ? kimiResult.value
-        : ({
-            provider: 'kimi',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error: kimiResult.reason instanceof Error ? kimiResult.reason.message : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const kimi = providerResultSnapshot('kimi', kimiResult)
 
-    const miniMax =
-      miniMaxResult.status === 'fulfilled'
-        ? miniMaxResult.value
-        : ({
-            provider: 'minimax',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              miniMaxResult.reason instanceof Error
-                ? miniMaxResult.reason.message
-                : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const miniMax = providerResultSnapshot('minimax', miniMaxResult)
 
-    const deepSeek =
-      deepSeekResult.status === 'fulfilled'
-        ? deepSeekResult.value
-        : ({
-            provider: 'deepseek',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              deepSeekResult.reason instanceof Error
-                ? deepSeekResult.reason.message
-                : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const deepSeek = providerResultSnapshot('deepseek', deepSeekResult)
 
-    const fireworks =
-      fireworksResult.status === 'fulfilled'
-        ? fireworksResult.value
-        : ({
-            provider: 'fireworks',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              fireworksResult.reason instanceof Error
-                ? fireworksResult.reason.message
-                : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const fireworks = providerResultSnapshot('fireworks', fireworksResult)
 
-    const copilot =
-      copilotResult.status === 'fulfilled'
-        ? copilotResult.value
-        : ({
-            provider: 'copilot',
-            session: null,
-            weekly: null,
-            updatedAt: Date.now(),
-            error:
-              copilotResult.reason instanceof Error
-                ? copilotResult.reason.message
-                : 'Unknown error',
-            status: 'error'
-          } satisfies ProviderRateLimits)
+    const copilot = providerResultSnapshot('copilot', copilotResult)
 
     // Why: a disabled provider skips these late reads too — resolveCodexHome and the
     // Claude auth preparation both touch local credential homes after the fetch.
