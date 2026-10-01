@@ -6,6 +6,7 @@ export type PrActionMutations = {
   mergePR: (args: {
     prNumber: number
     method?: GitHubPRMergeMethod
+    bypassBranchProtection?: boolean
     prRepo?: GitHubPrRepoSlug | null
   }) => Promise<GitHubPrMutationOutcome>
   setPRAutoMerge: (args: {

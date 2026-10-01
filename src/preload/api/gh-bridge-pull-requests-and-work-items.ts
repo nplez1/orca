@@ -189,6 +189,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     sourceContext?: TaskSourceContext | null
     prNumber: number
     method?: 'merge' | 'squash' | 'rebase'
+    bypassBranchProtection?: boolean
     prRepo?: GitHubOwnerRepo | null
   }): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('gh:mergePR', args)
 } satisfies Partial<PreloadApi['gh']>

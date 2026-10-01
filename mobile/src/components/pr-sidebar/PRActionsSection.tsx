@@ -8,7 +8,11 @@ import type { MobilePrActions } from '../../session/use-mobile-pr-actions'
 import { unlinkMobilePr } from '../../source-control/mobile-pr-link'
 import { ConfirmModal } from '../ConfirmModal'
 import { canShowMobilePRAutoMergeControl } from './pr-auto-merge-availability'
-import { resolveMobilePrMergeMethod, resolvePrActionAvailability } from './pr-actions-state'
+import {
+  resolveMobilePrMergeMethod,
+  resolvePrActionAvailability,
+  resolveMobileAdminMergeBypassRequired
+} from './pr-actions-state'
 import { prActionsStyles as styles } from './pr-actions-styles'
 
 type Props = {
@@ -35,6 +39,9 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
   // Mobile keeps merge one-tap: use the repo default instead of surfacing a
   // desktop-style method picker in the narrow PR action stack.
   const effectiveMethod = resolveMobilePrMergeMethod(pr.mergeMethodSettings)
+  // Why: GitHub gates its own bypass behind an acknowledgement, and the one parameter that carries
+  // it to the host also skips a merge queue — so the user is asked, every time.
+  const adminBypassRequired = resolveMobileAdminMergeBypassRequired(pr)
   const state = actions.resolveState(pr.state)
   const autoMerge = actions.resolveAutoMerge(pr.autoMergeEnabled ?? false)
   const avail = resolvePrActionAvailability(state)
@@ -73,11 +80,18 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
 
   const confirmCopy = (): { title: string; message: string; confirmLabel: string } => {
     if (confirm?.kind === 'merge') {
-      return {
-        title: 'Merge pull request?',
-        message: `This will merge #${pr.number} into its base branch.`,
-        confirmLabel: 'Merge'
-      }
+      return adminBypassRequired
+        ? {
+            title: 'Bypass branch protection?',
+            message:
+              'This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.',
+            confirmLabel: 'Merge anyway'
+          }
+        : {
+            title: 'Merge pull request?',
+            message: `This will merge #${pr.number} into its base branch.`,
+            confirmLabel: 'Merge'
+          }
     }
     if (confirm?.kind === 'state' && confirm.state === 'closed') {
       return {
@@ -100,7 +114,7 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
     // Engine errors take over the shared error line after this; drop unlink text.
     setUnlinkError(null)
     if (confirm.kind === 'merge') {
-      actions.merge(confirm.method)
+      actions.merge(confirm.method, adminBypassRequired)
     } else {
       actions.updateState(confirm.state)
     }

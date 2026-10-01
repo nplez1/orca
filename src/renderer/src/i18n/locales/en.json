@@ -2632,6 +2632,17 @@
               "4ab19a62ef": "Enable auto-merge",
               "8f6cb3772f": "Merge this pull request automatically once requirements are met"
             }
+          },
+          "admin": {
+            "bypass": {
+              "cef3455aa7": "GitHub has requested changes on this pull request. Merging will ask you to bypass the rule with your admin privileges.",
+              "d3d99c95fa": "GitHub requires an approving review before this pull request can merge. Merging will ask you to bypass the rule with your admin privileges.",
+              "confirmation": {
+                "1859e45dbc": "Bypass branch protection?",
+                "3db0f1be2f": "This pull request does not meet its branch protection rules. Merging will skip those rules using your admin privileges.",
+                "28c23a473f": "Merge anyway"
+              }
+            }
           }
         },
         "project": {

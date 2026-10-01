@@ -48,6 +48,12 @@ export type GitHubWorkItem = {
   mergeQueueRequired?: boolean | null
   mergeMethodSettings?: GitHubPRMergeMethodSettings
   mergeStateStatus?: string | null
+  /**
+   * GitHub's answer to whether *this* viewer may waive branch protection on this pull request
+   * (`PullRequest.viewerCanMergeAsAdmin`). Absent means GitHub was not asked or did not answer,
+   * which readers must treat as "unknown" rather than "cannot".
+   */
+  viewerCanMergeAsAdmin?: boolean
   maintainerCanModify?: boolean
   // Why: true when a PR's head lives on a fork (headRepositoryOwner !== selected repo owner).
   // The Start-from picker passes this to resolvePrBase so fork heads use

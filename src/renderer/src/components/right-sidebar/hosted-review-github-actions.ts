@@ -27,6 +27,8 @@ export async function mergeGitHubHostedReview(args: {
   prNumber: number
   method: GitHubPRMergeMethod
   prRepo?: GitHubPRRepo | null
+  /** Set only by a caller whose confirmation told the user it would skip branch protection. */
+  bypassBranchProtection?: boolean
 }): Promise<Awaited<ReturnType<typeof window.api.gh.mergePR>>> {
   const target = getGitHubActionTarget(args.repo)
   if (target.kind === 'environment') {
@@ -37,6 +39,7 @@ export async function mergeGitHubHostedReview(args: {
         repo: args.repo.id,
         prNumber: args.prNumber,
         method: args.method,
+        ...(args.bypassBranchProtection ? { bypassBranchProtection: true } : {}),
         prRepo: args.prRepo ?? null
       },
       // Why: GitHub stack merges can run asynchronously for several minutes.
@@ -48,6 +51,7 @@ export async function mergeGitHubHostedReview(args: {
     repoId: args.repo.id,
     prNumber: args.prNumber,
     method: args.method,
+    ...(args.bypassBranchProtection ? { bypassBranchProtection: true } : {}),
     prRepo: args.prRepo ?? null
   })
 }

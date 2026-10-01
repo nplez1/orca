@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
 import { translate } from '@/i18n/i18n'
 import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
+import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import {
   resolveGitHubPRMergeMethods,
   GITHUB_PR_MERGE_METHOD_LABELS
@@ -89,17 +90,22 @@ export function PRMergeCell({
       return
     }
     const label = GITHUB_PR_MERGE_METHOD_LABELS[method]
-    const confirmed = await confirm({
-      title: translate('auto.components.TaskPage.844dc193c7', '{{value0}} PR #{{value1}}?', {
-        value0: label,
-        value1: item.number
-      }),
-      description: translate(
-        'auto.components.TaskPage.0506a78337',
-        'This will update the pull request on GitHub.'
-      ),
-      confirmLabel: label
-    })
+    const bypassBranchProtection = mergePresentation.adminBypassRequired
+    const confirmed = await confirm(
+      bypassBranchProtection
+        ? buildGitHubPRAdminBypassConfirmation()
+        : {
+            title: translate('auto.components.TaskPage.844dc193c7', '{{value0}} PR #{{value1}}?', {
+              value0: label,
+              value1: item.number
+            }),
+            description: translate(
+              'auto.components.TaskPage.0506a78337',
+              'This will update the pull request on GitHub.'
+            ),
+            confirmLabel: label
+          }
+    )
     if (!confirmed) {
       return
     }
@@ -131,6 +137,7 @@ export function PRMergeCell({
                   repo: runtimeRepoId,
                   prNumber: item.number,
                   method,
+                  ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
                   prRepo
                 },
                 {
@@ -143,6 +150,7 @@ export function PRMergeCell({
                 sourceContext,
                 prNumber: item.number,
                 method,
+                ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
                 prRepo
               })
         }

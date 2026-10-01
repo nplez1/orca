@@ -12,6 +12,7 @@ import {
   getGitHubRuntimeRepoId
 } from '@/lib/github-source-runtime-context'
 import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
+import { buildGitHubPRAdminBypassConfirmation } from '@/components/github-pr-admin-bypass-confirmation'
 import {
   GITHUB_PR_MERGE_METHOD_LABELS,
   resolveGitHubPRMergeMethods
@@ -175,18 +176,23 @@ export function PRActionsPanel({
       return
     }
     const label = GITHUB_PR_MERGE_METHOD_LABELS[method]
-    const confirmed = await confirm({
-      title: translate(
-        'auto.components.GitHubItemDialog.03d7216d62',
-        '{{value0}} PR #{{value1}}?',
-        { value0: label, value1: item.number }
-      ),
-      description: translate(
-        'auto.components.GitHubItemDialog.a27ee5ca1a',
-        'This will update the pull request on GitHub.'
-      ),
-      confirmLabel: label
-    })
+    const bypassBranchProtection = mergePresentation.adminBypassRequired
+    const confirmed = await confirm(
+      bypassBranchProtection
+        ? buildGitHubPRAdminBypassConfirmation()
+        : {
+            title: translate(
+              'auto.components.GitHubItemDialog.03d7216d62',
+              '{{value0}} PR #{{value1}}?',
+              { value0: label, value1: item.number }
+            ),
+            description: translate(
+              'auto.components.GitHubItemDialog.a27ee5ca1a',
+              'This will update the pull request on GitHub.'
+            ),
+            confirmLabel: label
+          }
+    )
     if (!confirmed) {
       return
     }
@@ -201,6 +207,7 @@ export function PRActionsPanel({
                 repo: getGitHubRuntimeRepoId(sourceContext, repoId ?? item.repoId),
                 prNumber: item.number,
                 method,
+                ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
                 prRepo
               },
               { timeoutMs: 30_000 }
@@ -211,6 +218,7 @@ export function PRActionsPanel({
               sourceContext,
               prNumber: item.number,
               method,
+              ...(bypassBranchProtection ? { bypassBranchProtection: true } : {}),
               prRepo
             })
       if (!result.ok) {
