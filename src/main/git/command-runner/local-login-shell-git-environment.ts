@@ -1,5 +1,4 @@
 import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
-import { isShellStartupEnvProbeSupported } from '../../pty/shell-startup-env'
 import { resolveLoginShellEnvironment } from '../../startup/login-shell-environment'
 import type { ResolvedCommand } from './wsl-command-resolution'
 
@@ -71,7 +70,8 @@ function probeShellEnvironment(
  * does not wait on it.
  */
 export function configureLocalLoginShellGitEnvironment(): void {
-  if (!isShellStartupEnvProbeSupported()) {
+  // Why: Windows has no POSIX login files, so the probe would only spawn a shell for nothing.
+  if (process.platform === 'win32') {
     return
   }
   resolveShellEnvironment = resolveLoginShellEnvironment
@@ -91,7 +91,7 @@ export function prepareLocalLoginShellGitEnvironment(
   signal?: AbortSignal
 ): Promise<NodeJS.ProcessEnv> | null {
   const resolver = resolveShellEnvironment
-  if (resolver === null || !isShellStartupEnvProbeSupported() || resolved.wsl !== null) {
+  if (resolver === null || process.platform === 'win32' || resolved.wsl !== null) {
     return null
   }
   return waitForPromiseWithSignal(probeShellEnvironment(resolver), signal).then(

@@ -64,7 +64,9 @@ describe('AI Vault listing wsl.exe probes', () => {
         additionalCodexSessionsDirs: [join(NATIVE_CODEX_HOME, 'sessions')],
         wslHomeDirs: []
       }),
-      expect.anything()
+      expect.anything(),
+      // The fork's third argument: no refresh or query for a plain listing.
+      {}
     )
   })
 
@@ -82,7 +84,8 @@ describe('AI Vault listing wsl.exe probes', () => {
     ])
     expect(scanAiVaultSessionsInService).toHaveBeenCalledWith(
       expect.objectContaining({ wslHomeDirs: [WSL_HOME] }),
-      expect.anything()
+      expect.anything(),
+      {}
     )
 
     execFileMock.mockImplementation((_command, _args, _options, callback) => {

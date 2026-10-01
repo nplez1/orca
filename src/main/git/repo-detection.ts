@@ -163,9 +163,14 @@ export async function getGitRepoRoot(path: string): Promise<string> {
       ['rev-parse', '--is-inside-work-tree', '--show-toplevel'],
       { cwd: path }
     )
-    const [insideWorkTree, toplevel] = stdout.split('\n').map((line) => line.trim())
-    if (insideWorkTree === 'true' && toplevel) {
-      return normalizeGitRepoRootForInputPath(path, toplevel)
+    // Why indexOf, not split('\n'): a path may itself contain a newline, so only the first one
+    // separates the boolean answer from the root git prints.
+    const firstNewline = stdout.indexOf('\n')
+    if (firstNewline !== -1 && stdout.slice(0, firstNewline).trim() === 'true') {
+      const toplevel = readGitPathOutput(stdout.slice(firstNewline + 1))
+      if (toplevel) {
+        return normalizeGitRepoRootForInputPath(path, toplevel)
+      }
     }
   } catch {
     // Fall through to the marker scan, then to preserving the original path.

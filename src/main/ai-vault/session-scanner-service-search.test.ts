@@ -12,7 +12,7 @@ import {
 } from '../ai-vault-search/session-search-indexer-test-fixture'
 import { SessionSearchInstance } from '../ai-vault-search/session-search-instance'
 import { SessionScannerServiceSearch } from './session-scanner-service-search'
-import type { AiVaultWorkerScanOptions } from './session-scanner-worker-protocol'
+import type { AiVaultServiceScanOptions } from './session-scanner-service-protocol'
 import {
   AI_VAULT_SERVICE_PROTOCOL_VERSION,
   type AiVaultServiceChildMessage,
@@ -230,7 +230,7 @@ async function openListService(
   return listHarness
 }
 
-function listOptions(overrides: Partial<AiVaultWorkerScanOptions> = {}): AiVaultWorkerScanOptions {
+function listOptions(overrides: Partial<AiVaultServiceScanOptions> = {}): AiVaultServiceScanOptions {
   return { limit: 50, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID, ...overrides }
 }
 

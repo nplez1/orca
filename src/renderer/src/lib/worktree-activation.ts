@@ -32,6 +32,10 @@ import {
 } from './worktree-activation-surface-selection'
 import { gateAndReseedEmptyWorkspace } from './worktree-activation-gated-empty-reseed'
 import { liftSidebarFiltersHidingWorktree } from './worktree-activation-sidebar-filters'
+import {
+  revealFolderWorkspaceInSidebar,
+  revealWorktreeInSidebarForActivation
+} from './worktree-activation-sidebar-reveal'
 
 /**
  * Shared activation sequence used by the worktree palette and add-repo/worktree dialogs.
@@ -168,12 +172,7 @@ export function activateAndRevealFolderWorkspace(
   if (opts?.showWorkspaceList) {
     state.setSidebarBody('workspaces')
   }
-  if (opts?.revealInSidebar !== false) {
-    state.revealWorktreeInSidebar(
-      workspaceKey,
-      opts?.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : undefined
-    )
-  }
+  revealFolderWorkspaceInSidebar(state, workspaceKey, opts)
 
   if (opts?.providesInitialSurface !== true) {
     ensureWebRuntimeWorktreeTerminalAfterWake(workspaceKey, {
@@ -293,21 +292,15 @@ export function activateAndRevealWorktree(
   if (opts?.showWorkspaceList) {
     state.setSidebarBody('workspaces')
   }
+  // Why: the upstream lift is view-aware, so the fork's reveal helper must not lift filters again.
   if (opts?.clearSidebarFilters !== false) {
     liftSidebarFiltersHidingWorktree(wt)
   }
-
   // 6. Reveal in sidebar
-  if (opts?.revealInSidebar !== false) {
-    if (opts?.sidebarRevealBehavior || opts?.executionHostId) {
-      state.revealWorktreeInSidebar(worktreeId, {
-        ...(opts.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : {}),
-        ...(opts.executionHostId ? { executionHostId: opts.executionHostId } : {})
-      })
-    } else {
-      state.revealWorktreeInSidebar(worktreeId)
-    }
-  }
+  revealWorktreeInSidebarForActivation(state, worktreeId, wt, {
+    ...opts,
+    clearSidebarFilters: false
+  })
 
   if (
     opts?.notifyHostRuntime !== false &&

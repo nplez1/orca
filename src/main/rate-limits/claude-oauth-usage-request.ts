@@ -31,33 +31,6 @@ type OAuthUsageResponse = {
   spend?: ClaudeOAuthSpend
   extra_usage?: ClaudeOAuthExtraUsage
   limits?: OAuthUsageLimit[] | null
-  spend?: OAuthSpend | null
-  extra_usage?: OAuthExtraUsage | null
-}
-
-/** Money as an integer count of 10^-`exponent` units, e.g. 800000 + 2 is $8,000.00. */
-type OAuthSpendMoney = {
-  amount_minor?: unknown
-  currency?: unknown
-  exponent?: unknown
-}
-
-/** The monthly spend cap an enterprise/usage-billed plan reports instead of windows. */
-type OAuthSpend = {
-  enabled?: unknown
-  percent?: unknown
-  used?: OAuthSpendMoney | null
-  limit?: OAuthSpendMoney | null
-}
-
-/** Repeats the spend cap figures as credits; the fallback source when `spend` is absent. */
-type OAuthExtraUsage = {
-  is_enabled?: unknown
-  currency?: unknown
-  decimal_places?: unknown
-  monthly_limit?: unknown
-  used_credits?: unknown
-  utilization?: unknown
 }
 
 // Why: 30 days, matching the window length the other monthly providers report.
@@ -75,7 +48,9 @@ function readMinorUnits(value: unknown, exponent: number | null): number | null 
   return minor / 10 ** exponent
 }
 
-function readSpendAmount(raw: OAuthSpendMoney | null | undefined): number | null {
+function readSpendAmount(
+  raw: NonNullable<ClaudeOAuthSpend['used']> | null | undefined
+): number | null {
   return readMinorUnits(raw?.amount_minor, readFiniteNumber(raw?.exponent))
 }
 

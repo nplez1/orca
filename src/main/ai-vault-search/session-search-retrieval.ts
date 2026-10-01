@@ -25,6 +25,16 @@ const FULL_WEIGHTS = '3.0, 2.0, 1.0, 1.0'
 // Tool and identifier columns do not contribute to conversation ranking.
 const CONVERSATION_WEIGHTS = '3.0, 2.0, 0.0, 0.0'
 
+/** Sessions columns the schema declares but upstream's `SessionRow` does not. */
+type SessionColumnOutsideRow =
+  | 'cwd_key'
+  | 'created_at'
+  | 'model'
+  | 'total_tokens'
+  | 'queued_message_count'
+  | 'subagent_transcript_count'
+  | 'modified_at'
+
 // Explicit columns let the existing statement cache reuse these reads; tests pin every schema field.
 const SESSION_COLUMN_LIST = (
   [
@@ -42,8 +52,13 @@ const SESSION_COLUMN_LIST = (
     'message_count',
     'resume_command',
     'content_hash',
-    'content_hash_count'
-  ] as const satisfies readonly (keyof SessionRow | 'cwd_key' | 'created_at')[]
+    'content_hash_count',
+    'model',
+    'total_tokens',
+    'queued_message_count',
+    'subagent_transcript_count',
+    'modified_at'
+  ] as const satisfies readonly (keyof SessionRow | SessionColumnOutsideRow)[]
 ).join(', ')
 
 export type RetrievalScope = {

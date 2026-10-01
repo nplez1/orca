@@ -17,6 +17,8 @@ import { fetchMiniMaxRateLimits } from '../minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
 import { fetchOpenCodeGoUsage } from '../opencode-go-usage-source-selection'
 import { RateLimitServiceFetchPolicy } from './service-fetch-policy'
+import { resolveCopilotCycleCredentials } from './service-copilot-cycle-credentials'
+import { trackSettledProviderResult } from './service-sibling-provider-result'
 import type { FetchAllCyclePrepared, ProviderRateLimits } from './service-types'
 
 export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServiceFetchPolicy {
@@ -81,26 +83,10 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
     // on the fetch critical path where its latency would stall every other provider.
     const copilotGhResult = disabled.has('copilot') ? null : readCopilotGhCredentialsForCycle()
-    const copilotStoredCredentials =
-      copilotConfigResult.config.token && copilotConfigResult.config.enterpriseSlug
-        ? {
-            token: copilotConfigResult.config.token,
-            enterpriseSlug: copilotConfigResult.config.enterpriseSlug
-          }
-        : null
-    // Why stored wins: it is the deliberate override, and the paste form exists for
-    // accounts gh cannot serve at all.
-    const copilotCredentials =
-      copilotStoredCredentials ??
-      // Why no token here: gh supplies its own sign-in; the stored token is only ever an
-      // explicit override passed to gh as GH_TOKEN.
-      (copilotGhResult?.status === 'ok'
-        ? { token: '', enterpriseSlug: '', source: 'user-entitlement' as const }
-        : { token: '', enterpriseSlug: '', source: 'enterprise-billing' as const })
+    const copilotCredentials = resolveCopilotCycleCredentials(copilotConfigResult, copilotGhResult)
     const copilotToken = copilotCredentials.token
     const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
-    const copilotSource =
-      'source' in copilotCredentials ? copilotCredentials.source : 'enterprise-billing'
+    const copilotSource = copilotCredentials.source
     const geminiCliOAuthEnabled = disabled.has('gemini')
       ? false
       : (this.geminiCliOAuthEnabledResolver?.() ?? false)
@@ -165,7 +151,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     }
     const fireworksGeneration = this.fireworksFetchGeneration
 
-    const currentCopilotConfigHash = `${copilotToken}|${copilotEnterpriseSlug}|${copilotSource}|${copilotConfigResult.error ?? ''}`
+    const currentCopilotConfigHash = copilotCredentials.configHash
     const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
     if (copilotConfigChanged) {
       this.lastCopilotConfigHash = currentCopilotConfigHash
@@ -213,26 +199,18 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     // Why its own promise: the keychain read and the desktop state.vscdb read
     // (on its worker thread) are both async and must not delay other providers.
     const cursorResultPromise = disabled.has('cursor')
-      ? Promise.resolve(this.disabledUsageProviderSnapshot('cursor')).then(
-          (value) => ({ status: 'fulfilled', value }) as const
-        )
-      : readCursorAuthSession()
-          .then((authReadResult) => {
+      ? trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('cursor')))
+      : trackSettledProviderResult(
+          readCursorAuthSession().then((authReadResult) => {
             this.cursorAuthConfigured = authReadResult.status === 'ok'
             return fetchCursorRateLimits({ signal, authReadResult })
           })
-          .then(
-            (value) => ({ status: 'fulfilled', value }) as const,
-            (reason) => ({ status: 'rejected', reason }) as const
-          )
+        )
 
-    const zcodeResultPromise = (
+    const zcodeResultPromise = trackSettledProviderResult(
       zcodePlanConfigResult.error
         ? Promise.resolve(this.getZcodePlanCredentialError(zcodePlanConfigResult.error))
         : fetchZcodeRateLimits({ signal, planCredential: zcodePlanCredential })
-    ).then(
-      (value) => ({ status: 'fulfilled', value }) as const,
-      (reason) => ({ status: 'rejected', reason }) as const
     )
 
     // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
@@ -249,13 +227,10 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       codexFetchGated || codexHomePath ? null : this.getMissingWslCodexHomeResult(codexTarget)
     // Why: reading Grok's auth file is the credential import, so a disabled Grok never reaches it.
     const grokResultPromise = grokAuthReadResult
-      ? fetchGrokRateLimits({ signal, authReadResult: grokAuthReadResult }).then(
-          (value) => ({ status: 'fulfilled', value }) as const,
-          (reason) => ({ status: 'rejected', reason }) as const
+      ? trackSettledProviderResult(
+          fetchGrokRateLimits({ signal, authReadResult: grokAuthReadResult })
         )
-      : Promise.resolve(this.disabledUsageProviderSnapshot('grok')).then(
-          (value) => ({ status: 'fulfilled', value }) as const
-        )
+      : trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('grok')))
 
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
     const claudeFetchGated =

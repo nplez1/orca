@@ -9,7 +9,6 @@ import {
   ensureFloatingWorkspaceLaunchDirectory,
   resolveFloatingWorkspaceLaunchDirectory
 } from '../floating-workspace-launch-directory'
-import { authorizeExternalPath } from './filesystem-auth'
 
 /** Pre-folder builds kept floating markdown notes beside the rest of the app data. */
 const LEGACY_FLOATING_NOTES_DIRNAME = 'floating-workspace'
@@ -88,8 +87,6 @@ export function getFloatingWorkspaceDirectoryPath(): string {
 
 export async function ensureFloatingWorkspaceDirectory(): Promise<string> {
   const cwd = await ensureFloatingWorkspaceLaunchDirectory(app.getPath('home'))
-  // Why: the folder is app-created, so file access in it (notes included) is always allowed.
-  authorizeExternalPath(cwd)
   await moveLegacyFloatingNotes(cwd)
   return cwd
 }
@@ -173,9 +170,6 @@ export async function resolveFloatingTerminalCwd(
   }
 
   if (isTrustedFloatingWorkspaceDirectory(canonicalCwd, store.getSettings())) {
-    // Why: picker-approved directories are persisted as explicit grants, so a
-    // restart can restore file creation access without trusting arbitrary text.
-    authorizeExternalPath(canonicalCwd)
     return canonicalCwd
   }
 
@@ -191,7 +185,6 @@ export async function grantFloatingWorkspaceDirectory(
   if (!canonicalDir) {
     return
   }
-  authorizeExternalPath(canonicalDir)
   const trustedDirectories = await getPreservedTrustedFloatingWorkspaceDirectories(
     store.getSettings()
   )

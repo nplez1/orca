@@ -16,7 +16,7 @@ import type {
   AiVaultServiceResultValue,
   AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
-import type { AiVaultWorkerScanOptions } from './session-scanner-worker-protocol'
+import type { AiVaultServiceScanOptions } from './session-scanner-service-protocol'
 
 type SearchOperation = Extract<
   AiVaultServiceRequest,
@@ -137,7 +137,7 @@ export class SessionScannerServiceSearch {
    * failed read, which is why it is swallowed.
    */
   async listSessions(
-    options: AiVaultWorkerScanOptions,
+    options: AiVaultServiceScanOptions,
     refresh: boolean,
     query?: string
   ): Promise<AiVaultListResult | null> {

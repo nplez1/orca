@@ -145,6 +145,9 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   claude: null,
   codex: null,
   qoder: null,
+  // Why null: these sources emit no descendant lifecycle facts, same as qoder above.
+  'qoder-cn': null,
+  'qwen-code': null,
   codebuddy: null,
   muse: null,
   grok: {
@@ -175,7 +178,8 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   devin: null,
   kimi: null,
   zcode: null,
-  dsh: null
+  dsh: null,
+  jcode: null
 }
 
 /** Providers whose normalizer already tracks its own descendants and derives the pane state

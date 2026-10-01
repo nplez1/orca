@@ -18,13 +18,13 @@ export function getUsageProviderAccountsSectionId(
       return 'accounts-grok'
     case 'cursor':
       return 'accounts-cursor'
-    case 'antigravity':
     case 'deepseek':
       return 'accounts-deepseek'
     case 'fireworks':
       return 'accounts-fireworks'
     case 'copilot':
       return 'accounts-copilot'
+    case 'antigravity':
     case 'kimi':
       // Why: Orca must not mutate Kimi's CLI-owned credential lifecycle.
       // Antigravity credentials live in the agy CLI; quota is fetched directly via agy.
