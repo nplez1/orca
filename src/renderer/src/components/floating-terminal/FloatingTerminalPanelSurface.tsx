@@ -17,6 +17,7 @@ import { renderFloatingTerminalOrchestrationCard } from './FloatingTerminalOrche
 import { FloatingTerminalOrchestrationDialog } from './FloatingTerminalOrchestrationDialog'
 import { FloatingTerminalResizeHandles } from './FloatingTerminalResizeHandles'
 import { renderFloatingTerminalSaveDialog } from './FloatingTerminalSaveDialog'
+import { FloatingTerminalTitlebarGrabHandle } from './FloatingTerminalTitlebarGrabHandle'
 import { FloatingTerminalWindowControls } from './FloatingTerminalWindowControls'
 import { FloatingWorkspaceTabDragContext } from './FloatingWorkspaceTabDragContext'
 import type { useFloatingTerminalPanelController } from './use-floating-terminal-panel-controller'
@@ -144,6 +145,7 @@ export function renderFloatingTerminalPanelSurface({
           onPointerCancel={handleDragEnd}
           onDoubleClick={handleTitlebarDoubleClick}
         >
+          <FloatingTerminalTitlebarGrabHandle />
           <FloatingWorkspaceTabDragContext enabled={open}>
             <TabBar
               tabs={terminalItems}
