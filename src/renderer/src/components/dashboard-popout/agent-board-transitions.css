@@ -1,9 +1,9 @@
 /*
  * View-transition tuning for the agent board. Each card carries a unique
  * `view-transition-name` (agentcard-…), so when a card changes column the
- * browser morphs it from its old position to the new one. Only loaded in the
- * pop-out (imported by AgentKanbanBoard), so these document-global pseudo rules
- * never affect the main window.
+ * browser morphs it from its old position to the new one. Imported by
+ * AgentKanbanBoard, so these document-global pseudo rules only affect whichever
+ * window mounts the board.
  */
 
 /* Card move/resize easing (applies to every transition group). */

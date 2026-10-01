@@ -1251,6 +1251,13 @@
           "24416f42cd": "Shared paths on worktrees",
           "9762364929": "Uses APFS clone-copy on macOS when possible, otherwise symlinks configured folders or files into created worktrees.",
           "a05bcdaf57": "Agents View",
+          "agentDashboard": {
+            "modeAriaLabel": "Agent Dashboard open mode",
+            "modeCopy": "Show the dashboard as an in-window board beside the sidebar or a separate pop-out window.",
+            "modeInWindow": "In-window",
+            "modeLabel": "Open as",
+            "modePopout": "Pop-out"
+          },
           "f63ea281e3": "Threaded left-sidebar feed for agent completions and blocking states.",
           "fb82ea1d7a": "Automatically materialize configured files or folders into newly created worktrees.",
           "newWorktreeCardStyle": {
@@ -1738,6 +1745,9 @@
             "603d29ed74": "Automatically materialize configured files or folders into newly created worktrees using APFS clone-copy on macOS when possible, otherwise symlinks.",
             "78c2a8dc74": "Shared paths on worktrees",
             "92a9357d1f": "agents view",
+            "agentDashboard": {
+              "popout": "pop-out"
+            },
             "bff1ff7768": "symlinks",
             "c387565812": "symlink",
             "ca5d1f3f46": "timeline",
@@ -3049,6 +3059,10 @@
     "placeholder": {
       "description": "This is where all your agents will show up at a glance. The board is coming soon.",
       "title": "Agent dashboard"
+    },
+    "recoverableError": {
+      "description": "The dashboard could not finish rendering. Retry to remount it, or reopen it.",
+      "title": "Orca dashboard hit an error."
     }
   },
   "runtimeRpc": {

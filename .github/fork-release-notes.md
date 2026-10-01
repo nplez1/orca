@@ -5,11 +5,11 @@ Built from [`{{SHA}}`](https://github.com/nplez1/orca/commit/{{SHA}}) on {{DATE}
 
 ## Install
 
-| Platform | Artifact | How |
-| --- | --- | --- |
-| macOS, Apple silicon | `Orca-NP-{{VERSION}}-arm64-mac.zip` | unzip, drag **Orca NP** into Applications |
-| macOS, Intel | `Orca-NP-{{VERSION}}-mac.zip` | same app, x64 build |
-| Windows | `orca-windows-setup.exe` | run it; SmartScreen warns once — *More info* → *Run anyway* |
+| Platform             | Artifact                            | How                                                         |
+| -------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| macOS, Apple silicon | `Orca-NP-{{VERSION}}-arm64-mac.zip` | unzip, drag **Orca NP** into Applications                   |
+| macOS, Intel         | `Orca-NP-{{VERSION}}-mac.zip`       | same app, x64 build                                         |
+| Windows              | `orca-windows-setup.exe`            | run it; SmartScreen warns once — _More info_ → _Run anyway_ |
 
 The `.dmg` and the `.zip` contain the same app; either works.
 
@@ -17,7 +17,7 @@ The `.dmg` and the `.zip` contain the same app; either works.
 
 ## What this build is
 
-- Ships as **Orca NP**, so it installs *beside* an official Orca rather than replacing it: its own app
+- Ships as **Orca NP**, so it installs _beside_ an official Orca rather than replacing it: its own app
   bundle, its own data (`Application Support/orca-np`), its own settings (`~/.orca-np`), and its own
   command (`orca-np`).
 - Updates from **this repository's releases**, never from stablyai's.

@@ -14,10 +14,8 @@ describe('agent dashboard performance isolation', () => {
     const sidebar = source('components/sidebar/index.tsx')
     const nav = source('components/sidebar/SidebarNav.tsx')
 
-    expect(backgroundServices).not.toMatch(/from ['"].*DashboardPopoutBridge['"]/)
-    expect(backgroundServices).toContain("import('../components/dashboard/DashboardPopoutBridge')")
-    expect(sidebar).not.toMatch(/from ['"].*AgentDashboard(?:Drawer|SidebarHost)['"]/)
-    expect(sidebar).toContain("import('./AgentDashboardSidebarHost')")
+    expect(backgroundServices).not.toContain('DashboardPopoutBridge')
+    expect(sidebar).not.toMatch(/AgentDashboard(?:Drawer|SidebarHost)/)
     expect(nav).not.toContain('useAgentBucketCounts')
     expect(nav).not.toContain('shared/dashboard-snapshot')
     expect(nav).toContain("import('./AgentDashboardSidebarEntry')")

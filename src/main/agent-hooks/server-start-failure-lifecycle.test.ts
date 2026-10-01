@@ -184,11 +184,9 @@ describe('AgentHookServer startup failure lifecycle', () => {
 
     try {
       let startSettled = false
-      const start = server
-        .start({ env: 'production', userDataPath })
-        .then(() => {
-          startSettled = true
-        })
+      const start = server.start({ env: 'production', userDataPath }).then(() => {
+        startSettled = true
+      })
 
       await expect(server.getStatusCacheHydrationReady()).resolves.toBeUndefined()
       expect(startSettled).toBe(false)

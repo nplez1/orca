@@ -179,7 +179,6 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onDeleteCurrentWorkspace: () => noopUnsubscribe,
     onOpenWorkspaceBoard: () => noopUnsubscribe,
     onToggleAgentDashboard: () => noopUnsubscribe,
-    onOpenAgentDashboardDrawer: () => noopUnsubscribe,
     onJumpToWorktreeIndex: () => noopUnsubscribe,
     onJumpToTabIndex: () => noopUnsubscribe,
     onWorktreeHistoryNavigate: () => noopUnsubscribe,

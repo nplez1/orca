@@ -302,8 +302,8 @@ These five are therefore refused only by the client whose guest actually runs th
 `additionalArguments` at creation, and the preload reads it back out of its own argv — the answer
 has to be there before the first snapshot is interpreted, which is earlier than any IPC handler a
 renderer could wait on. Every other viewer — a second desktop, the web client, which installs no
-page renderer at all, the dashboard pop-out, which is deliberately left unstamped — keeps tracking
-the host, which is the only reason a mirrored viewer shows anything but its first snapshot
+page renderer at all — keeps tracking the host, which is the only reason a mirrored viewer shows
+anything but its first snapshot
 forever. Improving what a _second_ client sees still means fixing the publish, not the carve-out;
 the carve-out no longer stands in the way of it.
 

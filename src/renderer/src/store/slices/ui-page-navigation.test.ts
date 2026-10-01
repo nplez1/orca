@@ -736,4 +736,48 @@ describe('createUISlice space navigation', () => {
     store.getState().hydratePersistedUI(makePersistedUI({ activeView: 'artifacts' }), 'startup')
     expect(store.getState().activeView).toBe('artifacts')
   })
+
+  it('returns to the originating view after closing the Agent Dashboard', () => {
+    const store = createUIStore()
+
+    store.getState().openTaskPage()
+    store.getState().openAgentDashboardPage()
+
+    expect(store.getState().activeView).toBe('dashboard')
+    expect(store.getState().previousViewBeforeDashboard).toBe('tasks')
+
+    store.getState().closeAgentDashboardPage()
+
+    expect(store.getState().activeView).toBe('tasks')
+  })
+
+  it('records and rewinds Agent Dashboard visits on close', () => {
+    const store = createUIStore()
+    store.setState({ worktreesByRepo: { 'repo-1': [makeWorktree('a')] } })
+
+    store.getState().recordWorktreeVisit('a')
+    store.getState().openAgentDashboardPage()
+    expect(store.getState().worktreeNavHistory).toEqual(['a', 'dashboard'])
+    expect(store.getState().worktreeNavHistoryIndex).toBe(1)
+
+    store.getState().closeAgentDashboardPage()
+    expect(store.getState().activeView).toBe('terminal')
+    expect(store.getState().worktreeNavHistoryIndex).toBe(0)
+  })
+
+  it('restores a hydrated dashboard view only while the experiment is on', () => {
+    const store = createUIStore()
+    store.setState({
+      settings: { ...getDefaultSettings('/tmp'), experimentalAgentDashboardPopout: true }
+    })
+    store.getState().hydratePersistedUI(makePersistedUI({ activeView: 'dashboard' }), 'startup')
+    expect(store.getState().activeView).toBe('dashboard')
+
+    const disabledStore = createUIStore()
+    disabledStore.setState({ settings: getDefaultSettings('/tmp') })
+    disabledStore
+      .getState()
+      .hydratePersistedUI(makePersistedUI({ activeView: 'dashboard' }), 'startup')
+    expect(disabledStore.getState().activeView).toBe('terminal')
+  })
 })
