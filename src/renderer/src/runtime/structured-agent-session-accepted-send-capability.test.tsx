@@ -7,7 +7,10 @@ import { AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY } from '../../../shared/
 const mocks = vi.hoisted(() => ({ supports: vi.fn() }))
 
 vi.mock('./runtime-rpc-client', () => ({
-  runtimeEnvironmentSupportsCapability: mocks.supports
+  runtimeEnvironmentSupportsCapability: mocks.supports,
+  // Why stubbed: the path-search capability module subscribes on import, and this suite only
+  // needs the one reader it exercises.
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 import { setLocalRuntimeCapabilitiesForTests } from './local-runtime-capabilities'
