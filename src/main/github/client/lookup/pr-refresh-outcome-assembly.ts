@@ -42,6 +42,9 @@ export function assemblePRRefreshFoundOutcome(args: {
       updatedAt: data.updatedAt,
       mergeable,
       ...(data.reviewDecision !== undefined ? { reviewDecision: data.reviewDecision } : {}),
+      ...(data.viewerCanMergeAsAdmin !== undefined
+        ? { viewerCanMergeAsAdmin: data.viewerCanMergeAsAdmin }
+        : {}),
       ...(data.autoMergeEnabled !== undefined ? { autoMergeEnabled: data.autoMergeEnabled } : {}),
       ...(data.autoMergeAllowed !== undefined ? { autoMergeAllowed: data.autoMergeAllowed } : {}),
       ...(stackMergeQueueRequired !== undefined || data.mergeQueueRequired !== undefined

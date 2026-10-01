@@ -35,11 +35,20 @@ export type { GitHubPrMutationOutcome } from './github-pr-mutation-outcome'
 export function fetchMergePR(
   client: RpcOperationSender,
   worktreeId: string,
-  args: { prNumber: number; method?: GitHubPRMergeMethod; prRepo?: GitHubPrRepoSlug | null }
+  args: {
+    prNumber: number
+    method?: GitHubPRMergeMethod
+    /** Set only after the sidebar's confirmation told the user it would skip branch protection. */
+    bypassBranchProtection?: boolean
+    prRepo?: GitHubPrRepoSlug | null
+  }
 ): Promise<GitHubPrMutationOutcome> {
   const params: Record<string, unknown> = { prNumber: args.prNumber }
   if (args.method) {
     params.method = args.method
+  }
+  if (args.bypassBranchProtection) {
+    params.bypassBranchProtection = true
   }
   return settleGithubPrMutation(githubPrMergeRun, () =>
     githubPrMergeRun.request(

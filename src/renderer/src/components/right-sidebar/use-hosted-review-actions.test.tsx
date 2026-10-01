@@ -54,6 +54,7 @@ function HookProbe(props: {
   onRefreshReview: () => Promise<void>
   pullRequest?: PRInfo
   isGitLab?: boolean
+  adminBypassRequired?: boolean
 }): null {
   latest = useHostedReviewActions({
     review,
@@ -64,6 +65,7 @@ function HookProbe(props: {
     reviewLabel: 'pull request',
     defaultMergeMethod: 'squash',
     autoMergeAction: null,
+    adminBypassRequired: props.adminBypassRequired ?? false,
     onRefreshReview: props.onRefreshReview
   })
   return null
@@ -73,13 +75,22 @@ async function renderHook(
   repo: Repo,
   onRefreshReview = vi.fn().mockResolvedValue(undefined),
   pullRequest?: PRInfo,
-  isGitLab = false
+  isGitLab = false,
+  adminBypassRequired = false
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
-    root?.render(createElement(HookProbe, { repo, onRefreshReview, pullRequest, isGitLab }))
+    root?.render(
+      createElement(HookProbe, {
+        repo,
+        onRefreshReview,
+        pullRequest,
+        isGitLab,
+        adminBypassRequired
+      })
+    )
   })
   return { onRefreshReview }
 }
@@ -155,6 +166,54 @@ describe('useHostedReviewActions', () => {
     })
     expect(runtimeRpcMocks.callRuntimeRpc).not.toHaveBeenCalled()
     expect(onRefreshReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirms the bypass before merging a review-gated pull request with admin privileges', async () => {
+    const { onRefreshReview } = await renderHook(makeRepo(), undefined, undefined, false, true)
+
+    await act(async () => {
+      await latest?.handleMerge('squash')
+    })
+
+    expect(confirmationMocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Bypass branch protection?', confirmLabel: 'Merge anyway' })
+    )
+    expect(window.api.gh.mergePR).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      repoId: 'repo-1',
+      prNumber: 1015,
+      method: 'squash',
+      bypassBranchProtection: true,
+      prRepo
+    })
+    expect(onRefreshReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not merge at all when the bypass confirmation is declined', async () => {
+    confirmationMocks.confirm.mockResolvedValue(false)
+    await renderHook(makeRepo(), undefined, undefined, false, true)
+
+    await act(async () => {
+      await latest?.handleMerge('squash')
+    })
+
+    expect(window.api.gh.mergePR).not.toHaveBeenCalled()
+  })
+
+  it('leaves an ordinary merge unconfirmed as a bypass', async () => {
+    await renderHook(makeRepo())
+
+    await act(async () => {
+      await latest?.handleMerge('squash')
+    })
+
+    expect(window.api.gh.mergePR).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      repoId: 'repo-1',
+      prNumber: 1015,
+      method: 'squash',
+      prRepo
+    })
   })
 
   it('gates runtime-owned ready mutations on the host capability', async () => {

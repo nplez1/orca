@@ -81,7 +81,12 @@ export default function HostedReviewActions({
       : stackMergeScope?.label
   const mergePresentation = useMemo(() => {
     if (isGitLab) {
-      return { ...presentGitLabMRMergeState(review), autoMergeAction: null }
+      // Why: GitLab exposes no viewer-scoped bypass, so nothing here can be waived by privilege.
+      return {
+        ...presentGitLabMRMergeState(review),
+        autoMergeAction: null,
+        adminBypassRequired: false
+      }
     }
     const presentation = presentGitHubPRMergeState({
       ...githubPR,
@@ -89,6 +94,7 @@ export default function HostedReviewActions({
       mergeable: review.mergeable,
       mergeStateStatus: review.mergeStateStatus,
       reviewDecision: review.reviewDecision,
+      viewerCanMergeAsAdmin: githubPR?.viewerCanMergeAsAdmin ?? review.viewerCanMergeAsAdmin,
       checksStatus: review.status,
       autoMergeEnabled: review.autoMergeEnabled,
       autoMergeAllowed: review.autoMergeAllowed,
@@ -115,6 +121,10 @@ export default function HostedReviewActions({
       directMergeAvailable:
         !stackBlocker &&
         (stackMergeScope.complete || presentation.directMergeAvailable || stackUsesMergeQueue),
+      // Why: a stack merges entry by entry in the main process and never reaches the per-pull-request
+      // preflight that carries `--admin`, so offering the bypass here would ask the user to confirm
+      // something the merge then does not do. Stack entries stay gated by their own review state.
+      adminBypassRequired: false,
       autoMergeAction: null
     }
   }, [githubPR, isGitLab, review, stackMergeLabel, stackMergeScope, stackUsesMergeQueue])
@@ -141,6 +151,7 @@ export default function HostedReviewActions({
     reviewLabel,
     defaultMergeMethod: mergeMethods.defaultMethod,
     autoMergeAction: mergePresentation.autoMergeAction,
+    adminBypassRequired: mergePresentation.adminBypassRequired,
     onRefreshReview
   })
   const isUpdatingReviewState = stateUpdating !== null

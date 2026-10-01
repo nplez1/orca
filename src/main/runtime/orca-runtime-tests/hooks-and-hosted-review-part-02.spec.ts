@@ -262,7 +262,8 @@ describe('OrcaRuntimeService', () => {
       'squash',
       null,
       prRepo,
-      localGitOptions
+      localGitOptions,
+      { bypassBranchProtection: false }
     )
     expect(setGitHubPRAutoMergeMock).toHaveBeenCalledWith(
       TEST_REPO_PATH,

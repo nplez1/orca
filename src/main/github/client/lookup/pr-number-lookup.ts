@@ -14,6 +14,7 @@ import {
   type RestPullRequest
 } from './pull-request-lookup-data'
 import { hydratePullRequestLookupData } from './pull-request-lookup-hydration'
+import { attachViewerCanMergeAsAdmin } from './pr-viewer-merge-privilege'
 import { isGitObjectId, isUsableRestStackMetadata } from './rest-stack-metadata-validation'
 export async function getRestPRByNumber(
   ownerRepo: GitHubApiRepository,
@@ -48,6 +49,23 @@ export async function getRestPRByNumber(
 }
 
 export async function getPRByNumber(
+  ownerRepo: GitHubApiRepository,
+  number: number,
+  ghOptions: ReturnType<typeof ghRepoExecOptions>,
+  executionScope: string,
+  knownPullRequestData?: PullRequestLookupData | null
+): Promise<PullRequestLookupData | null> {
+  const data = await lookupPRByNumberData(
+    ownerRepo,
+    number,
+    ghOptions,
+    executionScope,
+    knownPullRequestData
+  )
+  return data ? attachViewerCanMergeAsAdmin(ownerRepo, data, ghOptions, executionScope) : null
+}
+
+async function lookupPRByNumberData(
   ownerRepo: GitHubApiRepository,
   number: number,
   ghOptions: ReturnType<typeof ghRepoExecOptions>,

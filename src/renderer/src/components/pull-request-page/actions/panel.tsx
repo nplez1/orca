@@ -180,6 +180,7 @@ export function PRActionsPanel({
                     sourceContext,
                     prRepo,
                     mergeTarget,
+                    adminBypassRequired: mergePresentation.adminBypassRequired,
                     confirm,
                     setMergePending,
                     applyStatePatch,

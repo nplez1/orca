@@ -181,7 +181,7 @@ export class PrActionsEngine {
     this.setError(outcome.error)
   }
 
-  async merge(method?: GitHubPRMergeMethod): Promise<void> {
+  async merge(method?: GitHubPRMergeMethod, bypassBranchProtection = false): Promise<void> {
     const cfg = this.cfg
     const identity = this.identity
     this.setBusy({ kind: 'merge' })
@@ -190,7 +190,10 @@ export class PrActionsEngine {
       const outcome = await cfg.mutations.mergePR({
         prNumber: cfg.prNumber,
         method,
-        prRepo: cfg.prRepo
+        prRepo: cfg.prRepo,
+        // Why: only the caller that showed the bypass confirmation sets this; it is what tells the
+        // host to merge with admin privileges instead of reporting the unmet requirement.
+        ...(bypassBranchProtection ? { bypassBranchProtection: true } : {})
       })
       await this.settle(identity, outcome, { onSuccess: () => {}, onRevert: () => {} })
     } catch (err) {

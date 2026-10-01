@@ -758,7 +758,7 @@ describe('OrcaRuntimeRpcServer', () => {
       prRepo: null
     })
     expect(mocks.requestRepoPRReviewers).toHaveBeenCalledWith('id:repo-1', 456, ['alex'], null)
-    expect(mocks.mergeRepoPR).toHaveBeenCalledWith('id:repo-1', 456, 'squash', null)
+    expect(mocks.mergeRepoPR).toHaveBeenCalledWith('id:repo-1', 456, 'squash', null, false)
     expect(mocks.addGitLabRepoIssueComment).toHaveBeenCalledWith(
       'id:repo-1',
       123,

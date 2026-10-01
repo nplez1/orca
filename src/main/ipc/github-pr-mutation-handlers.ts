@@ -60,6 +60,7 @@ export function registerGitHubPRMutationHandlers(store: Store): void {
       args: GitHubRepoScopedArgs & {
         prNumber: number
         method?: 'merge' | 'squash' | 'rebase'
+        bypassBranchProtection?: boolean
         prRepo?: GitHubOwnerRepo | null
       }
     ) => {
@@ -70,7 +71,8 @@ export function registerGitHubPRMutationHandlers(store: Store): void {
         args.method,
         getGitHubRepoConnectionId(repo),
         args.prRepo ?? null,
-        ...getGitHubLocalGitOptionArgs(store, repo)
+        ...getGitHubLocalGitOptionArgs(store, repo),
+        { bypassBranchProtection: args.bypassBranchProtection === true }
       )
       broadcastSuccessfulPRMutation(result.ok, repo.path, repo.id, args.prNumber, event.sender.id)
       return result

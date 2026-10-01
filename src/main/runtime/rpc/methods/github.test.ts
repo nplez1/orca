@@ -423,11 +423,38 @@ describe('github RPC methods', () => {
       })
     )
 
-    expect(runtime.mergeRepoPR).toHaveBeenCalledWith('repo-1', 7, 'squash', {
-      owner: 'acme',
-      repo: 'widgets'
-    })
+    expect(runtime.mergeRepoPR).toHaveBeenCalledWith(
+      'repo-1',
+      7,
+      'squash',
+      {
+        owner: 'acme',
+        repo: 'widgets'
+      },
+      // No confirmed bypass was requested, so the host must merge without admin privileges.
+      false
+    )
     expect(response).toMatchObject({ ok: true, result: { ok: true } })
+  })
+
+  it('forwards a confirmed admin bypass to the merge', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      mergeRepoPR: vi.fn().mockResolvedValue({ ok: true })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: GITHUB_METHODS })
+
+    await dispatcher.dispatch(
+      makeRequest('github.mergePR', {
+        repo: 'repo-1',
+        prNumber: 7,
+        method: 'squash',
+        bypassBranchProtection: true,
+        prRepo: null
+      })
+    )
+
+    expect(runtime.mergeRepoPR).toHaveBeenCalledWith('repo-1', 7, 'squash', null, true)
   })
 
   it('sets PR auto-merge on the runtime server', async () => {

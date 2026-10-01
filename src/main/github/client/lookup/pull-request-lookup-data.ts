@@ -27,6 +27,8 @@ export type PullRequestLookupData = {
   isDraft?: boolean
   mergeable: string
   reviewDecision?: PRReviewDecision | null
+  /** GitHub's viewer-scoped answer to whether this account may waive branch protection. */
+  viewerCanMergeAsAdmin?: boolean
   autoMergeRequest?: unknown
   autoMergeEnabled?: boolean
   autoMergeAllowed?: boolean | null
@@ -150,6 +152,9 @@ export function normalizePullRequestLookupData(data: PullRequestLookupData): Pul
     ...data,
     reviewDecision:
       data.reviewDecision !== undefined ? normalizeReviewDecision(data.reviewDecision) : undefined,
+    ...(typeof data.viewerCanMergeAsAdmin === 'boolean'
+      ? { viewerCanMergeAsAdmin: data.viewerCanMergeAsAdmin }
+      : {}),
     autoMergeEnabled:
       data.autoMergeEnabled ??
       ('autoMergeRequest' in data ? isAutoMergeEnabled(data.autoMergeRequest) : undefined)

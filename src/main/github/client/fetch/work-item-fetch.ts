@@ -8,6 +8,8 @@ import {
 } from '../../gh-utils'
 import { githubHostExecOptions, type GitHubApiRepository } from '../../github-api-repository'
 import type { GhExecOptions } from './../github-exec-scope'
+import { githubPRStackExecutionScope } from './../github-exec-scope'
+import { getViewerCanMergeAsAdmin, hasUnmetReviewGate } from './../lookup/pr-viewer-merge-privilege'
 import { resolvePullRequestLookupCandidates } from './../pull-request-lookup-candidates'
 import { detectRepositoryMergeMetadata } from './../detect/repository-merge-metadata'
 import {
@@ -90,6 +92,28 @@ export async function fetchPullRequestReviewFields(
   }
 }
 
+// Why: the PR page and the land-pull-request dialog read work items, not the branch lookup, so
+// the bypass question has to be asked on this path as well.
+async function attachWorkItemViewerMergePrivilege(
+  ownerRepo: GitHubApiRepository,
+  number: number,
+  mapped: MainWorkItem,
+  ghOptions: GhExecOptions,
+  connectionId?: string | null,
+  localGitOptions: LocalGitExecOptions = {}
+): Promise<Pick<MainWorkItem, 'viewerCanMergeAsAdmin'>> {
+  if (!hasUnmetReviewGate(mapped)) {
+    return {}
+  }
+  const viewerCanMergeAsAdmin = await getViewerCanMergeAsAdmin(
+    ownerRepo,
+    number,
+    ghOptions,
+    githubPRStackExecutionScope(connectionId, localGitOptions)
+  )
+  return viewerCanMergeAsAdmin === undefined ? {} : { viewerCanMergeAsAdmin }
+}
+
 export async function fetchPullRequestWorkItem(
   repoPath: string,
   ownerRepo: GitHubApiRepository | null,
@@ -117,12 +141,21 @@ export async function fetchPullRequestWorkItem(
       )
       const item = JSON.parse(stdout) as Record<string, unknown>
       const mapped = mapPullRequestWorkItem(item, ownerRepo)
+      const bypass = await attachWorkItemViewerMergePrivilege(
+        ownerRepo,
+        number,
+        mapped,
+        ghOptions,
+        connectionId,
+        localGitOptions
+      )
       // Why: merge-metadata GraphQL is best-effort — don't fall through to REST, which drops latestReviews and blanks bot-only reviewer lists.
       const baseRefName = typeof item.baseRefName === 'string' ? item.baseRefName : undefined
       try {
         const mergeMetadata = await detectRepositoryMergeMetadata(ownerRepo, baseRefName, ghOptions)
         return {
           ...mapped,
+          ...bypass,
           mergeQueueRequired: mergeMetadata.mergeQueueRequired,
           ...(mergeMetadata.autoMergeAllowed !== null
             ? { autoMergeAllowed: mergeMetadata.autoMergeAllowed }
@@ -132,7 +165,7 @@ export async function fetchPullRequestWorkItem(
             : {})
         }
       } catch {
-        return mapped
+        return { ...mapped, ...bypass }
       }
     } catch {
       const { stdout } = await ghExecFileAsync(
