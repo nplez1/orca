@@ -258,7 +258,12 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
               : s.workspaceCleanupBrowse,
           // Why: restore only on startup; on 'sync' broadcasts it would clobber the window's current per-window view.
           activeView:
-            source === 'startup' ? sanitizeHydratedActiveView(ui.activeView) : s.activeView,
+            source === 'startup'
+              ? sanitizeHydratedActiveView(
+                  ui.activeView,
+                  s.settings?.experimentalAgentDashboardPopout === true
+                )
+              : s.activeView,
           persistedUIReady: true
         }
         // The incoming payload is authoritative for the writer-owned fields, so it becomes the

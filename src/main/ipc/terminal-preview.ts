@@ -4,7 +4,6 @@ import type {
   TerminalPreviewSnapshot
 } from '../../shared/terminal-preview'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { isDashboardPopoutRenderer } from '../window/dashboard-popout-window'
 import { isTrustedUIRenderer } from './ui'
 import {
   TERMINAL_PREVIEW_OUTPUT_BATCH_MAX_BYTES,
@@ -17,11 +16,10 @@ function isValidPtyId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= PREVIEW_ID_MAX_LENGTH
 }
 
-// Why: the preview dialog has two hosts — the pop-out window and the main
-// renderer's in-window overlay. The trusted UI renderer already has full PTY
-// access through the regular terminal channels, so admitting it adds no reach.
+// Why: the trusted UI renderer already has full PTY access through the regular
+// terminal channels, so admitting it adds no reach.
 function isTerminalPreviewRenderer(sender: WebContents): boolean {
-  return isDashboardPopoutRenderer(sender) || isTrustedUIRenderer(sender)
+  return isTrustedUIRenderer(sender)
 }
 /** Pop-out terminal transport with an atomic snapshot/live boundary. */
 export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): void {
@@ -38,7 +36,7 @@ export function registerTerminalPreviewHandlers(runtime: OrcaRuntimeService): vo
   // unsubscribe or a destroyed window always releases the size floor.
   const fitClaimsByContents = new Map<number, Map<string, symbol>>()
 
-  const previewViewerKey = (contentsId: number): string => `dashboard-popout:${contentsId}`
+  const previewViewerKey = (contentsId: number): string => `terminal-preview:${contentsId}`
 
   const releaseFitClaim = (contentsId: number, ptyId: string): void => {
     const claimed = fitClaimsByContents.get(contentsId)

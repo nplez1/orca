@@ -253,14 +253,14 @@ pnpm run sync:localization-runtime-catalog
   fork had patched — so no convergence question went to the fork owner this time either.
   - **`local(terminal)`: a BEL inside a control string is not a bell.** Pi writes `ESC _ pi:c BEL`
     on every prompt repaint, and the detector tracked only OSC, so each repaint announced a phantom
-    "Attention requested". APC/DCS/PM/SOS now all swallow a BEL. Deliberately *not* xterm-strict:
+    "Attention requested". APC/DCS/PM/SOS now all swallow a BEL. Deliberately _not_ xterm-strict:
     xterm keeps those four open until ST, and Pi never sends one, so xterm's rule would pin the
     string and drop every later real bell. This commit leads the sync so the replayed series stays
     a linear patch series; it is not upstream-bound.
   - **Rate-limit providers unioned on every enumeration again.** Upstream's `zcode` joined the
     provider union, the five status-item migrations, the service state/polling/preparation and the
     bar's pending chain, in the same places `deepseek`/`fireworks`/`copilot` already sit. The
-    `zcode` field is *optional* on `UsageProviderSnapshots`, so its pending probe keeps upstream's
+    `zcode` field is _optional_ on `UsageProviderSnapshots`, so its pending probe keeps upstream's
     `providers.zcode !== undefined` guard: an absent slice is not a pending one, and without that
     guard the setup CTA is held back forever.
   - **Upstream's junk-test purge deleted eleven files the fork had patched.** `#23815` removed 101
@@ -283,14 +283,14 @@ pnpm run sync:localization-runtime-catalog
     for live work.
   - **Two workflow files, both upstream-rewritten under a fork-owned verdict.** `e2e.yml` and
     `unit-tests.yml` keep upstream's new steps (the failure summary, the shard-selection artifact,
-    the `.index`/`.count` matrix) *and* the fork's verdict wiring. Their JSON reports were
+    the `.index`/`.count` matrix) _and_ the fork's verdict wiring. Their JSON reports were
     reconciled rather than duplicated: Playwright honours `PLAYWRIGHT_JSON_OUTPUT_FILE` over
     `PLAYWRIGHT_JSON_OUTPUT_NAME` when both are set (measured on 1.63.0), so the e2e step keeps
     upstream's env var and its own `--reporter=list,json` and the fork's verdict now reads the same
     `ci-shards/results.json` the failure summary does — the fork's second output name is gone, and
     with it the `if repository != stablyai/orca` shell guard the run step no longer needs. The
     unit-shard step keeps its report arguments inside that guard, because upstream added no
-    reporter of its own there. Both verdict contract suites were updated to pin the *interaction*
+    reporter of its own there. Both verdict contract suites were updated to pin the _interaction_
     and both pass. `e2e.yml`'s `Summarize E2E failures` step and the `unit-tests.yml`
     tee/mkdir/pipefail lines stay unguarded on purpose: upstream's shard lane already creates
     `ci-shards/` for its download-artifact step, and `pipefail` preserves Vitest's exit code, so
@@ -344,12 +344,12 @@ pnpm run sync:localization-runtime-catalog
     `upstream/main` (from `560c42e1d1`), the five deliberately-left ones **1069 behind** (from
     `615b1370fb`) — see [BRANCHES.md](./BRANCHES.md).
   - **Left open, by name:**
-    - *Which module added the five chunks* the mobile page's sweep grew by. The re-measure is the
+    - _Which module added the five chunks_ the mobile page's sweep grew by. The re-measure is the
       documented response to drift past the margin, but it is a measurement, not a diagnosis: a
       shared importer set moving is the known cause and the split is still inside both budgets, so
       nobody has yet named the module that moved. Worth one pass before the next sync re-measures
       again.
-    - *`local(identity)` and the remaining `~/.orca` readers.* `local(identity)` renames the *home*
+    - _`local(identity)` and the remaining `~/.orca` readers._ `local(identity)` renames the _home_
       directory (`~/.orca` → `~/.orca-np`) only where this patch already reached. Upstream has
       since added home-scoped stores that still hardcode `.orca`: `jira/site-credential-store.ts`,
       `jenkins/jenkins-server-store.ts`, `bitbucket/credential-store.ts`,
@@ -362,7 +362,7 @@ pnpm run sync:localization-runtime-catalog
       data migration that orphans what is already there, not a constant swap. Per-store triage
       before any of them moves: unreachable in a fork build, a live write whose reader already
       moved, or a migration that has to be designed.
-    - *The intermediate commits of this series are not self-consistent about the derived catalog.*
+    - _The intermediate commits of this series are not self-consistent about the derived catalog._
       `en-runtime-required.json` conflicted twice and was resolved by taking one side and
       regenerating at the tip (the runbook's procedure), so `runtime-required-catalog.test.ts`
       cross-checks `en.json` only at the tip. Nothing gates a mid-series commit, but a `git bisect`

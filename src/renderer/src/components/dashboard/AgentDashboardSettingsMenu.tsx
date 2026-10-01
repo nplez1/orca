@@ -9,43 +9,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { SettingsSegmentedControl, SettingsSwitch } from '../settings/SettingsFormControls'
-import type { AgentDashboardMode } from '../../../../shared/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
 
-type AgentDashboardSettingsMenuProps = {
-  /** Called after the mode flips so the host can hand the board over: the
-   *  in-window board closes for the pop-out, and the pop-out window is closed by
-   *  the main process. Omitted when the host needs no handoff. */
-  onModeChange?: (next: AgentDashboardMode) => void
-  /** Lets the host keep the companion board open while this menu owns the
-   *  next outside click, matching the workspace board's menu handling. */
-  onOpenChange?: (open: boolean) => void
-}
-
 /** Board-header settings for the Agent Dashboard, mirroring the workspace
- *  board's settings menu. Both hosts mount it: the pop-out renderer has its own
- *  settings-synced store, so the controls behave identically there. */
-export function AgentDashboardSettingsMenu({
-  onModeChange,
-  onOpenChange
-}: AgentDashboardSettingsMenuProps): React.JSX.Element {
-  const mode = useAppStore((s) => s.settings?.experimentalAgentDashboardMode ?? 'in-window')
+ *  board's settings menu. */
+export function AgentDashboardSettingsMenu(): React.JSX.Element {
   const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
   const cardClickAction = useAppStore(
     (s) => s.settings?.experimentalAgentDashboardCardClickAction ?? 'workspace'
   )
   const updateSettings = useAppStore((s) => s.updateSettings)
 
-  const handleModeChange = (next: AgentDashboardMode): void => {
-    if (next === mode) {
-      return
-    }
-    updateSettings({ experimentalAgentDashboardMode: next })
-    onModeChange?.(next)
-  }
-
   return (
-    <DropdownMenu modal={false} onOpenChange={onOpenChange}>
+    <DropdownMenu modal={false}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
@@ -64,51 +40,6 @@ export function AgentDashboardSettingsMenu({
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" sideOffset={8} collisionPadding={8} className="w-72 p-2">
-        <div className="flex items-start justify-between gap-3 rounded-md px-1.5 py-1.5">
-          <span className="min-w-0 space-y-0.5">
-            <span className="block text-[12px] font-medium leading-4 text-foreground">
-              {translate(
-                'auto.components.settings.ExperimentalPane.agentDashboard.modeLabel',
-                'Open as'
-              )}
-            </span>
-            <span className="block text-[11px] leading-4 text-muted-foreground">
-              {translate(
-                'auto.components.settings.ExperimentalPane.agentDashboard.modeCopy',
-                'Show the dashboard as an in-window board beside the sidebar or a separate pop-out window.'
-              )}
-            </span>
-          </span>
-        </div>
-        <div className="px-1.5 pb-1">
-          <SettingsSegmentedControl
-            value={mode}
-            onChange={handleModeChange}
-            ariaLabel={translate(
-              'auto.components.settings.ExperimentalPane.agentDashboard.modeAriaLabel',
-              'Agent Dashboard open mode'
-            )}
-            size="sm"
-            equalWidth
-            options={[
-              {
-                value: 'in-window',
-                label: translate(
-                  'auto.components.settings.ExperimentalPane.agentDashboard.modeInWindow',
-                  'In-window'
-                )
-              },
-              {
-                value: 'popout',
-                label: translate(
-                  'auto.components.settings.ExperimentalPane.agentDashboard.modePopout',
-                  'Pop-out'
-                )
-              }
-            ]}
-          />
-        </div>
-        <DropdownMenuSeparator />
         <div className="flex items-start justify-between gap-3 rounded-md px-1.5 py-1.5">
           <span className="min-w-0 space-y-0.5">
             <span className="block text-[12px] font-medium leading-4 text-foreground">

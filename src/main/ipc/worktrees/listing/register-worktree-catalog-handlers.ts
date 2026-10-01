@@ -39,7 +39,6 @@ import { getRegisteredWorktreeRootsRevision } from '../../registered-worktree-ro
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
 
-
 const WORKTREE_LIST_ALL_CONCURRENCY = 8
 
 async function mapWithConcurrency<T, R>(

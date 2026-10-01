@@ -1,30 +1,27 @@
-import type { AppState } from '../../store/types'
+import type { TopLevelView } from '../../../../shared/ui-chrome-types'
 
-export function toggleAgentDashboardFromShortcut(
-  state: Pick<
-    AppState,
-    | 'activeView'
-    | 'settings'
-    | 'agentDashboardDrawerOpen'
-    | 'setSidebarOpen'
-    | 'setAgentDashboardDrawerOpen'
-  >,
-  openPopout: () => void
-): void {
+/** Only the state the toggle reads and writes, so callers pass the store state
+ *  directly without a wider AppState dependency. */
+export type AgentDashboardShortcutState = {
+  activeView: TopLevelView
+  settings: { experimentalAgentDashboardPopout?: boolean } | null | undefined
+  openAgentDashboardPage: () => void
+  closeAgentDashboardPage: () => void
+}
+
+export function toggleAgentDashboardFromShortcut(state: AgentDashboardShortcutState): void {
+  // Why: match Tasks and the workspace board — a shortcut never swaps the surface out from under the Settings view.
   if (
-    state.activeView === 'settings' ||
-    state.settings?.experimentalAgentDashboardPopout !== true
+    state.settings?.experimentalAgentDashboardPopout !== true ||
+    state.activeView === 'settings'
   ) {
     return
   }
-  if (state.settings.experimentalAgentDashboardMode === 'popout') {
-    openPopout()
+  // Why: the dashboard is a top-level view, so the shortcut toggles it and closing
+  // returns to whatever view it was opened from.
+  if (state.activeView === 'dashboard') {
+    state.closeAgentDashboardPage()
     return
   }
-  const nextOpen = !state.agentDashboardDrawerOpen
-  // The drawer self-closes with the sidebar: reveal only when opening, never while closing.
-  if (nextOpen) {
-    state.setSidebarOpen(true)
-  }
-  state.setAgentDashboardDrawerOpen(nextOpen)
+  state.openAgentDashboardPage()
 }

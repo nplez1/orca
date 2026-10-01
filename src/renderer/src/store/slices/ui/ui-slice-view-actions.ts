@@ -102,6 +102,19 @@ export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<U
       set((state) => ({
         activeView: state.previousViewBeforeMobile
       })),
+    openAgentDashboardPage: () => {
+      get().recordViewVisit('dashboard')
+      set((state) => ({
+        activeView: 'dashboard',
+        previousViewBeforeDashboard:
+          state.activeView === 'dashboard' ? state.previousViewBeforeDashboard : state.activeView
+      }))
+    },
+    closeAgentDashboardPage: () =>
+      set((state) => ({
+        activeView: state.previousViewBeforeDashboard,
+        worktreeNavHistoryIndex: rewindHistoryIndexPastView(state, 'dashboard')
+      })),
     setNewWorkspaceDraft: (draft) => set({ newWorkspaceDraft: draft }),
     clearNewWorkspaceDraft: () => set({ newWorkspaceDraft: null })
   }
