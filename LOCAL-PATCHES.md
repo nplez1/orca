@@ -272,6 +272,130 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-01 — sync onto upstream `a5601375d4`** (166 commits), from the released tip `5065084bf1`
+  (np.15 released from `c8fa8feead`, with `#44`–`#47` landed on top of it). **140 commits replayed**,
+  then this sync's one fix commit on top: **105 byte-identical by `range-diff`, 34 adapted, none
+  dropped, none added.** New tip `546e94bf16`; the re-seat fixes landed as `883aa7d5f1`.
+  No merge commits were in the replay range, so the `--rebase-merges` trap did not apply this time.
+
+  - **A fork-owner decision finally settled upstream's source-grep purges.** Upstream is retiring
+    whole classes of test that assert on production source text, and this sync's range brought four
+    such waves (`45c63a66e9`, `7980ab9942`, `1f8159cca6`, `33351b0085`, `85f8d6b5f5`). The fork
+    asked, and the answer is **hybrid**: take upstream's deletion, and re-seat any assertion that
+    only the fork's own surface explains. Applied as follows.
+    - `app-startup-routing.test.ts` (650 lines, 27 cases) and the retired cases in
+      `desktop-startup-ordering.test.ts`, `use-file-explorer-name-filter.test.ts`,
+      `installer-utils.test.ts`, `ssh-connection-store.test.ts`, `dashboard-payload-validation.test.ts`,
+      `ai-vault-search-all-hosts-real-index.test.ts`, `folder-repo-git-upgrade.test.ts`,
+      `filesystem-watcher.test.ts`, `session-parse-cache-persistence.test.ts` and the updater suite
+      are **deleted as upstream deleted them**. Where the fork's version had been only a string
+      re-point, the fork's change goes with it.
+    - **Re-seated**, because nothing upstream reaches them: the four
+      `agentHookStatusCacheHydrationReady` assertions became a new case in upstream's trimmed
+      `desktop-startup-ordering.test.ts` (the file is still a `reliability-gates` `assertionRefs`
+      target, so it has to exist); the `cardClickAction: 'popover'` rejection stayed where upstream's
+      surviving analogue already asserts it; and the fork's *new* cases in those files stayed.
+
+  - **`local(identity)` met a Rust rewrite of the Windows launcher.** Upstream replaced
+    `native/windows-cli-launcher/OrcaCliLauncher.cs` with `src/main.rs` (`#23383`, for MSIL
+    heuristics). The fork's two C# deltas were carried over: the `orca-np` case in the
+    `ORCA_CLI_COMMAND` whitelist, and `cfcaae6b54`'s `ResolveElectronPath` — which matters more than
+    the whitelist, because the fork ships `Orca NP.exe` and upstream's Rust launcher hardcodes
+    `Orca.exe`, so the CLI would have been dead on Windows again.
+
+  - **The MiniMax credential protection re-seated onto the fork's extracted store.** Upstream added
+    `getMiniMaxApiKeyProtection()` (envelope-kind read, no decrypt, so opening Settings cannot
+    prompt for the keychain) into the module `fbf4b16e66` had emptied into
+    `createSecureCredentialStore`. It became `SecureCredentialStore.protection()`, so both new
+    stores get it too. The same shape recurred in `AccountsPane`, where the fork had moved the
+    state into `useAccountsPaneCredentialSections` — upstream's two new states were re-seated into
+    `useMiniMaxCredentials`.
+
+  - **The explorer name filter converged again, and this was the sync's largest merge.** `#34`
+    refactored the projection into helpers (`file-explorer-name-filter-policy`,
+    `-path-acceptance`, `-tree-nodes`, `-tree-sort`, `-projection-cache`) while upstream added the
+    display-root scope (`displayRootPath`, `#18750`). The merged projection keeps the fork's
+    helper-based acceptance/insertion/byte budget/chunked builder **and** upstream's
+    `getRelativePathInsideRoot` scope walk plus its containment gate. Two consequences worth naming:
+    `worktreePath` → `displayRootPath` wherever it means the *displayed* root, and
+    `file-explorer-visible-row-projection-build.ts` needed upstream's delta ported into it because
+    `#34` had extracted those functions cleanly (git saw no conflict while upstream had patched
+    exactly them).
+
+  - **Upstream added a real Antigravity fetch, which supersedes the fork's borrow.**
+    `antigravityResultPromise`/`antigravitySettled` arrived in this range; the fork's
+    `deriveAntigravityRateLimits(gemini)` declared the same name in the same scope. Kept upstream's
+    real read and dropped the derive — an upgrade, not a loss, but a **behaviour change** worth
+    knowing: Antigravity no longer borrows Gemini's numbers on a failed read.
+
+  - **Convergence decisions that went the other way.** `tui-agent-config.ts` took the fork's
+    extraction into `tui-agent-config-table.ts` (43 entries, fork identity intact);
+    `service-full-cycle-preparation.ts` took the fork's move of `FetchAllCyclePrepared` into
+    `service-types.ts`, with upstream's new `antigravityResultPromise` member re-added to the moved
+    copy; `worktree-removal.ts` keeps upstream's per-repo serialization with the fork's
+    remote-branch read/write inside it; `worktree-remote.ts` keeps upstream's removal of the trust
+    preflight (centralized in `execution-host-workspace-trust.ts`, `#23744`) and its
+    `surfaceOwner: false`, with `#27`'s `if (startup && sequencedStartup)` structure and its
+    `setup && !hasDefaultTabs` branch.
+
+  - **Four transient reds, all proved pre-existing in the fork's own history and none chased.**
+    Fixing them mid-replay would only have conflicted with the commit that already owns the fix:
+    1. `src/main/claude/hook-settings.ts` — the staging snapshot committed
+       `getWindowsPowerShellLifecycleCommand` mid-edit (`const innerCommand =` with no `return`).
+       `451c286810` owns it. Landed correctly.
+    2. `use-worktree-activity-status.ts` — the comma after `hasRetainedFailed` upstream's insertion
+       displaced. Same owner, same commit.
+    3. The three rate-limit provider suites (`service-{cursor,deepseek,fireworks}-usage`) failed
+       mid-series on the shared harness's provider mocks until `fc2ed2727e` added them.
+    4. `service-full-cycle-application.ts` was 308 counted lines until `ab0c9d9beb` extracted the
+       inline provider fallbacks into `providerResultSnapshot()`.
+
+  - **The traps, all found by a gate and none behind a conflict marker.**
+    1. **`pnpm tc`**: `deleteBranchOfRemovedWorktree` survived one resolution as an inline body, so
+       `finishUnregisteredWorktreeRemoval` lost its definition; the fork's `deleteRemoteBranch`
+       never reached upstream's extracted `finishLocalWorktreeRemoval` or the runtime finish args,
+       so the option was silently dropped between the IPC entry point and `git worktree remove`; an
+       unused `SecretAtRestProtection` import in `AccountsPane`; and a plain unused-import set where
+       two deleted tests had been the only users.
+    2. **The pre-commit `max-lines` hook**, twice. `file-explorer-name-filter-projection.ts` needed
+       the display-root gate/descent and the expanded-paths walk extracted into
+       `file-explorer-name-filter-projection-walk.ts`, and the chunk predicate moved into
+       `file-explorer-name-filter-tree-nodes.ts`. `remove-registered-local-worktree.ts` needed the
+       orphaned-worktree recovery extracted into `orphaned-local-worktree-cleanup.ts`. No
+       suppression and no per-file bump was added, per `AGENTS.md`.
+    3. **The pre-sync-tip lost-content diff reduced to six files, all fork-only by construction** —
+       `secure-credential-store.ts`, `service-types.ts`, `accounts-pane-credential-sections.ts`,
+       `file-explorer-name-filter-tree-nodes.ts`, `file-explorer-visible-row-projection-build.ts`,
+       `worktree-remote-branch-removal-real-git.test.ts`. Upstream never touched any of them because
+       the fork introduced them; each carries a deliberate re-seat listed above.
+
+  - Verified: `pnpm tc` clean at the tip; `range-diff` pairing all 140 patches with 105 `=` and 34
+    `!`, every `!` reviewed; the pre-sync-tip lost-content diff as above; the derived localization
+    catalog regenerated and both verifiers green; the fork's builder config loads and all five
+    update-feed references still name `nplez1/orca`; `check:max-lines-ratchet` OK (7 grandfathered
+    suppressions, no new bypasses); `check:reliability-gates` passes for 140 gates; the rpc-params
+    catalog verifies; and `ORCA_CODE_QUALITY_BASE=upstream/main pnpm run check:code-quality:changed`
+    reports **36 findings (27 design-system) across 1,459 changed files** — identical in kind and
+    count to the previous three entries, with **all nine flagged files byte-identical to the
+    released np.15 tip**.
+
+  - **Left open, by name:**
+    - _The projection cache key ignores the display root._
+      `getFileExplorerNameFilterProjectionCacheKey` keys on `root: worktreePath`, and
+      `use-file-explorer-chunked-projection` derives its job key from the same function, so two
+      display roots over one worktree can serve each other's cached rows. The risk exists only
+      because `#34`'s cache now meets `#18750`'s scope, and closing it means deciding whether the
+      display root belongs in the key or in the cached value.
+    - _`projectionContextKey` likewise omits `displayRootPath`_, so switching display root with a
+      filter active does not invalidate the "previous page" fence.
+    - _Nothing forces `displayRootPath` through the chunked path._ `NameFilteredProjectionArgs` is
+      built with a spread, so a future caller omitting it silently gets worktree-root scoping
+      rather than a compile error.
+    - _`local(identity)` and the remaining `~/.orca` readers_ — unchanged from the previous entry,
+      still a per-store data migration rather than a constant swap.
+    - _The mobile page's Phase C sweep_ — unchanged from the previous entry; the module that moved is
+      still unnamed.
+
 - **2026-09-29 — released as `v1.4.214-np.15`** from `c8fa8feead` (workflow run 36563775496,
   signed and notarized), onto upstream `31012aeb09` (173 commits), from the tip `976844fac3`
   (np.14 released from `fd69125d49`, with `#40`–`#42` landed on top of it). **129 published commits
