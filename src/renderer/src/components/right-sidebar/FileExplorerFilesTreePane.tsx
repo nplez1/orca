@@ -146,12 +146,16 @@ export function FileExplorerFilesTreePane({
     : displayRootPath
       ? (rootCache?.error ?? null)
       : rootError
-  const hasError = isEmptyState && !isLoading && !!treeError
+  // Why `!== null`: an empty-string error is a present message, not "no error" — only the
+  // absence of an error means the directory really is empty.
+  const hasError = isEmptyState && !isLoading && treeError !== null
   const showTree = !isEmptyState
   const emptyMessageKind = getFileExplorerNameFilterEmptyMessageKind({
     hasNameFilter,
-    hasLoadError: !!nameFilterFiles.loadError || !!projectionError,
-    truncated: !!nameFilterFiles.truncated,
+    // Why guarded: the kind is only ever computed for a filtered pane, and the reads are the
+    // only reason a caller without a filter has to supply a listing at all.
+    hasLoadError: hasNameFilter && (!!nameFilterFiles.loadError || !!projectionError),
+    truncated: hasNameFilter && !!nameFilterFiles.truncated,
     previousResults: !!nameFilterSource?.previousResults,
     searching: !!nameFilterSource?.searching || projectionPending,
     workspacePathSearch: nameFilterSource?.workspacePathSearch

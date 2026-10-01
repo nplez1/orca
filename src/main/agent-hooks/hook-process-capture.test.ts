@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { runProcess } from '../../shared/child-process/run-process'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { wrapRuntimeHomeHookCommand } from './runtime-home-hook-command'
 import { buildHookProcessCapture } from './hook-process-capture'
 import { readAgentProcessIdentity } from '../../shared/agent-process-presence'
@@ -14,7 +15,7 @@ describe('Claude outer hook process capture', () => {
     async (timeZone) => {
       const home = await mkdtemp(join(tmpdir(), 'orca-presence-hook-'))
       try {
-        const dir = join(home, '.orca', 'agent-hooks')
+        const dir = join(home, HOME_DIRECTORY_NAME, 'agent-hooks')
         await mkdir(dir, { recursive: true })
         await writeFile(
           join(dir, 'claude-hook.sh'),
