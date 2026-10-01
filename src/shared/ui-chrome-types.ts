@@ -102,6 +102,8 @@ export type RightSidebarTab =
   | 'source-control'
   | 'checks'
   | 'ports'
+  // Data-dependent: shown only while the active workspace has a linked issue.
+  | 'issue'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
   // static union stays closed while plugin tabs remain type-representable.
   | `plugin:${string}`

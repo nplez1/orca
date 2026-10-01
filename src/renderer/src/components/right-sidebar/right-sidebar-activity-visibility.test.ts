@@ -27,6 +27,13 @@ const items: ActivityBarItem[] = [
     gitOnly: true
   },
   { id: 'ports', icon: Files, title: 'Ports', shortcut: '', sshOnly: true },
+  {
+    id: 'issue',
+    icon: Files,
+    title: 'Issue',
+    shortcut: '',
+    linkedIssueOnly: true
+  },
   // Plugin panels carry no visibility flags, so they show in every context.
   {
     id: 'plugin:orca-samples.my-plugin/dashboard',
@@ -42,7 +49,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: false
+        isSshRepo: false,
+        hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'plugin:orca-samples.my-plugin/dashboard'])
 
@@ -50,9 +58,21 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: true
+        isSshRepo: true,
+        hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])
+  })
+
+  it('shows the Issue tab only when the active workspace has a linked issue', () => {
+    expect(
+      getVisibleRightSidebarActivityItems(items, {
+        isFolder: false,
+        isFolderWorkspace: false,
+        isSshRepo: false,
+        hasLinkedIssue: true
+      }).map((item) => item.id)
+    ).toEqual(['explorer', 'source-control', 'issue', 'plugin:orca-samples.my-plugin/dashboard'])
   })
 
   it('shows Workspaces only for folder workspaces and hides git tabs for all folder scopes', () => {
@@ -60,7 +80,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: true,
-        isSshRepo: true
+        isSshRepo: true,
+        hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual([
       'explorer',
@@ -74,7 +95,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: false,
-        isSshRepo: true
+        isSshRepo: true,
+        hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])
   })
