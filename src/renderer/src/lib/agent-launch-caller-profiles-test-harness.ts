@@ -45,12 +45,16 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
     }
   },
   {
+    // The floating workspace's agent quick launch rides the tab strip's create control, so its
+    // args are the tab-bar shape against a synthetic worktree that has no repo behind it (and no
+    // group, so the tab bar resolves the group to that worktree id).
     id: 'floating-default-agent',
-    caller: 'src/renderer/src/components/floating-terminal/FloatingTerminalWindowControls.tsx',
+    caller: 'src/renderer/src/components/tab-bar/use-tab-bar-create-menu-controller.ts',
     args: {
       agent: 'codex',
       worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
-      launchSource: 'shortcut'
+      groupId: FLOATING_TERMINAL_WORKTREE_ID,
+      launchSource: 'tab_bar_quick_launch'
     }
   },
   {

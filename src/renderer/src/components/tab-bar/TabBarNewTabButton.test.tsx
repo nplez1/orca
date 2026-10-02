@@ -6,6 +6,7 @@ import { getByRole, getByTestId, queryByTestId } from '@testing-library/dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { NEW_TAB_HOLD_TO_OPEN_MENU_MS, TabBarNewTabButton } from './TabBarNewTabButton'
+import type { DefaultAgentSource } from './use-tab-bar-default-agent'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
@@ -82,14 +83,18 @@ let container: HTMLDivElement
 let root: Root
 
 /** Mirrors the tab bar: this component reports a hold via onOpenMenu and the open state returns. */
-function ButtonHarness({ agentLaunchEnabled = true }: { agentLaunchEnabled?: boolean }): ReactNode {
+function ButtonHarness({
+  agentSource = 'detected'
+}: {
+  agentSource?: DefaultAgentSource
+}): ReactNode {
   const [isMenuOpen, setMenuOpen] = useState(false)
   return createElement(
     Fragment,
     null,
     createElement(TabBarNewTabButton, {
       worktreeId: 'worktree-1',
-      agentLaunchEnabled,
+      agentSource,
       isMenuOpen,
       onLaunchAgent: harness.onLaunchAgent,
       onOpenMenu: () => {
@@ -105,9 +110,9 @@ function ButtonHarness({ agentLaunchEnabled = true }: { agentLaunchEnabled?: boo
   )
 }
 
-function renderButton(agentLaunchEnabled = true): void {
+function renderButton(agentSource: DefaultAgentSource = 'detected'): void {
   act(() => {
-    root.render(createElement(ButtonHarness, { agentLaunchEnabled }))
+    root.render(createElement(ButtonHarness, { agentSource }))
   })
 }
 
@@ -219,8 +224,33 @@ describe('TabBarNewTabButton', () => {
     expect(queryByTestId(container, 'new-tab-menu-trigger')).toBeNull()
   })
 
-  it('does not offer the agent quick launch when the surface owns its own agent button', () => {
-    renderButton(false)
+  it('offers the configured agent without probing for detection, for a host with none', () => {
+    // Why: the floating workspace runs on a synthetic worktree with no detected agents; its
+    // launch path resolves a genuinely missing agent itself, so availability is settings alone.
+    harness.detectedIds = []
+    renderButton('configured')
+
+    act(() => getByRole(container, 'button', { name: 'Open Codex in a new tab' }).click())
+    expect(harness.onLaunchAgent).toHaveBeenCalledExactlyOnceWith('codex')
+  })
+
+  it('refuses an agent the host does not detect when detection is the source', () => {
+    harness.detectedIds = []
+    renderButton('detected')
+
+    expect(getByRole(container, 'button', { name: 'New tab' })).toBeTruthy()
+  })
+
+  it('keeps the plain new-tab button when the configured agent is disabled', () => {
+    harness.settings.disabledTuiAgents = ['codex']
+    renderButton('configured')
+
+    expect(getByRole(container, 'button', { name: 'New tab' })).toBeTruthy()
+    expect(queryByTestId(container, 'new-tab-menu-trigger')).toBeNull()
+  })
+
+  it('offers no agent when the source says there is none', () => {
+    renderButton('none')
 
     expect(getByRole(container, 'button', { name: 'New tab' })).toBeTruthy()
     expect(queryByTestId(container, 'new-tab-menu-trigger')).toBeNull()

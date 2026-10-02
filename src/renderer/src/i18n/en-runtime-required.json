@@ -559,7 +559,9 @@
             "25d7817f79": "terminal"
           },
           "FloatingTerminalWindowControls": {
-            "1e502f1284": "Open"
+            "1e502f1284": "Open",
+            "648352c51f": "Open {{value0}} in floating workspace",
+            "82da3701e7": "Could not build launch command for {{value0}}."
           },
           "floating": {
             "terminal": {

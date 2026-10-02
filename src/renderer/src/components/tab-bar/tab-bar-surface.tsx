@@ -52,7 +52,7 @@ export function renderTabBarSurface({
     worktreeId,
     terminalOnly = false,
     showAgentLaunchItems = true,
-    showDefaultAgentQuickLaunch = true,
+    defaultAgentSource = 'detected',
     onNewTerminalTab,
     onOpenEntry,
     tabStripChrome = 'default'
@@ -212,7 +212,7 @@ export function renderTabBarSurface({
       >
         <TabBarNewTabButton
           worktreeId={worktreeId}
-          agentLaunchEnabled={showDefaultAgentQuickLaunch}
+          agentSource={defaultAgentSource}
           isMenuOpen={newTabMenuOpen}
           onLaunchAgent={launchDefaultAgent}
           onOpenMenu={() => setNewTabMenuOpen(true)}
