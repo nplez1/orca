@@ -1018,6 +1018,15 @@ html.native-shell .app-layout {
   padding-right: max(0px, calc(var(--window-controls-width, 0px) - 40px));
 }
 
+/* Why: the Tasks source row is the page's top edge, and the fixed-position
+   window-controls overlay (138px wide, 36px tall when custom desktop chrome is
+   active) covers the window's top-right corner. The row already sits at the
+   frame's px-5 inset, so only the width past that inset is needed. max(0px, …)
+   keeps this a no-op on macOS, where the var is 0px. */
+.tasks-source-row-window-controls-inset {
+  padding-right: max(0px, calc(var(--window-controls-width, 0px) - 1.25rem));
+}
+
 .sidebar-toggle {
   -webkit-app-region: no-drag;
   background: none;

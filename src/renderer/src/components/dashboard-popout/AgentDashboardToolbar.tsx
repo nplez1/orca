@@ -43,6 +43,8 @@ type AgentDashboardToolbarProps = {
   /** Replaces the built-in dropdown. The map needs a popover: its panel holds
    *  range sliders, and a Radix menu swallows the arrow keys those need. */
   filterControl?: React.ReactNode
+  /** Board controls (settings, etc.) rendered after the filter control. */
+  trailingActions?: React.ReactNode
 }
 
 export function AgentDashboardToolbar({
@@ -54,7 +56,8 @@ export function AgentDashboardToolbar({
   filters,
   onFiltersChange,
   searchInputRef,
-  filterControl
+  filterControl,
+  trailingActions
 }: AgentDashboardToolbarProps): React.JSX.Element {
   const isMac = navigator.userAgent.includes('Mac')
   const projects = projectOptions(cards, filterOptions?.projects)
@@ -83,7 +86,11 @@ export function AgentDashboardToolbar({
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+      <div
+        className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2"
+        // Why: this row is the board's top edge, so keep its trailing controls clear of the Windows/Linux window-controls overlay.
+        style={{ paddingRight: 'max(0.75rem, var(--window-controls-width, 0px))' }}
+      >
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -210,6 +217,7 @@ export function AgentDashboardToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        {trailingActions}
       </div>
       {!filterControl && activeCount > 0 ? (
         <AgentDashboardFilterChips

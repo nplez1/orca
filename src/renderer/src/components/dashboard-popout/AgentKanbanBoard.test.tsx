@@ -88,9 +88,10 @@ function renderBoard(
     filterOptions?: DashboardFilterOptions
     cardClickAction?: DashboardSnapshot['cardClickAction']
     onRevealAgent?: (args: DashboardRevealAgentArgs) => void
+    toolbarActions?: React.ReactNode
   } = {}
 ): void {
-  const { cardClickAction, onRevealAgent, ...snapshotOptions } = options
+  const { cardClickAction, onRevealAgent, toolbarActions, ...snapshotOptions } = options
   const snapshot: DashboardSnapshot = {
     generatedAt: 1,
     cards,
@@ -102,6 +103,7 @@ function renderBoard(
       snapshot={snapshot}
       onAckAgent={ackAgent}
       onRevealAgent={onRevealAgent ?? vi.fn()}
+      toolbarActions={toolbarActions}
     />
   )
 }
@@ -174,7 +176,22 @@ describe('AgentKanbanBoard', () => {
     expect(cards).toHaveLength(3)
     expect(cards.filter((c) => c.dataset.bucket === 'attention')).toHaveLength(2)
     expect(within(document.body).getByText('d1').dataset.bucket).toBe('done')
-    expect(screen.getByText('3 total')).toBeTruthy()
+  })
+
+  it('starts at the toolbar row so the columns own the board top edge', () => {
+    renderBoard([card({ bucket: 'working' })], {
+      toolbarActions: <button type="button">Board settings</button>
+    })
+
+    // Why: the board's own header row is gone — no title, no total, no close control —
+    // and the toolbar carries the board controls instead.
+    expect(screen.queryByRole('heading', { name: 'Agents' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/total/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close dashboard' })).not.toBeInTheDocument()
+    const settings = screen.getByRole('button', { name: 'Board settings' })
+    // Colocation proves the toolbar is the board's first row: the trailing action sits
+    // in the same element as the search box, with no header row above it.
+    expect(settings.parentElement).toContainElement(screen.getByLabelText('Search agents'))
   })
 
   it('leaves every column border neutral now that cards carry the state color', () => {

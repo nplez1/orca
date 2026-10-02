@@ -146,6 +146,7 @@
       "TaskPage": {
         "163df31e0e": "https://example.atlassian.net",
         "171b7739d8": "mrs",
+        "1a06219d5c": "Close tasks",
         "2007e14d95": "gitlab",
         "246c2b3dd3": "Atlassian account settings",
         "285bc21dc5": "Change the query or clear it.",
@@ -159,6 +160,7 @@
         "3d93316bb0": "prs",
         "456b8512da": "MergeRequest",
         "4645a7814f": "jira",
+        "4826fd1ad8": "Close · Esc",
         "513cddfa7a": "Verifying…",
         "51411113df": "list",
         "59c14d34a2": "Create a token in",
@@ -557,7 +559,9 @@
             "25d7817f79": "terminal"
           },
           "FloatingTerminalWindowControls": {
-            "1e502f1284": "Open"
+            "1e502f1284": "Open",
+            "648352c51f": "Open {{value0}} in floating workspace",
+            "82da3701e7": "Could not build launch command for {{value0}}."
           },
           "floating": {
             "terminal": {
@@ -3150,6 +3154,7 @@
       "subagents_one": "{{count}} subagent",
       "subagents_other": "{{count}} subagents"
     },
+    "close": "Close dashboard",
     "placeholder": {
       "description": "This is where all your agents will show up at a glance. The board is coming soon.",
       "title": "Agent dashboard"
@@ -3157,7 +3162,9 @@
     "recoverableError": {
       "description": "The dashboard could not finish rendering. Retry to remount it, or reopen it.",
       "title": "Orca dashboard hit an error."
-    }
+    },
+    "title": "Agents",
+    "total": "{{count}} total"
   },
   "fileExplorer": {
     "root": {
