@@ -52,7 +52,7 @@ export function TaskPageSourceBar({
     handleLinearScopeOpen
   } = model
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="tasks-source-row-window-controls-inset flex items-center justify-between gap-2">
       <div
         className="flex min-w-0 flex-wrap items-center gap-2"
         data-contextual-tour-target="tasks-source-filters"

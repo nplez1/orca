@@ -6,11 +6,11 @@ describe('pageOwnsTitlebar', () => {
     expect(pageOwnsTitlebar('automations')).toBe(true)
     expect(pageOwnsTitlebar('artifacts')).toBe(true)
     expect(pageOwnsTitlebar('dashboard')).toBe(true)
+    expect(pageOwnsTitlebar('tasks')).toBe(true)
   })
 
   it('leaves the stacked titlebar to the other sidebar views', () => {
     expect(pageOwnsTitlebar('terminal')).toBe(false)
-    expect(pageOwnsTitlebar('tasks')).toBe(false)
     expect(pageOwnsTitlebar('skills')).toBe(false)
     expect(pageOwnsTitlebar('settings')).toBe(false)
   })
