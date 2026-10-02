@@ -53,8 +53,10 @@ export function CommentsInlineToggle({
 /**
  * Why inline comments are missing, shown only when the head rule suppressed them.
  *
- * An unexplained absence reads as a bug, so this names the cause and both commits; the reader can
- * still open any comment from its card, which falls back to the provider in this state.
+ * An unexplained absence reads as a bug, so this names the cause and both commits. The labels say
+ * exactly what each SHA is — the checkout, and the commit the comments' line numbers belong to —
+ * rather than asserting which one the pull request points at. The reader can still open any comment
+ * from its card, which falls back to the provider while this is showing.
  */
 export function CommentsInlineHeadMismatchNotice({
   worktreeHeadOid,
@@ -68,7 +70,7 @@ export function CommentsInlineHeadMismatchNotice({
       <div>
         {translate(
           'auto.components.right.sidebar.checks.panel.comments.list.6b9c7f83c4',
-          "Comments are not shown in code because the checked-out commit is not this pull request's head."
+          'Comments are not shown in code because they do not belong to the commit that is checked out.'
         )}
       </div>
       <div className="mt-1 font-mono text-[10px] text-muted-foreground/80">
@@ -83,7 +85,7 @@ export function CommentsInlineHeadMismatchNotice({
           {commentsHeadSha.slice(0, 7)}{' '}
           {translate(
             'auto.components.right.sidebar.checks.panel.comments.list.a8502d9752',
-            '(pull request head)'
+            '(comments fetched at)'
           )}
         </div>
       </div>

@@ -16,9 +16,11 @@ export type PRCommentGutterMark = {
  * gutter is where a reader already looks for per-line annotations. Monaco's built-in right-click
  * gutter menu reads `GUTTER_LINE_NUMBERS`, which is a separate target type, so the two coexist.
  *
- * Monaco defaults `glyphMargin` to false, and turning it on reserves a gutter column, so it is only
- * enabled while this file actually has a collapsed thread — a file with no review comments looks
- * exactly as it did before.
+ * The gutter column does not exist until it is asked for: the standalone entry point monaco-editor
+ * ships (`esm/vs/editor/editor.api2.js`) overrides the raw registry default with
+ * `EditorOptions.glyphMargin.defaultValue = false`, even though the option is registered with
+ * `true`. So the column is enabled while this file has a collapsed thread and released when it has
+ * none, which leaves a file with no review comments laid out exactly as it was.
  */
 export function usePRCommentGutterMarks(args: {
   editor: monacoEditor.ICodeEditor | null

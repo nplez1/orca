@@ -75,13 +75,15 @@ export const createCommentFetchActions = (
         set((s) => ({
           commentsCache: withBoundedCacheEntry(s.commentsCache, cacheKey, {
             // Why: the cache key is per-repo/PR, not per-head, so the head the comments were
-            // fetched against has to travel with them. Inline rendering refuses to place a
-            // comment on a line number that belongs to a different head. A caller that omits
-            // the head must not erase the one already recorded.
+            // fetched against has to travel with them; inline rendering refuses to place a comment
+            // on a line number that belongs to a different head.
+            // A caller that omits the head records none rather than inheriting the previous one:
+            // inheriting would stamp fresh comments with a stale head and let them render on the
+            // wrong lines, while an absent head simply blocks inline placement.
             ...s.commentsCache[cacheKey],
             data: comments,
             fetchedAt: Date.now(),
-            headSha: options?.headSha ?? s.commentsCache[cacheKey]?.headSha
+            headSha: options?.headSha
           })
         }))
         return comments

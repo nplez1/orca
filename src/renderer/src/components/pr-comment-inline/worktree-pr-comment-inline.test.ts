@@ -162,7 +162,8 @@ describe('deriveWorktreePRCommentInline', () => {
     expect(review.blocker).toEqual({
       kind: 'head-mismatch',
       worktreeHeadOid: OTHER_SHA,
-      commentsHeadSha: HEAD_SHA
+      commentsHeadSha: HEAD_SHA,
+      prHeadSha: HEAD_SHA
     })
     expect(review.inlineThreadsByPath).toBeNull()
     expect(review.threadsByPath?.get('src/a.ts')).toHaveLength(1)
@@ -186,8 +187,24 @@ describe('deriveWorktreePRCommentInline', () => {
     expect(review.blocker).toEqual({
       kind: 'head-mismatch',
       worktreeHeadOid: OTHER_SHA,
-      commentsHeadSha: HEAD_SHA
+      commentsHeadSha: HEAD_SHA,
+      prHeadSha: OTHER_SHA
     })
+  })
+
+  it('withholds placement when the checkout is left on the revision the comments describe but the pull request moved on', () => {
+    const review = deriveWorktreePRCommentInline(
+      buildState({ commentsHeadSha: HEAD_SHA, prHeadSha: OTHER_SHA, worktreeHead: HEAD_SHA }),
+      worktree.id
+    )
+
+    expect(review.blocker).toEqual({
+      kind: 'head-mismatch',
+      worktreeHeadOid: HEAD_SHA,
+      commentsHeadSha: HEAD_SHA,
+      prHeadSha: OTHER_SHA
+    })
+    expect(review.inlineThreadsByPath).toBeNull()
   })
 
   it('reports no review for an unknown worktree or an unmatched branch', () => {

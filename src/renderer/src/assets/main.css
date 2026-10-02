@@ -3310,8 +3310,8 @@ html.native-shell .app-layout {
   margin-top: 2px;
 }
 
-/* The gutter marker a collapsed thread leaves behind. Sized to the glyph
-   margin's own box; Monaco paints the decoration, so this only styles it. */
+/* The gutter marker a collapsed thread leaves behind. Monaco paints this inside the column it
+   reserves only while a thread is collapsed, so the class styles the decoration, not the column. */
 .orca-pr-comment-gutter-mark {
   display: flex;
   align-items: center;

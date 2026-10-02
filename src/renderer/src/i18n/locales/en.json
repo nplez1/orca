@@ -13507,9 +13507,9 @@
               },
               "comments": {
                 "list": {
-                  "a8502d9752": "(pull request head)",
+                  "a8502d9752": "(comments fetched at)",
                   "c0227ee68e": "(checked out)",
-                  "6b9c7f83c4": "Comments are not shown in code because the checked-out commit is not this pull request's head.",
+                  "6b9c7f83c4": "Comments are not shown in code because they do not belong to the commit that is checked out.",
                   "a2a5fb7686": "Show comments in code",
                   "38a6c0254e": "Hide comments in code"
                 }

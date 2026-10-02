@@ -88,37 +88,59 @@ export function commitOidsMatch(
 }
 
 export type PRCommentInlineBlocker =
-  | { kind: 'head-mismatch'; worktreeHeadOid: string; commentsHeadSha: string }
+  | {
+      kind: 'head-mismatch'
+      /** Resolved HEAD of the checkout on screen. */
+      worktreeHeadOid: string
+      /** Commit the comments' line numbers were resolved against. */
+      commentsHeadSha: string
+      /** The pull request's current head, when it was known. */
+      prHeadSha: string | null
+    }
   | { kind: 'unverified-head' }
 
 /**
  * Why inline placement is suppressed, or null when it is safe.
  *
- * A comment's `line` is a line number in the PR's head commit, so it may only be drawn once the
- * commit being shown is known to be that same commit. An unverifiable head is treated as a
- * mismatch: a comment on the wrong line reads as a fact about the code, which is worse than
- * asking the user to open the file from the Checks pane instead.
+ * A comment's `line` is a line number in the commit its thread was resolved against, so it may only
+ * be drawn when the checkout is that same commit — otherwise the comment lands on whatever code has
+ * since taken that line, and reads as a fact about it. The checkout must also still be the pull
+ * request's current head, so a worktree left behind on an older revision does not quietly present
+ * that revision's review as the current one.
  *
- * A user-facing `enabled: false` is not reported as a blocker — that was a deliberate choice and
- * does not deserve a warning.
+ * An unverifiable head counts as a mismatch: a comment on the wrong line is worse than asking the
+ * user to open the file from the Checks pane.
+ *
+ * A user-facing `enabled: false` is not a blocker — that was a deliberate choice and does not
+ * deserve a warning.
  */
 export function resolvePRCommentInlineBlocker(input: {
   enabled: boolean
-  /** Resolved HEAD of the worktree the editor is showing. */
   worktreeHeadOid: string | null | undefined
-  /** Head the cached comments were fetched against, as recorded by `fetchPRComments`. */
   commentsHeadSha: string | null | undefined
+  /** The pull request's head. Omitted by a surface that shows the reviewed revision by construction. */
+  prHeadSha?: string | null | undefined
 }): PRCommentInlineBlocker | null {
   if (!input.enabled) {
     return null
   }
   const worktreeHeadOid = input.worktreeHeadOid?.trim() ?? ''
   const commentsHeadSha = input.commentsHeadSha?.trim() ?? ''
+  const prHeadSha = input.prHeadSha?.trim() ?? ''
   if (!worktreeHeadOid || !commentsHeadSha) {
     return { kind: 'unverified-head' }
   }
-  if (commitOidsMatch(worktreeHeadOid, commentsHeadSha)) {
-    return null
+  const mismatch = {
+    kind: 'head-mismatch' as const,
+    worktreeHeadOid,
+    commentsHeadSha,
+    prHeadSha: prHeadSha || null
   }
-  return { kind: 'head-mismatch', worktreeHeadOid, commentsHeadSha }
+  if (!commitOidsMatch(worktreeHeadOid, commentsHeadSha)) {
+    return mismatch
+  }
+  if (prHeadSha && !commitOidsMatch(worktreeHeadOid, prHeadSha)) {
+    return mismatch
+  }
+  return null
 }

@@ -104,10 +104,11 @@ describe('resolvePRCommentInlineBlocker', () => {
   const matching = {
     enabled: true,
     worktreeHeadOid: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0',
-    commentsHeadSha: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'
+    commentsHeadSha: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0',
+    prHeadSha: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'
   }
 
-  it('clears placement when the worktree head is the head the comments were fetched against', () => {
+  it('clears placement when the checkout is the head the comments were fetched against', () => {
     expect(resolvePRCommentInlineBlocker(matching)).toBeNull()
   })
 
@@ -124,8 +125,29 @@ describe('resolvePRCommentInlineBlocker', () => {
     ).toEqual({
       kind: 'head-mismatch',
       worktreeHeadOid: 'f1e2d3c4b5a69788796a5b4c3d2e1f0f1e2d3c4b',
-      commentsHeadSha: matching.commentsHeadSha
+      commentsHeadSha: matching.commentsHeadSha,
+      prHeadSha: matching.prHeadSha
     })
+  })
+
+  it('blocks a checkout left behind on an older revision the comments still describe', () => {
+    // The line numbers would be right, but the review on screen would not be the one under review.
+    expect(
+      resolvePRCommentInlineBlocker({
+        ...matching,
+        prHeadSha: 'f1e2d3c4b5a69788796a5b4c3d2e1f0f1e2d3c4b'
+      })
+    ).toEqual({
+      kind: 'head-mismatch',
+      worktreeHeadOid: matching.worktreeHeadOid,
+      commentsHeadSha: matching.commentsHeadSha,
+      prHeadSha: 'f1e2d3c4b5a69788796a5b4c3d2e1f0f1e2d3c4b'
+    })
+  })
+
+  it('ignores an unknown pull request head on a surface that pins the revision itself', () => {
+    expect(resolvePRCommentInlineBlocker({ ...matching, prHeadSha: null })).toBeNull()
+    expect(resolvePRCommentInlineBlocker({ ...matching, prHeadSha: undefined })).toBeNull()
   })
 
   it('blocks placement when either head is unknown', () => {

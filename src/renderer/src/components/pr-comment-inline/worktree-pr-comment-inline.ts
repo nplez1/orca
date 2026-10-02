@@ -157,7 +157,8 @@ export function deriveWorktreePRCommentInline(
   const blocked = resolvePRCommentInlineBlocker({
     enabled,
     worktreeHeadOid: worktree.head,
-    commentsHeadSha
+    commentsHeadSha,
+    prHeadSha: pr.headSha
   })
   return buildPRCommentInlineFromComments({
     repoPath: repo.path,
