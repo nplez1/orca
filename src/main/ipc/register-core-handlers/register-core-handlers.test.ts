@@ -35,6 +35,7 @@ const {
   registerOrcaProfileHandlersMock,
   registerCodexAccountHandlersMock,
   registerAgentHookHandlersMock,
+  registerSessionSummaryHandlersMock,
   registerClaudeAccountHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
   registerDeepSeekCredentialsHandlersMock,
@@ -105,6 +106,7 @@ const {
   registerOrcaProfileHandlersMock: vi.fn(),
   registerCodexAccountHandlersMock: vi.fn(),
   registerAgentHookHandlersMock: vi.fn(),
+  registerSessionSummaryHandlersMock: vi.fn(),
   registerClaudeAccountHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
   registerDeepSeekCredentialsHandlersMock: vi.fn(),
@@ -330,6 +332,10 @@ vi.mock('../agent-hooks', () => ({
   registerAgentHookHandlers: registerAgentHookHandlersMock
 }))
 
+vi.mock('../session-summary', () => ({
+  registerSessionSummaryHandlers: registerSessionSummaryHandlersMock
+}))
+
 vi.mock('../claude-accounts', () => ({
   registerClaudeAccountHandlers: registerClaudeAccountHandlersMock
 }))
@@ -458,6 +464,7 @@ describe('registerCoreHandlers', () => {
     registerOrcaProfileHandlersMock.mockReset()
     registerCodexAccountHandlersMock.mockReset()
     registerAgentHookHandlersMock.mockReset()
+    registerSessionSummaryHandlersMock.mockReset()
     registerClaudeAccountHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
     registerDeepSeekCredentialsHandlersMock.mockReset()
@@ -559,6 +566,7 @@ describe('registerCoreHandlers', () => {
     expect(registerCodexConfigSyncHandlersMock).toHaveBeenCalledWith(
       codexAccounts.runtimeHomeService
     )
+    expect(registerSessionSummaryHandlersMock).toHaveBeenCalled()
     expect(registerPetHandlersMock).toHaveBeenCalled()
     expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
