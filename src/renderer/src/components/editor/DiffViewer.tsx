@@ -7,6 +7,9 @@ import { computeDiffEditorFontSize, resolveEditorFontFamily } from '@/lib/editor
 import { useContextualCopySetup } from './useContextualCopySetup'
 import { selectWorktreeDiffComments } from '@/store/worktree-diff-comments-selector'
 import { useDiffCommentDecorator } from '../diff-comments/useDiffCommentDecorator'
+import { usePRCommentInlineDecorator } from '../pr-comment-inline/usePRCommentInlineDecorator'
+import { usePRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
+import { useWorktreePRCommentInline } from '../pr-comment-inline/worktree-pr-comment-inline'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { applyDiffEditorLineNumberOptions } from './diff-editor-line-number-options'
@@ -148,6 +151,23 @@ export default function DiffViewer({
     onUpdateComment: worktreeId ? (id, body) => updateDiffComment(worktreeId, id, body) : undefined,
     pendingScrollCommentId: pendingScrollForThisViewer,
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
+  })
+
+  // Why: the worktree diff shows the same file the PR reviews, so it draws the same review threads —
+  // through its own decorator instance so the local-note add-note flow is untouched.
+  const worktreePRComments = useWorktreePRCommentInline(worktreeId)
+  const prCommentSurface = usePRCommentInlineSurface(worktreePRComments, relativePath)
+  usePRCommentInlineDecorator({
+    editor: modifiedEditor,
+    monacoModelIdentity: modifiedModelKey ?? modelKey,
+    filePath: relativePath,
+    threads: prCommentSurface?.threads ?? null,
+    scope: prCommentSurface?.scope ?? null,
+    enabled: prCommentSurface?.enabled ?? false,
+    onReply: prCommentSurface?.onReply,
+    onResolveThread: prCommentSurface?.onResolveThread,
+    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
+    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
   })
 
   useDiffViewerFirstChangeAutoScroll({

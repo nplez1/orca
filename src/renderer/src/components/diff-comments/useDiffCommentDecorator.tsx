@@ -20,6 +20,7 @@ import {
 } from './diff-comment-view-zone-entry'
 import type { DiffCommentLineRange, DiffCommentLineTarget } from './diff-comment-line-range'
 import { useDiffCommentDraftZone, type DiffCommentDraft } from './diff-comment-draft-zone'
+import type { RightPanelCommentSubmitResult } from '../right-sidebar/right-panel-comment-composer'
 
 export type { DiffCommentDraft }
 
@@ -49,6 +50,17 @@ type DecoratorArgs = {
   // Present only on surfaces that allow editing (local diffs); PR review notes are remote and can't be edited here.
   onUpdateComment?: (commentId: string, body: string) => Promise<boolean>
   formatCommentPrompt?: (comment: DecoratedDiffComment) => string
+  // Review-thread actions. Omitted by surfaces that only draw local notes, which is what keeps the
+  // note card and the review card apart without a second zone pipeline.
+  onReplyToThread?: (
+    comment: DecoratedDiffComment,
+    body: string
+  ) => Promise<RightPanelCommentSubmitResult>
+  onSetThreadResolved?: (threadId: string, resolve: boolean) => void | Promise<unknown>
+  onCollapseThread?: (commentId: string) => void
+  // Why: a review thread renders taller than its root body (replies, composer). Monaco fixes
+  // heightInPx at insertion, so an estimate that only counts the root body starts too short.
+  estimateZoneHeight?: (comment: DecoratedDiffComment) => number
   // Pending scroll-to-note id from the sidebar; decorator reveals the line and acks so the same id can be re-requested later.
   pendingScrollCommentId?: string | null
   onPendingScrollConsumed?: () => void
@@ -72,6 +84,10 @@ export function useDiffCommentDecorator({
   onDeleteComment,
   onUpdateComment,
   formatCommentPrompt,
+  onReplyToThread,
+  onSetThreadResolved,
+  onCollapseThread,
+  estimateZoneHeight,
   pendingScrollCommentId,
   onPendingScrollConsumed
 }: DecoratorArgs): void {
@@ -97,9 +113,15 @@ export function useDiffCommentDecorator({
   // Stash callbacks in refs so the effect doesn't tear down + re-attach on every parent render (parent passes inline arrows) — avoids flicker.
   const onDeleteCommentRef = useRef(onDeleteComment)
   const onUpdateCommentRef = useRef(onUpdateComment)
+  const onReplyToThreadRef = useRef(onReplyToThread)
+  const onSetThreadResolvedRef = useRef(onSetThreadResolved)
+  const onCollapseThreadRef = useRef(onCollapseThread)
   const onPendingScrollConsumedRef = useRef(onPendingScrollConsumed)
   onDeleteCommentRef.current = onDeleteComment
   onUpdateCommentRef.current = onUpdateComment
+  onReplyToThreadRef.current = onReplyToThread
+  onSetThreadResolvedRef.current = onSetThreadResolved
+  onCollapseThreadRef.current = onCollapseThread
   onPendingScrollConsumedRef.current = onPendingScrollConsumed
 
   const { onAddCommentClickRef, isDraftOpen } = useDiffCommentDraftZone({
@@ -304,6 +326,9 @@ export function useDiffCommentDecorator({
         resizeZone,
         onDeleteCommentRef,
         onUpdateCommentRef,
+        onReplyToThreadRef,
+        onSetThreadResolvedRef,
+        onCollapseThreadRef,
         clearDeliveredDiffComments
       })
     }
@@ -336,7 +361,10 @@ export function useDiffCommentDecorator({
 
         // Estimate height up front: Monaco fixes heightInPx at insertion and never re-measures, so an underestimate bleeds into the next line.
         const lineCount = getCommentBodyLayoutLineCount(c.body)
-        const heightInPx = Math.max(ZONE_MIN_PX, ZONE_CHROME_PX + lineCount * ZONE_LINE_PX)
+        const estimatedHeight = estimateZoneHeight
+          ? estimateZoneHeight(c)
+          : ZONE_CHROME_PX + lineCount * ZONE_LINE_PX
+        const heightInPx = Math.max(ZONE_MIN_PX, estimatedHeight)
 
         // suppressMouseDown: false so clicks (Delete button) reach our DOM listeners; true would route mousedown to the editor.
         const commentId = c.id
@@ -401,6 +429,7 @@ export function useDiffCommentDecorator({
     clearDeliveredDiffComments,
     comments,
     editor,
+    estimateZoneHeight,
     filePath,
     formatCommentPrompt,
     monacoModelIdentity,

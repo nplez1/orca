@@ -3198,6 +3198,151 @@ html.native-shell .app-layout {
   margin-top: 4px;
 }
 
+/* ── Inline GitHub review threads ─────────────────────────────────────
+   Same card surface as a local note (`.orca-diff-comment-card`), so a
+   reader moving between the two doesn't see a seam. Only the thread's own
+   furniture lives here. */
+.orca-pr-comment-thread {
+  /* Why: threads carry a reply composer and a reply list, so they may want
+     more width than a one-line note before their body starts wrapping. */
+  max-width: 480px;
+}
+
+.orca-pr-comment-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  object-fit: cover;
+}
+
+.orca-pr-comment-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orca-pr-comment-meta-text {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.orca-pr-comment-bot-badge,
+.orca-pr-comment-resolved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, var(--border));
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+.orca-pr-comment-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.orca-pr-comment-replies-toggle,
+.orca-pr-comment-reply-trigger {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease;
+}
+
+.orca-pr-comment-replies-toggle:hover,
+.orca-pr-comment-reply-trigger:hover {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--foreground);
+}
+
+/* Why: replies hang off the root the way GitHub nests them — a rail rather
+   than a nested card, which keeps a long thread from reading as a stack of
+   unrelated boxes. */
+.orca-pr-comment-reply {
+  display: flex;
+  gap: 8px;
+  margin-left: 3px;
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in srgb, var(--foreground) 12%, var(--border));
+}
+
+.orca-pr-comment-reply-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orca-pr-comment-reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.orca-pr-comment-composer {
+  margin-top: 2px;
+}
+
+/* The gutter marker a collapsed thread leaves behind. Sized to the glyph
+   margin's own box; Monaco paints the decoration, so this only styles it. */
+.orca-pr-comment-gutter-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+
+.orca-pr-comment-gutter-mark:hover {
+  color: var(--foreground);
+}
+
+.orca-pr-comment-gutter-mark::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  /* Why: a mask, not a background image, so the bubble follows the token
+     above through hover and dark mode without a second asset. */
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/%3E%3C/svg%3E");
+}
+
 /* Why: tours need a distinct item surface without highlighting the underlying target. */
 .orca-contextual-tour-panel {
   --contextual-tour-panel-surface: color-mix(in srgb, var(--foreground) 7%, var(--popover));

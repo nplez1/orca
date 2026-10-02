@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import type { ChecksPanelEmptyContentModel } from './empty-content-props'
 import { ChecksPanelReviewHeader } from '../ChecksPanel'
@@ -170,15 +171,21 @@ describe('checks panel concrete content', () => {
       titleDraft: '',
       setTitleDraft: vi.fn(),
       titleInputRef: { current: null },
-      titleSaving: false
+      titleSaving: false,
+      activeWorktreePath: null,
+      updateSettings: vi.fn()
     } satisfies ChecksPanelActiveContentModel
 
     render(
-      <ChecksPanelActiveContent model={model} ReviewHeaderComponent={ChecksPanelReviewHeader} />
+      <TooltipProvider>
+        <ChecksPanelActiveContent model={model} ReviewHeaderComponent={ChecksPanelReviewHeader} />
+      </TooltipProvider>
     )
 
     expect(screen.getByText('Preserve mounted panel behavior')).toBeTruthy()
     expect(screen.getByText('No checks configured')).toBeTruthy()
+    // Why: the inline-comments toggle lives in the Comments header, so this surface owns it.
+    expect(screen.getByRole('button', { name: 'Hide comments in code' })).toBeTruthy()
     expect(screen.getByText('No comments')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '#42' }).getAttribute('title')).toContain(

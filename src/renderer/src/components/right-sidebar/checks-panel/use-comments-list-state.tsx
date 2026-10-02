@@ -56,6 +56,14 @@ export type PRCommentsListProps = {
   onResolve?: (threadId: string, resolve: boolean) => boolean | Promise<boolean>
   onEditComment?: (comment: PRComment, body: string) => Promise<boolean>
   onDeleteComment?: (comment: PRComment) => void | Promise<void>
+  /** Whether review threads are drawn inline in code; drives the Comments header toggle. */
+  commentsInlineEnabled?: boolean
+  onToggleCommentsInline?: () => void
+  /** True when the head rule suppresses inline comments, so the header explains the absence. */
+  commentsInlineBlocked?: boolean
+  commentsInlineHeadMismatch?: { worktreeHeadOid: string; commentsHeadSha: string } | null
+  /** Opens a review comment in the code. Absent when there is nowhere to place it. */
+  onOpenCommentInCode?: (comment: PRComment) => void
   onSetReaction?: (
     comment: PRComment,
     content: GitHubReactionContent,
@@ -74,6 +82,7 @@ export function useCommentsListState({
   onResolve,
   onEditComment,
   onDeleteComment,
+  onOpenCommentInCode,
   onSetReaction,
   onResolveSelectedCommentsWithAI
 }: PRCommentsListProps) {
@@ -245,6 +254,7 @@ export function useCommentsListState({
         onReply={onReply}
         onEditComment={onEditComment}
         onDeleteComment={onDeleteComment}
+        onOpenCommentInCode={onOpenCommentInCode}
         onSetReaction={onSetReaction}
         onQueueForAgent={canQueue ? () => addGroupToSelection(groupId) : undefined}
       />

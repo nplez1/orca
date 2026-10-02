@@ -74,8 +74,14 @@ export const createCommentFetchActions = (
               })) as PRComment[])
         set((s) => ({
           commentsCache: withBoundedCacheEntry(s.commentsCache, cacheKey, {
+            // Why: the cache key is per-repo/PR, not per-head, so the head the comments were
+            // fetched against has to travel with them. Inline rendering refuses to place a
+            // comment on a line number that belongs to a different head. A caller that omits
+            // the head must not erase the one already recorded.
+            ...s.commentsCache[cacheKey],
             data: comments,
-            fetchedAt: Date.now()
+            fetchedAt: Date.now(),
+            headSha: options?.headSha ?? s.commentsCache[cacheKey]?.headSha
           })
         }))
         return comments
