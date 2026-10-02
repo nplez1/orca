@@ -2,7 +2,7 @@ import type { TaskPageComposerActionsModel } from '../use-task-page-composer-act
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { X, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { shouldShowJiraSiteSelector } from '../task-page-jira-board-model'
@@ -24,7 +24,6 @@ export function TaskPageSourceBar({
     settings,
     jiraBoardViewMode,
     openTaskPage,
-    closeTaskPage,
     updateSettings,
     selectJiraSite,
     linearConnected,
@@ -58,24 +57,6 @@ export function TaskPageSourceBar({
         className="flex min-w-0 flex-wrap items-center gap-2"
         data-contextual-tour-target="tasks-source-filters"
       >
-        {/* Why: Close is anchored left with the source icons for one compact band, clear of the app sidebar on the right. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 rounded-full"
-              onClick={closeTaskPage}
-              aria-label={translate('auto.components.TaskPage.1a06219d5c', 'Close tasks')}
-            >
-              <X className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.TaskPage.4826fd1ad8', 'Close · Esc')}
-          </TooltipContent>
-        </Tooltip>
-        <div className="mx-1 h-5 w-px bg-border/50" aria-hidden />
         {visibleSourceOptions.map((source) => {
           const active = taskSource === source.id
           const sourceAvailabilityNotice = taskSourceAvailabilityNoticeByProvider[source.id] ?? null

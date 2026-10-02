@@ -37,6 +37,9 @@ test('the sidebar entry is a first-class dashboard view with a back-stack entry'
   )
   expect(unselectedBackground).toBe('rgba(0, 0, 0, 0)')
 
+  // A back entry only lights up with somewhere to return to, so visit another page first.
+  await orcaPage.locator('button[data-contextual-tour-target="sidebar-tasks"]').click()
+
   await entry.click()
   await expect(orcaPage.locator(DASHBOARD_PAGE)).toBeVisible()
   await expect(entry).toHaveAttribute('aria-current', 'page')
@@ -52,8 +55,9 @@ test('the sidebar entry is a first-class dashboard view with a back-stack entry'
     )
   ).toBe(true)
 
-  // The board's close control returns to the previous view and unselects the entry.
-  await orcaPage.getByRole('button', { name: 'Close dashboard' }).click()
+  // The dashboard has no close control: the shared back control is its way out, and using
+  // it returns to the previous view and drops the selected state.
+  await orcaPage.getByRole('button', { name: 'Go back' }).click()
   await expect(orcaPage.locator(DASHBOARD_PAGE)).toBeHidden()
   await expect(entry).not.toHaveAttribute('aria-current', 'page')
   await expect(entry).not.toHaveAttribute('data-current', 'true')

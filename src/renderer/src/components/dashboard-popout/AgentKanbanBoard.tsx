@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { XIcon } from 'lucide-react'
 import {
   DASHBOARD_BUCKET_ORDER,
   dashboardCardRevealArgs,
@@ -108,10 +107,8 @@ type AgentKanbanBoardProps = {
   onAckAgent: (paneKey: string) => void
   /** Focuses the agent's pane. */
   onRevealAgent: (args: AgentRevealArgs) => void
-  /** When provided, renders a close control in the header. */
-  onClose?: () => void
-  /** Header controls rendered before the close button. */
-  headerActions?: React.ReactNode
+  /** Board controls rendered at the trailing end of the toolbar row. */
+  toolbarActions?: React.ReactNode
 }
 
 /** The agent board: status columns fed by a snapshot. */
@@ -120,8 +117,7 @@ export function AgentKanbanBoard({
   containerClassName = 'h-full w-full',
   onAckAgent,
   onRevealAgent,
-  onClose,
-  headerActions
+  toolbarActions
 }: AgentKanbanBoardProps): React.JSX.Element {
   const visibleBuckets = useMemo(
     () =>
@@ -227,38 +223,12 @@ export function AgentKanbanBoard({
   }, [dialogCard?.paneKey, dialogCard?.unseen, onAckAgent])
 
   return (
-    // Why: the pop-out is its own React root with no app-level provider, and the
-    // card's repo tooltip needs one in both hosts. Nesting inside the main
-    // window's provider is harmless.
+    // Why: tighter delay than the app root's 400ms — the board's cards are dense and a
+    // hover here should not wait.
     <TooltipProvider delayDuration={300}>
       <div
         className={cn('relative flex flex-col bg-background text-foreground', containerClassName)}
       >
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
-          <h1 className="text-[13px] font-semibold">
-            {translate('dashboardPopout.title', 'Agents')}
-          </h1>
-          <span className="text-[11px] text-muted-foreground">
-            {translate('dashboardPopout.total', '{{count}} total', {
-              count: visibleCards.length
-            })}
-          </span>
-          {headerActions || onClose ? (
-            <div className="ml-auto flex items-center gap-1">
-              {headerActions}
-              {onClose ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label={translate('dashboardPopout.close', 'Close dashboard')}
-                  className="rounded-sm p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  <XIcon className="size-4" />
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
         <AgentDashboardToolbar
           cards={visibleCards}
           filterOptions={snapshot.filterOptions}
@@ -268,6 +238,7 @@ export function AgentKanbanBoard({
           filters={filters}
           onFiltersChange={setFilters}
           searchInputRef={searchInputRef}
+          trailingActions={toolbarActions}
         />
         <div className="scrollbar-sleek flex min-h-0 flex-1 overflow-x-auto p-3">
           {/* Auto margins center the capped board and collapse during horizontal overflow. */}

@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { SYNC_FIT_PANES_EVENT } from '@/constants/terminal'
 import { canShowRightSidebarForView } from '@/lib/right-sidebar-visibility'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
+import { pageOwnsTitlebar } from '@/lib/page-owned-titlebar'
 import { resolveLeftTitlebarChromeLayout } from '@/lib/titlebar-left-chrome'
 import { shouldShowWorktreeCreationSurface } from '@/lib/worktree-creation-surface'
 import { useAppStore } from '../store'
@@ -78,6 +79,8 @@ export function useAppChromeLayout() {
   // Tasks/Landing show the full titlebar only when the sidebar is collapsed; open, they mirror workspace view (creation suppresses it).
   const stackedSidebarOpen =
     !workspaceChromeActive && !creationLayoutActive && showSidebar && sidebarOpen
+  // Why: pages that draw their own top edge render nothing under a stacked titlebar, leaving an empty 36px stripe above their first row.
+  const stackedTitlebarVisible = stackedSidebarOpen && !pageOwnsTitlebar(activeView)
   // Visible creation keeps only the top-left window chrome; tabs and right-sidebar chrome stay gated by workspaceChromeActive.
   const leftTitlebarChromeLayout = resolveLeftTitlebarChromeLayout({
     workspaceChromeActive,
@@ -139,6 +142,7 @@ export function useAppChromeLayout() {
     showTitlebarExpandButton: workspaceChromeActive && !hasTabBar && effectiveActiveTabExpanded,
     sidebarOpen,
     stackedSidebarOpen,
+    stackedTitlebarVisible,
     // Why: the workbench stays mounted while hidden, so visibility tracks the same condition separately.
     terminalWorkbenchVisible: workspaceChromeActive,
     titlebarLeftControlsRef,

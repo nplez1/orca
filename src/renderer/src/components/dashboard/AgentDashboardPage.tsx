@@ -13,7 +13,6 @@ import { useLiveDashboardSnapshot } from './useLiveDashboardSnapshot'
  */
 export default function AgentDashboardPage(): React.JSX.Element {
   const snapshot = useLiveDashboardSnapshot()
-  const closePage = useAppStore((s) => s.closeAgentDashboardPage)
 
   const handleAckAgent = useCallback((paneKey: string) => {
     useAppStore.getState().acknowledgeAgents([paneKey])
@@ -31,8 +30,7 @@ export default function AgentDashboardPage(): React.JSX.Element {
         containerClassName="h-full w-full"
         onAckAgent={handleAckAgent}
         onRevealAgent={handleRevealAgent}
-        onClose={closePage}
-        headerActions={<AgentDashboardSettingsMenu />}
+        toolbarActions={<AgentDashboardSettingsMenu />}
       />
     </div>
   )
