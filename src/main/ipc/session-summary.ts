@@ -8,11 +8,17 @@ import {
   isSessionSummaryOpenRequest
 } from '../../shared/session-summary-types'
 import { createAgentCliSessionFoldBrain } from '../session-summary/session-summary-agent-cli-fold-brain'
+import {
+  resolveSessionSummaryFoldParams,
+  type SessionSummaryFoldSettings
+} from '../session-summary/session-summary-fold-params'
 import { SessionSummaryService } from '../session-summary/session-summary-service'
 import { SessionSummaryStore } from '../session-summary/session-summary-store'
 import { readSessionSummaryTranscriptEvents } from '../session-summary/session-summary-transcript-source'
 
-export function createSessionSummaryService(): SessionSummaryService {
+export function createSessionSummaryService(
+  getSettings: () => SessionSummaryFoldSettings
+): SessionSummaryService {
   return new SessionSummaryService({
     store: SessionSummaryStore.fromUserData(),
     readEvents: readSessionSummaryTranscriptEvents,
@@ -20,7 +26,9 @@ export function createSessionSummaryService(): SessionSummaryService {
       agentHookServer.getStatusSnapshot().find((entry) => entry.paneKey === paneKey),
     createBrain: (params) =>
       createAgentCliSessionFoldBrain({
-        resolveParams: () => params,
+        // Request params are an explicit override; the user's text-generation
+        // settings are the normal source.
+        resolveParams: () => params ?? resolveSessionSummaryFoldParams(getSettings()),
         // Folds carry their context in the prompt; the CLI never needs a repo cwd.
         cwd: join(tmpdir(), 'orca-session-summary')
       }),
@@ -28,7 +36,10 @@ export function createSessionSummaryService(): SessionSummaryService {
   })
 }
 
-export function registerSessionSummaryHandlers(service = createSessionSummaryService()): void {
+export function registerSessionSummaryHandlers(
+  getSettings: () => SessionSummaryFoldSettings,
+  service = createSessionSummaryService(getSettings)
+): void {
   ipcMain.removeHandler('sessionSummary:open')
   ipcMain.removeHandler('sessionSummary:close')
   service.onUpdate((snapshot: SessionSummarySnapshot) => {
