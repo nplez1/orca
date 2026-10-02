@@ -137,3 +137,103 @@ Source-control and review changes must consider GitLab and other supported git p
 ## GitHub CLI Usage
 
 Be mindful of the user's `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.
+
+# Fork workflow (`nplez1/orca`) — local, not proposed upstream
+
+Everything above is upstream's guidance and stays authoritative. This section is fork-local: it
+describes how work reaches a branch and a PR in this fork. See [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md)
+for why fork-only material lives outside PR-owned files.
+
+## Remotes — work goes to the fork
+
+- `origin` → `ssh://git@ssh.github.com:443/nplez1/orca.git` — **the fork. This is where work goes.**
+- `upstream` → `https://github.com/stablyai/orca.git` — someone else's repository. **Read-only.**
+- Worktree branch: `nplez1/<Task>`.
+
+**Never open a PR or an issue on `stablyai/orca` unless upstream is asked for in so many words.** If
+one was already opened, say so before anything else and offer to close it.
+
+## Opening a PR — use the script, never hand-rolled `gh`
+
+```bash
+node local/open-pr.mjs --title "<conventional title>" --body-file /tmp/body.md
+node local/open-pr.mjs --title "..." --body-file /tmp/body.md --dry-run    # inspect first
+node local/open-pr.mjs --title "..." --body-file /tmp/body.md --upstream   # only when asked
+```
+
+It defaults to fork `nplez1/orca` / base `nplez1/main`, requires `--upstream` to leave the fork, and
+refuses a head that does not descend from its base.
+
+Why the ancestry check matters: the two branches called `main` are different lines. A head cut from
+`main` and opened against `nplez1/main` looks like a small diff locally but carries every fork-only
+patch as a reversion — that is where the ~300k-line PRs came from.
+
+## Branch state
+
+- `node local/branch-status.mjs` — live SHAs and PR state. **Source of truth.**
+- [`BRANCHES.md`](./BRANCHES.md) — why each branch exists, what blocks it, dependency order. Read before
+  any PR or branch work. It records what the script cannot know; if the two disagree, the script is right.
+- [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) — the fork-only patch series.
+- A `local(...)` commit is refused on every branch except `nplez1/main` (`.husky/commit-msg`). If it
+  fires, switch branches — do not bypass it.
+- Fork PR branches are cut from `nplez1/main`; upstream-bound branches from `origin/main`.
+- Chained branches rebase **parent-first**. Force-push with `--force-with-lease origin <branch>`.
+
+## Verify
+
+- Typecheck `pnpm tc` (`tc:node` / `tc:cli` / `tc:web`) · tests `pnpm test <path>`
+- Changed-lines gate CI enforces: `pnpm run check:code-quality:changed`
+- Lint `pnpm exec oxlint` · format `pnpm format`
+- **Always pass an explicit `timeout` of at least 600000 ms** for typecheck, test, or lint. The 120 s
+  default is below their real cost and causes repeated timeouts and restarts.
+- Electron and tests: `ORCA_BACKGROUND_LAUNCH=1`, hidden renderers, CDP screenshots. Never steal focus.
+
+## CI-fix cycle — standing preference
+
+When asked to fix CI failures:
+
+1. `gh pr checks` to identify the failing checks.
+2. Run **only the failing test files** locally.
+3. Commit and push.
+4. **Let CI verify — do not run the full suite locally.**
+
+Do not poll CI with long sleeps inside one turn; one check after the push, then report. A full
+relevant-suite run is still expected **before opening a PR** — this preference is about CI-fix cycles,
+not about skipping verification on new work.
+
+## Dev build identity
+
+This fork ships as **Orca NP** — its own bundle id, data directory, home directory, and CLI name (see
+[`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) § `local(identity)`). Launch and point at **Orca NP**, never
+the upstream `Orca` app. If a path or launcher looks like upstream's, stop and check.
+
+## Project skills
+
+This repo's agent skills are tracked by the `local(skills)` patch at
+`.agents/skills/{electron,typescript,react-useeffect}`. A worktree branched before that patch has none
+— that is expected, not a missing install. Do not look for them in `~/.agents/skills/`.
+
+For rendered Orca UI validation use the `$electron` skill plus Playwright CDP — not computer-use.
+
+## Shared / multi-agent worktrees
+
+When other agents may be editing the same worktree: re-read a file **in the same turn** as your edit
+(never from a body read several turns earlier), keep edits small and disjoint, make each `oldText`
+unique in the file, and re-check the file afterwards. Never emit overlapping edits in one call.
+
+## Delegation defaults
+
+When handed a bounded research, review, or implementation prompt, assume unless it says otherwise:
+
+- **Read-only** unless the prompt says to write.
+- **Worktree-scoped**: read, search, and edit only under the worktree path named. Never read outside it.
+- **Cite `file:line`** for every claim about existing code.
+- **Respect any word budget** given.
+- **Report what was not verified**, plus any cap, skip, or sampling applied.
+
+## Search; do not guess paths
+
+- Resolve a path with a search before reading it. On `ENOENT`, search for the real path — do not guess
+  a second spelling.
+- Filename search: `fd`. Content search: `rg`. (`bfs` is not installed by default.)
+- Never edit a path that has not been confirmed to exist.

@@ -220,6 +220,32 @@ Scope: a fresh checkout of `nplez1/main` carries the skills; a worktree branched
 gets them on its next sync. The `electron` skill's runtime dependency is `@playwright/cli`
 (`npm i -g @playwright/cli`, which provides the `playwright-cli` binary).
 
+### `local(agents)`: the fork workflow section in `AGENTS.md`
+
+Anchors: the `# Fork workflow` section appended at the end of `AGENTS.md`, headed
+`# Fork workflow (nplez1/orca) — local, not proposed upstream`.
+
+**Why:** the fork's PR/branch invariants (fork base, `origin` vs `upstream`, the only sanctioned
+PR path, the CI-fix cycle, the Orca NP dev identity, the `Explore`/delegation defaults) were only
+recorded in `BRANCHES.md` and `open-pr.mjs`, which agents reach late or not at all. Reads and edits
+before a PR were repeatedly aimed at the wrong remote or the wrong `main`, producing PRs against
+`stablyai/orca` and ~300k-line diffs from a base mismatch. `AGENTS.md` is the file every harness loads
+at session start, so the rules belong there.
+
+**Known deviation from § Rules.** This patch touches `AGENTS.md`, which upstream owns and PR branches
+can also edit — exactly the case the rule above warns about. It is deliberate: the alternative
+(`.pi/APPEND_SYSTEM.md`) is Pi-only, and these rules need to reach every agent harness that runs in a
+worktree. The practical cost is that a future upstream or PR change to `AGENTS.md` must be merged
+around this section rather than silently replacing it. If the section is ever dropped by a sync,
+re-append it from this description.
+
+Why it is appended rather than woven in: it keeps the fork-only block contiguous, so a conflict during
+`git rebase origin/main` is one hunk at the end of the file instead of several scattered through
+upstream's prose.
+
+Scope: same as `local(skills)` — a fresh worktree cut from `nplez1/main` carries it; a worktree
+branched before this commit does not.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream
