@@ -7551,7 +7551,10 @@
           "7ddd66fede": "Editor Word Wrap",
           "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
           "collapseUnchangedTitle": "Collapse Unchanged Regions",
-          "collapseUnchangedDescription": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way."
+          "collapseUnchangedDescription": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way.",
+          "34155c6ed5": "Draw each review thread below its commented line, with reply and resolve controls. When off, the thread stays reachable from a small marker in the gutter.",
+          "9c020a16db": "PR Comments Inline",
+          "7fea4145c9": "Show GitHub review threads on the lines they were left on in the code."
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -13493,6 +13496,23 @@
                   "title": "{{reviewLabelCap}} not supported here",
                   "body": "This repository provider does not support creating a {{reviewLabel}} from Orca."
                 }
+              },
+              "comment": {
+                "controls": {
+                  "3dd06603e1": "Show in code"
+                },
+                "row": {
+                  "5cca1251df": "Show in code"
+                }
+              },
+              "comments": {
+                "list": {
+                  "a8502d9752": "(comments fetched at)",
+                  "c0227ee68e": "(checked out)",
+                  "6b9c7f83c4": "Comments are not shown in code because they do not belong to the commit that is checked out.",
+                  "a2a5fb7686": "Show comments in code",
+                  "38a6c0254e": "Hide comments in code"
+                }
               }
             }
           },
@@ -17894,6 +17914,28 @@
               "behind": "Behind base",
               "mergeQueue": "Merge queue",
               "blocked": "Blocked"
+            }
+          }
+        }
+      },
+      "pr": {
+        "comment": {
+          "inline": {
+            "PRCommentThreadCard": {
+              "be8d2e8f48": "Reply",
+              "90e6e6fd21": "Reply to this thread",
+              "21e296c94d": "Show {{value0}} {{value1}}",
+              "b1daf89414": "Hide {{value0}} {{value1}}",
+              "2002706ed8": "Hide thread",
+              "e2be68390f": "Open on GitHub",
+              "3b01798961": "Resolve thread",
+              "b50141162f": "Unresolve thread",
+              "27eb8f6ea9": "Resolved",
+              "dfcd8f7f21": "bot",
+              "3868fce1a3": "Replies are unavailable here."
+            },
+            "usePRCommentInlineDecorator": {
+              "c3b537227a": "Replies are unavailable here."
             }
           }
         }

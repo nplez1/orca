@@ -97,6 +97,8 @@ export const createCommentMutationActions = (
       const entry = s.commentsCache[cacheKey]
       return {
         commentsCache: withBoundedCacheEntry(s.commentsCache, cacheKey, {
+          // Why: a reply does not change which head the cached line numbers belong to, so keep it.
+          ...entry,
           data: mergePRCommentIntoList(entry?.data, comment),
           fetchedAt: Date.now()
         })

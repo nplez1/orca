@@ -6,6 +6,8 @@ import { useAppStore } from '@/store'
 import { computeDiffEditorFontSize, resolveEditorFontFamily } from '@/lib/editor-font-zoom'
 import { selectWorktreeDiffComments } from '@/store/worktree-diff-comments-selector'
 import { useDiffCommentDecorator } from '../diff-comments/useDiffCommentDecorator'
+import { usePRCommentInlineDecorator } from '../pr-comment-inline/usePRCommentInlineDecorator'
+import { usePRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
 import { applyDiffEditorLineNumberOptions } from './diff-editor-line-number-options'
 import { DiffSectionHeader } from './DiffSectionHeader'
 import type { DiffComment } from '../../../../shared/diff-comment-types'
@@ -40,6 +42,7 @@ export function DiffSectionItem({
   addLineCommentLabel,
   addLineCommentPlaceholder,
   inlineComments,
+  prCommentReview,
   getCommentableLineNumbers,
   setSectionHeights,
   setSections,
@@ -144,6 +147,22 @@ export function DiffSectionItem({
     onUpdateComment: worktreeId ? (id, body) => updateDiffComment(worktreeId, id, body) : undefined,
     pendingScrollCommentId: pendingScrollForThisSection,
     onPendingScrollConsumed: () => setScrollToDiffCommentId(null)
+  })
+
+  // Why: review threads run their own decorator instance rather than joining the local-note list, so
+  // the note flow's add-note overlay and draft zone stay out of a comment a user only wants to reply to.
+  const prCommentSurface = usePRCommentInlineSurface(prCommentReview ?? null, section.path)
+  usePRCommentInlineDecorator({
+    editor: modifiedEditor,
+    monacoModelIdentity: `${modelPathBase}:modified`,
+    filePath: section.path,
+    threads: prCommentSurface?.threads ?? null,
+    scope: prCommentSurface?.scope ?? null,
+    enabled: prCommentSurface?.enabled ?? false,
+    onReply: prCommentSurface?.onReply,
+    onResolveThread: prCommentSurface?.onResolveThread,
+    pendingRevealCommentId: prCommentSurface?.pendingRevealCommentId ?? null,
+    onPendingRevealConsumed: prCommentSurface?.onPendingRevealConsumed
   })
 
   useEffect(() => {

@@ -44,6 +44,7 @@ export function PRCommentGroupView({
   onReply,
   onEditComment,
   onDeleteComment,
+  onOpenCommentInCode,
   onSetReaction,
   onQueueForAgent
 }: {
@@ -63,6 +64,7 @@ export function PRCommentGroupView({
   onReply?: (comment: PRComment, body: string) => Promise<RightPanelCommentSubmitResult>
   onEditComment?: (comment: PRComment, body: string) => Promise<boolean>
   onDeleteComment?: (comment: PRComment) => void | Promise<void>
+  onOpenCommentInCode?: (comment: PRComment) => void
   onSetReaction?: (
     comment: PRComment,
     content: GitHubReactionContent,
@@ -115,6 +117,7 @@ export function PRCommentGroupView({
     onResolve,
     onEditComment,
     onDeleteComment,
+    onOpenCommentInCode,
     onSetReaction,
     onQueueForAgent
   }
@@ -201,6 +204,7 @@ export function ResolvedCommentGroupsSection({
   onReply,
   onEditComment,
   onDeleteComment,
+  onOpenCommentInCode,
   onSetReaction
 }: {
   groups: PRCommentGroup[]
@@ -216,6 +220,7 @@ export function ResolvedCommentGroupsSection({
   onReply?: (comment: PRComment, body: string) => Promise<RightPanelCommentSubmitResult>
   onEditComment?: (comment: PRComment, body: string) => Promise<boolean>
   onDeleteComment?: (comment: PRComment) => void | Promise<void>
+  onOpenCommentInCode?: (comment: PRComment) => void
   onSetReaction?: (
     comment: PRComment,
     content: GitHubReactionContent,
@@ -257,6 +262,7 @@ export function ResolvedCommentGroupsSection({
                 onReply={onReply}
                 onEditComment={onEditComment}
                 onDeleteComment={onDeleteComment}
+                onOpenCommentInCode={onOpenCommentInCode}
                 onSetReaction={onSetReaction}
               />
             ))}

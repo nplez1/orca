@@ -21,6 +21,8 @@ import { RichMarkdownSpellcheckSetting } from './RichMarkdownSpellcheckSetting'
 import { DiffShowWhitespaceSetting } from './DiffShowWhitespaceSetting'
 import { EditorWordWrapSetting } from './EditorWordWrapSetting'
 import { EditorFontFamilySetting } from './EditorFontFamilySetting'
+import { PRCommentsInlineSetting } from './PRCommentsInlineSetting'
+import { MarkdownReviewNotesSetting } from './MarkdownReviewNotesSetting'
 import {
   createAutoSaveDelayDraftState,
   resolveAutoSaveDelayDraftState,
@@ -371,32 +373,9 @@ export function GeneralEditorSettingsSection({
 
       <RichMarkdownSpellcheckSetting settings={settings} updateSettings={updateSettings} />
 
-      <SearchableSetting
-        title={translate(
-          'auto.components.settings.GeneralEditorSettingsSection.4edc104f0f',
-          'Markdown Review Notes'
-        )}
-        description={translate(
-          'auto.components.settings.GeneralEditorSettingsSection.5f02e6fb21',
-          'Show local markdown review note controls in markdown files.'
-        )}
-        keywords={['markdown', 'review', 'notes', 'annotations', 'agents']}
-      >
-        <SettingsSwitchRow
-          label={translate(
-            'auto.components.settings.GeneralEditorSettingsSection.4edc104f0f',
-            'Markdown Review Notes'
-          )}
-          description={translate(
-            'auto.components.settings.GeneralEditorSettingsSection.f80603d293',
-            'Show markdown note controls in every markdown view and include markdown notes in agent handoff actions.'
-          )}
-          checked={settings.markdownReviewToolsEnabled}
-          onChange={() =>
-            updateSettings({ markdownReviewToolsEnabled: !settings.markdownReviewToolsEnabled })
-          }
-        />
-      </SearchableSetting>
+      <MarkdownReviewNotesSetting settings={settings} updateSettings={updateSettings} />
+
+      <PRCommentsInlineSetting settings={settings} updateSettings={updateSettings} />
     </section>
   )
 }

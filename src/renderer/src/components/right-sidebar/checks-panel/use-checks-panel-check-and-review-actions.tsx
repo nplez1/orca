@@ -254,7 +254,8 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
           fetchPRComments(repo.path, refreshedPR.number, {
             force: true,
             repoId: repo.id,
-            prRepo: refreshedPR.prRepo
+            prRepo: refreshedPR.prRepo,
+            headSha: refreshedPR.headSha
           })
             .then(
               (result) => {

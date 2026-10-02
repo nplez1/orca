@@ -72,7 +72,8 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
         const result = await fetchPRComments(repo.path, targetPRNumber, {
           force,
           repoId: repo.id,
-          prRepo: targetPRRepo
+          prRepo: targetPRRepo,
+          headSha: pr?.headSha
         })
         if (!isCurrentAsyncResult(requestKey)) {
           return
@@ -165,7 +166,11 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
       pr?.headSha
     )
     setCommentsLoading(true)
-    void fetchPRComments(repo.path, prNumber, { repoId: repo.id, prRepo: pr?.prRepo }).then(
+    void fetchPRComments(repo.path, prNumber, {
+      repoId: repo.id,
+      prRepo: pr?.prRepo,
+      headSha: pr?.headSha
+    }).then(
       (result) => {
         if (!cancelled && isCurrentAsyncResult(requestKey)) {
           setComments(result)

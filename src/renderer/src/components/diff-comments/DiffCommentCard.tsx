@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { useCommentCardResize } from './useCommentCardResize'
 import { translate } from '@/i18n/i18n'
 
 // Why: the saved-note card lives inside a Monaco view zone's DOM node.
@@ -62,55 +63,15 @@ export function DiffCommentCard({
   const [draft, setDraft] = useState(body)
   const [submitting, setSubmitting] = useState(false)
   const mountedRef = useMountedRef()
-  const cardRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const resizeAfterCloseRef = useRef(false)
-  const observesRenderedSize = observeRenderedSize === true && onContentResize !== undefined
+  const { cardRef, onContentResizeRef } = useCommentCardResize(
+    observeRenderedSize === true,
+    onContentResize
+  )
 
-  // Why: stash `onContentResize` in a ref so resize effects do not depend on
-  // the decorator's fresh arrow each render. Re-running the edit layout effect
-  // would yank the caret to the textarea's end while the user is mid-edit.
-  const onContentResizeRef = useRef(onContentResize)
-  onContentResizeRef.current = onContentResize
-
-  useLayoutEffect(() => {
-    const card = cardRef.current
-    if (!card || !observesRenderedSize) {
-      return
-    }
-    onContentResizeRef.current?.()
-    let frameId: number | null = null
-    const notifyResize = (): void => {
-      if (frameId !== null) {
-        return
-      }
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        onContentResizeRef.current?.()
-      })
-    }
-    if (typeof ResizeObserver === 'undefined') {
-      return () => {
-        if (frameId !== null) {
-          cancelAnimationFrame(frameId)
-        }
-      }
-    }
-    // Why: narrow diff panes can wrap body/header text after Monaco's initial
-    // estimate; observe the real card height in either diff layout.
-    const observer = new ResizeObserver(() => notifyResize())
-    observer.observe(card)
-    return () => {
-      observer.disconnect()
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-    }
-  }, [observesRenderedSize])
-
-  // Why: focus + auto-grow the textarea on entering edit mode. Layout effect
-  // so the height is set before the browser paints — a measurement pass on
-  // the next animation frame would visibly jump from 0 to N px.
+  // Why: focus + auto-grow the textarea on entering edit mode. Layout effect so the height is set
+  // before the browser paints — measuring on the next animation frame visibly jumps 0 → N px.
   useLayoutEffect(() => {
     if (!editing) {
       if (resizeAfterCloseRef.current) {
@@ -127,7 +88,7 @@ export function DiffCommentCard({
     el.focus()
     el.setSelectionRange(el.value.length, el.value.length)
     onContentResizeRef.current?.()
-  }, [editing])
+  }, [editing, onContentResizeRef])
 
   const scheduleContentResizeAfterClose = (): void => {
     // Why: closing edit mode removes the textarea/footer before Monaco can

@@ -291,7 +291,8 @@ export function useChecksPanelManualRefresh(model: ChecksPanelManualRefreshInput
         const refreshedComments = fetchPRComments(repo.path, refreshedPR.number, {
           force: true,
           repoId: repo.id,
-          prRepo: refreshedPR.prRepo
+          prRepo: refreshedPR.prRepo,
+          headSha: refreshedPR.headSha
         }).then(
           (result) => {
             if (isCurrentRequest() && isCurrentAsyncResult(prRequestKey)) {

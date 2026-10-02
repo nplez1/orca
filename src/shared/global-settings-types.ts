@@ -96,6 +96,9 @@ export type GlobalSettings = {
   richMarkdownSpellcheckEnabled?: boolean
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
+  /** Whether GitHub PR review threads are drawn inline on their commented lines in the code.
+   *  Hiding them keeps a small gutter marker per thread rather than removing the thread entirely. */
+  prCommentsInlineEnabled: boolean
   /** Why: mirrors terminal selection-paste muscle memory without mutating the
    *  normal system clipboard; Linux and macOS enable it by default, Windows
    *  leaves middle-click semantics unchanged unless the user opts in. */

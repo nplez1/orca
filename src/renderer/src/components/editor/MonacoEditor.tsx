@@ -24,6 +24,8 @@ import { useMonacoEditorMount } from './use-monaco-editor-mount'
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import { snapshotMonacoViewState } from './monaco-view-state-persistence'
 import { MonacoMarkdownAnnotationOverlay } from './MonacoMarkdownAnnotationOverlay'
+import { usePRCommentInlineDecorator } from '../pr-comment-inline/usePRCommentInlineDecorator'
+import type { PRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
 
 type MonacoEditorProps = {
   fileId: string
@@ -43,6 +45,8 @@ type MonacoEditorProps = {
   worktreeId?: string
   markdownAnnotationsEnabled?: boolean
   conflictDecorationsEnabled?: boolean
+  /** GitHub review threads for this file. Absent on surfaces that never show a pull request. */
+  prCommentInline?: PRCommentInlineSurface | null
   readOnly?: boolean
   liveTail?: boolean
   autoHeight?: boolean
@@ -65,6 +69,7 @@ export default function MonacoEditor({
   worktreeId,
   markdownAnnotationsEnabled = false,
   conflictDecorationsEnabled = false,
+  prCommentInline = null,
   readOnly = false,
   liveTail = false,
   autoHeight = false
@@ -138,6 +143,21 @@ export default function MonacoEditor({
     language,
     worktreeId,
     markdownAnnotationsEnabled
+  })
+
+  usePRCommentInlineDecorator({
+    editor: mountedEditor,
+    // Why: Monaco drops model-scoped view zones and decorations on a model swap, and a retained
+    // editor keeps the same object across tabs — the model URI is what actually changed.
+    monacoModelIdentity: modelUri.toString(),
+    filePath: relativePath,
+    threads: prCommentInline?.threads ?? null,
+    scope: prCommentInline?.scope ?? null,
+    enabled: prCommentInline?.enabled ?? false,
+    onReply: prCommentInline?.onReply,
+    onResolveThread: prCommentInline?.onResolveThread,
+    pendingRevealCommentId: prCommentInline?.pendingRevealCommentId ?? null,
+    onPendingRevealConsumed: prCommentInline?.onPendingRevealConsumed
   })
 
   // Why useLayoutEffect: cleanup runs before @monaco-editor/react disposes the editor, so getScrollTop() still reads valid state on unmount.
