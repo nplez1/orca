@@ -20,10 +20,11 @@ import { FileExplorerFilesTreePane } from './FileExplorerFilesTreePane'
 import { FileExplorerNameFilter } from './FileExplorerNameFilter'
 import { FileExplorerNameFilterTruncationNotice } from './FileExplorerNameFilterTruncationNotice'
 import { FileExplorerQueryStrip } from './FileExplorerQueryStrip'
+import { FileExplorerSearchOverlay } from './FileExplorerSearchOverlay'
+import { FileExplorerWorkspacePlaceholder } from './FileExplorerWorkspacePlaceholder'
 import { FileExplorerToolbar } from './FileExplorerToolbar'
 import { SearchFilters } from './SearchFilters'
 import { SearchQueryRow } from './SearchQueryRow'
-import { SearchResultsPane } from './SearchResultsPane'
 import { useFileSearchPanel } from './useFileSearchPanel'
 import {
   getNameFilterCollapsedPathsAfterExpand,
@@ -36,7 +37,6 @@ import { useFileExplorerVisibleRowProjection } from './useFileExplorerVisibleRow
 import { useFileExplorerBackgroundMenu } from './use-file-explorer-background-menu'
 import { useFileExplorerNameFilter } from './use-file-explorer-name-filter'
 import { useFileExplorerTreePaneState } from './use-file-explorer-tree-pane-state'
-import { translate } from '@/i18n/i18n'
 import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
 
 /** Coordinates scoped navigation while retaining the actual worktree root for file operations and runtime routing. */
@@ -234,19 +234,7 @@ function FileExplorerFiles(): React.JSX.Element {
   })
 
   if (!worktreePath) {
-    return (
-      <div className="flex h-full items-center justify-center text-[11px] text-muted-foreground px-4 text-center">
-        {explorerView === 'search'
-          ? translate(
-              'auto.components.right.sidebar.Search.98c8435e36',
-              'Select a workspace to search'
-            )
-          : translate(
-              'auto.components.right.sidebar.FileExplorer.79b1537dd3',
-              'Select a workspace to browse files'
-            )}
-      </div>
-    )
+    return <FileExplorerWorkspacePlaceholder explorerView={explorerView} />
   }
 
   return (
@@ -395,23 +383,7 @@ function FileExplorerFiles(): React.JSX.Element {
             handleExplorerBackgroundContextMenuCapture={handleExplorerBackgroundContextMenuCapture}
             handleExplorerBackgroundDoubleClick={handleExplorerBackgroundDoubleClick}
           />
-          <div
-            className={cn(
-              'absolute inset-0 flex min-h-0 flex-col',
-              explorerView !== 'search' && 'pointer-events-none invisible'
-            )}
-          >
-            {searchPanel.activeWorktreeId ? (
-              <SearchResultsPane {...searchPanel.resultsProps} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.right.sidebar.Search.98c8435e36',
-                  'Select a workspace to search'
-                )}
-              </div>
-            )}
-          </div>
+          <FileExplorerSearchOverlay explorerView={explorerView} searchPanel={searchPanel} />
         </div>
       </div>
 
