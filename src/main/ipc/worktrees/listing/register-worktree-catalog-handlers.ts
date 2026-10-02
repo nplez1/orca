@@ -7,53 +7,20 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import type { DetectedWorktreeListResult } from '../../../../shared/worktree/types'
-import { getSshGitProvider } from '../../../providers/ssh-git-dispatch'
 import { EMPTY_RETIRED_NAME_REGISTRY } from '../../../../shared/worktree/retired-name-registry'
 import { getRetiredNameRegistryForRepo } from '../../../worktree-name-retirement'
-import {
-  buildDetectedGitWorktrees,
-  createSshWorktreeMetaIndex,
-  listDisconnectedSshWorktrees,
-  stampAndMergeVisibleDetectedWorktree
-} from './ssh-worktree-fallback'
-import { listVisibleFolderWorkspaces } from './folder-workspace-catalog'
-import {
-  applyFreshDetectedWorktreeScanSideEffects,
-  listDetectedGitWorktrees,
-  type DetectedWorktreeMetadataPrune,
-  type DetectedWorktreeSideEffectToken
-} from './detected-worktree-scan-cache'
-import {
-  loggedUnavailableSshGitProviders,
-  loggedWorktreeListFailures,
-  warnOnce
-} from './worktree-listing-diagnostics'
+import { buildDetectedGitWorktrees, createSshWorktreeMetaIndex } from './ssh-worktree-fallback'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import {
   readAllWorktreeMetaForHost,
   readAllWorktreeMetaForRepo
 } from '../../../persistence/host-qualified-worktree-meta'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
-import type { Worktree } from '../../../../shared/worktree/types'
-import {
-  projectPendingWorktreeRemovals,
-  snapshotPendingWorktreeRemovals,
-  type PendingWorktreeRemovals
-} from '../../../worktree-background-removal'
-import { getLocalWorktreeScanGeneration } from '../../../local-worktree-scan-generation'
-import { getRegisteredWorktreeRootsRevision } from '../../registered-worktree-roots-cache'
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
+import { listRepoWorktrees } from './list-repo-worktrees'
 
 const WORKTREE_LIST_ALL_CONCURRENCY = 8
-
-// Why always marked: the desktop renderer ships with this main process, so it reads the marker.
-function markLocalWorktreesUnderRemoval<T extends Worktree>(
-  worktrees: T[],
-  pendingAtScan: PendingWorktreeRemovals
-): T[] {
-  return projectPendingWorktreeRemovals(worktrees, (worktree) => worktree.id, true, pendingAtScan)
-}
 
 async function mapWithConcurrency<T, R>(
   items: readonly T[],
@@ -112,80 +79,14 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
     }
 
     // Why: each local repo listing can spawn `git worktree list`; cap fan-out so large fleets don't start unbounded subprocesses.
-    const results = await mapWithConcurrency(repos, WORKTREE_LIST_ALL_CONCURRENCY, async (repo) => {
-      const connectionId = getSshTargetIdForExecutionHost(getRepoExecutionHostId(repo))
-      try {
-        let gitWorktrees
-        let freshScan = true
-        let sideEffectToken: DetectedWorktreeSideEffectToken | undefined
-        let metadataPrune: DetectedWorktreeMetadataPrune | undefined
-        let hygieneDue: boolean | undefined
-        const pendingAtScan = snapshotPendingWorktreeRemovals()
-        if (isFolderRepo(repo)) {
-          return listVisibleFolderWorkspaces(store, repo)
-        } else if (connectionId) {
-          const provider = getSshGitProvider(connectionId)
-          if (!provider) {
-            warnOnce(
-              loggedUnavailableSshGitProviders,
-              `${connectionId}:${repo.id}`,
-              `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${connectionId}`
-            )
-            return listDisconnectedSshWorktrees(store, repo, sshMetaIndexForRepo(repo))
-          }
-          loggedUnavailableSshGitProviders.delete(`${connectionId}:${repo.id}`)
-          try {
-            sideEffectToken = {
-              generation: getLocalWorktreeScanGeneration(repo.id),
-              authorizedRootsRevision: getRegisteredWorktreeRootsRevision(repo.id)
-            }
-            gitWorktrees = await provider.listWorktrees(repo.path)
-          } catch (err) {
-            warnOnce(
-              loggedWorktreeListFailures,
-              `${repo.id}:${repo.path}`,
-              `[worktrees] failed to list worktrees for repo "${repo.displayName}" (${repo.id}) at ${repo.path}`,
-              err
-            )
-            return listDisconnectedSshWorktrees(store, repo, sshMetaIndexForRepo(repo))
-          }
-        } else {
-          const scan = await listDetectedGitWorktrees(store, repo)
-          gitWorktrees = scan.gitWorktrees
-          freshScan = scan.fresh
-          sideEffectToken = scan.sideEffectToken
-          metadataPrune = scan.metadataPrune
-          hygieneDue = scan.hygieneDue
-        }
-        if (freshScan) {
-          await applyFreshDetectedWorktreeScanSideEffects(
-            store,
-            repo,
-            gitWorktrees,
-            metadataPrune,
-            {
-              sideEffectToken,
-              ...(hygieneDue === undefined ? {} : { hygieneDue })
-            }
-          )
-        }
-        loggedWorktreeListFailures.delete(`${repo.id}:${repo.path}`)
-        const metadata = metadataForRepo(repo)
-        const worktrees = buildDetectedGitWorktrees(store, repo, gitWorktrees, metadata)
-          .filter((worktree) => worktree.visible)
-          .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))
-        return connectionId ? worktrees : markLocalWorktreesUnderRemoval(worktrees, pendingAtScan)
-      } catch (err) {
-        warnOnce(
-          loggedWorktreeListFailures,
-          `${repo.id}:${repo.path}`,
-          `[worktrees] failed to list worktrees for repo "${repo.displayName}" (${repo.id}) at ${repo.path}`,
-          err
-        )
-        // Why: do NOT seed empty success — it flags the repo registered, blocking access to legit linked worktrees until the cache is invalidated.
-        return []
-      }
-    })
+    const results = await mapWithConcurrency(repos, WORKTREE_LIST_ALL_CONCURRENCY, (repo) =>
+      listRepoWorktrees({
+        store,
+        repo,
+        resolveMetadata: () => metadataForRepo(repo),
+        resolveSshMetaIndex: () => sshMetaIndexForRepo(repo)
+      })
+    )
 
     return results.flat()
   })
@@ -252,70 +153,11 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
       ? createSshWorktreeMetaIndex(Object.entries(allMeta ?? {}))
       : new Map()
 
-    try {
-      let gitWorktrees
-      let freshScan = true
-      let sideEffectToken: DetectedWorktreeSideEffectToken | undefined
-      let metadataPrune: DetectedWorktreeMetadataPrune | undefined
-      let hygieneDue: boolean | undefined
-      const pendingAtScan = snapshotPendingWorktreeRemovals()
-      if (isFolderRepo(repo)) {
-        return listVisibleFolderWorkspaces(store, repo)
-      } else if (connectionId) {
-        const provider = getSshGitProvider(connectionId)
-        if (!provider) {
-          warnOnce(
-            loggedUnavailableSshGitProviders,
-            `${connectionId}:${repo.id}`,
-            `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${connectionId}`
-          )
-          return listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
-        }
-        loggedUnavailableSshGitProviders.delete(`${connectionId}:${repo.id}`)
-        try {
-          sideEffectToken = {
-            generation: getLocalWorktreeScanGeneration(repo.id),
-            authorizedRootsRevision: getRegisteredWorktreeRootsRevision(repo.id)
-          }
-          gitWorktrees = await provider.listWorktrees(repo.path)
-        } catch (err) {
-          warnOnce(
-            loggedWorktreeListFailures,
-            `${repo.id}:${repo.path}`,
-            `[worktrees] failed to list worktrees for repo "${repo.displayName}" (${repo.id}) at ${repo.path}`,
-            err
-          )
-          return listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
-        }
-      } else {
-        const scan = await listDetectedGitWorktrees(store, repo)
-        gitWorktrees = scan.gitWorktrees
-        freshScan = scan.fresh
-        sideEffectToken = scan.sideEffectToken
-        metadataPrune = scan.metadataPrune
-        hygieneDue = scan.hygieneDue
-      }
-      if (freshScan) {
-        await applyFreshDetectedWorktreeScanSideEffects(store, repo, gitWorktrees, metadataPrune, {
-          sideEffectToken,
-          ...(hygieneDue === undefined ? {} : { hygieneDue })
-        })
-      }
-      loggedWorktreeListFailures.delete(`${repo.id}:${repo.path}`)
-      const metadata = allMeta ?? readAllWorktreeMetaForRepo(store, repo)
-      const worktrees = buildDetectedGitWorktrees(store, repo, gitWorktrees, metadata)
-        .filter((worktree) => worktree.visible)
-        .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))
-      return connectionId ? worktrees : markLocalWorktreesUnderRemoval(worktrees, pendingAtScan)
-    } catch (err) {
-      warnOnce(
-        loggedWorktreeListFailures,
-        `${repo.id}:${repo.path}`,
-        `[worktrees] failed to list worktrees for repo "${repo.displayName}" (${repo.id}) at ${repo.path}`,
-        err
-      )
-      // Why: see worktrees:listAll catch — seeding an empty-success result would poison the auth cache and block linked worktrees.
-      return []
-    }
+    return listRepoWorktrees({
+      store,
+      repo,
+      resolveMetadata: () => allMeta ?? readAllWorktreeMetaForRepo(store, repo),
+      resolveSshMetaIndex: () => sshWorktreeMetaIndex
+    })
   })
 }

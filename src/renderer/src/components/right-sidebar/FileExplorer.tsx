@@ -17,12 +17,8 @@ import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { getVisibleFileExplorerWorktreePath } from './file-explorer-reset'
 import { FileExplorerBackgroundMenu } from './FileExplorerBackgroundMenu'
 import { FileExplorerFilesTreePane } from './FileExplorerFilesTreePane'
-import { FileExplorerNameFilter } from './FileExplorerNameFilter'
-import { FileExplorerNameFilterTruncationNotice } from './FileExplorerNameFilterTruncationNotice'
-import { FileExplorerQueryStrip } from './FileExplorerQueryStrip'
+import { FileExplorerQuerySection } from './FileExplorerQuerySection'
 import { FileExplorerToolbar } from './FileExplorerToolbar'
-import { SearchFilters } from './SearchFilters'
-import { SearchQueryRow } from './SearchQueryRow'
 import { SearchResultsPane } from './SearchResultsPane'
 import { useFileSearchPanel } from './useFileSearchPanel'
 import {
@@ -296,72 +292,21 @@ function FileExplorerFiles(): React.JSX.Element {
             sparse={!!activeWorktree?.isSparse}
           />
         )}
-        <FileExplorerQueryStrip view={explorerView} onSelectView={handleSelectExplorerView}>
-          {/* Why: keep both query rows mounted and cross-fade so the Names/Contents
-             switch does not remount or shift when changing modes. */}
-          <div className="relative min-h-7">
-            <div
-              className={cn(
-                explorerView !== 'files' && 'pointer-events-none invisible absolute inset-x-0 top-0'
-              )}
-            >
-              <FileExplorerNameFilter
-                query={nameFilterQuery}
-                scopeLabel={rootOptions?.find((option) => option.value === rootChoice)?.label}
-                loading={nameFilterFiles.loading}
-                onQueryChange={setNameFilterQuery}
-                onClear={handleClearNameFilter}
-              />
-            </div>
-            <div
-              className={cn(
-                explorerView !== 'search' &&
-                  'pointer-events-none invisible absolute inset-x-0 top-0'
-              )}
-            >
-              <SearchQueryRow {...searchPanel.queryRowProps} />
-            </div>
-          </div>
-          {explorerView === 'files' ? (
-            <div className="min-h-4">
-              {hasNameFilter ? (
-                <FileExplorerNameFilterTruncationNotice
-                  shownCount={nameFilterFiles.files.length}
-                  totalCount={nameFilterFiles.totalCount ?? null}
-                  truncated={!!nameFilterFiles.truncated}
-                  workspacePathSearch={nameFilterFiles.workspacePathSearch}
-                  isUpdating={
-                    !!nameFilterFiles.previousResults ||
-                    (nameFilterFiles.searching && nameFilterFiles.files.length > 0) ||
-                    projectionPending ||
-                    nameFilterSource?.workspacePathSearch?.state.freshness === 'dirty' ||
-                    nameFilterSource?.workspacePathSearch?.state.freshness === 'reconciling'
-                  }
-                  isIndexing={
-                    nameFilterSource?.workspacePathSearch?.degradationReason === 'missing' ||
-                    nameFilterSource?.workspacePathSearch?.degradationReason === 'building'
-                  }
-                  isSearching={
-                    nameFilterFiles.searching &&
-                    nameFilterFiles.loading &&
-                    !nameFilterFiles.previousResults
-                  }
-                  hasError={!!nameFilterFiles.loadError || !!projectionError}
-                  hasProjectionError={projectionError === 'budget'}
-                />
-              ) : null}
-            </div>
-          ) : null}
-        </FileExplorerQueryStrip>
-        <div
-          className={cn(
-            'border-b border-border px-2 pb-1.5',
-            explorerView !== 'search' &&
-              'pointer-events-none invisible h-0 overflow-hidden border-b-0 p-0'
-          )}
-        >
-          <SearchFilters {...searchPanel.filtersProps} />
-        </div>
+        <FileExplorerQuerySection
+          view={explorerView}
+          onSelectView={handleSelectExplorerView}
+          hasNameFilter={hasNameFilter}
+          nameFilterQuery={nameFilterQuery}
+          nameFilterScopeLabel={rootOptions?.find((option) => option.value === rootChoice)?.label}
+          nameFilterLoading={nameFilterFiles.loading}
+          onNameFilterQueryChange={setNameFilterQuery}
+          onClearNameFilter={handleClearNameFilter}
+          nameFilterFiles={nameFilterFiles}
+          nameFilterSource={nameFilterSource}
+          projectionPending={projectionPending}
+          projectionError={projectionError}
+          searchPanel={searchPanel}
+        />
         {/* Why: the Files and Contents views share one body slot; layering them
            avoids remounting heavy virtualized panes while preserving full height. */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
