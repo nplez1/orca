@@ -5,6 +5,7 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { OpenFile } from '../../store/slices/editor'
 import type { HoveredTabInsertion } from '../tab-group/useTabDragSplit'
 import type { TabCreateEntryArgs } from './tab-create-entry-action'
+import type { DefaultAgentSource } from './use-tab-bar-default-agent'
 
 export type TabBarProps = {
   tabs: (TerminalTab & { unifiedTabId?: string })[]
@@ -25,8 +26,9 @@ export type TabBarProps = {
   onOpenEntry?: (args: TabCreateEntryArgs) => Promise<void>
   terminalOnly?: boolean
   showAgentLaunchItems?: boolean
-  /** Floating panels hide the tab bar's agent quick launch; their window controls own one. */
-  showDefaultAgentQuickLaunch?: boolean
+  /** Where the create control's agent comes from. Floating panels ask for `configured`: their
+   *  synthetic worktree has no detected agents, and they own the launch themselves. */
+  defaultAgentSource?: DefaultAgentSource
   onNewFileTab?: () => void
   onOpenFileTab?: () => void
   newTabMenuOrder?: 'default' | 'markdown-first'

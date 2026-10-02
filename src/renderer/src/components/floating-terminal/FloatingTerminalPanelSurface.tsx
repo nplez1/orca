@@ -194,8 +194,10 @@ export function renderFloatingTerminalPanelSurface({
               onPinFile={pinFile}
               tabBarOrder={tabBarOrder}
               tabStripChrome="floating-panel"
-              // Why: the floating window controls already own the agent launch; the tab bar keeps only the create menu (with its agent entries).
-              showDefaultAgentQuickLaunch={false}
+              // Why: the floating workspace's agent quick launch sits in this strip, exactly as it
+              // does in the main window; the synthetic floating worktree has no detected agents,
+              // so the control offers the configured default agent instead of probing.
+              defaultAgentSource="configured"
             />
           </FloatingWorkspaceTabDragContext>
           <FloatingTerminalWindowControls

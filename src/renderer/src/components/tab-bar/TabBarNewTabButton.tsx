@@ -4,7 +4,7 @@ import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { translate } from '@/i18n/i18n'
-import { useTabBarDefaultAgent } from './use-tab-bar-default-agent'
+import { useTabBarDefaultAgent, type DefaultAgentSource } from './use-tab-bar-default-agent'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 
 /** How long the primary control must be held before the create menu opens. */
@@ -180,20 +180,20 @@ function SplitNewTabTrigger({
  */
 export function TabBarNewTabButton({
   worktreeId,
-  agentLaunchEnabled = true,
+  agentSource = 'detected',
   isMenuOpen,
   onLaunchAgent,
   onOpenMenu
 }: {
   worktreeId: string
-  /** Floating panels own their own agent button, so they render the plain "+". */
-  agentLaunchEnabled?: boolean
+  /** Floating panels ask for `configured`: their synthetic worktree has no detected agents. */
+  agentSource?: DefaultAgentSource
   /** The create menu's open state, owned by the tab bar; a hold-release click must not launch under it. */
   isMenuOpen: boolean
   onLaunchAgent: (agent: TuiAgent) => void
   onOpenMenu: () => void
 }): React.JSX.Element {
-  const { agent, isAgentLaunchPending } = useTabBarDefaultAgent(worktreeId, agentLaunchEnabled)
+  const { agent, isAgentLaunchPending } = useTabBarDefaultAgent(worktreeId, agentSource)
   if (agent === null) {
     return <PlainNewTabTrigger />
   }
