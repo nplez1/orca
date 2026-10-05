@@ -23,8 +23,13 @@ export function useCommentCardResize(
 ): CommentCardResize {
   const cardRef = useRef<HTMLDivElement | null>(null)
   const onContentResizeRef = useRef(onContentResize)
-  onContentResizeRef.current = onContentResize
   const observesRenderedSize = observeRenderedSize && onContentResize !== undefined
+
+  // Stash in an effect rather than during render: callers pass a fresh arrow each render and a
+  // render-time ref write is impure (react-doctor/no-ref-current-in-render).
+  useLayoutEffect(() => {
+    onContentResizeRef.current = onContentResize
+  }, [onContentResize])
 
   useLayoutEffect(() => {
     const card = cardRef.current

@@ -117,12 +117,18 @@ export function useDiffCommentDecorator({
   const onSetThreadResolvedRef = useRef(onSetThreadResolved)
   const onCollapseThreadRef = useRef(onCollapseThread)
   const onPendingScrollConsumedRef = useRef(onPendingScrollConsumed)
-  onDeleteCommentRef.current = onDeleteComment
-  onUpdateCommentRef.current = onUpdateComment
-  onReplyToThreadRef.current = onReplyToThread
-  onSetThreadResolvedRef.current = onSetThreadResolved
-  onCollapseThreadRef.current = onCollapseThread
-  onPendingScrollConsumedRef.current = onPendingScrollConsumed
+  // Stash in an effect rather than during render: a render-time ref write is impure
+  // (react-doctor/no-ref-current-in-render). Every reader runs from a handler, a rAF, or a later
+  // effect. No dependency list on purpose — callers pass inline arrows, so the point is to re-stash
+  // the latest of each on every commit (a dep array of fresh arrows would be recreated every render).
+  useEffect(() => {
+    onDeleteCommentRef.current = onDeleteComment
+    onUpdateCommentRef.current = onUpdateComment
+    onReplyToThreadRef.current = onReplyToThread
+    onSetThreadResolvedRef.current = onSetThreadResolved
+    onCollapseThreadRef.current = onCollapseThread
+    onPendingScrollConsumedRef.current = onPendingScrollConsumed
+  })
 
   const { onAddCommentClickRef, isDraftOpen } = useDiffCommentDraftZone({
     editor,

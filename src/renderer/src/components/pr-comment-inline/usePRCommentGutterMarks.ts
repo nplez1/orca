@@ -32,8 +32,13 @@ export function usePRCommentGutterMarks(args: {
   const { editor, monacoModelIdentity, marks, onActivate } = args
   const marksRef = useRef(marks)
   const onActivateRef = useRef(onActivate)
-  marksRef.current = marks
-  onActivateRef.current = onActivate
+
+  // Stash in an effect rather than during render: a render-time ref write is impure
+  // (react-doctor/no-ref-current-in-render), and both refs are only read from the click handler.
+  useEffect(() => {
+    marksRef.current = marks
+    onActivateRef.current = onActivate
+  }, [marks, onActivate])
 
   // Why: read the marks through a ref so a click always resolves against the current set without
   // re-subscribing every time the thread list changes identity.
