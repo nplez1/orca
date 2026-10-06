@@ -104,6 +104,25 @@ the normal path. With both lineages in place every child lifecycle event fired t
 deliberate silence on those channels for omp/prime-agent was filled by upstream's unconditional
 binding.
 
+**Since the 2026-10-06 sync the live set belongs to a session, not to the process.**
+`agent-status-async-subagent-session-source.ts` publishes
+`globalThis.__orcaPiAsyncSubagents = { bySession, registration, awaitingSession }`: each factory run
+owns its registration, the owning session comes from that registration's own event context, a child
+that reports before its session announces itself waits in `awaitingSession` and is adopted only by
+the session that names it, and a shutdown closes only its own bus. The `globalThis` home is what lets
+a `/reload` — which re-evaluates the module — keep the children a same-file resume expects; it is
+deliberately **not** the authority for attribution, because a child bound before its session named
+itself would otherwise land in the previous session's bucket.
+
+**Settlement is the other half.** `session_start` is this lane's descendant-scope reset, so the
+resume placeholder is gated through `gatePaneStateOnDescendants` and an empty live set is never
+defaulted to `working`. Without that, resuming a session and letting its last child end left the pane
+held `working` by a hold nobody had reported. Anchors for both:
+`src/shared/agent-hook-listener.ts` (the placeholder gate), `descendant-pane-state.ts`,
+`agent-status-session-boundary-source.ts` (per-registration shutdown), and the lifecycle cases in
+`agent-hook-listener-descendant-lifecycle.test.ts` and `agent-status-async-subagent.test.ts`
+(resume A with no new turn, last child ends ⇒ `done`).
+
 So the two `subagent:async-*` bindings are dropped from upstream's roster setup; upstream's
 OMP-only `task:subagent:lifecycle` binding stays. Channel coverage differs in both directions (see
 the 2026-09-21 sync entry), which is why this converges on the fork's subsystem rather than
