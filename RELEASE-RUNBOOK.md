@@ -34,7 +34,9 @@ gh run watch --repo nplez1/orca
 ```
 
 A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`, `latest.yml`, and
-`orca-windows-setup.exe`. Keep that release; it is also your rollback artifact.
+`orca-windows-setup.exe`, and a body that opens with a generated change summary (see
+[Release notes](#release-notes--read-the-draft-before-it-goes-live) below). Keep that release; it is
+also your rollback artifact.
 
 ## Step 1 — the five secrets
 
@@ -65,11 +67,62 @@ if someone reports a bug — upstream has never shipped that version.
 Once `MAC_CERTS` exists the workflow switches itself to the signed, hardened, notarized path. There
 is nothing else to change.
 
+## Release notes — read the draft before it goes live
+
+The body is generated, not written: `.github/scripts/fork-release-notes.mjs` runs in the macos job and
+fills the `{{CHANGE_SUMMARY}}` placeholder in `.github/fork-release-notes.md`, which holds the static
+install and project sections. Nothing about the notes is hand-maintained per release, because a
+hand-written "worth knowing" list is what made these releases read as install instructions with no
+list of changes.
+
+Where the summary comes from:
+
+- `git log <previous -np. tag>..HEAD` — every commit in the range, grouped as `local(...)` fork
+  patches, features, fixes, performance, refactors, docs, tests, maintenance, other. The fork patch
+  group is first, because it is what a user of this build notices.
+- Merges are reported in the opening paragraph rather than as bullets; the commits they brought in
+  appear in the groups.
+- Each group prints at most 12 entries (`--max-per-group`) and then `+N more`, so a large range stays
+  readable. Trailing PR numbers are stripped, and repeated subjects collapse to `(xN)`.
+- The previous tag is the newest `v*-np.*` tag that is neither this build nor a later one, so a rebase
+  that leaves the previous tag off `HEAD`'s line does not matter.
+
+**Why the checkout fetches full history:** the summary needs `git log` over the range, and the default
+one-commit clone has neither the commits nor the tags. It is a full clone of this repository (a few
+minutes on the runner), which is the price of a range that spans a rebase; do not lower `fetch-depth`
+in the macos job to speed it up. The generator detects a shallow checkout and refuses to guess, which
+would leave every future release without a summary.
+
+**The generator cannot fail the release.** No history, a tag that does not exist, or a shallow clone
+produces a warning, a body without a summary, and exit 0. The shell step in the workflow is the second
+layer: if the notes file is empty it writes a minimal body instead.
+
+**Read the body of the draft before publishing.** The release is created as a draft and only
+`gh release edit --draft=false` at the end of the windows job makes it public, which is the window for
+exactly this check:
+
+```bash
+gh release view v<version> --repo nplez1/orca --json body --jq .body | less
+```
+
+What to look for: the summary is present and starts with the fork patches; the comparison link is
+`<previous tag>...<this tag>` and is not broken; the install table names the version being released;
+the signing paragraph matches this run (the macos job logs `signed=true` or `signed=false`). If the
+body is wrong, edit the release (`gh release edit v<version> --notes-file notes.md`) before flipping it
+public — or leave it as a draft and delete it, since an installed build cannot see a draft.
+
+To preview locally before a release, or after trimming `.github/fork-release-notes.md`:
+
+```bash
+node .github/scripts/fork-release-notes.mjs --version 1.4.214-np.17 --signing unsigned \
+  | less          # add --prev-tag vX.Y.Z-np.N to compare against a tag other than the newest
+```
+
 ## Step 3 — install on each machine
 
 1. **Back up Orca NP state first.** This build is its own identity — bundle id
    `com.nplez1.orca`, product name `Orca NP`, home directory `~/.orca-np`, packaged userData
-   `appData/orca-np`, CLI `orca-np` — so it installs *beside* an official Orca rather than replacing
+   `appData/orca-np`, CLI `orca-np` — so it installs _beside_ an official Orca rather than replacing
    it, and the two keep separate state. (The `orca://` URL scheme is deliberately shared: it is
    pairing and skill-share interop, not plumbing.) The backup is still worth taking: a bug in this
    build can damage the state this build owns.
@@ -114,6 +167,10 @@ curl -s https://github.com/nplez1/orca/releases.atom | grep -o '<title>[^<]*' | 
 
 # what the fork has published
 gh release list --repo nplez1/orca --limit 5
+
+# what the newest release says changed (a body without a summary means the generator warned; the
+# run log has the reason)
+gh release view --repo nplez1/orca --json tagName,body --jq '"\(.tagName)\n\(.body)"' | head -30
 
 # do the installed builds still point at this fork after the local patch series moves?
 grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/updater-*.ts src/shared/release-channel.ts

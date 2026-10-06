@@ -35,7 +35,12 @@ jobs:
   macos:
     runs-on: macos-15
     steps:
+      # Why full history: the release notes are generated from `git log <previous release tag>..HEAD`,
+      # and the default clone carries one commit and no tags. Deepening to the tag would not be
+      # enough either — this fork rebases onto upstream, so the previous tag is not on HEAD's line.
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/setup@v2
@@ -121,6 +126,28 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # Why generated: the notes must say what changed, and a hand-maintained list goes stale. The
+      # script derives the summary from git and never exits non-zero, so a release can still be cut
+      # when history is unusable (see "Release notes" in RELEASE-RUNBOOK.md).
+      - name: Generate the release notes
+        shell: bash
+        env:
+          SIGNING: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/fork-release-notes.mjs \
+            --version "$RELEASE_VERSION" \
+            --sha "$GITHUB_SHA" \
+            --repo "$PUBLISH_OWNER/orca" \
+            --signing "$SIGNING" \
+            --out /tmp/notes.md || true
+          # Why the check: a missing notes file would create a release with an empty body, which is
+          # worse than one without a change summary.
+          if [ ! -s /tmp/notes.md ]; then
+            echo "::warning title=Release notes::The notes generator produced nothing; publishing a minimal body instead."
+            printf '**Orca NP %s**\n\nBuilt from `%s`.\n' "$RELEASE_VERSION" "$GITHUB_SHA" >/tmp/notes.md
+          fi
+
       # Why create the release up front, as a draft: electron-builder's publisher would otherwise
       # have two artifact legs race to create it, and the loser aborts the whole job with
       # 422 "Published releases must have a valid tag" even though the winner succeeded — which is
@@ -136,26 +163,6 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
-
-          # Why node, and why the heredoc is quoted: one placeholder expands to a multi-line
-          # paragraph, and only the command line may interpolate shell values.
-          node - "$RELEASE_VERSION" "$GITHUB_SHA" "${{ steps.signing.outputs.signed }}" >/tmp/notes.md <<'JS'
-          const fs = require('fs')
-          const [version, sha, signed] = process.argv.slice(2)
-          const signing =
-            signed === 'true'
-              ? '**Signed and notarized.** This build carries a Developer ID signature and a stapled Apple notarization ticket, so it opens with no Gatekeeper override and macOS keeps its permission grants across updates.'
-              : '**Unsigned validation build — not for deployment.** Gatekeeper requires a manual override on first launch, and macOS treats each build as a new app, so permission grants will not survive an update.'
-          fs.writeFileSync(
-            1,
-            fs
-              .readFileSync('.github/fork-release-notes.md', 'utf8')
-              .replaceAll('{{VERSION}}', version)
-              .replaceAll('{{SHA}}', sha.slice(0, 10))
-              .replaceAll('{{DATE}}', new Date().toISOString().slice(0, 10))
-              .replaceAll('{{SIGNING}}', signing)
-          )
-          JS
 
           if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" >/dev/null 2>&1; then
             echo "$tag already exists; uploading into it"
