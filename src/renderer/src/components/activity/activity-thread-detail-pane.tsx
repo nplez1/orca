@@ -5,6 +5,7 @@ import { agentTypeToIconAgent } from '@/lib/agent-status'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { EventRepoBadge, ThreadAgentStateIndicator } from './activity-thread-controls'
+import { SessionSummaryPanel } from './session-summary-panel'
 import type { ActivityTerminalPortalSlotId, AgentPaneThread } from './activity-thread-types'
 
 export function ActivityThreadDetailPane({
@@ -60,6 +61,7 @@ export function ActivityThreadDetailPane({
               </div>
             </div>
           </div>
+          <SessionSummaryPanel paneKey={selectedThread.paneKey} />
           {/* Why: Terminal stays mounted in the hidden workspace tree; this target moves that existing TerminalPane here instead of spawning a second PTY/xterm owner. */}
           {(() => {
             // Why: retained threads can outlive their tab; portal needs a live TerminalPane to render into.
