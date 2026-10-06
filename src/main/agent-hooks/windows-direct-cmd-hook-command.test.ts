@@ -38,12 +38,12 @@ describe('wrapWindowsDirectCmdHookCommand', () => {
 
   it('declines any path the shells cannot carry bare', () => {
     for (const path of [
-      'C:\\Users\\Bob Smith\\.orca\\agent-hooks\\claude-hook.cmd',
-      'C:\\Users\\%name%\\.orca\\agent-hooks\\claude-hook.cmd',
-      'C:\\Users\\a^b\\.orca\\agent-hooks\\claude-hook.cmd',
-      'C:\\Users\\a&b\\.orca\\agent-hooks\\claude-hook.cmd',
-      'C:\\Users\\a(b)\\.orca\\agent-hooks\\claude-hook.cmd',
-      'C:\\Users\\rené\\.orca\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\Bob Smith\\.orca-np\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\%name%\\.orca-np\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\a^b\\.orca-np\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\a&b\\.orca-np\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\a(b)\\.orca-np\\agent-hooks\\claude-hook.cmd',
+      'C:\\Users\\rené\\.orca-np\\agent-hooks\\claude-hook.cmd',
       '/home/alice/.orca-np/agent-hooks/claude-hook.sh',
       // Why: WINDOWS_CMD_SAFE_PATH admits a UNC profile, but `//server/share/...` is not a
       // command cmd.exe reliably starts — keep those on the encoded launcher.

@@ -106,7 +106,7 @@ describe('AntigravityHookService', () => {
       expect(script).not.toContain('powershell.exe')
       expect(script).toContain('ELECTRON_RUN_AS_NODE=1')
       expect(
-        readFileSync(join(homeDir, '.orca', 'agent-hooks', 'antigravity-hook-post.cjs'), 'utf8')
+        readFileSync(join(homeDir, '.orca-np', 'agent-hooks', 'antigravity-hook-post.cjs'), 'utf8')
       ).toContain('/hook/antigravity')
       // Why (#9358/#9941): delayed expansion eats `!` out of percent-expanded curl args.
       expect(script).toContain('setlocal DisableDelayedExpansion')
@@ -289,7 +289,7 @@ describe('AntigravityHookService', () => {
       expect(script).not.toContain('powershell.exe')
       expect(script).toContain('ELECTRON_RUN_AS_NODE=1')
       expect(
-        readFileSync(join(homeDir, '.orca', 'agent-hooks', 'antigravity-hook-post.cjs'), 'utf8')
+        readFileSync(join(homeDir, '.orca-np', 'agent-hooks', 'antigravity-hook-post.cjs'), 'utf8')
       ).toContain('/hook/antigravity')
       expect(script).toContain('setlocal DisableDelayedExpansion')
     })
@@ -299,7 +299,7 @@ describe('AntigravityHookService', () => {
     withPlatform('win32', () => {
       const service = new AntigravityHookService()
       expect(service.install().state).toBe('installed')
-      const hookDir = join(homeDir, '.orca', 'agent-hooks')
+      const hookDir = join(homeDir, '.orca-np', 'agent-hooks')
       const readerPath = join(hookDir, 'antigravity-hook-post.cjs')
       const corePath = join(hookDir, 'antigravity-hook.cmd')
       const configPath = join(homeDir, '.gemini', 'config', 'hooks.json')
@@ -320,7 +320,7 @@ describe('AntigravityHookService', () => {
       const service = new AntigravityHookService()
       let runtimePath = 'C:\\Orca1\\Orca.exe'
       service.setWindowsRuntimePathProvider(() => runtimePath)
-      const readerPath = join(homeDir, '.orca', 'agent-hooks', 'antigravity-hook-post.cjs')
+      const readerPath = join(homeDir, '.orca-np', 'agent-hooks', 'antigravity-hook-post.cjs')
       await service.refreshManagedScripts()
       expect(existsSync(readerPath)).toBe(false)
       expect(service.install().state).toBe('installed')
@@ -329,7 +329,7 @@ describe('AntigravityHookService', () => {
       await service.refreshManagedScripts()
       expect(readFileSync(readerPath, 'utf8')).toContain("require('node:string_decoder')")
       expect(
-        readFileSync(join(homeDir, '.orca', 'agent-hooks', 'antigravity-hook.cmd'), 'utf8')
+        readFileSync(join(homeDir, '.orca-np', 'agent-hooks', 'antigravity-hook.cmd'), 'utf8')
       ).toContain('ORCA_AGENT_HOOK_NODE=C:\\Orca2\\Orca.exe')
     } finally {
       vi.restoreAllMocks()

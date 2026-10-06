@@ -271,7 +271,9 @@ describe('createManagedCommandMatcher', () => {
   })
 
   it('matches encoded Windows launcher commands by decoding their script path', () => {
-    const command = wrapWindowsHookCommand('C:\\Users\\alice\\.orca\\agent-hooks\\claude-hook.cmd')
+    const command = wrapWindowsHookCommand(
+      'C:\\Users\\alice\\.orca-np\\agent-hooks\\claude-hook.cmd'
+    )
     expect(match(command)).toBe(true)
   })
 
@@ -289,9 +291,11 @@ describe('createManagedCommandMatcher', () => {
     const matchPosix = createManagedCommandMatcher('copilot-hook.sh')
     const matchPowerShell = createManagedCommandMatcher('copilot-hook.ps1')
 
-    expect(matchPosix("& 'C:\\Users\\alice\\.orca\\agent-hooks\\copilot-hook.ps1'")).toBe(true)
+    expect(matchPosix("& 'C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.ps1'")).toBe(true)
     expect(
-      matchPosix(wrapWindowsHookCommand('C:\\Users\\alice\\.orca\\agent-hooks\\copilot-hook.ps1'))
+      matchPosix(
+        wrapWindowsHookCommand('C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.ps1')
+      )
     ).toBe(true)
     expect(matchPowerShell("/bin/sh '/home/alice/.orca-np/agent-hooks/copilot-hook.sh'")).toBe(true)
   })
@@ -357,7 +361,7 @@ describe('removeManagedCommands', () => {
                 'C:\\Windows\\System32\\cmd.exe',
                 '/d',
                 '/c',
-                'C:\\Users\\alice\\.orca\\agent-hooks\\copilot-hook.cmd'
+                'C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.cmd'
               ]
             },
             { type: 'command', command: 'echo keep me' }
@@ -422,7 +426,7 @@ describe('hookDefinitionHasManagedCommand', () => {
             {
               type: 'command',
               command: 'C:\\Windows\\System32\\conhost.exe',
-              args: ['--headless', 'C:\\Users\\alice\\.orca\\agent-hooks\\copilot-hook.cmd']
+              args: ['--headless', 'C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.cmd']
             }
           ]
         },
@@ -606,20 +610,22 @@ function expectedDecodedWindowsHookCommand(scriptPath: string): string {
 
 describe('wrapWindowsHookCommand', () => {
   it('invokes the .cmd through an encoded PowerShell command', () => {
-    const command = wrapWindowsHookCommand('C:\\Users\\alice\\.orca\\agent-hooks\\codex-hook.cmd')
+    const command = wrapWindowsHookCommand(
+      'C:\\Users\\alice\\.orca-np\\agent-hooks\\codex-hook.cmd'
+    )
     expect(command).toMatch(qualifiedWindowsPowerShellCommand)
     expect(command).not.toMatch(/^powershell\b/i)
     expect(decodeWindowsHookCommand(command)).toBe(
-      expectedDecodedWindowsHookCommand('C:\\Users\\alice\\.orca\\agent-hooks\\codex-hook.cmd')
+      expectedDecodedWindowsHookCommand('C:\\Users\\alice\\.orca-np\\agent-hooks\\codex-hook.cmd')
     )
   })
 
   it('doubles typographic single quotes in the script path literal', () => {
     const decoded = decodeWindowsHookCommand(
-      wrapWindowsHookCommand('C:\\Users\\O\u2019Brien\\.orca\\agent-hooks\\codex-hook.cmd')
+      wrapWindowsHookCommand('C:\\Users\\O\u2019Brien\\.orca-np\\agent-hooks\\codex-hook.cmd')
     )
     expect(decoded).toContain(
-      "Test-Path -LiteralPath 'C:\\Users\\O\u2019\u2019Brien\\.orca\\agent-hooks\\codex-hook.cmd'"
+      "Test-Path -LiteralPath 'C:\\Users\\O\u2019\u2019Brien\\.orca-np\\agent-hooks\\codex-hook.cmd'"
     )
   })
 
@@ -680,7 +686,7 @@ describe('wrapWindowsHookCommand', () => {
 describe('wrapWindowsCmdHookCommand', () => {
   it('returns the bare, directly-spawnable path for a cmd-safe managed script', () => {
     // Direct-spawn consumers need a launchable argv[0], not a cmd builtin such as `if`.
-    const scriptPath = 'C:\\Users\\alice\\.orca\\agent-hooks\\codex-hook.cmd'
+    const scriptPath = 'C:\\Users\\alice\\.orca-np\\agent-hooks\\codex-hook.cmd'
     const command = wrapWindowsCmdHookCommand(scriptPath)
     expect(command).toBe(scriptPath)
     expect(command).not.toMatch(/^if\b/)
