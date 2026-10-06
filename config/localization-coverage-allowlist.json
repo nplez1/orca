@@ -404,5 +404,12 @@
     "text": "rcfile",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/activity/session-summary-panel.tsx",
+    "kind": "object-property:error",
+    "text": "Error",
+    "dynamic": false,
+    "count": 1
   }
 ]

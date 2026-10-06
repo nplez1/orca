@@ -19343,5 +19343,24 @@
     "failures": "Failures",
     "openJenkinsSettings": "Open Jenkins settings",
     "toggleStage": "Toggle stage steps"
+  },
+  "activity": {
+    "sessionSummary": {
+      "now": "Now",
+      "sinceLastLook": "Since you last looked",
+      "earlier": "Earlier",
+      "timeline": "Timeline",
+      "goal": "Goal",
+      "plan": "Plan",
+      "done": "Done",
+      "blockers": "Blockers",
+      "decisions": "Decisions",
+      "updating": "Updating…",
+      "backlogHint": "{{count}} events to catch up on",
+      "upToDate": "Up to date",
+      "label": "Session summary",
+      "failed": "Could not summarize this session.",
+      "unavailable": "No readable transcript for this session yet."
+    }
   }
 }
