@@ -361,6 +361,22 @@ pnpm run sync:localization-runtime-catalog
     `src/renderer/src/components/{settings,status-bar,right-sidebar}`, `src/relay`, plus the
     tab-bar and sidebar suites.
 
+  - **The sync process itself changed.** Every sync so far rebased the whole line, which pays per
+    commit *per collision*: seven fork commits touch `service-full-cycle-preparation.ts`, so that one
+    file stopped this rebase three times and the same decision was made three times. The release line
+    now **merges** upstream (measured on the 50-commit delta pending after this sync: a merge presents
+    26 file-level conflicts and auto-merges 68 files, while a rebase replays 150 commits), and rebase
+    is kept for the `local(...)` series and for feature branches, which are small and want linear
+    review. `git range-diff` stays for those and is replaced on the release line by
+    `git show --remerge-diff` plus endpoint-delta review. Four tools and one ledger now back the
+    process — `node local/sync/{pre-sync,conflicts,post-sync,identity-sweep}.mjs` and
+    `local/sync/convergence-ledger.md`, documented in `local/sync/README.md` and the rewritten
+    `UPSTREAM-SYNC-RUNBOOK.md`. The ledger is the part that pays back first: it holds the decisions
+    this sync settled (key store, repo detection, floating workspace, identity, provider unions, the
+    schema-version rule) so they are not re-litigated next time. `local/sync/curate.mjs` can collapse
+    the scaffolding into a curated series (150 → 126 patches, removing 10 conflict-capable commits)
+    and was deliberately **not** run: that is another public rewrite for a modest gain.
+
   - **Left open, by name:**
     - _The mobile-web sweep table follows upstream._ The fork's `a2994c2741` had re-measured
       `MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP` one script lower per route; this rebase took upstream's
