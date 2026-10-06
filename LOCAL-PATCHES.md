@@ -326,6 +326,38 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-06 — released as `v1.4.214-np.18`** from `2d0c739ee6` (signed and notarized, workflow run
+  37485475655), on the merge line: the release carries upstream `6c693edf40` in full. **This one went
+  through three second-model gates, and the first two were NO-GO.** That is the headline: the flow
+  caught four defects that a green test suite did not.
+
+  - **Gate 1** (on the merge) found pi settlement stranding on resume, pi ownership holes, relay
+    cancellation matching only the sender id while the renderer submits under a UUID, and release
+    notes counting 103 rebase-duplicate commits as new. **Gate 2** confirmed the settlement fix and
+    the notes, then rejected the ownership fix outright — *"B's distinct bus is unobserved… 'once per
+    evaluation' preserves the collision rather than fixes it"* — and found a child-only update
+    stranding the cached row plus two cancellation races (a cancel during authorization still
+    submitting its query; a settled token falling back to the sender id and killing a peer). **Gate
+    3** ran its own probes over the fixed tree and returned GO (`PI_PROBES_PASS`,
+    `CANCELLATION_PROBES_PASS`), naming no blockers.
+  - **What the fixes changed, in mechanism terms:** pi children are keyed by the session that owns
+    them and the *binding* is keyed by the bus (`PiAsyncSubagentBusBinding { bus, registration,
+    listeners }`, ownership transferred to the newest registration on that bus), a hold nobody claims
+    is retracted rather than merely not re-published, and `session_start`'s placeholder is gated so a
+    resumed session that loses its last child settles `done`. Cancellation moved to a live
+    token→request fence begun before the first await and checked again after submission, with
+    `fs:cancelListFiles` requiring a live request so an unknown or settled token cancels nothing.
+  - **Release notes now lead with what changed** — the previous body was install instructions and
+    project detail. `.github/scripts/fork-release-notes.mjs` groups the range by type, counts only
+    commits that are not patch-equivalents of the last release (`git cherry`, which matters because
+    this fork's line gets rebased), caps each group, folds sync bookkeeping into one counted line, and
+    links the full comparison.
+  - **Deferred by the reviewer, with its agreement:** acknowledgement validation and a
+    review-required status for modified-file red flags in `post-sync`; notes-body validation beyond a
+    heading plus size floor; the dual `includeIgnored`/`includeIgnoredFiles` spelling; the
+    `recentError` row that is computed but no longer rendered; and the unnamed-consumer sender
+    fallback in the path-search handler, which no current renderer call site reaches.
+
 - **2026-10-05 (second sync of the day) — merge of upstream `6c693edf40` (50 commits) into the
   release line, from `807aa6062c`.** The first sync on the new flow
   ([UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)), and the pilot that paid for the tooling:
