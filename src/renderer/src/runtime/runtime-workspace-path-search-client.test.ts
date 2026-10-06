@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { searchRuntimeFilePaths } from './runtime-file-search-client'
+import { searchRuntimeFilePaths } from './runtime-file-path-search-client'
 import {
   fsSearch,
   runtimeEnvironmentCall,

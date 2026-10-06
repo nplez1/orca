@@ -40,6 +40,7 @@ import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
 import { buildWorktreeRemovalSuccessResult } from './worktree-removal-result'
+import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -107,9 +108,7 @@ export function createRemoveWorktree(
         worktreeId,
         requiredExecutionHostId
       )
-      const terminalPtyIdsBeforeRemoval = (get().tabsByWorktree[worktreeId] ?? []).flatMap(
-        (tab) => get().ptyIdsByTabId[tab.id] ?? []
-      )
+      const beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
       if (!forgetLocalOnly) {
         removalGenerationGuard?.assertCurrent()
       }
@@ -251,7 +250,7 @@ export function createRemoveWorktree(
         worktreeId,
         hostId,
         requiredExecutionHostId,
-        terminalPtyIdsBeforeRemoval,
+        beforeRemoval,
         catalogVersion: removalResult?.catalogVersion
       })
       // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.

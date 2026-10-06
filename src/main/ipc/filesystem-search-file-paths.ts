@@ -31,6 +31,8 @@ export async function searchQuickOpenFilePaths(
   rootPath: string,
   store: Store,
   args: {
+    includeIgnored?: boolean
+    followSymlinks?: boolean
     query: string
     limit: number
     excludePaths?: string[]
@@ -62,13 +64,23 @@ export async function searchQuickOpenFilePaths(
   )
   const wslDistroForOutput = parseWslPath(authorizedRootPath)?.distro ?? localGitOptions.wslDistro
 
-  const excludePathPrefixes = buildExcludePathPrefixes(authorizedRootPath, args.excludePaths)
+  // Upstream's union: the workspace spelling and the canonical root can differ on macOS symlinked roots.
+  const excludePathPrefixes = [
+    ...new Set([
+      ...buildExcludePathPrefixes(rootPath, args.excludePaths),
+      ...buildExcludePathPrefixes(authorizedRootPath, args.excludePaths)
+    ])
+  ]
   const { primary, ignoredPass } = buildRgArgsForQuickOpen({
     searchRoot: '.',
+    followSymlinks: args.followSymlinks,
     excludePathPrefixes,
     forceSlashSeparator: sep === '\\'
   })
-  const passArgs = args.includeIgnoredFiles === false ? primary : ignoredPass
+  // Both option spellings select the pass: the runtime RPC sends `includeIgnored` (upstream), the
+  // fingerprinted name-filter request sends `includeIgnoredFiles` (fork).
+  const passArgs =
+    args.includeIgnoredFiles === false || args.includeIgnored === false ? primary : ignoredPass
   // Fresh ranker per attempt so a retry cannot double-count paths from the aborted scan.
   const scanOnce = async (): Promise<QuickOpenFilePathSearchResult> => {
     const generationStartedAt = performance.now()

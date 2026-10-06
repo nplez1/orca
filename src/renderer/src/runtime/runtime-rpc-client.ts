@@ -1,3 +1,4 @@
+import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
@@ -57,6 +58,9 @@ export async function callRuntimeRpc<TResult>(
     expectedEnvironmentRuntimeId?: string
   } = {}
 ): Promise<TResult> {
+  if (options.signal?.aborted) {
+    throw createRuntimeRpcAbortError()
+  }
   const expectedEnvironmentPairingRevision =
     target.kind === 'environment'
       ? captureRuntimeEnvironmentRequestRevision(
@@ -69,10 +73,13 @@ export async function callRuntimeRpc<TResult>(
     method !== 'status.get' &&
     options.skipCompatibilityCheck !== true
   ) {
-    await ensureRuntimeEnvironmentCompatible(target.environmentId, {
-      ...options,
-      expectedEnvironmentPairingRevision
-    })
+    await waitForPromiseWithSignal(
+      ensureRuntimeEnvironmentCompatible(target.environmentId, {
+        ...options,
+        expectedEnvironmentPairingRevision
+      }),
+      options.signal
+    )
   }
   if (options.signal?.aborted) {
     throw createRuntimeRpcAbortError()

@@ -17,7 +17,7 @@ export function resolveRuntimeFileListDerivedState(args: {
   queryLimit: number
   requestOutcome: { requestKey: string; correlationId: string; pending: boolean }
   visibleLoadingRequestKey: string
-  browseListingPending: boolean
+  browseCapable: boolean
   enabled: boolean
   targetCanList: boolean
   operationRouteAvailable: boolean
@@ -44,12 +44,15 @@ export function resolveRuntimeFileListDerivedState(args: {
     queryLimit,
     requestOutcome,
     visibleLoadingRequestKey,
-    browseListingPending,
+    browseCapable,
     enabled,
     targetCanList,
     operationRouteAvailable,
     loadError
   } = args
+  // Why: mirrors the unscoped listing effect's guard so its first render already reads as loading.
+  const browseListingPending =
+    !usesRuntimePathSearch && enabled && targetCanList && operationRouteAvailable && browseCapable
   const requestScopeKey = JSON.stringify({
     displayScopeKey: requestDisplayScopeKey,
     pageBudget: { maxPaths: queryLimit, maxSerializedBytes: MAX_WORKSPACE_PATH_SEARCH_PAGE_BYTES }

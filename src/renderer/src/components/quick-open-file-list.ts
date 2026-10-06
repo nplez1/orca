@@ -12,6 +12,7 @@ import { startRuntimeUnscopedFileListing } from './runtime-file-listing-fallback
 import { resolveRuntimeFileListDerivedState } from './runtime-file-list-derived-state'
 import { useRuntimePathSearchSchedulerLifecycle } from './use-runtime-path-search-scheduler-lifecycle'
 import { NO_LISTING, scheduleRuntimeFilePathSearch } from './runtime-path-search-request'
+import { useQuickOpenRecentListing } from './quick-open-recent-file-merge'
 import { getRuntimeFileListTarget } from './runtime-file-list-scan-target'
 
 export {
@@ -43,6 +44,7 @@ export function useRuntimeFileListForWorktree({
   queryLimit = 32,
   includeIgnoredFiles,
   includeDotfiles = true,
+  recentPaths,
   queryInputAt
 }: {
   enabled: boolean
@@ -62,6 +64,11 @@ export function useRuntimeFileListForWorktree({
   includeDotfiles?: boolean
   /** Renderer-monotonic timestamp captured by the controlled input change handler. */
   queryInputAt?: number
+  /**
+   * Recently opened paths the caller offers for the listing; each is validated against the host
+   * before it is shown, so one that no longer exists never reads as an openable file.
+   */
+  recentPaths?: readonly string[]
 }): RuntimeFileListState {
   const worktree = useAppStore((state) =>
     // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
@@ -116,10 +123,9 @@ export function useRuntimeFileListForWorktree({
   const activeTargetStatus = useAppStore((state) =>
     connectionId ? state.sshConnectionStates.get(connectionId)?.status : undefined
   )
-  const connectionPending =
-    activeTargetStatus === 'connecting' ||
-    activeTargetStatus === 'deploying-relay' ||
-    activeTargetStatus === 'reconnecting'
+  const connectionPending = ['connecting', 'deploying-relay', 'reconnecting'].includes(
+    activeTargetStatus ?? ''
+  )
   const usesRuntimeEnvironmentRpc = runtimeEnvironmentId !== null
   const hasRemoteHost = usesRuntimeEnvironmentRpc || connectionId !== undefined
   const trimmedQuery = query?.trim() ?? ''
@@ -133,14 +139,6 @@ export function useRuntimeFileListForWorktree({
     (hasRemoteHost
       ? isQuickOpenRemoteQueryTooLarge(remoteQuery)
       : isQuickOpenQueryTooLarge(remoteQuery))
-  // Why: mirrors the unscoped listing effect's guard so its first render already reads as loading.
-  const browseListingPending =
-    !usesRuntimePathSearch &&
-    enabled &&
-    target.canList &&
-    operationRouteAvailable &&
-    Boolean(worktreeId) &&
-    Boolean(worktreePath)
   const requestDisplayScopeKey = useMemo(
     () =>
       JSON.stringify({
@@ -182,11 +180,19 @@ export function useRuntimeFileListForWorktree({
     queryLimit,
     requestOutcome,
     visibleLoadingRequestKey,
-    browseListingPending,
+    browseCapable: Boolean(worktreeId) && Boolean(worktreePath),
     enabled,
     targetCanList: target.canList,
     operationRouteAvailable,
     loadError
+  })
+  const publishListing = useQuickOpenRecentListing({
+    enabled,
+    requestKey,
+    recentPaths,
+    publish: setListing,
+    host: { runtimeEnvironmentId, worktreeId, worktreePath, connectionId },
+    scope: { excludeRequest, includeIgnoredFiles, includeDotfiles }
   })
   useRuntimePathSearchSchedulerLifecycle({
     searchScheduler,
@@ -222,7 +228,7 @@ export function useRuntimeFileListForWorktree({
       setRequestOutcome,
       setLoadError,
       setVisibleLoadingRequestKey,
-      setListing,
+      setListing: publishListing,
       setListedOperationOwner
     })
   }, [
@@ -232,6 +238,7 @@ export function useRuntimeFileListForWorktree({
     includeIgnoredFiles,
     operationOwnerKey,
     pathSearchEnabled,
+    publishListing,
     queryInputAt,
     queryLimit,
     queryMode,
@@ -273,7 +280,7 @@ export function useRuntimeFileListForWorktree({
       connectionId,
       excludePaths: excludeRequest.paths.length > 0 ? excludeRequest.paths : undefined,
       operationOwnerRef,
-      setListing,
+      setListing: publishListing,
       setListedOperationOwner,
       setLoadError,
       setVisibleLoadingRequestKey
@@ -284,6 +291,7 @@ export function useRuntimeFileListForWorktree({
     excludeRequest,
     operationOwnerKey,
     operationRouteAvailable,
+    publishListing,
     requestDisplayScopeKey,
     requestKey,
     requestScopeKey,

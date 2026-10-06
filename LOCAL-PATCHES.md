@@ -298,6 +298,40 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-05 (second sync of the day) — merge of upstream `6c693edf40` (50 commits) into the
+  release line, from `807aa6062c`.** The first sync on the new flow
+  ([UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)), and the pilot that paid for the tooling:
+  `pre-sync.mjs` proved the tip green and predicted **26 conflicted paths** with classes
+  (both-rewrote 17, union 4, rename-replay 2, duplicate-members 1, duplicate-tail 1, modify/delete 1)
+  *before anything moved*, the merge produced exactly those 26, `conflicts.mjs` triaged them file by
+  file, and `post-sync.mjs` finished with **7 passed, 1 skipped, no hard gate failed**. One conflict
+  set, resolved once per file — no commit was replayed, nothing was force-pushed.
+
+  - **What the merge surfaced that no conflict marker showed.** A pi session change never cleared the
+    fork's live subagent state, so a closed session's children rode the next session's post and a
+    fresh bus had zero listeners (`agent-status-session-boundary-source.ts`); upstream's newer
+    `quick-open-recent-validation.ts` needed `runtime-file-request-debounce.ts`, which this fork's line
+    had deleted; and three fork modules are now superseded by upstream's and are gone
+    (`filesystem-text-search-handler.ts`, `filesystem-quick-open-listing-handler.ts`,
+    `relay/quick-open-list-line-processor.ts`). Dead code that upstream outgrew is the one case where
+    the fork's own file goes.
+  - **Test re-seats.** 18 upstream pi/renderer assertions were re-seated onto the fork's model (its
+    pi lane emits `subagent_async_state`/`subagent_runs`, never upstream's `subagents`/
+    `subagents_update` rows) and 1 was deleted because the pi lane parks children nowhere, so its
+    fixture cannot be produced. The binding policy — one binding per channel — is unchanged.
+  - **Verified:** `pnpm tc` clean; 347 pi, 1,941 renderer quick-open + runtime, 6,346
+    `src/main/ipc` + providers, 2,184 relay and 24,398 `src/renderer/src/components` tests passing;
+    the runtime-required catalog regenerates to no diff and both localization verifiers pass;
+    `check:code-quality:changed` passes; the identity sweep and the lost-content scan are clean.
+  - **Left failing, and proved not ours:** `agent-session-*`, `agent-launch-replay`,
+    `agent-state-rules-live-update` and `DiffViewer.word-wrap-lifecycle` reproduce on pre-merge
+    `807aa6062c`; `file-explorer-watch-reconcile` reproduces on pristine upstream `6c693edf40`.
+  - **Left open, by name:** the relay now carries both an `includeIgnored` and the fork's older
+    `includeIgnoredFiles` spelling — one of them should go, and the choice belongs with the
+    path-index work. The fork's `recentError` status row is computed and tested but no longer
+    rendered; decide whether it comes back or the module drops it. Both are unresolved convergence
+    questions, so neither is in the ledger yet.
+
 - **2026-10-05 — unreleased** from `0ca31372cc`, onto upstream `9def4b9ba1` (505 commits), from the
   released tip `99f1a03ba7` (np.16). **148 commits replayed**, then this sync's fix commit on top:
   `range-diff` pairing not re-counted, but no commit was dropped and one `fix(sync)` commit was

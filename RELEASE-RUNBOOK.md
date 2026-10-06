@@ -6,8 +6,8 @@ Everything here is fork-only; none of it touches upstream.
 Companions: [BRANCHES.md](./BRANCHES.md) for branch state, [LOCAL-PATCHES.md](./LOCAL-PATCHES.md)
 for the fork-only patches the builds depend on, and
 [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for the sync that usually precedes a
-release. This fork is a rebased patch series, so bring upstream in first — a release built from a
-stale base cannot see the fixes upstream has since landed.
+release. Bring upstream in first — a release built from a stale base cannot see the fixes upstream
+has since landed.
 
 ## What is already done
 
@@ -58,24 +58,26 @@ run if any of the five is missing, before the build starts.
 gh workflow run fork-release.yml --repo nplez1/orca --ref nplez1/main
 ```
 
-The version is stamped `1.4.197-np.<run number>` by the workflow. That suffix matters twice: it keeps
-fork releases strictly newer than each other, and it makes a fork build identifiable if someone
-reports a bug — upstream has never shipped that version.
+The version is stamped `<package.json version>-np.<run number>` by the workflow. That suffix matters
+twice: it keeps fork releases strictly newer than each other, and it makes a fork build identifiable
+if someone reports a bug — upstream has never shipped that version.
 
 Once `MAC_CERTS` exists the workflow switches itself to the signed, hardened, notarized path. There
 is nothing else to change.
 
 ## Step 3 — install on each machine
 
-1. **Back up Orca state first.** The fork build shares `~/Library/Application Support/Orca` and
-   `~/.orca` with official Orca — same bundle id, same Keychain identity, same CLI shim — so a
-   fork-build bug can damage state you depend on. Installing it also _replaces_ official Orca rather
-   than sitting beside it.
+1. **Back up Orca NP state first.** This build is its own identity — bundle id
+   `com.nplez1.orca`, product name `Orca NP`, home directory `~/.orca-np`, packaged userData
+   `appData/orca-np`, CLI `orca-np` — so it installs *beside* an official Orca rather than replacing
+   it, and the two keep separate state. (The `orca://` URL scheme is deliberately shared: it is
+   pairing and skill-share interop, not plumbing.) The backup is still worth taking: a bug in this
+   build can damage the state this build owns.
 2. **Copy the artifact by `scp` or USB, not a browser.** Only browser/Mail/AirDrop downloads get the
    quarantine bit; a direct copy needs no Gatekeeper override. Notarized builds avoid this anyway,
    but it costs nothing.
-3. Confirm the installed version, e.g. `defaults read /Applications/Orca.app/Contents/Info.plist
-CFBundleShortVersionString`, and that `/usr/local/bin/orca` resolves.
+3. Confirm the installed version, e.g. `defaults read "/Applications/Orca NP.app/Contents/Info.plist"
+CFBundleShortVersionString`, and that `/usr/local/bin/orca-np` resolves.
 
 ## Step 4 — prove the update path
 

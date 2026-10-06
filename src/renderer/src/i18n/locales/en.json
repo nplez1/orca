@@ -306,7 +306,15 @@
         "aiCreditsKeyword": "ai credits",
         "tokenKeyword": "token"
       }
-    }
+    },
+    "followSymlinkedDirectoriesKeywords": {
+      "symlink": "symlink",
+      "linkedFolder": "linked folder",
+      "quickOpen": "quick open",
+      "fileExplorer": "file explorer"
+    },
+    "followSymlinkedDirectories": "Follow symlinked directories",
+    "followSymlinkedDirectoriesDescription": "Search linked folders in Quick Open and expand local linked folders in File Explorer."
   },
   "menu": {
     "checkForUpdates": "Check for Updates...",
@@ -1129,7 +1137,8 @@
             "totalTooLarge": "{{fileName}} would bring the attachments over {{maxSize}} in total.",
             "dimensionsTooLarge": "{{fileName}} has dimensions that are too large to preview safely.",
             "invalidImage": "{{fileName}} is not a valid supported image.",
-            "additionalErrors": "{{count}} additional images could not be attached."
+            "additionalErrors": "{{count}} additional images could not be attached.",
+            "compressed": "{{fileName}} was compressed from {{originalSize}} to {{size}} to fit the attachment limit."
           }
         }
       },
@@ -1168,6 +1177,16 @@
         "tooLarge": "Too large to copy, so Orca couldn't hand it to the agent.",
         "storageFull": "Orca's storage for dropped files is full, so Orca couldn't hand it to the agent.",
         "generic": "Try the drop again."
+      },
+      "reveal": {
+        "in": {
+          "file": {
+            "manager": {
+              "notFound": "File not found. It may have been moved or deleted.",
+              "launchFailed": "Could not reveal the file."
+            }
+          }
+        }
       }
     },
     "hooks": {
@@ -3691,10 +3710,7 @@
             "1d04b1630b": "Split Down",
             "6b3efb106e": "Split Up",
             "fdd29eb669": "Pin Tab",
-            "8e9d603a09": "Unpin Tab",
-            "revealInFinder": "Reveal in Finder",
-            "openContainingFolder": "Open Containing Folder",
-            "revealInFileExplorer": "Reveal in File Explorer"
+            "8e9d603a09": "Unpin Tab"
           },
           "QuickLaunchButton": {
             "348a04c1ad": "Agent settings…",
@@ -6622,6 +6638,7 @@
         "SidebarFeedbackImageAttachments": {
           "screenshotsHint": "Attach up to {{count}} screenshots, {{maxSize}} total",
           "attachImages": "Attach",
+          "preparing": "Preparing attachments…",
           "removeImage": "Remove {{fileName}}"
         },
         "WorkspaceKanbanSearchField": {
@@ -15790,10 +15807,7 @@
           "f0fd4174b5": "Open file tab to use rich markdown editing",
           "a10d9b8337": "Open file",
           "2076ecfc9c": "Previous change",
-          "631dab0df3": "Next change",
-          "revealInFinder": "Reveal in Finder",
-          "openContainingFolder": "Open Containing Folder",
-          "revealInFileExplorer": "Reveal in File Explorer"
+          "631dab0df3": "Next change"
         },
         "EditorPanelMarkdownActionsMenu": {
           "3e0ce48c24": "Export as PDF",
@@ -16374,6 +16388,9 @@
         "richMarkdownImageInsertionFeedback": {
           "importedFileKept": "Image insertion canceled because the destination changed. The imported file was kept.",
           "destinationChanged": "Image insertion canceled because the destination changed. Try again."
+        },
+        "useMarkdownDocuments": {
+          "listFailed": "Failed to list Markdown documents."
         }
       },
       "diff": {
@@ -16743,6 +16760,7 @@
             "effd75e330": "Nearby Context",
             "7d1480fbf1": "HTML",
             "9098b118ab": "Page",
+            "accessibleNameOpenQuote": "\"",
             "eb98a0971a": "\"",
             "d053db279d": "role=",
             "a759d8f866": "Selected Element",
@@ -17900,6 +17918,7 @@
           "tool": {
             "arrow": "Arrow",
             "ellipse": "Ellipse",
+            "eraser": "Eraser",
             "highlight": "Highlighter",
             "pen": "Pen",
             "rect": "Rectangle",
@@ -18514,6 +18533,13 @@
         "localAttachmentUnsupported": "Local attachments are not available for remote sessions.",
         "removeAttachment": "Remove attachment",
         "pastedImageLabel": "Pasted image",
+        "draftNotSaved": "This draft couldn't be saved yet. Orca keeps trying.",
+        "imageNotBroughtBack": "{{name}} couldn't be brought back with this draft. Attach it again or remove it.",
+        "pastedImageNotBroughtBack": "This pasted image couldn't be brought back with this draft. Remove it, and paste it again if you still need it.",
+        "removeImageToSend": "An image couldn't be brought back. Remove it to send.",
+        "removeImagesToSend": "Some images couldn't be brought back. Remove them to send.",
+        "imageAttachAgainLabel": "Attach again",
+        "pastedImageNotKeptLabel": "Not kept",
         "imagePasteFailed": "Image paste failed.",
         "imageSaving": "Saving pasted image…",
         "worktreeNotReady": "Worktree not ready — try again in a moment.",
@@ -18570,13 +18596,35 @@
         "ranCommandsManyToolsSummary": "Ran {{commandCount}} commands and used {{toolCount}} tools",
         "usedOneSummary": "Used 1 tool",
         "usedManySummary": "Used {{toolCount}} tools",
-        "editedFile": "Edited file",
-        "addedFile": "Added file",
-        "deletedFile": "Deleted file",
-        "renamedFile": "Renamed file",
         "copyDiff": "Copy diff",
         "diffGap": "Lines not shown",
         "diffTruncated": "Diff truncated",
+        "row": {
+          "running": "Running",
+          "reading": "Reading",
+          "editing": "Editing",
+          "searching": "Searching",
+          "searchingWeb": "Searching the web",
+          "fetching": "Fetching",
+          "listed": "Listed",
+          "listing": "Listing",
+          "ran": "Ran",
+          "read": "Read",
+          "edited": "Edited",
+          "searched": "Searched",
+          "searchedWeb": "Searched the web",
+          "fetched": "Fetched",
+          "added": "Added",
+          "deleted": "Deleted",
+          "renamed": "Renamed",
+          "subagent": "Subagent",
+          "triedRead": "Tried to read",
+          "triedEdit": "Tried to edit",
+          "triedSearch": "Tried to search",
+          "triedList": "Tried to list",
+          "triedFetch": "Tried to fetch",
+          "triedSearchWeb": "Tried to search the web"
+        },
         "runReadOne": "Read 1 file",
         "runReadMany": "Read {{value0}} files",
         "runSearchOne": "Searched 1 time",
@@ -19353,7 +19401,8 @@
     }
   },
   "quickOpen": {
-    "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results."
+    "moreMatchesAvailable": "More matches may be available. Refine your search to narrow the results.",
+    "recentValidationFailed": "Recent files could not be checked: {{error}}"
   },
   "checksPanel": {
     "unlinked": {

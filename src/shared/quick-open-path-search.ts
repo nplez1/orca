@@ -1,10 +1,27 @@
-import { isClipboardTextByteLengthOverLimit } from './clipboard-text'
-import { compareFileNames } from './file-name-sort'
+import { matchQuickOpenSeparatorAlternatives } from './quick-open-separator-match'
+import { isQuickOpenQueryTooLarge } from './quick-open-query-size-limits'
+import {
+  finalizeResults,
+  retainTopResult,
+  type QuickOpenRankedResult
+} from './quick-open-bounded-result-page'
+
+// Why: the query limits, the bounded result page and the name-filter matcher are their own
+// modules; this file stays the single import site the host, relay and renderer already use.
+export {
+  QUICK_OPEN_QUERY_MAX_BYTES,
+  QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS,
+  isQuickOpenQueryTooLarge,
+  isQuickOpenRemoteQueryTooLarge
+} from './quick-open-query-size-limits'
+export {
+  NameFilterPathMatcher,
+  pathMatchesQueryTokens,
+  splitPathQueryTokens
+} from './quick-open-name-filter-path-matcher'
 
 export const QUICK_OPEN_RESULT_LIMIT = 50
-export const QUICK_OPEN_QUERY_MAX_BYTES = 2 * 1024
-export const QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS = 256
-export const QUICK_OPEN_SEARCH_VERSION = 1
+export const QUICK_OPEN_SEARCH_VERSION = 3
 
 export type QuickOpenIndexedFile = {
   path: string
@@ -34,6 +51,8 @@ export function prepareQuickOpenFiles(files: readonly string[]): QuickOpenIndexe
   return files.map((path, inputIndex) => prepareQuickOpenFile(path, inputIndex))
 }
 
+const identifierBoundaries = new WeakMap<QuickOpenIndexedFile, ReadonlySet<number>>()
+
 const preparedQuickOpenFiles = new WeakMap<readonly string[], QuickOpenIndexedFile[]>()
 
 export function getPreparedQuickOpenFiles(
@@ -48,17 +67,6 @@ export function getPreparedQuickOpenFiles(
   return prepared
 }
 
-export function isQuickOpenQueryTooLarge(
-  query: string,
-  maxBytes = QUICK_OPEN_QUERY_MAX_BYTES
-): boolean {
-  return isClipboardTextByteLengthOverLimit(query, maxBytes)
-}
-
-export function isQuickOpenRemoteQueryTooLarge(query: string): boolean {
-  return query.length > QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS || isQuickOpenQueryTooLarge(query)
-}
-
 export function rankQuickOpenFiles(
   query: string,
   files: readonly QuickOpenIndexedFile[],
@@ -71,8 +79,8 @@ export function rankQuickOpenFiles(
   const normalizedQuery = normalizeQuickOpenQuery(query)
   const results: QuickOpenRankedResult[] = []
   for (const file of files) {
-    const score = normalizedQuery ? fuzzyMatchIndexedFile(normalizedQuery, file) : 0
-    if (score !== -1) {
+    const score = scoreQuickOpenTerms(normalizedQuery, file)
+    if (score !== null) {
       retainTopResult(results, { path: file.path, score, inputIndex: file.inputIndex }, limit)
     }
   }
@@ -80,7 +88,7 @@ export function rankQuickOpenFiles(
 }
 
 export class QuickOpenPathRanker {
-  private readonly normalizedQuery: string | null
+  private readonly normalizedQuery: readonly string[] | null
   private readonly retained: QuickOpenRankedResult[] = []
   private inputIndex = 0
   private matchCount = 0
@@ -98,8 +106,8 @@ export class QuickOpenPathRanker {
     if (this.normalizedQuery === null) {
       return
     }
-    const score = this.normalizedQuery ? fuzzyMatchIndexedFile(this.normalizedQuery, file) : 0
-    if (score === -1) {
+    const score = scoreQuickOpenTerms(this.normalizedQuery, file)
+    if (score === null) {
       return
     }
     this.matchCount++
@@ -118,122 +126,99 @@ export class QuickOpenPathRanker {
   }
 }
 
-function normalizeQuickOpenQuery(query: string): string {
-  return query.trim().replace(/\\/g, '/').toLowerCase()
+function normalizeQuickOpenQuery(query: string): readonly string[] {
+  const terms = [...new Set(query.trim().replace(/\\/g, '/').toLowerCase().split(/\s+/))]
+    .filter(Boolean)
+    .sort()
+  return terms
 }
 
-/**
- * Whitespace-separated, lowercased tokens. The host scan and the renderer's
- * `relativePathMatchesNameFilter` share this so a filtered page and its client-side
- * re-check agree on what matches.
- * Why: accepted pasted queries are on a hot path; tokenize whitespace directly instead of
- * allocating a regex split array.
- */
-export function splitPathQueryTokens(query: string): string[] {
-  const tokens: string[] = []
-  let tokenStart = -1
-  for (let index = 0; index <= query.length; index += 1) {
-    const isEnd = index === query.length
-    if (!isEnd && !isQueryWhitespace(query.charCodeAt(index))) {
-      if (tokenStart === -1) {
-        tokenStart = index
-      }
-      continue
+function scoreQuickOpenTerms(terms: readonly string[], file: QuickOpenIndexedFile): number | null {
+  let score = 0
+  for (const term of terms) {
+    let termScore = fuzzyMatchIndexedFile(term, file)
+    if (termScore === null && (term.includes('-') || term.includes('_'))) {
+      const filenameStart = file.lowerPath.lastIndexOf('/') + 1
+      const parentStart = file.lowerPath.lastIndexOf('/', filenameStart - 2) + 1
+      const fallback =
+        fuzzyMatchIndexedFile(term, file, true) ??
+        fuzzyMatchIndexedFile(term, file, true, filenameStart) ??
+        fuzzyMatchIndexedFile(term, file, true, parentStart) ??
+        (fuzzyMatchIndexedFile(term.replace(/[-_]/g, ''), file) === null
+          ? null
+          : matchQuickOpenSeparatorAlternatives(
+              term,
+              file.lowerPath,
+              identifierBoundaries.get(file)
+            ))
+      termScore = fallback === null ? null : fallback + 10
     }
-    if (tokenStart !== -1) {
-      tokens.push(query.slice(tokenStart, index).toLocaleLowerCase())
-      tokenStart = -1
+    if (termScore === null) {
+      return null
     }
+    score += termScore
   }
-  return tokens
-}
-
-function isQueryWhitespace(code: number): boolean {
-  return (
-    code === 32 ||
-    (code >= 9 && code <= 13) ||
-    code === 160 ||
-    code === 5760 ||
-    (code >= 8192 && code <= 8202) ||
-    code === 8232 ||
-    code === 8233 ||
-    code === 8239 ||
-    code === 8287 ||
-    code === 12288 ||
-    code === 65279
-  )
-}
-
-/** Every token must appear somewhere in the lowercased relative path. */
-export function pathMatchesQueryTokens(relativePath: string, tokens: readonly string[]): boolean {
-  if (tokens.length === 0) {
-    return true
-  }
-  // Why: callers pass already-normalized paths — lowercasing only, no second normalize per path.
-  const haystack = relativePath.toLocaleLowerCase()
-  return tokens.every((token) => haystack.includes(token))
-}
-
-/**
- * Substring-AND matcher for the Explore name filter. Counts every match and retains only the
- * lexicographically first `limit` paths, so host memory cannot grow with the workspace and the
- * page is a stable prefix of the order the tree renders in. `totalCount` is exact, and callers
- * surface it so a bounded page never reads as a complete result set.
- */
-export class NameFilterPathMatcher {
-  private readonly tokens: string[]
-  private readonly retained: QuickOpenRankedResult[] = []
-  private inputIndex = 0
-  private matchCount = 0
-
-  constructor(
-    query: string,
-    private readonly limit: number
-  ) {
-    this.tokens = limit <= 0 || isQuickOpenQueryTooLarge(query) ? [] : splitPathQueryTokens(query)
-  }
-
-  consider(path: string): void {
-    const inputIndex = this.inputIndex++
-    if (this.tokens.length === 0 || !pathMatchesQueryTokens(path, this.tokens)) {
-      return
-    }
-    this.matchCount++
-    // Why: score 0 for every match makes retainTopResult a bounded max-heap on the path,
-    // so the retained page is the first `limit` names in sort order, not in scan order.
-    retainTopResult(this.retained, { path, score: 0, inputIndex }, this.limit)
-  }
-
-  result(): { paths: string[]; totalCount: number } {
-    return {
-      paths: this.retained.sort(compareRankedResult).map((entry) => entry.path),
-      totalCount: this.matchCount
-    }
-  }
+  return score
 }
 
 function prepareQuickOpenFile(path: string, inputIndex: number): QuickOpenIndexedFile {
   const searchPath = path.replace(/\\/g, '/')
   const lastSlash = searchPath.lastIndexOf('/')
-  return {
+  const file = {
     path,
     lowerPath: searchPath.toLowerCase(),
     lowerFilename: searchPath.slice(lastSlash + 1).toLowerCase(),
     inputIndex
   }
+  if (/[A-Z]/.test(searchPath)) {
+    const boundaries = new Set<number>()
+    let lowerOffset = 0
+    for (let index = 0; index < searchPath.length; index++) {
+      if (
+        index > 0 &&
+        /[A-Z]/.test(searchPath[index]) &&
+        (/[a-z0-9]/.test(searchPath[index - 1]) ||
+          (/[A-Z]/.test(searchPath[index - 1]) && /[a-z]/.test(searchPath[index + 1] ?? '')))
+      ) {
+        boundaries.add(lowerOffset)
+      }
+      lowerOffset += searchPath[index].toLowerCase().length
+    }
+    if (boundaries.size > 0) {
+      identifierBoundaries.set(file, boundaries)
+    }
+  }
+  return file
 }
 
-function fuzzyMatchIndexedFile(query: string, file: QuickOpenIndexedFile): number {
+function fuzzyMatchIndexedFile(
+  query: string,
+  file: QuickOpenIndexedFile,
+  equivalentSeparators = false,
+  searchStart = 0
+): number | null {
   let qi = 0
   let score = 0
   let lastMatchIdx = -1
 
   while (qi < query.length) {
-    const next = lastMatchIdx + 1
-    const ti =
-      file.lowerPath[next] === query[qi] ? next : file.lowerPath.indexOf(query[qi], next + 1)
+    const next = lastMatchIdx === -1 ? searchStart : lastMatchIdx + 1
+    let ti = file.lowerPath[next] === query[qi] ? next : file.lowerPath.indexOf(query[qi], next + 1)
+    if (equivalentSeparators && (query[qi] === '-' || query[qi] === '_')) {
+      for (const separator of ['-', '_', ' ']) {
+        const alternate = file.lowerPath.indexOf(separator, next)
+        if (alternate !== -1 && (ti === -1 || alternate < ti)) {
+          ti = alternate
+        }
+      }
+      if (lastMatchIdx >= 0 && ti !== next && identifierBoundaries.get(file)?.has(next)) {
+        score += 2
+        qi++
+        continue
+      }
+    }
     if (ti === -1) {
-      return -1
+      return null
     }
     const gap = lastMatchIdx === -1 ? 0 : ti - lastMatchIdx - 1
     score += gap
@@ -241,7 +226,8 @@ function fuzzyMatchIndexedFile(query: string, file: QuickOpenIndexedFile): numbe
       ti > 0 &&
       (file.lowerPath[ti - 1] === '/' ||
         file.lowerPath[ti - 1] === '.' ||
-        file.lowerPath[ti - 1] === '-')
+        file.lowerPath[ti - 1] === '-' ||
+        (equivalentSeparators && file.lowerPath[ti - 1] === '_'))
     ) {
       score -= 5
     }
@@ -250,73 +236,39 @@ function fuzzyMatchIndexedFile(query: string, file: QuickOpenIndexedFile): numbe
   }
 
   if (qi < query.length) {
-    return -1
+    return null
   }
-  if (file.lowerFilename.includes(query)) {
+  if (
+    equivalentSeparators
+      ? filenameContainsSeparatorVariant(file.lowerFilename, query) ||
+        file.lowerFilename.includes(query.replace(/[-_]/g, ''))
+      : file.lowerFilename.includes(query)
+  ) {
     score -= 100
   }
   return score
 }
 
-type QuickOpenRankedResult = QuickOpenSearchResult & {
-  inputIndex: number
-}
-
-function retainTopResult(
-  heap: QuickOpenRankedResult[],
-  candidate: QuickOpenRankedResult,
-  limit: number
-): void {
-  if (heap.length === limit && compareRankedResult(candidate, heap[0]) >= 0) {
-    return
-  }
-  if (heap.length < limit) {
-    heap.push(candidate)
-    siftResultUp(heap, heap.length - 1)
-    return
-  }
-  heap[0] = candidate
-  siftResultDown(heap)
-}
-
-function siftResultUp(heap: QuickOpenRankedResult[], startIndex: number): void {
-  let index = startIndex
-  while (index > 0) {
-    const parentIndex = Math.floor((index - 1) / 2)
-    if (compareRankedResult(heap[index], heap[parentIndex]) <= 0) {
-      return
+function filenameContainsSeparatorVariant(filename: string, query: string): boolean {
+  for (let start = 0; start <= filename.length - query.length; start++) {
+    let offset = 0
+    while (offset < query.length) {
+      const expected = query[offset]
+      const actual = filename[start + offset]
+      if (
+        expected !== actual &&
+        !(
+          (expected === '-' || expected === '_') &&
+          (actual === '-' || actual === '_' || actual === ' ')
+        )
+      ) {
+        break
+      }
+      offset++
     }
-    ;[heap[index], heap[parentIndex]] = [heap[parentIndex], heap[index]]
-    index = parentIndex
-  }
-}
-
-function siftResultDown(heap: QuickOpenRankedResult[]): void {
-  let index = 0
-  while (true) {
-    const leftIndex = index * 2 + 1
-    if (leftIndex >= heap.length) {
-      return
+    if (offset === query.length) {
+      return true
     }
-    const rightIndex = leftIndex + 1
-    const worseChildIndex =
-      rightIndex < heap.length && compareRankedResult(heap[rightIndex], heap[leftIndex]) > 0
-        ? rightIndex
-        : leftIndex
-    if (compareRankedResult(heap[worseChildIndex], heap[index]) <= 0) {
-      return
-    }
-    ;[heap[index], heap[worseChildIndex]] = [heap[worseChildIndex], heap[index]]
-    index = worseChildIndex
   }
-}
-
-function finalizeResults(results: QuickOpenRankedResult[]): QuickOpenSearchResult[] {
-  return results
-    .sort(compareRankedResult)
-    .map(({ path, score }): QuickOpenSearchResult => ({ path, score }))
-}
-
-function compareRankedResult(a: QuickOpenRankedResult, b: QuickOpenRankedResult): number {
-  return a.score - b.score || compareFileNames(a.path, b.path) || a.inputIndex - b.inputIndex
+  return false
 }

@@ -94,8 +94,13 @@ export function renderTabBarSurface({
     launchAgentFromNewTabEntry(agent)
     runPendingNewTabMenuFocusAfterClose()
   }
-  const { tabStripRef, tabStripOverflowState, activeTabDockSide, scrollTabStrip } =
-    tabStripNavigation
+  const {
+    tabStripRef,
+    tabStripOverflowState,
+    activeTabDockSide,
+    scrollTabStrip,
+    subscribeToStripResize
+  } = tabStripNavigation
   const includeTopTabBorder = tabStripChrome !== 'floating-panel'
   const renderedItems = renderTabBarItems({
     items: orderedItems,
@@ -172,8 +177,9 @@ export function renderTabBarSurface({
             ) : null}
           </div>
           <TabStripScrollIndicator
-            metrics={tabStripOverflowState}
+            hasOverflow={tabStripOverflowState.hasOverflow}
             scrollContainerRef={tabStripRef}
+            subscribeToStripResize={subscribeToStripResize}
             disabled={tabStripDragScroll.isTabDragActive}
           />
         </div>

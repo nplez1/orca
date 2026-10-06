@@ -1,49 +1,52 @@
+import { createBrowserUuid } from '@/lib/browser-uuid'
+import { throwIfSignalAborted, waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
 import type { SearchOptions, SearchResult } from '../../../shared/code-search-types'
-import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
-import type { PathSearchMode } from '../../../shared/quick-open-path-search'
-import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
-import { validateWorkspacePathSearchQuery } from '../../../shared/workspace-path-search-contract'
 import type { RuntimeFileListResult } from '../../../shared/runtime-types'
-import {
-  buildExcludePathPrefixes,
-  shouldExcludeQuickOpenRelPath
-} from '../../../shared/quick-open-filter'
 import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
 import {
   createEmptyRuntimeFileSearchResult,
   getRuntimeFileSearchRejectedField
 } from './runtime-file-search-bounds'
-import {
-  hasCachedLegacyQuickOpenInventory,
-  searchLegacyQuickOpenInventory
-} from './runtime-legacy-quick-open-inventory'
+import { validateLegacyQuickOpenRecentCandidates } from './runtime-legacy-quick-open-inventory'
 import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
-import { searchRuntimeNameFilterPaths } from './runtime-workspace-path-search-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
-
-const QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE =
-  'Quick Open search requires a newer paired Orca host. Update the remote host and reconnect.'
 
 export async function searchRuntimeFiles(
   context: RuntimeFileOperationArgs,
-  options: SearchOptions
+  options: SearchOptions,
+  signal?: AbortSignal
 ): Promise<SearchResult> {
+  throwIfSignalAborted(signal)
   if (getRuntimeFileSearchRejectedField(options)) {
     return createEmptyRuntimeFileSearchResult()
   }
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind !== 'environment' || !context.worktreeId) {
-    return window.api.fs.search({
+    const requestToken = createBrowserUuid()
+    const cancel = (): void => {
+      void window.api.fs.cancelSearch({ requestToken }).catch(() => undefined)
+    }
+    const request = window.api.fs.search({
       ...options,
-      connectionId: context.connectionId
+      connectionId: context.connectionId,
+      requestToken
     })
+    signal?.addEventListener('abort', cancel, { once: true })
+    try {
+      if (signal?.aborted) {
+        cancel()
+      }
+      return await waitForPromiseWithSignal(request, signal)
+    } finally {
+      signal?.removeEventListener('abort', cancel)
+    }
   }
   const { rootPath: _rootPath, ...runtimeOptions } = options
   return callRuntimeRpc<SearchResult>(
     target,
     'files.search',
     { worktree: toRuntimeWorktreeSelector(context.worktreeId), ...runtimeOptions },
-    { timeoutMs: 15_000 }
+    { timeoutMs: 15_000, signal }
   )
 }
 
@@ -51,6 +54,10 @@ export async function listRuntimeFiles(
   context: RuntimeFileOperationArgs,
   args: {
     rootPath: string
+    candidatePaths?: string[]
+    includeIgnored?: boolean
+    allowLegacyIncludeIgnored?: boolean
+    followSymlinks?: boolean
     excludePaths?: string[]
     requestToken?: string
     // Why: naming the cap is what makes a full page readable as "there is more". The host returns
@@ -65,7 +72,11 @@ export async function listRuntimeFiles(
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind !== 'environment' || !context.worktreeId) {
     return window.api.fs.listFiles({
+      ...(args.includeIgnored === undefined ? {} : { includeIgnored: args.includeIgnored }),
+      ...(args.followSymlinks === undefined ? {} : { followSymlinks: args.followSymlinks }),
+      ...(args.allowLegacyIncludeIgnored ? { allowLegacyIncludeIgnored: true } : {}),
       rootPath: args.rootPath,
+      ...(args.candidatePaths === undefined ? {} : { candidatePaths: args.candidatePaths }),
       connectionId: context.connectionId,
       excludePaths: args.excludePaths,
       requestToken: args.requestToken,
@@ -73,175 +84,66 @@ export async function listRuntimeFiles(
       ...(args.nameFilter && !context.connectionId ? { nameFilter: args.nameFilter } : {})
     })
   }
+  let includeIgnored = args.includeIgnored
+  if (includeIgnored === false || args.followSymlinks || args.candidatePaths !== undefined) {
+    const capability = await callRuntimeRpc<RuntimeFileListResult>(
+      target,
+      'files.searchPaths',
+      {
+        worktree: toRuntimeWorktreeSelector(context.worktreeId),
+        query: '',
+        limit: 1,
+        mode: 'quick-open'
+      },
+      { timeoutMs: 5_000, signal: args.signal }
+    ).catch((error: unknown) => {
+      if (error instanceof RuntimeRpcCallError && error.code === 'method_not_found') {
+        return null
+      }
+      throw error
+    })
+    if (
+      includeIgnored === false &&
+      args.allowLegacyIncludeIgnored &&
+      (capability?.quickOpenSearchVersion ?? 0) < 2
+    ) {
+      includeIgnored = undefined
+    }
+    if (
+      !(
+        typeof capability?.quickOpenSearchVersion === 'number' &&
+        capability.quickOpenSearchVersion >= (args.candidatePaths === undefined ? 2 : 3)
+      )
+    ) {
+      if (args.candidatePaths !== undefined && includeIgnored !== false && !args.followSymlinks) {
+        return validateLegacyQuickOpenRecentCandidates({
+          target,
+          worktreeSelector: toRuntimeWorktreeSelector(context.worktreeId),
+          worktreePath: context.worktreePath,
+          excludePaths: args.excludePaths,
+          candidatePaths: args.candidatePaths,
+          signal: args.signal
+        })
+      }
+      if (includeIgnored === false || args.followSymlinks) {
+        throw new Error('Update the remote host to use Quick Open listing options.')
+      }
+    }
+  }
   return callRuntimeRpc<string[]>(
     target,
     'files.listAll',
     {
       worktree: toRuntimeWorktreeSelector(context.worktreeId),
+      ...(args.candidatePaths === undefined ? {} : { candidatePaths: args.candidatePaths }),
+      ...(includeIgnored === undefined ? {} : { includeIgnored }),
+      ...(args.followSymlinks === undefined ? {} : { followSymlinks: args.followSymlinks }),
       excludePaths: args.excludePaths,
       // Optional on the host schema since #17954; an older host strips it and keeps its own default.
       ...(args.maxResults === undefined ? {} : { maxResults: args.maxResults })
     },
     { timeoutMs: 15_000, ...(args.signal === undefined ? {} : { signal: args.signal }) }
   )
-}
-
-export async function searchRuntimeFilePaths(
-  context: RuntimeFileOperationArgs,
-  args: {
-    query: string
-    limit?: number
-    excludePaths?: string[]
-    requestToken?: string
-    signal?: AbortSignal
-    mode?: PathSearchMode
-    includeIgnoredFiles?: boolean
-    includeDotfiles?: boolean
-    correlationId?: WorkspacePathSearchCorrelationId
-  }
-): Promise<FilePathSearchResult> {
-  const target = getActiveRuntimeTarget(context.settings)
-  if (target.kind !== 'environment') {
-    if (!context.worktreePath) {
-      return { files: [], totalCount: null, truncated: false }
-    }
-    const limit = args.limit ?? 32
-    // Why: a local workspace has the same query-scoped search as a remote host, and only it
-    // can count matches past the page — an unscoped listing cannot.
-    if (!context.connectionId) {
-      return window.api.fs.searchFilePaths({
-        rootPath: context.worktreePath,
-        query: args.query,
-        limit,
-        mode: args.mode,
-        excludePaths: args.excludePaths,
-        includeIgnoredFiles: args.includeIgnoredFiles,
-        requestToken: args.requestToken,
-        ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId })
-      })
-    }
-    if (args.mode === 'name-filter') {
-      const validated = validateWorkspacePathSearchQuery(args.query, 'remote')
-      if (!validated.ok || !validated.query.trim()) {
-        throw new Error('Remote filename filter query is too large or invalid')
-      }
-      return window.api.fs.searchFilePaths({
-        rootPath: context.worktreePath,
-        connectionId: context.connectionId,
-        query: validated.query,
-        limit,
-        mode: 'name-filter',
-        excludePaths: args.excludePaths,
-        includeIgnoredFiles: args.includeIgnoredFiles,
-        includeDotfiles: args.includeDotfiles,
-        requestToken: args.requestToken,
-        correlationId: args.correlationId
-      })
-    }
-    const files = await window.api.fs.listFiles({
-      rootPath: context.worktreePath,
-      connectionId: context.connectionId,
-      excludePaths: args.excludePaths,
-      requestToken: args.requestToken,
-      maxResults: limit + 1,
-      searchQuery: args.query
-    })
-    return { files: files.slice(0, limit), totalCount: null, truncated: files.length > limit }
-  }
-  if (!context.worktreeId) {
-    return { files: [], totalCount: null, truncated: false }
-  }
-  const worktreeSelector = toRuntimeWorktreeSelector(context.worktreeId)
-  const limit = args.limit ?? 32
-  if (args.mode === 'name-filter') {
-    return searchRuntimeNameFilterPaths(context, target, {
-      query: args.query,
-      limit,
-      excludePaths: args.excludePaths,
-      signal: args.signal,
-      includeIgnoredFiles: args.includeIgnoredFiles,
-      includeDotfiles: args.includeDotfiles,
-      correlationId: args.correlationId
-    })
-  }
-  if (hasCachedLegacyQuickOpenInventory(target, worktreeSelector, context.worktreePath)) {
-    return searchLegacyQuickOpenInventory({
-      target,
-      worktreeSelector,
-      query: args.query,
-      limit,
-      worktreePath: context.worktreePath,
-      excludePaths: args.excludePaths,
-      signal: args.signal
-    })
-  }
-  let result: RuntimeFileListResult
-  try {
-    result = await callRuntimeRpc<RuntimeFileListResult>(
-      target,
-      'files.searchPaths',
-      {
-        worktree: worktreeSelector,
-        query: args.query,
-        limit,
-        excludePaths: args.excludePaths,
-        mode: 'quick-open'
-      },
-      { timeoutMs: 15_000, ...(args.signal === undefined ? {} : { signal: args.signal }) }
-    )
-  } catch (error) {
-    if (error instanceof RuntimeRpcCallError && error.code === 'method_not_found') {
-      try {
-        return await searchLegacyQuickOpenInventory({
-          target,
-          worktreeSelector,
-          query: args.query,
-          limit,
-          worktreePath: context.worktreePath,
-          excludePaths: args.excludePaths,
-          signal: args.signal
-        })
-      } catch (legacyError) {
-        if (legacyError instanceof RuntimeRpcCallError && legacyError.code === 'method_not_found') {
-          throw new Error(QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE)
-        }
-        throw legacyError
-      }
-    }
-    throw error
-  }
-  if (
-    args.excludePaths?.length &&
-    !(typeof result.quickOpenSearchVersion === 'number' && result.quickOpenSearchVersion >= 1)
-  ) {
-    try {
-      return await searchLegacyQuickOpenInventory({
-        target,
-        worktreeSelector,
-        query: args.query,
-        limit,
-        worktreePath: context.worktreePath,
-        excludePaths: args.excludePaths,
-        signal: args.signal
-      })
-    } catch (legacyError) {
-      if (legacyError instanceof RuntimeRpcCallError && legacyError.code === 'method_not_found') {
-        throw new Error(QUICK_OPEN_REMOTE_UPDATE_REQUIRED_MESSAGE)
-      }
-      throw legacyError
-    }
-  }
-  const excludePrefixes = buildExcludePathPrefixes(
-    context.worktreePath ?? result.rootPath,
-    args.excludePaths
-  )
-  return {
-    files: result.files
-      .map((entry) => entry.relativePath)
-      .filter((relativePath) => !shouldExcludeQuickOpenRelPath(relativePath, excludePrefixes)),
-    totalCount: result.totalCount ?? null,
-    truncated: result.truncated
-  }
 }
 
 /**

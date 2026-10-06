@@ -42,6 +42,7 @@ export const fsApi = {
   readDir: (args: {
     dirPath: string
     connectionId?: string
+    followSymlinks?: boolean
   }): Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]> =>
     ipcRenderer.invoke('fs:readDir', args),
   readFile: (args: {
@@ -120,7 +121,11 @@ export const fsApi = {
     args: { filePath: string; connectionId?: string } & SshMutationExpectation
   ): Promise<void> => ipcRenderer.invoke('fs:createFile', args),
   createDir: (
-    args: { dirPath: string; connectionId?: string } & SshMutationExpectation
+    args: {
+      dirPath: string
+      connectionId?: string
+      followSymlinks?: boolean
+    } & SshMutationExpectation
   ): Promise<void> => ipcRenderer.invoke('fs:createDir', args),
   rename: (
     args: {
@@ -166,6 +171,10 @@ export const fsApi = {
     requestToken?: string
     maxResults?: number
     searchQuery?: string
+    candidatePaths?: string[]
+    includeIgnored?: boolean
+    allowLegacyIncludeIgnored?: boolean
+    followSymlinks?: boolean
     nameFilter?: string
   }): Promise<string[]> => ipcRenderer.invoke('fs:listFiles', args),
   searchFilePaths: (args: {
@@ -197,7 +206,10 @@ export const fsApi = {
     ipcRenderer.invoke('fs:getWorkspacePathSearchDiagnosticsSummary'),
   cancelListFiles: (args: { requestToken: string }): Promise<void> =>
     ipcRenderer.invoke('fs:cancelListFiles', args),
+  cancelSearch: (args: { requestToken: string }): Promise<void> =>
+    ipcRenderer.invoke('fs:cancelSearch', args),
   search: (args: {
+    requestToken?: string
     query: string
     rootPath: string
     caseSensitive?: boolean

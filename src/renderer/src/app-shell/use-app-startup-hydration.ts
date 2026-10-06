@@ -5,6 +5,7 @@ import { installCodexDetachedPaneRestartExecutor } from '@/components/terminal-p
 import { useAppStore } from '../store'
 import { reconcileHydratedWorkspaceTabModels } from './reconcile-hydrated-workspace-tab-models'
 import { useStartupActions } from './use-app-startup-actions'
+import { waitForNativeChatDraftsAtStartup } from './native-chat-draft-startup'
 import { sweepRestoredCodexPanesForStaleAccounts } from '../lib/codex-stale-pane-sweep'
 import { fetchWorkspaceSessionWithRuntimeHostOwners } from '../lib/workspace-session-host-hydration'
 import { collectFolderWorkspaceKeysFromSession } from '../lib/workspace-session-hydration-keys'
@@ -140,7 +141,9 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
         const localCatalogChain = startLocalCatalogHydration(actions)
         const startupBackgroundChain = Promise.allSettled([
           keybindingsPromise,
-          localCatalogChain
+          localCatalogChain,
+          // Why: native chat drafts share the writers' barrier so they settle before recovery without serialising behind it.
+          timeRendererStartupStep('native-chat-drafts', waitForNativeChatDraftsAtStartup)
         ]).then(([keybindingsOutcome, catalogOutcome]) => {
           if (keybindingsOutcome.status === 'rejected') {
             throw keybindingsOutcome.reason

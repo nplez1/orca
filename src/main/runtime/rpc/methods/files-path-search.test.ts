@@ -70,7 +70,8 @@ describe('file path search RPC method', () => {
       rootPath: '/repo',
       files: [{ relativePath: 'src/app.ts', basename: 'app.ts', kind: 'text' }],
       totalCount: 1,
-      truncated: false
+      truncated: false,
+      quickOpenSearchVersion: 1
     })
     const runtime = {
       getRuntimeId: () => 'test-runtime',
@@ -100,7 +101,8 @@ describe('file path search RPC method', () => {
       'app',
       8,
       ['/repo/nested'],
-      controller.signal
+      controller.signal,
+      { includeIgnored: undefined, followSymlinks: undefined }
     )
     expect(response).toMatchObject({ ok: true, result: { quickOpenSearchVersion: 1 } })
   })

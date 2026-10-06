@@ -22,9 +22,9 @@ export { importExternalPathsToRuntime } from './runtime-file-import-client'
 export {
   cancelRuntimeFileList,
   listRuntimeFiles,
-  searchRuntimeFilePaths,
   searchRuntimeFiles
 } from './runtime-file-search-client'
+export { searchRuntimeFilePaths } from './runtime-file-path-search-client'
 export {
   isMissingRuntimePathError,
   listRuntimeMarkdownDocuments,

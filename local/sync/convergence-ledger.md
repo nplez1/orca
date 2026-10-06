@@ -217,6 +217,40 @@ cases are in that script).
 
 ---
 
+## pi subagent session boundaries
+
+**Paths:** `src/main/pi/agent-status-*-source.ts`, `src/shared/agent-hook-listener/descendant-events.ts`
+
+**Decision:** a pi session change (`/new`, resume, fork) clears the fork's live `subagentRuns` set and
+resets `piAsyncSubagentBusBound` / `subagentChannelsBound` / `subagentRunnerExitBound`, because Pi
+hands the re-run factory a fresh `pi.events`. A `/reload` or a same-file resume keeps the set.
+Bindings stay one per channel.
+
+**Why:** measured on the merge of upstream `6c693edf40` — the fresh bus had zero listeners, so a
+second session reported no children at all, and a closed session's children rode the next session's
+post. The receiver replaces its child list per post.
+
+**Do not:** emit upstream's `subagents` / `subagents_update` roster rows (the fork removed the pi
+`subagent:async-*` bindings, so they have no producer), or withhold `agent_end`.
+
+---
+
+## Quick Open recent candidates
+
+**Paths:** `src/renderer/src/components/quick-open-*.ts*`, `src/renderer/src/runtime/runtime-file-*`
+
+**Decision:** a recent candidate is validated by `useQuickOpenRecentListing` from the **request
+chain**, keyed by request id (`quick-open-recent-file-merge.ts`). The listing result is the fork's
+`FilePathSearchResult`, so `totalCount` is required on both sides of the seam.
+
+**Why:** starting the validation from a render effect arms its debounce past the caller's window, so
+the candidate can be handed on unvalidated.
+
+**Do not:** move that validation back into an effect, or make `totalCount` optional to satisfy an
+older fixture.
+
+---
+
 ## Localization catalogs
 
 **Paths:** `src/renderer/src/i18n/**`
