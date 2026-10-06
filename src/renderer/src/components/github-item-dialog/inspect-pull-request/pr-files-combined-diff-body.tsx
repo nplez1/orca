@@ -3,13 +3,13 @@ import type { Virtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { DiffSectionItem } from '@/components/editor/DiffSectionItem'
 import { translate } from '@/i18n/i18n'
-import type { DecoratedDiffComment } from '@/components/diff-comments/decorated-diff-comment'
 import { CombinedDiffFileTree } from '../../editor/combined-diff/browse-files/combined-diff-file-tree'
 import type { DiffSection } from '@/components/editor/diff-section-types'
 import type { CombinedDiffFileTreeEntry } from '../../editor/combined-diff/resolve-changes/combined-diff-section-identity'
 import type { GitHubPRFile } from '../../../../../shared/github/pull-request-types'
 import type { GitBranchChangeEntry } from '../../../../../shared/git-diff-compare-types'
 import type { DiffSectionItemProps } from '@/components/editor/diff-section-item-props'
+import type { WorktreePRCommentInline } from '@/components/pr-comment-inline/worktree-pr-comment-inline'
 import { PRFilesCombinedDiffToolbar } from './pr-files-combined-diff-toolbar'
 
 export function PRFilesCombinedDiffBody({
@@ -34,7 +34,7 @@ export function PRFilesCombinedDiffBody({
   isDark,
   settings,
   sectionHeights,
-  inlineReviewComments,
+  prCommentReview,
   loadSection,
   retrySection,
   toggleSection,
@@ -68,7 +68,7 @@ export function PRFilesCombinedDiffBody({
   isDark: boolean
   settings: DiffSectionItemProps['settings']
   sectionHeights: Record<number, number>
-  inlineReviewComments: DecoratedDiffComment[]
+  prCommentReview: WorktreePRCommentInline | null
   loadSection: (index: number) => void
   retrySection: (index: number) => void
   toggleSection: (index: number) => void
@@ -132,7 +132,7 @@ export function PRFilesCombinedDiffBody({
                     settings={settings}
                     sectionHeight={sectionHeights[virtualItem.index]}
                     worktreeId={`github-pr:${repoId}:${prNumber}`}
-                    inlineComments={inlineReviewComments}
+                    prCommentReview={prCommentReview}
                     loadSection={loadSection}
                     retrySection={retrySection}
                     toggleSection={toggleSection}

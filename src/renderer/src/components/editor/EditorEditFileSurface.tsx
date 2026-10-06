@@ -19,6 +19,8 @@ import { ExternalFileChangeBanner } from './ExternalFileChangeBanner'
 import type { useMarkdownDocuments } from './useMarkdownDocuments'
 import { EditorMarkdownFileSurface } from './EditorMarkdownFileSurface'
 import type { MarkdownRenderState } from './markdown-render-mode'
+import { useWorktreePRCommentInline } from '../pr-comment-inline/worktree-pr-comment-inline'
+import { usePRCommentInlineSurface } from '../pr-comment-inline/usePRCommentInlineSurface'
 
 const noopEditorContentChange = (_content: string): void => {}
 const noopEditorSave = async (_content: string): Promise<boolean> => false
@@ -90,6 +92,10 @@ export function EditorEditFileSurface({
   handleSave: (content: string) => Promise<boolean>
   reloadContent: (file: OpenFile) => void
 }): React.JSX.Element {
+  // Why: resolved at the surface that owns the retained Monaco instance, so switching tabs hands the
+  // editor the new file's own thread set instead of reusing the previous one's zones.
+  const worktreePRComments = useWorktreePRCommentInline(activeFile.worktreeId)
+  const prCommentInline = usePRCommentInlineSurface(worktreePRComments, activeFile.relativePath)
   if (activeFile.conflict?.kind === 'conflict-placeholder') {
     return <ConflictPlaceholderView file={activeFile} />
   }
@@ -202,6 +208,7 @@ export function EditorEditFileSurface({
         worktreeId={activeFile.worktreeId}
         markdownAnnotationsEnabled={markdownAnnotationsEnabled && isMarkdown}
         conflictDecorationsEnabled={activeFile.conflict?.conflictStatus === 'unresolved'}
+        prCommentInline={prCommentInline}
         revealLine={
           matchesPendingEditorReveal(pendingEditorReveal, activeFile)
             ? pendingEditorReveal.line

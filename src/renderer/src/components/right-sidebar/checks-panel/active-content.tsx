@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { Check, LoaderCircle, Pencil, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DetachedHeadBadge } from '@/components/DetachedHeadBadge'
@@ -20,6 +20,10 @@ import { translate } from '@/i18n/i18n'
 import type { ChecksPanelReview } from '../checks-panel-review'
 import type { ChecksPanelHostedReviewModifierDestination } from '../checks-panel-hosted-review-click-routing'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
+import { useWorktreePRCommentInline } from '../../pr-comment-inline/worktree-pr-comment-inline'
+import { usePRCommentCodeNavigation } from '../../pr-comment-inline/pr-comment-code-navigation'
+import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
+import type { PRComment } from '../../../../../shared/github/comment-types'
 type ReviewHeaderComponentProps = {
   review: ChecksPanelReview
   isRefreshing: boolean
@@ -102,8 +106,35 @@ export function ChecksPanelActiveContent({
     titleDraft,
     titleInputRef,
     titleSaving,
-    setTitleDraft
+    setTitleDraft,
+    activeWorktreePath,
+    updateSettings
   } = model
+  // Why: the toggle and the explanation must describe what the editor actually does, so both read
+  // the same derivation the editor uses rather than the panel's own review lookup.
+  const prCommentInline = useWorktreePRCommentInline(activeWorktreeId)
+  const commentsInlineEnabled = prCommentInline.enabled
+  const commentsInlinePlacementAllowed = prCommentInline.inlineThreadsByPath !== null
+  const inlineMismatch =
+    prCommentInline.blocker?.kind === 'head-mismatch' ? prCommentInline.blocker : null
+  const openCommentInCode = usePRCommentCodeNavigation({
+    worktreeId: activeWorktreeId,
+    worktreePath: activeWorktreePath,
+    placementAllowed: commentsInlinePlacementAllowed
+  })
+  const handleToggleCommentsInline = useCallback((): void => {
+    void updateSettings({ prCommentsInlineEnabled: !isPRCommentsInlineEnabled(settings) })
+  }, [settings, updateSettings])
+  const handleOpenCommentInCode = useCallback(
+    (comment: PRComment): void => {
+      // Why: when the recorded line cannot be trusted, GitHub is the only place the comment is
+      // certainly anchored to the right code, so the jump degrades instead of scrolling somewhere wrong.
+      if (!openCommentInCode(comment) && comment.url) {
+        void window.api.shell.openUrl(comment.url)
+      }
+    },
+    [openCommentInCode]
+  )
   if (!activeReview) {
     return null
   }
@@ -266,6 +297,18 @@ export function ChecksPanelActiveContent({
         onResolve={pr || activeGitLabReview ? handleResolve : undefined}
         onEditComment={pr ? handleEditComment : undefined}
         onDeleteComment={pr ? handleDeleteComment : undefined}
+        commentsInlineEnabled={commentsInlineEnabled}
+        onToggleCommentsInline={activeWorktreeId ? handleToggleCommentsInline : undefined}
+        commentsInlineBlocked={inlineMismatch !== null}
+        commentsInlineHeadMismatch={
+          inlineMismatch
+            ? {
+                worktreeHeadOid: inlineMismatch.worktreeHeadOid,
+                commentsHeadSha: inlineMismatch.commentsHeadSha
+              }
+            : null
+        }
+        onOpenCommentInCode={activeWorktreePath ? handleOpenCommentInCode : undefined}
         onSetReaction={canTargetPRComments ? handleSetReaction : undefined}
       />
       <SourceControlAgentActionDialog

@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FileCode,
   MoreHorizontal,
   LoaderCircle,
   Pencil,
@@ -170,12 +171,17 @@ export function isMutablePRConversationComment(comment: PRComment): boolean {
 export function CommentMoreMenu({
   comment,
   botAuthorOverrides,
+  canOpenInCode,
+  onOpenInCode,
   onStartEdit,
   onDelete,
   onQueueForAgent
 }: {
   comment: PRComment
   botAuthorOverrides: ReadonlySet<string>
+  /** Whether this comment has a line the code viewer can place it on. */
+  canOpenInCode?: boolean
+  onOpenInCode?: () => void
   onStartEdit?: () => void
   onDelete?: () => void | Promise<void>
   onQueueForAgent?: () => void
@@ -186,10 +192,11 @@ export function CommentMoreMenu({
   // the action when the author is already detected as a bot without it.
   const hasMarkAsBot = authorLogin.length > 0 && (isOverriddenBot || !isBotPRComment(comment))
   const hasGoToComment = Boolean(comment.url)
+  const hasOpenInCode = Boolean(canOpenInCode && onOpenInCode)
   const hasEdit = Boolean(onStartEdit)
   const hasDelete = Boolean(onDelete)
   const hasQueue = Boolean(onQueueForAgent)
-  if (!hasGoToComment && !hasEdit && !hasDelete && !hasQueue && !hasMarkAsBot) {
+  if (!hasGoToComment && !hasOpenInCode && !hasEdit && !hasDelete && !hasQueue && !hasMarkAsBot) {
     return null
   }
 
@@ -219,7 +226,21 @@ export function CommentMoreMenu({
             )}
           </DropdownMenuItem>
         ) : null}
-        {hasQueue && (hasGoToComment || hasEdit || hasDelete) ? <DropdownMenuSeparator /> : null}
+        {hasQueue && (hasGoToComment || hasOpenInCode || hasEdit || hasDelete) ? (
+          <DropdownMenuSeparator />
+        ) : null}
+        {hasOpenInCode ? (
+          <DropdownMenuItem onSelect={() => onOpenInCode?.()}>
+            <FileCode />
+            {translate(
+              'auto.components.right.sidebar.checks.panel.comment.controls.3dd06603e1',
+              'Show in code'
+            )}
+          </DropdownMenuItem>
+        ) : null}
+        {hasGoToComment && (hasOpenInCode || hasEdit || hasDelete) ? (
+          <DropdownMenuSeparator />
+        ) : null}
         {hasGoToComment && (
           <DropdownMenuItem onSelect={() => window.api.shell.openUrl(comment.url)}>
             <ExternalLink />

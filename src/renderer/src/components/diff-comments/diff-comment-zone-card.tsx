@@ -3,6 +3,8 @@ import type { Root } from 'react-dom/client'
 import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
 import { formatDiffComments } from '@/lib/diff-comments-format'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { PRCommentThreadCard } from '../pr-comment-inline/PRCommentThreadCard'
+import type { RightPanelCommentSubmitResult } from '../right-sidebar/right-panel-comment-composer'
 import type { DiffCommentDeliverySnapshot } from '@/store/slices/diffComments'
 import { DiffCommentCard } from './DiffCommentCard'
 import { DiffCommentDraftCard } from './DiffCommentDraftCard'
@@ -23,6 +25,21 @@ export function getRenderSignature(
     url: comment.url ?? null,
     canDelete: comment.canDelete ?? null,
     canEdit: comment.canEdit ?? null,
+    // Why: reply and resolve mutate the thread in place. Without these, an optimistic cache write
+    // would leave the already-mounted zone showing the thread as it was when it was inserted.
+    isBot: comment.isBot ?? null,
+    thread: comment.thread
+      ? {
+          threadId: comment.thread.threadId ?? null,
+          isResolved: comment.thread.isResolved,
+          replies: comment.thread.replies.map((reply) => ({
+            id: reply.id,
+            body: reply.body,
+            author: reply.author,
+            createdAt: reply.createdAt
+          }))
+        }
+      : null,
     sendPrompt: formatCommentPrompt ? formatCommentPrompt(comment) : null
   })
 }
@@ -53,16 +70,56 @@ export type DiffCommentZoneCardContext = {
   resizeZone: (commentId: string) => void
   onDeleteCommentRef: RefObject<(commentId: string) => void>
   onUpdateCommentRef: RefObject<((commentId: string, body: string) => Promise<boolean>) | undefined>
+  /** Reply to a review thread's root comment. Absent on surfaces that cannot post. */
+  onReplyToThreadRef?: RefObject<
+    | ((comment: DecoratedDiffComment, body: string) => Promise<RightPanelCommentSubmitResult>)
+    | undefined
+  >
+  /** Resolve or unresolve a review thread. Absent on surfaces that cannot mutate the thread. */
+  onSetThreadResolvedRef?: RefObject<
+    ((threadId: string, resolve: boolean) => void | Promise<unknown>) | undefined
+  >
+  /** Collapses an expanded thread back to its gutter marker. Absent where nothing draws markers. */
+  onCollapseThreadRef?: RefObject<((commentId: string) => void) | undefined>
   clearDeliveredDiffComments: (
     worktreeId: string,
     comments: readonly DiffCommentDeliverySnapshot[]
   ) => Promise<boolean>
 }
 
+function renderPRCommentThreadCard(
+  root: Root,
+  comment: DecoratedDiffComment,
+  context: DiffCommentZoneCardContext
+): void {
+  const onReplyToThread = context.onReplyToThreadRef?.current
+  const onSetThreadResolved = context.onSetThreadResolvedRef?.current
+  const onCollapseThread = context.onCollapseThreadRef?.current
+  root.render(
+    // View zones are separate React roots outside the app root, so App.tsx context providers don't reach them.
+    <TooltipProvider delayDuration={400}>
+      <PRCommentThreadCard
+        comment={comment}
+        onReply={onReplyToThread ? (body) => onReplyToThread(comment, body) : undefined}
+        onSetResolved={
+          onSetThreadResolved && comment.thread?.threadId
+            ? (resolve) => onSetThreadResolved(comment.thread?.threadId ?? '', resolve)
+            : undefined
+        }
+        onCollapse={onCollapseThread ? () => onCollapseThread(comment.id) : undefined}
+        onContentResize={() => context.resizeZone(comment.id)}
+        observeRenderedSize
+      />
+    </TooltipProvider>
+  )
+}
+
 export function renderDiffCommentZoneCard(
   root: Root,
   comment: DecoratedDiffComment,
-  {
+  context: DiffCommentZoneCardContext
+): void {
+  const {
     worktreeId,
     filePath,
     activeGroupId,
@@ -71,8 +128,11 @@ export function renderDiffCommentZoneCard(
     onDeleteCommentRef,
     onUpdateCommentRef,
     clearDeliveredDiffComments
-  }: DiffCommentZoneCardContext
-): void {
+  } = context
+  if (comment.thread) {
+    renderPRCommentThreadCard(root, comment, context)
+    return
+  }
   root.render(
     // View zones are separate React roots outside the app root, so App.tsx context providers don't reach them.
     <TooltipProvider delayDuration={400}>

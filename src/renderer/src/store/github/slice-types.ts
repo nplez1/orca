@@ -88,7 +88,9 @@ export type GitHubSlice = {
   fetchPRComments: (
     repoPath: string,
     prNumber: number,
-    options?: RepoScopedFetchOptions & { prRepo?: GitHubOwnerRepo | null }
+    // Why: headSha is recorded alongside the comments so inline rendering can tell whether the
+    // cached line numbers were computed for the head commit that is actually checked out.
+    options?: RepoScopedFetchOptions & { prRepo?: GitHubOwnerRepo | null; headSha?: string }
   ) => Promise<PRComment[]>
   addPRConversationComment: (
     repoPath: string,

@@ -34,46 +34,16 @@ import {
   readAllWorktreeMetaForRepo
 } from '../../../persistence/host-qualified-worktree-meta'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
-import type { Worktree } from '../../../../shared/worktree/types'
+import { snapshotPendingWorktreeRemovals } from '../../../worktree-background-removal'
 import {
-  projectPendingWorktreeRemovals,
-  snapshotPendingWorktreeRemovals,
-  type PendingWorktreeRemovals
-} from '../../../worktree-background-removal'
+  markLocalWorktreesUnderRemoval,
+  mapWithConcurrency,
+  WORKTREE_LIST_ALL_CONCURRENCY
+} from './worktree-catalog-list-all'
 import { getLocalWorktreeScanGeneration } from '../../../local-worktree-scan-generation'
 import { getRegisteredWorktreeRootsRevision } from '../../registered-worktree-roots-cache'
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
-
-const WORKTREE_LIST_ALL_CONCURRENCY = 8
-
-// Why always marked: the desktop renderer ships with this main process, so it reads the marker.
-function markLocalWorktreesUnderRemoval<T extends Worktree>(
-  worktrees: T[],
-  pendingAtScan: PendingWorktreeRemovals
-): T[] {
-  return projectPendingWorktreeRemovals(worktrees, (worktree) => worktree.id, true, pendingAtScan)
-}
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = []
-  let nextIndex = 0
-  const workerCount = Math.min(limit, items.length)
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < items.length) {
-        const index = nextIndex
-        nextIndex += 1
-        results[index] = await fn(items[index])
-      }
-    })
-  )
-  return results
-}
 
 export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): void {
   const { store } = context

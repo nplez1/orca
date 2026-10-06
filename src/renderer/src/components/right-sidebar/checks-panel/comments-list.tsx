@@ -25,6 +25,7 @@ import {
 } from '@/lib/pr-comment-audience-labels'
 import { translate } from '@/i18n/i18n'
 import { ResolvedCommentGroupsSection } from './comment-group'
+import { CommentsInlineHeadMismatchNotice, CommentsInlineToggle } from './comments-inline-controls'
 import {
   getPRCommentsListDisplayModeLabel,
   PR_COMMENT_LIST_DISPLAY_MODES,
@@ -48,7 +49,11 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
     onResolve,
     onEditComment,
     onDeleteComment,
-    onSetReaction
+    onSetReaction,
+    commentsInlineEnabled,
+    onToggleCommentsInline,
+    commentsInlineBlocked,
+    commentsInlineHeadMismatch
   } = props
   const {
     presentation,
@@ -95,6 +100,12 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
             <span className={presentation.sectionCount}>{comments.length}</span>
           )}
           <div className="-mr-1 ml-auto flex items-center gap-0.5">
+            {onToggleCommentsInline ? (
+              <CommentsInlineToggle
+                enabled={commentsInlineEnabled === true}
+                onToggle={onToggleCommentsInline}
+              />
+            ) : null}
             {canShowResolveWithAI && (
               <>
                 <Tooltip>
@@ -309,6 +320,15 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
           </div>
         )}
       </div>
+
+      {/* Why: inline comments are silently absent when the checked-out commit is not the reviewed
+          one, and an unexplained absence reads as a bug. */}
+      {commentsInlineBlocked && commentsInlineHeadMismatch ? (
+        <CommentsInlineHeadMismatchNotice
+          worktreeHeadOid={commentsInlineHeadMismatch.worktreeHeadOid}
+          commentsHeadSha={commentsInlineHeadMismatch.commentsHeadSha}
+        />
+      ) : null}
 
       {/* List */}
       {commentsLoading && comments.length === 0 ? (

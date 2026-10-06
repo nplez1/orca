@@ -173,6 +173,19 @@ export function createUiSurfaceActions(set: UISliceSet, _get: UISliceGet): Parti
     clearPendingRevealWorktreeId: () => set({ pendingRevealWorktree: null }),
     clearPendingRevealSidebarRow: () => set({ pendingRevealSidebarRow: null }),
     scrollToDiffCommentId: null,
-    setScrollToDiffCommentId: (id) => set({ scrollToDiffCommentId: id })
+    setScrollToDiffCommentId: (id) => set({ scrollToDiffCommentId: id }),
+    prCommentInlineDisplayById: {},
+    setPRCommentInlineDisplay: (commentId, display) =>
+      set((state) => {
+        const next = { ...state.prCommentInlineDisplayById }
+        // Why: null drops the choice so the thread falls back to its derived default (resolved
+        // threads collapsed, the rest following the global setting) instead of pinning it.
+        if (display === null) {
+          delete next[commentId]
+        } else {
+          next[commentId] = display
+        }
+        return { prCommentInlineDisplayById: next }
+      })
   }
 }

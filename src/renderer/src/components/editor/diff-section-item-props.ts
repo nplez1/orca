@@ -1,6 +1,7 @@
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'
+import type { WorktreePRCommentInline } from '../pr-comment-inline/worktree-pr-comment-inline'
 import type { DiffSection } from './diff-section-types'
 
 export type DiffSectionItemProps = {
@@ -32,6 +33,8 @@ export type DiffSectionItemProps = {
   addLineCommentLabel?: string
   addLineCommentPlaceholder?: string
   inlineComments?: readonly DecoratedDiffComment[]
+  /** GitHub review threads for this diff's file. Absent on non-review diff surfaces. */
+  prCommentReview?: WorktreePRCommentInline | null
   getCommentableLineNumbers?: (section: DiffSection) => readonly number[] | undefined
   setSectionHeights: Dispatch<SetStateAction<Record<number, number>>>
   setSections: Dispatch<SetStateAction<DiffSection[]>>
