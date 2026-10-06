@@ -115,13 +115,22 @@ deliberately **not** the authority for attribution, because a child bound before
 itself would otherwise land in the previous session's bucket.
 
 **Settlement is the other half.** `session_start` is this lane's descendant-scope reset, so the
-resume placeholder is gated through `gatePaneStateOnDescendants` and an empty live set is never
-defaulted to `working`. Without that, resuming a session and letting its last child end left the pane
-held `working` by a hold nobody had reported. Anchors for both:
-`src/shared/agent-hook-listener.ts` (the placeholder gate), `descendant-pane-state.ts`,
-`agent-status-session-boundary-source.ts` (per-registration shutdown), and the lifecycle cases in
-`agent-hook-listener-descendant-lifecycle.test.ts` and `agent-status-async-subagent.test.ts`
-(resume A with no new turn, last child ends ⇒ `done`).
+resume placeholder is gated through `gatePaneStateOnDescendants`, an empty live set is never
+defaulted to `working`, and a hold **nobody claims** — no lead verdict and an empty roster — is
+retracted rather than merely not re-published. Without that, resuming a session and letting its last
+child end left the pane held `working` by a hold nobody had reported, and a child-only update left
+the cached row naming a child that no longer existed. Anchors for both:
+`src/shared/agent-hook-listener.ts` (the placeholder gate), `descendant-pane-state.ts` (the
+retraction), `agent-status-session-boundary-source.ts` (per-registration shutdown), and the
+lifecycle cases in `agent-hook-listener-descendant-lifecycle.test.ts` and
+`agent-status-async-subagent.test.ts` (resume A with no new turn, last child ends ⇒ `done`).
+
+**The binding belongs to a bus, not to an evaluation.** `PiAsyncSubagentBusBinding { bus,
+registration, listeners }` is looked up by the bus object and ownership transfers to the newest
+registration on it, so a second factory's distinct bus is still observed and a superseded
+registration's in-flight callbacks refuse through the newer registration's `closed` flag. Telling
+these apart matters: keyed by evaluation, B's bus was silently unobserved and B's child was filed
+under A.
 
 So the two `subagent:async-*` bindings are dropped from upstream's roster setup; upstream's
 OMP-only `task:subagent:lifecycle` binding stays. Channel coverage differs in both directions (see

@@ -223,19 +223,31 @@ cases are in that script).
 
 **Decision:** the fork's live pi child set is **keyed by the session that owns it**, on
 `globalThis.__orcaPiAsyncSubagents` (`agent-status-async-subagent-session-source.ts`) — the one home
-that survives both a `/reload`, which re-evaluates the generated module, and the fresh `pi.events` a
-session change hands the re-run factory. Every post carries the _current_ session's bucket and
-nothing else, so a pane shows one session's children at a time. A session change (`/new`, fork, a
-resume into a different file) resets `piAsyncSubagentBusBound` / `subagentChannelsBound` /
-`subagentRunnerExitBound` and invalidates the registration that bound the old bus
-(`piAsyncSubagentState.registration`, the guard a stale callback is refused by), but **clears no
-children**: they stay in their own bucket and come back when that session is current again — after
-`/new` by `/resume`, and across a `/reload` of the session already open. A resume into the file
-already open keeps its bucket current throughout (`keepsSession`). The key is the file Pi names in a
-resume target (`session_file`), its `session_id` as fallback, and the last key seen while a
-re-evaluated module has no metadata yet. Bindings are re-armed once per lane per registration;
-`subagent:process-terminal` carries two listeners by design (the fork's descendant bus and upstream's
-runner-exit lane).
+that survives a `/reload`, which re-evaluates the generated module. Every post carries the _current_
+session's bucket and nothing else, so a pane shows one session's children at a time. A session change
+(`/new`, fork, a resume into a different file) resets the three bind flags and invalidates the
+registration that bound the old bus (`piAsyncSubagentState.registration`, the guard a stale callback
+is refused by), but **clears no children**: they stay in their own bucket and come back when that
+session is current again — after `/new` by `/resume`, and across a `/reload` of the session already
+open. A resume into the file already open keeps its bucket current throughout (`keepsSession`). The
+key is the file Pi names in a resume target (`session_file`), its `session_id` as fallback, and the
+last key seen while a re-evaluated module has no metadata yet.
+
+**The binding's identity is the bus, and ownership lives on the registration.**
+`PiAsyncSubagentBusBinding { bus, registration, listeners }` is looked up by the **bus object**, and
+ownership transfers to the newest registration on that bus; both callbacks read
+`binding.registration` per call and refuse once it is closed. Shutdown marks its registration closed
+and splices only the binding that registration owns, unsubscribing through the bus's own `off`, so a
+superseded registration owns no binding: its shutdown leaves the live bus reporting, and its
+in-flight callbacks refuse through the newer registration's `closed` flag. Keying this on the
+_evaluation_ instead — the shape the second gate rejected — left a second, distinct bus unobserved
+and let a superseded callback still post. `subagent:process-terminal` carries two listeners by
+design (the fork's descendant bus and upstream's runner-exit lane).
+
+**A hold nobody claims is retracted.** `descendant-pane-state.ts` recognises when nothing claims the
+pane — no lead verdict and an empty roster — and drops the cached row if it still carries
+descendants. Merely declining to publish a new claim is not enough: the previously published hold
+stayed in `lastStatusByPaneKey` naming a child that no longer existed.
 
 **Why:** measured on the merge of upstream `6c693edf40` and then on the second-model review of it: a
 session change reported a closed session's children under the next one, a fresh bus had zero
