@@ -298,6 +298,82 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-05 — unreleased** from `0ca31372cc`, onto upstream `9def4b9ba1` (505 commits), from the
+  released tip `99f1a03ba7` (np.16). **148 commits replayed**, then this sync's fix commit on top:
+  `range-diff` pairing not re-counted, but no commit was dropped and one `fix(sync)` commit was
+  added. No merge commits were in the replay range, so the `--rebasemerge` trap did not apply.
+  Upstream moved 50 commits further on while this ran; `origin/main` was fast-forwarded to its
+  newest tip (`6c693edf40`), so the next sync starts from there.
+
+  - **Two convergence decisions went to the fork owner, and both were settled:**
+    1. **The key-store factory.** Upstream added `createEncryptedApiKeyFileStore` (`53f9ea7839`)
+       in the same range the fork's `bde2837be6` added `createSecureCredentialStore`; upstream's is
+       a behavioural superset (`{ durable: true }` writes, `ApiKeyFileUnreadableError` for a
+       transient read failure, which upstream's `service-fetch-targets.ts` catches). Upstream's
+       survives; the fork's file, its test and every call site are gone, and the deepseek,
+       fireworks and copilot stores were ported onto it.
+    2. **Repo detection: async meets one spawn.** Upstream rewrote `repo-detection.ts` to be sync
+       with a single combined `rev-parse`; the fork's `ea059d2afc` made the same functions async to
+       keep them off the main thread. The merged file keeps the fork's async execution *and*
+       upstream's `GitRepoProbe`/`isGitRepoFromProbe`/`inspectGitRepoForRegistration` structure,
+       ported to `gitExecFileAsync`/`scanGitMarker`/`fs/promises`, including upstream's
+       newline-safe `indexOf('\\n')` root parse and the `records.length === 4` newline-ambiguity
+       fallback. `local-repo-registration.ts` awaits the inspected root.
+    3. **Floating workspace.** Upstream and the fork's `#16` each gave it a folder. The fork's
+       `~/.orca-np/floating-workspace` (`ensureFloatingWorkspaceDirectory`, the launch-directory
+       module, `moveLegacyFloatingNotes`) survives, with upstream's tabular work — `FileDocument`,
+       `.csv`/`.tsv`, `isOsOpenedDocumentName`, `MAX_PENDING_OS_OPENED_DOCUMENTS` — ported onto it
+       in upstream's `os-opened-documents.ts` (the fork's `os-opened-markdown-files.ts` is gone,
+       and the test upstream superseded was deleted).
+
+  - **`authorizeExternalPath` and upstream's `extraRoots` now coexist.** Upstream's `51fe6f3fba`
+    deleted main's in-memory path grants in favour of `extraRoots` plus the `user-file` access
+    kind, but the fork's floating-workspace, picker-grant and OS-opened-document surfaces are built
+    on the grants (62 callers at the old base). The rebase first dropped them, which `pnpm tc` and
+    eight tests caught; the mechanism is ported onto the newer `filesystem-auth.ts` and both
+    mechanisms are live.
+
+  - **Other re-seats.** The fork's `codexRoster` → `agentDescendant` rename replayed onto upstream's
+    new `codex-transcript-poll.ts` and `codex-status-transcript-line.test.ts`; the fork's
+    `statusCacheHydrationReady` wrapping moved into upstream's extracted
+    `initializeStatusHookOwner()`; `local(identity)` extended to upstream's new
+    `TABULAR_PROGID` (`OrcaNP.Tabular`) and to jcode/qoder remote-hook paths; the ai-vault session
+    index took upstream's `AiVaultServiceScanOptions` + shared `SESSION_PARSE_CACHE_SCHEMA_VERSION`
+    (trap 8: both sides meant 4, then 5 — the higher number wins and the number now lives in the
+    snapshot serializer); `#20`'s extracted `quick-open-rg-path-scan.ts` gained upstream's filename
+    decoder, `getQuickOpenRgOutputMode` and path-too-large verdict; `#34` kept the fork's chunked
+    projection and worker-shaped relay over upstream's NUL reader; `#39`/`#40` moved the
+    Antigravity and Zcode search catalogs into the fork's `accounts-search-extra-providers.ts` to
+    stay under the 300-line cap (no suppression); `#42` re-seated the disabled-provider gates onto
+    upstream's zcode/antigravity/OpenCode plumbing; the dashboard popout plumbing stays deleted
+    (`#44` made the dashboard a first-class view) rather than carrying upstream's window fix;
+    `#45` keeps `useJiraIssueWorkspaceDetail` with upstream's request-id and comments-loading
+    fixes re-seated into it.
+
+  - **Verified:** `pnpm tc` clean across all three projects; `check:code-quality:changed` against
+    `upstream/main` reports 27 design-system + 12 other findings, all in fork-only files and
+    unchanged in kind from the previous syncs (two duplicate-import findings this sync introduced
+    were fixed); the local builder config loads, all five update-feed references name
+    `nplez1/orca`, the runtime-required catalog regenerates and both localization verifiers pass;
+    the lost-content diff reduces to 17 files, 15 of them absent upstream and two deliberate.
+    Suites run and green: `src/main/ipc`, `src/main/session-summary`, `src/main/ai-vault`,
+    `src/main/ai-vault-search`, `src/main/git`, `src/shared/agent-hook-listener`,
+    `src/renderer/src/components/{settings,status-bar,right-sidebar}`, `src/relay`, plus the
+    tab-bar and sidebar suites.
+
+  - **Left open, by name:**
+    - _The mobile-web sweep table follows upstream._ The fork's `a2994c2741` had re-measured
+      `MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP` one script lower per route; this rebase took upstream's
+      re-measurement (74 scripts, spread 10) and its fence suite passes, but the fork's own
+      bundling job should re-measure if it disagrees.
+    - _The five remaining `pnpm test` areas are upstream-red or environment-bound_, unchanged from
+      the previous sync: the `agent-session-*` files, the two `browser-manager` suites that need
+      `ORCA_BACKGROUND_LAUNCH=1`, and the relay region test that needs the uninstalled `cloud/`
+      workspace.
+    - The four findings the previous sync's fixes carried (the file-explorer display-root cache
+      key, `projectionContextKey`, the unforced `displayRootPath` spread, and the `~/.orca`
+      readers) are unchanged.
+
 - **2026-10-01 — released as `v1.4.214-np.16`** from `b5dddf0421` (workflow run 36886007740,
   signed and notarized), onto upstream `a5601375d4` (166 commits), from the released tip
   `5065084bf1` (np.15 released from `c8fa8feead`, with `#44`–`#47` landed on top of it). **140

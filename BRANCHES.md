@@ -1,7 +1,8 @@
 # Branch tracker
 
-Last updated **2026-10-01** — `nplez1/main` rebased onto upstream main @ `a5601375d4`, 166
-commits on from the previous base `31012aeb09`. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+Last updated **2026-10-05** — `nplez1/main` rebased onto upstream main @ `9def4b9ba1`, 148
+commits on from the previous base `a5601375d4` (the fork line is now `0ca31372cc`; upstream has
+since moved 50 commits further on, and `origin/main` mirrors its newest tip). See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
 for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
