@@ -34,8 +34,12 @@ const repo: Repo = {
   addedAt: 0
 }
 const worktree = { path: '/repos/one-feature', head: 'abc', branch: 'feature', isBare: false }
-// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a first local scan reads only this store method; routing, listing and registration are mocked.
-const store = { captureNativeLocalWorktreeMetadataScanExpectation: vi.fn() } as unknown as Store
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a first local scan reads only these store methods; routing, listing and registration are mocked.
+const store = {
+  captureNativeLocalWorktreeMetadataScanExpectation: vi.fn(),
+  // Why: the removal-records reconciliation reads the profile directory on this path.
+  getProfileStorageDirectory: () => '/tmp/orca-profile'
+} as unknown as Store
 
 async function scanAndRegister(): Promise<void> {
   const scan = await listDetectedGitWorktrees(store, repo)

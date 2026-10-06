@@ -23,7 +23,8 @@ const CANDIDATE_AGENTS: Record<NativeChatTranscriptAgent, AiVaultAgent> = {
   claude: 'claude',
   codex: 'codex',
   grok: 'grok',
-  omp: 'omp'
+  omp: 'omp',
+  opencode: 'opencode'
 }
 
 export type SessionSummarySessionIdentity = {

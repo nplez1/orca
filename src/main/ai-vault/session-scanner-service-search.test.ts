@@ -12,13 +12,13 @@ import {
 } from '../ai-vault-search/session-search-indexer-test-fixture'
 import { SessionSearchInstance } from '../ai-vault-search/session-search-instance'
 import { SessionScannerServiceSearch } from './session-scanner-service-search'
-import type { AiVaultServiceScanOptions } from './session-scanner-service-protocol'
 import {
   AI_VAULT_SERVICE_PROTOCOL_VERSION,
   type AiVaultServiceChildMessage,
   type AiVaultServiceParentMessage,
   type AiVaultServiceRequestBody,
   type AiVaultServiceResultValue,
+  type AiVaultServiceScanOptions,
   type AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
 
@@ -230,7 +230,9 @@ async function openListService(
   return listHarness
 }
 
-function listOptions(overrides: Partial<AiVaultServiceScanOptions> = {}): AiVaultServiceScanOptions {
+function listOptions(
+  overrides: Partial<AiVaultServiceScanOptions> = {}
+): AiVaultServiceScanOptions {
   return { limit: 50, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID, ...overrides }
 }
 

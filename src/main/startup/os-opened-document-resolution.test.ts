@@ -4,10 +4,14 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveOsOpenedDocuments } from './os-opened-documents'
 
+vi.mock('../ipc/filesystem-auth', () => ({
+  authorizeExternalPath: vi.fn()
+}))
 vi.mock('../ipc/floating-workspace-directory', () => ({
   ensureFloatingWorkspaceDirectory: vi.fn()
 }))
 
+const { authorizeExternalPath } = await import('../ipc/filesystem-auth')
 const { ensureFloatingWorkspaceDirectory } = await import('../ipc/floating-workspace-directory')
 
 describe('resolveOsOpenedDocuments', () => {
@@ -15,6 +19,7 @@ describe('resolveOsOpenedDocuments', () => {
   let fileRoot: string
 
   beforeEach(async () => {
+    vi.mocked(authorizeExternalPath).mockClear()
     vi.mocked(ensureFloatingWorkspaceDirectory).mockClear()
     floatingRoot = await mkdtemp(join(tmpdir(), 'orca-os-open-root-'))
     fileRoot = await mkdtemp(join(tmpdir(), 'orca-os-open-files-'))
@@ -43,6 +48,7 @@ describe('resolveOsOpenedDocuments', () => {
           name: 'design notes'
         }
       ])
+      expect(authorizeExternalPath).toHaveBeenCalledWith(filePath)
     }
   )
 
@@ -64,16 +70,21 @@ describe('resolveOsOpenedDocuments', () => {
     const documents = await resolveOsOpenedDocuments([bundlePath, filePath])
 
     expect(documents.map((document) => document.filePath)).toEqual([filePath])
+    // Security contract: a path we never validated must never be authorized.
+    expect(authorizeExternalPath).toHaveBeenCalledTimes(1)
+    expect(authorizeExternalPath).toHaveBeenCalledWith(filePath)
   })
 
   it('drops a path that no longer exists', async () => {
     const missingPath = join(fileRoot, 'gone.csv')
 
     expect(await resolveOsOpenedDocuments([missingPath])).toEqual([])
+    expect(authorizeExternalPath).not.toHaveBeenCalled()
   })
 
   it('returns nothing for an empty input without touching the filesystem', async () => {
     expect(await resolveOsOpenedDocuments([])).toEqual([])
     expect(ensureFloatingWorkspaceDirectory).not.toHaveBeenCalled()
+    expect(authorizeExternalPath).not.toHaveBeenCalled()
   })
 })

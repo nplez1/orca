@@ -444,11 +444,9 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       }
     } else if (setup && !hasDefaultTabs) {
       // Why: blank worktree creates normally seed this first shell in the renderer; spawning it here keeps setup status under host observation.
-      const terminal = await runtime.createTerminal(
-        `id:${worktree.id}`,
-        { activate: true },
-        worktree
-      )
+      // Why no creation evidence here: this shell is the blank create's first terminal, seeded
+      // from the renderer side, so it is not attributed to a host worktree materialization.
+      const terminal = await runtime.createTerminal(`id:${worktree.id}`, { activate: true })
       startupTerminalHandle = terminal.handle
       startupTerminal = { spawned: true, surface: terminal.surface }
     }

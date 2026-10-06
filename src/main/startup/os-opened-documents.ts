@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FileDocument } from '../../shared/filesystem-entry-types'
+import { authorizeExternalPath } from '../ipc/filesystem-auth'
 import { ensureFloatingWorkspaceDirectory } from '../ipc/floating-workspace-directory'
 import { fileDocumentFromFilePath, isMarkdownDocumentName } from '../ipc/markdown-documents'
 
@@ -135,6 +136,9 @@ export class OsOpenedDocumentState {
 /**
  * Turns OS-handed paths into the same document shape the floating workspace's own
  * file picker produces; the floating tab then reads each one as a user-named file.
+ *
+ * Why the grant as well: main keeps the fork's path grants, so an OS-opened document is readable
+ * without the reader declaring an access kind.
  */
 export async function resolveOsOpenedDocuments(
   filePaths: readonly string[]
@@ -158,6 +162,7 @@ export async function resolveOsOpenedDocuments(
     } catch {
       continue
     }
+    authorizeExternalPath(filePath)
     documents.push(
       fileDocumentFromFilePath(floatingRoot, filePath, {
         outsideRootRelativePath: 'basename'

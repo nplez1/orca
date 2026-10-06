@@ -22,7 +22,9 @@ function expectHostSetupSpawn(runtime: WorktreeRuntimeStub, worktreeId: string):
       title: 'Setup',
       command: expect.stringContaining('__ORCA_SETUP_COMPLETE__:'),
       activate: false
-    })
+    }),
+    // The host's creation evidence for a terminal it spawned during materialization.
+    expect.objectContaining({ id: worktreeId })
   )
   expect(runtime.armWorktreeSetupRunner).toHaveBeenCalledWith(
     'term-setup',

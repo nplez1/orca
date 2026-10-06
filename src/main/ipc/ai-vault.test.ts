@@ -124,7 +124,9 @@ describe('listAiVaultSessions host routing', () => {
         includeAntigravityIdeSessions: true,
         executionHostId: 'local'
       }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      // The fork's third argument: no refresh or query for a plain listing.
+      {}
     )
     expect(mocks.scanRemoteAiVaultSessions).not.toHaveBeenCalled()
   })

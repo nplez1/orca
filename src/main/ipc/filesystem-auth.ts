@@ -1,4 +1,5 @@
 import { resolve, dirname, basename } from 'node:path'
+import { realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import type { Store } from '../persistence'
 import { PATH_OUTSIDE_ALLOWED_DIRECTORIES } from '../../shared/local-file-access'
@@ -17,6 +18,36 @@ export { invalidateAuthorizedRootsCacheForRepo } from './registered-worktree-roo
 export { isENOENT } from './filesystem-path-containment'
 
 export const PATH_ACCESS_DENIED_MESSAGE = `${PATH_OUTSIDE_ALLOWED_DIRECTORIES}. If this blocks a legitimate workflow, please file a GitHub issue.`
+// Why: authorized external paths accumulate all session; LRU-bound the set. Safe to evict because every caller re-authorizes before operating.
+export const AUTHORIZED_EXTERNAL_PATHS_MAX = 4096
+const authorizedExternalPaths = new Set<string>()
+
+function rememberAuthorizedExternalPath(path: string): void {
+  // Delete-then-add makes re-authorized paths most-recent so LRU eviction sheds only the oldest untouched entries.
+  authorizedExternalPaths.delete(path)
+  authorizedExternalPaths.add(path)
+  while (authorizedExternalPaths.size > AUTHORIZED_EXTERNAL_PATHS_MAX) {
+    const oldest = authorizedExternalPaths.keys().next().value
+    if (oldest === undefined) {
+      break
+    }
+    authorizedExternalPaths.delete(oldest)
+  }
+}
+
+/**
+ * A path main holds a grant for, beyond the allowed roots: app-owned folders and picker-approved
+ * ones, which the desktop reads and writes without declaring an access kind of their own.
+ */
+export function authorizeExternalPath(targetPath: string): void {
+  const resolvedTarget = resolve(targetPath)
+  rememberAuthorizedExternalPath(resolvedTarget)
+  try {
+    // Why: macOS canonicalizes /tmp to /private/tmp during read authorization.
+    rememberAuthorizedExternalPath(realpathSync(resolvedTarget))
+  } catch {}
+}
+
 /** One allowed-root list shared by every check in a single authorization, built on first use. */
 type AllowedRootsSnapshot = { get: () => readonly string[] }
 
@@ -34,6 +65,14 @@ export function isPathAllowed(
   allowedRoots?: AllowedRootsSnapshot
 ): boolean {
   const resolvedTarget = resolve(targetPath)
+  if (authorizedExternalPaths.has(resolvedTarget)) {
+    return true
+  }
+  for (const authorizedPath of authorizedExternalPaths) {
+    if (isDescendantOrEqual(resolvedTarget, authorizedPath)) {
+      return true
+    }
+  }
   return (allowedRoots?.get() ?? getAllowedRoots(store)).some((root) =>
     isDescendantOrEqual(resolvedTarget, root)
   )

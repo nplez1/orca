@@ -5,10 +5,8 @@ import { app } from 'electron'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { FloatingTerminalCwdRequest } from '../../shared/ui-chrome-types'
 import type { Store } from '../persistence'
-import {
-  ensureFloatingWorkspaceLaunchDirectory,
-  resolveFloatingWorkspaceLaunchDirectory
-} from '../floating-workspace-launch-directory'
+import { ensureFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'
+import { authorizeExternalPath } from './filesystem-auth'
 
 /** Pre-folder builds kept floating markdown notes beside the rest of the app data. */
 const LEGACY_FLOATING_NOTES_DIRNAME = 'floating-workspace'
@@ -73,6 +71,14 @@ function isTrustedFloatingWorkspaceDirectory(
 }
 
 /**
+ * The app-data folder older builds kept floating markdown notes in. Upstream's desktop root check
+ * still names it, and notes that could not be moved stay there.
+ */
+export function getDefaultFloatingWorkspacePath(): string {
+  return path.join(app.getPath('userData'), LEGACY_FLOATING_NOTES_DIRNAME)
+}
+
+/**
  * The Floating Workspace folder (`~/.orca/floating-workspace`): where its terminals and agents
  * start by default, and where its markdown notes always live (even when the start directory is
  * pointed elsewhere). Created and authorized on first use.
@@ -81,12 +87,10 @@ function isTrustedFloatingWorkspaceDirectory(
  * directory — as their working directory, and agent CLIs read `AGENTS.md` from the cwd, so the
  * folder is where floating-workspace instructions live.
  */
-export function getFloatingWorkspaceDirectoryPath(): string {
-  return resolveFloatingWorkspaceLaunchDirectory(app.getPath('home'))
-}
-
 export async function ensureFloatingWorkspaceDirectory(): Promise<string> {
   const cwd = await ensureFloatingWorkspaceLaunchDirectory(app.getPath('home'))
+  // Why: the folder is app-created, so file access in it (notes included) is always allowed.
+  authorizeExternalPath(cwd)
   await moveLegacyFloatingNotes(cwd)
   return cwd
 }
@@ -170,6 +174,9 @@ export async function resolveFloatingTerminalCwd(
   }
 
   if (isTrustedFloatingWorkspaceDirectory(canonicalCwd, store.getSettings())) {
+    // Why: picker-approved directories are persisted as explicit grants, so a
+    // restart can restore file creation access without trusting arbitrary text.
+    authorizeExternalPath(canonicalCwd)
     return canonicalCwd
   }
 
@@ -185,6 +192,7 @@ export async function grantFloatingWorkspaceDirectory(
   if (!canonicalDir) {
     return
   }
+  authorizeExternalPath(canonicalDir)
   const trustedDirectories = await getPreservedTrustedFloatingWorkspaceDirectories(
     store.getSettings()
   )

@@ -14,9 +14,9 @@ import { sessionSearchSqliteAvailable } from '../ai-vault-search/session-search-
 import type {
   AiVaultServiceRequest,
   AiVaultServiceResultValue,
+  AiVaultServiceScanOptions,
   AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
-import type { AiVaultServiceScanOptions } from './session-scanner-service-protocol'
 
 type SearchOperation = Extract<
   AiVaultServiceRequest,
