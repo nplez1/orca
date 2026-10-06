@@ -15,6 +15,11 @@
       "reason": "The fork's listing behaviour survived the handoff: `fs:listFiles` still accepts `nameFilter` and matches its whitespace-separated tokens (args at line 40, matching at 98-110), and `fs:cancelListFiles` is still registered. The module's channel was not dropped, only re-homed.",
       "since": "235cd5118b"
     },
+    "src/relay/quick-open-list-line-processor.ts": {
+      "supersededBy": "src/relay/fs-file-listing-paths.ts + quick-open-listing-path-filter.ts (via fs-handler-list-files.ts)",
+      "reason": "Compared branch by branch: root-relative normalisation, the unparseable-record return, the blocklist backstop, exclude prefixes, the name-filter dotfile scope, matcher delivery, dedupe, maxResults truncation, the counted-line return, and the decode/cancel/symlink/separator framing all have live counterparts. It was a pure module, so the deletion lost no behaviour of its own. The behaviour that WAS lost sat in the other deleted module and has been restored rather than acknowledged away: the worker-owned index warm at fs:listFiles and cancelLocalConsumer(senderId) at fs:cancelListFiles had no caller left while fs:searchFilePaths still submitted index queries under that consumer id, so a cancelled filter left its worker query running. Both are restored in filesystem-search-handlers.ts and pinned by filesystem-quick-open-path-index-wiring.test.ts.",
+      "since": "235cd5118b"
+    },
     "src/main/ipc/filesystem/filesystem-text-search-handler.ts": {
       "supersededBy": "src/main/ipc/filesystem/filesystem-content-search-handler.ts",
       "reason": "Upstream's handler registers the same `fs:search` channel and adds `fs:cancelSearch` with sender-scoped cancellation, which the fork's extracted handler never had. A superset, verified by reading both registrations.",

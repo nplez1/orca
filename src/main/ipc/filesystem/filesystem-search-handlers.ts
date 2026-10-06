@@ -12,6 +12,9 @@ import type { FilesystemHandlerContext } from './filesystem-handler-context'
 import { registerFilesystemContentSearchHandler } from './filesystem-content-search-handler'
 import { registerFilesystemPathSearchHandler } from './filesystem-path-search-handler'
 import { registerWorkspacePathIndexIpc } from './workspace-path-index-ipc'
+import { isWorkspacePathIndexEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
+import { resolveAuthorizedPath } from '../filesystem-auth'
+import { prewarmQuickOpenPathInventory } from '../quick-open-path-inventory'
 
 // 32 visible matches plus one truncation sentinel stays below the legacy frame ceiling.
 const QUICK_OPEN_SSH_LEGACY_RESULT_LIMIT = 33
@@ -99,6 +102,18 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
           return []
         }
         const nameFilterTokens = args.nameFilter ? splitFileNameFilterTokens(args.nameFilter) : []
+        if (isWorkspacePathIndexEnabled()) {
+          // Why: warm the worker-owned catalog while the explorer lists, so the first name
+          // filter is served from it instead of paying a cold build on the keystroke.
+          void resolveAuthorizedPath(args.rootPath, store)
+            .then((root) =>
+              prewarmQuickOpenPathInventory(args.rootPath, store, {
+                authorizedRootPath: root,
+                correlationId: `list-${event.sender.id}`
+              })
+            )
+            .catch(() => undefined)
+        }
         return await listQuickOpenFiles(
           args.rootPath,
           store,
@@ -119,6 +134,11 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
 
   ipcMain.handle('fs:cancelListFiles', (event, args: { requestToken: string }): void => {
     listFilesCancellations.cancel(event, args.requestToken)
+    if (isWorkspacePathIndexEnabled()) {
+      // Why: `fs:searchFilePaths` falls back to the sender id as the index consumer, so a
+      // superseded filter's worker query is only stoppable by that id.
+      pathIndexService.cancelLocalConsumer(String(event.sender.id))
+    }
   })
 
   registerFilesystemPathSearchHandler(context, pathIndexService)
