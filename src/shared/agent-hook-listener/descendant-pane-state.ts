@@ -66,6 +66,17 @@ export function applyDescendantEventToPane(
   if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
     return null
   }
+  // Why: an empty live set is not evidence of work either. Defaulting to `working` here is what
+  // strands a pane whose scope reset dropped the lead's verdict — its last child leaves the set,
+  // and the row is held open by a state nobody reported. Nothing is claimed instead, so the pane
+  // keeps its own verdict rather than inheriting one from the absence of it.
+  if (
+    facts.kind === 'live-set' &&
+    leadState === undefined &&
+    !state.descendantRosterByPaneKey.has(paneKey)
+  ) {
+    return null
+  }
 
   // Why: a child event before any lead event still proves the pane is working — the lead spawned it.
   const effectiveLeadState = leadState ?? 'working'

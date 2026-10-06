@@ -16,6 +16,7 @@ import {
 } from './agent-hook-listener/listener-limits'
 import type { HookListenerState } from './agent-hook-listener/listener-state'
 import { extractPromptText } from './agent-hook-listener/prompt-fields'
+import { gatePaneStateOnDescendants } from './agent-hook-listener/descendant-pane-state'
 import { normalizeProviderEvent } from './agent-hook-listener/provider-dispatch'
 import { hasExplicitUserPrompt } from './agent-hook-listener/provider-event-routing'
 import { hasExplicitAmpPrompt } from './agent-hook-listener/providers/amp-events'
@@ -242,11 +243,24 @@ export function normalizeHookPayload(
     eventName === 'session_start' &&
     providerSession !== null
   // A transcript session_start carries resume identity while idle; receivers discard the placeholder row.
-  const transportPayload =
-    dispatched.payload ??
-    (providerSessionOnly
+  const sessionPlaceholder =
+    providerSessionOnly && !dispatched.payload
       ? normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
-      : null)
+      : null
+  // Why: a session_start is this lane's descendant-scope reset, so it is also the one place the
+  // pane's own verdict can be re-established — otherwise the next child event reads the absence of
+  // a verdict as `working`. Gating the placeholder does that, and recomputes the hold from the live
+  // child set this same post carried, which is what a resume republishes for a session still held.
+  const gatedPlaceholder =
+    sessionPlaceholder !== null
+      ? gatePaneStateOnDescendants(state, paneKey, sessionPlaceholder)
+      : null
+  const transportPayload = dispatched.payload ?? gatedPlaceholder
+  // Why: an identity-only record is what discards a status row, so it is only right while there is
+  // no state to publish. A resume whose children are still live does have one, and publishing it is
+  // how the pane gets its hold back instead of waiting for the next child event to describe one.
+  const providerSessionOnlyRecord =
+    providerSessionOnly && (transportPayload?.subagents?.length ?? 0) === 0
   const restoredUnconfirmed =
     source === 'claude' && state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
   if (!transportPayload) {
@@ -301,7 +315,7 @@ export function normalizeHookPayload(
         }
       : {}),
     ...(providerSession ? { providerSession } : {}),
-    ...(providerSessionOnly ? { providerSessionOnly: true } : {}),
+    ...(providerSessionOnlyRecord ? { providerSessionOnly: true } : {}),
     payload: transportPayload
   }
 }

@@ -3,7 +3,10 @@ import { getPiPrefillHandlerSourceLines } from './prefill-extension-source'
 import { getAgentStatusInputRedactionSourceLines } from './agent-status-input-redaction-source'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 import { getOmpSessionOwnerHandlerSourceLines } from './omp-session-status-owner-source'
-import { getPiAgentStatusAsyncSubagentSourceLines } from './agent-status-async-subagent-source'
+import {
+  getPiAgentStatusAsyncSubagentSessionNoteLines,
+  getPiAgentStatusAsyncSubagentSourceLines
+} from './agent-status-async-subagent-source'
 import { getPiAgentStatusUiPromptHandlerSourceLines } from './agent-status-ui-prompt-source'
 import {
   getPiSubagentRosterEventSourceLines,
@@ -22,6 +25,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
       ? [
           "  onStatus('session_start', (event, ctx) => {",
           '    updateSessionMetadata(ctx)',
+          ...getPiAgentStatusAsyncSubagentSessionNoteLines(kind),
           ...(kind === 'pi' ? ['    piUiPromptDepth = 0'] : []),
           '    // Why: /reload re-registers the active session, but it is not a',
           '    // turn boundary and must not clear the visible status or unread state.',
@@ -42,7 +46,10 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
   // Why: OMP can switch sessions in-process, so each latest-only post needs fresh identity.
   const ctxParam = ', ctx'
   const bareCtxParams = '_event, ctx'
-  const captureSessionMetadata = ['    updateRuntimeOmpSessionMetadata(ctx)']
+  const captureSessionMetadata = [
+    '    updateRuntimeOmpSessionMetadata(ctx)',
+    ...getPiAgentStatusAsyncSubagentSessionNoteLines(kind)
+  ]
   const primeDaemonWorkerGuard =
     kind === 'prime-agent'
       ? [

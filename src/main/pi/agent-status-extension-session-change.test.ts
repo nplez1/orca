@@ -344,6 +344,74 @@ describe('Pi session changes', () => {
     expect(agentEndCount(harness)).toBe(1)
   })
 
+  it('files a child that reports before its own session announces itself under that session', async () => {
+    const harness = createPi()
+    await holdRunOpen(harness)
+    // Pi re-runs the factory for the next session while the module still names the old one, so a
+    // child that reports in that window must not be filed under the session merely left on screen.
+    await harness.replacePiSession('new')
+    startAsync(harness, 'run-b', 'scout')
+    await vi.advanceTimersByTimeAsync(0)
+    await harness.callHook('session_start', { reason: 'new' }, session('B'))
+    await vi.advanceTimersByTimeAsync(0)
+
+    // B’s child is B’s: the session that names itself here adopts it.
+    expect(posts(harness).at(-1)).toMatchObject({
+      hook_event_name: 'session_start',
+      session_id: 'B'
+    })
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['run-b'])
+
+    // And A’s own bucket never gained it, so coming back to A shows A’s child alone.
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await harness.callHook('session_start', { reason: 'resume' }, session('A'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['run-a'])
+  })
+
+  it('moves a child filed under a session id to the file that session is kept by', async () => {
+    const harness = createPi()
+    // A Pi that can name the session by id only: no transcript path yet.
+    await harness.callHook(
+      'session_start',
+      { reason: 'startup' },
+      { isIdle: () => true, sessionManager: { getSessionId: () => 'A' } }
+    )
+    startAsync(harness, 'run-a', 'scout')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(posts(harness).at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-a' })])
+
+    // The same session comes back knowing the file it is kept by, so that is the key from here on.
+    await harness.callHook('session_start', { reason: 'resume' }, session('A'))
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Why: LOCAL(nplez1) — the file names the session the id named, so the bucket moves with the
+    // key instead of orphaning a child whose add was already reported under the old one.
+    expect(posts(harness).at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-a' })])
+    complete(harness, 'run-a')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+  })
+
+  it('arms one bus per evaluation, and shuts down only a registration’s own', async () => {
+    const harness = createPi()
+    await holdRunOpen(harness)
+    // A second registration of the same extension in this process, on its own bus.
+    const child = harness.registerTaskChild()
+
+    // Why: one binding per channel is the fork’s policy, so a second factory in one evaluation does
+    // not arm a second bus — the armed one keeps exactly its own listener on each channel.
+    expect(harness.piEventListenerCount('subagent:async-started')).toBe(1)
+
+    // What a second registration must NOT be able to do is silence the armed lane: its own shutdown
+    // refuses its own bus, and the armed registration still reports the child that ends.
+    await child.callHook('session_shutdown', { reason: 'new' })
+    await vi.advanceTimersByTimeAsync(0)
+    complete(harness, 'run-a')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+  })
+
   it('posts nothing more once a session ends with a child still live, however often it is shut down', async () => {
     const harness = createPi()
     await harness.callHook('session_start', { reason: 'startup' }, session('A'))
@@ -473,7 +541,7 @@ describe('Pi /reload', () => {
     expect(agentEndCount(harness)).toBe(1)
   })
 
-  it('releases a workflow’s pre-reload children when the workflow ends', async () => {
+  it('retires a workflow’s pre-reload children when the workflow ends', async () => {
     const harness = createPi()
     await harness.callHook('agent_start', {}, session('A'))
     startWorkflow(harness)
@@ -484,28 +552,34 @@ describe('Pi /reload', () => {
     complete(harness, WORKFLOW)
     await vi.advanceTimersByTimeAsync(0)
 
+    // Why: LOCAL(nplez1) — a finished workflow takes the children it launched with it. The parent
+    // link the lane keeps on every run is what does it: without it child-a would stay in the live
+    // set with no end signal left to remove it, holding the pane working for good.
+    expect(posts(harness).at(-1)).toEqual({
+      hook_event_name: 'subagent_async_state',
+      subagent_runs: []
+    })
     expect(agentEndCount(harness)).toBe(1)
-    expect(posts(harness).at(-1)?.subagents).toBeUndefined()
   })
 
-  it('parts with a workflow a reload released, keeping the child that reported no end of its own', async () => {
+  it('keeps a same-registration child when its workflow ends, and retires it on its own end', async () => {
     const harness = createPi()
     await harness.callHook('agent_start', {}, session('A'))
     startWorkflow(harness)
     startChild(harness, 'child-a')
-    await harness.reloadPi()
+    await vi.advanceTimersByTimeAsync(0)
     complete(harness, WORKFLOW)
     await vi.advanceTimersByTimeAsync(0)
 
-    // Why: LOCAL(nplez1) — the live set now survives the reload, so the released workflow leaves it
-    // and its child does not: this lane retires a child on its own end signal and keeps no parent
-    // link to sweep it with the workflow, so the child's exit is what retires it.
-    expect(posts(harness)).toEqual([
-      { hook_event_name: 'agent_start', subagent_runs: [] },
-      { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'child-a' }] }
-    ])
+    // Why: LOCAL(nplez1) — this registration saw child-a start, so its own completion is still
+    // coming: the sweep that retires a pre-reload workflow's children must not take it early, and
+    // until that completion arrives the child keeps holding the pane.
+    expect(posts(harness).at(-1)).toEqual({
+      hook_event_name: 'subagent_async_state',
+      subagent_runs: [{ id: 'child-a' }]
+    })
 
-    exitRunner(harness, 'child-a')
+    complete(harness, 'child-a')
     await vi.advanceTimersByTimeAsync(0)
     expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
   })
@@ -882,8 +956,12 @@ describe('OMP session switches', () => {
     harness.emitPiEvent('task:subagent:lifecycle', { id: 'c1', agent: 'task', status: 'started' })
     await vi.advanceTimersByTimeAsync(0)
     const emitOnChildBus = harness.registerTaskChild()
-    emitOnChildBus('task:subagent:lifecycle', { id: 'g1', agent: 'task', status: 'started' })
-    emitOnChildBus('task:subagent:lifecycle', { id: 'g1', status: 'completed' })
+    emitOnChildBus.emitPiEvent('task:subagent:lifecycle', {
+      id: 'g1',
+      agent: 'task',
+      status: 'started'
+    })
+    emitOnChildBus.emitPiEvent('task:subagent:lifecycle', { id: 'g1', status: 'completed' })
     await vi.advanceTimersByTimeAsync(0)
 
     expect(postedHookNames(harness)).toEqual(['agent_start', 'agent_start'])

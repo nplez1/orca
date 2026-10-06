@@ -315,6 +315,15 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     await harness.replacePiSession('resume', '/sessions/A.jsonl')
     await drive(harness, 'session_start', { reason: 'resume' }, sessionCtx('A'))
     expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-1' })])
+    // Why: the resume publishes the restored hold itself, so a receiver that discarded the row when
+    // the session changed learns the returned session is still held by the child it names.
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({ id: 'run-1', agentType: 'researcher' })
+    ])
+    // Why: a NEW turn here would re-describe the pane's own verdict, and the final child would settle
+    // against that instead of against a restored one. The case that has to hold on its own is the
+    // resume with no turn — see 'settles a resumed session when its last child completes'.
     await drive(harness, 'agent_start', {}, sessionCtx('A'))
     await drive(harness, 'agent_end', {}, sessionCtx('A'))
     // The resumed turn ends and the pane is still held, by that child, named.
@@ -325,6 +334,33 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
 
     await emit(harness, FORK_COMPLETED, { id: 'run-1' })
     expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('settles a resumed session when its last child completes, with no new turn', async () => {
+    const harness = createHarness('pi', { existsSync: () => true })
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
+    await drive(harness, 'before_agent_start', { prompt: 'delegate the sweep' }, sessionCtx('A'))
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+    await emit(harness, FORK_STARTED, { id: 'run-1', type: 'researcher' })
+    await drive(harness, 'agent_end', {}, sessionCtx('A'))
+    expect(harness.states.at(-1)).toBe('working')
+
+    // A→B→A: /new takes the pane to a session with no children of its own.
+    await harness.replacePiSession('new')
+    await drive(harness, 'session_start', { reason: 'new' }, sessionCtx('B'))
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await drive(harness, 'session_start', { reason: 'resume' }, sessionCtx('A'))
+    // The resume re-publishes the hold A's still-live child justifies.
+    expect(harness.accepted.at(-1)?.state).toBe('working')
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({ id: 'run-1', agentType: 'researcher' })
+    ])
+
+    // No turn follows the resume: the child's own completion is the only event left, and it has to
+    // settle the pane rather than leave the hold standing on a child that is gone.
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
+    expect(harness.states.at(-1)).toBe('done')
+    expect(harness.accepted.at(-1)?.subagents).toBeUndefined()
   })
 
   it('keeps the held state working once only the child is still working', async () => {

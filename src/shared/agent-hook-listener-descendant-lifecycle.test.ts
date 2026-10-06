@@ -158,6 +158,65 @@ describe('descendant lifecycle never settles the pane', () => {
       expect(started?.payload.prompt).toBe('delegate')
       expect(started?.hasExplicitPrompt).toBeUndefined()
     })
+
+    it('carries the hold across a session switch, and settles when the resumed child ends', () => {
+      // A: a turn ends while a child still runs, so the pane is held by that child alone.
+      startTurn()
+      publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'run-1' }] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('working')
+
+      // /new discards A's scope; B has no children of its own, so the pane is idle there — and
+      // with no state to publish the session_start stays the identity-only resume record it was.
+      const newSession = publish('pi', {
+        hook_event_name: 'session_start',
+        reason: 'new',
+        session_id: 'B',
+        session_file: '/sessions/B.jsonl'
+      })
+      expect(newSession?.payload.state).toBe('done')
+      expect(newSession?.providerSessionOnly).toBe(true)
+
+      // Why: the resume is where A's hold comes back — the same post carries A's live child set,
+      // and re-publishing the hold is what keeps the pane from showing an idle session instead.
+      const resumed = publish('pi', {
+        hook_event_name: 'session_start',
+        reason: 'resume',
+        session_id: 'A',
+        session_file: '/sessions/A.jsonl',
+        subagent_runs: [{ id: 'run-1', agent_type: 'researcher' }]
+      })
+      expect(resumed?.payload.state).toBe('working')
+      expect(resumed?.payload.subagents).toEqual([
+        expect.objectContaining({ id: 'run-1', agentType: 'researcher' })
+      ])
+      // Why: a hold is state, and an identity-only record would have the receiver discard it — the
+      // resume names the same session again, so the record is still published for resuming.
+      expect(resumed?.providerSessionOnly).toBeUndefined()
+      expect(resumed?.providerSession).toMatchObject({ id: 'A' })
+
+      // No new turn follows: A's last child ending is the only event left, and it settles the pane
+      // because the resume restored the verdict it is gated against.
+      expect(
+        publishedState('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      ).toBe('done')
+    })
+
+    it('does not invent a working row for an empty live set nobody described', () => {
+      // Why: an empty set is not a claim that the pane is working. Defaulting to `working` from it
+      // is what strands a pane whose last child leaves — the pane keeps its own verdict instead.
+      expect(
+        publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      ).toBeNull()
+      expect(state.descendantRosterByPaneKey.has(PANE_KEY)).toBe(false)
+      expect(state.descendantLeadStateByPaneKey.has(PANE_KEY)).toBe(false)
+
+      // A set that does name a live child still proves the pane is working, and still gates it.
+      publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'run-1' }] })
+      expect(publishedState('pi', { hook_event_name: 'agent_end' })).toBe('working')
+      expect(
+        publishedState('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      ).toBe('done')
+    })
   })
 
   describe('a grok child blocked on a human answer (the one child event grok does not own)', () => {

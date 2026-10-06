@@ -60,8 +60,13 @@ export type AgentStatusExtensionHarness = {
   // What Pi does for /reload: as above, but the module is evaluated again and `globalThis` survives.
   reloadPi: () => Promise<void>
   // An OMP in-process task child: the same module's factory, run again on the child's own bus.
-  // Returns an emitter for events on that child's bus.
-  registerTaskChild: () => (name: string, event: unknown) => void
+  // Returns that registration's bus, so a test can drive its hooks and events and count what it
+  // armed — a second factory is what a per-evaluation binding policy has to stay honest about.
+  registerTaskChild: () => {
+    emitPiEvent: (name: string, event: unknown) => void
+    callHook: (name: string, event?: unknown, context?: HookContext) => Promise<void>
+    piEventListenerCount: (name: string) => number
+  }
 }
 
 const BASE_ENV = {
@@ -297,9 +302,18 @@ export function createAgentStatusExtensionHarness(args: {
       const leadHandlerLists = handlerLists
       const childBus = new EventEmitter()
       registerInto({}, childBus)
+      const childHandlerLists = handlerLists
       handlerLists = leadHandlerLists
-      return (name, event) => {
-        childBus.emit(name, event)
+      return {
+        emitPiEvent: (name: string, event: unknown) => {
+          childBus.emit(name, event)
+        },
+        callHook: async (name: string, event?: unknown, context?: HookContext) => {
+          for (const handler of childHandlerLists[name] ?? []) {
+            await handler(event, context)
+          }
+        },
+        piEventListenerCount: (name: string) => childBus.listenerCount(name)
       }
     },
     reloadPi: async () => {
