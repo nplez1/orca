@@ -38,6 +38,7 @@ export function CommentRow({
   onReply,
   onEditComment,
   onDeleteComment,
+  onOpenCommentInCode,
   onSetReaction,
   onQueueForAgent
 }: {
@@ -57,6 +58,7 @@ export function CommentRow({
   onReply?: (comment: PRComment) => void
   onEditComment?: (comment: PRComment, body: string) => Promise<boolean>
   onDeleteComment?: (comment: PRComment) => void | Promise<void>
+  onOpenCommentInCode?: (comment: PRComment) => void
   onSetReaction?: (
     comment: PRComment,
     content: GitHubReactionContent,
@@ -118,6 +120,14 @@ export function CommentRow({
   const trimmedDraft = draft.trim()
   const canSaveEdit = !submittingEdit && trimmedDraft.length > 0 && trimmedDraft !== comment.body
   const relativeTime = formatPrCommentRelativeTime(comment.createdAt, now)
+  // Why: an outdated thread's line belongs to an older diff, so the sidebar must not offer a jump
+  // that would land the reader on unrelated code.
+  const canOpenInCode =
+    onOpenCommentInCode !== undefined &&
+    Boolean(comment.path) &&
+    typeof comment.line === 'number' &&
+    comment.isOutdated !== true
+  const handleOpenInCode = canOpenInCode ? (): void => onOpenCommentInCode?.(comment) : undefined
 
   const authorAvatar = comment.authorAvatarUrl ? (
     <img
@@ -170,6 +180,8 @@ export function CommentRow({
       <CommentMoreMenu
         comment={comment}
         botAuthorOverrides={botAuthorOverrides}
+        canOpenInCode={canOpenInCode}
+        onOpenInCode={handleOpenInCode}
         onStartEdit={canMutateComment && onEditComment ? handleStartEdit : undefined}
         onDelete={canMutateComment && onDeleteComment ? handleDelete : undefined}
         onQueueForAgent={!isReply ? onQueueForAgent : undefined}
@@ -200,10 +212,29 @@ export function CommentRow({
           </span>
         ) : null}
         {comment.path ? (
-          <span className={presentation.pathBadge} title={comment.path}>
-            {comment.path.split('/').pop()}
-            {formatLineRange(comment) && `:${formatLineRange(comment)}`}
-          </span>
+          canOpenInCode ? (
+            <button
+              type="button"
+              className={cn(presentation.pathBadge, 'cursor-pointer transition-colors')}
+              title={comment.path}
+              aria-label={translate(
+                'auto.components.right.sidebar.checks.panel.comment.row.5cca1251df',
+                'Show in code'
+              )}
+              onClick={(event) => {
+                event.stopPropagation()
+                handleOpenInCode?.()
+              }}
+            >
+              {comment.path.split('/').pop()}
+              {formatLineRange(comment) && `:${formatLineRange(comment)}`}
+            </button>
+          ) : (
+            <span className={presentation.pathBadge} title={comment.path}>
+              {comment.path.split('/').pop()}
+              {formatLineRange(comment) && `:${formatLineRange(comment)}`}
+            </span>
+          )
         ) : null}
         <PRCommentActionBadge
           actionState={actionState}

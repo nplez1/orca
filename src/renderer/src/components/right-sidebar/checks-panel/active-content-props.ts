@@ -17,6 +17,7 @@ export type ChecksPanelActiveContentModel = Pick<
   | 'activeSourceControlLaunchPlatform'
   | 'activeWorktree'
   | 'activeWorktreeId'
+  | 'activeWorktreePath'
   | 'agentComposerState'
   | 'checks'
   | 'checksLoading'
@@ -40,6 +41,7 @@ export type ChecksPanelActiveContentModel = Pick<
   | 'titleInputRef'
   | 'titleSaving'
   | 'setTitleDraft'
+  | 'updateSettings'
 > &
   Pick<
     ChecksPanelContextState,
