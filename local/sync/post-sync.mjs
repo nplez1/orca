@@ -27,6 +27,7 @@ import {
   BUILDER_CONFIG,
   FORK_SLUG,
   builderConfig,
+  deletedForkModules,
   identitySweep,
   localizationVerifiers,
   lostContent,
@@ -60,8 +61,9 @@ local/sync/conflicts.mjs --verify when present), the derived localization catalo
 no diff, both localization verifiers, the fork builder config (${BUILDER_CONFIG})
 still loading, the update feed still naming ${FORK_SLUG}, the fork identity sweep (delegating to
 local/sync/identity-sweep.mjs when present), a red-flag scan of the files modified since the pre-sync
-tip compared against the upstream base pre-sync recorded, and the merged tip typecheck
-(${TYPE_CHECK_COMMAND}).
+tip compared against the upstream base pre-sync recorded, an inventory of the exported surface of
+every fork-only module this sync deleted (each name searched for a surviving reference), and the
+merged tip typecheck (${TYPE_CHECK_COMMAND}).
 
 Options:
   --json            machine-readable report on stdout
@@ -138,6 +140,12 @@ function main() {
       'red-flag scan of files modified since the pre-sync tip',
       "diff each flagged file against the pre-sync tip and take the old tip's content where the replay dropped it",
       () => lostContent(tip, source)
+    ],
+    [
+      'deleted-fork-modules',
+      'deleted fork-only modules, with the exported surface each one carried',
+      'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
+      () => deletedForkModules(tip, source)
     ],
     [
       'typecheck',

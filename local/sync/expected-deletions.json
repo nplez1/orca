@@ -1,0 +1,24 @@
+{
+  "why": [
+    "Deletions a reviewer has judged superseded, keyed by the deleted path.",
+    "`node local/sync/post-sync.mjs` inventories the exported surface of every deleted fork-only module",
+    "and fails when an export has no surviving reference. That is the right default: a module disappearing",
+    "is exactly when a caller can leave with it. This file is how a reviewed supersession is recorded so",
+    "the check can pass without weakening it.",
+    "Each entry must name the live replacement and the evidence for calling it a superset — the check",
+    "prints this, so the next sync inherits the reasoning instead of re-deriving it.",
+    "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed."
+  ],
+  "acknowledged": {
+    "src/main/ipc/filesystem/filesystem-quick-open-listing-handler.ts": {
+      "supersededBy": "src/main/ipc/filesystem/filesystem-search-handlers.ts (the inline `fs:listFiles` handler)",
+      "reason": "The fork's listing behaviour survived the handoff: `fs:listFiles` still accepts `nameFilter` and matches its whitespace-separated tokens (args at line 40, matching at 98-110), and `fs:cancelListFiles` is still registered. The module's channel was not dropped, only re-homed.",
+      "since": "235cd5118b"
+    },
+    "src/main/ipc/filesystem/filesystem-text-search-handler.ts": {
+      "supersededBy": "src/main/ipc/filesystem/filesystem-content-search-handler.ts",
+      "reason": "Upstream's handler registers the same `fs:search` channel and adds `fs:cancelSearch` with sender-scoped cancellation, which the fork's extracted handler never had. A superset, verified by reading both registrations.",
+      "since": "235cd5118b"
+    }
+  }
+}

@@ -219,19 +219,40 @@ cases are in that script).
 
 ## pi subagent session boundaries
 
-**Paths:** `src/main/pi/agent-status-*-source.ts`, `src/shared/agent-hook-listener/descendant-events.ts`
+**Paths:** `src/main/pi/agent-status-*-source.ts`, `src/main/pi/agent-status-extension-session-change.test.ts`, `src/shared/agent-hook-listener/descendant-events.ts`
 
-**Decision:** a pi session change (`/new`, resume, fork) clears the fork's live `subagentRuns` set and
-resets `piAsyncSubagentBusBound` / `subagentChannelsBound` / `subagentRunnerExitBound`, because Pi
-hands the re-run factory a fresh `pi.events`. A `/reload` or a same-file resume keeps the set.
-Bindings stay one per channel.
+**Decision:** the fork's live pi child set is **keyed by the session that owns it**, on
+`globalThis.__orcaPiAsyncSubagents` (`agent-status-async-subagent-session-source.ts`) — the one home
+that survives both a `/reload`, which re-evaluates the generated module, and the fresh `pi.events` a
+session change hands the re-run factory. Every post carries the _current_ session's bucket and
+nothing else, so a pane shows one session's children at a time. A session change (`/new`, fork, a
+resume into a different file) resets `piAsyncSubagentBusBound` / `subagentChannelsBound` /
+`subagentRunnerExitBound` and invalidates the registration that bound the old bus
+(`piAsyncSubagentState.registration`, the guard a stale callback is refused by), but **clears no
+children**: they stay in their own bucket and come back when that session is current again — after
+`/new` by `/resume`, and across a `/reload` of the session already open. A resume into the file
+already open keeps its bucket current throughout (`keepsSession`). The key is the file Pi names in a
+resume target (`session_file`), its `session_id` as fallback, and the last key seen while a
+re-evaluated module has no metadata yet. Bindings are re-armed once per lane per registration;
+`subagent:process-terminal` carries two listeners by design (the fork's descendant bus and upstream's
+runner-exit lane).
 
-**Why:** measured on the merge of upstream `6c693edf40` — the fresh bus had zero listeners, so a
-second session reported no children at all, and a closed session's children rode the next session's
-post. The receiver replaces its child list per post.
+**Why:** measured on the merge of upstream `6c693edf40` and then on the second-model review of it: a
+session change reported a closed session's children under the next one, a fresh bus had zero
+listeners, and a module-scope live set was rebuilt empty by `/reload` — losing the children a
+same-file resume keeps, against the intent that declaration's own comment stated. The receiver
+replaces its child list with every post (`replaceAgentDescendants`), so a post may only ever carry one
+session's set, and a stale registration must not file a closed session's children under the one now
+on screen. `agent-status-extension-session-change.test.ts` is the spec: "brings a session's children
+back when it is resumed, and shows none of them under another session" was **restored** for the
+fork's lane after the merge deleted its upstream counterpart (its fixture is producible again), and
+"keeps the children and the hold across a reload" asserts the set surviving rather than empty.
 
-**Do not:** emit upstream's `subagents` / `subagents_update` roster rows (the fork removed the pi
-`subagent:async-*` bindings, so they have no producer), or withhold `agent_end`.
+**Do not:** emit upstream's `subagents` / `subagents_update` roster rows (the fork removed the
+pi `subagent:async-*` bindings, so they have no producer); withhold `agent_end`; clear the live set on
+a session boundary, hold it in module scope, or drop the registration guard — each one loses children
+the session still owns, or lets a superseded registration write into the session now current. Do not
+re-adapt the reload test to an empty set a second time.
 
 ---
 

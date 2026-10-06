@@ -68,8 +68,10 @@ The two mistakes it is designed to prevent, both made for real:
 
 **`post-sync.mjs`** — the integration checks, grouped and machine-checkable: conflict markers, the
 identity sweep, the derived catalogs and both localization verifiers, the builder config, the
-update-feed references, the lost-content diff, and `pnpm tc`. "Skipped" and "unavailable" are
-reported as themselves, never as a pass.
+update-feed references, the lost-content diff, the exported surface of every deleted fork-only
+module (each name searched for a surviving reference — a deleted module is invisible to a
+modified-files diff), and `pnpm tc`. "Skipped" and "unavailable" are reported as themselves, never
+as a pass.
 
 **`identity-sweep.mjs`** — upstream reintroduces `~/.orca`, `orca.exe` and `orca-dev` every sync.
 This reports them against a documented allowlist (the `orca://` scheme, the relay's fixed shim, the
