@@ -18,19 +18,22 @@ This fork carries two different kinds of content on one branch:
 - **A patch series** — the `local(...)` commits (identity, updater, CI, build, hooks, docs, vm,
   skills, terminal, agents). Small, self-contained, and genuinely fork-only.
 
-For years every sync rebased *both*. That is why they got expensive: a rebase pays per commit *per
-collision*, so `service-full-cycle-preparation.ts` — seven fork commits, all touching a file
+For years every sync rebased *both*. That is where the cost comes from: a rebase pays once per commit
+*per collision*, so `service-full-cycle-preparation.ts` — seven fork commits, all touching a file
 upstream also changed — stopped the 2026-10-05 rebase three separate times, re-deciding the same
 thing each time.
 
 **Decision (2026-10-05): merge upstream into the release line; keep rebase for the patch series and
-for feature branches.** Measured on the delta that was pending at that date (upstream 50 commits
-ahead):
+for feature branches.** The deciding cost is repeated resolution, not a measured speedup:
 
-| Shape | Cost |
-| --- | --- |
-| Merge `upstream/main` into the release line | **26 file-level conflicts**, 68 files auto-merge, one tree to verify, no force-push |
-| Rebase the same delta | **150 commits replayed**, each at risk of its own conflict, ~20 stops observed for the comparable 2026-10-05 delta |
+- A rebase stops once per commit *per collision*, so the same file stops it several times and each
+  stop re-decides a question already settled.
+- A merge presents one conflict set for the whole pending delta, resolved once per file. On the
+  50-commit delta pending at that date, `node local/sync/conflicts.mjs --merge-tree <old-tip>
+  upstream/main --summary` lists **26 conflicted paths** (68 files auto-merge), and there is one tree
+  to verify and no force-push.
+- The "~20 stops" figure that used to appear here came from the preceding, much larger sync (505
+  upstream commits). It is **not** a measurement of that 50-commit delta and is not used as one.
 
 What a merge gives up, and what replaces it:
 
@@ -61,7 +64,7 @@ node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
 node local/sync/post-sync.mjs [--json] [--skip-typecheck]
 node local/sync/identity-sweep.mjs [--json|--fix]
-node local/sync/curate.mjs --plan | --write-manifest | --apply   # rebuild a curated patch series; not run by default
+node local/sync/curate.mjs --plan | --write-manifest                # plan a curated patch series; never builds a branch
 ```
 
 `local/sync/convergence-ledger.md` is not a script: it is the durable record of *which side wins*
@@ -92,9 +95,11 @@ git checkout nplez1/main
 git merge upstream/main          # one conflict set, resolved once per file
 ```
 
-**Patch series and feature branches (rebase):** cut from `origin/main` as always, then rebase
-`--onto` the new base. Replay order is by commit date, so a commit that arrived through a merge can
-land after the commits that refined it. That is expected; see the traps in Step 2.
+**Patch series and feature branches (rebase):** a fork PR branch is cut from `nplez1/main`, which is
+the base `local/open-pr.mjs` requires; only an **upstream-bound** branch is cut from `origin/main`.
+Either way, rebase `--onto` the new base. Replay order is by commit date, so a commit that arrived
+through a merge can land after the commits that refined it. That is expected; see the traps in
+Step 2.
 
 ```bash
 GIT_EDITOR=true git rebase upstream/main
@@ -107,17 +112,29 @@ node local/sync/conflicts.mjs --summary     # what is conflicted, by class
 node local/sync/conflicts.mjs               # per-file, per-hunk: stages, balance, class, ledger entries
 ```
 
-Then work the file. The three stages are the ground truth, not the markers:
+Then work the file. The three index stages are the ground truth, not the markers, and they exist in
+both shapes:
 
 ```bash
 f=src/main/ipc/ai-vault-search.ts
-for s in 1 2 3; do git show ":$s:$f" > /tmp/$s.ts; done   # 1=old parent 2=ours 3=theirs
-diff -u /tmp/1.ts /tmp/3.ts   # what THIS commit changes, against its own parent
-diff -u /tmp/1.ts /tmp/2.ts   # what upstream (or our line) already changed
+for s in 1 2 3; do git show ":$s:$f" > /tmp/$s.ts; done   # 1=base 2=ours 3=theirs
 ```
 
-The commit's own delta (`1 → 3`) is what has to be re-applied onto the new base (`2`). Stages
-survive until you `git add`, so this works at any point in the rebase.
+**In a rebase**, `:2:` (`ours`) is the new base — upstream's line — and `:3:` (`theirs`) is the commit
+being replayed. Stage 1 is that commit's own old parent, so `1 → 3` is the commit's own delta and is
+what has to be re-applied onto `:2:`. Resolve, `git add`, then `GIT_EDITOR=true git rebase
+--continue`.
+
+**In a merge**, it is the other way round: `:2:` (`ours`) is our line, `:3:` (`theirs`) is upstream,
+and `:1:` is the common ancestor. Stage 3 is the incoming upstream file, and the resolution for the
+*merged* tree is what you stage with `git add` before `git merge --continue`.
+
+**`--ours` / `--theirs` name the opposite pair of sides in a merge than in a rebase.** In a merge
+`--ours` is our line and `--theirs` is upstream; in a rebase `--ours` is the base being rebased onto
+(upstream's line) and `--theirs` is the commit being replayed. That inversion is expensive when it is
+missed, so resolve from the stages above rather than from the flags.
+
+Stages survive until you `git add`, so this works at any point in either operation.
 
 **Classify every conflict, and stop on the substantial ones.**
 
@@ -125,7 +142,9 @@ survive until you `git add`, so this works at any point in the rebase.
   block; both added a member to the same union; a rename replay landing on a file upstream kept
   editing; an import line in a test. Check the union for **duplicate members** — plain
   concatenation repeats what both sides already had, and that has produced duplicate `Object.assign`
-  members, duplicate `Map` entries and a missing comma.
+  members, duplicate `Map` entries and a missing comma. `conflicts.mjs` reports a
+  `duplicate-members` hunk for the shapes it can see (indented `key: value`, `x.set(key, ...)`, a
+  one-per-line quoted union entry); it cannot see every list shape, so read the union too.
 - **Substantial — stop and report before resolving.** Signals:
   - upstream rewrote the same function or file we did;
   - an add/add collision on a file _we_ also introduced (two independent implementations of one
@@ -170,13 +189,17 @@ answer into the ledger** in the same commit. Decisions already taken are in
 6. **The commit-msg hook refuses `local(` commits anywhere but `nplez1/main`.** Sync on the branch
    itself; do not bypass the hook.
 7. **Reword a commit whose body no longer describes its content** (ours described the engine we
-   dropped). Fold the doc fix in with `git rebase -i <sha>^`, mark it `edit`, amend, continue.
-8. **Both sides can pick the same persisted-format version for different reasons**, and that one
-   number then means two things. Since schema 2 the `appVersion` equality gate is gone, so the
-   version number is the _only_ compatibility signal, and a collision is not detectable any other
+   dropped). **Rebases only:** fold the doc fix in with `git rebase -i <sha>^`, mark it `edit`, amend,
+   continue. The merge release line has no linear series to reword; there, amend the merge commit or
+   land a follow-up commit.
+8. **Both sides can pick the same persisted-format version for different reasons**, and the two
+   lineages can already **share** a number. Since schema 2 the `appVersion` equality gate is gone, so
+   the version number is the _only_ compatibility signal, and a collision is not detectable any other
    way — upstream's own test for its bump writes the previous version, so it cannot see the fork's
-   copy. **When both sides bump a persisted-format version in one sync, the merged file takes the
-   higher number**, even though the two reasons look compatible.
+   copy. **When both sides bump a persisted-format version in one sync, the merged file takes a
+   version strictly above every version either side has shipped** — not merely the higher of the two,
+   because the two lines have already meant the same number before (both sides meant 4, then both
+   meant 5), and a released build is out there writing that number.
 9. **`git merge-tree` prints its informational messages on stdout in this git version.** A naive
    `2>&1 | tail -n +2` counts `Auto-merging` lines as conflicted paths, which inflated one dry run
    from 95 files to 481. Read the `CONFLICT` lines deliberately; `conflicts.mjs --merge-tree` does.
@@ -229,7 +252,7 @@ Then the gates that no script can judge:
 ## Step 4 — push
 
 ```bash
-git push origin upstream/main:main          # the upstream mirror the PR branches are cut from
+git push origin upstream/main:main          # the upstream mirror; only upstream-bound branches are cut from it
 git push origin nplez1/main                 # a merge line fast-forwards; no force needed
 ```
 

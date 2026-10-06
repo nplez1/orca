@@ -44,13 +44,15 @@ usage
 
 --summary and --json compose with --merge-tree; --verify runs alone.
 
-classes, each a hint and never a resolution
-  union              both sides balanced, added lines disjoint: '<<<<<<<' lines then '>>>>>>>' lines
-  duplicate-tail     a side ends mid-expression and the shared tail after '>>>>>>>' closes it, so
-                     duplicate the closing tail line(s); when neither side is unbalanced the tail
-                     must NOT be duplicated
-  both-rewrote       same region changed on both sides: human decision, candidate bodies printed
-  duplicate-members  both sides add the same member, so a union repeats it (check the commas)
+classes, each a hint and never a resolution; a class describes the shape and names the question it
+leaves open — the report never says which side to keep
+  union              both sides balanced, added lines disjoint
+  duplicate-tail     both sides opened the same expression and one or both end mid-expression at a
+                     shared tail after '>>>>>>>' that closes them
+  both-rewrote       same region changed on both sides, or the sides diverge before the shared tail
+                     could close either: human decision, candidate bodies printed
+  duplicate-members  both sides add the same member (indented key/value, x.set(key, ...), or a
+                     one-per-line quoted union/list entry), so a union repeats it
   rename-replay      same line shapes, different identifiers or paths — advisory
   add/add            from AA/AU/UA; modify/delete from UD/DU; both-deleted from DD
   inconclusive       the hunk could not be classified: no class is claimed for it
@@ -454,11 +456,43 @@ function renderSummary(result, ledger) {
 
 // ------------------------------------------------------------------ verify
 
+// A scan that could not run is never a clean tree: the operator has to see the command's own error.
+function verifyFailed(what, stderr, maxLines = 10) {
+  console.log(`verify: FAIL — ${what}`)
+  const lines = String(stderr ?? '')
+    .trimEnd()
+    .split('\n')
+    .filter((line) => line !== '')
+  for (const line of lines.slice(0, maxLines)) {
+    console.log(`  ${line}`)
+  }
+  if (lines.length > maxLines) {
+    console.log(`  ... ${lines.length - maxLines} more line(s)`)
+  }
+  return 1
+}
+
 function runVerify() {
-  const paths = unmergedPaths()
+  let paths
+  try {
+    paths = unmergedPaths()
+  } catch (error) {
+    return verifyFailed(
+      'the unmerged-path scan (git diff --diff-filter=U) could not run',
+      error.message
+    )
+  }
   const grep = git(['grep', '-I', '-l', '-E', MARKER_PATTERN, '--', '.'])
   if (grep.error) {
-    throw grep.error
+    return verifyFailed('git grep could not be spawned', grep.error.message ?? grep.error)
+  }
+  // git grep exits 1 for "no match", which is the pass case; any other non-zero status is the scan
+  // itself failing, and reporting that as clean would hide the files it never read.
+  if (grep.status !== 0 && grep.status !== 1) {
+    return verifyFailed(
+      `the conflict-marker scan could not run (git grep exit ${grep.status})`,
+      (grep.stderr ?? '') + (grep.stdout ?? '')
+    )
   }
   const markers = (grep.stdout ?? '').split('\n').filter(Boolean)
   const rows = []

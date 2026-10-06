@@ -92,14 +92,20 @@ export function updaterFeed() {
   }
   const details = []
   const missing = []
+  const scanFailures = []
   const globbed = files.filter((file) => !FEED_FILES.includes(file))
   for (const file of files) {
     const present = existsSync(path.join(repoRoot(), file))
-    const hits = present
-      ? (gitText(['grep', '-n', '-F', '-e', FORK_SLUG, '--', file]) ?? '')
-          .split('\n')
-          .filter(Boolean)
-      : []
+    const grepped = present ? git(['grep', '-n', '-F', '-e', FORK_SLUG, '--', file]) : null
+    // git grep exits 1 for "no match", which is the finding this check wants; any other non-zero
+    // status is the scan failing and must not read as a missing reference.
+    if (grepped && !grepped.ok && grepped.code !== 1) {
+      scanFailures.push(
+        `${file}: git grep exited ${grepped.code ?? 'without running'} — ${tailText(grepped.stderr, 2).join(' ')}`
+      )
+      continue
+    }
+    const hits = grepped?.ok ? grepped.stdout.split('\n').filter(Boolean) : []
     if (hits.length > 0) {
       details.push(...hits)
       continue
@@ -119,13 +125,15 @@ export function updaterFeed() {
       `${FEED_GLOB.dir}/${FEED_GLOB.prefix}*.ts is empty: upstream may have moved the updater`
     )
   }
+  const failed = scanFailures.length > 0
   return {
-    status: missing.length === 0 ? STATUS.passed : STATUS.failed,
-    summary:
-      missing.length === 0
+    status: failed || missing.length > 0 ? STATUS.failed : STATUS.passed,
+    summary: failed
+      ? `the fork-reference scan could not run for ${scanFailures.length} file(s)`
+      : missing.length === 0
         ? `feed override still points at the fork (${globbed.length} ${FEED_GLOB.prefix}*.ts helper(s) scanned)`
         : `${missing.length} feed override file(s) lost the fork reference`,
-    details
+    details: [...scanFailures.map((line) => `  ! ${line}`), ...details]
   }
 }
 
@@ -138,13 +146,35 @@ export function identitySweep() {
       details: []
     }
   }
-  const result = run('node', [toolPath(sweep)], { cwd: repoRoot() })
+  const result = run('node', [toolPath(sweep), '--json'], { cwd: repoRoot() })
+  let report = null
+  try {
+    report = JSON.parse(result.stdout)
+  } catch {
+    report = null
+  }
+  if (report === null) {
+    // An unreadable report is a failed check, never "no violations".
+    return {
+      status: STATUS.failed,
+      summary: `${sweep} --json produced no readable report (exit ${result.code ?? 'did not run'})`,
+      details: headText(`${result.stdout}\n${result.stderr}`, 20)
+    }
+  }
+  const fixable = report.counts?.fixable ?? 0
+  const reportOnly = report.counts?.reportOnly ?? 0
   return {
-    status: result.ok ? STATUS.passed : STATUS.failed,
-    summary: result.ok
-      ? `no violations (${sweep})`
-      : `violations found (exit ${result.code ?? 'did not run'})`,
-    details: headText(`${result.stdout}\n${result.stderr}`, 30)
+    status: fixable === 0 ? STATUS.passed : STATUS.failed,
+    summary:
+      fixable === 0
+        ? `no fixable violations, ${reportOnly} report-only (${sweep})`
+        : `${fixable} fixable violation(s) (${sweep})`,
+    details: [
+      `${reportOnly} report-only finding(s) are informational and need a decision, not a rewrite`,
+      ...(report.fixable ?? [])
+        .slice(0, 30)
+        .map((hit) => `  ! ${hit.file}:${hit.line}  ${hit.text} -> ${hit.to}`)
+    ]
   }
 }
 
@@ -159,9 +189,43 @@ export function resolvePreSyncTip() {
   return backup ? { tip: backup, source: `ref ${BACKUP_REF}` } : { tip: null, source: null }
 }
 
+// The upstream base this sync recorded, i.e. `pre-sync.mjs --prepare`'s newBase. The red-flag scan
+// must not compare against the moving `upstream/main`: upstream keeps advancing after the sync, and
+// the set of files it "touched in this range" would change under the check.
+//
+// With no state file the only records left are the backup ref, which names the pre-sync TIP, and the
+// merged tree itself, so the base is derived from HEAD: `merge-base(HEAD, upstream/main)` is a commit
+// in HEAD's own history, so it does not move as upstream advances. Deriving it from the pre-sync tip
+// instead yields the PREVIOUS sync's base and collapses the upstream range to nothing.
+export function pinnedUpstreamBase(tip, source) {
+  const { state, source: stateSource, file } = readSyncState()
+  if (state?.newBase) {
+    const resolved = gitText(['rev-parse', '--verify', '--quiet', `${state.newBase}^{commit}`])
+    return resolved
+      ? { base: resolved, source: `${stateSource} (${file})` }
+      : {
+          base: null,
+          source: null,
+          problem: `the state file records new base ${state.newBase}, which does not resolve to a commit`
+        }
+  }
+  const derived = gitText(['merge-base', 'HEAD', UPSTREAM_REF])
+  return derived
+    ? {
+        base: derived,
+        source: `merge-base(HEAD, ${UPSTREAM_REF}) (no state file${source ? `; tip from ${source}` : ''})`
+      }
+    : {
+        base: null,
+        source: null,
+        problem: `no recorded base: no state file, and no merge base between HEAD and ${UPSTREAM_REF}`
+      }
+}
+
 // Runbook Step 3.1, the check that catches the dropped-merge-commit trap: a MODIFIED file that
-// upstream never touched in this sync's range means the replay moved content it did not own. A
-// path upstream does not have at all is fork-only by construction, and expected here.
+// upstream never touched in this sync's range means the replay moved content it did not own. A path
+// upstream does not have at all is fork-only by construction, and expected here. This is a red-flag
+// scan over modified files — it does not prove that no content was lost anywhere else.
 export function lostContent(tip, source) {
   if (!tip) {
     return {
@@ -170,22 +234,47 @@ export function lostContent(tip, source) {
       details: []
     }
   }
-  const oldBase = gitText(['merge-base', tip, UPSTREAM_REF])
+  const pinned = pinnedUpstreamBase(tip, source)
+  if (pinned.base === null) {
+    return {
+      status: STATUS.failed,
+      summary: `cannot pin the upstream base: ${pinned.problem}`,
+      details: [
+        'the scan compares against the base pre-sync recorded; without it the answer is unknown, not clean'
+      ]
+    }
+  }
+  const base = pinned.base
+  const oldBase = gitText(['merge-base', tip, base])
   if (!oldBase) {
     return {
       status: STATUS.failed,
-      summary: `no merge base between ${tip.slice(0, 10)} and ${UPSTREAM_REF}`,
+      summary: `no merge base between ${tip.slice(0, 10)} and the pinned base ${base.slice(0, 10)}`,
       details: []
     }
   }
-  const upstreamChanged = new Set(changedNames([oldBase, UPSTREAM_REF]) ?? [])
-  // Renames and deletes are covered by the content at the added path, so the runbook's diff
-  // filter stays M; anything wider would flag every file upstream renamed.
-  const modified = changedNames(['--diff-filter=M', tip, 'HEAD']) ?? []
+  const upstreamChanged = changedNames([oldBase, base])
+  const modified = changedNames(['--diff-filter=M', tip, 'HEAD'])
+  // A failed diff has to read as a failed check: an empty result set looks exactly like "nothing
+  // modified here", which is the clean answer this scan must not invent.
+  if (upstreamChanged === null || modified === null) {
+    const range =
+      upstreamChanged === null
+        ? `${oldBase.slice(0, 10)}..${base.slice(0, 10)}`
+        : `${tip.slice(0, 10)}..HEAD`
+    return {
+      status: STATUS.failed,
+      summary: `git diff --name-only failed for ${range}`,
+      details: ['the modified/upstream-touched sets are unknown, so the scan cannot report clean']
+    }
+  }
+  const upstreamFiles = new Set(upstreamChanged)
   const redFlags = []
   const forkOnly = []
-  for (const file of modified.filter((name) => !upstreamChanged.has(name))) {
-    if (git(['cat-file', '-e', `${UPSTREAM_REF}:${file}`]).ok) {
+  for (const file of modified.filter((name) => !upstreamFiles.has(name))) {
+    // The pinned base resolves, so a cat-file miss means the path is absent there (fork-only
+    // by construction), not that the probe failed.
+    if (git(['cat-file', '-e', `${base}:${file}`]).ok) {
       redFlags.push(file)
     } else {
       forkOnly.push(file)
@@ -195,15 +284,16 @@ export function lostContent(tip, source) {
     status: redFlags.length === 0 ? STATUS.passed : STATUS.failed,
     summary:
       redFlags.length === 0
-        ? `no unexpected change; ${forkOnly.length} fork-only file(s) listed below`
-        : `${redFlags.length} modified file(s) upstream never touched`,
+        ? `red-flag scan clear (modified files only); ${forkOnly.length} fork-only file(s) listed below`
+        : `${redFlags.length} modified file(s) upstream never touched in this range`,
     details: [
       `pre-sync tip: ${tip.slice(0, 10)} from ${source}`,
-      `old base (merge-base of that tip and ${UPSTREAM_REF}): ${oldBase.slice(0, 10)}`,
-      `${modified.length} file(s) modified here, ${upstreamChanged.size} file(s) upstream touched`,
-      `red flags (upstream knows the path but did not touch it in this range): ${redFlags.length}`,
+      `pinned upstream base: ${base.slice(0, 10)} from ${pinned.source}`,
+      `old base (merge-base of that tip and the pinned base): ${oldBase.slice(0, 10)}`,
+      `${modified.length} file(s) modified here, ${upstreamFiles.size} file(s) upstream touched`,
+      `red flags (the pinned base knows the path but upstream did not touch it in this range): ${redFlags.length}`,
       ...(redFlags.length === 0 ? [] : redFlags.slice(0, 30).map((file) => `  ! ${file}`)),
-      `fork-only by construction (path does not exist upstream), expected: ${forkOnly.length}`,
+      `fork-only by construction (path absent at the pinned base), expected here: ${forkOnly.length}`,
       ...forkOnly.slice(0, 30).map((file) => `  - ${file}`)
     ]
   }

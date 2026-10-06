@@ -70,7 +70,7 @@ grants are what make a first-launch OS-opened document readable.
 
 ## Explorer name filter and the path index
 
-**Paths:** `src/renderer/src/components/right-sidebar/file-explorer-name-filter-*.ts`, `useFileExplorerVisibleRowProjection.ts`, `src/main/ipc/quick-open-*`, `src/relay/fs-handler-list-files*.ts`
+**Paths:** `src/renderer/src/components/right-sidebar/file-explorer-name-filter-*.ts`, `src/renderer/src/components/right-sidebar/useFileExplorerVisibleRowProjection.ts`, `src/main/ipc/quick-open-*`, `src/relay/fs-handler-list-files*.ts`
 
 **Decision:** the fork's chunked projection, worker-owned path index and `onPathBatch` scan API
 win; upstream's NUL-separated reader, `RipgrepFilenameDecoder`, `getQuickOpenRgOutputMode` and
@@ -106,6 +106,29 @@ synchronously ahead of the readiness promise.
 
 ---
 
+## pi subagent bindings: one binding per channel
+
+**Paths:** `src/main/pi/agent-status-subagent-roster-source.ts`, `src/main/pi/agent-status-async-subagent-source.ts`, `src/main/pi/agent-status-extension-source.ts`, `src/main/pi/agent-status-{async-subagent,extension-async-subagents,extension-omp-lifecycle}.test.ts`
+
+**Decision:** the fork's own bus owns pi's child roster. `agent-status-async-subagent-source.ts`
+binds **both** plugin lineages (`subagents:*` from the tintinweb fork and `subagent:async-*` from
+`@earendil-works/pi-subagents`), posts the full live set as `subagent_runs` on every post, and routes
+`subagent:process-terminal` through the same retire-and-repost path. The two `subagent:async-*`
+bindings are therefore removed from upstream's roster setup in
+`agent-status-subagent-roster-source.ts` (marked `LOCAL(nplez1)`); upstream's OMP-only
+`task:subagent:lifecycle` binding stays.
+
+**Why:** with both lineages bound, every child lifecycle event fired twice, and upstream's
+unconditional binding filled the fork's deliberate silence on those channels for omp/prime-agent.
+Channel coverage differs in both directions, which is why this converges on the fork's subsystem
+rather than upstream's.
+
+**Do not:** re-add the two `subagent:async-*` bindings to the roster setup, or drop
+`subagent:process-terminal` from the fork's bus — a child whose only end signal is its runner exit
+then stays in the live set until the descendant lane's quiet-reap window retracts it.
+
+---
+
 ## Status bar, usage providers, rate limits
 
 **Paths:** `src/main/rate-limits/**`, `src/renderer/src/components/status-bar/**`, `src/shared/rate-limit-types.ts`
@@ -131,7 +154,9 @@ synchronously ahead of the readiness promise.
 its `request` argument to the service and no longer has a worker fallback. The persisted-format
 version is the single shared `SESSION_PARSE_CACHE_SCHEMA_VERSION` in
 `session-parse-cache-snapshot-serialization.ts` — when both sides bump it in one sync, the merged
-file takes the **higher** number.
+file takes a version **strictly above every version either side has shipped**, never merely the
+higher of the two: the two lineages have already meant the same number once (both sides meant 4,
+then both meant 5), and a released build is out there writing it.
 
 **Why:** the version number is the only compatibility signal (the `appVersion` equality gate is
 gone), and two meanings under one number silently replay wrong rows.
@@ -142,7 +167,7 @@ gone), and two meanings under one number silently replay wrong rows.
 
 ## Accounts settings, search catalogs, provider panes
 
-**Paths:** `src/renderer/src/components/settings/accounts-search*.ts`, `AccountsPane*.tsx`, `src/main/ipc/register-core-handlers/**`
+**Paths:** `src/renderer/src/components/settings/accounts-search*.ts`, `src/renderer/src/components/settings/AccountsPane*.tsx`, `src/main/ipc/register-core-handlers/**`
 
 **Decision:** the newer-provider search catalogs live in `accounts-search-extra-providers.ts` and
 are re-exported from `accounts-search.ts` to stay under the 300-line cap (Grok, Cursor, Antigravity,

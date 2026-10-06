@@ -7,9 +7,13 @@
  * `orca-dev`/`orca.exe` expectations found by hand while reading conflicts. Rename list:
  * LOCAL-PATCHES.md `local(identity)`. A `fix` rule is a mechanical literal that `--fix` rewrites; a
  * rule without a replacement template is a real violation awaiting a decision, mostly the `~/.orca`
- * readers, where re-pointing a path is a per-store data migration. Both kinds fail the gate.
+ * readers, where re-pointing a path is a per-store data migration.
  *
- * Usage: node local/sync/identity-sweep.mjs [--json | --fix | --help]
+ * Exit status is non-zero only for a fixable finding: report-only findings need a decision, not a
+ * rewrite, and there are hundreds of them, so a gate that always fails is no gate at all. --strict
+ * fails on report-only findings too.
+ *
+ * Usage: node local/sync/identity-sweep.mjs [--json] [--fix] [--strict] [--help]
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -61,14 +65,32 @@ const HOME_ANCHOR =
   /~\/|homedir\(|\/home\/|\/Users\/|[A-Za-z]:\\+Users|\bHOME\b|home(?:Dir|Path|Root)?\b/
 const FIXTURE_PATHS = /\.(?:test|spec)\.[cm]?[jt]sx?$|^config\/scripts\/|fixtures?|__tests__/
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|#|;|<!--)/
-/** Upstream owns its release workflows; this fork does not run them, so renaming in them is sync churn. */
-const UPSTREAM_WORKFLOWS = /^\.github\/workflows\//
+/** A workflow upstream already ships is upstream-owned; one this fork added is not. */
+const WORKFLOW_PATH = /^\.github\/workflows\//
+const upstreamFiles = new Map()
+
+/** Memoized `git cat-file -e upstream/main:<path>`: a fork-owned workflow is not upstream's. */
+function existsInUpstream(file) {
+  const cached = upstreamFiles.get(file)
+  if (cached !== undefined) {
+    return cached
+  }
+  const result = spawnSync('git', ['cat-file', '-e', `upstream/main:${file}`], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8'
+  })
+  const exists = result.status === 0
+  upstreamFiles.set(file, exists)
+  return exists
+}
 const CLI_POSITION =
   /['"`]orca['"`]\s*(?:serve|orchestration|worktree|repo|skills|browser|emulator|computer|--)|(?:command|executable|launcher|cli)[\w]*\s*[:=]\s*['"`][^'"\n]*[\\/]?orca['"`]|\b(?:which|command -v|spawn|execFile|exec)\b[^)]{0,40}['"`]orca['"`]|\bORCA_CLI_COMMAND\b[^'"\n]{0,30}['"`]orca['"`]/i
 const APP_DATA_ROOT =
   /(?:LOCALAPPDATA|Application Support|XDG_CONFIG_HOME|Roaming|appData)[^'"\n]{0,24}[\\/]orca(?![-\w])/g
 // Why `evidence`: where the reader itself still says `.orca`, rewriting the expectation alone would
-// fail the suite. Why `contextNot`: a fixture naming a *stale* `.orca` hook on purpose is not a left-over.
+// fail the suite. Every `evidence`-gated path needs it, config/scripts included — a rewrite there is
+// a real edit to a dev script, not a fixture literal. Why `contextNot`: a fixture naming a *stale*
+// `.orca` hook on purpose is not a left-over.
 const HOME_FIXTURE = {
   anchor: HOME_ANCHOR,
   paths: FIXTURE_PATHS,
@@ -76,7 +98,7 @@ const HOME_FIXTURE = {
   notPaths: /^src\/relay\//,
   contextBack: 4,
   contextNot: /stale|legacy|previous|retired/i,
-  evidence: (file, source) => source.includes('.orca-np') || file.startsWith('config/scripts/')
+  evidence: (file, source) => source.includes('.orca-np')
 }
 const IN_COMMENT = { anchor: HOME_ANCHOR, lineIs: COMMENT_LINE }
 const HOME_ONLY = { anchor: HOME_ANCHOR }
@@ -96,7 +118,12 @@ const WHY = {
     'upstream-owned release workflow this fork does not run; renaming inside it only conflicts at sync.'
 }
 const RULES = [
-  ['upstream-owned-workflow', /(?:bin[\\/])orca\.exe/g, undefined, { paths: UPSTREAM_WORKFLOWS }],
+  [
+    'upstream-owned-workflow',
+    /(?:bin[\\/])orca\.exe/g,
+    undefined,
+    { paths: WORKFLOW_PATH, evidence: (file) => existsInUpstream(file) }
+  ],
   ['nsis-progid', /Orca\.(Markdown|Tabular)\b/g, 'OrcaNP.$1'],
   ['packaged-launcher-path', /(bin)([\\/])orca\.exe/g, '$1$2orca-np.exe'],
   ['home-dir-fixture', HOME_SEGMENT, '.orca-np', HOME_FIXTURE],
@@ -244,7 +271,7 @@ function applyFixes(violations) {
   return changed
 }
 
-function printReport({ violations, allowed, files, skipped }) {
+function printReport({ violations, allowed, files, skipped }, strict = false) {
   const pick = (want) => violations.filter((hit) => isFixable(hit) === want)
   const buckets = [
     ['FIXABLE', pick(true)],
@@ -252,23 +279,33 @@ function printReport({ violations, allowed, files, skipped }) {
   ]
   const tail = `${allowed.length} allowlisted (${files} files scanned, ${skipped} skipped)`
   const head = `identity-sweep: ${buckets[0][1].length} fixable, ${buckets[1][1].length} report-only, ${tail}`
-  const line = (h) => `    [${h.id}] ${h.file}:${h.line}  ${h.text}${h.fix ? ` -> ${h.fix}` : ''}`
-  const readme = (hits) => RULES.filter(([id]) => hits.some((h) => h.id === id))
+  const policy = `gate: ${buckets[0][1].length === 0 ? 'PASS' : 'FAIL'} — report-only findings are informational${strict ? '; --strict is on, so they fail too' : ' (--strict fails on them too)'}`
+  const line = (hit) =>
+    `    [${hit.id}] ${hit.file}:${hit.line}  ${hit.text}${hit.fix ? ` -> ${hit.fix}` : ''}`
+  const readme = (hits) => RULES.filter(([id]) => hits.some((hit) => hit.id === id))
   const titles = (hits) => readme(hits).map(([id]) => `  ${id}${WHY[id] ? ` — ${WHY[id]}` : ''}`)
   const groups = buckets.filter(([, hits]) => hits.length > 0)
   const body = groups.flatMap(([label, hits]) => [`\n${label}`, ...titles(hits), ...hits.map(line)])
-  process.stdout.write(`${head}\n${body.join('\n')}\n`)
+  process.stdout.write(`${head}\n${policy}\n${body.join('\n')}\n`)
 }
 
 const USAGE = `Scans ${SCAN_ROOTS.join(', ')} for names this fork renamed to "Orca NP".
 
-  node local/sync/identity-sweep.mjs [--json | --fix | --help]
+  node local/sync/identity-sweep.mjs [--json] [--fix] [--strict] [--help]
 
 Buckets
   fixable  a mechanical literal (path, executable name, test expectation, config value, NSIS
            define). --fix rewrites these, prints every file it changed, safe to run twice.
   why      a real violation awaiting a decision: persisted user paths, on-disk state, the bare
-           \`orca\`, legacy names. Never rewritten. Both buckets fail the gate.
+           \`orca\`, legacy names. Never rewritten.
+
+Exit status
+  non-zero only when a fixable finding remains. Report-only findings are informational by
+  default: each needs a decision, not a rewrite, and there are hundreds of them.
+  --strict  fail on report-only findings too, for a caller that wants the report to be a gate.
+
+A report-only rule scoped to a file upstream ships (\`upstream-owned-workflow\`) applies only to
+workflows present in upstream/main, so a workflow this fork adds keeps its normal rules.
 
 Rules`
 
@@ -286,29 +323,46 @@ function printHelp() {
   process.stdout.write(`${body.join('\n')}\n${note}${note2}${note3}\n`)
 }
 
+// Report-only findings are informational: they need a decision, not a rewrite. Only a fixable
+// finding fails the default gate; --strict makes report-only findings fail too.
+function exitCodeFor(fixable, reportOnly, strict) {
+  if (fixable.length > 0) {
+    return 1
+  }
+  return strict && reportOnly.length > 0 ? 1 : 0
+}
+
 function main() {
-  const [flag] = process.argv.slice(2)
-  if (flag && !['--json', '--fix', '--help'].includes(flag)) {
-    process.stderr.write(`identity-sweep: unknown argument '${flag}' — try --help\n`)
+  const flags = new Set(process.argv.slice(2))
+  const unknown = [...flags].filter(
+    (flag) => !['--json', '--fix', '--strict', '--help', '-h'].includes(flag)
+  )
+  if (unknown.length > 0) {
+    process.stderr.write(`identity-sweep: unknown argument '${unknown[0]}' — try --help\n`)
     process.exitCode = 2
     return
   }
-  if (flag === '--help') {
-    return printHelp()
+  if (flags.has('--help') || flags.has('-h')) {
+    printHelp()
+    return
   }
-  if (flag === '--fix') {
+  const strict = flags.has('--strict')
+  if (flags.has('--fix')) {
     const changed = applyFixes(scan().violations)
     const say = ({ file, replacements }) =>
       `identity-sweep: rewrote ${file} — ${replacements} replacements`
     process.stdout.write(`${changed.map(say).join('\n') || 'identity-sweep: nothing to fix'}\n`)
-    return printReport(scan())
   }
   const result = scan()
   const fixable = result.violations.filter(isFixable)
   const reportOnly = result.violations.filter((hit) => !isFixable(hit))
-  if (flag === '--json') {
+  if (flags.has('--json')) {
     const brief = (hit) => ({ rule: hit.id, file: hit.file, line: hit.line, text: hit.text })
-    const json = { ok: result.violations.length === 0, filesScanned: result.files }
+    const json = {
+      ok: exitCodeFor(fixable, reportOnly, strict) === 0,
+      strict,
+      filesScanned: result.files
+    }
     json.filesSkipped = result.skipped
     json.counts = {
       fixable: fixable.length,
@@ -320,10 +374,10 @@ function main() {
     json.allowlisted = result.allowed.map((hit) => ({ ...brief(hit), why: hit.allowed }))
     process.stdout.write(`${JSON.stringify(json, null, 2)}\n`)
   } else {
-    printReport(result)
+    printReport(result, strict)
   }
   // Why exitCode and not exit(): a large --json report must not be truncated on a pipe.
-  process.exitCode = result.violations.length === 0 ? 0 : 1
+  process.exitCode = exitCodeFor(fixable, reportOnly, strict)
 }
 
 main()

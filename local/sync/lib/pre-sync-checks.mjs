@@ -9,6 +9,7 @@ import {
   git,
   gitText,
   mergeTree,
+  readSyncState,
   refExists,
   repoRoot,
   run,
@@ -24,7 +25,11 @@ export const ORIGIN_FORK_REF = `refs/remotes/origin/${FORK_BRANCH}`
 export const UPSTREAM_REF = 'refs/remotes/upstream/main'
 export const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
 export const BACKUP_REF = 'backup/nplez1-main-pre-sync'
-export const NEXT_COMMAND = `git checkout ${FORK_BRANCH} && git merge --ff-only origin/${FORK_BRANCH} && GIT_EDITOR=true git rebase upstream/main`
+// The release line merges; a feature branch or a `local(...)` series rebases (see the runbook's "Two
+// shapes, one decision"). `pre-sync.mjs --rebase` selects the second procedure.
+export const MERGE_COMMAND = `git checkout ${FORK_BRANCH} && git merge upstream/main`
+export const REBASE_COMMAND = `git checkout ${FORK_BRANCH} && GIT_EDITOR=true git rebase upstream/main`
+export const nextCommand = (rebase) => (rebase ? REBASE_COMMAND : MERGE_COMMAND)
 
 function treeClean() {
   const status = git(['status', '--porcelain=v1'])
@@ -98,33 +103,96 @@ function remotes() {
 
 // Records the three SHAs the sync needs and hands them to the later gates, so the dry run and
 // --prepare never re-derive them (and cannot disagree with what the report printed).
+//
+// oldTip is the LOCAL tip of the release branch, never the remote's: the archive tag and the conflict
+// dry run are about the commits this sync will move, and preferring the remote ref once left four
+// unpushed local commits out of both. The branch's relationship to its upstream is reported
+// explicitly instead of one side being chosen silently.
 function syncShas(options) {
-  const forkRef = refExists(ORIGIN_FORK_REF) ? ORIGIN_FORK_REF : LOCAL_FORK_REF
-  const missing = [!refExists(forkRef) && forkRef, !refExists(UPSTREAM_REF) && UPSTREAM_REF].filter(
-    Boolean
-  )
+  const missing = [
+    !refExists(LOCAL_FORK_REF) && LOCAL_FORK_REF,
+    !refExists(UPSTREAM_REF) && UPSTREAM_REF
+  ].filter(Boolean)
   if (missing.length > 0) {
     return { status: STATUS.failed, summary: `missing ref(s): ${missing.join(', ')}`, details: [] }
   }
-  const oldTip = gitText(['rev-parse', forkRef])
+  const oldTip = gitText(['rev-parse', LOCAL_FORK_REF])
   const newBase = gitText(['rev-parse', UPSTREAM_REF])
-  const oldBase = gitText(['merge-base', forkRef, UPSTREAM_REF])
-  const localTip = refExists(LOCAL_FORK_REF) ? gitText(['rev-parse', LOCAL_FORK_REF]) : null
-  options.shas = { forkRef, oldBase, oldTip, newBase, localTip }
+  const oldBase = gitText(['merge-base', LOCAL_FORK_REF, UPSTREAM_REF])
+  if (oldBase === null) {
+    return {
+      status: STATUS.failed,
+      summary: `no merge base between ${FORK_BRANCH} and ${UPSTREAM_REF}`,
+      details: [
+        'the fork line and upstream share no ancestor; check that both remotes are the right repos'
+      ]
+    }
+  }
+  const head = gitText(['rev-parse', 'HEAD'])
+  const relation = forkUpstreamRelation()
+  options.shas = { forkRef: LOCAL_FORK_REF, oldBase, oldTip, newBase, relation }
   const count = (range) => gitText(['rev-list', '--count', range]) ?? '?'
+  // A branch behind its upstream (or diverged from it) must be reconciled first: the sync would
+  // otherwise start from a tip that is missing commits the remote already has.
+  const diverged = relation.verdict === 'behind' || relation.verdict === 'diverged'
   return {
-    status: STATUS.info,
-    summary: `old base ${oldBase.slice(0, 10)}, old tip ${oldTip.slice(0, 10)}, new base ${newBase.slice(0, 10)}`,
+    status: diverged ? STATUS.failed : STATUS.info,
+    summary: `old base ${oldBase.slice(0, 10)}, old tip ${oldTip.slice(0, 10)} (local, ${relation.verdict}), new base ${newBase.slice(0, 10)}`,
     details: [
-      `old base (merge-base ${forkRef} ${UPSTREAM_REF}): ${oldBase}`,
-      `old tip  (${forkRef}): ${oldTip}`,
-      localTip && localTip !== oldTip
-        ? `local ${FORK_BRANCH} tip: ${localTip} (does not match ${forkRef})`
+      `old base (merge-base ${FORK_BRANCH} ${UPSTREAM_REF}): ${oldBase}`,
+      `old tip  (local ${FORK_BRANCH}): ${oldTip}`,
+      head !== oldTip
+        ? `HEAD: ${head} — not the local ${FORK_BRANCH} tip; the sync is recorded against ${FORK_BRANCH}`
         : null,
+      `branch relationship: ${relation.verdict} — ${relation.detail}`,
       `new base (${UPSTREAM_REF}): ${newBase}`,
-      `${count(`${oldBase}..${UPSTREAM_REF}`)} upstream commit(s) coming in, ${count(`${oldBase}..${forkRef}`)} fork commit(s) to replay`,
-      `archive tag to take: archive/pre-sync-${oldTip.slice(0, 10)}`
+      `${count(`${oldBase}..${UPSTREAM_REF}`)} upstream commit(s) coming in, ${count(`${oldBase}..${LOCAL_FORK_REF}`)} fork commit(s) to replay`,
+      `archive tag to take: archive/pre-sync-${oldTip.slice(0, 10)}`,
+      `next step (${options.rebase ? 'rebase' : 'merge'}): ${nextCommand(options.rebase)}`,
+      options.rebase
+        ? null
+        : 'a feature branch or a local(...) series rebases instead: rerun with --rebase for that procedure'
     ].filter(Boolean)
+  }
+}
+
+/**
+ * Explicit equal / ahead / behind / diverged verdict for the local release branch against
+ * origin/<branch>. A branch that is behind or has diverged has to be reconciled before the sync
+ * starts from it, so the gate fails rather than picking either side.
+ */
+function forkUpstreamRelation() {
+  if (!refExists(ORIGIN_FORK_REF)) {
+    return {
+      verdict: 'unknown',
+      detail: `${ORIGIN_FORK_REF} is absent — fetch the fork remote first`
+    }
+  }
+  const counts = gitText([
+    'rev-list',
+    '--left-right',
+    '--count',
+    `${LOCAL_FORK_REF}...${ORIGIN_FORK_REF}`
+  ])
+  if (counts === null) {
+    return { verdict: 'unknown', detail: `git rev-list --left-right --count failed` }
+  }
+  const [ahead, behind] = counts.split(/\s+/).map(Number)
+  if (ahead === 0 && behind === 0) {
+    return { verdict: 'equal', detail: `origin/${FORK_BRANCH} is at the same commit` }
+  }
+  if (behind === 0) {
+    return { verdict: 'ahead', detail: `${ahead} local commit(s) not on origin/${FORK_BRANCH}` }
+  }
+  if (ahead === 0) {
+    return {
+      verdict: 'behind',
+      detail: `${behind} commit(s) on origin/${FORK_BRANCH} are missing locally — fast-forward first`
+    }
+  }
+  return {
+    verdict: 'diverged',
+    detail: `${ahead} local and ${behind} remote commit(s) differ — reconcile with origin/${FORK_BRANCH} first`
   }
 }
 
@@ -191,18 +259,21 @@ function conflictDryRun(options) {
   }
 }
 
-// The runbook's manual Step 0 mutations. Idempotent by construction: every ref is checked before
-// it is created and never moved, so a rerun cannot clobber the rollback target.
-export function prepare(options, failedGates) {
+// The runbook's manual Step 0 mutations. Idempotent by construction: every ref is checked before it
+// is created and never moved, so a rerun cannot clobber the rollback target. A failure is returned in
+// `failures` — the driver exits non-zero on it and never reports a printed failure as a pass — and a
+// backup that has drifted off the pre-sync tip is reported rather than treated as a silent pass.
+export function prepare(options, failedGates, rebase = false) {
   const messages = []
-  const failedConfig = []
+  const failures = []
   if (failedGates > 0) {
     return {
       messages: [`refused: ${failedGates} hard gate(s) failed, nothing was mutated`],
-      failedConfig
+      failures,
+      state: null
     }
   }
-  const { forkRef, oldBase, oldTip, newBase, localTip } = options.shas
+  const { forkRef, oldBase, oldTip, newBase, relation } = options.shas
   for (const [key, value] of [
     ['rerere.enabled', 'true'],
     ['merge.conflictStyle', 'zdiff3']
@@ -210,10 +281,16 @@ export function prepare(options, failedGates) {
     const set = git(['config', key, value])
     const actual = gitText(['config', '--get', key])
     if (!set.ok || actual !== value) {
-      failedConfig.push(key)
+      failures.push(`git config ${key} ${value} failed (now ${actual ?? 'unset'})`)
     }
     messages.push(
       `git config ${key} ${value}: ${set.ok && actual === value ? 'set' : `FAILED (now ${actual ?? 'unset'})`}`
+    )
+  }
+  const previous = readSyncState()
+  if (previous.state?.oldTip && previous.state.oldTip !== oldTip) {
+    messages.push(
+      `state file recorded tip ${previous.state.oldTip.slice(0, 10)}; rewriting it for ${oldTip.slice(0, 10)}`
     )
   }
   const archiveTag = `archive/pre-sync-${oldTip.slice(0, 10)}`
@@ -233,19 +310,27 @@ export function prepare(options, failedGates) {
   ]
   for (const { ref, kind, label, stale } of wanted) {
     if (refExists(ref)) {
-      const atTip = gitText(['rev-parse', `${ref}^{commit}`]) === oldTip
+      const at = gitText(['rev-parse', `${ref}^{commit}`])
+      const atTip = at === oldTip
       messages.push(
-        `${label} already exists at ${gitText(['rev-parse', '--short', ref])} — left exactly as it is${atTip ? '' : ` (${stale})`}`
+        `${label} already exists at ${(at ?? '?').slice(0, 10)} — left exactly as it is${atTip ? '' : ` (${stale})`}`
       )
+      if (!atTip) {
+        failures.push(
+          `${label} is stale: ${(at ?? '?').slice(0, 10)} is not the pre-sync tip ${oldTip.slice(0, 10)} — move it or pick a new name before relying on it as the rollback target`
+        )
+      }
       continue
     }
     // One argv entry: `git branch a/b <sha>` and `git tag a/b <sha>` take a single ref name.
     const created = git([kind, ref.replace(/^refs\/(heads|tags)\//, ''), oldTip])
-    messages.push(
-      created.ok
-        ? `created ${label} at ${oldTip.slice(0, 10)}`
-        : `FAILED to create ${label}: ${tailText(created.stderr, 3).join(' ')}`
-    )
+    if (created.ok) {
+      messages.push(`created ${label} at ${oldTip.slice(0, 10)}`)
+    } else {
+      const reason = tailText(created.stderr, 3).join(' ')
+      messages.push(`FAILED to create ${label}: ${reason}`)
+      failures.push(`could not create ${label}: ${reason}`)
+    }
   }
   const state = {
     tool: 'local/sync/pre-sync.mjs',
@@ -256,16 +341,17 @@ export function prepare(options, failedGates) {
     oldBase,
     oldTip,
     newBase,
-    localForkTip: localTip,
+    upstreamRelation: relation?.verdict ?? null,
+    mode: rebase ? 'rebase' : 'merge',
     backupRef: BACKUP_REF,
     archiveTag,
-    nextCommand: NEXT_COMMAND
+    nextCommand: nextCommand(rebase)
   }
   messages.push(
     `wrote state file ${writeSyncState(state)} (under the git directory, so it is not tracked)`
   )
-  messages.push(`next: ${NEXT_COMMAND}`)
-  return { messages, failedConfig, state }
+  messages.push(`next (${rebase ? 'rebase' : 'merge'}): ${nextCommand(rebase)}`)
+  return { messages, failures, state }
 }
 
 export const preSyncGates = {

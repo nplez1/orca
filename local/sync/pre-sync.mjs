@@ -7,14 +7,18 @@
 // mid-series (an early commit can carry a syntax error a later commit fixes), so the only usable
 // signal is that the starting tip is green. This proves that before anything moves.
 //
-// Inspection is read-only. `--prepare` additionally takes the rollback ref and sets
-// rerere/zdiff3; it refuses to mutate while a hard gate fails, and it is idempotent — an existing
-// backup ref is reported, never re-pointed, because it is the rollback target for the sync that
-// is about to happen.
+// Inspection is read-only except for the derived localization catalog, which the
+// localization-catalog gate regenerates (`pnpm run sync:localization-runtime-catalog` rewrites it with
+// --fix); that rewriting *is* the check. `--prepare` is the only path that mutates refs or config: it
+// takes the rollback ref and sets rerere/zdiff3; it refuses to mutate while a hard gate fails, and it
+// is idempotent — an existing backup ref is reported, never re-pointed, because it is the rollback
+// target for the sync that is about to happen. A ref creation or config write that failed is a
+// non-zero exit, never just a printed line.
 //
 //   node local/sync/pre-sync.mjs                    # inspect only; non-zero if a hard gate fails
 //   node local/sync/pre-sync.mjs --skip-typecheck   # skip pnpm tc (minutes)
-//   node local/sync/pre-sync.mjs --prepare [--json]
+//   node local/sync/pre-sync.mjs --prepare [--json] # also take the rollback ref and write the state
+//   node local/sync/pre-sync.mjs --rebase           # the branch is a feature/local(...) series
 //
 // The gates themselves live in lib/pre-sync-checks.mjs and lib/checks.mjs; this file is the
 // operator-facing report: one row per gate, with the title and the remediation text.
@@ -31,7 +35,7 @@ import { BACKUP_REF, FORK_BRANCH, prepare, preSyncGates } from './lib/pre-sync-c
 import { Report, STATUS, repoRoot, stateFilePath } from './lib/run.mjs'
 
 function parseArgs(argv) {
-  const options = { prepare: false, json: false, skipTypecheck: false, help: false }
+  const options = { prepare: false, json: false, skipTypecheck: false, rebase: false, help: false }
   for (const flag of argv) {
     if (flag === '--prepare') {
       options.prepare = true
@@ -39,6 +43,8 @@ function parseArgs(argv) {
       options.json = true
     } else if (flag === '--skip-typecheck') {
       options.skipTypecheck = true
+    } else if (flag === '--rebase') {
+      options.rebase = true
     } else if (flag === '--help' || flag === '-h') {
       options.help = true
     } else {
@@ -49,24 +55,29 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`Usage: node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck]
+  console.log(`Usage: node local/sync/pre-sync.mjs [--prepare] [--json] [--skip-typecheck] [--rebase]
 
-Read-only gates, each reported separately: working tree clean (nothing is safe to rebase
-dirty), no conflict markers, the derived localization catalog regenerates to no diff, local(...)
-commits confined to ${FORK_BRANCH}, the three sync SHAs (old base, old tip, new base), the merge
-dry run with its conflict count, the branch and both remotes, and the fork tip typecheck
-(${TYPE_CHECK_COMMAND}).
+Read-only gates except for the derived localization catalog, which the localization-catalog gate
+regenerates (that rewriting is the check). Each is reported separately: working tree clean (nothing
+is safe to merge or rebase dirty), no conflict markers, the derived localization catalog regenerates
+to no diff, local(...) commits confined to ${FORK_BRANCH}, the branch and both remotes, the three sync
+SHAs (old base, local old tip, new base) with the branch's relationship to origin/${FORK_BRANCH}
+(equal / ahead / behind / diverged), the merge dry run with its conflict count, and the fork tip
+typecheck (${TYPE_CHECK_COMMAND}).
 
 Options:
   --prepare         after the gates pass: set rerere/zdiff3, create ${BACKUP_REF} and tag
                     archive/pre-sync-<old-tip-short>, write the state file to
                     ${path.basename(stateFilePath())} under the git directory (untracked).
-                    Idempotent: an existing backup ref or tag is reported, never moved.
+                    Idempotent: an existing backup ref or tag is reported, never moved, and one
+                    that no longer points at the pre-sync tip fails the prepare.
   --json            machine-readable report on stdout
   --skip-typecheck  skip ${TYPE_CHECK_COMMAND}; reported as skipped, never as passed
+  --rebase          the branch being synced is a feature branch or a local(...) series, so print
+                    the rebase procedure; the default is the release line's merge procedure
   -h, --help        this text
 
-Exit code is non-zero if any hard gate fails.`)
+Exit code is non-zero if any hard gate fails, or if --prepare could not complete every mutation.`)
 }
 
 function main() {
@@ -123,8 +134,8 @@ function main() {
     ],
     [
       'sync-shas',
-      'old base, old tip and new base are recorded',
-      'a missing ref means the sync has no endpoint; fetch both remotes',
+      'old base, local old tip and new base are recorded',
+      'a missing ref means the sync has no endpoint; a local branch behind or diverged from its upstream has to be reconciled first (fetch both remotes)',
       () => preSyncGates.syncShas(options)
     ],
     [
@@ -152,7 +163,7 @@ function main() {
       })
     }
   }
-  const prepared = options.prepare ? prepare(options, report.failures.length) : null
+  const prepared = options.prepare ? prepare(options, report.failures.length, options.rebase) : null
   const summary = prepared
     ? [
         '',
@@ -165,8 +176,9 @@ function main() {
       ? JSON.stringify(report.toJSON({ prepare: prepared }), null, 2)
       : report.render(summary)
   )
-  // A failed --prepare has to be non-zero even though its own gates passed.
-  if (prepared?.failedConfig.length > 0) {
+  // A failed --prepare has to be non-zero even though its own gates passed, and a stale backup is a
+  // reported condition, not a pass.
+  if (prepared && prepared.failures.length > 0) {
     process.exit(1)
   }
   process.exit(report.failures.length === 0 ? 0 : 1)

@@ -1,19 +1,27 @@
 #!/usr/bin/env node
 /**
- * Rebuild the fork's history as a curated, linear patch series.
+ * Plan a curated, linear patch series for the fork's history.
  *
- * The series is a CONTIGUOUS partition of the existing line: each patch is emitted as the tree of a
- * real historical commit, so the final tree is byte-identical and nothing can change behaviourally.
- * That is the whole safety argument, and `--plan`/`--apply` both assert it.
+ * The series is a CONTIGUOUS partition of the existing line: each patch is the tree of a real
+ * historical commit, so a series built from the plan ends byte-identical and nothing can change
+ * behaviourally. `--plan` prints that partition, and planning is all this tool does.
  *
- * It is opt-in and deliberately conservative:
- *  - `--plan` (default) prints what it would do and touches nothing.
- *  - `--apply` builds a NEW branch (`nplez1/curated`) from a clean tree. It never force-updates
- *    `nplez1/main`, because rewriting the release line is a decision, not a side effect.
+ * Applying a curation is a MANUAL, reviewed operation, deliberately not automated here: the old
+ * `--apply` path force-moved `nplez1/curated` onto a rebuilt series, overwriting whatever branch
+ * already had that name; the commit hooks can rewrite the trees it commits; the `local(...)`
+ * commit-msg hook refuses commits outside `nplez1/main`; and the tree comparison it asserted only ran
+ * after the fact. Read the plan, rebuild the series by hand, and keep the archive tag as the rollback
+ * target.
  *
- * Why not run it every sync: measured on 2026-10-05, folding the scaffolding took 148 patches to
- * ~133. Fifteen fewer review entries in exchange for a public rewrite is a bad trade until the
- * scaffolding has accumulated again. See local/sync/README.md.
+ * Folding is limited to `docs(fork)`, whose content is the bookkeeping of a previous sync or release.
+ * `fix(sync)` is NOT bookkeeping — `0ca31372cc` restored authorization behaviour across 14 files — so
+ * it is reported as its own bucket and never folded. `chore(staging)` stays excluded too: that prefix
+ * has carried a 57-file dump of unrelated work.
+ *
+ * Why not run it every sync: measured on 2026-10-05, folding both `docs(fork)` and `fix(sync)` took
+ * 148 patches to ~133; with `fix(sync)` no longer foldable the gain is smaller again. Fewer review
+ * entries in exchange for a public rewrite is a bad trade until `docs(fork)` has accumulated. See
+ * local/sync/README.md.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -24,10 +32,12 @@ const REPO = join(HERE, '..', '..')
 const LINE_SEP = '\u001f'
 const REC_SEP = '\u001e'
 
-// Scaffolding: commits whose only content is the bookkeeping of a previous sync or release.
-// `chore(staging)` is deliberately NOT here: that prefix has carried a 57-file dump of unrelated
-// work, so folding it into a neighbouring patch would attribute someone else's change.
-const SCAFFOLDING = /^(docs\(fork\)|fix\(sync\)):/
+// Bookkeeping-only commits, foldable into the neighbouring patch. `fix(sync)` is deliberately NOT
+// here: that prefix has restored behaviour (0ca31372cc touched 14 files' authorization), so folding
+// it would attribute a real fix to an unrelated patch.
+const FOLDABLE = /^docs\(fork\):/
+/** Its own bucket in the report, never folded. */
+const FIX_SYNC = /^fix\(sync\):/
 
 function git(args, opts = {}) {
   return execFileSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 1 << 30, ...opts })
@@ -37,12 +47,12 @@ function usage() {
   console.log(`Usage:
   node local/sync/curate.mjs --plan [--range <rev-range>]        # default: print the plan
   node local/sync/curate.mjs --write-manifest [--range <range>]  # write local/sync/patch-series.json
-  node local/sync/curate.mjs --apply [--range <range>]           # build nplez1/curated (clean tree only)
   node local/sync/curate.mjs --help
 
 The range defaults to "<upstream merge-base>..<current branch tip>". Every patch in the plan is a
-contiguous group of commits, emitted as the tree of the group's LAST commit, so the final tree is
-identical to the current tip's.`)
+contiguous group of commits, emitted as the tree of the group's LAST commit, so a series built from
+the plan is identical to the current tip's. Applying a curation is a manual, reviewed operation:
+this tool plans it and never builds a branch.`)
 }
 
 function parseArgs(argv) {
@@ -55,8 +65,6 @@ function parseArgs(argv) {
       out.mode = 'plan'
     } else if (a === '--write-manifest') {
       out.mode = 'manifest'
-    } else if (a === '--apply') {
-      out.mode = 'apply'
     } else if (a === '--range') {
       out.range = argv[++i]
     } else {
@@ -99,31 +107,24 @@ function readCommits(range) {
   return commits
 }
 
-/** Group a run of scaffolding into the neighbouring group, otherwise one commit per group. */
+/** Group a run of foldable bookkeeping into the neighbouring group, otherwise one commit per group. */
 function buildPlan(commits) {
   const groups = []
   let pending = null
   for (const commit of commits) {
-    const isScaffold = SCAFFOLDING.test(commit.subject)
     if (!pending) {
-      pending = { members: [commit], scaffoldingOnly: isScaffold }
+      pending = { members: [commit] }
       continue
     }
-    if (isScaffold) {
+    if (FOLDABLE.test(commit.subject)) {
       // Attach to the group being built: that group's endpoint becomes this commit, whose tree
-      // already contains both the work and its bookkeeping. Contiguity is what keeps the final
-      // tree byte-identical.
+      // already contains both the work and its bookkeeping. Contiguity is what keeps the series
+      // byte-identical.
       pending.members.push(commit)
-      pending.scaffoldingOnly = pending.scaffoldingOnly && true
-      continue
-    }
-    if (isScaffold) {
-      pending.members.push(commit)
-      pending.scaffoldingOnly = true
       continue
     }
     groups.push(pending)
-    pending = { members: [commit], scaffoldingOnly: false }
+    pending = { members: [commit] }
   }
   if (pending) {
     groups.push(pending)
@@ -131,7 +132,7 @@ function buildPlan(commits) {
   return groups.map((group) => {
     const last = group.members.at(-1)
     // The title comes from the work, not from the bookkeeping that followed it.
-    const titled = group.members.find((c) => !SCAFFOLDING.test(c.subject)) ?? last
+    const titled = group.members.find((c) => !FOLDABLE.test(c.subject)) ?? last
     return {
       endSha: last.sha,
       subject: titled.subject,
@@ -155,15 +156,21 @@ function upstreamChangedFiles(range) {
 }
 
 function printPlan(commits, groups, range) {
-  const foldedCount = commits.filter((c) => SCAFFOLDING.test(c.subject)).length
+  const foldable = commits.filter((c) => FOLDABLE.test(c.subject))
+  const fixSync = commits.filter((c) => FIX_SYNC.test(c.subject))
+  const fixSyncFiles = new Set(fixSync.flatMap((c) => c.files))
   console.log(`commits in range: ${commits.length}`)
-  console.log(`scaffolding commits: ${foldedCount}`)
+  console.log(`docs(fork) commits (foldable): ${foldable.length}`)
+  // Reported, never folded: one fix(sync) commit can restore behaviour across a dozen files.
+  console.log(
+    `fix(sync) commits (never folded): ${fixSync.length}, touching ${fixSyncFiles.size} file(s)`
+  )
   console.log(
     `curated patches: ${groups.length}  (was ${commits.length}, ${commits.length - groups.length} fewer)`
   )
 
   // The honest measure of a fold is not how many commits it removes but how many *conflict-capable*
-  // ones: a scaffolding commit that only touches fork-owned files (LOCAL-PATCHES.md, BRANCHES.md)
+  // ones: a bookkeeping commit that only touches fork-owned files (LOCAL-PATCHES.md, BRANCHES.md)
   // replays cleanly, so folding it buys nothing.
   const upstreamFiles = upstreamChangedFiles(range)
   if (upstreamFiles) {
@@ -187,7 +194,7 @@ function printPlan(commits, groups, range) {
 
   const interesting = groups.filter((g) => g.folded.length > 0)
   if (interesting.length > 0) {
-    console.log('\ngroups that absorb scaffolding:')
+    console.log('\ngroups that absorb docs(fork) bookkeeping:')
     for (const g of interesting) {
       console.log(`  ${g.subject}`)
       for (const f of g.folded) {
@@ -211,47 +218,6 @@ function writeManifest(range, commits, groups) {
   console.log(`wrote ${path} (${groups.length} patches)`)
 }
 
-function applyPlan(groups) {
-  const branch = 'nplez1/curated'
-  const dirty = git(['status', '--porcelain']).trim()
-  if (dirty) {
-    console.error(
-      'Refusing to run: the working tree is not clean. History surgery can destroy edits.'
-    )
-    console.error(dirty)
-    process.exit(1)
-  }
-  const tip = git(['rev-parse', 'HEAD']).trim()
-  const short = tip.slice(0, 9)
-  const archive = `archive/pre-curation-${short}`
-  if (git(['tag', '--list', archive]).trim() === '') {
-    git(['tag', archive, tip])
-    console.log(`archived the current tip as ${archive}`)
-  } else {
-    console.log(`archive tag ${archive} already exists; leaving it as it is`)
-  }
-  // Start from the range's base, not its first commit: the first patch's tree is emitted as a
-  // commit on top of the base, which is what reproduces the series.
-  const base = git(['rev-parse', groups[0].members[0].sha]).trim()
-  git(['checkout', '-B', branch, `${base}^`])
-  for (const group of groups) {
-    // read-tree sets index+worktree to that real historical tree; the commit then carries it.
-    git(['read-tree', '-u', '--reset', group.endSha])
-    const body =
-      group.folded.length > 0 ? `\n\nFolded by curation: ${group.folded.join(' | ')}` : ''
-    git(['commit', '-q', '--allow-empty', '-m', `${group.subject}${body}`])
-  }
-  const newTip = git(['rev-parse', 'HEAD']).trim()
-  const diff = git(['diff', '--stat', tip, newTip]).trim()
-  if (diff) {
-    console.error(`!! trees differ — do NOT push ${branch}:`)
-    console.error(diff)
-    process.exit(1)
-  }
-  console.log(`\n${branch} built: ${groups.length} patches, tree identical to ${tip}`)
-  console.log('Review it, then move the release line yourself if you want it.')
-}
-
 const args = parseArgs(process.argv.slice(2))
 if (args.help) {
   usage()
@@ -263,14 +229,8 @@ if (commits.length === 0) {
   console.error(`No commits in range ${range}`)
   process.exit(1)
 }
-if (args.mode === 'apply' && SCAFFOLDING.test(commits.at(-1).subject) === false) {
-  // Not an error, just a note: the tip is usually a product commit on this fork.
-}
 const groups = buildPlan(commits)
 printPlan(commits, groups, range)
 if (args.mode === 'manifest') {
   writeManifest(range, commits, groups)
-}
-if (args.mode === 'apply') {
-  applyPlan(groups)
 }

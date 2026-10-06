@@ -30,6 +30,7 @@ import {
   identitySweep,
   localizationVerifiers,
   lostContent,
+  pinnedUpstreamBase,
   resolvePreSyncTip,
   updaterFeed
 } from './lib/post-sync-checks.mjs'
@@ -58,8 +59,9 @@ Integration checks, each reported separately: no conflict markers (delegating to
 local/sync/conflicts.mjs --verify when present), the derived localization catalog regenerates to
 no diff, both localization verifiers, the fork builder config (${BUILDER_CONFIG})
 still loading, the update feed still naming ${FORK_SLUG}, the fork identity sweep (delegating to
-local/sync/identity-sweep.mjs when present), lost content (files modified here that upstream never
-touched), and the merged tip typecheck (${TYPE_CHECK_COMMAND}).
+local/sync/identity-sweep.mjs when present), a red-flag scan of the files modified since the pre-sync
+tip compared against the upstream base pre-sync recorded, and the merged tip typecheck
+(${TYPE_CHECK_COMMAND}).
 
 Options:
   --json            machine-readable report on stdout
@@ -83,11 +85,15 @@ function main() {
     return
   }
   const { tip, source } = resolvePreSyncTip()
+  const base = pinnedUpstreamBase(tip, source)
   const report = new Report('post-sync integration checks', {
     repo: repoRoot(),
     branch: gitText(['rev-parse', '--abbrev-ref', 'HEAD']) ?? 'unknown',
     head: gitText(['rev-parse', '--short', 'HEAD']) ?? 'unknown',
-    preSyncTip: tip ? `${tip.slice(0, 10)} (from ${source})` : 'none found'
+    preSyncTip: tip ? `${tip.slice(0, 10)} (from ${source})` : 'none found',
+    upstreamBase: base.base
+      ? `${base.base.slice(0, 10)} (from ${base.source})`
+      : `unresolved: ${base.problem}`
   })
   // One row per check. A check that throws is a failed check, never a missing one.
   const checks = [
@@ -129,7 +135,7 @@ function main() {
     ],
     [
       'lost-content',
-      'no content lost between the pre-sync tip and HEAD',
+      'red-flag scan of files modified since the pre-sync tip',
       "diff each flagged file against the pre-sync tip and take the old tip's content where the replay dropped it",
       () => lostContent(tip, source)
     ],

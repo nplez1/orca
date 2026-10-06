@@ -86,29 +86,86 @@ test('clean union: both sides balanced and their added lines disjoint', () => {
 })
 
 test('duplicate-tail: one unbalanced side, closed by the shared tail', () => {
+  // Both sides open the SAME call; only ours is left open, and the shared tail closes it.
   const file = conflict({
     base: ['  const x = old(1)'],
     ours: ['  const x = makeThing(', '    arg'],
-    theirs: ['  const x = makeOther(1)'],
+    theirs: ['  const x = makeThing(1)'],
     tail: ['  )']
   })
   assert.equal(file.hunks[0].class, 'duplicate-tail')
   assert.deepEqual(file.hunks[0].duplicateFor, ['ours'])
   assert.equal(file.hunks[0].tailCloses.ours, 1)
   assert.equal(file.hunks[0].tailCloses.theirs, null)
+  assert.equal(file.hunks[0].sharesOpenPrefix, true)
 })
 
-test('duplicate-tail: both sides unbalanced and the tail closes both', () => {
+// A competing replacement: both sides end mid-expression at a tail that would close either, but the
+// sides diverge at the call name. Duplicating the tail would emit two `return`s.
+test('duplicate-tail: no shared open prefix is a competing replacement, not a duplication', () => {
   const file = conflict({
     base: ['  return old('],
     ours: ['  return f(', '    a'],
     theirs: ['  return g(', '    b'],
     tail: ['  )']
   })
+  assert.equal(file.hunks[0].class, 'both-rewrote')
+  assert.deepEqual(file.hunks[0].duplicateFor, [])
+  assert.equal(file.hunks[0].tailCloses.ours, 1)
+  assert.equal(file.hunks[0].tailCloses.theirs, 1)
+  assert.equal(file.hunks[0].sharesOpenPrefix, false)
+})
+
+test('duplicate-tail: both sides unbalanced on the same expression, tail closes both', () => {
+  const file = conflict({
+    base: ['  return old(', '    x'],
+    ours: ['  return f(', '    a'],
+    theirs: ['  return f(', '    b'],
+    tail: ['  )']
+  })
   assert.equal(file.hunks[0].class, 'duplicate-tail')
   assert.deepEqual(file.hunks[0].duplicateFor, ['ours', 'theirs'])
   assert.equal(file.hunks[0].tailCloses.ours, 1)
   assert.equal(file.hunks[0].tailCloses.theirs, 1)
+  assert.equal(file.hunks[0].sharesOpenPrefix, true)
+})
+
+// Only the matching bracket kind closes a side: a `}` must not read as closing a `[`.
+test('a `}` does not close a `[`', () => {
+  const merged = MERGED(
+    `${HEAD} HEAD`,
+    '  const list = [',
+    MID,
+    '  const list = [',
+    `${END} upstream/main`,
+    '  }'
+  )
+  const file = classifyFile({ path: 'src/z.ts', status: 'UU', ours: 'x', theirs: 'y', merged })
+  assert.equal(file.hunks[0].sharesOpenPrefix, true)
+  assert.equal(file.hunks[0].tailCloses.ours, null)
+  assert.equal(file.hunks[0].tailCloses.theirs, null)
+  assert.notEqual(file.hunks[0].class, 'duplicate-tail')
+})
+
+// The tail search has to stop at the next conflict: the following hunk's `}` belongs to it, not here.
+test('the shared tail does not reach into the next conflict', () => {
+  const merged = MERGED(
+    `${HEAD} HEAD`,
+    '  if (a) {',
+    MID,
+    '  const x = 1',
+    `${END} upstream/main`,
+    `${HEAD} HEAD`,
+    '  }',
+    MID,
+    '  )',
+    `${END} upstream/main`
+  )
+  const file = classifyFile({ path: 'src/y.ts', status: 'UU', ours: 'x', theirs: 'y', merged })
+  assert.equal(file.hunks.length, 2)
+  assert.equal(file.hunks[0].balance.ours, 1)
+  assert.equal(file.hunks[0].tailCloses.ours, null)
+  assert.notEqual(file.hunks[0].class, 'duplicate-tail')
 })
 
 // The trap that produced a real defect: balanced sides must never get the tail duplicated,
@@ -143,6 +200,36 @@ test('duplicate-members: a union would repeat a member both sides added', () => 
   })
   assert.equal(file.class, 'duplicate-members')
   assert.deepEqual(file.hunks[0].sharedMembers, ['b'])
+})
+
+test('duplicate-members: a Map.set entry both sides added', () => {
+  const file = conflict({
+    base: ['const map = new Map()', "map.set('deepseek', 1)"],
+    ours: ['const map = new Map()', "map.set('deepseek', 1)", "map.set('zcode', 2)"],
+    theirs: ['const map = new Map()', "map.set('deepseek', 1)", "map.set('zcode', 3)"]
+  })
+  assert.equal(file.class, 'duplicate-members')
+  assert.deepEqual(file.hunks[0].sharedMembers, ['zcode'])
+})
+
+test('duplicate-members: a one-per-line union member both sides added', () => {
+  const file = conflict({
+    base: ['export type Provider =', "  | 'deepseek'"],
+    ours: ['export type Provider =', "  | 'deepseek'", "  | 'zcode'"],
+    theirs: ['export type Provider =', "  | 'deepseek'", "  | 'zcode'", "  | 'antigravity'"]
+  })
+  assert.equal(file.class, 'duplicate-members')
+  assert.deepEqual(file.hunks[0].sharedMembers, ['zcode'])
+})
+
+// A bare quoted line is a directive or a lone string, not a list member.
+test('a bare quoted line is not read as a union member', () => {
+  const file = conflict({
+    base: ['const a = 1'],
+    ours: ['const a = 1', "'use strict'"],
+    theirs: ['const a = 1', "'use strict'"]
+  })
+  assert.deepEqual(file.hunks[0].sharedMembers, [])
 })
 
 test('both-rewrote: same existing content changed on both sides', () => {

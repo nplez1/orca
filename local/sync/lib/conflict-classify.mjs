@@ -4,7 +4,9 @@
 // ADVISORY ONLY. delimiterBalance counts `()[]{}` without stripping strings or comments, so a
 // bracket inside a literal skews it; added/removed counts are multiset differences, not an LCS diff
 // (a moved line is one removal plus one addition); member and rename detection are line-shape
-// heuristics. A class describes the shape of a conflict, never the resolution: the decisions live in
+// heuristics: a member is an indented `key: value` / `key = value`, an `x.set(key, ...)` argument,
+// or a one-per-line quoted union/list entry. A class describes the shape of a conflict and names
+// the question it leaves open; it is never the resolution. The decisions live in
 // `local/sync/convergence-ledger.md`.
 
 const START = /^<{7}(?: (.*))?$/
@@ -43,17 +45,34 @@ const SEVERITY = {
   inconclusive: 6
 }
 
-// Kept out of the branches below only to stop the formatter exploding every object literal.
+// Kept out of the branches below only to stop the formatter exploding every object literal. Each
+// reason describes the shape and ends in the one question the resolver has to answer; none of them
+// is an instruction.
 const REASON = {
   empty: 'empty conflict region — nothing to compare',
-  rename: 'same line shapes, different identifiers or paths — confirm a rename, not a value change',
-  bothChanged: 'both sides changed content that already existed here — human decision',
-  dedup: 'both sides add the same member, so a union repeats it (check the commas)',
-  overlap: 'same region changed on both sides — human decision',
+  rename:
+    'same line shapes, different identifiers or paths — is this one rename replaying, or two independent changes?',
+  bothChanged:
+    'both sides changed content that already existed here — which change belongs in the merged file?',
+  dedup: 'both sides add the same member, so a union would repeat it — which entry survives?',
+  overlap: 'same region changed on both sides — which change belongs in the merged file?',
   union:
-    'both sides balanced, added lines disjoint — `<<<<<<<` lines, then `>>>>>>>` lines, tail once',
-  tail: 'ends mid-expression and the shared tail closes it — duplicate the closing tail line(s)',
-  unbalanced: 'unbalanced and the shared tail does not close it — human decision'
+    'both sides balanced, added lines disjoint — do the added lines from both sides belong, and is the shared tail present exactly once?',
+  tail: 'a side ends mid-expression and the shared tail closes it — does the tail close one side, both, or neither?',
+  divergingTail:
+    'the sides diverge before the shared tail could close either — one expression with two tails, or two competing replacements?',
+  unbalanced:
+    'unbalanced and the shared tail does not close it — which side expression is complete?'
+}
+
+/** Index of the next conflict start at or after `from`, or the end of the file. */
+function nextHunkStart(rows, from) {
+  for (let index = from; index < rows.length; index += 1) {
+    if (START.test(rows[index])) {
+      return index
+    }
+  }
+  return rows.length
 }
 
 /** Split merged content into conflict regions. A nested marker is treated as content. */
@@ -86,7 +105,9 @@ export function parseConflictHunks(text) {
     if (end) {
       current.endLine = index + 1
       current.theirsLabel = end[1] ?? ''
-      current.tail = rows.slice(index + 1)
+      // Bounded at the next conflict: searching to the end of the file let a later hunk's bracket
+      // "close" this hunk's open expression.
+      current.tail = rows.slice(index + 1, nextHunkStart(rows, index + 1))
       hunks.push(current)
       current = null
       continue
@@ -111,16 +132,65 @@ export function delimiterBalance(lines) {
   return balance
 }
 
-/** Line of the shared tail after `>>>>>>>` that closes a side sitting at `balance`, or null. */
-function closesAt(tail, balance) {
-  if (balance === 0) {
+const MATE = { '(': ')', '[': ']', '{': '}' }
+
+/** Openers left unclosed by `lines`, innermost last. */
+function openers(lines) {
+  const stack = []
+  for (const line of lines) {
+    for (const character of line) {
+      if (character === '(' || character === '[' || character === '{') {
+        stack.push(character)
+      } else if (character === ')' || character === ']' || character === '}') {
+        stack.pop()
+      }
+    }
+  }
+  return stack
+}
+
+/** Lines shared at the start of both sides, the last of them only up to its first difference. */
+function commonPrefix(ours, theirs) {
+  const prefix = []
+  for (let index = 0; index < Math.min(ours.length, theirs.length); index += 1) {
+    if (ours[index] === theirs[index]) {
+      prefix.push(ours[index])
+      continue
+    }
+    let shared = 0
+    while (shared < ours[index].length && ours[index][shared] === theirs[index][shared]) {
+      shared += 1
+    }
+    if (shared > 0) {
+      prefix.push(ours[index].slice(0, shared))
+    }
+    break
+  }
+  return prefix
+}
+
+/**
+ * Line of the tail after `>>>>>>>` that closes the side's open brackets, or null. Only the matching
+ * kind closes (`}` never closes `[`), and a nested opener inside the tail has to close first.
+ */
+function closesAt(tail, stack) {
+  if (stack.length === 0) {
     return null
   }
-  let running = 0
+  const open = [...stack]
   for (let index = 0; index < tail.length; index += 1) {
-    running += delimiterBalance([tail[index]])
-    if (running === -balance) {
-      return index + 1
+    for (const character of tail[index]) {
+      if (character === '(' || character === '[' || character === '{') {
+        open.push(character)
+      } else if (character === ')' || character === ']' || character === '}') {
+        if (MATE[open.at(-1)] !== character) {
+          return null
+        }
+        open.pop()
+        if (open.length === 0) {
+          return index + 1
+        }
+      }
     }
   }
   return null
@@ -167,11 +237,21 @@ function addedLines(baseLines, sideLines) {
 // Only indented lines count as members, which keeps duplicate-members quiet on `const x = 1` lines.
 const MEMBER_COLON = /^\s+["'`]?([A-Za-z_$][\w$-]*)["'`]?\s*:/
 const MEMBER_ASSIGN = /^\s+["'`]?([A-Za-z_$][\w$-]*)["'`]?\s*=\s*\S/
+// Map-like additions, and one-per-line union/list members, which carry their own marker so a bare
+// quoted line (a directive, a lone string) is not read as a member.
+const MEMBER_SET = /^\s*[\w$.?]+\.set\(\s*["'`]?([A-Za-z_$][\w$.-]*)["'`]?\s*,/
+const MEMBER_UNION_PIPED = /^\s*\|\s*["'`]([A-Za-z_$][\w$.-]*)["'`]/
+const MEMBER_UNION_LISTED = /^\s*["'`]([A-Za-z_$][\w$.-]*)["'`]\s*[|,]/
 const IDENTIFIER = /[A-Za-z_$][A-Za-z0-9_$]*/g
 const STRING_LITERAL = /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g
 
 function memberKey(line) {
-  const match = MEMBER_COLON.exec(line.replace(/,\s*$/, '')) ?? MEMBER_ASSIGN.exec(line)
+  const match =
+    MEMBER_COLON.exec(line.replace(/,\s*$/, '')) ??
+    MEMBER_ASSIGN.exec(line) ??
+    MEMBER_SET.exec(line) ??
+    MEMBER_UNION_PIPED.exec(line) ??
+    MEMBER_UNION_LISTED.exec(line)
   return match ? match[1] : null
 }
 
@@ -211,9 +291,10 @@ export function classifyHunk(hunk, index = 0) {
   const theirs = hunk.theirs
   const tail = hunk.tail ?? []
   const base = hunk.base ?? []
+  const stack = { ours: openers(ours), theirs: openers(theirs) }
   const balance = { ours: delimiterBalance(ours), theirs: delimiterBalance(theirs) }
-  const closesOurs = closesAt(tail, balance.ours)
-  const closesTheirs = closesAt(tail, balance.theirs)
+  const closesOurs = closesAt(tail, stack.ours)
+  const closesTheirs = closesAt(tail, stack.theirs)
   const balanced = balance.ours === 0 && balance.theirs === 0
   const delta = { ours: lineDelta(base, ours), theirs: lineDelta(base, theirs) }
   const added = { ours: addedLines(base, ours), theirs: addedLines(base, theirs) }
@@ -223,6 +304,9 @@ export function classifyHunk(hunk, index = 0) {
   // At least one unbalanced side is the ONLY case where duplicating the shared tail can be right;
   // when both sides are balanced the tail must not be duplicated.
   const duplicateFor = [closesOurs ? 'ours' : null, closesTheirs ? 'theirs' : null].filter(Boolean)
+  // A competing replacement (`return f(` against `return g(`) is not a tail duplication: both sides
+  // have to open the same expression for the shared tail to belong to either one.
+  const sharesOpenPrefix = delimiterBalance(commonPrefix(ours, theirs)) > 0
   let state = { class: 'inconclusive', reason: REASON.empty }
   if (ours.length > 0 || theirs.length > 0) {
     if (balanced && isRenameReplay(ours, theirs)) {
@@ -235,8 +319,10 @@ export function classifyHunk(hunk, index = 0) {
       state = { class: 'both-rewrote', reason: REASON.overlap }
     } else if (balanced) {
       state = { class: 'union', reason: REASON.union }
-    } else if (duplicateFor.length > 0) {
+    } else if (duplicateFor.length > 0 && sharesOpenPrefix) {
       state = { class: 'duplicate-tail', reason: REASON.tail, duplicateFor }
+    } else if (duplicateFor.length > 0) {
+      state = { class: 'both-rewrote', reason: REASON.divergingTail, duplicateFor: [] }
     } else {
       state = { class: 'both-rewrote', reason: REASON.unbalanced }
     }
@@ -256,6 +342,7 @@ export function classifyHunk(hunk, index = 0) {
     firstDiff: firstDiff(ours, theirs, hunk.startLine),
     additionOverlap,
     sharedMembers,
+    sharesOpenPrefix,
     tailCloses: { ours: closesOurs, theirs: closesTheirs },
     duplicateFor: [],
     ...state
