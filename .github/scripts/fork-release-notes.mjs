@@ -23,7 +23,14 @@ const GIT_MAX_BUFFER = 64 * 1024 * 1024
 // release, so comparing against one would describe upstream's history as this fork's change.
 const FORK_RELEASE_TAG = /^v\d+\.\d+\.\d+-np\.\d+$/
 
-const GROUP_ORDER = ['local', 'feat', 'fix', 'perf', 'refactor', 'docs', 'test', 'chore', 'other']
+// A reader updates for features and fixes. The fork-patch group is why this build differs from
+// upstream's, but it is bookkeeping to that reader, and the maintenance tail is bookkeeping to
+// everyone — so the product changes lead and the noise trails.
+const GROUP_ORDER = ['feat', 'fix', 'perf', 'refactor', 'local', 'docs', 'test', 'other', 'chore']
+
+// The fork-patch group stays visible without spending a whole screen on sync and release-record
+// commits, which are the bulk of it in a range this size.
+const FORK_PATCH_LIMIT = 6
 
 const GROUP_TITLES = {
   local: 'Fork patches (`local(...)`) — what makes this build different',
@@ -183,6 +190,31 @@ function listCommits(rangeArgs) {
     .filter((commit) => commit.subject.trim().length > 0)
 }
 
+// A rebase replays the same work as new commits, so `<prev>..HEAD` reports commits the previous
+// release already contains. `git cherry` asks git itself which of them are patch-equivalent (same
+// diff, new sha) instead of guessing from subjects; merges are outside what it compares, and are
+// reported in the lead rather than as bullets. Undefined means the check could not run, in which
+// case the range is counted as-is rather than silently.
+function alreadyInPrevShas(prevTag) {
+  const result = git(['cherry', prevTag, 'HEAD'])
+  if (!result.ok) {
+    warn(
+      `could not check which commits are already in ${prevTag} (${result.error}); ` +
+        `counting every commit in the range`
+    )
+    return undefined
+  }
+
+  const shas = new Set()
+  for (const line of result.out.split('\n')) {
+    const match = /^- ([0-9a-f]{40})(?:\s|$)/.exec(line)
+    if (match != null) {
+      shas.add(match[1])
+    }
+  }
+  return shas
+}
+
 function tagExists(tag) {
   return git(['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]).ok
 }
@@ -232,17 +264,23 @@ function stripTrailingRefs(text) {
 function classify(subject) {
   const match = subject.match(/^([a-z]+)(?:\(([^)]*)\))?!?:\s*(.+)$/)
   if (match == null) {
-    return { group: 'other', scope: undefined, text: stripTrailingRefs(subject) }
+    return { group: 'other', scope: undefined, text: stripTrailingRefs(subject), type: 'other' }
   }
 
   const text = stripTrailingRefs(match[3])
   if (text.length === 0) {
-    return { group: 'other', scope: undefined, text: stripTrailingRefs(subject) }
+    return { group: 'other', scope: undefined, text: stripTrailingRefs(subject), type: 'other' }
   }
+
+  const scope = match[2] == null || match[2].length === 0 ? undefined : match[2]
+  // `docs(fork)` records this fork's own sync and release process: bookkeeping, like the
+  // maintenance tail, rather than documentation of the product.
+  const bookkeeping = match[1] === 'docs' && scope === 'fork'
   return {
-    group: TYPE_GROUPS[match[1]] ?? 'other',
-    scope: match[2] == null || match[2].length === 0 ? undefined : match[2],
-    text
+    group: bookkeeping ? 'chore' : (TYPE_GROUPS[match[1]] ?? 'other'),
+    scope,
+    text,
+    type: match[1]
   }
 }
 
@@ -305,6 +343,29 @@ function renderGroup(title, entries, maxPerGroup) {
   return lines
 }
 
+// Commits that only bookkeep the repository are the loudest part of a range this size and the least
+// useful to a reader; the count and its breakdown say more here than twelve bullets of it would.
+function renderCompactGroup(title, entries) {
+  if (entries.length === 0) {
+    return []
+  }
+
+  const byType = new Map()
+  for (const entry of entries) {
+    byType.set(entry.type, (byType.get(entry.type) ?? 0) + entry.count)
+  }
+  const breakdown = [...byType.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([type, count]) => `\`${type}\` ${count}`)
+    .join(', ')
+  const total = entries.reduce((sum, entry) => sum + entry.count, 0)
+  const prose =
+    `${total} commit${total === 1 ? '' : 's'} of maintenance and fork bookkeeping (${breakdown}), ` +
+    `counted rather than listed; the commit list for this release has the details.`
+
+  return [`### ${title}`, '', wrap(prose), '']
+}
+
 // Every line of a blockquote needs the marker, so this cannot go through plain wrap().
 function wrapBlockquote(text, width = 100) {
   return wrap(text, width - 2)
@@ -318,9 +379,10 @@ function renderLead({
   missingTag,
   firstRelease,
   total,
+  rangeTotal,
+  alreadyInPrev,
   merges,
   forkPatchCount,
-  maxPerGroup,
   windowSize,
   compareUrl
 }) {
@@ -328,11 +390,22 @@ function renderLead({
 
   if (prevTag != null) {
     const heading = `## What changed since \`${prevTag}\``
+    // The range of a rebased branch contains commits the previous release already shipped, as new
+    // shas with identical patches (`git cherry` finds them). Counting them would overstate what
+    // changed, so the headline counts what the check left and says what the range held.
+    const rangeClause =
+      alreadyInPrev === 0
+        ? ''
+        : ` (${rangeTotal} commit${rangeTotal === 1 ? '' : 's'} ` +
+          `${rangeTotal === 1 ? 'is' : 'are'} in the range; ${alreadyInPrev} of them ` +
+          `${alreadyInPrev === 1 ? 'is' : 'are'} already in that release as ` +
+          `${alreadyInPrev === 1 ? 'a rebased copy' : 'rebased copies'} — same patch, new commit)`
     const prose =
-      `${total} commit${total === 1 ? '' : 's'} landed since the last release, including ` +
+      `${total} commit${total === 1 ? '' : 's'} changed since the last release${rangeClause}, including ` +
       `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`)${mergeClause}. ` +
-      `Changes are grouped by type below, newest first; each group shows at most ${maxPerGroup} entries.`
-    return [heading, '', wrap(prose), '', compareLink(total, compareUrl), '']
+      `Changes are grouped by type below, newest first; a group that is capped says how many ` +
+      `commits it left out.`
+    return [heading, '', wrap(prose), '', compareLink(rangeTotal ?? total, compareUrl), '']
   }
 
   const heading = '## What changed'
@@ -346,9 +419,11 @@ function renderLead({
         )
   const prose = firstRelease
     ? `This is the first release, so there is no earlier release tag to compare against. ` +
-      `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`) are listed in full, and the ` +
+      `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`) ` +
+      `${forkPatchCount === 1 ? 'is' : 'are'} listed in full, and the ` +
       `${windowSize} most recent commits are summarized by type below.`
-    : `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`) are listed in full, and the ` +
+    : `**${forkPatchCount} fork patch${forkPatchCount === 1 ? '' : 'es'}** (\`local(...)\`) ` +
+      `${forkPatchCount === 1 ? 'is' : 'are'} listed in full, and the ` +
       `${windowSize} most recent commits are summarized by type below.`
   return [heading, '', ...(note == null ? [] : [note, '']), wrap(prose), '']
 }
@@ -358,7 +433,7 @@ function compareLink(total, compareUrl) {
   if (compareUrl == null) {
     return ''
   }
-  return `[All ${total} commits in the comparison →](${compareUrl})`
+  return `[${total === 1 ? 'The single commit' : `All ${total} commits`} in the comparison →](${compareUrl})`
 }
 
 function describeMergeClause(merges) {
@@ -376,7 +451,7 @@ function describeMergeClause(merges) {
 }
 
 function buildSummary(options, context) {
-  const { commits, prevTag, missingTag, tag } = context
+  const { commits, prevTag, missingTag, tag, rangeTotal, alreadyInPrev } = context
   // A tag that was expected but is absent is not a first release: the note above the summary says
   // what actually happened.
   const firstRelease = prevTag == null && missingTag == null
@@ -400,22 +475,39 @@ function buildSummary(options, context) {
     missingTag,
     firstRelease,
     total: commits.length,
+    rangeTotal,
+    alreadyInPrev,
     merges,
     forkPatchCount: dedupe(buckets.get('local')).length,
-    maxPerGroup: options.maxPerGroup,
     windowSize: options.firstReleaseWindow,
     compareUrl
   })
 
   if (commits.length === 0) {
     lines.push(
-      'No commits landed since the last release, so this build repackages the same source.',
+      (rangeTotal ?? 0) > 0
+        ? `Every commit in \`${prevTag}..${tag}\` is already in \`${prevTag}\`, so this build ` +
+            `contains no source change of its own.`
+        : 'No commits landed since the last release, so this build repackages the same source.',
       ''
     )
   }
 
   for (const group of GROUP_ORDER) {
-    lines.push(...renderGroup(GROUP_TITLES[group], dedupe(buckets.get(group)), options.maxPerGroup))
+    const entries = dedupe(buckets.get(group))
+    if (group === 'chore') {
+      lines.push(...renderCompactGroup(GROUP_TITLES[group], entries))
+      continue
+    }
+    // With a previous release the fork-patch group is a change list and stays short. Without one it
+    // is the summary's main content — and the lead says it is listed in full — so it is not capped.
+    const limit =
+      group !== 'local'
+        ? options.maxPerGroup
+        : prevTag == null
+          ? entries.length
+          : Math.min(options.maxPerGroup, FORK_PATCH_LIMIT)
+    lines.push(...renderGroup(GROUP_TITLES[group], entries, limit))
   }
 
   return lines
@@ -437,9 +529,19 @@ function renderFallbackSummary({ prevTag }) {
 
 function loadSummary(options, context) {
   const { tag, prevTag, missingTag } = context
-  const commits = listCommits(
+  const range =
     prevTag == null ? ['-n', String(options.firstReleaseWindow), 'HEAD'] : [`${prevTag}..HEAD`]
-  )
+  const rangeCommits = listCommits(range)
+
+  // Only the commits the previous release does not already contain describe this build's change;
+  // the rest are the rebase's duplicates of it. Everything downstream sees the filtered list, so no
+  // group and no count can report them as new.
+  const equivalents = prevTag == null ? undefined : alreadyInPrevShas(prevTag)
+  const commits =
+    equivalents == null
+      ? rangeCommits
+      : rangeCommits.filter((commit) => !equivalents.has(commit.sha))
+  const alreadyInPrev = rangeCommits.length - commits.length
 
   if (prevTag == null) {
     // Without a range there is no way to know which commits are the fork's own, except that the
@@ -453,7 +555,14 @@ function loadSummary(options, context) {
     }
   }
 
-  return buildSummary(options, { commits, prevTag, missingTag, tag })
+  return buildSummary(options, {
+    commits,
+    prevTag,
+    missingTag,
+    tag,
+    rangeTotal: prevTag == null ? undefined : rangeCommits.length,
+    alreadyInPrev
+  })
 }
 
 function renderTemplate({ templatePath, template, version, sha, signing, summary }) {

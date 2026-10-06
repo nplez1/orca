@@ -141,10 +141,16 @@ jobs:
             --repo "$PUBLISH_OWNER/orca" \
             --signing "$SIGNING" \
             --out /tmp/notes.md || true
-          # Why the check: a missing notes file would create a release with an empty body, which is
-          # worse than one without a change summary.
-          if [ ! -s /tmp/notes.md ]; then
-            echo "::warning title=Release notes::The notes generator produced nothing; publishing a minimal body instead."
+          # Why the check: an empty file is not the only failure — a missing file, a partially
+          # written body, or the generator's last-resort stub all publish a release with no change
+          # summary. Require the heading the generator always emits and a body long enough to be the
+          # whole template rather than a fragment; anything else gets the minimal body instead.
+          size=0
+          if [ -f /tmp/notes.md ]; then
+            size="$(wc -c </tmp/notes.md | tr -d '[:space:]')"
+          fi
+          if ! grep -q '^## What changed' /tmp/notes.md 2>/dev/null || [ "$size" -lt 400 ]; then
+            echo "::warning title=Release notes::The notes body is empty or incomplete; publishing a minimal body instead."
             printf '**Orca NP %s**\n\nBuilt from `%s`.\n' "$RELEASE_VERSION" "$GITHUB_SHA" >/tmp/notes.md
           fi
 

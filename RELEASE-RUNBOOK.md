@@ -77,13 +77,26 @@ list of changes.
 
 Where the summary comes from:
 
-- `git log <previous -np. tag>..HEAD` — every commit in the range, grouped as `local(...)` fork
-  patches, features, fixes, performance, refactors, docs, tests, maintenance, other. The fork patch
-  group is first, because it is what a user of this build notices.
+- `git log <previous -np. tag>..HEAD` — every commit in the range, grouped as features, fixes,
+  performance, refactors, `local(...)` fork patches, docs, tests, other, maintenance. Product
+  changes lead because that is what a reader came for; the fork-patch group is why this build differs
+  from upstream's, kept after them so it cannot bury them.
+- **Patch-equivalent commits are excluded before anything is counted.** This branch is rebased onto
+  upstream, so most of a range is commits the previous release already shipped, replayed under new
+  shas with identical patches. `git cherry <previous tag> HEAD` is what decides — git's own
+  equivalence check, not a subject comparison — and the opening paragraph says how many the range
+  held and how many of those the previous release already contains (the `rangeTotal` and
+  `alreadyInPrev` in the lead; on 2026-10-06 that read "613 commits changed since the last release
+  (716 commits are in the range; 103 of them are already in that release as rebased copies)").
+  Check the two numbers against `git log --oneline <prev>..HEAD | wc -l` and
+  `git cherry <prev> HEAD | grep -c '^-'` before believing the notes.
 - Merges are reported in the opening paragraph rather than as bullets; the commits they brought in
   appear in the groups.
-- Each group prints at most 12 entries (`--max-per-group`) and then `+N more`, so a large range stays
-  readable. Trailing PR numbers are stripped, and repeated subjects collapse to `(xN)`.
+- Product groups print at most 12 entries (`--max-per-group`) and then `+N more`. The fork-patch
+  group is capped at 6 (`FORK_PATCH_LIMIT`), because sync and release-record commits are most of it
+  and the useful part of that group is that it is named at all. Maintenance, CI, and `docs(fork)`
+  fork bookkeeping collapse to a single counted line instead of twelve bullets. Trailing PR numbers
+  are stripped, and repeated subjects collapse to `(xN)`.
 - The previous tag is the newest `v*-np.*` tag that is neither this build nor a later one, so a rebase
   that leaves the previous tag off `HEAD`'s line does not matter.
 
@@ -95,7 +108,8 @@ would leave every future release without a summary.
 
 **The generator cannot fail the release.** No history, a tag that does not exist, or a shallow clone
 produces a warning, a body without a summary, and exit 0. The shell step in the workflow is the second
-layer: if the notes file is empty it writes a minimal body instead.
+layer, and it checks more than an empty file: a body with no `## What changed` heading, or one under
+400 bytes, is replaced by a minimal body rather than published as a truncated or summary-less release.
 
 **Read the body of the draft before publishing.** The release is created as a draft and only
 `gh release edit --draft=false` at the end of the windows job makes it public, which is the window for
@@ -105,7 +119,8 @@ exactly this check:
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less
 ```
 
-What to look for: the summary is present and starts with the fork patches; the comparison link is
+What to look for: the summary is present and starts with the features and fixes; the headline count
+matches what `git cherry` says the previous release does not already contain; the comparison link is
 `<previous tag>...<this tag>` and is not broken; the install table names the version being released;
 the signing paragraph matches this run (the macos job logs `signed=true` or `signed=false`). If the
 body is wrong, edit the release (`gh release edit v<version> --notes-file notes.md`) before flipping it
