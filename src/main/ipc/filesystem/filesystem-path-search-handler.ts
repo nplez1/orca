@@ -27,11 +27,13 @@ import type { WorkspacePathIndexService } from '../../workspace-path-index/works
 import { runWorkspacePathIndexIfEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
+import type { FilesystemIndexConsumerTokens } from './filesystem-index-consumer-tokens'
 
 /** Routes local name filters through the authorized worker-owned generation. */
 export function registerFilesystemPathSearchHandler(
   context: FilesystemHandlerContext,
-  pathIndexService: WorkspacePathIndexService
+  pathIndexService: WorkspacePathIndexService,
+  indexConsumerTokens: FilesystemIndexConsumerTokens
 ): void {
   const { store, listFilesCancellations } = context
   const sequenceByConsumer = new Map<string, number>()
@@ -58,6 +60,14 @@ export function registerFilesystemPathSearchHandler(
       const limit = resolveQuickOpenResultLimit(args.limit)
       try {
         const rendererConsumer = readRendererConsumer(args)
+        if (rendererConsumer && args.mode === 'name-filter' && !args.connectionId) {
+          // Recorded before the first await: a cancel that races the submit must still find it.
+          indexConsumerTokens.record(
+            event.sender.id,
+            args.requestToken,
+            rendererConsumer.consumerId
+          )
+        }
         if (args.mode === 'name-filter') {
           const validation = validateWorkspacePathSearchQuery(args.query)
           if (!validation.ok) {
@@ -207,6 +217,9 @@ export function registerFilesystemPathSearchHandler(
           }
         }
       } finally {
+        if (args.requestToken) {
+          indexConsumerTokens.forget(event.sender.id, args.requestToken)
+        }
         listFilesCancellations.finish(event, args.requestToken, controller)
       }
     }

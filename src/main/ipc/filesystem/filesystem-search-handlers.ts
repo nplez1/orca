@@ -11,6 +11,7 @@ import { QuickOpenPathRanker } from '../../../shared/quick-open-path-search'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 import { registerFilesystemContentSearchHandler } from './filesystem-content-search-handler'
 import { registerFilesystemPathSearchHandler } from './filesystem-path-search-handler'
+import { createFilesystemIndexConsumerTokens } from './filesystem-index-consumer-tokens'
 import { registerWorkspacePathIndexIpc } from './workspace-path-index-ipc'
 import { isWorkspacePathIndexEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
 import { resolveAuthorizedPath } from '../filesystem-auth'
@@ -21,6 +22,7 @@ const QUICK_OPEN_SSH_LEGACY_RESULT_LIMIT = 33
 
 export function registerFilesystemSearchHandlers(context: FilesystemHandlerContext): void {
   const pathIndexService = registerWorkspacePathIndexIpc(context)
+  const indexConsumerTokens = createFilesystemIndexConsumerTokens()
   registerFilesystemContentSearchHandler(context)
   const { store } = context
   const { listFilesCancellations } = context
@@ -135,11 +137,13 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
   ipcMain.handle('fs:cancelListFiles', (event, args: { requestToken: string }): void => {
     listFilesCancellations.cancel(event, args.requestToken)
     if (isWorkspacePathIndexEnabled()) {
-      // Why: `fs:searchFilePaths` falls back to the sender id as the index consumer, so a
-      // superseded filter's worker query is only stoppable by that id.
-      pathIndexService.cancelLocalConsumer(String(event.sender.id))
+      // Why: a renderer-named consumer owns the worker query for this token; the sender id is
+      // only the identity `fs:searchFilePaths` falls back to when the renderer names none.
+      pathIndexService.cancelLocalConsumer(
+        indexConsumerTokens.lookup(event.sender.id, args.requestToken) ?? String(event.sender.id)
+      )
     }
   })
 
-  registerFilesystemPathSearchHandler(context, pathIndexService)
+  registerFilesystemPathSearchHandler(context, pathIndexService, indexConsumerTokens)
 }
