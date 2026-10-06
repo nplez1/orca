@@ -332,6 +332,26 @@ pnpm run sync:localization-runtime-catalog
     rendered; decide whether it comes back or the module drops it. Both are unresolved convergence
     questions, so neither is in the ledger yet.
 
+  - **A second-model review of the merge found three things this sync did not fix**, recorded here
+    rather than fixed silently:
+    1. _The pi lifecycle fix may be incomplete._ This merge made a session change clear the fork's
+       live `subagentRuns` and reset its binding flags, which fixed both a leaked child and a fresh
+       bus with zero listeners. The review's view is that children should be preserved and restored
+       per session, that stale registration callbacks should be invalidated, and that the 18 adapted
+       assertions it reviewed were adapted a little too readily. The adapted tests are the evidence
+       to re-examine, in particular the one named for keeping children across a `reload`.
+    2. _The fork's indexed path search has no cancellation._ Verified not a regression — the
+       pre-merge fork file had none either — but `fs:cancelSearch`/`fs:cancelListFiles` cover
+       upstream's two paths only, so a superseded indexed query keeps running.
+    3. _The ledger and an adapted test disagree about `/reload`._ The ledger's pi entry promises a
+       reload keeps the live set; an adapted test changed a listener count from 1 to 2. One of the
+       two is wrong, and the ledger is the one a future sync will trust.
+  - **A tooling limit this sync exposed:** `post-sync.mjs`'s lost-content check compares *modified*
+    files, so deleting fork-only code that had unique side effects escapes it. Three fork modules
+    were deleted this sync as upstream-superseded; the review is the only thing that questioned
+    whether a replaced surface was a superset. The next version of that check should inventory a
+    deleted module's exported side effects, not just its paths.
+
 - **2026-10-05 — unreleased** from `0ca31372cc`, onto upstream `9def4b9ba1` (505 commits), from the
   released tip `99f1a03ba7` (np.16). **148 commits replayed**, then this sync's fix commit on top:
   `range-diff` pairing not re-counted, but no commit was dropped and one `fix(sync)` commit was
