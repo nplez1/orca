@@ -11,7 +11,7 @@ import { QuickOpenPathRanker } from '../../../shared/quick-open-path-search'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 import { registerFilesystemContentSearchHandler } from './filesystem-content-search-handler'
 import { registerFilesystemPathSearchHandler } from './filesystem-path-search-handler'
-import { createFilesystemIndexConsumerTokens } from './filesystem-index-consumer-tokens'
+import { createFilesystemIndexRequestFences } from './filesystem-index-request-fences'
 import { registerWorkspacePathIndexIpc } from './workspace-path-index-ipc'
 import { isWorkspacePathIndexEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
 import { resolveAuthorizedPath } from '../filesystem-auth'
@@ -22,7 +22,7 @@ const QUICK_OPEN_SSH_LEGACY_RESULT_LIMIT = 33
 
 export function registerFilesystemSearchHandlers(context: FilesystemHandlerContext): void {
   const pathIndexService = registerWorkspacePathIndexIpc(context)
-  const indexConsumerTokens = createFilesystemIndexConsumerTokens()
+  const indexRequestFences = createFilesystemIndexRequestFences()
   registerFilesystemContentSearchHandler(context)
   const { store } = context
   const { listFilesCancellations } = context
@@ -137,13 +137,16 @@ export function registerFilesystemSearchHandlers(context: FilesystemHandlerConte
   ipcMain.handle('fs:cancelListFiles', (event, args: { requestToken: string }): void => {
     listFilesCancellations.cancel(event, args.requestToken)
     if (isWorkspacePathIndexEnabled()) {
-      // Why: a renderer-named consumer owns the worker query for this token; the sender id is
-      // only the identity `fs:searchFilePaths` falls back to when the renderer names none.
-      pathIndexService.cancelLocalConsumer(
-        indexConsumerTokens.lookup(event.sender.id, args.requestToken) ?? String(event.sender.id)
-      )
+      // Why: only a request still in flight under this token owns a worker query. A settled or
+      // unknown token owns none, so a late cancel must not reach another consumer's query.
+      const outstanding = indexRequestFences.liveRequest(event.sender.id, args.requestToken)
+      if (outstanding) {
+        // A renderer-named consumer owns its own worker query; a request that named none is the
+        // sender-keyed one this handler submits as `local:<pid>:<senderId>`.
+        pathIndexService.cancelLocalConsumer(outstanding.consumerId ?? String(event.sender.id))
+      }
     }
   })
 
-  registerFilesystemPathSearchHandler(context, pathIndexService, indexConsumerTokens)
+  registerFilesystemPathSearchHandler(context, pathIndexService, indexRequestFences)
 }

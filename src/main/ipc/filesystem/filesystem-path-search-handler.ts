@@ -27,13 +27,16 @@ import type { WorkspacePathIndexService } from '../../workspace-path-index/works
 import { runWorkspacePathIndexIfEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
-import type { FilesystemIndexConsumerTokens } from './filesystem-index-consumer-tokens'
+import type {
+  FilesystemIndexRequestFence,
+  FilesystemIndexRequestFences
+} from './filesystem-index-request-fences'
 
 /** Routes local name filters through the authorized worker-owned generation. */
 export function registerFilesystemPathSearchHandler(
   context: FilesystemHandlerContext,
   pathIndexService: WorkspacePathIndexService,
-  indexConsumerTokens: FilesystemIndexConsumerTokens
+  indexRequestFences: FilesystemIndexRequestFences
 ): void {
   const { store, listFilesCancellations } = context
   const sequenceByConsumer = new Map<string, number>()
@@ -58,16 +61,21 @@ export function registerFilesystemPathSearchHandler(
     ): Promise<FilePathSearchResult> => {
       const controller = listFilesCancellations.begin(event, args.requestToken)
       const limit = resolveQuickOpenResultLimit(args.limit)
+      let fence: FilesystemIndexRequestFence | null = null
       try {
         const rendererConsumer = readRendererConsumer(args)
-        if (rendererConsumer && args.mode === 'name-filter' && !args.connectionId) {
-          // Recorded before the first await: a cancel that races the submit must still find it.
-          indexConsumerTokens.record(
-            event.sender.id,
-            args.requestToken,
-            rendererConsumer.consumerId
-          )
-        }
+        // Why: begun before the first await, so a cancel that lands while this request is still
+        // authorizing, acquiring the index service, or waiting on a warm build still fences the
+        // query it owns — and this registry is what routes that cancel to a single consumer.
+        fence =
+          args.mode === 'name-filter' && !args.connectionId
+            ? indexRequestFences.begin({
+                senderId: event.sender.id,
+                requestToken: args.requestToken,
+                consumerId: rendererConsumer?.consumerId ?? null,
+                signal: controller?.signal
+              })
+            : null
         if (args.mode === 'name-filter') {
           const validation = validateWorkspacePathSearchQuery(args.query)
           if (!validation.ok) {
@@ -123,6 +131,9 @@ export function registerFilesystemPathSearchHandler(
             }
           }
           identity = searchIdentity
+          if (fence?.isCancelled()) {
+            return unavailableWorkspacePathSearch(searchIdentity, 'cancelled')
+          }
           const indexedAttempt = await runWorkspacePathIndexIfEnabled(() =>
             pathIndexService.search({
               identity: searchIdentity,
@@ -133,6 +144,11 @@ export function registerFilesystemPathSearchHandler(
                 args.correlationId ?? `search-${consumer.consumerId}-${consumer.sequence}`
             })
           )
+          if (fence?.isCancelled()) {
+            // Why: the cancel landed after the check above but before the scheduler registered the
+            // query, so this request's verdict is decided here instead of by the worker's result.
+            return unavailableWorkspacePathSearch(searchIdentity, 'cancelled')
+          }
           if (indexedAttempt.enabled) {
             const indexed = indexedAttempt.value
             if (indexed.ready) {
@@ -217,8 +233,8 @@ export function registerFilesystemPathSearchHandler(
           }
         }
       } finally {
-        if (args.requestToken) {
-          indexConsumerTokens.forget(event.sender.id, args.requestToken)
+        if (fence) {
+          indexRequestFences.forget(event.sender.id, args.requestToken, fence)
         }
         listFilesCancellations.finish(event, args.requestToken, controller)
       }
