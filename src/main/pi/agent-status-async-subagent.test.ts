@@ -411,6 +411,67 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     expect(harness.states.at(-1)).toBe('done')
   })
 
+  it('arms a second factory’s own bus, so its child reports', async () => {
+    const harness = createHarness('pi', { existsSync: () => true })
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
+    await drive(harness, 'before_agent_start', { prompt: 'delegate' }, sessionCtx('A'))
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+    await emit(harness, EW_STARTED, { runId: 'run-a', agentType: 'scout' })
+    // A second registration of the same extension in this process, on its own bus.
+    const child = harness.registerTaskChild()
+
+    // Why: one binding per channel PER BUS is the fork’s policy — not one per evaluation, which
+    // would leave this bus unobserved and lose every child that reports on it.
+    expect(harness.piEventListenerCount(EW_STARTED)).toBe(1)
+    expect(child.piEventListenerCount(EW_STARTED)).toBe(1)
+
+    // Its child is reported, and reported for the session its own context named.
+    await child.callHook('session_start', { reason: 'startup' }, sessionCtx('B'))
+    child.emitPiEvent(EW_STARTED, { runId: 'run-b', agentType: 'scout' })
+    await flushPosts()
+    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'B' })
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-b' })])
+  })
+
+  it('files a child under the session of the registration now live on the bus', async () => {
+    const harness = createHarness('pi', { existsSync: () => true })
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
+    await drive(harness, 'before_agent_start', { prompt: 'delegate' }, sessionCtx('A'))
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+    await emit(harness, EW_STARTED, { runId: 'run-a', agentType: 'scout' })
+    await drive(harness, 'agent_end', {}, sessionCtx('A'))
+
+    // Pi re-runs the factory in-process without shutting the previous registration down, so the bus
+    // the first one armed is now the second one’s — as is everything its channels report.
+    harness.reload()
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('B'))
+    await emit(harness, EW_STARTED, { runId: 'run-b', agentType: 'scout' })
+    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'B' })
+    // Why: a child filed by the run that INSTALLED the listeners lands in A, the session the pane
+    // is no longer showing, and A’s next resume hands it back as its own.
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-b' })])
+
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await drive(harness, 'session_start', { reason: 'resume' }, sessionCtx('A'))
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-a' })])
+  })
+
+  it('closes the channels a registration armed when its own shutdown closes it', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'delegate' })
+    await drive(harness, 'agent_start')
+    // The second registration took the first one’s bus over, so that binding is its own to close.
+    harness.reload()
+    await drive(harness, 'session_shutdown', { reason: 'new' })
+
+    // Why: a callback the superseded registration installed would keep posting for a session that is
+    // gone, and nothing would ever close it.
+    expect(harness.piEventListenerCount(EW_STARTED)).toBe(0)
+    const before = harness.posted.length
+    await emit(harness, EW_STARTED, { runId: 'run-b', agentType: 'scout' })
+    expect(harness.posted).toHaveLength(before)
+  })
+
   it('binds each lifecycle channel once across an in-process extension reload', () => {
     const harness = createHarness()
     for (const channel of [...START_CHANNELS, ...END_CHANNELS]) {

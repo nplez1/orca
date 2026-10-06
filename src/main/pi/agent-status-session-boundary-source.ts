@@ -22,9 +22,9 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    if (!keepsSession) clearRunnerExitCheck()',
     // LOCAL(nplez1): Pi hands the factory it re-runs after this a FRESH `pi.events` for every
     // reload, resume and fork, so the next registration has to be allowed to arm that bus. Only
-    // upstream's roster and this lane's channel binding key off the evaluation, and both are reset
-    // here; children themselves are not, since they are keyed by the session that owns them.
-    '    piAsyncSubagentBusBound = false',
+    // upstream's roster keys off the evaluation and is reset here; this lane's binding is keyed by
+    // the bus it armed, and is closed below with the registration that armed it. Children are not
+    // reset either, since they are keyed by the session that owns them.
     '    subagentChannelsBound = false',
     '    subagentRunnerExitBound = false',
     // Why: the registration that bound the old bus can still be called while Pi replaces it, so it
@@ -33,6 +33,9 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     // keyed by the session that owns them, so the next session’s posts read its own bucket and this
     // one keeps its own.
     '    piAsyncSubagentRegistration.closed = true',
+    // Why: close exactly the callbacks THIS registration armed. A superseded registration owns no
+    // binding (the run now live on that bus took it over), so its shutdown leaves that bus reporting.
+    '    piAsyncSubagentCloseBus(piAsyncSubagentRegistration)',
     // Why: on quit the PTY's exit clears the pane, and a done here would notify on every quit.
     "    if (keepsSession || reason === 'quit') {",
     // Why: on a reload or same-file resume this registration stops being called while its session

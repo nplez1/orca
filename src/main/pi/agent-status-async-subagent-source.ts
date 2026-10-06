@@ -29,11 +29,13 @@ export function getPiAgentStatusAsyncSubagentSessionNoteLines(kind: PiAgentKind)
  *  it. Sending the whole set keeps this caller idempotent like the rest: the newest message is
  *  complete, so it repairs whatever the coalescer dropped before it.
  *
- *  Channel binding stays once per evaluation — one binding per channel, with a session boundary
- *  resetting the flag because Pi hands the re-run factory a fresh `pi.events` — while the
- *  REGISTRATION that decides a child's session is per factory run. That split is what keeps two
- *  registrations out of each other's buckets and stops one registration's shutdown from refusing
- *  the other's bus; a second factory in ONE evaluation shares the single armed channel by policy. */
+ *  Channel binding is keyed by the BUS it belongs to — one binding per channel per `pi.events`
+ *  object — while the REGISTRATION that decides a child's session is what those channels read at
+ *  call time. Pi hands a re-run factory its own bus, so a bus this lane has not armed is a channel
+ *  nothing observes and is armed; a bus already carrying this lane is never armed twice, and the
+ *  newest registration on it takes over what those channels report. That split is what keeps two
+ *  registrations out of each other's buckets, and stops one registration's shutdown from refusing
+ *  the other's bus. */
 export function getPiAgentStatusAsyncSubagentSourceLines(kind: PiAgentKind): string[] {
   if (kind !== 'pi') {
     return []
@@ -41,18 +43,26 @@ export function getPiAgentStatusAsyncSubagentSourceLines(kind: PiAgentKind): str
 
   return [
     '  // Why: pi reloads extensions in-process and re-runs this factory: pi.on handlers are',
-    '  // replaced, but bus listeners can outlive the registration that bound them, so bind at most',
-    '  // once per evaluation. Deliberately a BLOCK and not an early return — returning would skip',
-    '  // every handler registered after this point.',
+    '  // replaced, but bus listeners can outlive the registration that bound them. Deliberately a',
+    '  // BLOCK and not an early return — returning would skip every handler registered after this point.',
     '  // Why: a registration per factory run, holding only what THIS run may say: which session its',
     '  // own event context named, and whether its own shutdown has superseded it. Deliberately not a',
     '  // process-global token — a registration’s shutdown must refuse its own bus and nothing else.',
     '  const piAsyncSubagentRegistration: PiAsyncSubagentRegistration = { sessionKey: null, closed: false }',
     '  piAsyncSubagentActiveRegistration = piAsyncSubagentRegistration',
-    '  if (!piAsyncSubagentBusBound) {',
+    '  // Why: the bus decides between arming and taking over. Arm a bus this lane does not hold yet,',
+    '  // and adopt one it already holds: a re-run that Pi does not replace keeps the `pi.events` it',
+    '  // was handed, so the binding belongs to the bus, and the run now live on it is what its',
+    '  // channels report for.',
+    '  const piAsyncSubagentBus = pi && typeof pi === "object" ? (pi as { events?: unknown }).events : undefined',
+    '  const piAsyncSubagentExistingBinding = piAsyncSubagentBindingForBus(piAsyncSubagentBus)',
+    '  if (piAsyncSubagentExistingBinding) {',
+    '    piAsyncSubagentExistingBinding.registration = piAsyncSubagentRegistration',
+    '  } else if (piAsyncSubagentBus && typeof (piAsyncSubagentBus as { on?: unknown }).on === "function") {',
     '  try {',
-    '    const bus = pi && typeof pi === "object" ? (pi as { events?: { on?: (event: string, listener: (payload: unknown) => void) => void } }).events : undefined',
-    '    const isSuperseded = (): boolean => piAsyncSubagentRegistration.closed',
+    '    const bus = piAsyncSubagentBus as { on: (event: string, listener: (payload: unknown) => void) => void; off?: (event: string, listener: (payload: unknown) => void) => void }',
+    '    const binding: PiAsyncSubagentBusBinding = { bus, registration: piAsyncSubagentRegistration, listeners: [] }',
+    '    piAsyncSubagentBusBindings.push(binding)',
     '    const readBusField = (payload: unknown, keys: string[]): string | undefined => {',
     "      if (!payload || typeof payload !== 'object') return undefined",
     '      const record = payload as Record<string, unknown>',
@@ -71,39 +81,45 @@ export function getPiAgentStatusAsyncSubagentSourceLines(kind: PiAgentKind): str
     '      // every post, so a post that loses the race with a newer one costs nothing.',
     "      post('subagent_async_state')",
     '    }',
+    '    // Why: both callbacks read the BINDING, not this run: the registration a bus reports for can',
+    '    // be replaced by a newer one, and a superseded registration must not keep filing children',
+    '    // under the session it happened to name.',
     '    const onAsyncStarted = (payload: unknown): void => {',
-    '      if (isSuperseded()) return',
+    '      const registration = binding.registration',
+    '      if (registration.closed) return',
     '      const runId = readRunId(payload)',
     '      // Why: an unnamed child could never be removed again, so it must not be added.',
     '      if (!runId) return',
-    '      piAsyncSubagentRunsForWrite(piAsyncSubagentRegistration).set(runId, {',
+    '      piAsyncSubagentRunsForWrite(registration).set(runId, {',
     '        id: runId,',
     "        agent_type: readBusField(payload, ['agentType', 'agent_type', 'subagentType', 'type']),",
     "        description: readBusField(payload, ['description', 'task', 'prompt']),",
     '        // Why: a workflow’s completion is the only end signal its awaited children get once a',
     '        // /reload has dropped theirs, so the parent link has to survive with the run.',
     "        parent: readBusField(payload, ['parentWorkflowRunId', 'parent_workflow_run_id', 'parent']),",
-    '        registration: piAsyncSubagentRegistration',
+    '        registration',
     '      })',
     '      postAsyncSubagentState()',
     '    }',
     '    const onAsyncComplete = (payload: unknown): void => {',
-    '      if (isSuperseded()) return',
+    '      const registration = binding.registration',
+    '      if (registration.closed) return',
     '      const runId = readRunId(payload)',
-    '      if (!runId || !piAsyncSubagentRetireRun(piAsyncSubagentRegistration, runId)) return',
+    '      if (!runId || !piAsyncSubagentRetireRun(registration, runId)) return',
     '      postAsyncSubagentState()',
     '    }',
     "    for (const channel of ['subagents:created', 'subagents:started', 'subagent:async-started']) {",
-    '      bus?.on?.(channel, onAsyncStarted)',
+    '      bus.on(channel, onAsyncStarted)',
+    '      binding.listeners.push({ channel, listener: onAsyncStarted })',
     '    }',
     '    // Why: a child whose only end signal is its runner exit (`subagent:process-terminal`) would',
     '    // otherwise stay in the live set until the descendant lane quiet-reaped it. That event names',
     "    // the run as `runId` — one of readRunId's aliases — and only shrinks the posted set: the pane",
     '    // recomputes its own hold from that set rather than settling on the event.',
     "    for (const channel of ['subagents:completed', 'subagents:failed', 'subagent:async-complete', 'subagent:process-terminal']) {",
-    '      bus?.on?.(channel, onAsyncComplete)',
+    '      bus.on(channel, onAsyncComplete)',
+    '      binding.listeners.push({ channel, listener: onAsyncComplete })',
     '    }',
-    '    piAsyncSubagentBusBound = true',
     '  } catch {',
     '    // Why: status reporting must never fail the pi run; an unavailable bus just means no children.',
     '  }',

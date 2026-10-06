@@ -4,6 +4,7 @@ import { createContext, runInContext } from 'node:vm'
 import ts from 'typescript-api'
 import { vi } from 'vitest'
 
+import { createTrackedPiEventBus, type PiEventBus } from './agent-status-extension-test-event-bus'
 import { getPiAgentStatusExtensionSource } from './agent-status-extension-source'
 
 export type HookContext = {
@@ -17,10 +18,6 @@ export type HookContext = {
     getSessionFile?: () => unknown
     getHeader?: () => unknown
   }
-}
-
-type PiEventBus = {
-  on: (name: string, listener: (event: unknown) => void) => unknown
 }
 
 export type HookHandler = (event?: unknown, context?: HookContext) => Promise<void> | void
@@ -223,6 +220,10 @@ export function createAgentStatusExtensionHarness(args: {
   let handlerLists: Record<string, HookHandler[]> = {}
   let piEvents = new EventEmitter()
   let busSubscriptions: [string, (event: unknown) => void][] = []
+  // Why: the object Pi handed the extension as `pi.events` for this bus. Pi re-runs the factory
+  // when it replaces the registration's handlers but not its bus, so that re-run has to see the
+  // SAME object — an extension that carries bus identity must read one bus, not two.
+  let piEventsObject: PiEventBus | null = null
   const commands: AgentStatusExtensionHarness['commands'] = {}
   const setModelMock = vi.fn(async (_model: unknown) => true)
   const registerInto = (
@@ -253,17 +254,12 @@ export function createAgentStatusExtensionHarness(args: {
     for (const [name, listener] of busSubscriptions) {
       piEvents.off(name, listener)
     }
-    busSubscriptions = []
+    busSubscriptions.length = 0
     for (const key of Object.keys(handlers)) {
       delete handlers[key]
     }
-    const bus = piEvents
-    registerInto(handlers, {
-      on(name: string, listener: (event: unknown) => void) {
-        bus.on(name, listener)
-        busSubscriptions.push([name, listener])
-      }
-    })
+    piEventsObject = createTrackedPiEventBus(piEvents, busSubscriptions)
+    registerInto(handlers, piEventsObject)
   }
   args.seedEventBus?.(piEvents)
   if (args.kind === 'pi' && !args.sharedEventBus) {
@@ -291,7 +287,9 @@ export function createAgentStatusExtensionHarness(args: {
       for (const key of Object.keys(handlers)) {
         delete handlers[key]
       }
-      registerInto(handlers)
+      // Why: re-running the factory does not replace the registration, so it is handed the bus
+      // object it already has — only a new session (`replacePiSession`) gets a new one.
+      registerInto(handlers, piEventsObject ?? piEvents)
     },
     replacePiSession: async (reason, targetSessionFile) => {
       await callHook('session_shutdown', { reason, targetSessionFile })

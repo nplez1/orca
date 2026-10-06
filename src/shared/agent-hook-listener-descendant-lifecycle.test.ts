@@ -217,6 +217,26 @@ describe('descendant lifecycle never settles the pane', () => {
         publishedState('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
       ).toBe('done')
     })
+
+    it('retracts a hold it published when the child-only set empties with no lead verdict', () => {
+      // Why: no event here describes the pane's own turn, so the only reason this pane has a row
+      // at all is the hold the live child justified. Publishing nothing for the empty set leaves
+      // that hold, and the child it names, in the cache with nothing left that could clear it.
+      const started = publish('pi', {
+        hook_event_name: 'subagent_async_state',
+        subagent_runs: [{ id: 'run-1', agent_type: 'researcher' }]
+      })
+      expect(started?.payload.state).toBe('working')
+      expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(true)
+
+      expect(
+        publish('pi', { hook_event_name: 'subagent_async_state', subagent_runs: [] })
+      ).toBeNull()
+      expect(state.descendantRosterByPaneKey.has(PANE_KEY)).toBe(false)
+      // Why: the roster was only half of it — the cached row held the child and the state too.
+      expect(state.lastStatusByPaneKey.has(PANE_KEY)).toBe(false)
+      expect(paneHasStateClaims(state, PANE_KEY)).toBe(false)
+    })
   })
 
   describe('a grok child blocked on a human answer (the one child event grok does not own)', () => {

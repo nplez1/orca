@@ -190,8 +190,8 @@ describe('Pi async subagent roster', () => {
     await harness.reloadPi()
     // Why: Pi drops a replaced registration's own subscriptions, so a /reload re-arms every channel
     // exactly once — upstream's roster for its runner-exit grace, the fork's bus for its live set.
-    // (`harness.reload()` re-runs the factory on the raw emitter, where the roster's per-bus re-arm
-    // flag is gone, so it is not the model for this guarantee.)
+    // (`harness.reload()` never shuts the previous registration down and hands it the bus object it
+    // already has, so it is not the model for Pi dropping a superseded subscription.)
     expect(harness.piEventListenerCount('task:subagent:lifecycle')).toBe(1)
     expect(harness.piEventListenerCount('subagent:async-started')).toBe(1)
     expect(harness.piEventListenerCount('subagent:process-terminal')).toBe(2)

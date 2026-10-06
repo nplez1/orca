@@ -10,7 +10,7 @@ import {
 } from '../agent-descendant-roster'
 import { normalizeAgentStatusPayload, type ParsedAgentStatusPayload } from '../agent-status-types'
 import type { DescendantEntry, DescendantEventFacts } from './descendant-events'
-import type { HookListenerState } from './listener-state'
+import { deleteLegacyAgentStatus, type HookListenerState } from './listener-state'
 
 function getOrCreateDescendantRoster(
   state: HookListenerState,
@@ -63,18 +63,22 @@ export function applyDescendantEventToPane(
   // described, and no later child event could settle it — the grok contract is that a
   // child's terminal events are ignored. Starts still prove the pane is working.
   const leadState = state.descendantLeadStateByPaneKey.get(paneKey)
+  // Why: nothing left can justify a row, and nothing ever described the pane's own turn — the only
+  // row that can be standing is the hold this lane published, which no event is left to clear.
+  const nothingClaimsThePane =
+    leadState === undefined && !state.descendantRosterByPaneKey.has(paneKey)
   if (facts.kind === 'child' && facts.ended === true && leadState === undefined) {
+    if (nothingClaimsThePane) {
+      retractDescendantHoldRow(state, paneKey)
+    }
     return null
   }
   // Why: an empty live set is not evidence of work either. Defaulting to `working` here is what
   // strands a pane whose scope reset dropped the lead's verdict — its last child leaves the set,
   // and the row is held open by a state nobody reported. Nothing is claimed instead, so the pane
   // keeps its own verdict rather than inheriting one from the absence of it.
-  if (
-    facts.kind === 'live-set' &&
-    leadState === undefined &&
-    !state.descendantRosterByPaneKey.has(paneKey)
-  ) {
+  if (facts.kind === 'live-set' && nothingClaimsThePane) {
+    retractDescendantHoldRow(state, paneKey)
     return null
   }
 
@@ -101,6 +105,16 @@ export function applyDescendantEventToPane(
     lastAssistantMessageIsToolOutput: cachedTool.lastAssistantMessageIsToolOutput,
     subagents: agentDescendantRosterToSnapshots(state.descendantRosterByPaneKey.get(paneKey))
   })
+}
+
+/** Drop the row this lane published from a live child set, once nothing is left to justify it:
+ *  the cached row is the last survivor of a hold whose child is gone. Only a row carrying
+ *  descendants is this lane's own — a pane nobody has described has no row, and a row from before
+ *  a scope reset carries no child to retract. */
+function retractDescendantHoldRow(state: HookListenerState, paneKey: string): void {
+  if ((state.lastStatusByPaneKey.get(paneKey)?.payload.subagents?.length ?? 0) > 0) {
+    deleteLegacyAgentStatus(state, paneKey)
+  }
 }
 
 /** Fold the live child set an event carried into the pane's roster. Returns nothing: the

@@ -393,14 +393,14 @@ describe('Pi session changes', () => {
     expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
   })
 
-  it('arms one bus per evaluation, and shuts down only a registration’s own', async () => {
+  it('keeps one binding per channel on a bus, and shuts down only a registration’s own', async () => {
     const harness = createPi()
     await holdRunOpen(harness)
     // A second registration of the same extension in this process, on its own bus.
     const child = harness.registerTaskChild()
 
-    // Why: one binding per channel is the fork’s policy, so a second factory in one evaluation does
-    // not arm a second bus — the armed one keeps exactly its own listener on each channel.
+    // Why: the lead’s bus was armed by its own registration, so the one already on it keeps exactly
+    // its own listener on each channel rather than gaining a second.
     expect(harness.piEventListenerCount('subagent:async-started')).toBe(1)
 
     // What a second registration must NOT be able to do is silence the armed lane: its own shutdown
