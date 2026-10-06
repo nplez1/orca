@@ -317,8 +317,10 @@ pnpm run sync:localization-runtime-catalog
     the fork's own file goes.
   - **Test re-seats.** 18 upstream pi/renderer assertions were re-seated onto the fork's model (its
     pi lane emits `subagent_async_state`/`subagent_runs`, never upstream's `subagents`/
-    `subagents_update` rows) and 1 was deleted because the pi lane parks children nowhere, so its
-    fixture cannot be produced. The binding policy — one binding per channel — is unchanged.
+    `subagents_update` rows). The 1 deletion — upstream's "brings a session's children back when it is
+    resumed", dropped because the fork's lane appeared to park children nowhere — was **restored**
+    once the lane got per-session state, rewritten for this lane's `subagent_runs` shape; see the
+    second-model review below. The binding policy — one binding per channel — is unchanged.
   - **Verified:** `pnpm tc` clean; 347 pi, 1,941 renderer quick-open + runtime, 6,346
     `src/main/ipc` + providers, 2,184 relay and 24,398 `src/renderer/src/components` tests passing;
     the runtime-required catalog regenerates to no diff and both localization verifiers pass;
@@ -334,18 +336,21 @@ pnpm run sync:localization-runtime-catalog
 
   - **A second-model review of the merge found three things this sync did not fix**, recorded here
     rather than fixed silently:
-    1. _The pi lifecycle fix may be incomplete._ This merge made a session change clear the fork's
-       live `subagentRuns` and reset its binding flags, which fixed both a leaked child and a fresh
-       bus with zero listeners. The review's view is that children should be preserved and restored
-       per session, that stale registration callbacks should be invalidated, and that the 18 adapted
-       assertions it reviewed were adapted a little too readily. The adapted tests are the evidence
-       to re-examine, in particular the one named for keeping children across a `reload`.
+    1. _The pi lifecycle fix may be incomplete._ **Fixed** in `local(agents)`: a session change no
+       longer clears the fork's live `subagentRuns`. The set is keyed by the session that owns it on
+       `globalThis.__orcaPiAsyncSubagents`, every post carries the current session's bucket only, and
+       a superseded registration is refused by a `piAsyncSubagentState.registration` guard — so
+       children are preserved and restored per session (`/new` then `/resume`, and across a
+       `/reload`), while a closed session's children still cannot ride the next session's post. The
+       deleted upstream test is **restored** for the fork's lane and the reload test now asserts the
+       set surviving; the ledger's pi entry carries the mechanism.
     2. _The fork's indexed path search has no cancellation._ Verified not a regression — the
        pre-merge fork file had none either — but `fs:cancelSearch`/`fs:cancelListFiles` cover
        upstream's two paths only, so a superseded indexed query keeps running.
-    3. _The ledger and an adapted test disagree about `/reload`._ The ledger's pi entry promises a
-       reload keeps the live set; an adapted test changed a listener count from 1 to 2. One of the
-       two is wrong, and the ledger is the one a future sync will trust.
+    3. _The ledger and an adapted test disagree about `/reload`._ **Settled, and the ledger was the
+       one that was right:** a `/reload` keeps the live set (item 1), and the listener count of 2 is
+       expected rather than a doubling — two lanes bind `subagent:process-terminal` (the fork's
+       descendant bus and upstream's runner-exit lane).
   - **A tooling limit this sync exposed:** `post-sync.mjs`'s lost-content check compares *modified*
     files, so deleting fork-only code that had unique side effects escapes it. Three fork modules
     were deleted this sync as upstream-superseded; the review is the only thing that questioned

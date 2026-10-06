@@ -27,6 +27,10 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    piAsyncSubagentBusBound = false',
     '    subagentChannelsBound = false',
     '    subagentRunnerExitBound = false',
+    // Why: the registration that bound the old bus can still be called while Pi replaces it, so it
+    // is refused from here on. Its session's children are not cleared: they are keyed by the session
+    // that owns them, so the next session's posts read its own bucket and this one keeps its own.
+    '    piAsyncSubagentState.registration = null',
     // Why: on quit the PTY's exit clears the pane, and a done here would notify on every quit.
     "    if (keepsSession || reason === 'quit') {",
     // Why: this registration's queue outlives it and would deliver stale posts after the next one's.
@@ -37,10 +41,6 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    closeOutRun(sessionMetadata.session_file)',
     // Why: pi-subagents can still emit here until Pi invalidates this registration.
     '    lifecycleState.onEvent = undefined',
-    // LOCAL(nplez1): the fork reports pi children from its own bus, which outlives this
-    // registration; dropping the live set here is what keeps a closed-out session's children
-    // off the next session's posts, since the receiver replaces its child list with every post.
-    '    piAsyncSubagentRuns.clear()',
     '  })',
     ''
   ]

@@ -30,7 +30,10 @@ const END_CHANNELS = [FORK_COMPLETED, FORK_FAILED, EW_COMPLETE]
 
 /** Drives the REAL generated extension source into the REAL listener entry, so the pane state
  *  asserted here is the one a pi pane would actually show. */
-function createHarness(kind: 'pi' | 'omp' | 'prime-agent' = 'pi') {
+function createHarness(
+  kind: 'pi' | 'omp' | 'prime-agent' = 'pi',
+  options: { existsSync?: () => boolean } = {}
+) {
   const state = createHookListenerState()
   const states: (string | undefined)[] = []
   const accepted: (ParsedAgentStatusPayload | undefined)[] = []
@@ -38,6 +41,7 @@ function createHarness(kind: 'pi' | 'omp' | 'prime-agent' = 'pi') {
   const harness = createAgentStatusExtensionHarness({
     kind,
     env: HOOK_ENV,
+    existsSync: options.existsSync,
     fetchImpl: async (_url, init) => {
       const body: { payload?: Record<string, unknown> } = JSON.parse(String(init?.body))
       posted.push(body.payload ?? {})
@@ -74,6 +78,14 @@ async function drive(
 ): Promise<void> {
   await harness.callHook(name, event, context)
   await flushPosts()
+}
+
+/** A session the extension can name, so a child's bucket is keyed the way production keys it. */
+function sessionCtx(id: string): HookContext {
+  return {
+    isIdle: () => true,
+    sessionManager: { getSessionId: () => id, getSessionFile: () => `/sessions/${id}.jsonl` }
+  }
 }
 
 async function emit(
@@ -271,10 +283,45 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     await emit(harness, FORK_STARTED, { id: 'run-1' })
 
     // Why: the posted set is authoritative, so a reload that rebuilt it empty would tell the
-    // receiver the child had finished. The set lives at module scope for exactly this reason.
+    // receiver the child had finished. The set lives on globalThis for exactly this reason.
     harness.reload()
     await drive(harness, 'agent_end', {})
     expect(harness.states.at(-1)).toBe('working')
+
+    await emit(harness, FORK_COMPLETED, { id: 'run-1' })
+    expect(harness.states.at(-1)).toBe('done')
+  })
+
+  it('brings a resumed session’s children back to the pane, and keeps them off another session', async () => {
+    // Why: a pi post carries its session identity only once its transcript exists on disk, and the
+    // receiver refuses a pi `session_start` that cannot name the session it resumes.
+    const harness = createHarness('pi', { existsSync: () => true })
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
+    await drive(harness, 'before_agent_start', { prompt: 'delegate the sweep' }, sessionCtx('A'))
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+    await emit(harness, FORK_STARTED, { id: 'run-1', type: 'researcher' })
+    await drive(harness, 'agent_end', {}, sessionCtx('A'))
+    expect(harness.states.at(-1)).toBe('working')
+
+    // A new session is a scope reset for the pane: a pane shows one session's children at a time,
+    // so B is not held by A's child and does not name it.
+    await harness.replacePiSession('new')
+    await drive(harness, 'session_start', { reason: 'new' }, sessionCtx('B'))
+    expect(harness.states.at(-1)).toBe('done')
+    expect(harness.accepted.at(-1)?.subagents).toBeUndefined()
+
+    // The session that comes back is the one its children were never taken from, so the resume is
+    // where the pane gets them back — and with them, the hold.
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await drive(harness, 'session_start', { reason: 'resume' }, sessionCtx('A'))
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-1' })])
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+    await drive(harness, 'agent_end', {}, sessionCtx('A'))
+    // The resumed turn ends and the pane is still held, by that child, named.
+    expect(harness.states.at(-1)).toBe('working')
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({ id: 'run-1', agentType: 'researcher' })
+    ])
 
     await emit(harness, FORK_COMPLETED, { id: 'run-1' })
     expect(harness.states.at(-1)).toBe('done')

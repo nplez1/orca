@@ -14,6 +14,7 @@ import { getPiAgentStatusPostQueueSourceLines } from './agent-status-post-queue-
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
 import { getPiAgentStatusHandlerSourceLines } from './agent-status-handler-source'
 import { getPiAgentStatusRuntimeDetectionSourceLines } from './agent-status-runtime-detection-source'
+import { getPiAgentStatusAsyncSubagentSessionModuleLines } from './agent-status-async-subagent-session-source'
 import { getPiAgentStatusWslCurlSourceLines } from './agent-status-wsl-curl-source'
 import { getPiSubagentSnapshotSourceLines } from './agent-status-subagent-roster-source'
 
@@ -142,20 +143,8 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '// Orca receiver from building an unbounded queue of obsolete snapshots.',
     'const HOOK_POST_TIMEOUT_MS = 1000',
     ...getPiAgentStatusPostQueueSourceLines(kind),
-    ...(kind === 'pi'
-      ? [
-          'let piUiPromptDepth = 0',
-          'let piTurnInFlight = false',
-          // Why: pi reloads extensions in-process, which re-runs the factory. Bus listeners
-          // are not replaced on reload the way pi.on handlers are, so a second
-          // registration would post every async child event twice.
-          'let piAsyncSubagentBusBound = false',
-          // Why: the live child set lives at module scope so it survives an in-process
-          // extension reload — the roster it feeds is authoritative, and rebuilding it
-          // empty would tell the receiver every running child had finished.
-          'const piAsyncSubagentRuns = new Map<string, { id: string; agent_type?: string; description?: string }>()'
-        ]
-      : []),
+    ...(kind === 'pi' ? ['let piUiPromptDepth = 0', 'let piTurnInFlight = false'] : []),
+    ...getPiAgentStatusAsyncSubagentSessionModuleLines(kind),
     ...modelMetadataSourceLines,
     '',
     ...getPiSubagentSnapshotSourceLines(),
@@ -217,18 +206,6 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '',
     ...getPiAgentStatusRuntimeDetectionSourceLines(kind),
     '',
-    ...(kind === 'pi'
-      ? [
-          "// Why: the descendant roster is pane STATE, not an event, and pi's transport keeps only",
-          '// the newest post — the add a background spawn emits is overwritten by the tool burst that',
-          '// ends that same spawn. Riding every post means whichever post survives carries the truth.',
-          'function piAsyncSubagentField(): Record<string, unknown> {',
-          '  if (!piAsyncSubagentBusBound || isOmpRuntime()) return {}',
-          '  return { subagent_runs: Array.from(piAsyncSubagentRuns.values()) }',
-          '}',
-          ''
-        ]
-      : []),
     // `final` marks the last post of a session that is being closed.
     'function post(hookEventName: string, extra: Record<string, unknown> = {}, final = false): void {',
     '  const ompRuntime = isOmpRuntime()',

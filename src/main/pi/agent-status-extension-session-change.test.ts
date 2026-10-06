@@ -240,7 +240,7 @@ describe('Pi session changes', () => {
     ])
   })
 
-  it('stops listening once the old session is closed out', async () => {
+  it('refuses a child a closed-out session reports after close-out', async () => {
     const harness = createPi()
     await holdRunOpen(harness)
     await harness.callHook('session_shutdown', { reason: 'new' })
@@ -250,16 +250,16 @@ describe('Pi session changes', () => {
     // Another extension's shutdown handler can still be running while pi-subagents emits here.
     startAsync(harness, 'run-late', 'scout')
     await vi.advanceTimersByTimeAsync(0)
-    // Why: LOCAL(nplez1) — the fork's bus subscription outlives the registration (patch:
-    // local(pi-descendants)), so a late child is still reported; what close-out guarantees here is
-    // that the closed session's own children are gone from that set, and the receiver resets the
-    // pane's descendant scope on the next session_start.
-    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['run-late'])
+    // Why: LOCAL(nplez1) — Pi replaces the registration while the bus subscription it bound can
+    // still be called, so close-out invalidates that registration. A child it names belongs to the
+    // session the pane has stopped showing, and must not join the set the next session posts.
+    expect(posts(harness)).toHaveLength(sent)
 
     await harness.replacePiSession('new')
+    await harness.callHook('session_start', { reason: 'new' }, session('B'))
     await harness.callHook('agent_start', {}, session('B'))
     await endTurn(harness)
-    expect(posts(harness).at(-1)).toMatchObject({ hook_event_name: 'agent_end' })
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
     expect(
       posts(harness)
         .slice(sent)
@@ -298,6 +298,72 @@ describe('Pi session changes', () => {
     })
   })
 
+  it('brings a session’s children back when it is resumed, and shows none of them under another session', async () => {
+    const harness = createPi()
+    await holdRunOpen(harness)
+    await harness.replacePiSession('new')
+    await harness.callHook('session_start', { reason: 'new' }, session('B'))
+    await vi.advanceTimersByTimeAsync(0)
+    // pi-subagents keeps a session change's children running, and the pane rides one live set, so the
+    // session now on screen must carry none of the closed one's.
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+    startAsync(harness, 'run-b', 'reviewer')
+    complete(harness, 'run-b')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+    expect(
+      posts(harness)
+        .filter((post) => post.session_id === 'B')
+        .every((post) => (post.subagent_runs ?? []).every((run) => run.id !== 'run-a'))
+    ).toBe(true)
+
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await harness.callHook('session_start', { reason: 'resume' }, session('A'))
+    await vi.advanceTimersByTimeAsync(0)
+    // Why: LOCAL(nplez1) — the session that comes back is the one its children were never taken
+    // from, so the resume itself carries them, with the detail the bus reported when they started.
+    expect(posts(harness).at(-1)).toMatchObject({
+      hook_event_name: 'session_start',
+      session_id: 'A',
+      session_file: '/sessions/A.jsonl'
+    })
+    expect(posts(harness).at(-1)?.subagent_runs).toEqual([
+      expect.objectContaining({ id: 'run-a', description: expect.any(String) })
+    ])
+
+    // pi-subagents reports the run's completion to the resumed session, finished or not.
+    complete(harness, 'run-a')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(posts(harness).at(-1)).toMatchObject({
+      hook_event_name: 'subagent_async_state',
+      session_id: 'A'
+    })
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+    // Why: LOCAL(nplez1) — a restored child leaves the live set, which is what settles the pane
+    // receiver-side; this lane never fabricates a completion of its own for one.
+    expect(agentEndCount(harness)).toBe(1)
+  })
+
+  it('posts nothing more once a session ends with a child still live, however often it is shut down', async () => {
+    const harness = createPi()
+    await harness.callHook('session_start', { reason: 'startup' }, session('A'))
+    await harness.callHook('agent_start', {}, session('A'))
+    startAsync(harness, 'run-a', 'scout')
+    // Two shutdown handlers race on a session whose run its children still hold open.
+    await harness.callHook('session_shutdown', { reason: 'new' })
+    await harness.callHook('session_shutdown', { reason: 'new' })
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    // Why: the run is closed out once, under the session that ran it — a second close-out finds no
+    // turn left to end, and a child that is merely still running is not a completion.
+    expect(agentEndCount(harness)).toBe(1)
+    expect(posts(harness).at(-1)).toMatchObject({
+      hook_event_name: 'agent_end',
+      session_id: 'A',
+      session_boundary: true
+    })
+  })
+
   it('restores a session’s children once, not on every later resume', async () => {
     const harness = createPi()
     await holdRunOpen(harness)
@@ -317,6 +383,7 @@ describe('Pi session changes', () => {
       hook_event_name: 'session_start',
       session_id: 'A'
     })
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
     expect(posts(harness).at(-1)?.subagents).toBeUndefined()
   })
 
@@ -361,9 +428,10 @@ describe('Pi /reload', () => {
     // A turn that ends while the pre-reload child still runs must not report done.
     await harness.callHook('agent_start', {}, session('A'))
     await vi.advanceTimersByTimeAsync(0)
-    // Why: a module-level reload rebuilds the fork's live set, so the pre-reload child is no longer
-    // carried on it — the fork keeps no per-session park to restore one from.
-    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+    // Why: LOCAL(nplez1) — the live set is keyed by the session that owns it on a home a
+    // re-evaluated module cannot rebuild (globalThis), so the pre-reload child is still this
+    // session's; the ledger's promise for a /reload is exactly this set surviving.
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['run-a'])
     await endTurn(harness)
     // Why: nothing is withheld at source, so the turn reports its own completion; the pane's hold
     // comes from the live set the receiver keeps.
@@ -371,7 +439,25 @@ describe('Pi /reload', () => {
 
     complete(harness, 'run-a')
     await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
     expect(agentEndCount(harness)).toBe(2)
+  })
+
+  it('files a child that reports in the reload window under the session that owns it', async () => {
+    const harness = createPi()
+    await holdRunOpen(harness)
+    // The module is evaluated again, so its `sessionMetadata` is empty until the resumed session's own
+    // `session_start`; a background child can report in between.
+    await harness.reloadPi()
+    startAsync(harness, 'run-b', 'scout')
+    await vi.advanceTimersByTimeAsync(0)
+    await harness.callHook('session_start', { reason: 'reload' }, session('A'))
+    await harness.callHook('agent_start', {}, session('A'))
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Why: LOCAL(nplez1) — a reload keeps the session, so the child is filed under it and reported
+    // with the pre-reload one rather than under an unnamed session the pane would never read again.
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual(['run-a', 'run-b'])
   })
 
   it('keeps the turn counters across a reload, so a child starting afterwards is not read as late', async () => {
@@ -402,7 +488,7 @@ describe('Pi /reload', () => {
     expect(posts(harness).at(-1)?.subagents).toBeUndefined()
   })
 
-  it('drops the rows of pre-reload children released while the turn is still running', async () => {
+  it('parts with a workflow a reload released, keeping the child that reported no end of its own', async () => {
     const harness = createPi()
     await harness.callHook('agent_start', {}, session('A'))
     startWorkflow(harness)
@@ -411,10 +497,17 @@ describe('Pi /reload', () => {
     complete(harness, WORKFLOW)
     await vi.advanceTimersByTimeAsync(0)
 
-    // Why: LOCAL(nplez1) — a module-level reload rebuilds the fork's live set, so the released
-    // workflow is not on it and there is nothing to drop; upstream's roster kept the rows and
-    // restated them as `subagents_update`.
-    expect(posts(harness)).toEqual([{ hook_event_name: 'agent_start', subagent_runs: [] }])
+    // Why: LOCAL(nplez1) — the live set now survives the reload, so the released workflow leaves it
+    // and its child does not: this lane retires a child on its own end signal and keeps no parent
+    // link to sweep it with the workflow, so the child's exit is what retires it.
+    expect(posts(harness)).toEqual([
+      { hook_event_name: 'agent_start', subagent_runs: [] },
+      { hook_event_name: 'subagent_async_state', subagent_runs: [{ id: 'child-a' }] }
+    ])
+
+    exitRunner(harness, 'child-a')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
   })
 
   it.each(['reload', 'resume'] as const)(
@@ -492,13 +585,15 @@ describe('children that start outside a turn', () => {
     ])
   })
 
-  it('ends a run for a child that started before any turn in this session', async () => {
+  it('reports a child that started before any turn in this session, and clears when it ends', async () => {
     const harness = createPi()
     startAsync(harness, 'run-a', 'scout')
     await vi.advanceTimersByTimeAsync(0)
     complete(harness, 'run-a')
     await vi.advanceTimersByTimeAsync(0)
 
+    // Why: LOCAL(nplez1) — this lane opens no run of its own for a child, so its whole report is
+    // the live set: the child joins it and leaves it, and the pane's hold is read from those sets.
     expect(postedHookNames(harness)).toEqual(['subagent_async_state', 'subagent_async_state'])
     expect(postedSubagentRunIds(harness)).toEqual([['run-a'], []])
   })
