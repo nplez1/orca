@@ -75,8 +75,11 @@ export function resolveClaudePaneStatus(
         // A child's permission wait displaces the main agent record itself (`waitingAgentId`,
         // `stateBeforeWait`) instead of living on the roster, so the roster never carries one.
         hasWaitingChildWork: false,
-        // LOCAL(nplez1): an ordinary background shell reads as plain `working`; only a Claude
-        // session-cron callback earns the monitoring mode (see LOCAL-PATCHES.md).
+        // LOCAL(nplez1): a background shell the agent started is agent work, so it reads plain
+        // `working`; only a Claude session-cron callback earns the monitoring badge (see
+        // LOCAL-PATCHES.md § local(agents)). Upstream's *owed* notification evidence stays where
+        // upstream put it — `owedShell` on the non-agent side — because an owed shell is a pending
+        // wake-up rather than the running shell the policy is about.
         hasLiveAgentWork:
           held.runningAgent ||
           held.owedAgent ||

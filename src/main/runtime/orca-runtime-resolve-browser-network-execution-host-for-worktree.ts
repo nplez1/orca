@@ -28,7 +28,6 @@ import type { ResolvedTerminalWorkspaceLaunchTarget } from './orca-runtime-core'
 import { AGENT_HOOK_RUNTIME_ENV_KEYS } from './orca-runtime-core'
 import { ensureJcodeRuntimeDir } from '../../shared/jcode-runtime-dir'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
-import { homedir } from 'node:os'
 import { getExplicitWorktreeIdSelector } from './runtime-worktree-selection'
 import { WORKTREE_ID_SEPARATOR } from '../../shared/worktree/id'
 import { WorktreeIdRequiresFullPathError } from './runtime-worktree-lineage-resolution'
@@ -93,9 +92,14 @@ export class OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree extend
   // directory the panel's own terminals use — the user's floating-workspace setting.
   protected async resolveFloatingWorkspacePath(): Promise<string> {
     const store = this.store
-    return store
-      ? resolveFloatingTerminalCwd(store, { path: store.getSettings().floatingTerminalCwd })
-      : homedir()
+    const configuredPath = (store?.getSettings().floatingTerminalCwd ?? '').trim()
+    if (!store || !configuredPath) {
+      // Why: this is a resolution, not a launch. Falling back through `resolveFloatingTerminalCwd`
+      // with no configured path creates the folder inside the user's home, which a pure resolution
+      // must not do — the launch path is what ensures it.
+      return resolveFloatingWorkspaceLaunchDirectory()
+    }
+    return resolveFloatingTerminalCwd(store, { path: configuredPath })
   }
 
   protected floatingWorkspaceToResolvedWorktree(path: string): ResolvedWorktree {
@@ -129,9 +133,10 @@ export class OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree extend
       return {
         scope: {
           id: FLOATING_TERMINAL_WORKTREE_ID,
-          // Why: the Floating Workspace's own folder, not $HOME — a floating terminal or agent must
-          // not inherit a project (or the whole home directory) as its working directory.
-          path: resolveFloatingWorkspaceLaunchDirectory(),
+          // Why: the configured floating workspace when the user set one, else the Floating
+          // Workspace's own folder rather than $HOME — a floating terminal or agent must not inherit
+          // a project (or the whole home directory) as its working directory.
+          path: await this.resolveFloatingWorkspacePath(),
           connectionId: null,
           repo: null,
           folderWorkspace: null

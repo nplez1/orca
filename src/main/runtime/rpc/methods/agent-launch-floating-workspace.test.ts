@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { resolveFloatingWorkspaceLaunchDirectory } from '../../../floating-workspace-launch-directory'
@@ -71,6 +74,29 @@ describe('agent.launch with the real floating workspace resolver', () => {
       repo: null,
       folderWorkspace: null
     })
+  })
+
+  // Why: the panel's own terminals launch in the configured floating workspace, so the sentinel a
+  // runtime resolves has to agree with them instead of always answering the default folder.
+  it.each(selectors)('honours a configured floating workspace for %s', async (selector) => {
+    const configuredDir = await mkdtemp(join(tmpdir(), 'orca-floating-cwd-'))
+    try {
+      const runtime = new OrcaRuntimeService({
+        getSettings: () => ({
+          floatingTerminalCwd: configuredDir,
+          floatingTerminalTrustedCwds: []
+        })
+      } as never)
+
+      await expect(runtime.showTerminalWorkspaceLaunchScope(selector)).resolves.toMatchObject({
+        id: FLOATING_TERMINAL_WORKTREE_ID,
+        // Why not a realpath: an untrusted configured directory is handed back as the resolver
+        // resolved it, which is what the launch then spawns in.
+        path: configuredDir
+      })
+    } finally {
+      await rm(configuredDir, { recursive: true, force: true })
+    }
   })
 
   // Why here: the runtime resolvers this crosses are @ts-nocheck, so only a call that runs them

@@ -354,11 +354,31 @@ pnpm run sync:localization-runtime-catalog
     needed the fork's two SQLite-reading search suites (the boundary gate fails otherwise), and
     upstream's new agent-launch route suite mocks the RPC client, so it must answer the fork's
     import-time capability subscription. Both fixed in `4370252718`.
-  - **Verification.** `post-sync.mjs` is 9 passed / 1 info / no hard gate; `pnpm tc` clean;
+  - **`post-sync.mjs` green, and one second-model gate — NO-GO, then two fixes.** A single
+    `github-copilot/gpt-6.1-sol` high-reasoning pass ran its own probes over the merged tree. **P1
+    (release blocker):** the floating-terminal scope had been resolved with the fork's pure folder
+    function, which ignores a configured `floatingTerminalCwd` — and that scope *is* a launch cwd
+    (`orca-runtime-create-terminal.ts` falls back to `workspace.path`), while the panel's own floating
+    terminal honours the setting, so an agent could run in one directory while its filesystem requests
+    addressed another. Its probe printed `CONFIGURED_DIRECTORY_HONOURED false`. **Fixed** to honour the
+    setting with a pure fallback when it is unset, pinned by two new cases in
+    `agent-launch-floating-workspace.test.ts`. **P2:** an owed shell notification alone earns
+    `monitoring`, against the `local(agents)` sentence that reserves the badge for session crons. The
+    fork's own tests pin both halves of the real rule (a running shell + cron → plain `working`; a cron
+    with the shell set empty → `monitoring`), and every alternative mapping breaks one of them, so the
+    nuance is **accepted and now written into the ledger** rather than silently kept. Everything else
+    the gate probed held: the polling force flag reads a fresh closure and no other cadence writer is
+    left; the four deletions leave no orphaned caller; upstream's only `tui-agent-config` table change
+    was `rovo` and it is ported; no consumer lost an export with `export *` removed; the notes range and
+    cherry counts agree (156 / 155 `+` / 0 `-`). Its third finding — `~/.orca/floating-workspace` being
+    the fork's own storage — reproduces at `ed0be2085f`, so it is pre-existing and recorded in the
+    ledger as an open migration.
+  - **Verification.** `post-sync.mjs` 9 passed / 1 info / no hard gate; `pnpm tc` clean;
     `check:code-quality:changed` clean against the pre-sync tip across 2752 changed files (against
     `upstream/main` it reports 58 findings, all in fork-owned files — pre-existing debt). Tests:
     `src/renderer/src` 39 239 passed, `src/shared` + `src/main/ipc` + `src/main/git` + `config/scripts`
-    20 786 passed, `src/main/agent-hooks` + `src/main/claude` 3 169 passed.
+    20 786 passed, `src/main/agent-hooks` + `src/main/claude` 3 169 passed, plus the floating-workspace
+    and policy suites re-run after the gate's fixes.
   - **Failures that are this machine, with the proof.** The agent-session/agent-launch SQLite family
     and `config/scripts/verify-localization-catalogs.test.mjs` (a `spawnSync bun ENOENT`) fail
     identically on a worktree of the pre-sync tip and of `upstream/main` — 8 of 19 in

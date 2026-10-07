@@ -66,13 +66,17 @@ grants are what make a first-launch OS-opened document readable.
 
 **Do not:** delete `authorizeExternalPath`, or "converge" the two mechanisms into one.
 
-**Sentinel scope (2026-10-07 sync):** the floating-terminal *scope* resolves
-`resolveFloatingWorkspaceLaunchDirectory()` directly, not upstream's `resolveFloatingWorkspacePath()`
-method. Upstream's method is settings-aware and is kept for its other caller
-(`persist-headless-terminal-title`), but this scope must not create the folder: going through the
-fork's `resolveFloatingTerminalCwd` mkdirs `~/.orca/floating-workspace`, which the unit-test home
-write guard rejects and which upstream's own assertion here does not expect (it reads
-`~/.orca/floating-workspace` with no store, where upstream's method answers `$HOME`).
+**Sentinel scope (2026-10-07 sync):** the floating-terminal *scope* resolves through
+`resolveFloatingWorkspacePath()`, which honours a configured `floatingTerminalCwd` and otherwise
+returns `resolveFloatingWorkspaceLaunchDirectory()` **without creating it**. It deliberately does not
+fall back through `resolveFloatingTerminalCwd` with an empty path: that call ensures the folder, which
+writes `~/.orca/floating-workspace` during a resolution, trips the unit-test home-write guard, and is
+the launch path's job. `agent-launch-floating-workspace.test.ts` pins both branches — configured
+directory honoured, default folder when unset.
+
+**Why:** the scope becomes the launch cwd (`orca-runtime-create-terminal.ts` falls back to
+`workspace.path`), so ignoring the setting here would put a floating agent in one directory while the
+panel's own floating terminal and its filesystem requests use another.
 
 **Open (needs the fork owner):** the ledger above says the folder is `~/.orca-np/floating-workspace`,
 but `floating-workspace-launch-directory.ts` joins `HOME_DIRECTORY_NAME`-less `.orca` and its test
@@ -124,13 +128,21 @@ synchronously ahead of the readiness promise.
 `runningNonAgent` / `owedShell`. The fork's `local(agents)` policy is expressed there, not at the
 call sites: `hasLiveAgentWork` is `held.runningAgent || held.owedAgent ||
 state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)` and `hasLiveNonAgentWork` is
-`state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell`. An owed shell notification
-stays on the non-agent side because upstream maps it there and because the fork's own cron test
-(`server-claude-cancel-captures.test.ts`) passes with the shell set empty.
+`state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell`.
 
 **Why:** a running shell the agent launched is still agent work, and `foldAgentLeadStatus` returns
-`monitoring` only when `hasLiveAgentWork` is false, so putting a running shell on the non-agent side
-is the whole badge difference.
+`monitoring` only when `hasLiveAgentWork` is false, so moving the running shell off the non-agent side
+is the whole badge difference. Two fork tests pin the two halves from opposite directions:
+`claude-background-task-status.test.ts` (a running shell *and* a cron → plain `working`, because the
+running shell is agent work) and `server-claude-cancel-captures.test.ts` (a cron with the shell set
+empty → `monitoring`).
+
+**Accepted nuance:** upstream's *owed* shell notification stays on the non-agent side, as upstream
+maps it, so a lone owed-shell window (no cron) can show `monitoring` for the notification lease. The
+2026-10-07 review gate flagged that against the policy sentence above; the alternative (owed shell as
+agent work) breaks `claude-background-task-status.test.ts`, and treating a live cron as overriding a
+running shell breaks the cancel-capture case. An owed shell is a pending wake-up rather than the
+running shell the policy is about, so the fork deviates from upstream only for the running shell set.
 
 **Do not:** stop re-adapting upstream tests that pin the other policy — `server-claude-terminal-interrupt.test.ts`
 needed its running-shell case changed to expect no `workingMode`.
