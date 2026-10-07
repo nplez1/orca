@@ -112,6 +112,29 @@ describe('SessionSummaryService', () => {
     expect(updates.some((u) => u.status === 'ready')).toBe(false)
   })
 
+  // A pane whose status row was dropped keeps a provider-session remnant
+  // (`server-cleanup.ts`): no state, prompt, or timestamps, but a resumable
+  // session — which is all the fold needs to summarize a finished agent.
+  it('summarizes a finished session from a provider-session remnant row', async () => {
+    const { store } = testStore()
+    const { service, updates, setEntry } = harness(store, events(4))
+    setEntry({
+      agentType: 'claude',
+      providerSession: {
+        key: 'session_id',
+        id: 'sess-done',
+        transcriptPath: '/tmp/sess-done.jsonl'
+      }
+    })
+
+    service.open({ paneKey: 'tab:leaf' })
+
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
+    const ready = updates.find((u) => u.status === 'ready')
+    expect(ready?.ledger?.foldedThrough).toBe(4)
+    expect(updates.some((u) => u.status === 'unavailable')).toBe(false)
+  })
+
   it('cancels the fold on close without reporting failure', async () => {
     const { store } = testStore()
     const { service, updates, setBrainReply } = harness(store, events(5))

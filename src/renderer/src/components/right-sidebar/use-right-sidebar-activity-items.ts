@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CircleDot, Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
+import { CircleDot, Info, Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -16,6 +16,7 @@ import {
 import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { AgentSessionHistoryIcon } from './agent-session-history-icon'
+import { hasSessionSummaryBridge } from './session-summary-subject'
 import type { ActivityBarItem } from './activity-bar-buttons'
 
 export type RightSidebarActivityItems = {
@@ -80,6 +81,20 @@ export function useRightSidebarActivityItems({
         title: translate('auto.components.right.sidebar.index.aiVaultSessionHistory', 'Agents'),
         shortcut: ''
       },
+      // Why conditional: a paired web client composes no session-summary bridge, so
+      // offering the tab there would leave the pane permanently on its loading state.
+      ...(hasSessionSummaryBridge()
+        ? [
+            {
+              // Why: the pane summarizes an agent session in this workspace, so it sits
+              // beside Agents rather than with the source-control group.
+              id: 'summary' as const,
+              icon: Info,
+              title: translate('activity.sessionSummary.label', 'Session summary'),
+              shortcut: ''
+            }
+          ]
+        : []),
       {
         id: 'workspaces',
         icon: Workflow,

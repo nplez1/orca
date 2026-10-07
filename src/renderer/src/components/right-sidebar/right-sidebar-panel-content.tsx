@@ -9,6 +9,7 @@ const ChecksPanel = lazy(() => import('./ChecksPanel'))
 const PortsPanel = lazy(() => import('./PortsPanel'))
 const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
 const IssuePane = lazy(() => import('./IssuePane'))
+const SessionSummaryPane = lazy(() => import('./SessionSummaryPane'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
 const FolderWorkspacePrChecksPanel = lazy(() => import('./FolderWorkspacePrChecksPanel'))
 const PluginPanel = lazy(() => import('./PluginPanel'))
@@ -39,6 +40,11 @@ export function RightSidebarPanelContent({
             linked issue, but the persisted route can still name it across a
             workspace switch — the pane itself renders the no-link state. */}
         {effectiveTab === 'issue' && <IssuePane />}
+        {/* Why isVisible: the panel stays mounted while the sidebar is collapsed, and
+            the summary fold must not run for a pane nobody is reading. */}
+        {effectiveTab === 'summary' && (
+          <SessionSummaryPane isVisible={rightSidebarOpen && effectiveTab === 'summary'} />
+        )}
         {effectiveTab === 'workspaces' && <FolderWorkspaceWorktreesPanel />}
         {effectiveTab === 'pr-checks' && (
           <FolderWorkspacePrChecksPanel

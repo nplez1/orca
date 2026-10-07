@@ -2,11 +2,8 @@
 // one-shot mode. The app has no direct model client (see docs/reference/
 // session-summary.md); a direct-model brain can replace this without touching
 // the fold protocol — it only needs `complete(prompt) -> raw text`.
-import {
-  DEFAULT_COMMIT_MESSAGE_AGENT_ID,
-  getCommitMessageAgentSpec,
-  isCustomAgentId
-} from '../../shared/commit-message-agent-spec'
+import { mkdirSync } from 'node:fs'
+import { getCommitMessageAgentSpec, isCustomAgentId } from '../../shared/commit-message-agent-spec'
 import { planCommitMessageGeneration } from '../../shared/commit-message-plan'
 import type { CommitMessagePlanInput } from '../../shared/commit-message-plan'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
@@ -19,17 +16,25 @@ import {
 import type { SessionFoldBrain } from './session-summary-fold'
 
 export type AgentCliFoldBrainDeps = {
-  /** The user's text-generation settings; null falls back to the default agent/model. */
+  /** The configured fold agent; null means nothing usable is selected, which fails the
+   *  fold rather than substituting an agent the user did not choose. */
   resolveParams: () => ResolvedSourceControlAiGenerationParams | null
-  /** Where the CLI runs. Folds need no repo context; callers pass a scratch dir. */
+  /** Where the CLI runs. Folds need no repo context; callers pass a scratch dir, which
+   *  this brain creates because a missing cwd fails the spawn. */
   cwd: string
 }
 
 export function createAgentCliSessionFoldBrain(deps: AgentCliFoldBrainDeps): SessionFoldBrain {
   return {
     async complete({ prompt, signal }): Promise<string> {
-      const params: Partial<ResolvedSourceControlAiGenerationParams> = deps.resolveParams() ?? {}
-      const agentId = params.agentId ?? DEFAULT_COMMIT_MESSAGE_AGENT_ID
+      const params = deps.resolveParams()
+      // Why: the summary is the user's transcript. Running an agent they did not pick —
+      // or disabled — because their choice was unusable would send it to that provider.
+      if (!params) {
+        throw new Error('No session-summary agent is configured. Choose one in Settings → Agents.')
+      }
+      mkdirSync(deps.cwd, { recursive: true })
+      const agentId = params.agentId
       const defaultModel = isCustomAgentId(agentId)
         ? 'default'
         : (getCommitMessageAgentSpec(agentId)?.defaultModelId ?? 'default')

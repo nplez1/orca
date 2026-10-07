@@ -59,9 +59,15 @@ function runElectronBuilder(args, environment) {
   })
 }
 
+async function prepareCachedFpmTools() {
+  const { getFpmPath } = require('app-builder-lib/out/toolsets/linux.js')
+  await getFpmPath()
+}
+
 export async function packageLinuxFormats({
   preparedDirectory = resolve('dist/linux-unpacked'),
   outputDirectory = resolve('dist'),
+  prepareFpmTools = prepareCachedFpmTools,
   prepareAppImageTools = preparePrAppImageTools,
   runBuilder = runElectronBuilder
 } = {}) {
@@ -73,6 +79,8 @@ export async function packageLinuxFormats({
   mkdirSync(outputDirectory, { recursive: true })
   const staging = mkdtempSync(join(outputDirectory, '.linux-package-formats-'))
   try {
+    // DEB and RPM share a download cache that cannot initialize safely across processes.
+    await prepareFpmTools()
     const results = await Promise.allSettled(
       formats.map(async (format) => {
         const startedFormatAt = performance.now()

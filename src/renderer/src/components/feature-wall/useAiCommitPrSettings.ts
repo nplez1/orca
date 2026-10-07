@@ -1,32 +1,24 @@
 import { useCallback, useState } from 'react'
 import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+import { resolveCommitMessageAgentChoice } from '../../../../shared/commit-message-agent-spec'
 import {
-  CUSTOM_AGENT_ID,
-  getCommitMessageAgentCapability,
-  isCustomAgentId,
-  resolveCommitMessageAgentChoice
-} from '../../../../shared/commit-message-agent-spec'
-import { getAgentCatalog } from '@/lib/agent-catalog'
+  aiGenerationAgentChangePatch,
+  aiGenerationModelChangePatch,
+  aiGenerationThinkingChangePatch,
+  resolveAiGenerationSelection,
+  type AiGenerationSelection
+} from '@/lib/ai-generation-settings'
 import { useAppStore } from '@/store'
 import {
   EMPTY_COMMIT_MESSAGE_AI_SETTINGS,
   readCommitMessageAiSettings,
-  resolveCommitMessageSelectedModel,
-  resolveCommitMessageSelectedThinking,
   seedCommitMessageAiEnablePatch
 } from './ai-commit-pr-settings-helpers'
 
-export type AiCommitPrSettingsViewModel = {
+export type AiCommitPrSettingsViewModel = AiGenerationSelection & {
   config: CommitMessageAiSettings
   selectPortalRoot: HTMLElement | null
   setSelectPortalHost: (node: HTMLDivElement | null) => void
-  agentSelectValue: string | undefined
-  activeCapability: ReturnType<typeof getCommitMessageAgentCapability>
-  activeModel: ReturnType<typeof resolveCommitMessageSelectedModel> | null
-  activeThinking: string | undefined
-  isCustom: boolean
-  unsupportedAgentLabel: string | null
   toggleAi: () => void
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
@@ -45,45 +37,10 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
   }, [])
 
   const config = settings ? readCommitMessageAiSettings(settings) : EMPTY_COMMIT_MESSAGE_AI_SETTINGS
-  const resolvedAgentId = resolveCommitMessageAgentChoice(
-    config.agentId,
-    settings?.defaultTuiAgent,
-    settings?.disabledTuiAgents
-  )
-  const isCustom = isCustomAgentId(resolvedAgentId)
-  const activeCapability =
-    resolvedAgentId && !isCustomAgentId(resolvedAgentId)
-      ? getCommitMessageAgentCapability(resolvedAgentId)
-      : undefined
-  const unsupportedConfiguredAgent =
-    resolvedAgentId && !isCustom && !activeCapability ? resolvedAgentId : null
-  const unsupportedConfiguredAgentLabel = unsupportedConfiguredAgent
-    ? (getAgentCatalog().find((a) => a.id === unsupportedConfiguredAgent)?.label ??
-      unsupportedConfiguredAgent)
-    : null
-  const agentSelectValue = activeCapability
-    ? activeCapability.id
-    : isCustom
-      ? CUSTOM_AGENT_ID
-      : undefined
-  const activeModel = activeCapability
-    ? resolveCommitMessageSelectedModel(config, activeCapability)
-    : null
-  const activeThinking = activeModel
-    ? resolveCommitMessageSelectedThinking(config, activeModel)
-    : undefined
-  const unsupportedDefaultAgent =
-    resolvedAgentId === null &&
-    !config.agentId &&
-    settings?.defaultTuiAgent &&
-    settings.defaultTuiAgent !== 'blank'
-      ? settings.defaultTuiAgent
-      : null
-  const unsupportedDefaultAgentLabel = unsupportedDefaultAgent
-    ? (getAgentCatalog().find((a) => a.id === unsupportedDefaultAgent)?.label ??
-      unsupportedDefaultAgent)
-    : null
-  const unsupportedAgentLabel = unsupportedConfiguredAgentLabel ?? unsupportedDefaultAgentLabel
+  const selection = resolveAiGenerationSelection(config, {
+    defaultTuiAgent: settings?.defaultTuiAgent,
+    disabledTuiAgents: settings?.disabledTuiAgents
+  })
 
   const writeConfig = (patch: Partial<CommitMessageAiSettings>): void => {
     if (!settings) {
@@ -92,9 +49,14 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
     updateSettings({ commitMessageAi: { ...config, ...patch } })
   }
 
+  const writeSelectionPatch = (patch: Partial<CommitMessageAiSettings>): void => {
+    if (Object.keys(patch).length > 0) {
+      writeConfig(patch)
+    }
+  }
+
   const toggleAi = (): void => {
-    const nextEnabled = !config.enabled
-    if (!nextEnabled) {
+    if (config.enabled) {
       writeConfig({ enabled: false })
       return
     }
@@ -103,97 +65,35 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
       settings?.defaultTuiAgent,
       settings?.disabledTuiAgents
     )
-    if (!seedAgentId) {
-      writeConfig({ enabled: true, agentId: null })
-      return
-    }
-    writeConfig(seedCommitMessageAiEnablePatch(config, seedAgentId))
-  }
-
-  const onAgentChange = (newAgentId: string): void => {
-    if (isCustomAgentId(newAgentId)) {
-      writeConfig({ agentId: CUSTOM_AGENT_ID })
-      return
-    }
-    const capability = getCommitMessageAgentCapability(newAgentId as TuiAgent)
-    if (!capability) {
-      return
-    }
-    const nextSelectedModelByAgent = { ...config.selectedModelByAgent }
-    if (!nextSelectedModelByAgent[capability.id]) {
-      nextSelectedModelByAgent[capability.id] = capability.defaultModelId
-    }
-    const newModel = resolveCommitMessageSelectedModel(
-      { ...config, agentId: capability.id },
-      capability
+    writeConfig(
+      seedAgentId
+        ? seedCommitMessageAiEnablePatch(config, seedAgentId)
+        : { enabled: true, agentId: null }
     )
-    const nextSelectedThinkingByModel = { ...config.selectedThinkingByModel }
-    if (
-      newModel.thinkingLevels &&
-      newModel.defaultThinkingLevel &&
-      !nextSelectedThinkingByModel[newModel.id]
-    ) {
-      nextSelectedThinkingByModel[newModel.id] = newModel.defaultThinkingLevel
-    }
-    writeConfig({
-      agentId: capability.id,
-      selectedModelByAgent: nextSelectedModelByAgent,
-      selectedThinkingByModel: nextSelectedThinkingByModel
-    })
-  }
-
-  const onModelChange = (newModelId: string): void => {
-    if (!activeCapability) {
-      return
-    }
-    const model = activeCapability.models.find((m) => m.id === newModelId)
-    if (!model) {
-      return
-    }
-    const nextSelectedModelByAgent = {
-      ...config.selectedModelByAgent,
-      [activeCapability.id]: model.id
-    }
-    const nextSelectedThinkingByModel = { ...config.selectedThinkingByModel }
-    if (
-      model.thinkingLevels &&
-      model.defaultThinkingLevel &&
-      !nextSelectedThinkingByModel[model.id]
-    ) {
-      nextSelectedThinkingByModel[model.id] = model.defaultThinkingLevel
-    }
-    writeConfig({
-      selectedModelByAgent: nextSelectedModelByAgent,
-      selectedThinkingByModel: nextSelectedThinkingByModel
-    })
-  }
-
-  const onThinkingChange = (newLevelId: string): void => {
-    if (!activeModel) {
-      return
-    }
-    writeConfig({
-      selectedThinkingByModel: {
-        ...config.selectedThinkingByModel,
-        [activeModel.id]: newLevelId
-      }
-    })
   }
 
   return {
     config,
     selectPortalRoot,
     setSelectPortalHost,
-    agentSelectValue,
-    activeCapability,
-    activeModel,
-    activeThinking,
-    isCustom,
-    unsupportedAgentLabel,
+    ...selection,
     toggleAi,
-    onAgentChange,
-    onModelChange,
-    onThinkingChange,
+    onAgentChange: (newAgentId) =>
+      writeSelectionPatch(aiGenerationAgentChangePatch(config, newAgentId)),
+    onModelChange: (newModelId) => {
+      if (selection.activeCapability) {
+        writeSelectionPatch(
+          aiGenerationModelChangePatch(config, selection.activeCapability, newModelId)
+        )
+      }
+    },
+    onThinkingChange: (newLevelId) => {
+      if (selection.activeModel) {
+        writeSelectionPatch(
+          aiGenerationThinkingChangePatch(config, selection.activeModel, newLevelId)
+        )
+      }
+    },
     writeConfig
   }
 }
