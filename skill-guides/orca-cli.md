@@ -159,9 +159,9 @@ its reads route to: a bare key uses that host's selected Jira site, or its only 
 refused when several are connected — pass the issue URL then, or when the issue is on a site
 other than the selected one. The key must live on a site connected to that host, and the
 workspace keeps its card badge and Issue panel from this write; confirm with
-`worktree show --json` (it prints `linkedWorkItem`) or `worktree ps --json`, where a Jira link
-appears as `linkedWorkItem` with `provider: "jira"` — use it to find a workspace that has no
-link yet.
+`worktree show --json` (it prints `linkedWorkItem`) or `worktree ps --json`, where a linked item
+appears as `linkedWorkItem` with `provider: "jira"` and a row with no link omits the field — use
+that to find a workspace that has no link yet.
 `--gitlab-issue` and
 `--gitlab-mr` write separate GitLab numbers and accept `#42` / `!77` respectively.
 All numbers must be positive safe integers. The GitLab flags also accept HTTP(S) URLs
