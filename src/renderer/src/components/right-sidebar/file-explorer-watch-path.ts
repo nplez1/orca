@@ -43,10 +43,12 @@ export function canonicalizeFileExplorerWatchPath(
 }
 
 export function createCachedDirPathIndex(
-  cache: Record<string, { children: unknown }>
+  cache: Record<string, { children: unknown }>,
+  /** A key enumeration already taken of `cache`, so scans can be shared instead of repeated. */
+  keys: readonly string[] = Object.keys(cache)
 ): ReadonlyMap<string, string> {
   const index = new Map<string, string>()
-  for (const key of Object.keys(cache)) {
+  for (const key of keys) {
     const normalizedKey = normalizeRuntimePathForComparison(key)
     if (!index.has(normalizedKey)) {
       index.set(normalizedKey, key)

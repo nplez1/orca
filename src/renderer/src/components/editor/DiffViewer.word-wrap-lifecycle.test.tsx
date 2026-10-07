@@ -13,7 +13,11 @@ const fixture = vi.hoisted(() => {
       onDidDispose: (callback: () => void) => {
         disposals.add(callback)
         return { dispose: () => disposals.delete(callback) }
-      }
+      },
+      // The PR-comment gutter hook subscribes and decorates through the modified editor.
+      onMouseDown: vi.fn(() => ({ dispose: vi.fn() })),
+      updateOptions: vi.fn(),
+      createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() }))
     }
     const disposeUpdate = vi.fn()
     const editor = {
