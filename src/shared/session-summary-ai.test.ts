@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCommitMessageAgentSpec } from './commit-message-agent-spec'
 import {
+  readSessionSummaryDiscoveredModels,
   resolveSessionSummaryAiParams,
   type SessionSummaryAiSettingsInput
 } from './session-summary-ai'
@@ -135,5 +136,43 @@ describe('resolveSessionSummaryAiParams', () => {
     )
 
     expect(resolved?.agentCommandOverride).toBe('/opt/claude')
+  })
+})
+
+describe('readSessionSummaryDiscoveredModels', () => {
+  const models = [{ id: 'deepseek/deepseek-flash', label: 'Deepseek Flash' }]
+
+  it('reads the local slot first', () => {
+    expect(
+      readSessionSummaryDiscoveredModels(
+        {
+          sessionSummaryAi: config({
+            discoveredModelsByAgent: { pi: models },
+            discoveredModelsByAgentByHost: {
+              'ssh:host-1': { pi: [{ id: 'remote', label: 'Remote' }] }
+            }
+          })
+        },
+        'pi'
+      )
+    ).toEqual(models)
+  })
+
+  it('falls back to the local host slot', () => {
+    expect(
+      readSessionSummaryDiscoveredModels(
+        {
+          sessionSummaryAi: config({
+            discoveredModelsByAgentByHost: { local: { pi: models } }
+          })
+        },
+        'pi'
+      )
+    ).toEqual(models)
+  })
+
+  it('reports nothing before a probe has run', () => {
+    expect(readSessionSummaryDiscoveredModels({ sessionSummaryAi: config() }, 'pi')).toEqual([])
+    expect(readSessionSummaryDiscoveredModels({}, 'pi')).toEqual([])
   })
 })

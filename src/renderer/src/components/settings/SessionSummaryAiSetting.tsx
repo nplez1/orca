@@ -19,6 +19,7 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
     activeThinking,
     isCustom,
     unsupportedAgentLabel,
+    discoveryStatus,
     onAgentChange,
     onModelChange,
     onThinkingChange,
@@ -57,6 +58,16 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
             onThinkingChange={onThinkingChange}
             onCustomCommandChange={onCustomCommandChange}
           />
+          {discoveryStatus !== 'idle' ? (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              {discoveryStatus === 'discovering'
+                ? translate('settings.sessionSummaryAi.discovering', 'Discovering models…')
+                : translate(
+                    'settings.sessionSummaryAi.modelsUnavailable',
+                    "Couldn't list this agent's models — using its built-in list."
+                  )}
+            </p>
+          ) : null}
         </div>
       </SearchableSetting>
     </section>

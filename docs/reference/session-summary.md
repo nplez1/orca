@@ -72,6 +72,18 @@ meant summary cost could not be tuned without changing commit messages. Resoluti
 `src/shared/session-summary-ai.ts` (read by `session-summary-fold-params.ts`); with nothing
 configured it follows the default agent and that agent's default model and effort.
 
+A **dynamic** agent ships only a stub model list — Pi advertises `Config default` — so the
+pane asks its CLI once (`<binary> --list-models`, the same probe Native Chat uses), keeps the
+answer and replaces the stub with it. Two rules matter there:
+
+- **Only a real probe is cached.** A result whose `catalogOrigin` is `spec` is the built-in
+  list, and caching it would retire the probe for that agent forever.
+- **Storage is host-keyed; resolution is local.** The fold spawns the agent CLI on the local
+  machine and reads the transcript from the local filesystem
+  (`session-summary-agent-cli-fold-brain.ts`), so a remote host's model list would offer
+  models that spawn cannot run. The list is stored under the host-keyed slots so a future
+  host-aware fold needs no migration, but the pane reads the local slot.
+
 ## Adding a right-sidebar tab
 
 `summary` is a **static** tab, so a new value has to be declared in three allowlists or it

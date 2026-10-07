@@ -14,6 +14,9 @@ import {
 } from './commit-message-agent-spec'
 import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
 import type { SessionSummaryAiSettings } from './session-summary-ai-types'
+import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from './commit-message-host-key'
+import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
+import type { TuiAgent } from './tui-agent'
 
 export type SessionSummaryAiSettingsInput = {
   sessionSummaryAi?: SessionSummaryAiSettings | null
@@ -34,6 +37,25 @@ export function readSessionSummaryAiSettings(
   settings: Pick<SessionSummaryAiSettingsInput, 'sessionSummaryAi'>
 ): SessionSummaryAiSettings {
   return settings.sessionSummaryAi ?? EMPTY_SESSION_SUMMARY_AI_SETTINGS
+}
+
+/**
+ * Models a probe reported for this agent, local slot first.
+ *
+ * The fold spawns the agent CLI on the local machine, so the picker resolves the
+ * local list even though storage is host-keyed — a remote host's models are not
+ * runnable by the local spawn.
+ */
+export function readSessionSummaryDiscoveredModels(
+  settings: Pick<SessionSummaryAiSettingsInput, 'sessionSummaryAi'>,
+  agentId: TuiAgent
+): CommitMessageAiModelCapability[] {
+  const config = readSessionSummaryAiSettings(settings)
+  return (
+    config.discoveredModelsByAgent?.[agentId] ??
+    config.discoveredModelsByAgentByHost?.[LOCAL_COMMIT_MESSAGE_HOST_KEY]?.[agentId] ??
+    []
+  )
 }
 
 /**

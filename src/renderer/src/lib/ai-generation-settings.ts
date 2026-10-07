@@ -23,6 +23,11 @@ export type AiGenerationSettingsConfig = Pick<
 export type AiGenerationSelectionSettings = {
   defaultTuiAgent?: DefaultTuiAgentPreference
   disabledTuiAgents?: Iterable<unknown> | null
+  /** Models a CLI probe reported, keyed by the agent that reported them. Replaces
+   *  that agent's spec list (a dynamic agent's spec list is only a stub), so the
+   *  effort levels the probe found become selectable. Keyed by agent so another
+   *  agent's probe can never be applied to the selected one. */
+  discoveredModelsByAgent?: Partial<Record<TuiAgent, readonly CommitMessageModelCapability[]>>
 }
 
 export type AiGenerationSelection = {
@@ -87,10 +92,15 @@ export function resolveAiGenerationSelection(
     settings.disabledTuiAgents
   )
   const isCustom = isCustomAgentId(resolvedAgentId)
-  const activeCapability =
+  const specCapability =
     resolvedAgentId && !isCustomAgentId(resolvedAgentId)
       ? getCommitMessageAgentCapability(resolvedAgentId)
       : undefined
+  const discovered = (resolvedAgentId && settings.discoveredModelsByAgent?.[resolvedAgentId]) || []
+  const activeCapability =
+    specCapability && discovered.length > 0
+      ? { ...specCapability, models: [...discovered] }
+      : specCapability
   const unsupportedConfiguredAgent =
     resolvedAgentId && !isCustom && !activeCapability ? resolvedAgentId : null
   const unsupportedDefaultAgent =

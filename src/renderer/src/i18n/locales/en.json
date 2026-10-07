@@ -182,7 +182,9 @@
         "agent": "agent",
         "model": "model",
         "transcript": "transcript"
-      }
+      },
+      "discovering": "Discovering models…",
+      "modelsUnavailable": "Couldn't list this agent's models — using its built-in list."
     },
     "terminal": {
       "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
