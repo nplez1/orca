@@ -59,12 +59,17 @@ export type JiraIssueWorkspaceDetailState = {
 export function useJiraIssueWorkspaceDetail({
   issue,
   fetchKey = null,
+  fetchSiteId = null,
   providerSettings,
   sourceContext,
   refreshSignal = 0
 }: {
   issue: JiraIssue | null
   fetchKey?: string | null
+  /** The site the linked workspace already records. The host would otherwise pick
+   *  from its own selected/active site, which is a different site whenever the
+   *  user has more than one — the read then returns nothing for a valid key. */
+  fetchSiteId?: string | null
   providerSettings: RuntimeJiraSettings
   sourceContext?: TaskSourceContext | null
   refreshSignal?: number
@@ -100,7 +105,11 @@ export function useJiraIssueWorkspaceDetail({
     }
     setIssueLoading(true)
 
-    void jiraGetIssue(providerSettings, seed?.key ?? fetchKey!, seed?.siteId)
+    void jiraGetIssue(
+      providerSettings,
+      seed?.key ?? fetchKey!,
+      seed?.siteId ?? fetchSiteId ?? undefined
+    )
       .then((result) => {
         if (fetchRequestId !== issueRequestIdRef.current || !result) {
           return
@@ -115,7 +124,7 @@ export function useJiraIssueWorkspaceDetail({
           setIssueLoading(false)
         }
       })
-  }, [issue, fetchKey, providerSettings, reloadSignal])
+  }, [issue, fetchKey, fetchSiteId, providerSettings, reloadSignal])
 
   const sideData = useJiraIssueSideData({ providerSettings, issueKey, issueSiteId: siteId })
   const commentsState = useJiraIssueComments({ providerSettings, issueKey, issueSiteId: siteId })

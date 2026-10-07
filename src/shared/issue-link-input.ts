@@ -1,4 +1,5 @@
 import { parseGitHubIssueOrPRLink } from './github/links'
+import { JIRA_ISSUE_KEY_PATTERN, parseJiraIssueUrl } from './jira-issue-url'
 import { parseLinearIssueInput } from './linear/links'
 import type { WorkspaceSourceProvider } from './new-workspace/workspace-source'
 
@@ -6,7 +7,8 @@ import type { WorkspaceSourceProvider } from './new-workspace/workspace-source'
 // so adding Jira here is a one-entry change rather than a new axis.
 export const ISSUE_LINK_PROVIDERS = [
   'github',
-  'linear'
+  'linear',
+  'jira'
 ] as const satisfies readonly WorkspaceSourceProvider[]
 
 export type IssueLinkProvider = (typeof ISSUE_LINK_PROVIDERS)[number]
@@ -32,12 +34,20 @@ export function getIssueLinkProviderFromUrl(input: string): IssueLinkProvider | 
   if (parseLinearIssueInput(trimmed)) {
     return 'linear'
   }
+  // Why: `/browse/<KEY>` and nothing looser. A bare Atlassian host would flip a
+  // pasted board URL into Jira and then refuse to save it, exactly like a pull URL.
+  if (parseJiraIssueUrl(trimmed)) {
+    return 'jira'
+  }
   return null
 }
 
 export type ParsedIssueLinkInput =
   | { provider: 'github'; number: number }
   | { provider: 'linear'; identifier: string; organizationUrlKey?: string }
+  /** `siteUrl` is the site named by a pasted issue URL, or null for a bare key
+   *  — a key alone cannot say which of the user's Jira sites holds it. */
+  | { provider: 'jira'; key: string; siteUrl: string | null }
 
 /**
  * Single parse shared by the dialog's save gate and its payload builder, so a
@@ -55,6 +65,22 @@ export function parseIssueLinkInput(
   if (provider === 'linear') {
     const parsed = parseLinearIssueInput(trimmed)
     return parsed ? { provider: 'linear', ...parsed } : null
+  }
+
+  if (provider === 'jira') {
+    const parsedUrl = parseJiraIssueUrl(trimmed)
+    if (parsedUrl) {
+      // Why: the URL's own site, not the connected one — this is what tells the
+      // save path which site to read the issue from.
+      return {
+        provider: 'jira',
+        key: parsedUrl.issueKey,
+        siteUrl: `${parsedUrl.origin}${parsedUrl.sitePath}`
+      }
+    }
+    return JIRA_ISSUE_KEY_PATTERN.test(trimmed)
+      ? { provider: 'jira', key: trimmed.toUpperCase(), siteUrl: null }
+      : null
   }
 
   const link = parseGitHubIssueOrPRLink(trimmed)

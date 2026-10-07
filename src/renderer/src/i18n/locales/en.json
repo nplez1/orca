@@ -6660,14 +6660,20 @@
           "2c245ac134": "Saving unlinks {{link}} — a workspace tracks one issue.",
           "d8c8a30d1f": "Couldn't open that issue. Check the identifier and your Linear connection.",
           "269198eeda": "Couldn't open that issue. Check the number and your GitHub connection.",
-          "f047887705": "Paste a GitHub or Linear URL, or enter a number. Leave blank to remove the link.",
+          "f047887705": "Paste an issue URL or key, or enter an issue number. Leave blank to remove the link.",
           "ad78f9bee2": "Issue",
-          "662ae142f8": "Issue #, or a GitHub or Linear URL",
-          "929c98d05a": "Issue provider"
+          "662ae142f8": "Issue #, key, or an issue URL",
+          "929c98d05a": "Issue provider",
+          "3d7a1e90b4": "Jira",
+          "7b2c48d0a6": "Not a Jira issue key or Jira issue URL.",
+          "e91f5b2c73": "Couldn't open that issue. Check the identifier and your Jira connection."
         },
         "worktreeIssueDisplacement": {
           "3f61c0a8d2": "Linear {{value}}",
-          "9c4b7e1f60": "GitHub #{{value}}"
+          "9c4b7e1f60": "GitHub #{{value}}",
+          "b7f1d0c4a9": "Jira {{value}}",
+          "c3a9f2b1d7": "This workspace is linked to a GitLab issue, which this field cannot replace.",
+          "6d0e8a45b2": "This workspace was created from a linked change request. This field only links issues."
         },
         "WorktreeCardSshHostControl": {
           "connectFailed": "SSH connection failed",
@@ -6785,6 +6791,16 @@
           "63cf2888f5": "{{value0}} hidden",
           "040f28a2a6": "Status",
           "66ae0c2967": "Show all"
+        },
+        "useWorktreeMetaJiraLink": {
+          "4c1f7a2b90": "That Jira URL belongs to a site that is not connected.",
+          "8d2e0b6f31": "Connect Jira in Settings, then link the issue.",
+          "1a9c45e7d3": "Paste the full Jira issue URL so Orca knows which site holds it.",
+          "6f3b8c0a52": "Could not prepare this Jira link.",
+          "b5d9e17c48": "Couldn't find {{key}} on {{site}}. Check the key and your Jira access.",
+          "27e6a3d1f5": "Couldn't read {{key}} from Jira. Check your Jira connection and try again.",
+          "9b7f1d38a4": "More than one connected Jira account uses that site, so Orca cannot tell which one to read.",
+          "2e5a90c47b": "The Jira site this workspace is linked to is not connected."
         }
       },
       "shared": {

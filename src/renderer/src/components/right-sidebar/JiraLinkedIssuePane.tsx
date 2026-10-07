@@ -22,6 +22,12 @@ import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type JiraLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'jira' }>
 
+/** The site a linked workspace already records, for the first hydrate. */
+function fetchJiraSiteId(sourceContext: TaskSourceContext | null): string | null {
+  const identity = sourceContext?.provider === 'jira' ? sourceContext.providerIdentity : null
+  return identity?.provider === 'jira' ? (identity.siteId ?? null) : null
+}
+
 function jiraUserOption(user: JiraUser): IssueAssigneeOption {
   return { id: user.accountId, label: user.displayName, avatarUrl: user.avatarUrl }
 }
@@ -67,12 +73,14 @@ export function JiraLinkedIssuePane({
     issue: null,
     // Why: the workspace persists only the issue key; the hook hydrates the rest.
     fetchKey: linkedIssue.key,
+    // Why: the link's own site, not the host's currently selected one — a workspace
+    // linked to another site would otherwise read back nothing for a valid key.
+    fetchSiteId: fetchJiraSiteId(sourceContext),
     providerSettings,
     sourceContext
   })
   const displayed = detail.displayed
   const siteId = displayed?.siteId ?? undefined
-
   const searchAssignees = useCallback(
     (query: string): Promise<IssueAssigneeOption[]> =>
       jiraSearchUsers(providerSettings, query, siteId).then((users) => users.map(jiraUserOption)),

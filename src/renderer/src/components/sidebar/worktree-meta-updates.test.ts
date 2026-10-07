@@ -3,6 +3,7 @@ import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import {
   buildWorktreeMetaUpdates,
   parseGitLabMergeRequestNumberForMetaField,
+  type ResolvedJiraIssueLink,
   type WorktreeMetaDraft,
   type WorktreeMetaLiveLinks,
   type WorktreeMetaSnapshot,
@@ -37,13 +38,15 @@ function buildUpdates(
   draft: Partial<WorktreeMetaDraft>,
   snapshot: Partial<WorktreeMetaSnapshot> = {},
   live: WorktreeMetaLiveLinks = {},
-  reviewProvider: WorktreeReviewProvider = 'github'
+  reviewProvider: WorktreeReviewProvider = 'github',
+  jiraLink: ResolvedJiraIssueLink | null = null
 ): Partial<WorktreeMeta> {
   const updates = buildWorktreeMetaUpdates(
     makeDraft(draft),
     makeSnapshot(snapshot),
     live,
-    reviewProvider
+    reviewProvider,
+    jiraLink
   )
   const undefinedKeys = Object.keys(updates).filter(
     (key) => updates[key as keyof WorktreeMeta] === undefined
@@ -57,6 +60,33 @@ const LINEAR_LINK_KEYS = [
   'linkedLinearIssueWorkspaceId',
   'linkedLinearIssueOrganizationUrlKey'
 ] as const
+
+/** A resolved Jira link, as the dialog's lookup produces it. */
+function jiraLink(key: string): ResolvedJiraIssueLink {
+  return {
+    linkedWorkItem: {
+      provider: 'jira',
+      type: 'issue',
+      number: 0,
+      title: `${key} Fix checkout`,
+      url: `https://acme.atlassian.net/browse/${key}`,
+      jiraIdentifier: key
+    },
+    linkedTaskSourceContext: {
+      kind: 'task-source',
+      provider: 'jira',
+      projectId: 'account-backed-task-source',
+      hostId: 'local',
+      providerIdentity: {
+        provider: 'jira',
+        siteId: 'site-1',
+        siteUrl: 'https://acme.atlassian.net',
+        projectKey: key.slice(0, key.lastIndexOf('-'))
+      },
+      accountLabel: 'Acme'
+    }
+  }
+}
 
 describe('buildWorktreeMetaUpdates', () => {
   it('writes only the GitLab MR slot in GitLab mode', () => {
@@ -184,19 +214,119 @@ describe('buildWorktreeMetaUpdates', () => {
     expect(updates).not.toHaveProperty('linkedTaskSourceContext')
   })
 
-  // The row cannot render a GitLab or Jira issue, so clearing one would destroy a
-  // link the user was never shown — and neither has another editor to restore it.
-  it('leaves work items owned by other providers alone', () => {
-    for (const provider of ['jira', 'gitlab'] as const) {
+  // A GitLab issue still has no editor here, so clearing one would destroy a link
+  // the user was never shown. Jira is NOT in this set any more: the dialog now
+  // reads and writes it, so a save that names a different issue must displace it.
+  it('leaves a GitLab work item alone', () => {
+    const updates = buildUpdates(
+      { issueInput: '12' },
+      {},
+      { linkedWorkItemProvider: 'gitlab', linkedWorkItemType: 'issue' }
+    )
+
+    expect(updates).not.toHaveProperty('linkedWorkItem')
+    expect(updates).not.toHaveProperty('linkedTaskSourceContext')
+  })
+
+  it('displaces a Jira work item when the field names another issue', () => {
+    const updates = buildUpdates(
+      { issueInput: '12' },
+      {},
+      { linkedWorkItemProvider: 'jira', linkedWorkItemType: 'issue' }
+    )
+
+    expect(updates).toHaveProperty('linkedWorkItem', null)
+    expect(updates).toHaveProperty('linkedTaskSourceContext', null)
+  })
+
+  it('clears a Jira work item when the field is emptied', () => {
+    const updates = buildUpdates(
+      { issueInput: '' },
+      { issueInput: 'ABC-1', issueProvider: 'jira' },
+      {
+        linkedWorkItemProvider: 'jira',
+        linkedWorkItemType: 'issue',
+        linkedWorkItemJiraIdentifier: 'ABC-1',
+        linkedWorkItemUrl: 'https://acme.atlassian.net/browse/ABC-1'
+      }
+    )
+
+    expect(updates).toHaveProperty('linkedWorkItem', null)
+    expect(updates).toHaveProperty('linkedTaskSourceContext', null)
+  })
+
+  it('writes the resolved Jira item and its source context', () => {
+    const resolved = jiraLink('ABC-2')
+    const updates = buildUpdates(
+      { issueInput: 'ABC-2', issueProvider: 'jira' },
+      {},
+      { linkedWorkItemProvider: 'github', linkedWorkItemType: 'issue', linkedIssue: 12 },
+      'github',
+      resolved
+    )
+
+    expect(updates).toHaveProperty('linkedWorkItem', resolved.linkedWorkItem)
+    expect(updates).toHaveProperty('linkedTaskSourceContext', resolved.linkedTaskSourceContext)
+    expect(updates).toHaveProperty('linkedIssue', null)
+  })
+
+  // Same key, another site is a different issue — so it replaces rather than re-states.
+  it('replaces a Jira link when the same key names another site', () => {
+    const resolved = jiraLink('ABC-1')
+    const updates = buildUpdates(
+      { issueInput: 'https://other.atlassian.net/browse/ABC-1', issueProvider: 'jira' },
+      { issueInput: 'ABC-1', issueProvider: 'jira' },
+      {
+        linkedWorkItemProvider: 'jira',
+        linkedWorkItemType: 'issue',
+        linkedWorkItemJiraIdentifier: 'ABC-1',
+        linkedWorkItemUrl: 'https://acme.atlassian.net/browse/ABC-1'
+      },
+      'github',
+      resolved
+    )
+
+    expect(updates).toHaveProperty('linkedWorkItem', resolved.linkedWorkItem)
+  })
+
+  // A work item another surface owns must survive a Jira save: this row has no
+  // editor for a change request or a GitLab issue, so replacing one would drop a
+  // title, URL and read-routing context nothing here can restore.
+  it('refuses to write a Jira item over a work item it does not own', () => {
+    for (const live of [
+      { linkedWorkItemProvider: 'github', linkedWorkItemType: 'pr' },
+      { linkedWorkItemProvider: 'gitlab', linkedWorkItemType: 'mr' },
+      { linkedWorkItemProvider: 'gitlab', linkedWorkItemType: 'issue' }
+    ] as const) {
       const updates = buildUpdates(
-        { issueInput: '12' },
+        { issueInput: 'ABC-2', issueProvider: 'jira' },
         {},
-        { linkedWorkItemProvider: provider, linkedWorkItemType: 'issue' }
+        live,
+        'github',
+        jiraLink('ABC-2')
       )
 
       expect(updates).not.toHaveProperty('linkedWorkItem')
       expect(updates).not.toHaveProperty('linkedTaskSourceContext')
     }
+  })
+
+  // A URL that respells the linked key on the SAME site names the issue already
+  // held, so the item and its source context survive; only the empty GitHub slot
+  // is restated, which is a no-op for persistence.
+  it('keeps the Jira item when its key is respelled as its own URL', () => {
+    const updates = buildUpdates(
+      { issueInput: 'https://acme.atlassian.net/browse/abc-1', issueProvider: 'jira' },
+      { issueInput: 'ABC-1', issueProvider: 'jira' },
+      {
+        linkedWorkItemProvider: 'jira',
+        linkedWorkItemType: 'issue',
+        linkedWorkItemJiraIdentifier: 'ABC-1',
+        linkedWorkItemUrl: 'https://acme.atlassian.net/browse/ABC-1'
+      }
+    )
+
+    expect(updates).toEqual({ linkedIssue: null })
   })
 
   // Only the spelling changed, so the field names the same issue it already

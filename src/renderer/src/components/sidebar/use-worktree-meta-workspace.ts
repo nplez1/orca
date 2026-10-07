@@ -7,6 +7,22 @@ import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-w
 import type { IssueLinkProvider } from '../../../../shared/issue-link-input'
 import type { WorktreeMetaLiveLinks } from './worktree-meta-updates'
 
+/** The link state as it stands right now, for save-time displacement decisions.
+ *  Exported so a save that awaits a lookup can re-read it on the other side of the
+ *  await instead of deciding against a value captured before it. */
+export function toWorktreeMetaLiveLinks(worktree: Worktree | undefined): WorktreeMetaLiveLinks {
+  return {
+    linkedPR: worktree?.linkedPR ?? null,
+    linkedIssue: worktree?.linkedIssue ?? null,
+    linkedLinearIssue: worktree?.linkedLinearIssue ?? null,
+    linkedLinearIssueOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null,
+    linkedWorkItemProvider: worktree?.linkedWorkItem?.provider ?? null,
+    linkedWorkItemType: worktree?.linkedWorkItem?.type ?? null,
+    linkedWorkItemUrl: worktree?.linkedWorkItem?.url ?? null,
+    linkedWorkItemJiraIdentifier: worktree?.linkedWorkItem?.jiraIdentifier ?? null
+  }
+}
+
 /** Resolves the workspace the meta dialog edits and the issue-link state it
  *  seeds from. Link state is read from the store rather than threaded through
  *  the untyped modalData bag — a call site that forgot a key would otherwise
@@ -62,36 +78,35 @@ export function useWorktreeMetaWorkspace(args: {
   )
   const linkedIssue = worktree?.linkedIssue ?? null
   const linkedLinearIssue = worktree?.linkedLinearIssue ?? null
+  // Why: the pane's resolver prefers the dedicated GitHub/Linear slots over the
+  // created-from work item, so the dialog seeds in that same order — otherwise
+  // the field would offer to rewrite a link the workspace is not actually using.
+  const linkedJiraWorkItem =
+    worktree?.linkedWorkItem?.provider === 'jira' && worktree.linkedWorkItem.type === 'issue'
+      ? worktree.linkedWorkItem
+      : null
   // Why: `typeof` rather than a null check — an unhydrated projection can leave
   // linkedIssue undefined, which `!== null` would read as a GitHub link.
   const currentProvider: IssueLinkProvider =
-    typeof linkedIssue === 'number' ? 'github' : linkedLinearIssue ? 'linear' : 'github'
+    typeof linkedIssue === 'number'
+      ? 'github'
+      : linkedLinearIssue
+        ? 'linear'
+        : linkedJiraWorkItem
+          ? 'jira'
+          : 'github'
   const currentIssue =
     currentProvider === 'linear'
       ? (linkedLinearIssue ?? '')
-      : typeof linkedIssue === 'number'
-        ? String(linkedIssue)
-        : ''
+      : currentProvider === 'jira'
+        ? (linkedJiraWorkItem?.jiraIdentifier ?? String(linkedJiraWorkItem?.number ?? ''))
+        : typeof linkedIssue === 'number'
+          ? String(linkedIssue)
+          : ''
   // Why: displacement is decided against live state, not the frozen snapshot —
   // the dialog's warning reads the same values, so a link added by the CLI while
   // the dialog was open cannot outlive a save that promised to displace it.
-  const liveLinks = useMemo<WorktreeMetaLiveLinks>(
-    () => ({
-      linkedPR: worktree?.linkedPR ?? null,
-      linkedIssue,
-      linkedLinearIssue,
-      linkedLinearIssueOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null,
-      linkedWorkItemProvider: worktree?.linkedWorkItem?.provider ?? null,
-      linkedWorkItemType: worktree?.linkedWorkItem?.type ?? null
-    }),
-    [
-      linkedIssue,
-      linkedLinearIssue,
-      worktree?.linkedPR,
-      worktree?.linkedLinearIssueOrganizationUrlKey,
-      worktree?.linkedWorkItem
-    ]
-  )
+  const liveLinks = useMemo(() => toWorktreeMetaLiveLinks(worktree), [worktree])
 
   return {
     worktree,

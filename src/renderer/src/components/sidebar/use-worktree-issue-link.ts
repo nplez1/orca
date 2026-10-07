@@ -5,7 +5,7 @@ import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { findIndexedWorktreeOwner } from '@/lib/worktree-runtime-owner-index'
 import { buildLinearIssueUrl, parseLinearIssueInput } from '../../../../shared/linear/links'
-import type { IssueLinkProvider } from '../../../../shared/issue-link-input'
+import { parseIssueLinkInput, type IssueLinkProvider } from '../../../../shared/issue-link-input'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import { parseExplicitGitHubIssueUrl } from './worktree-meta-updates'
 import { isWorkItemLinkQueryTooLarge } from '../../../../shared/new-workspace/work-item-link-query-bounds'
@@ -52,6 +52,10 @@ export function useWorktreeIssueLink(args: {
   /** The persisted identifier the stored org key belongs to. */
   linkedLinearIssue?: string | null
   linearSourceContext?: TaskSourceContext | null
+  /** Resolves a Jira key to its canonical URL. The dialog owns this because the
+   *  save path needs the same site choice and lookup; without it only a typed
+   *  issue URL can be opened, since a bare key cannot name its site. */
+  resolveJiraIssueUrl?: (parsed: { key: string; siteUrl: string | null }) => Promise<string | null>
 }): {
   canOpenIssue: boolean
   openingIssue: boolean
@@ -67,9 +71,11 @@ export function useWorktreeIssueLink(args: {
     issueProvider,
     linearOrganizationUrlKey,
     linkedLinearIssue,
-    linearSourceContext
+    linearSourceContext,
+    resolveJiraIssueUrl
   } = args
   const isLinear = issueProvider === 'linear'
+  const isJira = issueProvider === 'jira'
   const fetchIssue = useAppStore((s) => s.fetchIssue)
   const fetchLinearIssue = useAppStore((s) => s.fetchLinearIssue)
   const [openingIssue, setOpeningIssue] = useState(false)
@@ -92,12 +98,12 @@ export function useWorktreeIssueLink(args: {
   )
 
   const issueNumber = useMemo(
-    () => (isLinear ? null : parseGitHubIssueOrPRNumber(boundedInput)),
-    [isLinear, boundedInput]
+    () => (isLinear || isJira ? null : parseGitHubIssueOrPRNumber(boundedInput)),
+    [isJira, isLinear, boundedInput]
   )
   const issueUrlFromInput = useMemo(
-    () => (isLinear ? null : parseExplicitGitHubIssueUrl(boundedInput)),
-    [isLinear, boundedInput]
+    () => (isLinear || isJira ? null : parseExplicitGitHubIssueUrl(boundedInput)),
+    [isJira, isLinear, boundedInput]
   )
   const issueInputLooksLikeUrl = useMemo(
     () => /^https?:\/\//i.test(boundedInput.trim()),
@@ -107,6 +113,13 @@ export function useWorktreeIssueLink(args: {
     () => (isLinear ? parseLinearIssueInput(boundedInput) : null),
     [isLinear, boundedInput]
   )
+  const parsedJiraIssue = useMemo(() => {
+    if (!isJira) {
+      return null
+    }
+    const parsed = parseIssueLinkInput(boundedInput.trim(), 'jira')
+    return parsed?.provider === 'jira' ? parsed : null
+  }, [isJira, boundedInput])
   // Why: only an org key that is authoritative *for this identifier* may build a
   // URL directly — the input's own, or the workspace's stored one while the typed
   // identifier still is that issue. The connected viewer's key is not: a bare key
@@ -149,11 +162,13 @@ export function useWorktreeIssueLink(args: {
       ]?.data?.url ?? null
     )
   })
-  const canOpenIssue = isLinear
-    ? Boolean(parsedLinearIssue)
-    : issueInputLooksLikeUrl
-      ? Boolean(issueUrlFromInput)
-      : Boolean(cachedIssueUrl || (issueRepo && issueNumber))
+  const canOpenIssue = isJira
+    ? Boolean(parsedJiraIssue && (parsedJiraIssue.siteUrl || resolveJiraIssueUrl))
+    : isLinear
+      ? Boolean(parsedLinearIssue)
+      : issueInputLooksLikeUrl
+        ? Boolean(issueUrlFromInput)
+        : Boolean(cachedIssueUrl || (issueRepo && issueNumber))
 
   const handleOpenIssue = useCallback(async () => {
     if (openingIssue) {
@@ -168,6 +183,44 @@ export function useWorktreeIssueLink(args: {
       mountedRef.current &&
       openRequestRef.current === generation &&
       latestRequestKeyRef.current === requestKey
+
+    if (isJira) {
+      if (!parsedJiraIssue) {
+        return
+      }
+      // Why: a pasted URL names its own site, so it opens without a lookup. A bare
+      // key cannot, and goes through the dialog's resolver for the site choice.
+      if (parsedJiraIssue.siteUrl) {
+        void window.api.shell.openUrl(
+          `${parsedJiraIssue.siteUrl}/browse/${encodeURIComponent(parsedJiraIssue.key)}`
+        )
+        return
+      }
+      if (!resolveJiraIssueUrl) {
+        return
+      }
+      setOpeningIssue(true)
+      try {
+        const url = await resolveIssueUrlWithinTimeout(
+          resolveJiraIssueUrl(parsedJiraIssue).then((resolved) =>
+            resolved ? { url: resolved } : null
+          )
+        )
+        if (!isCurrentRequest()) {
+          return
+        }
+        if (url) {
+          void window.api.shell.openUrl(url)
+        } else {
+          setFailedIssueInput(issueInput)
+        }
+      } finally {
+        if (mountedRef.current) {
+          setOpeningIssue(false)
+        }
+      }
+      return
+    }
 
     if (isLinear) {
       if (!parsedLinearIssue) {
@@ -246,6 +299,7 @@ export function useWorktreeIssueLink(args: {
     cachedIssueUrl,
     fetchIssue,
     fetchLinearIssue,
+    isJira,
     isLinear,
     issueInput,
     issueInputLooksLikeUrl,
@@ -256,7 +310,9 @@ export function useWorktreeIssueLink(args: {
     linearSourceContext,
     mountedRef,
     openingIssue,
-    parsedLinearIssue
+    parsedJiraIssue,
+    parsedLinearIssue,
+    resolveJiraIssueUrl
   ])
 
   const resetOpeningIssue = useCallback(() => {

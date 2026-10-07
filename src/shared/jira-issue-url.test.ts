@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { JiraIssue, JiraSite } from './jira-types'
-import { getMatchingJiraSites, isResolvedJiraIssueMatch, parseJiraIssueUrl } from './jira-issue-url'
+import {
+  getJiraSiteIdentityKey,
+  getMatchingJiraSites,
+  isResolvedJiraIssueMatch,
+  parseJiraIssueUrl
+} from './jira-issue-url'
 
 function site(id: string, siteUrl: string): JiraSite {
   return { id, siteUrl, email: `${id}@example.com`, displayName: id, accountId: id }
@@ -91,5 +96,41 @@ describe('Jira site and issue matching', () => {
         issue({ url: 'https://other.atlassian.net/browse/ORCA-123' })
       )
     ).toBe(false)
+  })
+})
+
+describe('getJiraSiteIdentityKey', () => {
+  // A stored link keeps the site URL while a typed value is usually an issue URL,
+  // so both spellings of one site must reduce to the same identity.
+  it('reduces a site URL and an issue URL on that site to one identity', () => {
+    expect(getJiraSiteIdentityKey('https://company.atlassian.net')).toBe(
+      getJiraSiteIdentityKey('https://company.atlassian.net/browse/ORCA-123')
+    )
+    expect(getJiraSiteIdentityKey('https://jira.company.com:8443/jira')).toBe(
+      getJiraSiteIdentityKey('https://jira.company.com:8443/jira/browse/TEAM_CORE-42')
+    )
+  })
+
+  it('ignores a trailing slash and the host case', () => {
+    expect(getJiraSiteIdentityKey('https://Company.Atlassian.net/')).toBe(
+      getJiraSiteIdentityKey('https://company.atlassian.net/browse/ORCA-123')
+    )
+  })
+
+  it('separates two sites that are not the same instance', () => {
+    expect(getJiraSiteIdentityKey('https://company.atlassian.net')).not.toBe(
+      getJiraSiteIdentityKey('https://other.atlassian.net')
+    )
+    // Same host, different context path: two Jira instances.
+    expect(getJiraSiteIdentityKey('https://jira.company.com/jira')).not.toBe(
+      getJiraSiteIdentityKey('https://jira.company.com/other')
+    )
+  })
+
+  it('returns null for values that cannot name a Jira site', () => {
+    expect(getJiraSiteIdentityKey(null)).toBeNull()
+    expect(getJiraSiteIdentityKey('not a url')).toBeNull()
+    expect(getJiraSiteIdentityKey('ftp://jira.company.com')).toBeNull()
+    expect(getJiraSiteIdentityKey('https://jira.company.com/jira?account=a')).toBeNull()
   })
 })
