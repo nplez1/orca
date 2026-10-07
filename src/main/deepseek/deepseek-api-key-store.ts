@@ -3,7 +3,7 @@ import { createEncryptedApiKeyFileStore } from '../credentials/encrypted-api-key
 const deepSeekApiKeyStore = createEncryptedApiKeyFileStore({
   fileName: 'deepseek-api-key.enc',
   envelopePrefix: 'orca-deepseek-api-key:v1:',
-  providerLabel: 'DeepSeek API key',
+  providerLabel: 'DeepSeek',
   logScope: 'deepseek'
 })
 
