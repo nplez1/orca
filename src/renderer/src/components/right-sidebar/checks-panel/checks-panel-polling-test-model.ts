@@ -11,6 +11,7 @@ export function createModel(overrides: Partial<PollingInput> = {}): PollingInput
     activeWorktree: null,
     asyncResultKeyRef: { current: 'cache::main::42' },
     branch: 'main',
+    checks: [],
     fetchPRChecks,
     hostedReviewCacheKey: 'hosted-review',
     isCurrentAsyncResult: () => true,

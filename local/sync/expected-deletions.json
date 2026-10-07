@@ -7,23 +7,15 @@
     "the check can pass without weakening it.",
     "Each entry must name the live replacement and the evidence for calling it a superset — the check",
     "prints this, so the next sync inherits the reasoning instead of re-deriving it.",
-    "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed."
+    "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed.",
+    "Entries are therefore per sync: a previous sync's acknowledgements are pruned once their deletion is",
+    "no longer part of the tip..HEAD range."
   ],
   "acknowledged": {
-    "src/main/ipc/filesystem/filesystem-quick-open-listing-handler.ts": {
-      "supersededBy": "src/main/ipc/filesystem/filesystem-search-handlers.ts (the inline `fs:listFiles` handler)",
-      "reason": "The fork's listing behaviour survived the handoff: `fs:listFiles` still accepts `nameFilter` and matches its whitespace-separated tokens (args at line 40, matching at 98-110), and `fs:cancelListFiles` is still registered. The module's channel was not dropped, only re-homed.",
-      "since": "235cd5118b"
-    },
-    "src/relay/quick-open-list-line-processor.ts": {
-      "supersededBy": "src/relay/fs-file-listing-paths.ts + quick-open-listing-path-filter.ts (via fs-handler-list-files.ts)",
-      "reason": "Compared branch by branch: root-relative normalisation, the unparseable-record return, the blocklist backstop, exclude prefixes, the name-filter dotfile scope, matcher delivery, dedupe, maxResults truncation, the counted-line return, and the decode/cancel/symlink/separator framing all have live counterparts. It was a pure module, so the deletion lost no behaviour of its own. The behaviour that WAS lost sat in the other deleted module and has been restored rather than acknowledged away: the worker-owned index warm at fs:listFiles and cancelLocalConsumer(senderId) at fs:cancelListFiles had no caller left while fs:searchFilePaths still submitted index queries under that consumer id, so a cancelled filter left its worker query running. Both are restored in filesystem-search-handlers.ts and pinned by filesystem-quick-open-path-index-wiring.test.ts.",
-      "since": "235cd5118b"
-    },
-    "src/main/ipc/filesystem/filesystem-text-search-handler.ts": {
-      "supersededBy": "src/main/ipc/filesystem/filesystem-content-search-handler.ts",
-      "reason": "Upstream's handler registers the same `fs:search` channel and adds `fs:cancelSearch` with sender-scoped cancellation, which the fork's extracted handler never had. A superset, verified by reading both registrations.",
-      "since": "235cd5118b"
+    "src/main/claude/claude-turn-row-revision.ts": {
+      "supersededBy": "src/main/native-chat/agent-session-timeline/agent-journal-turn-row-revision.ts (writeAgentJournalTurnRow et al.)",
+      "reason": "Upstream moved it, it was not ours to lose: `c0b07d3a71` renames `claude-turn-row-revision.ts` to the provider-neutral `agent-journal-turn-row-revision.ts` (`R068`) and updates both callers in the same commit. The four exports renamed with it — `ClaudeTurnRowTarget`/`ClaudeTurnRowWrite`/`ClaudeTurnRowDelivery` become `AgentJournalTurnRowTarget`/`AgentJournalTurnRowWrite`/`AgentJournalTurnRowDelivery` and `writeClaudeTurnRow` becomes `writeAgentJournalTurnRow`. The live tree references them from `claude-context-facts.ts` and `claude-open-turn.ts` (the same two callers the scan reported as its old referrers) plus `provider-timeline-settlement.ts` and `provider-timeline-turn-decisions.ts`, so no call was dropped in the merge. The fork never modified the file: `git diff 6c693edf40 ed0be2085f` on it and on both callers is empty, which is why the merge took upstream's move cleanly.",
+      "since": "7c0a53a148"
     }
   }
 }
