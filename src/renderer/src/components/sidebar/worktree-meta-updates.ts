@@ -4,7 +4,9 @@ import {
   LINEAR_ISSUE_LINK_CLEARED
 } from '../../../../shared/linear/links'
 import { parseIssueLinkInput, type IssueLinkProvider } from '../../../../shared/issue-link-input'
+import { getJiraSiteIdentityKey } from '../../../../shared/jira-issue-url'
 import type { WorkspaceSourceProvider } from '../../../../shared/new-workspace/workspace-source'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import type { WorkspaceLinkedItem } from '../../../../shared/worktree/types'
 import { parseGitLabIssueOrMRLink } from '../../../../shared/new-workspace/gitlab-links'
@@ -52,6 +54,17 @@ export type WorktreeMetaLiveLinks = {
   linkedWorkItemProvider?: WorkspaceSourceProvider | null
   /** `linkedWorkItem` also describes PRs and MRs, which this row does not own. */
   linkedWorkItemType?: WorkspaceLinkedItem['type'] | null
+  /** The item's own URL, so a Jira link can tell "same issue" from "same key, another site". */
+  linkedWorkItemUrl?: string | null
+  linkedWorkItemJiraIdentifier?: string | null
+}
+
+/** A Jira issue resolved to the shape a workspace link is stored in. Jira has no
+ *  dedicated slot, so the dialog cannot write one from the typed text alone: the
+ *  stored item needs the issue's title and URL, and the read needs its site. */
+export type ResolvedJiraIssueLink = {
+  linkedWorkItem: WorkspaceLinkedItem
+  linkedTaskSourceContext: TaskSourceContext
 }
 
 export function parseExplicitGitHubIssueUrl(input: string): string | null {
@@ -145,6 +158,12 @@ function issueLinkIdentity(
   if (parsed.provider === 'github') {
     return `github:${parsed.number}`
   }
+  if (parsed.provider === 'jira') {
+    // Why: two sites can hold the same key, so a typed URL names the site it
+    // means. A bare key names none and matches either spelling of the same issue.
+    const site = getJiraSiteIdentityKey(parsed.siteUrl)
+    return site ? `jira:${parsed.key.toUpperCase()}@${site}` : `jira:${parsed.key.toUpperCase()}`
+  }
   const organizationUrlKey = parsed.organizationUrlKey ?? storedLinearOrganizationUrlKey ?? ''
   return `linear:${parsed.identifier}:${organizationUrlKey.trim().toLowerCase()}`
 }
@@ -169,7 +188,7 @@ export function isIssueFieldDirty(
  *  describes. Org keys only disagree when both are known: a stored link without
  *  one is not evidence of a different organization, so a URL that supplies it
  *  refines the link rather than replacing it. */
-function keepsLinkedWorkItem(
+export function keepsLinkedWorkItem(
   input: string,
   provider: IssueLinkProvider,
   live: WorktreeMetaLiveLinks
@@ -180,6 +199,19 @@ function keepsLinkedWorkItem(
   }
   if (parsed.provider === 'github') {
     return live.linkedWorkItemProvider === 'github' && parsed.number === live.linkedIssue
+  }
+  if (parsed.provider === 'jira') {
+    if (
+      live.linkedWorkItemProvider !== 'jira' ||
+      parsed.key.toUpperCase() !== (live.linkedWorkItemJiraIdentifier ?? '').trim().toUpperCase()
+    ) {
+      return false
+    }
+    const typedSite = getJiraSiteIdentityKey(parsed.siteUrl)
+    const liveSite = getJiraSiteIdentityKey(live.linkedWorkItemUrl)
+    // Why: org keys only disagree when both are known — the same rule as Linear.
+    // A bare key re-states the stored link; a URL naming another site does not.
+    return !typedSite || !liveSite || typedSite === liveSite
   }
   if (
     live.linkedWorkItemProvider !== 'linear' ||
@@ -199,11 +231,38 @@ function keepsLinkedWorkItem(
 /** Owns both provider slot families. One issue per workspace: writing one
  *  provider clears the other. Emits nothing at all unless the field changed —
  *  the dialog opens focused on Comment, so an untouched field must never
- *  destroy a link the user came here to keep. */
+ *  destroy a link the user came here to keep.
+ *
+ *  `jiraLink` is the resolved Jira issue for a dirty Jira field; it is null for
+ *  every other provider, and null when the save path could not resolve one. */
+/** Whether the Issue field may replace the work item the workspace holds.
+ *
+ *  It owns an absent item and its own Jira issue; the GitHub and Linear issue it
+ *  also displaces carry their own provider slots and a warning. A PR/MR-typed item
+ *  and a GitLab issue belong to surfaces this row has no editor for, so replacing
+ *  one would drop a title, URL and read-routing context nothing here can restore. */
+export function canReplaceLinkedWorkItem(live: WorktreeMetaLiveLinks): boolean {
+  const provider = live.linkedWorkItemProvider
+  if (provider === null || provider === undefined) {
+    return true
+  }
+  return live.linkedWorkItemType === 'issue' && provider !== 'gitlab'
+}
+
+/** Whether the draft re-states the Jira issue the workspace already holds, in
+ *  which case saving rewrites nothing and needs no Jira read. */
+export function keepsLiveJiraWorkItem(
+  draft: WorktreeMetaDraft,
+  live: WorktreeMetaLiveLinks
+): boolean {
+  return keepsLinkedWorkItem(draft.issueInput, draft.issueProvider, live)
+}
+
 function buildIssueLinkUpdates(
   draft: WorktreeMetaDraft,
   current: WorktreeMetaSnapshot,
-  live: WorktreeMetaLiveLinks
+  live: WorktreeMetaLiveLinks,
+  jiraLink: ResolvedJiraIssueLink | null
 ): Partial<WorktreeMeta> {
   if (!isIssueFieldDirty(draft, current)) {
     return {}
@@ -216,12 +275,14 @@ function buildIssueLinkUpdates(
   // re-states the same one, such as a URL adding an org key, must keep its own
   // title and SSH/runtime routing context. Narrow on purpose: `type` because the
   // field also records the PR or MR a workspace was created from, and provider
-  // because GitLab and Jira issues have no slot in this row — displacing what it
-  // cannot display would destroy a link the user was never shown and has no
-  // other editor to restore it from.
+  // because GitLab issues have no slot in this row — displacing what it cannot
+  // display would destroy a link the user was never shown and has no other
+  // editor to restore it from.
   const displacedWorkItem: Partial<WorktreeMeta> =
     !keepsLinkedWorkItem(trimmed, draft.issueProvider, live) &&
-    (live.linkedWorkItemProvider === 'github' || live.linkedWorkItemProvider === 'linear') &&
+    (live.linkedWorkItemProvider === 'github' ||
+      live.linkedWorkItemProvider === 'linear' ||
+      live.linkedWorkItemProvider === 'jira') &&
     live.linkedWorkItemType === 'issue'
       ? { linkedWorkItem: null, linkedTaskSourceContext: null }
       : {}
@@ -255,6 +316,25 @@ function buildIssueLinkUpdates(
       linkedIssue: parsed.number,
       ...displacedLinear,
       ...displacedWorkItem
+    }
+  }
+
+  if (parsed.provider === 'jira') {
+    if (keepsLinkedWorkItem(trimmed, draft.issueProvider, live)) {
+      return { linkedIssue: null, ...displacedLinear }
+    }
+    // Why: a Jira link is the stored item plus its source context, so there is
+    // nothing to write without one, and nothing the field may replace either —
+    // `canReplaceLinkedWorkItem` is what stops a Jira save from silently throwing
+    // away a work item another surface owns.
+    if (!jiraLink || !canReplaceLinkedWorkItem(live)) {
+      return {}
+    }
+    return {
+      linkedIssue: null,
+      ...displacedLinear,
+      linkedWorkItem: jiraLink.linkedWorkItem,
+      linkedTaskSourceContext: jiraLink.linkedTaskSourceContext
     }
   }
 
@@ -298,12 +378,13 @@ export function buildWorktreeMetaUpdates(
   draft: WorktreeMetaDraft,
   current: WorktreeMetaSnapshot,
   live: WorktreeMetaLiveLinks,
-  reviewProvider: WorktreeReviewProvider = 'github'
+  reviewProvider: WorktreeReviewProvider = 'github',
+  jiraLink: ResolvedJiraIssueLink | null = null
 ): Partial<WorktreeMeta> {
   return {
     ...buildCommentUpdate(draft, current),
     ...buildDisplayNameUpdate(draft, current),
-    ...buildIssueLinkUpdates(draft, current, live),
+    ...buildIssueLinkUpdates(draft, current, live, jiraLink),
     ...buildReviewLinkUpdate(draft, current, live, reviewProvider)
   }
 }

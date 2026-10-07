@@ -96,6 +96,21 @@ export function localizationCatalog() {
   }
 }
 
+/** Repo-wide oxlint — the same command the CI lint step runs.
+ *
+ *  Why it belongs here: the changed-lines gate only ever looks at a PR's own diff, so a merge
+ *  resolution that pushes a file past `max-lines` (or trips a naming rule) lands unnoticed and is
+ *  inherited by the next PR that touches that file. The np.18 sync left six such files behind,
+ *  and a later unrelated change inherited all of them. */
+export function repoLint() {
+  const result = run(pnpmCommand(), ['exec', 'oxlint'], { cwd: repoRoot() })
+  return {
+    status: result.ok ? STATUS.passed : STATUS.failed,
+    summary: result.ok ? 'clean' : `failed (exit ${result.code ?? 'did not run'})`,
+    details: result.ok ? [] : tailText(`${result.stdout}\n${result.stderr}`, 40)
+  }
+}
+
 export function typecheck(options) {
   if (options.skipTypecheck) {
     return { status: STATUS.skipped, summary: 'skipped by --skip-typecheck', details: [] }

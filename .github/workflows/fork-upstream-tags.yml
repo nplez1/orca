@@ -1,0 +1,40 @@
+name: Mirror upstream release tags
+
+# Why: `tests/e2e/cross-version-wire/` materializes released versions by tag, and it pins
+# tags that only exist upstream. When this fork lags upstream's release train, that job
+# fails for every branch with "could not resolve ref vX.Y.Z" — a red check about this
+# fork's tag list, not about the change under test.
+#
+# Only `v*` desktop tags are mirrored. The mobile release workflows trigger on
+# `mobile-ios-v*` / `mobile-android-v*`, so fetching those would start App Store and Play
+# builds; no desktop workflow triggers on a tag push, so `v*` is inert.
+on:
+  schedule:
+    # Off the hour, to stay off the release-train cron pile-up.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mirror-upstream-release-tags
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Mirror upstream's desktop release tags
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/stablyai/orca.git
+          # Tag refspec only: the mirror must never fetch or touch a branch.
+          git fetch --no-tags upstream '+refs/tags/v*:refs/tags/v*'
+          # No --force: an existing tag is never moved, so this only adds.
+          git push origin --tags
+          printf 'mirrored tags now include: %s\n' "$(git tag -l 'v*' | sort -V | tail -1)"

@@ -35,6 +35,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() })
 }))
 
+// upstream-identity-ok: mirrors the product's own RELEASES_URL (ProtocolBlockScreen.tsx); Orca Mobile APKs publish from upstream's releases
 const RELEASES_URL = 'https://github.com/stablyai/orca/releases'
 
 let renderer: ReactTestRenderer | null = null
@@ -195,7 +196,7 @@ describe('ProtocolBlockScreen', () => {
   describe('with the newest release known', () => {
     const release = {
       version: '0.0.52',
-      url: 'https://github.com/stablyai/orca/releases/tag/mobile-v0.0.52'
+      url: `${RELEASES_URL}/tag/mobile-v0.0.52`
     }
 
     it.each(['ios', 'android'] as const)('opens that exact release on %s', (os) => {

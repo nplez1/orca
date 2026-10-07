@@ -26,6 +26,11 @@ export type {
 } from './task-provider-identity'
 export type { TaskProvider } from './task-providers'
 
+/** The scope key the account-backed task sources (Jira, Linear) use when no repo
+ *  project names one: those sources are scoped by account, not by project, so
+ *  `projectId` only has to be a stable cache-scope key. */
+export const ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID = 'account-backed-task-source'
+
 export type TaskSourceContext = {
   kind: 'task-source'
   provider: TaskProvider

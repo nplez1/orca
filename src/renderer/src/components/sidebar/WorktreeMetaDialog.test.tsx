@@ -1,16 +1,27 @@
 // @vitest-environment happy-dom
 
-import { act, type ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useAppStore } from '@/store'
-import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
 import type { LinearIssue } from '../../../../shared/linear/issue-types'
-import type { Repo } from '../../../../shared/repo-types'
-import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
-import type { WorktreeMetaUpdateOptions } from '@/store/slices/worktree-helpers'
-import type { Worktree } from '../../../../shared/worktree/types'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import {
+  IME_FIELDS,
+  REPO_ID,
+  WORKTREE_ID,
+  fetchLinearIssue,
+  installWorktreeMetaDialogTestLifecycle,
+  issueInput,
+  makeLinearIssue,
+  makeWorktree,
+  openDialog,
+  openIssueButton,
+  openUrl,
+  providerChip,
+  saveButton,
+  updateWorktreeMeta
+} from './worktree-meta-dialog.test-harness'
 
 // Why: Radix tooltips need a provider the dialog does not own, and the menu's
 // portal needs real layout. Stand-ins keep these tests on provider selection.
@@ -52,201 +63,9 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
   }
 })
 
-import WorktreeMetaDialog from './WorktreeMetaDialog'
-
-const REPO_ID = 'repo-1'
-const WORKTREE_ID = 'repo-1::/repo/worktrees/feature'
-
-const IME_FIELDS = [
-  {
-    placeholder: 'Notes about this worktree...',
-    value: '日本語',
-    updates: { comment: '日本語' }
-  },
-  {
-    placeholder: 'Custom display name...',
-    value: '日本語の名前',
-    updates: { displayName: '日本語の名前' }
-  },
-  {
-    placeholder: 'Issue #, or a GitHub or Linear URL',
-    value: '42',
-    updates: { linkedIssue: 42 }
-  },
-  { placeholder: 'PR # or GitHub URL', value: '43', updates: { linkedPR: 43 } },
-  { placeholder: 'MR ! or GitLab URL', value: '!44', updates: { linkedGitLabMR: 44 } }
-] as const
-
-const initialState = useAppStore.getInitialState()
-const updateWorktreeMeta =
-  vi.fn<
-    (
-      id: string,
-      updates: Partial<WorktreeMeta>,
-      options?: WorktreeMetaUpdateOptions
-    ) => Promise<{ ok: true } | { ok: false; error: string }>
-  >()
-const fetchLinearIssue = vi.fn<(...args: never[]) => Promise<LinearIssue | null>>()
-const openUrl = vi.fn<(url: string) => void>()
-
-/** Only `url` is read by the open-issue path. */
-function makeLinearIssue(url: string): LinearIssue {
-  return { url } as LinearIssue
-}
-
-function makeRepo(id: string = REPO_ID, path: string = '/repo'): Repo {
-  return { id, path, displayName: 'orca', badgeColor: '#999999', addedAt: 1 }
-}
-
-function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
-  return {
-    id: WORKTREE_ID,
-    repoId: REPO_ID,
-    path: '/repo/worktrees/feature',
-    displayName: 'Feature work',
-    branch: 'feature',
-    head: 'abc123',
-    isBare: false,
-    isMainWorktree: false,
-    comment: 'existing note',
-    linkedIssue: null,
-    linkedPR: null,
-    linkedLinearIssue: null,
-    isArchived: false,
-    isUnread: false,
-    isPinned: false,
-    sortOrder: 0,
-    lastActivityAt: 1,
-    ...overrides
-  }
-}
-
-function makeFolderWorkspace(overrides: Partial<FolderWorkspace> = {}): FolderWorkspace {
-  return {
-    id: 'fw-1',
-    projectGroupId: 'pg-1',
-    name: 'Docs folder',
-    folderPath: '/repo/docs',
-    linkedTask: {
-      provider: 'linear',
-      type: 'issue',
-      number: 901,
-      title: 'Fix auth',
-      url: 'https://linear.app/acme/issue/STA-901',
-      linearIdentifier: 'STA-901'
-    },
-    comment: '',
-    isArchived: false,
-    isUnread: false,
-    isPinned: false,
-    sortOrder: 0,
-    lastActivityAt: 1,
-    createdAt: 1,
-    updatedAt: 1,
-    ...overrides
-  }
-}
-
-function openDialog(
-  options: {
-    worktree?: Partial<Worktree>
-    worktreeId?: string
-    folderWorkspace?: Partial<FolderWorkspace>
-    /** Extra owners of the same workspace ID, which the index reads as ambiguous. */
-    otherRepos?: { repoId: string; worktree?: Partial<Worktree> }[]
-    modalRepoId?: string
-    modalExecutionHostId?: string
-    modalReviewProvider?: 'github' | 'gitlab'
-    modalCurrentReview?: number
-    modalSuppressHostedReviewRefresh?: boolean
-    linearViewerOrganizationUrlKey?: string
-  } = {}
-): void {
-  const worktree = makeWorktree(options.worktree)
-  const otherRepos = options.otherRepos ?? []
-  useAppStore.setState({
-    repos: [makeRepo(), ...otherRepos.map((other) => makeRepo(other.repoId, `/${other.repoId}`))],
-    worktreesByRepo: {
-      [REPO_ID]: [worktree],
-      ...Object.fromEntries(
-        otherRepos.map((other) => [
-          other.repoId,
-          [makeWorktree({ repoId: other.repoId, ...other.worktree })]
-        ])
-      )
-    },
-    ...(options.folderWorkspace
-      ? { folderWorkspaces: [makeFolderWorkspace(options.folderWorkspace)] }
-      : {}),
-    ...(options.linearViewerOrganizationUrlKey
-      ? {
-          linearStatus: {
-            connected: true,
-            viewer: {
-              displayName: 'Viewer',
-              email: null,
-              organizationName: 'Active',
-              organizationUrlKey: options.linearViewerOrganizationUrlKey
-            }
-          }
-        }
-      : {}),
-    activeModal: 'edit-meta',
-    modalData: {
-      worktreeId: options.worktreeId ?? worktree.id,
-      ...(options.modalRepoId ? { repoId: options.modalRepoId } : {}),
-      ...(options.modalExecutionHostId ? { executionHostId: options.modalExecutionHostId } : {}),
-      ...(options.modalReviewProvider ? { reviewProvider: options.modalReviewProvider } : {}),
-      ...(options.modalCurrentReview ? { currentReview: options.modalCurrentReview } : {}),
-      ...(options.modalSuppressHostedReviewRefresh ? { suppressHostedReviewRefresh: true } : {}),
-      currentDisplayName: worktree.displayName,
-      currentComment: worktree.comment,
-      focus: 'comment'
-    },
-    updateWorktreeMeta,
-    fetchLinearIssue: fetchLinearIssue as unknown as ReturnType<
-      typeof useAppStore.getState
-    >['fetchLinearIssue']
-  })
-  render(<WorktreeMetaDialog />)
-}
-
-function issueInput(): HTMLInputElement {
-  return screen.getByPlaceholderText('Issue #, or a GitHub or Linear URL')
-}
-
-function providerChip(): HTMLButtonElement {
-  return screen.getByRole('button', { name: 'Issue provider' })
-}
-
-function saveButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: 'Save' })
-}
-
-function openIssueButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: 'Open linked issue' })
-}
+installWorktreeMetaDialogTestLifecycle()
 
 describe('WorktreeMetaDialog issue link row', () => {
-  beforeEach(() => {
-    useAppStore.setState(initialState, true)
-    updateWorktreeMeta.mockReset()
-    updateWorktreeMeta.mockResolvedValue({ ok: true })
-    fetchLinearIssue.mockReset()
-    fetchLinearIssue.mockResolvedValue(null)
-    openUrl.mockReset()
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: { shell: { openUrl } }
-    })
-  })
-
-  afterEach(() => {
-    cleanup()
-    vi.restoreAllMocks()
-    useAppStore.setState(initialState, true)
-  })
-
   it.each(IME_FIELDS)(
     'ignores IME Enter and resets on blur in $placeholder',
     async ({ placeholder, value, updates }) => {
@@ -508,7 +327,7 @@ describe('WorktreeMetaDialog issue link row', () => {
   // The warning above only promises the displacement — this asserts the payload
   // that carries it out, which is where the one-issue-per-workspace rule lives.
   it('clears the displaced GitHub link when a Linear value is saved', async () => {
-    openDialog({ worktree: { linkedIssue: 42 } })
+    openDialog({ worktree: { linkedIssue: 42 }, linearViewerOrganizationUrlKey: 'acme' })
 
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Linear' }))
     fireEvent.change(issueInput(), { target: { value: 'STA-335' } })

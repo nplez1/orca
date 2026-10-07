@@ -91,6 +91,10 @@ ORCA worktree set --worktree active --workspace-status in-review --json
 ORCA worktree set --worktree active --unread --json
 ORCA worktree create --repo id:<repoId> --name review-task --pr 123 --json
 ORCA worktree set --worktree active --gitlab-issue '#42' --gitlab-mr '!77' --json
+ORCA worktree set --worktree active --linear-issue STA-335 --json
+ORCA worktree set --worktree active --jira-issue ABC-123 --json
+ORCA worktree set --worktree active --jira-issue https://acme.atlassian.net/browse/ABC-123 --json
+ORCA worktree set --worktree active --jira-issue null --json
 ORCA worktree set --worktree active --pr null --gitlab-mr null --json
 ORCA worktree rm --worktree id:<repoId>::<worktreePath> --force --json
 ```
@@ -146,7 +150,19 @@ Update after a repro, fix, validation, handoff, or blocker. Keep it short and cu
 
 Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, `in-review`, `completed`. `--unread` puts the workspace's unread dot in the sidebar to ask for a person's attention; `--read` clears it.
 
-Issue/review links: `--pr` writes the GitHub pull request number; `--gitlab-issue` and
+Issue/review links: `--pr` writes the GitHub pull request number; `--linear-issue` and
+`--jira-issue` write the Linear and Jira issue links the right-sidebar Issue panel reads.
+`--linear-issue` takes an identifier (`STA-335`), a linear.app issue URL, or `null` to clear.
+`--jira-issue` takes a key (`ABC-123`), a Jira issue URL, or `null` to clear. A Jira link is
+resolved through the host that owns the workspace, because the stored link carries the site
+its reads route to: a bare key uses that host's selected Jira site, or its only one, and is
+refused when several are connected — pass the issue URL then, or when the issue is on a site
+other than the selected one. The key must live on a site connected to that host, and the
+workspace keeps its card badge and Issue panel from this write; confirm with
+`worktree show --json` (it prints `linkedWorkItem`) or `worktree ps --json`, where a linked item
+appears as `linkedWorkItem` with `provider: "jira"` and a row with no link omits the field — use
+that to find a workspace that has no link yet.
+`--gitlab-issue` and
 `--gitlab-mr` write separate GitLab numbers and accept `#42` / `!77` respectively.
 All numbers must be positive safe integers. The GitLab flags also accept HTTP(S) URLs
 whose host/project match the workspace's stored GitLab source context or the repo's

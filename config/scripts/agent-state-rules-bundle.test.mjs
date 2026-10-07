@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
+import { MAIN_RELEASE_REPO } from '../../src/shared/release-channel.ts'
 import {
   BUNDLED_AGENT_STATE_RULES_VERSION,
   LIVE_UPDATABLE_AGENT_STATE_RULE_IDS,
@@ -24,7 +25,7 @@ import {
 } from './agent-state-rules-bundle.mjs'
 import { agentStateRulesTag } from './release-tag-patterns.mjs'
 
-const REPO = 'stablyai/orca'
+const REPO = MAIN_RELEASE_REPO
 const NEXT = agentStateRulesTag(1, 'next')
 const STABLE = agentStateRulesTag(1, 'stable')
 

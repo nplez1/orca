@@ -431,8 +431,8 @@ describe('processFileExplorerFsPayload update reconciliation', () => {
     }
 
     expect(setDirCache).toHaveBeenCalledOnce()
-    // One scan, in purgeDirCacheSubtrees. The casing-fallback index stays unbuilt because every
-    // lookup here hits `dirPath in cache` directly.
+    // One scan, shared by the linked-alias check and purgeDirCacheSubtrees. The casing-fallback
+    // index stays unbuilt because every lookup here hits `dirPath in cache` directly.
     expect(keyVisits).toBe(entryCount)
     expect(expandedPathReads).toBe(expandedPaths.length)
     expect(remainingExpanded).toEqual(new Set())

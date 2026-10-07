@@ -105,7 +105,8 @@ describe('deepseek-api-key-store', () => {
     expect(safeStorageMock.encryptString).toHaveBeenCalledWith('sk-deepseek-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('encrypted', 'sk-deepseek-1234567890')
+      envelope('encrypted', 'sk-deepseek-1234567890'),
+      { durable: true }
     )
   })
 
@@ -116,7 +117,8 @@ describe('deepseek-api-key-store', () => {
     store.saveDeepSeekApiKey('sk-deepseek-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('plaintext', 'sk-deepseek-1234567890')
+      envelope('plaintext', 'sk-deepseek-1234567890'),
+      { durable: true }
     )
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('safeStorage encryption unavailable'))
     warn.mockRestore()

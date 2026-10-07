@@ -86,6 +86,26 @@ function getJiraSiteIdentity(
   }
 }
 
+/** A comparable identity for a Jira site URL or an issue URL: `origin` + site
+ *  path, with the trailing slash normalized away, so `https://acme.atlassian.net`,
+ *  `https://acme.atlassian.net/browse/ABC-1` and `https://acme.atlassian.net/jira`
+ *  all reduce to the site they name. Null when the value is not an http(s) URL a
+ *  Jira site could be, so callers cannot accidentally match on garbage.
+ *
+ *  Exported because a stored workspace link keeps its site URL and the dialog
+ *  compares a typed site against it; both must use one definition. */
+export function getJiraSiteIdentityKey(value: string | null | undefined): string | null {
+  if (!value) {
+    return null
+  }
+  const issueUrl = parseJiraIssueUrl(value)
+  if (issueUrl) {
+    return `${issueUrl.origin}${issueUrl.sitePath}`
+  }
+  const identity = getJiraSiteIdentity(value)
+  return identity ? `${identity.origin}${identity.sitePath}` : null
+}
+
 function normalizeSitePath(pathname: string): string {
   const trimmed = pathname.replace(/\/+$/g, '')
   return trimmed === '/' ? '' : trimmed

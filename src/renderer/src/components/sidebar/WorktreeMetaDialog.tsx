@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { getDisplacedLinkLabels } from './worktree-issue-displacement'
 import {
-  buildWorktreeMetaUpdates,
   parseGitLabMergeRequestNumberForMetaField,
   parseGitHubWorkItemNumberForMetaField,
   type WorktreeReviewProvider,
@@ -21,10 +20,11 @@ import {
   type WorktreeMetaSnapshot
 } from './worktree-meta-updates'
 import { useWorktreeIssueLink } from './use-worktree-issue-link'
+import { useIssueLinkRowOptions } from './use-worktree-meta-issue-row'
+import { useWorktreeMetaSave } from './use-worktree-meta-save'
 import { useWorktreeMetaWorkspace } from './use-worktree-meta-workspace'
 import { WorktreeIssueLinkField } from './WorktreeIssueLinkField'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
-import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 import { isWorkItemLinkQueryTooLarge } from '../../../../shared/new-workspace/work-item-link-query-bounds'
 import {
@@ -75,15 +75,8 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
   // Why: the opening row names its repo bucket for workspace IDs the owner index
   // reads as ambiguous across hosts.
   const ownerRepoId = typeof modalData.repoId === 'string' ? modalData.repoId : null
-  const {
-    worktree,
-    linkedIssue,
-    linkedLinearIssue,
-    currentIssue,
-    currentProvider,
-    isFolderWorkspace,
-    liveLinks
-  } = useWorktreeMetaWorkspace({ worktreeId, ownerRepoId, executionHostId })
+  const { worktree, currentIssue, currentProvider, isFolderWorkspace, liveLinks } =
+    useWorktreeMetaWorkspace({ worktreeId, ownerRepoId, executionHostId })
   // Why: ChecksPanel seeds the review it is looking at, which may not be linked yet.
   const currentReview =
     typeof modalData.currentReview === 'number'
@@ -103,10 +96,12 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
   const [issueProvider, setIssueProvider] = useState<IssueLinkProvider>('github')
   const [reviewInput, setReviewInput] = useState('')
   const [commentInput, setCommentInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<WorktreeMetaSnapshot>(EMPTY_SNAPSHOT)
   const [dialogElement, setDialogElement] = useState<HTMLElement | null>(null)
+  const { offeredProviders: offeredIssueProviders, resolveJiraIssueUrl } = useIssueLinkRowOptions({
+    worktree,
+    selected: issueProvider
+  })
   const { canOpenIssue, openingIssue, openIssueFailed, handleOpenIssue, resetOpeningIssue } =
     useWorktreeIssueLink({
       worktreeId,
@@ -115,37 +110,13 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
       issueProvider,
       linearOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null,
       linkedLinearIssue: worktree?.linkedLinearIssue ?? null,
-      linearSourceContext: worktree?.linkedTaskSourceContext ?? null
+      linearSourceContext: worktree?.linkedTaskSourceContext ?? null,
+      resolveJiraIssueUrl
     })
 
   const issueInputRef = useRef<HTMLInputElement>(null)
   const reviewInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const prevIsOpenRef = useRef(false)
-  const displayNameInputRef = useRef<HTMLInputElement>(null)
-  const mountedRef = useMountedRef()
-  if (isOpen && !prevIsOpenRef.current) {
-    setDisplayNameInput(currentDisplayName)
-    setIssueInput(currentIssue)
-    setIssueProvider(currentProvider)
-    setReviewInput(currentReview)
-    setCommentInput(currentComment)
-    // Why: the baseline is frozen with the seed instead of tracking the store.
-    // A background `orca worktree set --linear-issue` while the dialog is open
-    // would otherwise move it, making the untouched field read as dirty — and
-    // the next comment-only save would write the stale seed back over the new link.
-    setSnapshot({
-      displayName: currentDisplayName,
-      comment: currentComment,
-      issueInput: currentIssue,
-      issueProvider: currentProvider,
-      prInput: worktree?.linkedPR != null ? String(worktree.linkedPR) : '',
-      linkedLinearIssueOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null
-    })
-    setSaveError(null)
-    resetOpeningIssue()
-  }
-  prevIsOpenRef.current = isOpen
 
   const draft = useMemo<WorktreeMetaDraft>(
     () => ({ displayNameInput, issueInput, issueProvider, reviewInput, commentInput }),
@@ -213,10 +184,9 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
         draft,
         snapshot,
         isFolderWorkspace,
-        linkedIssue,
-        linkedLinearIssue
+        live: liveLinks
       }),
-    [draft, snapshot, isFolderWorkspace, linkedIssue, linkedLinearIssue]
+    [draft, snapshot, isFolderWorkspace, liveLinks]
   )
 
   const handleOpenChange = useCallback(
@@ -228,50 +198,17 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
     [closeModal]
   )
 
-  const handleSave = useCallback(async () => {
-    if (!canSave) {
-      return
-    }
-    setSaving(true)
-    // Why: a stale failure from the previous attempt must not sit under the
-    // spinner for the whole in-flight save.
-    setSaveError(null)
-    try {
-      const updates = buildWorktreeMetaUpdates(draft, snapshot, liveLinks, reviewProvider)
-
-      const result =
-        executionHostId || suppressHostedReviewRefresh
-          ? await updateWorktreeMeta(worktreeId, updates, {
-              ...(executionHostId ? { executionHostId } : {}),
-              ...(suppressHostedReviewRefresh ? { suppressHostedReviewRefresh: true } : {})
-            })
-          : await updateWorktreeMeta(worktreeId, updates)
-      // Why: a failed save refetches and reverts the optimistic write. Closing
-      // here would report success for an edit that silently undid itself, and
-      // would discard the name, comment and PR changes in the same payload.
-      if (!result.ok) {
-        if (mountedRef.current) {
-          setSaveError(result.error)
-        }
-        return
-      }
-      closeModal()
-      // Why: follow-up refreshes should not turn a successful metadata save
-      // into a failed dialog.
-      try {
-        void Promise.resolve(afterSave?.({ worktreeId, updates })).catch(console.error)
-      } catch (error) {
-        console.error(error)
-      }
-    } finally {
-      if (mountedRef.current) {
-        setSaving(false)
-      }
-    }
-  }, [
+  const {
+    saving,
+    saveError,
+    beginSession,
+    save: handleSave
+  } = useWorktreeMetaSave({
     worktreeId,
-    executionHostId,
+    isOpen,
+    ...(executionHostId ? { executionHostId } : {}),
     suppressHostedReviewRefresh,
+    worktree,
     canSave,
     draft,
     snapshot,
@@ -279,9 +216,38 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
     reviewProvider,
     updateWorktreeMeta,
     closeModal,
-    afterSave,
-    mountedRef
-  ])
+    afterSave
+  })
+
+  const displayNameInputRef = useRef<HTMLInputElement>(null)
+  // Why state, not a ref: tracking the previous open value is React's documented
+  // "store information from previous renders" pattern, and React may discard a
+  // render that mutates a ref, losing the write.
+  const [wasOpen, setWasOpen] = useState(false)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+  }
+  if (isOpen && !wasOpen) {
+    beginSession()
+    setDisplayNameInput(currentDisplayName)
+    setIssueInput(currentIssue)
+    setIssueProvider(currentProvider)
+    setReviewInput(currentReview)
+    setCommentInput(currentComment)
+    // Why: the baseline is frozen with the seed instead of tracking the store.
+    // A background `orca worktree set --linear-issue` while the dialog is open
+    // would otherwise move it, making the untouched field read as dirty — and
+    // the next comment-only save would write the stale seed back over the new link.
+    setSnapshot({
+      displayName: currentDisplayName,
+      comment: currentComment,
+      issueInput: currentIssue,
+      issueProvider: currentProvider,
+      prInput: worktree?.linkedPR != null ? String(worktree.linkedPR) : '',
+      linkedLinearIssueOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null
+    })
+    resetOpeningIssue()
+  }
 
   const handleCommentKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -357,6 +323,7 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
             inputRef={issueInputRef}
             value={issueInput}
             provider={issueProvider}
+            providers={offeredIssueProviders}
             isInvalid={issueInvalid}
             displacedLinkLabels={displacedLinkLabels}
             isReadOnly={isFolderWorkspace}

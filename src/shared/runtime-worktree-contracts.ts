@@ -8,7 +8,7 @@ import type {
   WorktreeLineageWarning
 } from './worktree/lineage-types'
 import type { RuntimeListingHostScope } from './runtime-listing-host-scope'
-import type { GitWorktreeInfo, Worktree } from './worktree/types'
+import type { GitWorktreeInfo, WorkspaceLinkedItem, Worktree } from './worktree/types'
 
 export type RuntimeWorktreeAgentRow = {
   paneKey: string
@@ -60,6 +60,10 @@ export type RuntimeWorktreePsSummary = {
   createdAt?: number
   creatorProvenance?: Worktree['creatorProvenance']
   linkedIssue: number | null
+  /** The created-from or linked work item, which is the only place a Jira link
+   *  lives. Optional: an older host does not send it, and absent means "not
+   *  reported", not "unlinked". */
+  linkedWorkItem?: WorkspaceLinkedItem | null
   linkedPR: { number: number; state: string } | null
   linkedLinearIssue: string | null
   linkedGitLabMR: number | null

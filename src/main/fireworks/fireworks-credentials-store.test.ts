@@ -94,7 +94,7 @@ describe('fireworks-credentials-store', () => {
     const store = await loadStore()
     expect(store.hasFireworksCredentials()).toBe(true)
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to harden Fireworks credentials file'),
+      expect.stringContaining('Failed to harden Fireworks API key file'),
       expect.any(Error)
     )
     warn.mockRestore()
@@ -108,7 +108,8 @@ describe('fireworks-credentials-store', () => {
     )
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}')
+      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
+      { durable: true }
     )
   })
 
@@ -117,7 +118,8 @@ describe('fireworks-credentials-store', () => {
     store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: 'acct-42' })
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":"acct-42"}')
+      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":"acct-42"}'),
+      { durable: true }
     )
   })
 
@@ -126,7 +128,8 @@ describe('fireworks-credentials-store', () => {
     store.saveFireworksCredentials({ apiKey: '  fw_test_1234567890  ', accountIdOverride: '   ' })
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}')
+      envelope('encrypted', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
+      { durable: true }
     )
   })
 
@@ -145,10 +148,11 @@ describe('fireworks-credentials-store', () => {
     store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: null })
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
-      envelope('plaintext', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}')
+      envelope('plaintext', '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'),
+      { durable: true }
     )
     expect(warn).toHaveBeenCalledWith(
-      '[fireworks] safeStorage encryption unavailable — storing Fireworks credentials in plaintext'
+      '[fireworks] safeStorage encryption unavailable — storing Fireworks API key in plaintext'
     )
     warn.mockRestore()
   })

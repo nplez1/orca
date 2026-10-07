@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAIN_RELEASE_REPO } from '../../../shared/release-channel'
 import { getTerminalTailSentinelMatches } from '../terminal-tail-sentinel-index'
 import {
   activateAgentStateRules,
@@ -128,7 +129,7 @@ describe('agent state rules channel and URL', () => {
 
   it('fetches the fixed release-download URL for the engine and channel', () => {
     expect(agentStateRulesDownloadUrl('next')).toBe(
-      'https://github.com/stablyai/orca/releases/download/agent-state-rules-engine-1-next/agent-state-rules.json'
+      `https://github.com/${MAIN_RELEASE_REPO}/releases/download/agent-state-rules-engine-1-next/agent-state-rules.json`
     )
   })
 })

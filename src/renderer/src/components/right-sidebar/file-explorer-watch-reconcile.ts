@@ -52,11 +52,13 @@ function cachedDirectoryChild(
 
 function hasCachedDirectoryLink(
   cache: Record<string, DirCache>,
-  pathIndex: ReadonlyMap<string, string>
+  cacheKeys: readonly string[]
 ): boolean {
-  for (const dirPath of pathIndex.values()) {
+  // Why: consumes the payload's shared key enumeration instead of forcing the casing-fallback index.
+  const cachedPaths = new Set(cacheKeys.map(normalizeRuntimePathForComparison))
+  for (const dirPath of cacheKeys) {
     for (const child of cache[dirPath].children) {
-      if (child.isSymlink && pathIndex.has(normalizeRuntimePathForComparison(child.path))) {
+      if (child.isSymlink && cachedPaths.has(normalizeRuntimePathForComparison(child.path))) {
         return true
       }
     }
@@ -85,9 +87,13 @@ export function processFileExplorerFsPayload(args: ProcessFileExplorerFsPayloadA
   const dirsToRefresh = new Set<string>()
   const childPathIndexes = new Map<string, Map<string, TreeNode>>()
   let hasLinkedCache: boolean | undefined
+  // Why: one cache enumeration serves the linked-alias check, casing-fallback lookups and the
+  // subtree purge, so a payload never walks the cache twice.
+  let enumeratedCacheKeys: string[] | undefined
+  const cacheKeys = (): string[] => (enumeratedCacheKeys ??= Object.keys(cache))
   let cachedDirPathIndex: ReadonlyMap<string, string> | undefined
   const cachePathIndex = (): ReadonlyMap<string, string> =>
-    (cachedDirPathIndex ??= createCachedDirPathIndex(cache))
+    (cachedDirPathIndex ??= createCachedDirPathIndex(cache, cacheKeys()))
   const cachedDirsToPurge = new Set<string>()
   const reconciledRenameSources = new Set<string>()
   let needsFullRefresh = false
@@ -122,7 +128,7 @@ export function processFileExplorerFsPayload(args: ProcessFileExplorerFsPayloadA
       !updatedChild.isDirectory &&
       updatedChild.isSymlink === false
     if (!knownFileUpdate) {
-      hasLinkedCache ??= hasCachedDirectoryLink(cache, cachePathIndex())
+      hasLinkedCache ??= hasCachedDirectoryLink(cache, cacheKeys())
       // Native events name the target, so cached aliases need the existing bounded refresh too.
       needsFullRefresh ||= hasLinkedCache
     }
@@ -236,7 +242,9 @@ export function processFileExplorerFsPayload(args: ProcessFileExplorerFsPayloadA
     }
   }
 
-  purgeDirCacheSubtrees(setDirCache, cachedDirsToPurge)
+  if (cachedDirsToPurge.size > 0) {
+    purgeDirCacheSubtrees(setDirCache, cachedDirsToPurge, { snapshot: cache, keys: cacheKeys() })
+  }
   purgeExpandedDirsSubtrees(worktreeId, cachedDirsToPurge)
 
   if (needsFullRefresh) {

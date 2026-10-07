@@ -21,6 +21,7 @@ import {
   TYPE_CHECK_COMMAND,
   conflictMarkers,
   localizationCatalog,
+  repoLint,
   typecheck
 } from './lib/checks.mjs'
 import {
@@ -62,8 +63,9 @@ no diff, both localization verifiers, the fork builder config (${BUILDER_CONFIG}
 still loading, the update feed still naming ${FORK_SLUG}, the fork identity sweep (delegating to
 local/sync/identity-sweep.mjs when present), a red-flag scan of the files modified since the pre-sync
 tip compared against the upstream base pre-sync recorded, an inventory of the exported surface of
-every fork-only module this sync deleted (each name searched for a surviving reference), and the
-merged tip typecheck (${TYPE_CHECK_COMMAND}).
+every fork-only module this sync deleted (each name searched for a surviving reference), the
+repo-wide lint the changed-lines gate never runs (which is how the np.18 merge left six over-cap
+files for a later PR to inherit), and the merged tip typecheck (${TYPE_CHECK_COMMAND}).
 
 Options:
   --json            machine-readable report on stdout
@@ -146,6 +148,12 @@ function main() {
       'deleted fork-only modules, with the exported surface each one carried',
       'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
       () => deletedForkModules(tip, source)
+    ],
+    [
+      'repo-lint',
+      'repo-wide oxlint passes',
+      'a merge resolved into a file that now breaks a repo-wide rule (max-lines is the usual one); split the file rather than bumping the cap',
+      repoLint
     ],
     [
       'typecheck',

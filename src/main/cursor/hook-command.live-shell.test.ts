@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { runProcess, runProcessSync, spawnProcess } from '../../shared/child-process/run-process'
 import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getCursorHookResponse } from './hook-events'
 import { CursorHookService } from './hook-service'
 
@@ -60,7 +61,7 @@ describe.skipIf(process.platform === 'win32')('local Cursor hooks through login 
       throw new Error('Cursor preToolUse hook was not installed')
     }
     command = registered
-    scriptPath = join(home, '.orca', 'agent-hooks', 'cursor-hook.sh')
+    scriptPath = join(home, HOME_DIRECTORY_NAME, 'agent-hooks', 'cursor-hook.sh')
   })
 
   afterEach(() => {

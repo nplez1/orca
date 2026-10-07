@@ -9,6 +9,7 @@ vi.mock('node:os', async (importOriginal) => ({
   homedir: () => sandbox.home
 }))
 vi.mock('electron', () => ({ app: { getPath: () => sandbox.home } }))
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getManagedLifecycleHook, hasSameManagedHookInvocation } from '../claude/hook-settings'
 import { createManagedCommandMatcher } from '../agent-hooks/installer-utils'
 import { qoderCnHookService, qoderHookService, QODER_HOOK_EVENTS } from './hook-service'
@@ -131,7 +132,10 @@ it.each([
     expect(Object.keys(installed.hooks).sort()).toEqual([...events].sort())
     expect(installed.statusLine).toEqual({ command: 'user-status' })
     expect(
-      readFileSync(join(sandbox.home, '.orca', 'agent-hooks', `${source}-hook.sh`), 'utf8')
+      readFileSync(
+        join(sandbox.home, HOME_DIRECTORY_NAME, 'agent-hooks', `${source}-hook.sh`),
+        'utf8'
+      )
     ).toContain(`/hook/${source}`)
     if (source === 'qoder-cn') {
       markQoderWorkspaceTrusted('/cn-workspace', sandbox.home, '.qoder-cn')

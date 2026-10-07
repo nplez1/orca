@@ -1,0 +1,57 @@
+name: Fork base gates
+
+# Why: a PR runs the *changed-lines* gate plus the full test suite, but the cheap
+# repo-wide rules (oxlint, including `max-lines`; the anti-slop naming rules; the
+# localization catalogs) only ever run against a PR's own diff, or against whatever
+# branch CI happens to build. So debt lands on this fork's release line unnoticed and
+# is inherited by the next PR that touches one of those files — which is how a single
+# Jira change inherited six over-cap files and a stale naming error.
+#
+# This runs those rules on the release line itself, where the debt is created, so it is
+# caught the day it lands instead of the day someone else trips over it.
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+  push:
+    branches: [nplez1/main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-base-gates-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      # The repo-wide rule set, unchanged from `pnpm lint`, one step per rule family so
+      # the failing family is named without reading a log.
+      - name: Repo-wide lint
+        run: pnpm exec oxlint --format github
+
+      - name: Fork identity in tests
+        run: node config/scripts/check-upstream-identity-literals.mjs
+
+      - name: Reject low-evidence patterns
+        run: pnpm run audit:anti-slop
+
+      - name: Max-lines ratchet
+        run: pnpm run check:max-lines-ratchet
+
+      - name: Localization catalogs
+        run: |
+          pnpm run verify:localization-catalogs
+          pnpm run verify:localization-extraction
+          pnpm run verify:localization-coverage
+
+      - name: Typecheck
+        run: pnpm tc

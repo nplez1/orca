@@ -26,6 +26,16 @@ describe('getIssueLinkProviderFromUrl', () => {
     expect(getIssueLinkProviderFromUrl('https://linear.app.evil.com/acme/issue/STA-335')).toBeNull()
   })
 
+  it('detects Jira issue URLs, and only when they name an issue', () => {
+    expect(getIssueLinkProviderFromUrl('https://acme.atlassian.net/browse/ABC-1')).toBe('jira')
+    expect(getIssueLinkProviderFromUrl('https://jira.acme.io/jira/browse/ABC-1')).toBe('jira')
+    // A board or project URL is valid Jira but not an issue, so it must not flip
+    // the provider into a state where the field then refuses to save it.
+    expect(
+      getIssueLinkProviderFromUrl('https://acme.atlassian.net/jira/software/boards/1')
+    ).toBeNull()
+  })
+
   // Linear and Jira issue-key shapes are byte-identical, so a bare key must
   // never override the user's explicit provider choice.
   it('is not decisive for bare issue keys', () => {
@@ -113,6 +123,45 @@ describe('parseIssueLinkInput', () => {
     it('rejects junk and empty input', () => {
       expect(parseIssueLinkInput('not an issue', 'linear')).toBeNull()
       expect(parseIssueLinkInput('   ', 'linear')).toBeNull()
+    })
+  })
+
+  describe('jira provider', () => {
+    it('accepts a bare key and normalizes its case', () => {
+      expect(parseIssueLinkInput('abc-1', 'jira')).toEqual({
+        provider: 'jira',
+        key: 'ABC-1',
+        siteUrl: null
+      })
+    })
+
+    it('accepts an issue URL and returns the site it names', () => {
+      expect(parseIssueLinkInput('https://acme.atlassian.net/browse/abc-1', 'jira')).toEqual({
+        provider: 'jira',
+        key: 'ABC-1',
+        siteUrl: 'https://acme.atlassian.net'
+      })
+      expect(
+        parseIssueLinkInput('https://jira.acme.io:8443/jira/browse/TEAM_CORE-42', 'jira')
+      ).toEqual({
+        provider: 'jira',
+        key: 'TEAM_CORE-42',
+        siteUrl: 'https://jira.acme.io:8443/jira'
+      })
+    })
+
+    it('rejects a Jira host that names no issue', () => {
+      expect(
+        parseIssueLinkInput('https://acme.atlassian.net/jira/software/boards/1', 'jira')
+      ).toBeNull()
+      expect(parseIssueLinkInput('https://acme.atlassian.net/browse/123', 'jira')).toBeNull()
+    })
+
+    it('rejects another provider\u2019s URL and junk', () => {
+      expect(parseIssueLinkInput('https://github.com/o/r/issues/12', 'jira')).toBeNull()
+      expect(parseIssueLinkInput('12', 'jira')).toBeNull()
+      expect(parseIssueLinkInput('#12', 'jira')).toBeNull()
+      expect(parseIssueLinkInput('   ', 'jira')).toBeNull()
     })
   })
 })
