@@ -118,10 +118,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
 
         // Unchanged details back off; a changed result restores the selected cadence.
         const signature = policyRef.current.accept(result)
-        // Why: an unfinished run needs a steady 30s cadence; backing off would hide the next transition.
-        pollIntervalRef.current = hasUnfinishedChecks(result)
-          ? 30_000
-          : signature === prevChecksRef.current
+        pollIntervalRef.current =
+          signature === prevChecksRef.current
             ? Math.min(pollIntervalRef.current * 2, 120_000)
             : 60_000
         prevChecksRef.current = signature
@@ -222,10 +220,8 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         setChecks(result)
         setComments(gitLabMRCommentsToPRComments(details?.comments))
         const signature = policyRef.current.accept(result)
-        // Why: an unfinished run needs a steady 30s cadence; backing off would hide the next transition.
-        pollIntervalRef.current = hasUnfinishedChecks(result)
-          ? 30_000
-          : signature === prevChecksRef.current
+        pollIntervalRef.current =
+          signature === prevChecksRef.current
             ? Math.min(pollIntervalRef.current * 2, 120_000)
             : 60_000
         prevChecksRef.current = signature

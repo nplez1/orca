@@ -80,9 +80,8 @@ export function resolveClaudePaneStatus(
         hasLiveAgentWork:
           held.runningAgent ||
           held.owedAgent ||
-          state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) ||
-          held.owedShell,
-        hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey)
+          state.claudeRunningNonAgentTaskPaneKeys.has(paneKey),
+        hasLiveNonAgentWork: state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell
       })
     }),
     ...(held.owedAgent || held.owedShell

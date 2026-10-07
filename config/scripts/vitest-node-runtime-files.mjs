@@ -9,6 +9,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/shared/child-process/run-process.test.ts',
   'tests/e2e/cursor-quota-transport.unit.test.ts',
   'src/main/ai-vault-search/session-search-index-writer.test.ts',
+  // LOCAL(nplez1): both open the search index with the real SQLite driver, so they must run in the
+  // Node project like upstream's own session-search suites above.
+  'src/main/ai-vault-search/session-search-instance.test.ts',
+  'src/main/ai-vault-search/session-search-list-latency.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
   'src/renderer/src/components/terminal-pane/pty-input-write-queue.test.ts',
   'src/renderer/src/lib/react-commit-cascade-observer.test.ts',

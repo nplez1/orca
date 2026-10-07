@@ -22,7 +22,12 @@ vi.mock('@/lib/web-client-location', () => ({ isWebClientLocation: () => false }
 vi.mock('@/runtime/local-runtime-capabilities', () => ({
   readLocalRuntimeCapabilitiesOrUnknown: mocks.readLocalRuntimeCapabilitiesOrUnknown
 }))
-vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: mocks.callRuntimeRpc }))
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: mocks.callRuntimeRpc,
+  // LOCAL(nplez1): the fork's path-search capability module subscribes at import time, so any mock
+  // of this module has to answer it (see src/renderer/src/runtime/runtime-workspace-path-search-capability.ts).
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
+}))
 vi.mock('@/lib/structured-agent-launch-settlement', () => ({}))
 
 import {

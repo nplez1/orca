@@ -119,9 +119,11 @@ describe('Claude native title confirms an Escape interruption', () => {
     title('✳ Followup')
     expect(row()).toMatchObject({
       state: 'working',
-      workingMode: 'monitoring',
       mainAgent: { state: 'done', outcome: 'cancellation' }
     })
+    // LOCAL(nplez1): a shell the agent launched is still agent work, so it reads plain `working`;
+    // only a session-cron callback earns the monitoring badge (see LOCAL-PATCHES.md § local(agents)).
+    expect(row().workingMode).toBeUndefined()
     await startTurn('<task-notification>Background shell finished</task-notification>')
     await hook({ hook_event_name: 'Stop', background_tasks: [] })
     expect(row()).toMatchObject({ state: 'done', mainAgent: { state: 'done' } })

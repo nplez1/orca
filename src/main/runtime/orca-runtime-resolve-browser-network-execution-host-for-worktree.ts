@@ -6,6 +6,7 @@ import {
   isFloatingWorkspaceSelector
 } from '../../shared/floating-workspace-worktree'
 import { resolveFloatingTerminalCwd } from '../ipc/floating-workspace-directory'
+import { resolveFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'
 import type { BrowserNetworkExecutionHost } from '../../shared/browser-client-host-protocol'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -128,7 +129,9 @@ export class OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree extend
       return {
         scope: {
           id: FLOATING_TERMINAL_WORKTREE_ID,
-          path: await this.resolveFloatingWorkspacePath(),
+          // Why: the Floating Workspace's own folder, not $HOME — a floating terminal or agent must
+          // not inherit a project (or the whole home directory) as its working directory.
+          path: resolveFloatingWorkspaceLaunchDirectory(),
           connectionId: null,
           repo: null,
           folderWorkspace: null

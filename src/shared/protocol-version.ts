@@ -60,7 +60,6 @@ import {
   AGENT_LAUNCH_RUNTIME_CAPABILITIES,
   AGENT_LAUNCH_RUNTIME_CAPABILITY
 } from './agent-launch-runtime-capability'
-export * from './orchestration-runtime-capabilities'
 
 // Why: declares the Orca runtime RPC compatibility contract. Desktop,
 // headless server, CLI, and mobile builds may drift in app version, but
