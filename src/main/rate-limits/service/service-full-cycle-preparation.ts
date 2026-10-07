@@ -16,12 +16,12 @@ import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/zcode-plan-sites'
 import { fetchMiniMaxRateLimits } from '../minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
 import { fetchOpenCodeGoUsage } from '../opencode-go-usage-source-selection'
-import { RateLimitServiceFetchPolicy } from './service-fetch-policy'
+import { RateLimitServiceCycleFetchState } from './service-cycle-fetch-state'
 import { resolveCopilotCycleCredentials } from './service-copilot-cycle-credentials'
 import { trackSettledProviderResult } from './service-sibling-provider-result'
 import type { FetchAllCyclePrepared, ProviderRateLimits } from './service-types'
 
-export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServiceFetchPolicy {
+export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServiceCycleFetchState {
   protected async prepareFetchAllCycle(
     signal: AbortSignal,
     options?: { force?: boolean }
@@ -101,19 +101,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       : ''
     const currentConfigHash = `${cookie}|${workspaceIdOverride}|${apiKeyFingerprint}|${openCodeGoApiKeyError ?? ''}`
     const opencodeConfigChanged = currentConfigHash !== this.lastOpencodeConfigHash
-    if (opencodeConfigChanged) {
-      this.lastOpencodeConfigHash = currentConfigHash
-      this.opencodeFetchGeneration += 1
-    }
-    const opencodeGeneration = this.opencodeFetchGeneration
+    const opencodeGeneration = this.syncOpencodeFetchGeneration(currentConfigHash)
 
     const currentMiniMaxConfigHash = `${miniMaxCookie}|${miniMaxGroupId}|${miniMaxModels}|${miniMaxEndpoint}|${miniMaxApiKey}|${miniMaxConfigResult.error ?? ''}`
     const miniMaxConfigChanged = currentMiniMaxConfigHash !== this.lastMiniMaxConfigHash
-    if (miniMaxConfigChanged) {
-      this.lastMiniMaxConfigHash = currentMiniMaxConfigHash
-      this.minimaxFetchGeneration += 1
-    }
-    const miniMaxGeneration = this.minimaxFetchGeneration
+    const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
 
     const antigravityUsageEnabled = this.antigravityUsageEnabledResolver?.() ?? true
 
@@ -124,11 +116,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       ? `${zcodePlanConfigResult.config.site}|${createHash('sha256').update(zcodePlanApiKey).digest('hex')}`
       : (zcodePlanConfigResult.error ?? '')
     const zcodeConfigChanged = currentZcodeConfigHash !== this.lastZcodeConfigHash
-    if (zcodeConfigChanged) {
-      this.lastZcodeConfigHash = currentZcodeConfigHash
-      this.zcodeFetchGeneration += 1
-    }
-    const zcodeGeneration = this.zcodeFetchGeneration
+    const zcodeGeneration = this.syncZcodeFetchGeneration(currentZcodeConfigHash)
     const zcodePlanCredential = zcodePlanApiKey
       ? {
           apiKey: zcodePlanApiKey,
@@ -137,63 +125,29 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       : null
     const currentDeepSeekConfigHash = `${deepSeekApiKey}|${deepSeekConfigResult.error ?? ''}`
     const deepSeekConfigChanged = currentDeepSeekConfigHash !== this.lastDeepSeekConfigHash
-    if (deepSeekConfigChanged) {
-      this.lastDeepSeekConfigHash = currentDeepSeekConfigHash
-      this.deepseekFetchGeneration += 1
-    }
-    const deepSeekGeneration = this.deepseekFetchGeneration
+    const deepSeekGeneration = this.syncDeepSeekFetchGeneration(currentDeepSeekConfigHash)
 
     const currentFireworksConfigHash = `${fireworksApiKey}|${fireworksAccountIdOverride ?? ''}|${fireworksConfigResult.error ?? ''}`
     const fireworksConfigChanged = currentFireworksConfigHash !== this.lastFireworksConfigHash
-    if (fireworksConfigChanged) {
-      this.lastFireworksConfigHash = currentFireworksConfigHash
-      this.fireworksFetchGeneration += 1
-    }
-    const fireworksGeneration = this.fireworksFetchGeneration
+    const fireworksGeneration = this.syncFireworksFetchGeneration(currentFireworksConfigHash)
 
     const currentCopilotConfigHash = copilotCredentials.configHash
     const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
-    if (copilotConfigChanged) {
-      this.lastCopilotConfigHash = currentCopilotConfigHash
-      this.copilotFetchGeneration += 1
-    }
-    const copilotGeneration = this.copilotFetchGeneration
+    const copilotGeneration = this.syncCopilotFetchGeneration(currentCopilotConfigHash)
 
-    // Mark all providers fetching while keeping previous data visible (Codex is cleared separately on account change).
-    this.updateState({
-      ...previousState,
-      claude: this.withFetchingStatus(previousState.claude, 'claude'),
-      // Why: a gated Codex cycle makes no attempt; a "fetching" chip would never settle.
-      codex: codexFetchGated
-        ? codexStateBeforeFetch
-        : this.withFetchingStatus(previousState.codex, 'codex'),
-      gemini: this.withFetchingStatus(previousState.gemini, 'gemini'),
-      opencodeGo: opencodeConfigChanged
-        ? this.withFetchingStatus(null, 'opencode-go')
-        : this.withFetchingStatus(previousState.opencodeGo, 'opencode-go'),
-      kimi: this.withFetchingStatus(previousState.kimi, 'kimi'),
-      antigravity: antigravityUsageEnabled
-        ? this.withFetchingStatus(previousState.antigravity, 'antigravity')
-        : (previousState.antigravity ?? antigravityUsageDisabledSnapshot()),
-      minimax: miniMaxConfigChanged
-        ? this.withFetchingStatus(null, 'minimax')
-        : this.withFetchingStatus(previousState.minimax, 'minimax'),
-      deepseek: deepSeekConfigChanged
-        ? this.withFetchingStatus(null, 'deepseek')
-        : this.withFetchingStatus(previousState.deepseek, 'deepseek'),
-      fireworks: fireworksConfigChanged
-        ? this.withFetchingStatus(null, 'fireworks')
-        : this.withFetchingStatus(previousState.fireworks, 'fireworks'),
-      copilot: copilotConfigChanged
-        ? this.withFetchingStatus(null, 'copilot')
-        : this.withFetchingStatus(previousState.copilot, 'copilot'),
-      grok: this.withFetchingStatus(previousState.grok, 'grok'),
-      cursor: this.withFetchingStatus(previousState.cursor, 'cursor'),
-      zcode: zcodeConfigChanged
-        ? this.withFetchingStatus(null, 'zcode')
-        : this.withFetchingStatus(previousState.zcode, 'zcode'),
-      // Why: a disabled provider holds no snapshot at all, so a prior reading cannot linger.
-      ...this.disabledUsageProviderStateOverrides()
+    this.markProvidersFetching({
+      previousState,
+      codexFetchGated,
+      codexStateBeforeFetch,
+      antigravityUsageEnabled,
+      changed: {
+        opencodeGo: opencodeConfigChanged,
+        minimax: miniMaxConfigChanged,
+        deepseek: deepSeekConfigChanged,
+        fireworks: fireworksConfigChanged,
+        copilot: copilotConfigChanged,
+        zcode: zcodeConfigChanged
+      }
     })
 
     // Why its own promise: the keychain read and the desktop state.vscdb read

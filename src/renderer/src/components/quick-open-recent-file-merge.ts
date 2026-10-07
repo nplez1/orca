@@ -9,7 +9,7 @@ import type { RuntimeFileListing } from './runtime-path-search-request'
 
 /** The options the listing itself used, so a validated recent path is one the caller's scope would
  *  have offered anyway. */
-function useRecentRequestShape(args: {
+function useRecentValidationRequest(args: {
   host: {
     runtimeEnvironmentId: string | null
     worktreeId: string | null
@@ -79,7 +79,7 @@ export function useQuickOpenRecentListing(args: {
     includeDotfiles: boolean
   }
 }): (value: RuntimeFileListing) => void {
-  const { context, options } = useRecentRequestShape({ host: args.host, scope: args.scope })
+  const { context, options } = useRecentValidationRequest({ host: args.host, scope: args.scope })
   const recentKey = JSON.stringify(args.recentPaths ?? [])
   // Why: keyed by the request, so a new query revokes its predecessor's pending validation.
   const cache = useQuickOpenRecentCache(args.enabled, `${args.requestKey}\n${recentKey}`)

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import {
   useActiveRepo,
@@ -31,10 +30,9 @@ import {
   useAiVaultSessionWorktreeMap,
   withAiVaultCurrentWorktreeStatus
 } from './ai-vault-session-worktree'
-import { openAiVaultSessionLogInOrca } from './ai-vault-session-log-open'
+import { useAiVaultSessionCopyActions } from './use-ai-vault-session-copy-actions'
 import { useAiVaultOriginalPaneActions } from './ai-vault-original-pane-actions'
 import type { AiVaultSession } from '../../../../shared/ai-vault-types'
-import { translate } from '@/i18n/i18n'
 import { AiVaultPanelHeader } from './AiVaultPanelHeader'
 import {
   aiVaultResultCountLabel,
@@ -225,15 +223,6 @@ export default function AiVaultPanel(): React.JSX.Element {
     hideEmptySessions
   })
 
-  const copyText = useCallback(async (text: string, label: string): Promise<void> => {
-    await window.api.ui.writeClipboardText(text)
-    toast.success(
-      translate('auto.components.right.sidebar.AiVaultPanel.valueCopied', '{{value0}} copied', {
-        value0: label
-      })
-    )
-  }, [])
-
   const getSessionResumeState = useCallback(
     (session: AiVaultSession) =>
       resolveAiVaultHistorySessionResumeState({
@@ -295,6 +284,7 @@ export default function AiVaultPanel(): React.JSX.Element {
   }, [])
 
   const requestDelete = useAiVaultSessionDeleteAction({ refresh, onDeleted: search.onDeleted })
+  const sessionCopyActions = useAiVaultSessionCopyActions()
 
   return (
     <div className="@container/ai-vault flex h-full min-h-0 flex-col bg-sidebar">
@@ -381,25 +371,11 @@ export default function AiVaultPanel(): React.JSX.Element {
             onCopyResume={(session, worktreeId) =>
               void launchActions.copyResumeCommand(session, worktreeId)
             }
-            onCopyId={(session) =>
-              void copyText(
-                session.sessionId,
-                translate('auto.components.right.sidebar.AiVaultPanel.sessionId', 'Session ID')
-              )
-            }
-            onCopyPath={(session) =>
-              void copyText(
-                session.filePath,
-                translate('auto.components.right.sidebar.AiVaultPanel.logPath', 'Log path')
-              )
-            }
-            onOpenLog={(session) => void openAiVaultSessionLogInOrca(session)}
-            onRevealLog={(session) => void window.api.shell.openPath(session.filePath)}
-            onOpenCwd={(session) => {
-              if (session.cwd) {
-                void window.api.shell.openPath(session.cwd)
-              }
-            }}
+            onCopyId={sessionCopyActions.copySessionId}
+            onCopyPath={sessionCopyActions.copySessionPath}
+            onOpenLog={sessionCopyActions.openSessionLog}
+            onRevealLog={sessionCopyActions.revealSessionLog}
+            onOpenCwd={sessionCopyActions.openSessionCwd}
             onRequestDelete={(session) => void requestDelete(session)}
           />
         )}
