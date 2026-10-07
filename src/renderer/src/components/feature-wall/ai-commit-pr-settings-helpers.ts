@@ -1,14 +1,11 @@
 import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   getCommitMessageAgentCapability,
   isCustomAgentId,
-  type CommitMessageAgentCapability,
-  type CommitMessageAgentChoice,
-  type CommitMessageModelCapability
+  type CommitMessageAgentChoice
 } from '../../../../shared/commit-message-agent-spec'
-import { getAgentCatalog } from '@/lib/agent-catalog'
+import { resolveAiGenerationModel, resolveAiGenerationThinking } from '@/lib/ai-generation-settings'
 
 export const EMPTY_COMMIT_MESSAGE_AI_SETTINGS: CommitMessageAiSettings = {
   enabled: false,
@@ -23,41 +20,7 @@ export function readCommitMessageAiSettings(settings: GlobalSettings): CommitMes
   return settings.commitMessageAi ?? EMPTY_COMMIT_MESSAGE_AI_SETTINGS
 }
 
-export function commitMessageAgentLabel(
-  agentId: TuiAgent,
-  capability: CommitMessageAgentCapability
-): string {
-  return getAgentCatalog().find((a) => a.id === agentId)?.label ?? capability.label
-}
-
-export function resolveCommitMessageSelectedModel(
-  config: CommitMessageAiSettings,
-  capability: CommitMessageAgentCapability
-): CommitMessageModelCapability {
-  const persisted = config.selectedModelByAgent[capability.id]
-  if (persisted) {
-    const found = capability.models.find((m) => m.id === persisted)
-    if (found) {
-      return found
-    }
-  }
-  return capability.models.find((m) => m.id === capability.defaultModelId) ?? capability.models[0]
-}
-
-export function resolveCommitMessageSelectedThinking(
-  config: CommitMessageAiSettings,
-  model: CommitMessageModelCapability
-): string | undefined {
-  if (!model.thinkingLevels) {
-    return undefined
-  }
-  const persisted = config.selectedThinkingByModel[model.id]
-  if (persisted && model.thinkingLevels.some((l) => l.id === persisted)) {
-    return persisted
-  }
-  return model.defaultThinkingLevel
-}
-
+/** First-enable seeding: pick the agent and default model/effort only where nothing is stored. */
 export function seedCommitMessageAiEnablePatch(
   config: CommitMessageAiSettings,
   seedAgentId: CommitMessageAgentChoice
@@ -65,12 +28,8 @@ export function seedCommitMessageAiEnablePatch(
   const seedCapability = isCustomAgentId(seedAgentId)
     ? undefined
     : getCommitMessageAgentCapability(seedAgentId)
-  const seedModel = seedCapability
-    ? resolveCommitMessageSelectedModel(config, seedCapability)
-    : null
-  const seedThinking = seedModel
-    ? resolveCommitMessageSelectedThinking(config, seedModel)
-    : undefined
+  const seedModel = seedCapability ? resolveAiGenerationModel(config, seedCapability) : null
+  const seedThinking = seedModel ? resolveAiGenerationThinking(config, seedModel) : undefined
   const nextSelectedModelByAgent = { ...config.selectedModelByAgent }
   if (seedCapability && !nextSelectedModelByAgent[seedCapability.id]) {
     nextSelectedModelByAgent[seedCapability.id] = seedCapability.defaultModelId

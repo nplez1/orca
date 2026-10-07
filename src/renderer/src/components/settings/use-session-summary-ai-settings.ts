@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
-import { resolveCommitMessageAgentChoice } from '../../../../shared/commit-message-agent-spec'
+import type { SessionSummaryAiSettings } from '../../../../shared/session-summary-ai-types'
+import { readSessionSummaryAiSettings } from '../../../../shared/session-summary-ai'
 import {
   aiGenerationAgentChangePatch,
   aiGenerationModelChangePatch,
@@ -9,67 +9,44 @@ import {
   type AiGenerationSelection
 } from '@/lib/ai-generation-settings'
 import { useAppStore } from '@/store'
-import {
-  EMPTY_COMMIT_MESSAGE_AI_SETTINGS,
-  readCommitMessageAiSettings,
-  seedCommitMessageAiEnablePatch
-} from './ai-commit-pr-settings-helpers'
 
-export type AiCommitPrSettingsViewModel = AiGenerationSelection & {
-  config: CommitMessageAiSettings
+export type SessionSummaryAiSettingsViewModel = AiGenerationSelection & {
+  config: SessionSummaryAiSettings
   selectPortalRoot: HTMLElement | null
   setSelectPortalHost: (node: HTMLDivElement | null) => void
-  toggleAi: () => void
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
-  writeConfig: (patch: Partial<CommitMessageAiSettings>) => void
+  onCustomCommandChange: (value: string) => void
 }
 
-export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
+/** Agent/model/effort for the session-summary fold, stored on its own so tuning a
+ *  summary never moves the commit-message choice (or the reverse). */
+export function useSessionSummaryAiSettings(): SessionSummaryAiSettingsViewModel {
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const [selectPortalRoot, setSelectPortalRoot] = useState<HTMLElement | null>(null)
   const setSelectPortalHost = useCallback((node: HTMLDivElement | null) => {
-    setSelectPortalRoot(
-      node?.closest<HTMLElement>('[data-onboarding-overlay], [data-slot="dialog-content"]') ?? node
-    )
+    setSelectPortalRoot(node?.closest<HTMLElement>('[data-slot="dialog-content"]') ?? node)
   }, [])
 
-  const config = settings ? readCommitMessageAiSettings(settings) : EMPTY_COMMIT_MESSAGE_AI_SETTINGS
+  const config = readSessionSummaryAiSettings({ sessionSummaryAi: settings?.sessionSummaryAi })
   const selection = resolveAiGenerationSelection(config, {
     defaultTuiAgent: settings?.defaultTuiAgent,
     disabledTuiAgents: settings?.disabledTuiAgents
   })
 
-  const writeConfig = (patch: Partial<CommitMessageAiSettings>): void => {
+  const writeConfig = (patch: Partial<SessionSummaryAiSettings>): void => {
     if (!settings) {
       return
     }
-    updateSettings({ commitMessageAi: { ...config, ...patch } })
+    updateSettings({ sessionSummaryAi: { ...config, ...patch } })
   }
 
-  const writeSelectionPatch = (patch: Partial<CommitMessageAiSettings>): void => {
+  const writeSelectionPatch = (patch: Partial<SessionSummaryAiSettings>): void => {
     if (Object.keys(patch).length > 0) {
       writeConfig(patch)
     }
-  }
-
-  const toggleAi = (): void => {
-    if (config.enabled) {
-      writeConfig({ enabled: false })
-      return
-    }
-    const seedAgentId = resolveCommitMessageAgentChoice(
-      config.agentId,
-      settings?.defaultTuiAgent,
-      settings?.disabledTuiAgents
-    )
-    writeConfig(
-      seedAgentId
-        ? seedCommitMessageAiEnablePatch(config, seedAgentId)
-        : { enabled: true, agentId: null }
-    )
   }
 
   return {
@@ -77,7 +54,6 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
     selectPortalRoot,
     setSelectPortalHost,
     ...selection,
-    toggleAi,
     onAgentChange: (newAgentId) =>
       writeSelectionPatch(aiGenerationAgentChangePatch(config, newAgentId)),
     onModelChange: (newModelId) => {
@@ -94,6 +70,6 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
         )
       }
     },
-    writeConfig
+    onCustomCommandChange: (value) => writeConfig({ customAgentCommand: value })
   }
 }

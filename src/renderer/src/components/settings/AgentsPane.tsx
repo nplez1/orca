@@ -52,6 +52,7 @@ import {
 import { AgentAvailabilityControl, type AgentCatalogRowProps } from './AgentCatalogRow'
 import { AgentDefaultSetting } from './AgentDefaultSetting'
 import { AgentDetectionCatalog } from './AgentDetectionCatalog'
+import { SessionSummaryAiSetting } from './SessionSummaryAiSetting'
 
 export {
   buildAgentAvailabilitySettingsUpdate,
@@ -271,6 +272,7 @@ export function AgentsPane({
         </>
       ) : null}
       <AgentGeneratedTabTitlesSetting settings={settings} updateSettings={updateSettings} />
+      <SessionSummaryAiSetting />
       {!isPairedWebClientWindow() ? (
         <AgentAwakeSetting settings={settings} updateSettings={updateSettings} />
       ) : null}

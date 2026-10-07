@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
-import { AiCommitPrSettingsFields } from './AiCommitPrSettingsFields'
+import { AiGenerationFields } from '../settings/ai-generation-fields'
 import { AiCommitPrSettingsSwitch } from './AiCommitPrSettingsSwitch'
 import { useAiCommitPrSettings } from './useAiCommitPrSettings'
 
@@ -51,7 +51,7 @@ export function AiCommitPrSettingsCard(): JSX.Element | null {
         </div>
 
         {config.enabled ? (
-          <AiCommitPrSettingsFields
+          <AiGenerationFields
             config={config}
             selectPortalRoot={selectPortalRoot}
             agentSelectValue={agentSelectValue}
@@ -63,7 +63,7 @@ export function AiCommitPrSettingsCard(): JSX.Element | null {
             onAgentChange={onAgentChange}
             onModelChange={onModelChange}
             onThinkingChange={onThinkingChange}
-            writeConfig={writeConfig}
+            onCustomCommandChange={(value) => writeConfig({ customAgentCommand: value })}
           />
         ) : null}
       </div>

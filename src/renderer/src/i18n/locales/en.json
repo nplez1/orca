@@ -174,6 +174,16 @@
     "retrying": "Retrying…"
   },
   "settings": {
+    "sessionSummaryAi": {
+      "title": "Session summaries",
+      "description": "The agent and model that summarize a session in the Summary tab. A fold runs only while that tab is open, reads only what was added since the last fold, and its result is cached.",
+      "keyword": {
+        "summary": "summary",
+        "agent": "agent",
+        "model": "model",
+        "transcript": "transcript"
+      }
+    },
     "terminal": {
       "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
       "optionLayoutCompose": "layout uses Option to compose characters like @, €, [, ]",

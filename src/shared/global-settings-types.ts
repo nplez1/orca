@@ -8,6 +8,7 @@ import type { TaskViewSettings } from './task-view-settings-types'
 import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
+import type { SessionSummaryAiSettings } from './session-summary-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { UiLanguage } from './ui-language'
@@ -516,6 +517,8 @@ export type GlobalSettings = {
   commitMessageAi?: CommitMessageAiSettings
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
+  /** Which agent and model fold a session summary on view. Separate from source-control AI so summary cost is tunable on its own. */
+  sessionSummaryAi?: SessionSummaryAiSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
   /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.

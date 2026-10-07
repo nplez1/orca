@@ -21,6 +21,7 @@ import {
 } from './agent-workspace-trust-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
 import { getAgentSessionSearchSearchEntries } from './agent-session-search-search'
+import { getSessionSummaryAiSearchEntries } from './session-summary-ai-search'
 import {
   getCodexTerminalServerIsolationDescription,
   getCodexTerminalServerIsolationSearchKeywords,
@@ -168,7 +169,8 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
     ]
   },
   ...getAgentCacheTimerSearchEntries(),
-  ...getAgentSessionSearchSearchEntries()
+  ...getAgentSessionSearchSearchEntries(),
+  ...getSessionSummaryAiSearchEntries()
 ])
 
 export function getAgentsPaneSearchEntries({

@@ -7,17 +7,19 @@ import {
   type CommitMessageAgentCapability,
   type CommitMessageModelCapability
 } from '../../../../shared/commit-message-agent-spec'
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
-import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
+import {
+  aiGenerationAgentLabel,
+  type AiGenerationSettingsConfig
+} from '@/lib/ai-generation-settings'
+import { AgentIcon } from '@/lib/agent-catalog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { translate } from '@/i18n/i18n'
-import { commitMessageAgentLabel } from './ai-commit-pr-settings-helpers'
 
-type AiCommitPrSettingsFieldsProps = {
-  config: CommitMessageAiSettings
+export type AiGenerationFieldsProps = {
+  config: AiGenerationSettingsConfig
   selectPortalRoot: HTMLElement | null
   agentSelectValue: string | undefined
   activeCapability: CommitMessageAgentCapability | undefined
@@ -28,10 +30,14 @@ type AiCommitPrSettingsFieldsProps = {
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
-  writeConfig: (patch: Partial<CommitMessageAiSettings>) => void
+  onCustomCommandChange: (value: string) => void
 }
 
-export function AiCommitPrSettingsFields({
+/** Agent / model / thinking-effort pickers for an agent-CLI text-generation setting.
+ *
+ *  Storage belongs to the caller; this only renders the choice. Keep it in step with
+ *  `resolveAiGenerationSelection`, which derives the values its props expect. */
+export function AiGenerationFields({
   config,
   selectPortalRoot,
   agentSelectValue,
@@ -43,16 +49,16 @@ export function AiCommitPrSettingsFields({
   onAgentChange,
   onModelChange,
   onThinkingChange,
-  writeConfig
-}: AiCommitPrSettingsFieldsProps): JSX.Element {
+  onCustomCommandChange
+}: AiGenerationFieldsProps): JSX.Element {
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
-        <Label className="text-xs">
+    <div className="flex flex-col gap-3">
+      <div className="space-y-1.5">
+        <Label>
           {translate('auto.components.feature.wall.AiCommitPrSettingsCard.29d119fe95', 'Agent')}
         </Label>
         <Select value={agentSelectValue} onValueChange={onAgentChange}>
-          <SelectTrigger size="sm" className="h-8 w-full text-xs">
+          <SelectTrigger size="sm" className="h-8 w-full">
             <span
               className={cn(
                 'flex min-w-0 items-center gap-2',
@@ -63,7 +69,7 @@ export function AiCommitPrSettingsFields({
                 <>
                   <AgentIcon agent={activeCapability.id} size={14} />
                   <span className="truncate">
-                    {commitMessageAgentLabel(activeCapability.id, activeCapability)}
+                    {aiGenerationAgentLabel(activeCapability.id, activeCapability)}
                   </span>
                 </>
               ) : isCustom ? (
@@ -97,7 +103,7 @@ export function AiCommitPrSettingsFields({
               <SelectItem key={capability.id} value={capability.id} className="cursor-pointer">
                 <span className="flex items-center gap-2">
                   <AgentIcon agent={capability.id} size={14} />
-                  <span>{commitMessageAgentLabel(capability.id, capability)}</span>
+                  <span>{aiGenerationAgentLabel(capability.id, capability)}</span>
                 </span>
               </SelectItem>
             ))}
@@ -115,7 +121,7 @@ export function AiCommitPrSettingsFields({
           </SelectContent>
         </Select>
         {unsupportedAgentLabel ? (
-          <p className="col-start-2 text-[11px] leading-snug text-muted-foreground">
+          <p className="text-[11px] leading-snug text-muted-foreground">
             {unsupportedAgentLabel}{' '}
             {translate(
               'auto.components.feature.wall.AiCommitPrSettingsCard.4d9b6d84df',
@@ -126,12 +132,12 @@ export function AiCommitPrSettingsFields({
       </div>
 
       {activeCapability && activeModel ? (
-        <div className="grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
-          <Label className="text-xs">
+        <div className="space-y-1.5">
+          <Label>
             {translate('auto.components.feature.wall.AiCommitPrSettingsCard.be8917699e', 'Model')}
           </Label>
           <Select value={activeModel.id} onValueChange={onModelChange}>
-            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+            <SelectTrigger size="sm" className="h-8 w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
@@ -146,15 +152,15 @@ export function AiCommitPrSettingsFields({
       ) : null}
 
       {activeModel?.thinkingLevels && activeThinking ? (
-        <div className="grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
-          <Label className="text-xs">
+        <div className="space-y-1.5">
+          <Label>
             {translate(
               'auto.components.feature.wall.AiCommitPrSettingsCard.4b2fc4b80c',
               'Thinking effort'
             )}
           </Label>
           <Select value={activeThinking} onValueChange={onThinkingChange}>
-            <SelectTrigger size="sm" className="h-8 w-full text-xs">
+            <SelectTrigger size="sm" className="h-8 w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
@@ -170,23 +176,23 @@ export function AiCommitPrSettingsFields({
 
       {isCustom ? (
         <div className="space-y-1.5">
-          <Label htmlFor="feature-wall-ai-commit-custom-command" className="text-xs">
+          <Label htmlFor="ai-generation-custom-command">
             {translate(
               'auto.components.feature.wall.AiCommitPrSettingsCard.9ee54037a4',
               'Custom command'
             )}
           </Label>
           <Input
-            id="feature-wall-ai-commit-custom-command"
+            id="ai-generation-custom-command"
             value={config.customAgentCommand}
-            onChange={(event) => writeConfig({ customAgentCommand: event.target.value })}
+            onChange={(event) => onCustomCommandChange(event.target.value)}
             placeholder={translate(
               'auto.components.feature.wall.AiCommitPrSettingsCard.8d4152701a',
               'e.g. ollama run llama3.1 {{value0}}',
               { value0: CUSTOM_PROMPT_PLACEHOLDER }
             )}
             spellCheck={false}
-            className="h-8 font-mono text-xs"
+            className="h-8"
           />
         </div>
       ) : null}

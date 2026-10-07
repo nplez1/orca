@@ -64,9 +64,13 @@ resolves that file per agent type; the fold turns it into a structured ledger.
 The ledger cache is `session-summaries.json` under `userData`, written atomically. It is a
 rebuildable cache: deleting it costs one fold per session, never state.
 
-The model that does the folding is the user's text-generation configuration
-(Settings → Git → Source Control AI — the same agent/model/thinking-level pickers as commit
-messages and PR fields), resolved in `session-summary-fold-params.ts`.
+The agent, model, and thinking effort that fold a summary are their own setting —
+**Settings → Agents → Session summaries** (`sessionSummaryAi`), which reuses the agent/model
+shape the Source Control AI settings use without sharing their value. It is deliberately
+separate: a summary is not a source-control action, and borrowing the commit-message recipe
+meant summary cost could not be tuned without changing commit messages. Resolution lives in
+`src/shared/session-summary-ai.ts` (read by `session-summary-fold-params.ts`); with nothing
+configured it follows the default agent and that agent's default model and effort.
 
 ## Adding a right-sidebar tab
 
