@@ -33,11 +33,7 @@ export function scanAiVaultSessionsInBackground(
   /** Forwarded to the service, which reconciles and filters before listing. */
   request: { refresh?: boolean; query?: string } = {}
 ): Promise<AiVaultListResult> {
-  // Why: an empty request is the service's own default — forwarding `{}` would grow every plain
-  // listing's call shape for no information.
-  return request.refresh || request.query
-    ? scanAiVaultSessionsInService(options, signal, request)
-    : scanAiVaultSessionsInService(options, signal)
+  return scanAiVaultSessionsInService(options, signal, request)
 }
 
 export function resolveAiVaultSessionTitlesInBackground(
