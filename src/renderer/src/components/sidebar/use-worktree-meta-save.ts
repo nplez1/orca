@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
@@ -30,6 +30,7 @@ import { toWorktreeMetaLiveLinks } from './use-worktree-meta-workspace'
  *  state on the other side of the read. */
 export function useWorktreeMetaSave(input: {
   worktreeId: string
+  isOpen: boolean
   executionHostId?: ExecutionHostId
   suppressHostedReviewRefresh: boolean
   /** The two fields the Jira read needs: its host, and the context it routes through. */
@@ -55,6 +56,7 @@ export function useWorktreeMetaSave(input: {
 } {
   const {
     worktreeId,
+    isOpen,
     executionHostId,
     suppressHostedReviewRefresh,
     worktree,
@@ -77,10 +79,17 @@ export function useWorktreeMetaSave(input: {
   const savingRef = useRef(false)
   const saveRequestRef = useRef(0)
 
-  const beginSession = useCallback(() => {
-    saveRequestRef.current += 1
-    setSaveError(null)
-  }, [])
+  // Why state only: this runs while the dialog renders its open seed, and a ref
+  // written during render can be lost when React discards that render.
+  const beginSession = useCallback(() => setSaveError(null), [])
+
+  // Why an effect, not the open path: a save that outlives its dialog session must
+  // not close or apply to the next one, and closing is the moment that becomes true.
+  useEffect(() => {
+    if (!isOpen) {
+      saveRequestRef.current += 1
+    }
+  }, [isOpen])
 
   /** The Jira link to write, or the reason to stop. Nothing to resolve for another
    *  provider, an untouched field, or a value that only respells the stored issue —

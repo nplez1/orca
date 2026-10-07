@@ -205,6 +205,7 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
     save: handleSave
   } = useWorktreeMetaSave({
     worktreeId,
+    isOpen,
     ...(executionHostId ? { executionHostId } : {}),
     suppressHostedReviewRefresh,
     worktree,
@@ -218,9 +219,15 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
     afterSave
   })
 
-  const prevIsOpenRef = useRef(false)
   const displayNameInputRef = useRef<HTMLInputElement>(null)
-  if (isOpen && !prevIsOpenRef.current) {
+  // Why state, not a ref: tracking the previous open value is React's documented
+  // "store information from previous renders" pattern, and React may discard a
+  // render that mutates a ref, losing the write.
+  const [wasOpen, setWasOpen] = useState(false)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+  }
+  if (isOpen && !wasOpen) {
     beginSession()
     setDisplayNameInput(currentDisplayName)
     setIssueInput(currentIssue)
@@ -241,7 +248,6 @@ const WorktreeMetaDialog = React.memo(function WorktreeMetaDialog() {
     })
     resetOpeningIssue()
   }
-  prevIsOpenRef.current = isOpen
 
   const handleCommentKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
