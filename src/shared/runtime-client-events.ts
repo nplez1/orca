@@ -7,6 +7,7 @@ import type {
 import type { SshConnectionState } from './ssh-types'
 import type { TerminalSideEffectBatch } from './terminal-side-effect-facts'
 import type { RuntimeNativeChatLaunchDraftResolution } from './runtime-types'
+import type { RuntimeNavigationTarget } from './runtime-navigation'
 
 export type RuntimeClientEvent =
   | { type: 'reposChanged' }
@@ -45,6 +46,8 @@ export type RuntimeClientEvent =
       setup?: WorktreeSetupLaunch
       startup?: WorktreeStartupLaunch
       defaultTabs?: WorktreeDefaultTabsLaunch
+      /** Absent on older hosts; clients must not infer navigation intent from a broadcast. */
+      navigation?: RuntimeNavigationTarget
     }
   // Why: the setup runner is a plain shell script, so no agent status can carry
   // "setup is running". The host that spawned it owns that fact and announces it.
@@ -74,12 +77,14 @@ export function toRuntimeActivateWorktreeEvent(
   worktreeId: string,
   setup?: CreateWorktreeResult['setup'],
   startup?: WorktreeStartupLaunch,
-  defaultTabs?: CreateWorktreeResult['defaultTabs']
+  defaultTabs?: CreateWorktreeResult['defaultTabs'],
+  navigation?: RuntimeNavigationTarget
 ): RuntimeActivateWorktreeEvent {
   return {
     type: 'activateWorktree',
     repoId,
     worktreeId,
+    ...(navigation ? { navigation } : {}),
     ...(setup ? { setup } : {}),
     ...(startup ? { startup } : {}),
     ...(defaultTabs ? { defaultTabs } : {})

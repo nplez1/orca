@@ -58,6 +58,7 @@ export type HostedReviewInfo = {
 }
 
 export type HostedReviewForBranchArgs = {
+  force?: boolean
   repoPath: string
   repoId?: string
   admissionTier?: 'interactive' | 'status' | 'background'

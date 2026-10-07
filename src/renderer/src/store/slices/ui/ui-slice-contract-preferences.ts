@@ -162,6 +162,12 @@ export type UISliceSurfaces = {
    */
   prCommentInlineDisplayById: Record<string, PRCommentInlineDisplay>
   setPRCommentInlineDisplay: (commentId: string, display: PRCommentInlineDisplay | null) => void
+  /** The floating workspace's directory, resolved from its setting the same way the runtime resolves a floating session's cwd. Null until resolved. */
+  floatingWorkspacePath: string | null
+  setFloatingWorkspacePath: (path: string | null) => void
+  /** Whether the floating workspace overlay is open; on screen only while the feature is enabled too. */
+  floatingWorkspacePanelOpen: boolean
+  setFloatingWorkspacePanelOpen: (open: boolean) => void
 }
 
 export type UISlicePersistence = {

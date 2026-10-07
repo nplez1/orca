@@ -360,6 +360,7 @@ export default function DiffViewer({
             keepCurrentOriginalModel
             keepCurrentModifiedModel
             options={{
+              dropIntoEditor: { enabled: false },
               readOnly: !editable,
               originalEditable: false,
               renderSideBySide: sideBySide,

@@ -12,17 +12,11 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 
-const { appGetPathMock, authorizeExternalPathMock } = vi.hoisted(() => ({
-  appGetPathMock: vi.fn(),
+const { authorizeExternalPathMock } = vi.hoisted(() => ({
   authorizeExternalPathMock: vi.fn()
-}))
-
-vi.mock('electron', () => ({
-  app: {
-    getPath: appGetPathMock
-  }
 }))
 
 vi.mock('./filesystem-auth', () => ({
@@ -70,14 +64,16 @@ describe('floating workspace directory authorization', () => {
     userDataDir = path.join(tempRoot, 'user-data')
     floatingWorkspaceDir = path.join(homeDir, '.orca', 'floating-workspace')
     await mkdir(homeDir)
-    appGetPathMock.mockImplementation((name: string) => {
-      if (name === 'home') {
-        return homeDir
+    installFakeAppEnvironment({
+      getPath: (name) => {
+        if (name === 'home') {
+          return homeDir
+        }
+        if (name === 'userData') {
+          return userDataDir
+        }
+        throw new Error(`unexpected app path: ${name}`)
       }
-      if (name === 'userData') {
-        return userDataDir
-      }
-      throw new Error(`unexpected app path: ${name}`)
     })
     authorizeExternalPathMock.mockClear()
   })

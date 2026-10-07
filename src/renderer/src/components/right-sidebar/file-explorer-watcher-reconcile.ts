@@ -42,11 +42,7 @@ function createSubtreeMatcher(paths: ReadonlySet<string>): (candidatePath: strin
 export function purgeDirCacheSubtrees(
   setDirCache: Dispatch<SetStateAction<Record<string, DirCache>>>,
   deletedPaths: ReadonlySet<string>,
-  /**
-   * A key enumeration already taken of `snapshot` (the payload's linked-alias check shares one
-   * with this purge). Reused only while state has not moved on; a diverged `prev` scans fresh.
-   */
-  priorScan?: { snapshot: Record<string, DirCache>; keys: readonly string[] }
+  snapshot?: { cache: Record<string, DirCache>; keys: readonly string[] }
 ): void {
   if (deletedPaths.size === 0) {
     return
@@ -55,7 +51,7 @@ export function purgeDirCacheSubtrees(
   setDirCache((prev) => {
     let changed = false
     const next: Record<string, DirCache> = {}
-    const keys = priorScan && prev === priorScan.snapshot ? priorScan.keys : Object.keys(prev)
+    const keys = prev === snapshot?.cache ? snapshot.keys : Object.keys(prev)
     for (const key of keys) {
       if (shouldPurge(key)) {
         changed = true

@@ -25,6 +25,7 @@ import {
 
 export { getManagedScript }
 import { getManagedStatusLineScript } from './statusline-script'
+import { refuseProfileAtDefaultHome } from './claude-profile-hook-target'
 import {
   applyManagedHooks,
   applyManagedStatusLine,
@@ -65,6 +66,9 @@ type ClaudeHookInstallOptions = {
   claudeVersion?: string
 }
 
+/** An account profile on this host; omitted for the default home. */
+type ClaudeHookTargetOptions = ClaudeHookInstallOptions & { configDir?: string }
+
 const DEFAULT_CLAUDE_HOOK_SERVICE_OPTIONS: ClaudeHookServiceOptions = {
   agent: 'claude',
   displayName: 'Claude',
@@ -98,8 +102,12 @@ export class ClaudeHookService {
       : (this.options.hookPlan ?? OPENCLAUDE_MANAGED_HOOK_PLAN)
   }
 
-  getStatus(options: ClaudeHookInstallOptions = {}): AgentHookInstallStatus {
-    const configPath = getConfigPath(this.options.settings)
+  getStatus(options: ClaudeHookTargetOptions = {}): AgentHookInstallStatus {
+    const refused = refuseProfileAtDefaultHome(this.options, options.configDir)
+    if (refused) {
+      return refused
+    }
+    const configPath = getConfigPath(this.options.settings, options.configDir)
     const scriptPath = getManagedScriptPath(this.options.settings)
     const config = readHooksJson(configPath)
     if (!config) {
@@ -159,8 +167,12 @@ export class ClaudeHookService {
     )
   }
 
-  install(options: ClaudeHookInstallOptions = {}): AgentHookInstallStatus {
-    const configPath = getConfigPath(this.options.settings)
+  install(options: ClaudeHookTargetOptions = {}): AgentHookInstallStatus {
+    const refused = refuseProfileAtDefaultHome(this.options, options.configDir)
+    if (refused) {
+      return refused
+    }
+    const configPath = getConfigPath(this.options.settings, options.configDir)
     const scriptPath = getManagedScriptPath(this.options.settings)
     const config = readHooksJson(configPath)
     if (!config) {
@@ -187,9 +199,10 @@ export class ClaudeHookService {
     } else {
       writeManagedScript(scriptPath, payload)
     }
-    if (plan.statusLine === 'install') {
+    // Why: a profile's statusLine arrives with the settings merge from the default home.
+    if (options.configDir === undefined && plan.statusLine === 'install') {
       nextConfig = this.installManagedStatusLine(nextConfig)
-    } else if (plan.statusLine === 'retire') {
+    } else if (options.configDir === undefined && plan.statusLine === 'retire') {
       nextConfig = this.retireManagedStatusLine(nextConfig)
     }
     writeHooksJson(configPath, nextConfig)

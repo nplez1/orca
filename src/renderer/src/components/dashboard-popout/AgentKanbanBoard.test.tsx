@@ -427,6 +427,6 @@ describe('AgentKanbanBoard', () => {
         onRevealAgent={vi.fn()}
       />
     )
-    expect(ackAgent).toHaveBeenCalledWith('pk-ack')
+    expect(ackAgent.mock.calls).toEqual([['pk-ack', 'view']])
   })
 })

@@ -18,6 +18,9 @@ const workspacePathSearchControllers = new Map<string, AbortController>()
 export function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
   const searches = new Map<string, AbortController>()
   return {
+    prepareDroppedPaths: async () => {
+      throw new Error('Preparing dropped file paths is not supported in the web client')
+    },
     readFileChunk: async ({ filePath, offset, length }) => {
       const file = await resolveRuntimeFilePath(filePath)
       return callRuntimeResult('files.readChunk', {

@@ -19,13 +19,18 @@ export function applyPRCacheResult(
   fetchedAt: number,
   accepted: boolean,
   preserveExisting: boolean,
-  preserveOnReject = false
+  preserveOnReject = false,
+  fetchedHeadOid?: string | null
 ): AppState['prCache'] {
   if (preserveExisting) {
     return cache
   }
   if (accepted) {
-    return withBoundedCacheEntry(cache, cacheKey, { data: pr, fetchedAt })
+    return withBoundedCacheEntry(cache, cacheKey, {
+      data: pr,
+      fetchedAt,
+      ...(fetchedHeadOid ? { fetchedHeadOid } : {})
+    })
   }
   // Why: a rejected result lost a race to a newer write; deleting the newer entry
   // blanked the Checks panel to its loading interstitial until the next PR fetch.
@@ -87,6 +92,7 @@ export function setGitHubPRResultCaches(
     fallbackPRNumber?: number | null
     fallbackPRSource?: GitHubPRFallbackSource | null
     requestStartedAt?: number
+    fetchedHeadOid?: string | null
     requestStartedEntry?: AppState['hostedReviewCache'][string]
   }
 ): Partial<AppState> {
@@ -139,7 +145,8 @@ export function setGitHubPRResultCaches(
       fallbackPRNumber: args.fallbackPRNumber
     }),
     preserveExistingPRForFallbackMiss,
-    hostedReviewSync.preservePRCacheOnReject
+    hostedReviewSync.preservePRCacheOnReject,
+    args.fetchedHeadOid
   )
   return {
     ...(nextPRCache === state.prCache ? {} : { prCache: nextPRCache }),
@@ -168,6 +175,7 @@ export function applyGitHubPRResultToCaches(args: {
   fallbackPRNumber?: number | null
   fallbackPRSource?: GitHubPRFallbackSource | null
   requestStartedAt?: number
+  fetchedHeadOid?: string | null
   requestStartedEntry?: AppState['hostedReviewCache'][string]
 }): {
   prCache: AppState['prCache']
@@ -223,7 +231,8 @@ export function applyGitHubPRResultToCaches(args: {
         fallbackPRNumber: args.fallbackPRNumber
       }),
       preserveExistingPRForFallbackMiss,
-      hostedReviewSync.preservePRCacheOnReject
+      hostedReviewSync.preservePRCacheOnReject,
+      args.fetchedHeadOid
     ),
     hostedReviewCache: hostedReviewSync.cache
   }

@@ -292,7 +292,6 @@ export function list(messages: NativeChatMessage[], isVisible = true): React.JSX
       isVisible={isVisible}
       isWorking={false}
       expandSignal={false}
-      fontScale={1}
     />
   )
 }
@@ -325,6 +324,7 @@ export function scrollTranscript(container: HTMLElement, top: number): void {
   if (!scroller) {
     throw new Error('no transcript scroll root')
   }
+  fireEvent.wheel(scroller, { deltaY: top - scroller.scrollTop })
   scroller.scrollTop = top
   fireEvent.scroll(scroller)
 }

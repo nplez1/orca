@@ -1,3 +1,4 @@
+import { invalidateReviewLookupsAfterPRMutation } from '../../pr-mutation-review-invalidation'
 import type { PRConflictSummary } from '../../../../shared/github/pull-request-types'
 import { isGitHubPRAdminBypassAvailable } from '../../../../shared/github/pull-request-admin-bypass'
 import { mapPRState } from '../../mappers'
@@ -63,7 +64,7 @@ export async function mergePR(
       )
       release()
       concurrencySlotHeld = false
-      return await mergeGitHubPRStack({
+      const result = await mergeGitHubPRStack({
         repository: ownerRepo,
         prNumber,
         method,
@@ -71,6 +72,10 @@ export async function mergePR(
         headSha: restData.headRefOid,
         ghOptions
       })
+      if (result.ok) {
+        invalidateReviewLookupsAfterPRMutation(repoPath, connectionId)
+      }
+      return result
     }
     const preflight = await getPRMergePreflight(
       repoPath,
@@ -100,6 +105,7 @@ export async function mergePR(
       ...ghOptions,
       env: { ...process.env, GH_PROMPT_DISABLED: '1' }
     })
+    invalidateReviewLookupsAfterPRMutation(repoPath, connectionId)
     return { ok: true }
   } catch (err) {
     const message =

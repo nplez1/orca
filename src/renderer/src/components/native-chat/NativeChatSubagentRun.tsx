@@ -48,7 +48,10 @@ function subagentStateLabel(
       case 'stopped':
         return translate('components.native-chat.subagents.state.stopped', 'stopped')
       case 'unverifiable':
-        return translate('components.native-chat.subagents.state.unverifiable', 'no recent update')
+        return translate(
+          'components.native-chat.subagents.state.unverifiable',
+          'status unavailable'
+        )
     }
   }
   switch (state) {
@@ -79,7 +82,7 @@ function subagentStateLabel(
     case 'unverifiable':
       return translate(
         'components.native-chat.subagents.state.unverifiableCount',
-        '{{value0}} with no recent update',
+        '{{value0}} with status unavailable',
         { value0: count }
       )
   }
@@ -290,7 +293,7 @@ export function NativeChatSubagentRun({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="group/subagent-run flex min-h-6 w-full items-center gap-1.5 rounded-md py-0.5 text-left font-sans text-[13px] leading-relaxed text-chat-foreground-faint hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+        className="group/subagent-run flex min-h-6 w-full items-center gap-1.5 rounded-md py-0.5 text-left font-sans text-[13px] native-chat-message-text leading-relaxed text-chat-foreground-faint hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
         aria-expanded={open}
         aria-live="polite"
       >
