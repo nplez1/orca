@@ -14,7 +14,7 @@ import {
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { linuxFormatArguments, packageLinuxFormats } from './package-linux-formats.mjs'
 
 let root
@@ -73,6 +73,54 @@ it('preserves configured hooks, architecture, names, and PR compression with exa
 })
 
 describe('independent Linux package formats', () => {
+  it('prepares the shared FPM cache once before starting any builder', async () => {
+    const require = createRequire(import.meta.url)
+    const tools = require('app-builder-lib/out/toolsets/linux.js')
+    const fpm = join(root, 'cached fpm')
+    const prepare = vi.spyOn(tools, 'getFpmPath').mockImplementation(async () => {
+      await Promise.resolve()
+      writeFileSync(fpm, 'ready')
+      return fpm
+    })
+    const builds = []
+    try {
+      await packageLinuxFormats({
+        preparedDirectory,
+        outputDirectory,
+        prepareAppImageTools: async () => ({}),
+        runBuilder: async (args) => {
+          expect(existsSync(fpm)).toBe(true)
+          builds.push(valueAfter(args, '--linux'))
+          emitPackage(args)
+        }
+      })
+      expect(prepare).toHaveBeenCalledTimes(1)
+      expect(builds.sort()).toEqual(targets.slice().sort())
+    } finally {
+      prepare.mockRestore()
+    }
+  })
+
+  it('starts no builders and leaves no artifacts when FPM preparation fails', async () => {
+    let builds = 0
+    await expect(
+      packageLinuxFormats({
+        preparedDirectory,
+        outputDirectory,
+        prepareFpmTools: async () => {
+          throw new Error('FPM download failed')
+        },
+        prepareAppImageTools: async () => ({}),
+        runBuilder: async (args) => {
+          builds += 1
+          emitPackage(args)
+        }
+      })
+    ).rejects.toThrow('FPM download failed')
+    expect(builds).toBe(0)
+    expect(readdirSync(outputDirectory)).toEqual([])
+  })
+
   it('starts all formats before awaiting completion and isolates metadata writes', async () => {
     if (process.platform !== 'win32') {
       symlinkSync('resources/package-type', join(preparedDirectory, 'marker-link'))
@@ -85,6 +133,7 @@ describe('independent Linux package formats', () => {
     await packageLinuxFormats({
       preparedDirectory,
       outputDirectory,
+      prepareFpmTools: async () => {},
       prepareAppImageTools: async () => ({}),
       runBuilder: async (args) => {
         const app = valueAfter(args, '--prepackaged')
@@ -141,6 +190,7 @@ describe('independent Linux package formats', () => {
         packageLinuxFormats({
           preparedDirectory,
           outputDirectory,
+          prepareFpmTools: async () => {},
           prepareAppImageTools: async ({ directory }) => {
             overlay = directory
             mkdirSync(directory)
@@ -195,6 +245,7 @@ describe('independent Linux package formats', () => {
     await packageLinuxFormats({
       preparedDirectory,
       outputDirectory,
+      prepareFpmTools: async () => {},
       prepareAppImageTools: async ({ directory }) => {
         overlay = directory
         mkdirSync(directory)
@@ -222,6 +273,7 @@ describe('independent Linux package formats', () => {
       packageLinuxFormats({
         preparedDirectory,
         outputDirectory,
+        prepareFpmTools: async () => {},
         prepareAppImageTools: async () => ({}),
         runBuilder: async (args) => {
           const result = emitPackage(args)
@@ -240,6 +292,7 @@ describe('independent Linux package formats', () => {
       packageLinuxFormats({
         preparedDirectory,
         outputDirectory,
+        prepareFpmTools: async () => {},
         prepareAppImageTools: async () => ({}),
         runBuilder: async (args) => {
           emitPackage(args)
@@ -256,6 +309,9 @@ describe('independent Linux package formats', () => {
       packageLinuxFormats({
         preparedDirectory,
         outputDirectory,
+        prepareFpmTools: async () => {
+          throw new Error('must not prepare tools')
+        },
         prepareAppImageTools: async () => ({}),
         runBuilder: async () => {
           throw new Error('must not run')
