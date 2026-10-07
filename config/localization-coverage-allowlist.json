@@ -77,7 +77,7 @@
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/activity/session-summary-panel.tsx",
+    "filePath": "src/renderer/src/components/activity/session-summary-ledger-view.tsx",
     "kind": "object-property:error",
     "text": "Error",
     "dynamic": false,

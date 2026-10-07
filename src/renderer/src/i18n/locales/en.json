@@ -19834,7 +19834,8 @@
       "upToDate": "Up to date",
       "label": "Session summary",
       "failed": "Could not summarize this session.",
-      "unavailable": "No readable transcript for this session yet."
+      "unavailable": "No readable transcript for this session yet.",
+      "notFocused": "Focus an agent session to see its summary."
     }
   }
 }

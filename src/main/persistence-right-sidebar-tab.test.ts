@@ -20,6 +20,7 @@ describe('normalizeRightSidebarTab', () => {
     'explorer',
     'search',
     'vault',
+    'summary',
     'workspaces',
     'source-control',
     'checks',

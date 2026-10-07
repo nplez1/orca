@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CircleDot, Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
+import { CircleDot, Info, Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -78,6 +78,14 @@ export function useRightSidebarActivityItems({
         id: 'vault',
         icon: AgentSessionHistoryIcon,
         title: translate('auto.components.right.sidebar.index.aiVaultSessionHistory', 'Agents'),
+        shortcut: ''
+      },
+      {
+        // Why: the pane summarizes an agent session in this workspace, so it sits
+        // beside Agents rather than with the source-control group.
+        id: 'summary',
+        icon: Info,
+        title: translate('activity.sessionSummary.label', 'Session summary'),
         shortcut: ''
       },
       {
