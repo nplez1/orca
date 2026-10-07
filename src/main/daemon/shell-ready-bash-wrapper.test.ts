@@ -7,6 +7,7 @@ import type * as DaemonBashRcfileModule from './daemon-bash-shell-ready-rcfile'
 import { getBashShellReadyRcfileContent } from '../providers/local-pty-shell-ready-bash-rcfile'
 import { getDaemonBashShellReadyRcfileContent } from './daemon-bash-shell-ready-rcfile'
 import { prependOrcaCliDirToChildPath } from '../cli/orca-cli-child-path'
+import { DEV_COMMAND_NAME } from '../cli/cli-install-constants'
 import {
   OVERLAY_ONLY_FEATURES,
   STARTUP_COMMAND_FEATURES
@@ -69,7 +70,7 @@ describePosix('daemon shell-ready bash wrapper', () => {
     mkdirSync(cliBin, { recursive: true })
     mkdirSync(ambientBin)
     for (const bin of [cliBin, ambientBin]) {
-      const launcher = join(bin, 'orca-dev')
+      const launcher = join(bin, DEV_COMMAND_NAME)
       writeFileSync(launcher, '#!/bin/sh\nexit 0\n')
       chmodSync(launcher, 0o755)
     }
@@ -89,11 +90,15 @@ describePosix('daemon shell-ready bash wrapper', () => {
     )
     const rcfile = join(userDataPath, 'cli-path-rcfile')
     writeFileSync(rcfile, content())
-    const result = spawnSync('bash', ['-c', '. "$1"; command -v orca-dev', 'bash', rcfile], {
-      env,
-      encoding: 'utf8',
-      timeout: 5000
-    })
+    const result = spawnSync(
+      'bash',
+      ['-c', `. "$1"; command -v ${DEV_COMMAND_NAME}`, 'bash', rcfile],
+      {
+        env,
+        encoding: 'utf8',
+        timeout: 5000
+      }
+    )
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)
     expect(result.stdout.split('\x1b]133;C\x07').join('').trim()).toBe(expectedLauncher)
