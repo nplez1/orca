@@ -36,6 +36,7 @@ import {
   resolveCreateParentSelector
 } from './worktree-create-parent-selector'
 import { getOptionalLinearIssueLinkFlag } from './worktree-linear-issue-link'
+import { getJiraIssueLinkFlagUpdates } from './worktree-jira-issue-link'
 import { getOptionalWorktreeUnreadFlag } from './worktree-unread-flag'
 import { getReviewTargetLinkFlags } from './worktree-review-link-flags'
 import { assertGitLabLinkFlagProjectsMatch } from './worktree-gitlab-link-context'
@@ -254,11 +255,13 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     })
     const worktree = await getRequiredWorktreeSelector(flags, 'worktree', cwd, client)
     await assertGitLabLinkFlagProjectsMatch(flags, client, { worktree })
+    const jiraIssueLink = await getJiraIssueLinkFlagUpdates({ flags, client, worktree })
     const result = await client.call<{ worktree: RuntimeWorktreeRecord }>('worktree.set', {
       worktree,
       displayName: getOptionalStringFlag(flags, 'display-name'),
       ...reviewLinks,
       ...linearIssueLink,
+      ...jiraIssueLink,
       comment: getOptionalStringFlag(flags, 'comment'),
       workspaceStatus: getOptionalStringFlag(flags, 'workspace-status'),
       isUnread,

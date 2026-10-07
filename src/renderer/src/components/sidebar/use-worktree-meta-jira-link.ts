@@ -3,7 +3,14 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { buildJiraWorkspaceSource } from '../../../../shared/new-workspace/workspace-source'
 import { getJiraSiteIdentityKey, parseJiraIssueUrl } from '../../../../shared/jira-issue-url'
-import { normalizeTaskSourceContext } from '../../../../shared/task-source-context'
+import {
+  selectJiraLinkSite,
+  type JiraLinkSiteFailure
+} from '../../../../shared/jira-link-site-selection'
+import {
+  ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID,
+  normalizeTaskSourceContext
+} from '../../../../shared/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { JiraSite } from '../../../../shared/jira-types'
 import type { ResolvedJiraIssueLink } from './worktree-meta-updates'
@@ -11,7 +18,38 @@ import type { ResolvedJiraIssueLink } from './worktree-meta-updates'
 /** The placeholder project the account-backed task sources already use for Jira:
  *  a Jira task source is scoped by site, not by project, so `projectId` is only a
  *  cache-scope key. Kept identical to the Task view's so both write one scope. */
-const JIRA_ACCOUNT_SCOPE_PROJECT_ID = 'account-backed-task-source'
+const JIRA_ACCOUNT_SCOPE_PROJECT_ID = ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID
+
+/** The dialog's copy for a site the shared selector could not resolve. */
+function jiraSiteFailureMessage(reason: JiraLinkSiteFailure): string {
+  switch (reason) {
+    case 'site-not-connected':
+      return translate(
+        'auto.components.sidebar.useWorktreeMetaJiraLink.4c1f7a2b90',
+        'That Jira URL belongs to a site that is not connected.'
+      )
+    case 'ambiguous-site':
+      return translate(
+        'auto.components.sidebar.useWorktreeMetaJiraLink.9b7f1d38a4',
+        'More than one connected Jira account uses that site, so Orca cannot tell which one to read.'
+      )
+    case 'linked-site-disconnected':
+      return translate(
+        'auto.components.sidebar.useWorktreeMetaJiraLink.2e5a90c47b',
+        'The Jira site this workspace is linked to is not connected.'
+      )
+    case 'no-sites':
+      return translate(
+        'auto.components.sidebar.useWorktreeMetaJiraLink.8d2e0b6f31',
+        'Connect Jira in Settings, then link the issue.'
+      )
+    case 'site-unresolved':
+      return translate(
+        'auto.components.sidebar.useWorktreeMetaJiraLink.1a9c45e7d3',
+        'Paste the full Jira issue URL so Orca knows which site holds it.'
+      )
+  }
+}
 
 // Why: a shared empty array. Returning a fresh `[]` from a selector makes
 // `useSyncExternalStore` see a new snapshot on every render and loop.
@@ -49,82 +87,18 @@ export function useResolveWorktreeMetaJiraLink(args: {
       const connectedSites = sites
       const liveIdentity = liveContext?.provider === 'jira' ? liveContext.providerIdentity : null
       const liveSiteId = liveIdentity?.provider === 'jira' ? liveIdentity.siteId : null
-      const typedSiteKey = getJiraSiteIdentityKey(parsed.siteUrl)
-      let site: JiraSite | undefined
-
-      if (typedSiteKey) {
-        const matchingSites = connectedSites.filter(
-          (candidate) => getJiraSiteIdentityKey(candidate.siteUrl) === typedSiteKey
-        )
-        if (matchingSites.length === 0) {
-          return {
-            ok: false,
-            error: translate(
-              'auto.components.sidebar.useWorktreeMetaJiraLink.4c1f7a2b90',
-              'That Jira URL belongs to a site that is not connected.'
-            )
-          }
-        }
-        // Why: two accounts can be connected to one Jira host, and the key alone
-        // does not say which to read. Only the site this workspace already uses may
-        // break that tie; picking the first would link an issue read from an account
-        // the user did not name.
-        site =
-          matchingSites.length === 1
-            ? matchingSites[0]
-            : matchingSites.find((candidate) => candidate.id === liveSiteId)
-        if (!site) {
-          return {
-            ok: false,
-            error: translate(
-              'auto.components.sidebar.useWorktreeMetaJiraLink.9b7f1d38a4',
-              'More than one connected Jira account uses that site, so Orca cannot tell which one to read.'
-            )
-          }
-        }
-      } else {
-        // Why: a bare key is byte-identical across providers and says nothing about
-        // the site, so it may only be resolved from state the user already chose:
-        // the site this workspace already reads from, then the site selected in
-        // Settings, then a lone connected site. Guessing differently would read the
-        // right key from the wrong host and silently link the wrong issue.
-        // Why: a site this workspace already reads from that is no longer connected
-        // fails here rather than falling through — resolving its key from a
-        // different site would move a live link to an issue the user never named.
-        if (liveSiteId && !connectedSites.some((candidate) => candidate.id === liveSiteId)) {
-          return {
-            ok: false,
-            error: translate(
-              'auto.components.sidebar.useWorktreeMetaJiraLink.2e5a90c47b',
-              'The Jira site this workspace is linked to is not connected.'
-            )
-          }
-        }
-        const candidates = [
-          liveSiteId,
-          selectedSiteId && selectedSiteId !== 'all' ? selectedSiteId : null,
-          connectedSites.length === 1 ? connectedSites[0].id : null
-        ].filter((id): id is string => typeof id === 'string' && id.length > 0)
-        site = candidates
-          .map((id) => connectedSites.find((candidate) => candidate.id === id))
-          .find((candidate) => candidate !== undefined)
+      // Why shared: the CLI links a Jira issue with the same site rules, so the
+      // choice lives in one place and only the copy differs.
+      const selection = selectJiraLinkSite({
+        siteUrl: parsed.siteUrl,
+        sites: connectedSites,
+        selectedSiteId,
+        linkedSiteId: liveSiteId
+      })
+      if (!selection.ok) {
+        return { ok: false, error: jiraSiteFailureMessage(selection.reason) }
       }
-
-      if (!site) {
-        return {
-          ok: false,
-          error:
-            connectedSites.length === 0
-              ? translate(
-                  'auto.components.sidebar.useWorktreeMetaJiraLink.8d2e0b6f31',
-                  'Connect Jira in Settings, then link the issue.'
-                )
-              : translate(
-                  'auto.components.sidebar.useWorktreeMetaJiraLink.1a9c45e7d3',
-                  'Paste the full Jira issue URL so Orca knows which site holds it.'
-                )
-        }
-      }
+      const site = selection.site
 
       // Why: the stored item and its context must agree on the site, the project
       // key and the issue key or the host drops the context on the next load
