@@ -108,19 +108,25 @@ function withConnection<T>(
 export async function writeClaudeTranscript(
   path: string,
   turns: readonly string[],
-  sessionId: string
+  sessionId: string,
+  /** `cwd` is the scope a listing matches on; `startIndex` sets how recent it is. */
+  placement: { cwd?: string; startIndex?: number } = {}
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, `${claudeLines(turns, sessionId, 0).join('\n')}\n`)
+  await writeFile(
+    path,
+    `${claudeLines(turns, sessionId, placement.startIndex ?? 0, placement.cwd).join('\n')}\n`
+  )
 }
 
 export function claudeLines(
   turns: readonly string[],
   sessionId: string,
-  startIndex: number
+  startIndex: number,
+  cwd?: string
 ): string[] {
   return turns.flatMap((turn, offset) => [
-    userRecord(startIndex + offset * 2, turn, sessionId),
+    userRecord(startIndex + offset * 2, turn, sessionId, cwd),
     assistantRecord(startIndex + offset * 2 + 1, `noted: ${turn}`, sessionId)
   ])
 }
