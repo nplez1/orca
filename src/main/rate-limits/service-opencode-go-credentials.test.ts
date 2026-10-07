@@ -44,6 +44,28 @@ vi.mock('./minimax/minimax-fetcher', () => ({
   fetchMiniMaxRateLimits: vi.fn()
 }))
 
+vi.mock('./deepseek/deepseek-fetcher', () => ({
+  fetchDeepSeekRateLimits: vi.fn()
+}))
+
+vi.mock('./fireworks/fireworks-fetcher', () => ({
+  fetchFireworksRateLimits: vi.fn()
+}))
+
+// Why: the Copilot provider probes the gh CLI during a fetch cycle. Without these two
+// mocks every service suite would spawn real gh subprocesses, which is both slow and
+// non-deterministic for the generation/invalidation races these suites assert.
+vi.mock('./copilot/copilot-fetcher', () => ({
+  fetchCopilotRateLimits: vi.fn()
+}))
+
+vi.mock('./copilot/copilot-gh-credentials', () => ({
+  resolveGhCopilotCredentials: vi.fn(async () => ({ status: 'gh-missing' })),
+  refreshCopilotGhCredentials: vi.fn(async () => ({ status: 'gh-missing' })),
+  readCopilotGhCredentialsForCycle: vi.fn(() => null),
+  getCachedCopilotGhCredentials: vi.fn(() => null)
+}))
+
 vi.mock('./grok-fetcher', () => ({
   fetchGrokRateLimits: vi.fn()
 }))
@@ -54,6 +76,14 @@ vi.mock('./grok-auth', () => ({
 
 vi.mock('../minimax/minimax-cookie-store', () => ({
   hasMiniMaxSessionCookie: vi.fn(() => false)
+}))
+
+vi.mock('../deepseek/deepseek-api-key-store', () => ({
+  hasDeepSeekApiKey: vi.fn(() => false)
+}))
+
+vi.mock('../fireworks/fireworks-credentials-store', () => ({
+  hasFireworksCredentials: vi.fn(() => false)
 }))
 
 const DECRYPT_ERROR =

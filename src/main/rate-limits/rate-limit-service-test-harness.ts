@@ -130,8 +130,48 @@ export function mockFreshBackgroundProviderFetches(): void {
   )
 }
 
+/** The provider modules a suite must mock before this harness can stub them, with the failure
+ *  the harness hit without this check: `vi.mocked(fetchDeepSeekRateLimits).mockResolvedValue`
+ *  on a real function reports "mockResolvedValue is not a function" at whichever line ran
+ *  first, which names neither the module nor the suite's obligation. Worse, a guarded version
+ *  would silently run the real fetcher — real credential reads and subprocesses. */
+function unmockedProviderModules(): string[] {
+  const modules: [string, unknown][] = [
+    ['./codex-fetcher', fetchCodexRateLimits],
+    ['./gemini-usage-fetcher', fetchGeminiRateLimits],
+    ['./kimi-fetcher', fetchKimiRateLimits],
+    ['./minimax/minimax-fetcher', fetchMiniMaxRateLimits],
+    ['./deepseek/deepseek-fetcher', fetchDeepSeekRateLimits],
+    ['./fireworks/fireworks-fetcher', fetchFireworksRateLimits],
+    ['./copilot/copilot-fetcher', fetchCopilotRateLimits],
+    ['./grok-fetcher', fetchGrokRateLimits],
+    ['./grok-auth', readGrokAuthSession],
+    ['./cursor-fetcher', fetchCursorRateLimits],
+    ['./cursor-auth', readCursorAuthSession],
+    ['./opencode-go-usage-source-selection', fetchOpenCodeGoUsage],
+    ['./zcode-usage-fetcher', fetchZcodeRateLimits],
+    ['./antigravity-usage-fetcher', fetchAntigravityRateLimits],
+    ['../minimax/minimax-cookie-store', hasMiniMaxSessionCookie],
+    ['../deepseek/deepseek-api-key-store', hasDeepSeekApiKey],
+    ['../fireworks/fireworks-credentials-store', hasFireworksCredentials]
+  ]
+  return modules
+    .filter(([, imported]) => !vi.isMockFunction(imported))
+    .map(([specifier]) => specifier)
+}
+
 /** Shared `beforeEach` body: healthy stubs for every provider the service polls. */
 export function resetRateLimitProviderMocks(): void {
+  // Why here: vitest hoists `vi.mock` per test file, so this is the first moment the harness can
+  // see whether the suite before it mocked what the stubbing below needs.
+  const unmocked = unmockedProviderModules()
+  if (unmocked.length > 0) {
+    throw new Error(
+      `rate-limit-service-test-harness: this suite must vi.mock ${unmocked.join(', ')}. ` +
+        'The harness stubs every provider the service polls, and a real fetcher here would ' +
+        'read real credentials or spawn subprocesses.'
+    )
+  }
   vi.clearAllMocks()
   vi.mocked(fetchGeminiRateLimits).mockResolvedValue(okProvider('gemini', 0, Date.now()))
   vi.mocked(fetchOpenCodeGoUsage).mockResolvedValue(okProvider('opencode-go', 0, Date.now()))
