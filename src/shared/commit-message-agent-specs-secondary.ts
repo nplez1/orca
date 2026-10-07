@@ -183,31 +183,45 @@ export function buildSecondaryCommitMessageAgentSpecs({
         { id: 'auto', label: 'Auto' },
         {
           id: 'claude-haiku-4.5',
-          label: 'Claude Haiku 4.5'
+          label: 'Claude Haiku 4.5',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-sonnet-4.5',
-          label: 'Claude Sonnet 4.5'
+          label: 'Claude Sonnet 4.5',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-sonnet-4.6',
-          label: 'Claude Sonnet 4.6'
+          label: 'Claude Sonnet 4.6',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-opus-4.5',
-          label: 'Claude Opus 4.5'
+          label: 'Claude Opus 4.5',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-opus-4.6',
-          label: 'Claude Opus 4.6'
+          label: 'Claude Opus 4.6',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-opus-4.6-fast',
-          label: 'Claude Opus 4.6 Fast'
+          label: 'Claude Opus 4.6 Fast',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'claude-opus-4.7',
-          label: 'Claude Opus 4.7'
+          label: 'Claude Opus 4.7',
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-4.1',
