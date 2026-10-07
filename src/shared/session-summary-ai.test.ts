@@ -137,6 +137,78 @@ describe('resolveSessionSummaryAiParams', () => {
 
     expect(resolved?.agentCommandOverride).toBe('/opt/claude')
   })
+
+  // The probe is what the picker showed the user, so it is what the fold must run.
+  it('honours a probed model and the effort the user picked for it', () => {
+    const resolved = resolveSessionSummaryAiParams(
+      input({
+        sessionSummaryAi: config({
+          agentId: 'pi',
+          selectedModelByAgent: { pi: 'deepseek/deepseek-flash' },
+          selectedThinkingByModel: { 'deepseek/deepseek-flash': 'high' },
+          discoveredModelsByAgent: {
+            pi: [
+              {
+                id: 'deepseek/deepseek-flash',
+                label: 'Deepseek Flash',
+                thinkingLevels: [
+                  { id: 'low', label: 'Low' },
+                  { id: 'high', label: 'High' }
+                ],
+                defaultThinkingLevel: 'low'
+              }
+            ]
+          }
+        })
+      })
+    )
+
+    expect(resolved).toEqual({
+      agentId: 'pi',
+      model: 'deepseek/deepseek-flash',
+      thinkingLevel: 'high'
+    })
+  })
+
+  it('uses the probed default effort for a probed model with no stored pick', () => {
+    const resolved = resolveSessionSummaryAiParams(
+      input({
+        sessionSummaryAi: config({
+          agentId: 'pi',
+          selectedModelByAgent: { pi: 'deepseek/deepseek-flash' },
+          discoveredModelsByAgent: {
+            pi: [
+              {
+                id: 'deepseek/deepseek-flash',
+                label: 'Deepseek Flash',
+                thinkingLevels: [{ id: 'medium', label: 'Medium' }],
+                defaultThinkingLevel: 'medium'
+              }
+            ]
+          }
+        })
+      })
+    )
+
+    expect(resolved?.thinkingLevel).toBe('medium')
+  })
+
+  it('falls back to the agent default when the probe no longer lists the stored model', () => {
+    const resolved = resolveSessionSummaryAiParams(
+      input({
+        sessionSummaryAi: config({
+          agentId: 'pi',
+          selectedModelByAgent: { pi: 'deepseek/retired-model' },
+          discoveredModelsByAgent: {
+            pi: [{ id: 'deepseek/deepseek-flash', label: 'Deepseek Flash' }]
+          }
+        })
+      })
+    )
+
+    expect(resolved?.model).toBe('default')
+    expect(resolved?.thinkingLevel).toBeUndefined()
+  })
 })
 
 describe('readSessionSummaryDiscoveredModels', () => {

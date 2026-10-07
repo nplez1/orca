@@ -97,9 +97,20 @@ export function resolveAiGenerationSelection(
       ? getCommitMessageAgentCapability(resolvedAgentId)
       : undefined
   const discovered = (resolvedAgentId && settings.discoveredModelsByAgent?.[resolvedAgentId]) || []
+  // Why the default entry: an unset choice runs the agent's own default, so the probe list
+  // must still show it — otherwise the pane displays a model the fold will not run.
+  const defaultEntry =
+    specCapability &&
+    discovered.length > 0 &&
+    !discovered.some((model) => model.id === specCapability.defaultModelId)
+      ? specCapability.models.find((model) => model.id === specCapability.defaultModelId)
+      : undefined
   const activeCapability =
     specCapability && discovered.length > 0
-      ? { ...specCapability, models: [...discovered] }
+      ? {
+          ...specCapability,
+          models: defaultEntry ? [defaultEntry, ...discovered] : [...discovered]
+        }
       : specCapability
   const unsupportedConfiguredAgent =
     resolvedAgentId && !isCustom && !activeCapability ? resolvedAgentId : null

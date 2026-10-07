@@ -39,21 +39,37 @@ describe('resolveAiGenerationSelection', () => {
     expect(selection.activeThinking).toBeUndefined()
   })
 
-  // Pi ships a single stub model; without this the picker cannot name a real one.
-  it('replaces a dynamic agent stub with the probed models', () => {
+  // Pi ships a single stub model; the probe replaces it, and the spec default stays visible
+  // because an unset choice still runs `--model default`.
+  it('replaces a dynamic agent stub with the probed models, keeping the default entry', () => {
     const selection = resolveAiGenerationSelection(config({ agentId: 'pi' }), {
       defaultTuiAgent: 'claude',
       discoveredModelsByAgent: { pi: PROBED_PI_MODELS }
     })
 
     expect(selection.activeCapability?.models.map((model) => model.id)).toEqual([
+      'default',
       'deepseek/deepseek-flash',
       'github-copilot/gpt-5.4'
     ])
-    // The spec default ('default') is absent from the probe, so the first model wins.
-    expect(selection.activeModel?.id).toBe('deepseek/deepseek-flash')
-    expect(selection.activeThinking).toBe('low')
+    // Unset choice → the agent's own default runs, so the pane shows exactly that.
+    expect(selection.activeModel?.id).toBe('default')
+    expect(selection.activeThinking).toBeUndefined()
     expect(selection.isCustom).toBe(false)
+  })
+
+  it('shows a probed model and the effort picked for it', () => {
+    const selection = resolveAiGenerationSelection(
+      config({
+        agentId: 'pi',
+        selectedModelByAgent: { pi: 'deepseek/deepseek-flash' },
+        selectedThinkingByModel: { 'deepseek/deepseek-flash': 'high' }
+      }),
+      { defaultTuiAgent: 'claude', discoveredModelsByAgent: { pi: PROBED_PI_MODELS } }
+    )
+
+    expect(selection.activeModel?.id).toBe('deepseek/deepseek-flash')
+    expect(selection.activeThinking).toBe('high')
   })
 
   it('keeps a probed model and its effort when the user picked them', () => {

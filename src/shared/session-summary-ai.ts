@@ -59,6 +59,65 @@ export function readSessionSummaryDiscoveredModels(
 }
 
 /**
+ * The model id the fold will actually pass, reconciled with whatever a probe reported.
+ *
+ * Unset means the agent's own default (`default`), which is what its CLI reads as "use my
+ * configured model". A stored choice that the probe no longer lists goes back to that
+ * default, because the pane must not display one model while the fold runs another.
+ */
+export function resolveSessionSummaryModelId(
+  config: SessionSummaryAiSettings,
+  agentId: TuiAgent
+): string {
+  const spec = getCommitMessageAgentSpec(agentId)
+  if (!spec) {
+    return ''
+  }
+  const stored = config.selectedModelByAgent[agentId]
+  if (!stored || stored === spec.defaultModelId) {
+    return spec.defaultModelId
+  }
+  // A static agent's list is authoritative: an id it does not carry is stale.
+  if (spec.modelSource === 'static') {
+    return spec.models.some((model) => model.id === stored) ? stored : spec.defaultModelId
+  }
+  // A dynamic agent's stub cannot judge an id, so only a probe that actually ran can.
+  const discovered = readSessionSummaryDiscoveredModels({ sessionSummaryAi: config }, agentId)
+  if (discovered.length === 0) {
+    return stored
+  }
+  return discovered.some((model) => model.id === stored) ? stored : spec.defaultModelId
+}
+
+/**
+ * Effort for the effective model, preferring what a probe reported for it.
+ *
+ * The spec only has static entries for static agents; a probed model's own levels are the
+ * authority for a dynamic one, so a level the user picked is not silently dropped.
+ */
+export function resolveSessionSummaryThinkingLevel(
+  config: SessionSummaryAiSettings,
+  agentId: TuiAgent
+): string | undefined {
+  const modelId = resolveSessionSummaryModelId(config, agentId)
+  if (!modelId) {
+    return undefined
+  }
+  const probed = readSessionSummaryDiscoveredModels({ sessionSummaryAi: config }, agentId).find(
+    (model) => model.id === modelId
+  )
+  const specModel = getCommitMessageModel(agentId, modelId)
+  const levels = probed?.thinkingLevels ?? specModel?.thinkingLevels
+  if (!levels?.length) {
+    return undefined
+  }
+  const stored = config.selectedThinkingByModel[modelId]
+  return stored && levels.some((level) => level.id === stored)
+    ? stored
+    : (probed?.defaultThinkingLevel ?? specModel?.defaultThinkingLevel)
+}
+
+/**
  * Resolves the fold's agent/model/thinking, or null when nothing usable is selected
  * — custom with an empty command, or every candidate agent disabled.
  */
@@ -84,24 +143,16 @@ export function resolveSessionSummaryAiParams(
   if (!spec) {
     return null
   }
-  // A stored model the agent no longer offers (or a host that no longer reports it)
-  // falls back to the agent's default rather than failing the fold.
-  const model =
-    getCommitMessageModel(agentChoice, config.selectedModelByAgent[agentChoice] ?? '') ??
-    getCommitMessageModel(agentChoice, spec.defaultModelId)
-  if (!model) {
+  const modelId = resolveSessionSummaryModelId(config, agentChoice)
+  if (!modelId) {
     return null
   }
-
-  const persistedThinking = config.selectedThinkingByModel[model.id]
-  const thinkingLevel = model.thinkingLevels?.some((level) => level.id === persistedThinking)
-    ? persistedThinking
-    : model.defaultThinkingLevel
+  const thinkingLevel = resolveSessionSummaryThinkingLevel(config, agentChoice)
   const agentCommandOverride = input.agentCmdOverrides?.[agentChoice]?.trim()
 
   return {
     agentId: agentChoice,
-    model: model.id,
+    model: modelId,
     ...(thinkingLevel ? { thinkingLevel } : {}),
     ...(agentCommandOverride ? { agentCommandOverride } : {})
   }
