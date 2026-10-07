@@ -114,6 +114,28 @@ it('indexes the history list but keeps no conversation text while content is off
   expect(errors).toEqual([])
 })
 
+it('reads the transcripts it already holds when content consent is turned on', async () => {
+  await writeClaudeTranscript(
+    transcriptPath(RECENT_SESSION_ID),
+    ['a distinctive conversation'],
+    RECENT_SESSION_ID
+  )
+  const subject = newInstance()
+  subject.apply({ contentEnabled: false, historyDays: null })
+  await subject.settled()
+  expect(messageRowCount()).toBe(0)
+
+  // Consent turned on inside the same profile: the files have not changed, so
+  // every row's stat comparison reads as "nothing to do" — and a full-text search
+  // over a history whose message rows were never written answers with nothing.
+  subject.apply({ contentEnabled: true, historyDays: null })
+  await subject.settled()
+
+  expect(messageRowCount()).toBeGreaterThan(0)
+  expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
+  expect(errors).toEqual([])
+})
+
 it('indexes and answers once the setting is on', async () => {
   await writeClaudeTranscript(
     transcriptPath(RECENT_SESSION_ID),
