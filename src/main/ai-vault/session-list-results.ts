@@ -103,3 +103,30 @@ function latestAiVaultScannedAt(results: readonly AiVaultListResult[]): string {
   // same instant in different ISO shapes resolve by host-enumeration order.
   return new Date(latestMs === Number.NEGATIVE_INFINITY ? nowMs : latestMs).toISOString()
 }
+
+/**
+ * The global (already capped) list plus a scope's own sessions.
+ *
+ * A scope path is a guarantee that its sessions are listed even when they are
+ * older than the recency cap, never a filter that hides everything else: the
+ * panel narrows to the scope it is showing, and the host's answer is the
+ * candidate pool it narrows. Both listing sources go through here — the
+ * filesystem scanner and the index — so which of them answered cannot change
+ * which sessions a scope's list contains.
+ */
+export function unionScopedSessions<T extends AiVaultSession>(
+  cappedSessions: T[],
+  scopeSessions: readonly T[]
+): T[] {
+  if (scopeSessions.length === 0) {
+    return cappedSessions
+  }
+  const byId = new Map<string, T>()
+  for (const session of cappedSessions) {
+    byId.set(session.id, session)
+  }
+  for (const session of scopeSessions) {
+    byId.set(session.id, session)
+  }
+  return [...byId.values()].sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
+}

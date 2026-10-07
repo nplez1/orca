@@ -7,6 +7,7 @@ import type {
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../shared/execution-host'
 import { withSpan } from '../observability/tracer'
 import { sessionSortTime } from './session-scanner-accumulator'
+import { unionScopedSessions } from './session-list-results'
 import { ScannedSessionCollection, dedupeScannedSessions } from './session-root-dedup'
 import {
   createAntigravityWorkspaceResolver,
@@ -145,33 +146,13 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
         scheduleSessionParseCachePersist(parseStats)
 
         return {
-          sessions: mergeSessions(cappedSessions, scopeSessions),
+          sessions: unionScopedSessions(cappedSessions, scopeSessions),
           issues: issues.map((issue) => ({ executionHostId, ...issue })),
           scannedAt: new Date().toISOString()
         }
       })
     )
   )
-}
-
-// In-scope sessions are guaranteed regardless of the recency cap, so the global
-// (already capped) result and the scope result are unioned and de-duplicated by
-// session id, then re-sorted DESC.
-function mergeSessions(
-  cappedSessions: AiVaultSession[],
-  scopeSessions: AiVaultSession[]
-): AiVaultSession[] {
-  if (scopeSessions.length === 0) {
-    return cappedSessions
-  }
-  const byId = new Map<string, AiVaultSession>()
-  for (const session of cappedSessions) {
-    byId.set(session.id, session)
-  }
-  for (const session of scopeSessions) {
-    byId.set(session.id, session)
-  }
-  return [...byId.values()].sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
 }
 
 // Agents whose on-disk layout names a directory per cwd, so a scope's older
