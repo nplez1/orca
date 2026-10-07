@@ -1,0 +1,51 @@
+name: Fork main unit tests
+
+# Why: `fork-main-gates.yml` covers the static rules on the release line, but this fork's main
+# branch ran **no tests at all** — only scheduled maintenance jobs. So a sync or merge could leave
+# 74 failing tests on `nplez1/main` and the first anyone heard of it was an unrelated PR inheriting
+# a red `test / tests` shard, with no way to tell which change caused it.
+#
+# Nightly rather than on every push: a merge to main is normally the tree a PR just tested, so a
+# second full suite per push mostly pays twice to re-tread the same shards. The nightly catches
+# what a sync's own gates miss, and `workflow_dispatch` is there to run it on demand.
+#
+# Reuses `unit-tests.yml` and the same shard plan the PR workflow uses, so a failure here means the
+# same thing it means there.
+on:
+  schedule:
+    - cron: '53 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-main-unit-tests
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      - name: Shard plan
+        id: plan
+        run: node config/scripts/ci-unit-plan.mjs
+
+  test:
+    needs: [plan]
+    # Parity with the PR workflow: same Node major, same runner, same shard assignments.
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      node_versions: '["24"]'
+      runner: ubuntu-24.04-arm
+      shards: ${{ needs.plan.outputs.shards }}
