@@ -1,20 +1,26 @@
 // @vitest-environment happy-dom
 
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSummarySnapshot } from '../../../../shared/session-summary-types'
 import SessionSummaryPane from './SessionSummaryPane'
 
 const mocks = vi.hoisted(() => {
-  const state: { paneKey: string | null; snapshot: SessionSummarySnapshot | null } = {
+  const state: {
+    paneKey: string | null
+    snapshot: SessionSummarySnapshot | null
+    hasBridge: boolean
+  } = {
     paneKey: null,
-    snapshot: null
+    snapshot: null,
+    hasBridge: true
   }
   return state
 })
 
 vi.mock('./session-summary-subject', () => ({
-  useSessionSummaryPaneKey: () => mocks.paneKey
+  useSessionSummaryPaneKey: () => mocks.paneKey,
+  hasSessionSummaryBridge: () => mocks.hasBridge
 }))
 vi.mock('@/components/activity/use-session-summary', () => ({
   useSessionSummary: () => mocks.snapshot
@@ -48,14 +54,31 @@ function readySnapshot(overrides: Partial<SessionSummarySnapshot> = {}): Session
 }
 
 describe('SessionSummaryPane', () => {
+  beforeEach(() => {
+    mocks.paneKey = null
+    mocks.snapshot = null
+    mocks.hasBridge = true
+  })
+
   it('asks the user to focus an agent when none is focused', () => {
     mocks.paneKey = null
     mocks.snapshot = null
+    mocks.hasBridge = true
 
     const markup = renderToStaticMarkup(<SessionSummaryPane isVisible />)
 
     expect(markup).toContain('Focus an agent session to see its summary.')
     expect(markup).toContain('lucide-info')
+  })
+
+  it('says so when this window has no summary bridge at all', () => {
+    mocks.paneKey = 'tab-1:leaf-1'
+    mocks.snapshot = null
+    mocks.hasBridge = false
+
+    expect(renderToStaticMarkup(<SessionSummaryPane isVisible />)).toContain(
+      'Session summaries are not available in this window.'
+    )
   })
 
   it('renders the brief for the resolved pane', () => {

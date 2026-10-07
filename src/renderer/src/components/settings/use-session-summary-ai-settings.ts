@@ -27,6 +27,8 @@ export type SessionSummaryAiSettingsViewModel = AiGenerationSelection & {
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
   onCustomCommandChange: (value: string) => void
+  /** Drops the cached probe result so the next render re-lists the agent's models. */
+  onRefreshModels: () => void
 }
 
 /** Agent/model/effort for the session-summary fold, stored on its own so tuning a
@@ -108,6 +110,29 @@ export function useSessionSummaryAiSettings(): SessionSummaryAiSettingsViewModel
     discoveredModels.length === 0
   )
 
+  // A cached list is only as fresh as the last probe, so the pane offers a refresh rather
+  // than leaving models the CLI started reporting unreachable for the life of the install.
+  const onRefreshModels = useCallback((): void => {
+    const latest = useAppStore.getState().settings
+    if (!latest || !selectedAgentId) {
+      return
+    }
+    const current = readSessionSummaryAiSettings({ sessionSummaryAi: latest.sessionSummaryAi })
+    const discoveredModelsByAgent = { ...current.discoveredModelsByAgent }
+    delete discoveredModelsByAgent[selectedAgentId]
+    const localSlot = current.discoveredModelsByAgentByHost?.[LOCAL_COMMIT_MESSAGE_HOST_KEY]
+    const discoveredModelsByAgentByHost = { ...current.discoveredModelsByAgentByHost }
+    if (localSlot) {
+      const nextLocalSlot = { ...localSlot }
+      delete nextLocalSlot[selectedAgentId]
+      discoveredModelsByAgentByHost[LOCAL_COMMIT_MESSAGE_HOST_KEY] = nextLocalSlot
+    }
+    setDiscoveryStatus('idle')
+    updateSettings({
+      sessionSummaryAi: { ...current, discoveredModelsByAgent, discoveredModelsByAgentByHost }
+    })
+  }, [selectedAgentId, updateSettings])
+
   useEffect(() => {
     if (!needsDiscovery || !selectedAgentId) {
       setDiscoveryStatus('idle')
@@ -162,6 +187,7 @@ export function useSessionSummaryAiSettings(): SessionSummaryAiSettingsViewModel
         )
       }
     },
-    onCustomCommandChange: (value) => writeConfig({ customAgentCommand: value })
+    onCustomCommandChange: (value) => writeConfig({ customAgentCommand: value }),
+    onRefreshModels
   }
 }

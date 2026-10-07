@@ -39,3 +39,9 @@ export function useSessionSummaryPaneKey(): string | null {
   const worktreeId = useAppStore((state) => state.activeWorktreeId)
   return useAppStore((state) => selectSessionSummaryPaneKey(state, worktreeId))
 }
+
+/** Whether this window can fold at all: the desktop bridge owns it, and a paired web
+ *  client composes no `sessionSummary` implementation. */
+export function hasSessionSummaryBridge(): boolean {
+  return typeof window.api?.sessionSummary?.open === 'function'
+}

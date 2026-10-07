@@ -187,7 +187,8 @@
         "transcript": "transcript"
       },
       "discovering": "Discovering models…",
-      "modelsUnavailable": "Couldn't list this agent's models — using its built-in list."
+      "modelsUnavailable": "Couldn't list this agent's models — using its built-in list.",
+      "refreshModels": "Refresh models"
     },
     "terminal": {
       "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
@@ -19850,6 +19851,7 @@
       "label": "Session summary",
       "failed": "Could not summarize this session.",
       "unavailable": "No readable transcript for this session yet.",
+      "unavailableInWindow": "Session summaries are not available in this window.",
       "notFocused": "Focus an agent session to see its summary."
     }
   }

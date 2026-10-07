@@ -76,8 +76,16 @@ A **dynamic** agent ships only a stub model list — Pi advertises `Config defau
 pane asks its CLI once (`<binary> --list-models`, the same probe Native Chat uses), keeps the
 answer and replaces the stub with it. Two rules matter there:
 
+- **The pane keys on the session, not just the pane.** A new agent session can start in the
+  pane the user is already focused on, and the key includes the provider session id so the
+  service resets the ledger instead of briefing the previous conversation.
+- **The tab only appears where a fold can run.** A paired web client composes no
+  `sessionSummary` bridge, so the activity bar omits the tab and the pane says so.
 - **Only a real probe is cached.** A result whose `catalogOrigin` is `spec` is the built-in
   list, and caching it would retire the probe for that agent forever.
+- **A cached list is refreshable.** The pane offers *Refresh models*, which drops the cached
+  probe for the selected agent and lists again; without it, a model the CLI started
+  reporting would stay unreachable for the life of the install.
 - **Storage is host-keyed; resolution is local.** The fold spawns the agent CLI on the local
   machine and reads the transcript from the local filesystem
   (`session-summary-agent-cli-fold-brain.ts`), so a remote host's model list would offer

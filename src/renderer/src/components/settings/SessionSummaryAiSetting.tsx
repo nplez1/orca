@@ -1,3 +1,5 @@
+import { RefreshCw } from 'lucide-react'
+import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { translate } from '@/i18n/i18n'
 import { AiGenerationFields } from './ai-generation-fields'
@@ -23,7 +25,8 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
     onAgentChange,
     onModelChange,
     onThinkingChange,
-    onCustomCommandChange
+    onCustomCommandChange,
+    onRefreshModels
   } = useSessionSummaryAiSettings()
 
   const title = translate('settings.sessionSummaryAi.title', 'Session summaries')
@@ -58,15 +61,31 @@ export function SessionSummaryAiSetting(): React.JSX.Element {
             onThinkingChange={onThinkingChange}
             onCustomCommandChange={onCustomCommandChange}
           />
-          {discoveryStatus !== 'idle' ? (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              {discoveryStatus === 'discovering'
-                ? translate('settings.sessionSummaryAi.discovering', 'Discovering models…')
-                : translate(
-                    'settings.sessionSummaryAi.modelsUnavailable',
-                    "Couldn't list this agent's models — using its built-in list."
-                  )}
-            </p>
+          {discoveryStatus !== 'idle' || activeCapability?.modelSource === 'dynamic' ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                {discoveryStatus === 'discovering'
+                  ? translate('settings.sessionSummaryAi.discovering', 'Discovering models…')
+                  : discoveryStatus === 'unavailable'
+                    ? translate(
+                        'settings.sessionSummaryAi.modelsUnavailable',
+                        "Couldn't list this agent's models — using its built-in list."
+                      )
+                    : null}
+              </p>
+              {activeCapability?.modelSource === 'dynamic' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="w-fit shrink-0"
+                  onClick={onRefreshModels}
+                >
+                  <RefreshCw className="size-3" />
+                  {translate('settings.sessionSummaryAi.refreshModels', 'Refresh models')}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </SearchableSetting>

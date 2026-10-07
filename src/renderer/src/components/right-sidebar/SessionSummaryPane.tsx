@@ -5,7 +5,8 @@ import { translate } from '@/i18n/i18n'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
-import { useSessionSummaryPaneKey } from './session-summary-subject'
+import { useAppStore } from '@/store'
+import { useSessionSummaryPaneKey, hasSessionSummaryBridge } from './session-summary-subject'
 
 function SessionSummarySubjectBody({
   paneKey,
@@ -55,14 +56,34 @@ export default function SessionSummaryPane({
   isVisible: boolean
 }): React.JSX.Element {
   const paneKey = useSessionSummaryPaneKey()
+  // A new agent session can start inside the pane the user is already focused on, so the
+  // key includes its identity: the service resets the ledger on open(), and without this the
+  // pane would keep briefing the previous conversation.
+  const sessionId = useAppStore((state) =>
+    paneKey ? (state.agentStatusByPaneKey[paneKey]?.providerSession?.id ?? '') : ''
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {paneKey ? (
+      {!hasSessionSummaryBridge() ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'activity.sessionSummary.unavailableInWindow',
+              'Session summaries are not available in this window.'
+            )}
+          </p>
+        </div>
+      ) : paneKey ? (
         // Why key: focus moves between agents while the pane stays mounted, and a
         // last-seen cursor belongs to one session — a fresh instance starts the next
         // one clean instead of inheriting the previous session's read count.
-        <SessionSummarySubjectBody key={paneKey} paneKey={paneKey} isOpen={isVisible} />
+        <SessionSummarySubjectBody
+          key={`${paneKey}:${sessionId}`}
+          paneKey={paneKey}
+          isOpen={isVisible}
+        />
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
