@@ -151,7 +151,7 @@ export function AiGenerationFields({
         </div>
       ) : null}
 
-      {activeModel?.thinkingLevels && activeThinking ? (
+      {activeCapability && activeModel ? (
         <div className="space-y-1.5">
           <Label>
             {translate(
@@ -159,18 +159,36 @@ export function AiGenerationFields({
               'Thinking effort'
             )}
           </Label>
-          <Select value={activeThinking} onValueChange={onThinkingChange}>
-            <SelectTrigger size="sm" className="h-8 w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
-              {activeModel.thinkingLevels.map((level) => (
-                <SelectItem key={level.id} value={level.id} className="cursor-pointer">
-                  {level.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {activeModel.thinkingLevels?.length ? (
+            <Select value={activeThinking} onValueChange={onThinkingChange}>
+              <SelectTrigger size="sm" className="h-8 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent portalContainer={selectPortalRoot} position="popper" align="start">
+                {activeModel.thinkingLevels.map((level) => (
+                  <SelectItem key={level.id} value={level.id} className="cursor-pointer">
+                    {level.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            // Why: the row stays visible so a model without an effort setting reads as
+            // exactly that, instead of the control silently disappearing.
+            <>
+              <Select disabled>
+                <SelectTrigger size="sm" className="h-8 w-full">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+              </Select>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                {translate(
+                  'settings.aiGeneration.noEffortForModel',
+                  'This model has no effort setting.'
+                )}
+              </p>
+            </>
+          )}
         </div>
       ) : null}
 
