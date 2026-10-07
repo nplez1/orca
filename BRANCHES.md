@@ -1,9 +1,11 @@
 # Branch tracker
 
-Last updated **2026-10-05** — `nplez1/main` rebased onto upstream main @ `9def4b9ba1`, 148
-commits on from the previous base `a5601375d4` (the fork line is now `0ca31372cc`; upstream has
-since moved 50 commits further on, and `origin/main` mirrors its newest tip). See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
-for how that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
+Last updated **2026-10-07** — `nplez1/main` merged upstream main @ `e5ade4b868` (148 commits) into
+the release line from `ed0be2085f` (merge `7c0a53a148`, fixes `d12baa886c` and `4370252718`). The
+fork's product line and patch series both survive; 56 conflicted paths, four half-applied behaviours
+re-seated and two clean-but-wrong merges repaired, all found by tests. See
+[UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how that is done and
+[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:

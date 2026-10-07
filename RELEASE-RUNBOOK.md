@@ -113,10 +113,22 @@ layer, and it checks more than an empty file: a body with no `## What changed` h
 
 **Read the body of the draft before publishing.** The release is created as a draft and only
 `gh release edit --draft=false` at the end of the windows job makes it public, which is the window for
-exactly this check:
+exactly this check. **A release does not go public without the change summary**: the body must carry
+`## What changed` for the range since the previous `-np.` tag. A minimal body means the generator did
+not run — publish nothing, read its warning in the run log, fix the cause, and re-run the workflow, or
+write the notes by hand with `gh release edit v<version> --notes-file notes.md`. An install-only body
+is the failure the generator replaced, not an acceptable fallback.
 
 ```bash
 gh release view v<version> --repo nplez1/orca --json body --jq .body | less
+```
+
+To check it against git before reading prose — the numbers must agree:
+
+```bash
+prev=$(git tag -l 'v*-np.*' --sort=-creatordate | head -1)
+git log --oneline "$prev"..HEAD | wc -l          # commits in the range
+git cherry "$prev" HEAD | grep -c '^-'           # of those, already shipped by that release
 ```
 
 What to look for: the summary is present and starts with the features and fixes; the headline count

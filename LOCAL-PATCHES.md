@@ -326,6 +326,51 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-07 — merge of upstream `e5ade4b868` (148 commits) into the release line, from
+  `ed0be2085f`**, on the merge flow (merge commit `7c0a53a148`). Pre-flight proved the tip green and
+  predicted **56 conflicted paths** (`both-rewrote 24, modify/delete 19, union 6, rename-replay 3,
+  duplicate-tail 2, duplicate-members 1, add/add 1`); the merge produced exactly those.
+
+  - **What the classes resolved to.** The 7 `modify/delete` where the fork had deleted the Agent
+    Dashboard popout plumbing took the deletion (ledger: *Dashboard and the popout window*). The 12
+    where upstream's `ca4e239861` retired test inventories took the deletion, including the fork's
+    identity-renamed assertions. Identity-only conflicts took upstream's file for `identity-sweep.mjs`
+    to re-sweep.
+  - **Upstream rewrites taken whole, fork delta re-applied.** `notification-options.ts` (the fold now
+    takes a translator), `use-hosted-review-polling.ts` and `use-checks-panel-foreground-effects.tsx`
+    (review refresh moved to upstream's visibility coordinator), `use-section-rows.ts`,
+    `FloatingTerminalPanelSurface.tsx`, `QuickOpen.tsx`, `AgentKanbanBoard.tsx`,
+    `file-explorer-{watch,watcher}-reconcile*` (both sides had landed the same single cache-key
+    enumeration). `resolveClaudePaneStatus` moved to `claude-pane-hold-evidence.ts`, where the fork's
+    `local(agents)` monitoring policy is re-expressed.
+  - **Four things the merge left half-applied, all found by tests, fixed in `4370252718`:**
+    `owedShell` belongs to non-agent work (the fork's policy only moves *running* shells); the fork's
+    30s unfinished-checks cadence is dropped in favour of upstream's detail timer while the `force`
+    cache bypass stays; the floating sentinel scope resolves the fork's pure folder path again (going
+    through the settings-aware resolver mkdirs `~/.orca/floating-workspace`, which the test home-write
+    guard rejects); and `protocol-version.ts` keeps upstream's explicit orchestration re-exports
+    without the `export *` the merge unioned beside them.
+  - **Two clean merges that were not correct merges.** Upstream's new `NODE_RUNTIME_INCLUDE` list
+    needed the fork's two SQLite-reading search suites (the boundary gate fails otherwise), and
+    upstream's new agent-launch route suite mocks the RPC client, so it must answer the fork's
+    import-time capability subscription. Both fixed in `4370252718`.
+  - **Verification.** `post-sync.mjs` is 9 passed / 1 info / no hard gate; `pnpm tc` clean;
+    `check:code-quality:changed` clean against the pre-sync tip across 2752 changed files (against
+    `upstream/main` it reports 58 findings, all in fork-owned files — pre-existing debt). Tests:
+    `src/renderer/src` 39 239 passed, `src/shared` + `src/main/ipc` + `src/main/git` + `config/scripts`
+    20 786 passed, `src/main/agent-hooks` + `src/main/claude` 3 169 passed.
+  - **Failures that are this machine, with the proof.** The agent-session/agent-launch SQLite family
+    and `config/scripts/verify-localization-catalogs.test.mjs` (a `spawnSync bun ENOENT`) fail
+    identically on a worktree of the pre-sync tip and of `upstream/main` — 8 of 19 in
+    `agent-launch-restart-replay.test.ts` on the upstream tree itself. Bun is not installed here, and
+    this SQLite setup does not persist the journal across a restart, so `pnpm test` (which runs vitest
+    under bun) is the harness to trust for those.
+  - **Named follow-ups:** the PR-transition refetch in the checks panel if a new run reads stale; the
+    three fork-specific assertions that went with upstream's retired test inventories; upstream's
+    `owedShell`/`owedAgent` lease semantics re-checked against the fork's policy on the next sync; and
+    the `~/.orca` vs `~/.orca-np` floating-workspace path, which the ledger and the code disagree on
+    and which is a note migration rather than a rename.
+
 - **2026-10-06 — released as `v1.4.214-np.18`** from `2d0c739ee6` (signed and notarized, workflow run
   37485475655), on the merge line: the release carries upstream `6c693edf40` in full. **This one went
   through three second-model gates, and the first two were NO-GO.** That is the headline: the flow

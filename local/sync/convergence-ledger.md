@@ -66,6 +66,21 @@ grants are what make a first-launch OS-opened document readable.
 
 **Do not:** delete `authorizeExternalPath`, or "converge" the two mechanisms into one.
 
+**Sentinel scope (2026-10-07 sync):** the floating-terminal *scope* resolves
+`resolveFloatingWorkspaceLaunchDirectory()` directly, not upstream's `resolveFloatingWorkspacePath()`
+method. Upstream's method is settings-aware and is kept for its other caller
+(`persist-headless-terminal-title`), but this scope must not create the folder: going through the
+fork's `resolveFloatingTerminalCwd` mkdirs `~/.orca/floating-workspace`, which the unit-test home
+write guard rejects and which upstream's own assertion here does not expect (it reads
+`~/.orca/floating-workspace` with no store, where upstream's method answers `$HOME`).
+
+**Open (needs the fork owner):** the ledger above says the folder is `~/.orca-np/floating-workspace`,
+but `floating-workspace-launch-directory.ts` joins `HOME_DIRECTORY_NAME`-less `.orca` and its test
+pins that. The identity sweep reports both as `home-dir-unknown` / `home-dir-reader`. Re-pointing it
+moves users' notes and `AGENTS.md` context, so it is a migration, not a rename.
+
+**Do not:** route this scope through the settings-aware resolver again.
+
 ---
 
 ## Explorer name filter and the path index
@@ -103,6 +118,22 @@ name; `main/codex/codex-subagent-roster.ts` is a _different_ module and keeps it
 
 **Do not:** resurrect `codexRoster*` names in `src/shared/`, or initialize hook-owner state
 synchronously ahead of the readiness promise.
+
+**Monitoring badge (2026-10-07 sync):** upstream moved `resolveClaudePaneStatus` into
+`providers/claude-pane-hold-evidence.ts` and split its evidence into `runningAgent` / `owedAgent` /
+`runningNonAgent` / `owedShell`. The fork's `local(agents)` policy is expressed there, not at the
+call sites: `hasLiveAgentWork` is `held.runningAgent || held.owedAgent ||
+state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)` and `hasLiveNonAgentWork` is
+`state.claudeActiveSessionCronPaneKeys.has(paneKey) || held.owedShell`. An owed shell notification
+stays on the non-agent side because upstream maps it there and because the fork's own cron test
+(`server-claude-cancel-captures.test.ts`) passes with the shell set empty.
+
+**Why:** a running shell the agent launched is still agent work, and `foldAgentLeadStatus` returns
+`monitoring` only when `hasLiveAgentWork` is false, so putting a running shell on the non-agent side
+is the whole badge difference.
+
+**Do not:** stop re-adapting upstream tests that pin the other policy — `server-claude-terminal-interrupt.test.ts`
+needed its running-shell case changed to expect no `workingMode`.
 
 ---
 
@@ -319,4 +350,143 @@ window plumbing (`src/main/window/dashboard-popout-window.ts`, its test, the pop
 was **deleted** by the fork, so upstream's later fixes to those files are taken as deletions rather
 than merged back in.
 
+**Ack intent (2026-10-07 sync):** the fork keeps the 1-arg ack — `onAckAgent: (paneKey: string) =>
+void` on `AgentKanbanBoard`, calling `onAckAgent(card.paneKey)` — and does not adopt upstream's
+`AgentSubjectReadIntent` parameter. Upstream added it with the popout relay the fork deleted; the
+fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept, so adopting the
+parameter would be cosmetic. The merge's test file had both assertions (`'explicit'`, `'view'`) from
+upstream's side; both are reverted to the 1-arg form.
+
 **Do not:** restore the popout window to carry an upstream fix.
+
+---
+
+## Checks panel polling and review refresh
+
+**Paths:** `src/renderer/src/components/right-sidebar/checks-panel/**`, `src/renderer/src/components/right-sidebar/source-control/review/**`, `src/shared/review-refresh-policy.ts`
+
+**Decision:** upstream's visibility-driven refresh owns *when* the panel refreshes —
+`useChecksDetailTimer` + `ChecksDetailPollingPolicy.delayMs` + `reviewRefreshIntervalMs` — and the
+fork does not set `pollIntervalRef` against that cadence. `use-hosted-review-polling.ts` and upstream's
+copy of the foreground refresh effect are taken as deletions; the fork's
+`scheduleAfterWorktreeActivationInputQuiet` wrap on them is gone with them. What the fork keeps is the
+cache bypass: `fetchPRChecks(..., { force: force || checksPending })`, where `checksPending` is
+`checks.some((check) => check.status !== 'completed')`, read from `modelRef.current`.
+
+**Why:** the fork's 30s-while-unfinished cadence and its PR-level `checksStatus` refetch were written
+against the polling implementation upstream replaced. Upstream's stability suite
+(`use-checks-panel-polling-stability.test.ts`) pins the new cadence, and the fork's force flag is
+independent of it — it only skips the renderer/gh cache while a run is live.
+
+**Open (named follow-up):** if the panel feels stale when a *new* run appears, re-add the
+PR-transition refetch as a policy concern inside `ChecksDetailPollingPolicy`, not as a second
+`pollIntervalRef` writer.
+
+**Do not:** re-add a second cadence owner, or re-wrap the refresh effects in the fork's activation
+quiet scheduler.
+
+---
+
+## Test inventories retired upstream
+
+**Paths:** `config/scripts/*.test.mjs`, `src/main/**/*-audit.test.ts`, `src/shared/child-process/**`, `src/shared/*-boundary.test.ts`
+
+**Decision:** upstream's `ca4e239861` ("Remove low-value test inventories and duplicate fuzz oracles")
+deleted ~50 workflow-contract scrapers and guard inventories (~21.6k lines) and the fork takes the
+deletion, including where the fork had only renamed assertions to Orca NP or added a fork-specific
+entry. Twelve paths were `modify/delete` in this sync and all twelve were resolved as deletions.
+
+**Why:** they are maintenance-heavy inventories whose churn the fork would re-pay every sync, and
+upstream replaced the ones it still wants with real tests
+(`pty-lifecycle-generation-retention.test.ts`, `terminal-output-frame-chunks.test.ts`).
+
+**Lost fork-specific coverage, as follow-ups:** `proxy-guarded-fetch-call-site-audit.test.ts` (the
+fork's `main/jenkins/jenkins-request.ts` entry), `desktop-startup-ordering.test.ts` (the fork's
+hook status-cache hydration readiness phase), and
+`mobile-web-bundle-packaging-workflow-contract.test.mjs` (the fork-release workflow entries). The
+fork docs that asserted those ratchets exist — `AGENTS.md` § Windows child processes, § Ripgrep —
+now describe guards upstream retired.
+
+**Do not:** re-add a deleted inventory to carry one fork entry; add the assertion to a surviving test
+instead.
+
+---
+
+## Node-runtime test inclusion
+
+**Paths:** `config/scripts/vitest-node-runtime-files.mjs`
+
+**Decision:** upstream's `NODE_RUNTIME_INCLUDE` list takes the fork's two SQLite-reading search suites
+as explicit entries — `src/main/ai-vault-search/session-search-instance.test.ts` and
+`session-search-list-latency.test.ts` — marked `LOCAL(nplez1)`.
+
+**Why:** upstream's new boundary gate (`vitest-sqlite-runtime-boundary.test.ts`) walks every unit file
+that imports a SQLite runtime and fails when it is not in the Node project. The fork's two suites open
+the index with `SyncDatabase` directly, so they must run there; without the entries the gate fails
+only in this fork, which is exactly what it is for.
+
+**Do not:** delete those entries as "fork-only noise" — the gate will fail the moment they are gone.
+
+---
+
+## Orchestration capability re-exports
+
+**Paths:** `src/shared/protocol-version.ts`, `src/shared/orchestration-runtime-capabilities.ts`
+
+**Decision:** `protocol-version.ts` keeps upstream's explicit `export { ... } from
+'./orchestration-runtime-capabilities'` block and imports `ORCHESTRATION_RUNTIME_CAPABILITIES` for its
+own aggregate; the fork's `export * from './orchestration-runtime-capabilities'` is removed.
+
+**Why:** both files were added independently with identical content, and the merge unioned the two
+export shapes, which lint reports as a duplicate export of twelve names. The aggregate array has no
+external importer, so the explicit block is the complete surface.
+
+**Do not:** re-add `export *` beside the explicit block.
+
+---
+
+## TUI agent config split
+
+**Paths:** `src/shared/tui-agent-config.ts`, `src/shared/tui-agent-config-table.ts`, `src/shared/tui-agent-config-types.ts`
+
+**Decision:** the fork's three-module split stands, and upstream's edits to the config table are
+ported into `tui-agent-config-table.ts` by hand — in this sync, `rovo` becoming `detectCmd: 'acli'`
+with `launchCmd: 'acli rovodev run'`.
+
+**Why:** upstream keeps a single 381-line file the fork split for the line budget, so a table edit
+upstream lands in `tui-agent-config.ts` while the fork's copy is in the `-table` module. The merge
+shows no conflict for either module, which is what makes this one easy to miss.
+
+**Do not:** accept a clean merge here as "nothing to port" — diff the table between the pinned base
+and upstream at every sync.
+
+---
+
+## Pane-scoped cache helpers
+
+**Paths:** `src/shared/agent-hook-listener/pane-scoped-cache-entries.ts`, `src/shared/agent-hook-listener/listener-state.ts`
+
+**Decision:** upstream's `pane-scoped-cache-entries.ts` is the module; the fork's
+`pane-scoped-cache-keys.ts` (same four exports, different order) is deleted and `listener-state.ts`
+imports only from `-entries`.
+
+**Why:** both sides added the same helpers after the pinned base, and the merge left both imports in
+`listener-state.ts`, which is a duplicate-identifier error rather than a silent choice.
+
+**Do not:** keep a second module for the same four helpers.
+
+---
+
+## File-explorer cache enumeration
+
+**Paths:** `src/renderer/src/components/right-sidebar/file-explorer-watch-*.ts`, `src/renderer/src/components/right-sidebar/file-explorer-watcher-reconcile.ts`
+
+**Decision:** upstream's shape wins — `cachedDirKeys` / `cachePathIndex()` /
+`purgeDirCacheSubtrees(..., { cache, keys })` — and the fork's parallel one-enumeration variant
+(`cacheKeys()`, `priorScan`, `hasCachedDirectoryLink(cache, keys)`) is dropped.
+
+**Why:** both implement the same "enumerate the cache once per payload" optimization, landed
+independently; upstream's `createCachedDirPathIndex(cache, keys = Object.keys(cache))` already accepts
+pre-computed keys, so the property the fork measured is preserved.
+
+**Do not:** restore the second variant — it re-litigates the same idea every sync.
