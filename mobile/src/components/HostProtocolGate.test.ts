@@ -128,6 +128,7 @@ describe('HostProtocolGate', () => {
     expect(output).not.toContain('HostContent')
     act(() => renderer?.root.findAllByType('Pressable')[0]?.props.onPress())
     expect(nativeTestState.openUrl).toHaveBeenCalledWith(
+      // upstream-identity-ok: Orca Mobile APKs publish from upstream's releases (app-update/github-release-update-source.ts)
       'https://github.com/stablyai/orca/releases'
     )
   })

@@ -43,7 +43,8 @@ describe('known-failure verdict wiring', () => {
       'node config/scripts/ci-e2e-failure-summary.mjs ci-shards/results.json'
     )
     const traces = step('Upload Playwright traces')
-    expect(traces.if).toBe("steps.run-e2e.outcome == 'failure'")
+    // Why `|| cancelled()`: upstream's "retain cancellation traces" change (#24617) is kept beside the fork's outcome check.
+    expect(traces.if).toBe("steps.run-e2e.outcome == 'failure' || cancelled()")
   })
 
   it('leaves the PR lane failing on any spec it runs', () => {

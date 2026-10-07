@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getReleaseNotesUrlForVersion } from '../../../shared/release-channel'
 import type { LinuxPackageInstallRecovery } from '../../../shared/update-status-types'
 
 const { toastSuccess } = vi.hoisted(() => ({ toastSuccess: vi.fn() }))
@@ -9,7 +10,7 @@ vi.mock('sonner', () => ({ toast: { success: toastSuccess } }))
 
 import { LinuxPackageInstallRecoveryCard } from './LinuxPackageInstallRecoveryCard'
 
-const RELEASE_URL = 'https://github.com/stablyai/orca/releases/tag/v1.4.200'
+const RELEASE_URL = getReleaseNotesUrlForVersion('1.4.200')
 const DIAGNOSTIC = 'pkexec: no polkit authentication agent found'
 const INSTALL_COMMAND = 'sudo apt-get install -y /tmp/orca-updates/orca_1.4.200_amd64.deb'
 const PACKAGE_FILE_NAME = 'orca_1.4.200_amd64.deb'
