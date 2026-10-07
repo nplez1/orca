@@ -338,25 +338,38 @@ it('reconciles before listing only when refresh asks it to', async () => {
   expect(listedSessionIds(refreshed)).toContain(LATE_SESSION_ID)
 })
 
-it('maps the scan depth onto the index bound and passes the scope through', async () => {
+it('maps the scan depth onto the index bound and reads the capped page beside the scope', async () => {
   const { service } = await openListService()
   await waitForCompletedSweep(service)
   const args = vi.spyOn(SessionSearchInstance.prototype, 'listSessions')
+  const calls = (): unknown[] => args.mock.calls.map(([call]) => call)
 
   await service.listSessions(listOptions({ limit: 3, scopePaths: ['/work/app'] }), false)
-  expect(args).toHaveBeenLastCalledWith({
-    limit: 3,
-    scopePaths: ['/work/app'],
-    executionHostId: LOCAL_EXECUTION_HOST_ID
-  })
+  // Two reads: the scope's own rows, then the capped page every list starts
+  // from, which the scope is added to rather than replaced with.
+  expect(calls()).toEqual([
+    { limit: 3, scopePaths: ['/work/app'], executionHostId: LOCAL_EXECUTION_HOST_ID },
+    { limit: 3, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID }
+  ])
 
+  args.mockClear()
   // `unlimited` is the panel's own depth, and the index reads it as no bound.
   await service.listSessions(listOptions({ unlimited: true }), false)
-  expect(args).toHaveBeenLastCalledWith({
-    limit: Number.POSITIVE_INFINITY,
-    scopePaths: [],
-    executionHostId: LOCAL_EXECUTION_HOST_ID
-  })
+  expect(calls()).toEqual([
+    { limit: Number.POSITIVE_INFINITY, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID }
+  ])
+
+  args.mockClear()
+  // Under no bound the scoped read already holds every scope; asking again for
+  // the whole table would be the same rows a second time.
+  await service.listSessions(listOptions({ unlimited: true, scopePaths: ['/work/app'] }), false)
+  expect(calls()).toEqual([
+    {
+      limit: Number.POSITIVE_INFINITY,
+      scopePaths: ['/work/app'],
+      executionHostId: LOCAL_EXECUTION_HOST_ID
+    }
+  ])
 })
 
 it('answers null with a query before a pass completes, leaving the filter to the caller', async () => {

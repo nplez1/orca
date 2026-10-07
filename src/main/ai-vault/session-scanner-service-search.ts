@@ -11,6 +11,7 @@ import {
   type SessionSearchScanRoots
 } from '../ai-vault-search/session-search-scan-roots'
 import { sessionSearchSqliteAvailable } from '../ai-vault-search/session-search-sqlite-support'
+import { unionScopedSessions } from './session-list-results'
 import type {
   AiVaultServiceRequest,
   AiVaultServiceResultValue,
@@ -148,19 +149,30 @@ export class SessionScannerServiceSearch {
     if (refresh) {
       await instance.reconcile().catch(() => undefined)
     }
-    const listed = instance.listSessions({
-      limit: aiVaultScanLimit(options),
-      scopePaths: options.scopePaths ?? [],
-      executionHostId: options.executionHostId ?? LOCAL_EXECUTION_HOST_ID,
-      ...(query ? { query } : {})
-    })
-    return listed === null
-      ? null
-      : {
-          sessions: listed.sessions.map(withCachedPreviews),
-          issues: [],
-          scannedAt: new Date().toISOString()
-        }
+    const limit = aiVaultScanLimit(options)
+    const scopePaths = options.scopePaths ?? []
+    const read = (paths: readonly string[]): AiVaultSession[] | null =>
+      instance.listSessions({
+        limit,
+        scopePaths: paths,
+        executionHostId: options.executionHostId ?? LOCAL_EXECUTION_HOST_ID,
+        ...(query ? { query } : {})
+      })?.sessions ?? null
+    const listed = read(scopePaths)
+    if (listed === null) {
+      return null
+    }
+    // An unbounded read already holds every scope's rows, so the scope pass would
+    // re-read a subset of the same table.
+    const capped = scopePaths.length > 0 && Number.isFinite(limit) ? read([]) : null
+    // The same union the scanner answers with, so a scoped view of the index
+    // cannot be the one listing source that hides everything outside its scope.
+    const sessions = unionScopedSessions(capped ?? [], listed)
+    return {
+      sessions: sessions.map(withCachedPreviews),
+      issues: [],
+      scannedAt: new Date().toISOString()
+    }
   }
 
   close(): void {

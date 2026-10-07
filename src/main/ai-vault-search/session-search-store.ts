@@ -85,6 +85,11 @@ export class SessionSearchStore {
     storeContent = true
   ) {
     this.db = openSessionSearchDatabase(path)
+    // Why here and not at the caller: which tier the rows were decoded under is a
+    // fact about the rows, so the store is what keeps it true across a consent change.
+    if (storeContent && !this.contentRowsIndexed()) {
+      this.adoptContentTier()
+    }
     this.writer = new SessionSearchIndexWriter(
       this.db,
       SESSION_SEARCH_COMMIT_CHARS,
@@ -191,6 +196,55 @@ export class SessionSearchStore {
     } catch (error) {
       this.reportWriteFailure(error)
       return null
+    }
+  }
+
+  /**
+   * True when the rows this index holds were decoded with message bodies in them.
+   *
+   * A store that predates the record has never been asked to keep content, which
+   * is the answer that makes the first enablement re-read rather than assume.
+   */
+  contentRowsIndexed(): boolean {
+    const row: unknown = this.db
+      .prepare("SELECT value FROM meta WHERE key = 'content_indexed'")
+      .get()
+    return typeof row === 'object' && row !== null && 'value' in row && row.value === '1'
+  }
+
+  /**
+   * The whole read every indexed row owes the newly consented content tier.
+   *
+   * Consent turned on cannot be answered by the stat comparison those rows
+   * already passed: their files have not changed and their message rows were
+   * never written, so nothing but a whole read can add them, and until one runs
+   * a full-text search over that history answers with nothing at all. The
+   * marking and the record share one transaction, so a process that dies between
+   * them cannot leave rows that look current under a tier nothing decoded them
+   * under — the failure mode no later pass would notice.
+   */
+  adoptContentTier(): void {
+    try {
+      this.db.exec('BEGIN IMMEDIATE')
+      try {
+        this.db
+          .prepare(
+            `UPDATE files SET state = 'due', fail_count = 0, failed_mtime_ms = NULL
+             WHERE state != 'due'`
+          )
+          .run()
+        this.db
+          .prepare("INSERT OR REPLACE INTO meta(key, value) VALUES ('content_indexed', '1')")
+          .run()
+        this.db.exec('COMMIT')
+      } catch (error) {
+        this.db.exec('ROLLBACK')
+        throw error
+      }
+    } catch (error) {
+      // Reported, not thrown: the next construction finds the record missing and
+      // marks the rows again, so one failed write is not a stranded index.
+      this.onError(error)
     }
   }
 

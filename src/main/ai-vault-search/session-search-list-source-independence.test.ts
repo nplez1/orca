@@ -98,3 +98,40 @@ it('serves preview turns from the parse cache rather than the transcript', async
   )
   child.close()
 })
+
+it('adds a scope to the capped list instead of replacing it with the scope', async () => {
+  const inScope = '11111111-1111-4111-8111-111111111111'
+  const elsewhere = '22222222-2222-4222-8222-222222222222'
+  await writeClaudeTranscript(
+    join(harness.claudeProjectDir, `${inScope}.jsonl`),
+    ['the older, in-scope conversation'],
+    inScope,
+    { cwd: '/repo/app' }
+  )
+  await writeClaudeTranscript(
+    join(harness.claudeProjectDir, `${elsewhere}.jsonl`),
+    ['the newer conversation somewhere else'],
+    elsewhere,
+    { cwd: '/other/place', startIndex: 10 }
+  )
+
+  const child = new SessionScannerServiceSearch()
+  child.apply({
+    databasePath: harness.databasePath,
+    roots: harness.roots,
+    settings: { contentEnabled: true, historyDays: null }
+  })
+  const listed = await child.listSessions({ platform: 'darwin', limit: 50, scopePaths: [] }, true)
+  expect(listed?.sessions.map((session) => session.sessionId)).toEqual([elsewhere, inScope])
+
+  // A scope is what the panel's own filter narrows from, so it must hold the
+  // scope's sessions past the cap AND the ones the cap already kept — the
+  // filesystem scanner's union. Replacing the list with the scope instead (as
+  // this path did) makes 'All' and a scope render the same sessions.
+  const scoped = await child.listSessions(
+    { platform: 'darwin', limit: 1, scopePaths: ['/repo/app'] },
+    false
+  )
+  expect(scoped?.sessions.map((session) => session.sessionId)).toEqual([elsewhere, inScope])
+  child.close()
+})
