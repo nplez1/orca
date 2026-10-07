@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { POSIX_SHELL_STARTUP_COMMAND_ENV } from './pty/posix-shell-startup-command'
 import { selectShellStartupFeatures } from './shell-startup-features'
+import { DEV_COMMAND_NAME } from './cli/cli-install-constants'
 import { prependOrcaCliDirToChildPath } from './cli/orca-cli-child-path'
 import { runZshPty } from './zsh-startup-hook-pty-harness'
 import { ZSH_WRAPPER_DIR_MARKER_FILE } from './shell-templates'
@@ -128,7 +129,7 @@ describePosix('zsh launch config', () => {
       mkdirSync(cliBin, { recursive: true })
       mkdirSync(ambientBin)
       for (const bin of [cliBin, ambientBin]) {
-        const launcher = join(bin, 'orca-dev')
+        const launcher = join(bin, DEV_COMMAND_NAME)
         writeFileSync(launcher, '#!/bin/sh\nexit 0\n')
         chmodSync(launcher, 0o755)
       }
@@ -153,7 +154,7 @@ describePosix('zsh launch config', () => {
       const config = getShellLaunchConfig(ZSH_PATH, features)
       const result = await runZshPty({
         env: { ...env, ...config.env },
-        commands: ['ORCA_LOOKUP=$(command -v orca-dev)'],
+        commands: [`ORCA_LOOKUP=$(command -v ${DEV_COMMAND_NAME})`],
         report: ['ORCA_LOOKUP']
       })
       expect(result.values.ORCA_LOOKUP).toBe(launcher)

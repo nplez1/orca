@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { DEV_COMMAND_NAME } from './cli/cli-install-constants'
 import { prependOrcaCliDirToChildPath } from './cli/orca-cli-child-path'
 import { POSIX_SHELL_STARTUP_COMMAND_ENV } from './pty/posix-shell-startup-command'
 import { getZshShellReadyWrapperFile } from './providers/local-pty-shell-ready-wrapper-generation'
@@ -83,8 +84,8 @@ describe('zsh deferred startup after prompt-hook replacement', () => {
         mkdirSync(bin, { recursive: true })
       }
       for (const bin of [cliBin, ambientBin]) {
-        writeFileSync(join(bin, 'orca-dev'), '#!/bin/sh\nexit 0\n')
-        chmodSync(join(bin, 'orca-dev'), 0o755)
+        writeFileSync(join(bin, DEV_COMMAND_NAME), '#!/bin/sh\nexit 0\n')
+        chmodSync(join(bin, DEV_COMMAND_NAME), 0o755)
       }
       writeFileSync(
         join(home, '.zshenv'),
@@ -164,7 +165,7 @@ describe('zsh deferred startup after prompt-hook replacement', () => {
           ...(repeatSource
             ? ['source -- "$HOME/wrapper/.zshenv"', 'source -- "$HOME/wrapper/.zshenv"']
             : []),
-          'O_LK=$(command -v orca-dev)',
+          `O_LK=$(command -v ${DEV_COMMAND_NAME})`,
           'O_IR=${+functions[__orca_deferred_line_init]}',
           'O_SR=${+widgets[__orca_saved_line_init]}',
           ...(scheduleCleanup
