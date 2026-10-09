@@ -139,13 +139,15 @@ export class RuntimeGitHubReviewMutationCommands {
     bypassBranchProtection = false
   ): Promise<Awaited<ReturnType<typeof mergePR>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
+    // Why: spreading [] would shift the options object into the localGitOptions slot, dropping the bypass.
+    const localGitOptions = this.deps.getLocalGitArgs(repo)[0] ?? {}
     return mergePR(
       repo.path,
       prNumber,
       method,
       repo.connectionId ?? null,
       prRepo ?? null,
-      ...this.deps.getLocalGitArgs(repo),
+      localGitOptions,
       { bypassBranchProtection }
     )
   }
