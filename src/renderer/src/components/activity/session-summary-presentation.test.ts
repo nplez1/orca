@@ -43,6 +43,48 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(resolveSessionSummaryHeaderState(null)).toEqual({ hint: 'Up to date', folding: false })
   })
 
+  it('names the missing transcript instead of claiming to be up to date', () => {
+    const state = resolveSessionSummaryHeaderState(snapshot({ status: 'unavailable' }))
+
+    expect(state).toEqual({ hint: 'No readable transcript', folding: false })
+  })
+
+  it('names the failure instead of claiming to be up to date', () => {
+    const state = resolveSessionSummaryHeaderState(snapshot({ status: 'failed' }))
+
+    expect(state).toEqual({ hint: 'Could not summarize this session', folding: false })
+  })
+
+  // A failed fold over a session already folded once leaves the last good ledger
+  // on screen, so the header keeps counting what never got folded.
+  it('counts the backlog when a fold failed over an existing ledger', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({
+        status: 'failed',
+        ledger: {
+          goal: null,
+          plan: [],
+          inProgress: null,
+          done: [],
+          blockers: [],
+          decisions: [],
+          timeline: [],
+          foldedThrough: 4,
+          foldedAt: 1
+        },
+        facts: {
+          paneKey: 'pane-1',
+          prompt: 'Refactor the parser',
+          messageCount: 9,
+          foldedThrough: 4,
+          backlogCount: 5
+        }
+      })
+    )
+
+    expect(state).toEqual({ hint: '5 events to catch up on', folding: false })
+  })
+
   it('reads as up to date when facts have no backlog', () => {
     const state = resolveSessionSummaryHeaderState(
       snapshot({

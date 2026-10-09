@@ -19970,7 +19970,9 @@
       "upToDate": "Up to date",
       "label": "Session summary",
       "failed": "Could not summarize this session.",
+      "failedHint": "Could not summarize this session",
       "unavailable": "No readable transcript for this session yet.",
+      "noTranscriptHint": "No readable transcript",
       "unavailableInWindow": "Session summaries are not available in this window.",
       "notFocused": "Focus an agent session to see its summary."
     }

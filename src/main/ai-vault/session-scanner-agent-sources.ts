@@ -30,7 +30,7 @@ const CODEX_SESSIONS_DIR = join(
   'sessions'
 )
 const GEMINI_SESSIONS_DIR = join(homedir(), '.gemini', 'tmp')
-const COPILOT_SESSIONS_DIR = join(
+export const COPILOT_SESSIONS_DIR = join(
   resolveAbsoluteDirOverride(process.env.COPILOT_HOME, join(homedir(), '.copilot')),
   'session-state'
 )
