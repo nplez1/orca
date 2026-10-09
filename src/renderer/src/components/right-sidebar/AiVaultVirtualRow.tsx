@@ -5,7 +5,7 @@ import type { AiVaultResumeStartup } from '@/lib/ai-vault-resume-command'
 import { cn } from '@/lib/utils'
 import { VaultGroupHeader } from './AiVaultPanelControls'
 import { VaultSessionRow } from './AiVaultSessionRow'
-import type { AiVaultSessionGroup } from './ai-vault-session-filters'
+import type { AiVaultListRow } from './ai-vault-virtual-rows'
 import type { AiVaultOriginalPaneTarget } from './ai-vault-original-pane'
 import {
   aiVaultSessionResumeLabel,
@@ -27,10 +27,7 @@ import type { AiVaultResumeInChatEligibility } from './ai-vault-session-resume-i
 import type { AiVaultSearchHit } from '../../../../shared/ai-vault-search-types'
 import { canResumeAiVaultSearchHit, hasAiVaultSearchHitPath } from './ai-vault-search-session'
 
-export type AiVaultListRow =
-  | { type: 'group'; group: AiVaultSessionGroup }
-  | { type: 'session'; groupKey: string; session: AiVaultSession }
-
+export type { AiVaultListRow }
 export function AiVaultVirtualRow({
   row,
   index,
@@ -50,6 +47,7 @@ export function AiVaultVirtualRow({
   getSessionResumeInChat,
   onToggleGroup,
   onToggleSessionDetails,
+  onToggleSubagentChildren,
   onJumpToOriginalPane,
   onJumpToWorktree,
   onResume,
@@ -82,6 +80,7 @@ export function AiVaultVirtualRow({
   getSessionResumeInChat: (session: AiVaultSession) => AiVaultResumeInChatEligibility
   onToggleGroup: (key: string) => void
   onToggleSessionDetails: (sessionId: string) => void
+  onToggleSubagentChildren: (parentSessionId: string) => void
   onJumpToOriginalPane: (session: AiVaultSession) => void
   onJumpToWorktree: (worktreeId: string) => void
   onResume: (session: AiVaultSession, worktreeId: string) => void
@@ -173,6 +172,10 @@ export function AiVaultVirtualRow({
           session={row.session}
           searchHit={searchHit}
           liveState={getSessionLiveState(row.session)}
+          subagentDepth={row.subagentDepth}
+          subagentChildCount={row.subagentChildCount}
+          subagentChildrenExpanded={row.subagentChildrenExpanded}
+          onToggleSubagentChildren={() => onToggleSubagentChildren(row.session.id)}
           resumeStartup={resumeStartup}
           realHomeResumeStartup={
             canBuildResumeStartup

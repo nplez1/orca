@@ -13,7 +13,7 @@ import type { PersistedSessionParseCacheEntry } from './session-parse-cache-stor
 
 // Why: the only compatibility signal a row has — see the schema history in
 // session-parse-cache-persistence.ts before changing it.
-export const SESSION_PARSE_CACHE_SCHEMA_VERSION = 5
+export const SESSION_PARSE_CACHE_SCHEMA_VERSION = 6
 export const SESSION_PARSE_CACHE_MAX_BYTES = 64 * 1024 * 1024
 export const SESSION_PARSE_CACHE_JSON_LIMITS = {
   structuralTokens: 1_000_000,

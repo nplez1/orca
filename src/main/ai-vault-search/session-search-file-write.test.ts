@@ -86,6 +86,48 @@ it('writes a whole read in one transaction', () => {
   expect(errors).toEqual([])
 })
 
+it('stores the sub-agent lineage the list nests a row under', () => {
+  replayTranscriptRead({
+    messages: userMessages('child prompt', 2),
+    outcome: {
+      session: syntheticSession({
+        sessionId: 'child',
+        subagent: { parentSessionId: 'parent', agentType: 'Explore', status: null }
+      })
+    }
+  })
+
+  expect(
+    index.db
+      .prepare('SELECT session_id, subagent_parent_session_id, subagent_agent_type FROM sessions')
+      .get()
+  ).toEqual({
+    session_id: 'child',
+    subagent_parent_session_id: 'parent',
+    subagent_agent_type: 'Explore'
+  })
+})
+
+it('clears a stale lineage when a re-read says the session is a root', () => {
+  replayTranscriptRead({
+    messages: userMessages('child prompt', 2),
+    outcome: {
+      session: syntheticSession({
+        sessionId: 'child',
+        subagent: { parentSessionId: 'parent', agentType: 'Explore', status: null }
+      })
+    }
+  })
+  replayTranscriptRead({
+    messages: userMessages('child prompt', 3),
+    outcome: { session: syntheticSession({ sessionId: 'child' }), byteOffset: 8192 }
+  })
+
+  expect(
+    index.db.prepare('SELECT subagent_parent_session_id, subagent_agent_type FROM sessions').get()
+  ).toEqual({ subagent_parent_session_id: null, subagent_agent_type: null })
+})
+
 it('files every row in one FTS table, under the column its role owns', () => {
   replayTranscriptRead({
     messages: [

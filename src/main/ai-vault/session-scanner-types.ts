@@ -159,6 +159,11 @@ export type SessionAccumulator = {
   // Recoverable signal for a zero-turn transcript (see AiVaultSession).
   queuedMessageCount: number
   subagentTranscriptCount: number
+  // The header's declared parent path, and the sub-agent identity the
+  // transcript declares. A non-null agent type is the transcript saying "I am a
+  // sub-agent"; lineage alone is not (see session-scanner-subagent-declaration.ts).
+  lineageParentSessionPath: string | null
+  declaredSubagentAgentType: string | null
   earliestTimestampMs: number
   latestTimestampMs: number
 }

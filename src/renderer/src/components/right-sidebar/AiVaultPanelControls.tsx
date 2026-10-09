@@ -201,12 +201,15 @@ export function VaultViewMenu({
   availableAgents,
   group,
   hideEmptySessions,
+  showSubagentSessions,
+  hiddenSubagentCount,
   sessionLimit,
   adjustmentCount,
   onAgentEnabledChange,
   onAllAgentsEnabledChange,
   onGroupChange,
   onHideEmptySessionsChange,
+  onShowSubagentSessionsChange,
   onSessionLimitChange,
   onReset
 }: {
@@ -215,12 +218,16 @@ export function VaultViewMenu({
   availableAgents: readonly AiVaultAgent[]
   group: AiVaultGroup
   hideEmptySessions: boolean
+  showSubagentSessions: boolean
+  /** Sub-agent rows with no parent in the current list; 0 when flattened. */
+  hiddenSubagentCount: number
   sessionLimit: AiVaultSessionLimit
   adjustmentCount: number
   onAgentEnabledChange: (agent: AiVaultAgent, enabled: boolean) => void
   onAllAgentsEnabledChange: (enabled: boolean) => void
   onGroupChange: (group: AiVaultGroup) => void
   onHideEmptySessionsChange: (hideEmptySessions: boolean) => void
+  onShowSubagentSessionsChange: (showSubagentSessions: boolean) => void
   onSessionLimitChange: (limit: AiVaultSessionLimit) => void
   onReset: () => void
 }): React.JSX.Element {
@@ -353,6 +360,27 @@ export function VaultViewMenu({
                 'Hide empty sessions'
               )}
             </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={showSubagentSessions}
+              onCheckedChange={(checked) => onShowSubagentSessionsChange(checked === true)}
+              onSelect={(event) => event.preventDefault()}
+            >
+              {translate(
+                'auto.components.right.sidebar.AiVaultPanelControls.showSubagentSessions',
+                'Show subagent sessions'
+              )}
+            </DropdownMenuCheckboxItem>
+            {/* Why: collapsed children whose parent fell outside this list are
+                hidden entirely, so say so rather than let rows vanish. */}
+            {!showSubagentSessions && hiddenSubagentCount > 0 ? (
+              <div className="px-2 pb-1 text-[11px] text-muted-foreground">
+                {translate(
+                  'auto.components.right.sidebar.AiVaultPanelControls.hiddenSubagentSessions',
+                  '{{value0}} subagent sessions hidden (parent not loaded)',
+                  { value0: hiddenSubagentCount }
+                )}
+              </div>
+            ) : null}
             <AiVaultSessionLimitMenu
               sessionLimit={sessionLimit}
               onSessionLimitChange={onSessionLimitChange}

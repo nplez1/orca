@@ -205,8 +205,9 @@ it('shows an empty state when every agent is disabled and keeps their history vi
   await userEvent.click(screen.getByRole('button', { name: 'Session History view options' }))
 
   expect(await screen.findByText('No agents enabled in Settings')).toBeTruthy()
-  expect(screen.getAllByRole('menuitemcheckbox')).toHaveLength(1)
+  expect(screen.getAllByRole('menuitemcheckbox')).toHaveLength(2)
   expect(screen.getByRole('menuitemcheckbox', { name: 'Hide empty sessions' })).toBeTruthy()
+  expect(screen.getByRole('menuitemcheckbox', { name: 'Show subagent sessions' })).toBeTruthy()
   expect(screen.queryByRole('menuitem', { name: 'Select all' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: 'Clear' })).toBeNull()
 })

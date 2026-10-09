@@ -33,6 +33,8 @@ type SessionColumnOutsideRow =
   | 'total_tokens'
   | 'queued_message_count'
   | 'subagent_transcript_count'
+  | 'subagent_parent_session_id'
+  | 'subagent_agent_type'
   | 'modified_at'
 
 // Explicit columns let the existing statement cache reuse these reads; tests pin every schema field.
@@ -57,6 +59,8 @@ const SESSION_COLUMN_LIST = (
     'total_tokens',
     'queued_message_count',
     'subagent_transcript_count',
+    'subagent_parent_session_id',
+    'subagent_agent_type',
     'modified_at'
   ] as const satisfies readonly (keyof SessionRow | SessionColumnOutsideRow)[]
 ).join(', ')

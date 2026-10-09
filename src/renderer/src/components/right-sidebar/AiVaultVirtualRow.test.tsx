@@ -42,7 +42,14 @@ function renderSession(session: AiVaultSession, blocked = false, searchHit?: AiV
   render(
     <TooltipProvider>
       <AiVaultVirtualRow
-        row={{ type: 'session', groupKey: 'today', session }}
+        row={{
+          type: 'session',
+          groupKey: 'today',
+          session,
+          subagentDepth: 0,
+          subagentChildCount: 0,
+          subagentChildrenExpanded: false
+        }}
         index={0}
         start={0}
         activeStickyHeaderIndex={null}
@@ -68,6 +75,7 @@ function renderSession(session: AiVaultSession, blocked = false, searchHit?: AiV
         getSessionResumeInChat={() => ({ available: false, reason: 'already-structured' })}
         onToggleGroup={vi.fn()}
         onToggleSessionDetails={vi.fn()}
+        onToggleSubagentChildren={vi.fn()}
         onJumpToOriginalPane={vi.fn()}
         onJumpToWorktree={vi.fn()}
         onResume={onResume}

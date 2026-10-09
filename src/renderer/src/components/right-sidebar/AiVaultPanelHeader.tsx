@@ -23,6 +23,8 @@ type AiVaultPanelHeaderProps = {
   availableAgents: readonly AiVaultAgent[]
   group: AiVaultGroup
   hideEmptySessions: boolean
+  showSubagentSessions: boolean
+  hiddenSubagentCount: number
   sessionLimit: AiVaultSessionLimit
   adjustmentCount: number
   /** Bumped by a caller that sent the user here, e.g. Settings; focuses the search box once. */
@@ -34,6 +36,7 @@ type AiVaultPanelHeaderProps = {
   onAllAgentsEnabledChange: (enabled: boolean) => void
   onGroupChange: (group: AiVaultGroup) => void
   onHideEmptySessionsChange: (hideEmptySessions: boolean) => void
+  onShowSubagentSessionsChange: (showSubagentSessions: boolean) => void
   onSessionLimitChange: (limit: AiVaultSessionLimit) => void
   onReset: () => void
   onRefresh: () => void
@@ -53,6 +56,8 @@ export function AiVaultPanelHeader({
   availableAgents,
   group,
   hideEmptySessions,
+  showSubagentSessions,
+  hiddenSubagentCount,
   sessionLimit,
   adjustmentCount,
   focusSearchRequestId = 0,
@@ -63,6 +68,7 @@ export function AiVaultPanelHeader({
   onAllAgentsEnabledChange,
   onGroupChange,
   onHideEmptySessionsChange,
+  onShowSubagentSessionsChange,
   onSessionLimitChange,
   onReset,
   onRefresh
@@ -111,12 +117,15 @@ export function AiVaultPanelHeader({
             availableAgents={availableAgents}
             group={group}
             hideEmptySessions={hideEmptySessions}
+            showSubagentSessions={showSubagentSessions}
+            hiddenSubagentCount={hiddenSubagentCount}
             sessionLimit={sessionLimit}
             adjustmentCount={adjustmentCount}
             onAgentEnabledChange={onAgentEnabledChange}
             onAllAgentsEnabledChange={onAllAgentsEnabledChange}
             onGroupChange={onGroupChange}
             onHideEmptySessionsChange={onHideEmptySessionsChange}
+            onShowSubagentSessionsChange={onShowSubagentSessionsChange}
             onSessionLimitChange={onSessionLimitChange}
             onReset={onReset}
           />

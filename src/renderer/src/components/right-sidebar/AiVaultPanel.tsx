@@ -87,11 +87,13 @@ export default function AiVaultPanel(): React.JSX.Element {
     searchSort,
     group,
     hideEmptySessions,
+    showSubagentSessions,
     sessionLimit,
     setSort,
     setSearchSort,
     setGroup,
     setHideEmptySessions,
+    setShowSubagentSessions,
     setSessionLimit,
     setAgentEnabled,
     setAllAgentsEnabled,
@@ -208,20 +210,23 @@ export default function AiVaultPanel(): React.JSX.Element {
     agents,
     group,
     hideEmptySessions,
+    showSubagentSessions,
     sessionLimit
   })
 
-  const { filteredSessions, groups } = useAiVaultPanelSessions(sessions, searching, group, {
-    query,
-    agents,
-    scope,
-    sort,
-    activeWorktreePaths,
-    activeProjectKey,
-    sessionProjectById,
-    projectLabelByKey,
-    hideEmptySessions
-  })
+  const { filteredSessions, groups, childrenByParentId, hiddenSubagentCount } =
+    useAiVaultPanelSessions(sessions, searching, group, {
+      query,
+      agents,
+      scope,
+      sort,
+      activeWorktreePaths,
+      activeProjectKey,
+      sessionProjectById,
+      projectLabelByKey,
+      hideEmptySessions,
+      showSubagentSessions
+    })
 
   const getSessionResumeState = useCallback(
     (session: AiVaultSession) =>
@@ -302,6 +307,8 @@ export default function AiVaultPanel(): React.JSX.Element {
         availableAgents={availableAgents}
         group={group}
         hideEmptySessions={hideEmptySessions}
+        showSubagentSessions={showSubagentSessions}
+        hiddenSubagentCount={hiddenSubagentCount}
         sessionLimit={sessionLimit}
         adjustmentCount={viewAdjustmentCount}
         focusSearchRequestId={focusSearchRequestId}
@@ -312,6 +319,7 @@ export default function AiVaultPanel(): React.JSX.Element {
         onAllAgentsEnabledChange={(enabled) => setAllAgentsEnabled(enabled, availableAgents)}
         onGroupChange={setGroup}
         onHideEmptySessionsChange={setHideEmptySessions}
+        onShowSubagentSessionsChange={setShowSubagentSessions}
         onSessionLimitChange={setSessionLimit}
         onReset={resetViewOptions}
         onRefresh={() => (searching ? search.retry() : void refresh({ force: true }))}
@@ -348,6 +356,7 @@ export default function AiVaultPanel(): React.JSX.Element {
             searchHits={searching ? searchHits : undefined}
             groups={groups}
             collapsedGroups={collapsedGroups}
+            childrenByParentId={childrenByParentId}
             loading={searching ? search.loading : loading}
             sessionsCount={sessions.length}
             filteredSessionsCount={filteredSessions.length}

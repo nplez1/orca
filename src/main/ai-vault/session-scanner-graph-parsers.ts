@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { withOmpSubagentTranscriptCount } from './session-scanner-omp-subagent-transcripts'
+import { consumeSubagentDeclarationRecord } from './session-scanner-subagent-declaration'
 import type {
   FileWithMtime,
   ResumableSessionParseState,
@@ -226,6 +227,7 @@ function consumeMessageGraphRecordLine(state: MessageGraphParseState, line: stri
     return
   }
   updateTimeline(accumulator, extractString(record.timestamp))
+  consumeSubagentDeclarationRecord(accumulator, record)
   if (accumulator.agent === 'omp') {
     state.ompTitle = foldOmpTranscriptTitle(state.ompTitle, record)
     if (state.ompTitle) {

@@ -1,4 +1,3 @@
-import { basename, extname } from 'node:path'
 import {
   aiVaultAgentLabel,
   type AiVaultAgent,
@@ -12,6 +11,7 @@ import type {
   ResumableSessionParseState,
   SessionAccumulator
 } from './session-scanner-types'
+import { scannedSubagentInfo } from './session-scanner-subagent-declaration'
 import {
   extractFullFirstUserPromptText,
   normalizeFullFirstUserPromptText,
@@ -64,6 +64,8 @@ export function createAccumulator(args: {
     lastUserPrompt: null,
     queuedMessageCount: 0,
     subagentTranscriptCount: 0,
+    lineageParentSessionPath: null,
+    declaredSubagentAgentType: null,
     earliestTimestampMs: 0,
     latestTimestampMs: 0
   }
@@ -176,7 +178,7 @@ export function finalizeSession(
       platform,
       codexHome: options.codexHome
     }),
-    subagent: null
+    subagent: scannedSubagentInfo(accumulator, sessionId)
   }
 }
 
@@ -350,8 +352,7 @@ export function sessionSortTime(session: AiVaultSession): number {
   return Date.parse(session.updatedAt ?? session.modifiedAt)
 }
 
-export function sessionIdFromFileName(filePath: string): string {
-  const fileName = basename(filePath, extname(filePath))
-  const match = fileName.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
-  return match?.[0] ?? fileName
-}
+// Why: moved to the values module so the sub-agent declaration reader can use
+// it without importing this module back (import/no-cycle); existing importers
+// keep the accumulator as their source.
+export { sessionIdFromFileName } from './session-scanner-values'

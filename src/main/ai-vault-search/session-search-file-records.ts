@@ -92,6 +92,8 @@ export class SessionSearchFileRecords {
       session.totalTokens,
       session.queuedMessageCount,
       session.subagentTranscriptCount,
+      session.subagent?.parentSessionId ?? null,
+      session.subagent?.agentType ?? null,
       session.model,
       session.modifiedAt,
       session.resumeCommand,
@@ -102,7 +104,8 @@ export class SessionSearchFileRecords {
       .prepare(
         `UPDATE sessions SET agent = ?, session_id = ?, file_path = ?, codex_home = ?, title = ?,
         cwd = ?, cwd_key = ?, branch = ?, created_at = ?, updated_at = ?, message_count = ?,
-        total_tokens = ?, queued_message_count = ?, subagent_transcript_count = ?, model = ?,
+        total_tokens = ?, queued_message_count = ?, subagent_transcript_count = ?,
+        subagent_parent_session_id = ?, subagent_agent_type = ?, model = ?,
         modified_at = ?, resume_command = ?, content_hash = ?, content_hash_count = ? WHERE id = ?`
       )
       .run(...values, rowId)

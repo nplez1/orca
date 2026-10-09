@@ -42,6 +42,8 @@ type IndexedSessionRow = {
   total_tokens: number
   queued_message_count: number
   subagent_transcript_count: number
+  subagent_parent_session_id: string | null
+  subagent_agent_type: string | null
   resume_command: string
 }
 
@@ -73,7 +75,7 @@ export type IndexedSessionList = {
 
 const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch, model,
   created_at, updated_at, modified_at, message_count, total_tokens, queued_message_count,
-  subagent_transcript_count, resume_command`
+  subagent_transcript_count, subagent_parent_session_id, subagent_agent_type, resume_command`
 
 /**
  * The columns the panel's own filter searches, minus preview text.
@@ -187,6 +189,13 @@ function indexedRowToSession(
     queuedMessageCount: row.queued_message_count,
     subagentTranscriptCount: row.subagent_transcript_count,
     resumeCommand: row.resume_command,
-    subagent: null
+    // Status stays Claude/OMP-only and on demand, so a listed child carries none.
+    subagent: row.subagent_parent_session_id
+      ? {
+          parentSessionId: row.subagent_parent_session_id,
+          agentType: row.subagent_agent_type,
+          status: null
+        }
+      : null
   }
 }

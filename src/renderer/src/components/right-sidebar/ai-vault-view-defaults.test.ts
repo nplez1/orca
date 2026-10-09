@@ -3,7 +3,8 @@ import { AI_VAULT_AGENTS } from '../../../../shared/ai-vault-types'
 import {
   countAiVaultViewAdjustments,
   DEFAULT_AI_VAULT_GROUP,
-  DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS
+  DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+  DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS
 } from './ai-vault-view-defaults'
 import { DEFAULT_AI_VAULT_SESSION_LIMIT } from './ai-vault-session-limit'
 
@@ -18,9 +19,14 @@ describe('ai-vault-view-defaults', () => {
         agents: [...AI_VAULT_AGENTS],
         group: DEFAULT_AI_VAULT_GROUP,
         hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+        showSubagentSessions: DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS,
         sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
       })
     ).toBe(0)
+  })
+
+  it('collapses subagent sessions by default', () => {
+    expect(DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS).toBe(false)
   })
 
   it('treats hiding empty sessions as an adjustment from the new default', () => {
@@ -29,6 +35,19 @@ describe('ai-vault-view-defaults', () => {
         agents: [...AI_VAULT_AGENTS],
         group: DEFAULT_AI_VAULT_GROUP,
         hideEmptySessions: true,
+        showSubagentSessions: DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS,
+        sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
+      })
+    ).toBe(1)
+  })
+
+  it('treats listing subagent sessions as an adjustment', () => {
+    expect(
+      countAiVaultViewAdjustments({
+        agents: [...AI_VAULT_AGENTS],
+        group: DEFAULT_AI_VAULT_GROUP,
+        hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+        showSubagentSessions: true,
         sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
       })
     ).toBe(1)
@@ -43,6 +62,7 @@ describe('ai-vault-view-defaults', () => {
         agents: swapped,
         group: DEFAULT_AI_VAULT_GROUP,
         hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+        showSubagentSessions: DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS,
         sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT
       })
     ).toBe(1)
@@ -54,6 +74,7 @@ describe('ai-vault-view-defaults', () => {
         agents: ['claude'],
         group: 'agent',
         hideEmptySessions: true,
+        showSubagentSessions: DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS,
         sessionLimit: 1000
       })
     ).toBe(4)

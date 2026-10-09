@@ -25,11 +25,13 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
   searchSort: AiVaultSearchSort
   group: AiVaultGroup
   hideEmptySessions: boolean
+  showSubagentSessions: boolean
   sessionLimit: AiVaultSessionLimit
   setSort: (sort: AiVaultSort) => void
   setSearchSort: (sort: AiVaultSearchSort) => void
   setGroup: (group: AiVaultGroup) => void
   setHideEmptySessions: (hide: boolean) => void
+  setShowSubagentSessions: (show: boolean) => void
   setSessionLimit: (limit: AiVaultSessionLimit) => void
   setAgentEnabled: (agent: AiVaultAgent, enabled: boolean) => void
   setAllAgentsEnabled: (enabled: boolean, scope: readonly AiVaultAgent[]) => void
@@ -77,6 +79,15 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
         current.hideEmptySessions === hideEmptySessions
           ? current
           : { ...current, hideEmptySessions }
+      ),
+    [updateOptions]
+  )
+  const setShowSubagentSessions = useCallback(
+    (showSubagentSessions: boolean) =>
+      updateOptions((current) =>
+        current.showSubagentSessions === showSubagentSessions
+          ? current
+          : { ...current, showSubagentSessions }
       ),
     [updateOptions]
   )
@@ -146,11 +157,13 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
     searchSort: options.searchSort,
     group: options.group,
     hideEmptySessions: options.hideEmptySessions,
+    showSubagentSessions: options.showSubagentSessions,
     sessionLimit: options.sessionLimit,
     setSort,
     setSearchSort,
     setGroup,
     setHideEmptySessions,
+    setShowSubagentSessions,
     setSessionLimit,
     setAgentEnabled,
     setAllAgentsEnabled,

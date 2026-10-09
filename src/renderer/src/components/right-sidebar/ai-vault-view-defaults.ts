@@ -10,6 +10,9 @@ import { DEFAULT_AI_VAULT_SESSION_LIMIT, type AiVaultSessionLimit } from './ai-v
 // Why: hide-empty used to default true; keep initial state, badge count, and Reset view
 // on one constant so a default flip cannot leave Reset pointing at the old value.
 export const DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS = false
+// Sub-agent transcripts (Pi writes one session file per sub-agent) are collapsed
+// under their parent by default; this is the escape hatch back to a flat list.
+export const DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS = false
 export const DEFAULT_AI_VAULT_SORT: AiVaultSort = 'updated'
 export const DEFAULT_AI_VAULT_SEARCH_SORT: AiVaultSearchSort = 'relevance'
 export const DEFAULT_AI_VAULT_GROUP: AiVaultGroup = 'project'
@@ -19,6 +22,7 @@ export function countAiVaultViewAdjustments(options: {
   agents: readonly AiVaultAgent[]
   group: AiVaultGroup
   hideEmptySessions: boolean
+  showSubagentSessions: boolean
   sessionLimit: AiVaultSessionLimit
 }): number {
   // Why: count by membership, not length — an agent swap keeps the array length but
@@ -28,6 +32,7 @@ export function countAiVaultViewAdjustments(options: {
     (allAgentsEnabled ? 0 : 1) +
     (options.group === DEFAULT_AI_VAULT_GROUP ? 0 : 1) +
     (options.hideEmptySessions === DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS ? 0 : 1) +
+    (options.showSubagentSessions === DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS ? 0 : 1) +
     (options.sessionLimit === DEFAULT_AI_VAULT_SESSION_LIMIT ? 0 : 1)
   )
 }

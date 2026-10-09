@@ -2,6 +2,7 @@ import { isAntigravityReferenceSession } from '../../../../shared/antigravity-se
 import type { AiVaultSubagentResumeActions } from './AiVaultSessionSubagents'
 import { useCallback } from 'react'
 import type React from 'react'
+import { ChevronRight } from 'lucide-react'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import {
@@ -29,6 +30,21 @@ import type { AiVaultSearchHit } from '../../../../shared/ai-vault-search-types'
 import { AiVaultSearchEvidence } from './AiVaultSearchEvidence'
 import { useAiVaultSessionDisplayTitle } from './use-ai-vault-session-display-title'
 
+// One step per nesting level. Pi emits a single level today; the cap keeps a
+// pathological chain from walking rows off the pane instead of clipping.
+const SUBAGENT_ROW_PADDING_CLASSES = [
+  'px-3',
+  'border-l border-sidebar-border pl-5 pr-3',
+  'border-l border-sidebar-border pl-9 pr-3',
+  'border-l border-sidebar-border pl-12 pr-3'
+] as const
+
+function subagentRowPaddingClass(depth: number): string {
+  return (
+    SUBAGENT_ROW_PADDING_CLASSES[Math.min(depth, SUBAGENT_ROW_PADDING_CLASSES.length - 1)] ?? 'px-3'
+  )
+}
+
 export function VaultSessionRow({
   session,
   liveState,
@@ -40,6 +56,10 @@ export function VaultSessionRow({
   resumeDisabled,
   resumeHidden,
   onToggleDetails,
+  subagentDepth = 0,
+  subagentChildCount = 0,
+  subagentChildrenExpanded = false,
+  onToggleSubagentChildren,
   onJumpToOriginalPane,
   showJumpToWorktree,
   onJumpToWorktree,
@@ -70,6 +90,12 @@ export function VaultSessionRow({
   resumeDisabled: boolean
   resumeHidden?: boolean
   onToggleDetails: () => void
+  /** 0 for a top-level row; 1+ for a sub-agent nested under its parent. */
+  subagentDepth?: number
+  /** Sub-agent rows the list holds for this session; 0 hides the disclosure. */
+  subagentChildCount?: number
+  subagentChildrenExpanded?: boolean
+  onToggleSubagentChildren?: () => void
   onJumpToOriginalPane?: () => void
   showJumpToWorktree: boolean
   onJumpToWorktree?: () => void
@@ -144,7 +170,8 @@ export function VaultSessionRow({
       <ContextMenuTrigger asChild className="block w-full min-w-0">
         <div
           className={cn(
-            'group/session-row flex w-full min-w-0 cursor-pointer flex-col border-b border-sidebar-border px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/55',
+            'group/session-row flex w-full min-w-0 cursor-pointer flex-col border-b border-sidebar-border py-2 text-left transition-colors hover:bg-sidebar-accent/55',
+            subagentRowPaddingClass(subagentDepth),
             !detailsExpanded && 'min-h-[98px]'
           )}
           onClick={(event) => {
@@ -210,6 +237,36 @@ export function VaultSessionRow({
             />
           </div>
           {searchHit ? <AiVaultSearchEvidence hit={searchHit} /> : null}
+          {subagentChildCount > 0 ? (
+            <button
+              type="button"
+              aria-expanded={subagentChildrenExpanded}
+              onClick={(event) => {
+                // The row itself toggles details; expanding children must not.
+                event.stopPropagation()
+                onToggleSubagentChildren?.()
+              }}
+              className="mt-1 inline-flex w-fit items-center gap-1 rounded-md border border-sidebar-border bg-background px-1.5 py-0.5 text-[11px] font-medium leading-none text-muted-foreground shadow-xs transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <ChevronRight
+                className={cn(
+                  'size-3 shrink-0 transition-transform',
+                  subagentChildrenExpanded && 'rotate-90'
+                )}
+              />
+              {subagentChildCount === 1
+                ? translate(
+                    'auto.components.right.sidebar.AiVaultSessionRow.subagentSession_one',
+                    '{{count}} subagent session',
+                    { count: subagentChildCount }
+                  )
+                : translate(
+                    'auto.components.right.sidebar.AiVaultSessionRow.subagentSession_other',
+                    '{{count}} subagent sessions',
+                    { count: subagentChildCount }
+                  )}
+            </button>
+          ) : null}
           {!detailsExpanded && !searchHit ? (
             <div className="mt-0.5 min-w-0 line-clamp-2 text-[12px] leading-4 text-muted-foreground">
               {latestTurn ? (

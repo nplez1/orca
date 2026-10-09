@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AiVaultAgent } from '../../shared/ai-vault-types'
+import type { AiVaultAgent, AiVaultSession } from '../../shared/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import type SyncDatabase from '../sqlite/sync-database'
 import { cwdKey } from './session-search-file-records'
@@ -47,6 +47,7 @@ type SeededSession = {
   totalTokens?: number
   queuedMessageCount?: number
   subagentTranscriptCount?: number
+  subagent?: AiVaultSession['subagent']
   resumeCommand?: string
 }
 
@@ -55,8 +56,8 @@ function seed(db: SyncDatabase, row: SeededSession): void {
   db.prepare(
     `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,model,
        created_at,updated_at,modified_at,message_count,total_tokens,queued_message_count,
-       subagent_transcript_count,resume_command)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       subagent_transcript_count,subagent_parent_session_id,subagent_agent_type,resume_command)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).run(
     row.id,
     row.agent ?? 'claude',
@@ -75,6 +76,8 @@ function seed(db: SyncDatabase, row: SeededSession): void {
     row.totalTokens ?? 0,
     row.queuedMessageCount ?? 0,
     row.subagentTranscriptCount ?? 0,
+    row.subagent?.parentSessionId ?? null,
+    row.subagent?.agentType ?? null,
     row.resumeCommand ?? ''
   )
 }
@@ -181,6 +184,41 @@ describe('scopePaths', () => {
     seed(db, { id: 2, cwd: '/work/app' })
 
     expect(sessionIds(list(db, { scopePaths: ['/work/app'] }))).toEqual(['2'])
+  })
+})
+
+describe('subagent lineage', () => {
+  it('carries a child row\u2019s parent and agent type', async () => {
+    const db = await openIndex()
+    seed(db, {
+      id: 1,
+      sessionId: 'child',
+      subagent: { parentSessionId: 'parent', agentType: 'Explore', status: null }
+    })
+
+    expect(list(db).sessions[0]?.subagent).toEqual({
+      parentSessionId: 'parent',
+      agentType: 'Explore',
+      status: null
+    })
+  })
+
+  it('leaves a root session and an unknown agent type null', async () => {
+    const db = await openIndex()
+    seed(db, { id: 1, sessionId: 'root' })
+    seed(db, {
+      id: 2,
+      sessionId: 'anonymous-child',
+      subagent: { parentSessionId: 'parent', agentType: null, status: null }
+    })
+
+    const byId = new Map(list(db).sessions.map((session) => [session.sessionId, session]))
+    expect(byId.get('root')?.subagent).toBeNull()
+    expect(byId.get('anonymous-child')?.subagent).toEqual({
+      parentSessionId: 'parent',
+      agentType: null,
+      status: null
+    })
   })
 })
 

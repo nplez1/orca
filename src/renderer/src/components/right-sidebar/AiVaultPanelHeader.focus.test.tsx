@@ -31,6 +31,8 @@ function header(focusSearchRequestId: number) {
       availableAgents={[]}
       group="project"
       hideEmptySessions={false}
+      showSubagentSessions={false}
+      hiddenSubagentCount={0}
       sessionLimit={250}
       adjustmentCount={0}
       focusSearchRequestId={focusSearchRequestId}
@@ -41,6 +43,7 @@ function header(focusSearchRequestId: number) {
       onAllAgentsEnabledChange={vi.fn()}
       onGroupChange={vi.fn()}
       onHideEmptySessionsChange={vi.fn()}
+      onShowSubagentSessionsChange={vi.fn()}
       onSessionLimitChange={vi.fn()}
       onReset={vi.fn()}
       onRefresh={vi.fn()}
