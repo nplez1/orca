@@ -425,15 +425,23 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     expect(harness.piEventListenerCount(EW_STARTED)).toBe(1)
     expect(child.piEventListenerCount(EW_STARTED)).toBe(1)
 
-    // Its child is reported, and reported for the session its own context named.
+    // Its child is reported, and filed under the pane's own session: a second registration of
+    // this extension runs a child agent, not a new session of the pane, so it does not name the
+    // pane's status (see agent-status-session-owner.test.ts).
     await child.callHook('session_start', { reason: 'startup' }, sessionCtx('B'))
     child.emitPiEvent(EW_STARTED, { runId: 'run-b', agentType: 'scout' })
     await flushPosts()
-    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'B' })
-    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-b' })])
+    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'A' })
+    // Both are descendants of the session the pane is showing, so both are in the set it holds on.
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'run-a' }),
+        expect.objectContaining({ id: 'run-b' })
+      ])
+    )
   })
 
-  it('files a child under the session of the registration now live on the bus', async () => {
+  it('files a second registration’s child under the pane’s own session', async () => {
     const harness = createHarness('pi', { existsSync: () => true })
     await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
     await drive(harness, 'before_agent_start', { prompt: 'delegate' }, sessionCtx('A'))
@@ -446,14 +454,48 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
     harness.reload()
     await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('B'))
     await emit(harness, EW_STARTED, { runId: 'run-b', agentType: 'scout' })
-    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'B' })
-    // Why: a child filed by the run that INSTALLED the listeners lands in A, the session the pane
-    // is no longer showing, and A’s next resume hands it back as its own.
-    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-b' })])
+    // Why: the child's context is not the pane's session, so the run it reports stays filed
+    // under the session the pane is showing — together with the pane's own child, which is what
+    // the pane's hold is computed from.
+    expect(harness.posted.at(-1)).toMatchObject({ session_id: 'A' })
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'run-b' })])
+    )
 
     await harness.replacePiSession('resume', '/sessions/A.jsonl')
     await drive(harness, 'session_start', { reason: 'resume' }, sessionCtx('A'))
-    expect(harness.posted.at(-1)?.subagent_runs).toEqual([expect.objectContaining({ id: 'run-a' })])
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'run-a' }),
+        expect.objectContaining({ id: 'run-b' })
+      ])
+    )
+  })
+
+  it('cleans up a refused child registration when it shuts down', async () => {
+    const harness = createHarness('pi', { existsSync: () => true })
+    await drive(harness, 'session_start', { reason: 'startup' }, sessionCtx('A'))
+    await drive(harness, 'agent_start', {}, sessionCtx('A'))
+
+    // The child registration's own session is refused as the pane's, so its runs are held, not
+    // bucketed — and the pane's posts carry them, which is what keeps it working while they run.
+    const child = harness.registerTaskChild()
+    await child.callHook('session_start', { reason: 'startup' }, sessionCtx('B'))
+    child.emitPiEvent(EW_STARTED, { runId: 'run-b', agentType: 'scout' })
+    await flushPosts()
+    expect(harness.posted.at(-1)?.subagent_runs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'run-b' })])
+    )
+
+    // Its shutdown is refused the pane's status handlers, but the cleanup is the registration's
+    // own: leaving it armed and held would pin the pane working with nothing left to clear it.
+    await child.callHook('session_shutdown', { reason: 'quit' })
+    expect(child.piEventListenerCount(EW_STARTED)).toBe(0)
+
+    await drive(harness, 'agent_end', {}, sessionCtx('A'))
+    await flushPosts()
+    expect(harness.posted.at(-1)?.subagent_runs ?? []).toEqual([])
+    expect(harness.states.at(-1)).toBe('done')
   })
 
   it('closes the channels a registration armed when its own shutdown closes it', async () => {
