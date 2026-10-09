@@ -130,3 +130,23 @@ export function getAgentStatusRunCloseOutSourceLines(): string[] {
     ''
   ]
 }
+
+/** The host clears a working row only on a later completion, so a busy post that lands after the
+ *  run already completed (a re-finalized message, a late tool end) must re-assert the completion
+ *  it displaced — otherwise the pane reads working with no event left to answer it. */
+export function getPiLateBusyPostCompletionSourceLines(kind: PiAgentKind): string[] {
+  if (kind !== 'pi') {
+    return []
+  }
+
+  return [
+    '  function republishLateBusyPostCompletion(): void {',
+    '    if (piTurnInFlight) return',
+    '    if (lifecycleState.runGeneration === 0) return',
+    '    lifecycleState.endedRunGeneration = lifecycleState.runGeneration',
+    '    lifecycleState.completionPostedGeneration = -1',
+    '    postAgentEndOnce()',
+    '  }',
+    ''
+  ]
+}
