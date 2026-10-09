@@ -16,6 +16,7 @@ import {
   parsePiModels,
   withOpenAiThinking
 } from './commit-message-model-parsers'
+import { COPILOT_FALLBACK_MODELS, COPILOT_MODEL_DISCOVERY } from './copilot-model-list-probe'
 
 // Why: this file is the source of truth for non-interactive agent invocation
 // (commit-message generation). It is intentionally separate from
@@ -127,10 +128,13 @@ export const COMMIT_MESSAGE_AGENT_SPECS: Partial<Record<TuiAgent, CommitMessageA
   }),
   ...buildSecondaryCommitMessageAgentSpecs({
     BASIC_THINKING_LEVELS,
-    OPENAI_THINKING_LEVELS,
     parseCursorModels,
     parseAntigravityModels,
-    parseLineModels
+    parseLineModels,
+    copilotCatalog: {
+      modelDiscovery: COPILOT_MODEL_DISCOVERY,
+      fallbackModels: COPILOT_FALLBACK_MODELS
+    }
   })
 }
 

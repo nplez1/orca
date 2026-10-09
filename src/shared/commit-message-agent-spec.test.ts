@@ -12,6 +12,7 @@ import {
 } from './commit-message-agent-spec'
 import {
   COMMIT_MESSAGE_MODEL_JSON_STRUCTURE_LIMITS,
+  OPENAI_THINKING_LEVELS,
   parseAntigravityModels,
   parseClaudeModels,
   parseCodexModels,
@@ -19,6 +20,7 @@ import {
   parseLineModels,
   parsePiModels
 } from './commit-message-model-parsers'
+import { COPILOT_MODEL_DISCOVERY, parseCopilotModels } from './copilot-model-list-probe'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -119,26 +121,62 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
     }
   })
 
-  it('lists Copilot hosted CLI models even when account policy filters the picker', () => {
-    expect(COMMIT_MESSAGE_AGENT_SPECS.copilot?.defaultModelId).toBe('gpt-5.4')
-    expect(COMMIT_MESSAGE_AGENT_SPECS.copilot?.models.map((m) => m.id)).toEqual([
-      'auto',
-      'claude-haiku-4.5',
-      'claude-sonnet-4.5',
-      'claude-sonnet-4.6',
-      'claude-opus-4.5',
-      'claude-opus-4.6',
-      'claude-opus-4.6-fast',
-      'claude-opus-4.7',
-      'gpt-4.1',
-      'gpt-5-mini',
-      'gpt-5.2',
-      'gpt-5.2-codex',
-      'gpt-5.3-codex',
-      'gpt-5.4',
-      'gpt-5.4-mini',
-      'gpt-5.5'
+  it('probes Copilot for its hosted CLI catalog instead of pinning a snapshot', () => {
+    const copilot = COMMIT_MESSAGE_AGENT_SPECS.copilot!
+
+    // The CLI ships no `models` subcommand; `help config` is the catalog it
+    // publishes, and it is what keeps this list current.
+    expect(copilot.modelSource).toBe('dynamic')
+    expect(copilot.modelDiscovery?.binary).toBe('copilot')
+    expect(copilot.modelDiscovery?.args).toEqual(['help', 'config'])
+    expect(copilot.defaultModelId).toBe('gpt-5.4')
+    // Models released after this fallback was frozen still resolve, because the
+    // probe reports them rather than the spec's own list.
+    expect(copilot.modelDiscovery).toEqual(COPILOT_MODEL_DISCOVERY)
+    expect(copilot.modelDiscovery?.parse('`model`: AI model to use.\n  - "gpt-9"\n')).toEqual([
+      { id: 'auto', label: 'Auto' },
+      {
+        id: 'gpt-9',
+        label: 'GPT 9',
+        thinkingLevels: OPENAI_THINKING_LEVELS,
+        defaultThinkingLevel: 'low'
+      }
     ])
+  })
+
+  it('lists Copilot models from its static fallback when the CLI cannot be probed', () => {
+    const ids = COMMIT_MESSAGE_AGENT_SPECS.copilot!.models.map((model) => model.id)
+
+    expect(ids[0]).toBe('auto')
+    expect(ids).toContain('gpt-5.4')
+    expect(ids.length).toBeGreaterThan(20)
+    // Never re-offer a model the CLI has dropped.
+    expect(ids).not.toContain('gpt-4.1')
+  })
+
+  it('reads Copilot model ids only from the `model` setting block', () => {
+    const stdout = [
+      '  `defaultMode`: mode for new sessions.',
+      '    - "interactive"',
+      '  `model`: AI model to use for Copilot CLI.',
+      '    - "claude-opus-5.5"',
+      '    - "gpt-6-luna"',
+      '  `contextTier`: context window tier.',
+      '    - "default"',
+      ''
+    ].join('\n')
+
+    expect(parseCopilotModels(stdout).map((model) => model.id)).toEqual([
+      'auto',
+      'claude-opus-5.5',
+      'gpt-6-luna'
+    ])
+  })
+
+  it('parses nothing when the Copilot help format changes', () => {
+    // An empty parse is the safe failure: the spec's fallback list is used and
+    // the result is never cached, so the next probe tries again.
+    expect(parseCopilotModels('Usage: copilot config [OPTIONS]')).toEqual([])
   })
 
   it('treats disabled default agents as unavailable for implicit Source Control AI choices', () => {

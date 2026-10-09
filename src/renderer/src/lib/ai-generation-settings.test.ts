@@ -110,8 +110,9 @@ describe('resolveAiGenerationSelection', () => {
 })
 
 describe('getCommitMessageAgentCapability', () => {
-  it('reports Pi as dynamic so the pane knows to probe', () => {
+  it('reports the agents whose model list is probed so the pane knows to probe', () => {
     expect(getCommitMessageAgentCapability('pi')?.modelSource).toBe('dynamic')
-    expect(getCommitMessageAgentCapability('copilot')?.modelSource).toBe('static')
+    expect(getCommitMessageAgentCapability('copilot')?.modelSource).toBe('dynamic')
+    expect(getCommitMessageAgentCapability('amp')?.modelSource).toBe('static')
   })
 })

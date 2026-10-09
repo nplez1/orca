@@ -7,18 +7,22 @@ import type {
 
 type SecondaryAgentSpecDeps = {
   BASIC_THINKING_LEVELS: ThinkingLevel[]
-  OPENAI_THINKING_LEVELS: ThinkingLevel[]
   parseCursorModels: (stdout: string) => CommitMessageModel[]
   parseAntigravityModels: (stdout: string) => CommitMessageModel[]
   parseLineModels: (stdout: string) => CommitMessageModel[]
+  /** Copilot's probe and the catalog a machine without the binary falls back to. */
+  copilotCatalog: {
+    modelDiscovery: NonNullable<CommitMessageAgentSpec['modelDiscovery']>
+    fallbackModels: CommitMessageModel[]
+  }
 }
 
 export function buildSecondaryCommitMessageAgentSpecs({
   BASIC_THINKING_LEVELS,
-  OPENAI_THINKING_LEVELS,
   parseCursorModels,
   parseAntigravityModels,
-  parseLineModels
+  parseLineModels,
+  copilotCatalog
 }: SecondaryAgentSpecDeps): Partial<Record<TuiAgent, CommitMessageAgentSpec>> {
   return {
     amp: {
@@ -174,102 +178,17 @@ export function buildSecondaryCommitMessageAgentSpecs({
         '--no-custom-instructions',
         '--model',
         model,
-        ...(thinkingLevel ? ['--effort', thinkingLevel] : [])
+        ...(thinkingLevel ? ['--reasoning-effort', thinkingLevel] : [])
       ],
-      modelSource: 'static',
-      // Why: Copilot CLI's picker is policy-filtered per account/org. Keep the
-      // full hosted CLI catalog here so users can select models enabled for them.
-      models: [
-        { id: 'auto', label: 'Auto' },
-        {
-          id: 'claude-haiku-4.5',
-          label: 'Claude Haiku 4.5',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-sonnet-4.5',
-          label: 'Claude Sonnet 4.5',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-sonnet-4.6',
-          label: 'Claude Sonnet 4.6',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-opus-4.5',
-          label: 'Claude Opus 4.5',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-opus-4.6',
-          label: 'Claude Opus 4.6',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-opus-4.6-fast',
-          label: 'Claude Opus 4.6 Fast',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'claude-opus-4.7',
-          label: 'Claude Opus 4.7',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-4.1',
-          label: 'GPT-4.1'
-        },
-        {
-          id: 'gpt-5-mini',
-          label: 'GPT-5 Mini',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.2',
-          label: 'GPT-5.2',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.2-codex',
-          label: 'GPT-5.2 Codex',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.3-codex',
-          label: 'GPT-5.3 Codex',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.4',
-          label: 'GPT-5.4',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.4-mini',
-          label: 'GPT-5.4 Mini',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        },
-        {
-          id: 'gpt-5.5',
-          label: 'GPT-5.5',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
-          defaultThinkingLevel: 'low'
-        }
-      ],
+      modelSource: 'dynamic',
+      // Why: the CLI has no `models` subcommand, but `help config` documents the
+      // `model` setting's accepted ids — the CLI's own catalog, so it keeps up
+      // with models released after this file was written. (The interactive picker
+      // is policy-filtered per account/org; this is the catalog behind it.)
+      modelDiscovery: copilotCatalog.modelDiscovery,
+      // Used verbatim only when the probe cannot run — no `copilot` on PATH — and
+      // kept out of the cache, so a later probe replaces it.
+      models: copilotCatalog.fallbackModels,
       defaultModelId: 'gpt-5.4'
     },
     antigravity: {

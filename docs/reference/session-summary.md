@@ -93,7 +93,12 @@ configured it follows the default agent and that agent's default model and effor
 
 A **dynamic** agent ships only a stub model list — Pi advertises `Config default` — so the
 pane asks its CLI once (`<binary> --list-models`, the same probe Native Chat uses), keeps the
-answer and replaces the stub with it. Two rules matter there:
+answer and replaces the stub with it. **Copilot** is dynamic too, but its catalog is only
+documented, not listed: the CLI has no `models` subcommand, so the probe reads
+`copilot help config`, whose `model` setting enumerates the accepted ids. That list is the CLI's
+own and therefore tracks models released after the build, which a pinned array cannot; a machine
+without the binary keeps a pinned snapshot of it (`COPILOT_FALLBACK_MODELS`) that the probe
+replaces the moment it can run. Two rules matter there:
 
 - **The pane keys on the session, not just the pane.** A new agent session can start in the
   pane the user is already focused on, and the key includes the provider session id so the
