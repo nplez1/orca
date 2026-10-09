@@ -87,6 +87,20 @@ afterEach(() => {
 })
 
 describe('GithubLinkedIssuePane', () => {
+  // The pane offers the same unlink / re-link actions the workspace dialog owns,
+  // for every provider whose link the pane can render.
+  it('offers the link actions for a GitHub issue', async () => {
+    mocks.lookup.mockResolvedValue(item('Fix checkout'))
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane worktree={worktree} linkedIssue={linkedIssue} sourceContext={null} />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(screen.getByText('Fix checkout')).toBeTruthy())
+    expect(screen.getByLabelText('More issue actions')).toBeTruthy()
+  })
+
   it('ignores a slower earlier lookup that resolves after a newer one', async () => {
     let resolveFirst: ((value: GitHubWorkItem) => void) | undefined
     let resolveSecond: ((value: GitHubWorkItem) => void) | undefined

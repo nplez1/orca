@@ -3,6 +3,31 @@ import { adfToMarkdownText, collectAdfMediaAttrs } from './adf-markdown'
 import { escapeMarkdownLinkDestination } from './adf-media-destination'
 
 describe('adfToMarkdownText media', () => {
+  // A mark a body was written with must survive the read, or a bold comment comes
+  // back plain after a reload.
+  it('renders ADF marks back into Markdown', () => {
+    const doc = {
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'bold', marks: [{ type: 'strong' }] },
+            { type: 'text', text: ' and ' },
+            { type: 'text', text: 'italic', marks: [{ type: 'em' }] },
+            { type: 'text', text: ' and ' },
+            { type: 'text', text: 'code', marks: [{ type: 'code' }] },
+            { type: 'text', text: ' and ' },
+            { type: 'text', text: 'both', marks: [{ type: 'strong' }, { type: 'em' }] }
+          ]
+        }
+      ]
+    }
+
+    expect(adfToMarkdownText(doc)).toBe('**bold** and _italic_ and `code` and **_both_**')
+  })
+
   it('keeps a placeholder when media cannot be resolved', () => {
     const markdown = adfToMarkdownText({
       type: 'doc',

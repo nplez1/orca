@@ -1,6 +1,7 @@
 import type {
-  JiraConnectArgs,
   JiraBoardIssuePageRequest,
+  JiraCommentBodyFormat,
+  JiraConnectArgs,
   JiraCreateIssueArgs,
   JiraIssueFilter,
   JiraIssueUpdate,
@@ -99,9 +100,10 @@ export class RuntimeJiraCommands {
   jiraAddIssueComment(
     key: string,
     body: string,
-    siteId?: string
+    siteId?: string,
+    bodyFormat?: JiraCommentBodyFormat
   ): ReturnType<typeof addIssueComment> {
-    return addIssueComment(key, body, siteId)
+    return addIssueComment(key, body, siteId, bodyFormat)
   }
 
   jiraIssueComments(key: string, siteId?: string): ReturnType<typeof getIssueComments> {

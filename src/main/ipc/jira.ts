@@ -21,6 +21,7 @@ import {
   updateIssue
 } from '../jira/issues'
 import type {
+  JiraCommentBodyFormat,
   JiraConnectArgs,
   JiraCreateIssueArgs,
   JiraIssueFilter,
@@ -232,14 +233,22 @@ export function registerJiraHandlers(): void {
 
   ipcMain.handle(
     'jira:addIssueComment',
-    async (_event, args: { key: string; body: string; siteId?: string }) => {
+    async (
+      _event,
+      args: { key: string; body: string; siteId?: string; bodyFormat?: JiraCommentBodyFormat }
+    ) => {
       if (typeof args?.key !== 'string' || !args.key.trim()) {
         return { ok: false, error: 'Issue key is required.' }
       }
       if (typeof args?.body !== 'string' || !args.body.trim()) {
         return { ok: false, error: 'Comment body is required.' }
       }
-      return addIssueComment(args.key.trim(), args.body.trim(), normalizeSiteId(args.siteId))
+      return addIssueComment(
+        args.key.trim(),
+        args.body.trim(),
+        normalizeSiteId(args.siteId),
+        args.bodyFormat === 'markdown' ? 'markdown' : 'plain'
+      )
     }
   )
 

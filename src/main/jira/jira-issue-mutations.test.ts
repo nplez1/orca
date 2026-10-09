@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { textToAdf } from './adf-markdown'
 import type { JiraClientForSite } from './authenticated-request'
 
 const {
@@ -68,6 +69,22 @@ function makeServerEntry(id = 'server-1'): JiraClientForSite {
   }
 }
 
+/** The JSON body of the first recorded request, read without an assertion. */
+function readPostedJsonBody(call: unknown): unknown {
+  if (!Array.isArray(call)) {
+    throw new Error('expected a request argument tuple')
+  }
+  const init = call[2]
+  if (typeof init !== 'object' || init === null || !('body' in init)) {
+    throw new Error('expected a request body')
+  }
+  const { body } = init
+  if (typeof body !== 'string') {
+    throw new Error('expected a serialized request body')
+  }
+  return JSON.parse(body)
+}
+
 describe('Jira issue mutations', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -98,6 +115,68 @@ describe('Jira issue mutations', () => {
     }
     // REST v2 rejects ADF documents; the description must stay a plain string.
     expect(body.fields.description).toBe('Body text')
+  })
+
+  // Only the composer's own Markdown is reinterpreted, so a body that merely looks
+  // like Markdown reaches Jira exactly as typed — the regression this branch prevents.
+  it('stores an unmarked comment body verbatim on a self-hosted site', async () => {
+    getClientsMock.mockReturnValue([makeServerEntry()])
+    jiraRequestMock.mockResolvedValueOnce({ id: 'comment-1' })
+    const { addIssueComment } = await import('./issues')
+    const pasted = '{code}\n- not a list\n{code}'
+
+    await addIssueComment('ALP-1', pasted, 'server-1')
+
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({ body: pasted })
+  })
+
+  it('stores an unmarked comment body as plain ADF text on Cloud', async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    jiraRequestMock.mockResolvedValueOnce({ id: 'comment-1' })
+    const { addIssueComment } = await import('./issues')
+
+    await addIssueComment('ALP-1', '**bold**', 'site-1')
+
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      body: textToAdf('**bold**')
+    })
+  })
+
+  it('posts a self-hosted comment as wiki markup', async () => {
+    getClientsMock.mockReturnValue([makeServerEntry()])
+    jiraRequestMock.mockResolvedValueOnce({ id: 'comment-1' })
+    const { addIssueComment } = await import('./issues')
+
+    await addIssueComment('ALP-1', '**bold**', 'server-1', 'markdown')
+
+    const [, path] = jiraRequestMock.mock.calls[0]
+    expect(path).toBe('/rest/api/2/issue/ALP-1/comment')
+    // The composer is Markdown; v2 renders wiki markup, so an unconverted body
+    // would show its asterisks.
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({ body: '{*}bold{*}' })
+  })
+
+  it('posts a Cloud comment as an ADF document', async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    jiraRequestMock.mockResolvedValueOnce({ id: 'comment-1' })
+    const { addIssueComment } = await import('./issues')
+
+    await addIssueComment('ALP-1', '**bold**', 'site-1', 'markdown')
+
+    const [, path] = jiraRequestMock.mock.calls[0]
+    expect(path).toBe('/rest/api/3/issue/ALP-1/comment')
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'bold', marks: [{ type: 'strong' }] }]
+          }
+        ]
+      }
+    })
   })
 
   it('shapes user-typed create fields into Jira user objects', async () => {

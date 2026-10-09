@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, LoaderCircle, RefreshCw, Send } from 'lucide-react'
+import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import { CommentComposer } from '@/components/comment-composer'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
@@ -197,6 +198,9 @@ export function JiraIssueWorkspaceContent({
   )
 }
 
+/** The Jira comment box: the shared composer, whose Markdown body is converted to
+ *  the site's own format on submit — Cloud takes an ADF document, Server/DC wiki
+ *  markup (`toCommentBody` in the main process). */
 export function JiraIssueCommentComposer({
   commentDraft,
   setCommentDraft,
@@ -212,31 +216,18 @@ export function JiraIssueCommentComposer({
 }): React.JSX.Element {
   return (
     <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
-      <div className="flex gap-2">
-        <textarea
-          value={commentDraft}
-          onChange={(event) => setCommentDraft(event.target.value)}
-          placeholder={translate(
-            'auto.components.JiraIssueWorkspace.a585fd204e',
-            'Add a Jira comment...'
-          )}
-          rows={2}
-          disabled={commentSubmitting}
-          className="min-h-10 flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        />
-        <Button
-          onClick={handleSubmitComment}
-          disabled={!canSubmitComment || commentSubmitting}
-          className="self-end gap-2"
-        >
-          {commentSubmitting ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : (
-            <Send className="size-4" />
-          )}
-          {translate('auto.components.JiraIssueWorkspace.b0b92666c9', 'Comment')}
-        </Button>
-      </div>
+      <CommentComposer
+        value={commentDraft}
+        onValueChange={setCommentDraft}
+        onSubmit={handleSubmitComment}
+        placeholder={translate(
+          'auto.components.JiraIssueWorkspace.a585fd204e',
+          'Add a Jira comment...'
+        )}
+        submitLabel={translate('auto.components.JiraIssueWorkspace.b0b92666c9', 'Comment')}
+        canSubmit={canSubmitComment}
+        submitting={commentSubmitting}
+      />
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { translate } from '@/i18n/i18n'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
+import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type LinearLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'linear' }>
@@ -43,6 +44,7 @@ export function LinearLinkedIssuePane({
   )
   const issue = entry?.data ?? null
   const [refreshing, setRefreshing] = useState(false)
+  const linkActions = useLinkedIssuePaneActions()
 
   useEffect(() => {
     // Why: 'all' — the identifier may belong to a different Linear workspace
@@ -68,6 +70,10 @@ export function LinearLinkedIssuePane({
           titleLoading={entry === undefined}
           refreshing={refreshing}
           onRefresh={refresh}
+          onOpenIssue={linkActions.openIssue}
+          onUnlinkIssue={linkActions.unlinkIssue}
+          onLinkAnotherIssue={linkActions.linkAnotherIssue}
+          linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
         />
         {entry !== undefined && entry.data === null ? (
           <IssuePaneMessage kind="unavailable" providerLabel="Linear" onRetry={refresh} />
@@ -101,6 +107,7 @@ function LinearLinkedIssueDetail({
 }): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
   const providerSettings = sourceContext ?? settings
+  const linkActions = useLinkedIssuePaneActions()
   const requestKey = `${sourceContext?.hostId ?? settings?.activeRuntimeEnvironmentId ?? 'local'}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })
 
@@ -113,6 +120,10 @@ function LinearLinkedIssueDetail({
         openUrl={detail.displayed.url ?? null}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        onOpenIssue={linkActions.openIssue}
+        onUnlinkIssue={linkActions.unlinkIssue}
+        onLinkAnotherIssue={linkActions.linkAnotherIssue}
+        linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
       />
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <div className="p-2">

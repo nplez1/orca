@@ -1,4 +1,5 @@
 import type {
+  JiraCommentBodyFormat,
   JiraCreateIssueArgs,
   JiraCreateIssueResult,
   JiraIssueUpdate,
@@ -9,6 +10,7 @@ import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { issueUrl, toBodyText } from './jira-issue-mapping'
+import { markdownCommentBody } from './jira-comment-body'
 import type { JiraRecord } from './jira-record-pages'
 
 /**
@@ -139,7 +141,8 @@ export async function updateIssue(
 export async function addIssueComment(
   key: string,
   body: string,
-  siteId?: string | null
+  siteId?: string | null,
+  bodyFormat: JiraCommentBodyFormat = 'plain'
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const entry = getClients(siteId)[0]
   if (!entry) {
@@ -152,7 +155,15 @@ export async function addIssueComment(
       `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/comment`,
       {
         method: 'POST',
-        body: JSON.stringify({ body: toBodyText(entry.site, body) })
+        // Why the branch: only Orca's own composer writes Markdown, and only it
+        // may be reinterpreted — a body from the CLI or an already-wiki body must
+        // reach Jira exactly as it was typed.
+        body: JSON.stringify({
+          body:
+            bodyFormat === 'markdown'
+              ? markdownCommentBody(entry.site, body)
+              : toBodyText(entry.site, body)
+        })
       }
     )
     return { ok: true, id: comment.id }

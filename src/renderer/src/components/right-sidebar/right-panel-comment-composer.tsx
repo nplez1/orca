@@ -10,15 +10,14 @@ import {
   getCommentBodySubmitState,
   hasBoundedCommentBodyText
 } from '@/lib/comment-body-submit-state'
+import { applyMarkdownAction, type MarkdownAction } from '@/lib/comment-markdown-actions'
 import {
-  clearRightPanelCommentFocusTimer,
-  scheduleRightPanelCommentFocusTimer
-} from './right-panel-comment-focus-timers'
+  clearCommentComposerFocusTimer,
+  scheduleCommentComposerFocusTimer
+} from '@/lib/comment-composer-focus-timer'
 import { translate } from '@/i18n/i18n'
 
 export type RightPanelCommentSubmitResult = { ok: true } | { ok: false; error: string }
-
-type MarkdownAction = 'bold' | 'italic' | 'code' | 'quote' | 'list'
 
 type RightPanelCommentComposerProps = {
   placeholder: string
@@ -29,46 +28,6 @@ type RightPanelCommentComposerProps = {
   autoFocus?: boolean
   className?: string
   onCancel?: () => void
-}
-
-function applyMarkdownAction(value: string, start: number, end: number, action: MarkdownAction) {
-  const selected = value.slice(start, end)
-  switch (action) {
-    case 'bold':
-      return {
-        value: `${value.slice(0, start)}**${selected || 'strong text'}**${value.slice(end)}`,
-        selectionStart: start + 2,
-        selectionEnd: start + 2 + (selected || 'strong text').length
-      }
-    case 'italic':
-      return {
-        value: `${value.slice(0, start)}_${selected || 'emphasis'}_${value.slice(end)}`,
-        selectionStart: start + 1,
-        selectionEnd: start + 1 + (selected || 'emphasis').length
-      }
-    case 'code':
-      return {
-        value: `${value.slice(0, start)}\`${selected || 'code'}\`${value.slice(end)}`,
-        selectionStart: start + 1,
-        selectionEnd: start + 1 + (selected || 'code').length
-      }
-    case 'quote': {
-      const prefix = start === 0 || value[start - 1] === '\n' ? '> ' : '\n> '
-      return {
-        value: `${value.slice(0, start)}${prefix}${selected || 'quote'}${value.slice(end)}`,
-        selectionStart: start + prefix.length,
-        selectionEnd: start + prefix.length + (selected || 'quote').length
-      }
-    }
-    case 'list': {
-      const prefix = start === 0 || value[start - 1] === '\n' ? '- ' : '\n- '
-      return {
-        value: `${value.slice(0, start)}${prefix}${selected || 'item'}${value.slice(end)}`,
-        selectionStart: start + prefix.length,
-        selectionEnd: start + prefix.length + (selected || 'item').length
-      }
-    }
-  }
 }
 
 export function RightPanelCommentComposer({
@@ -100,11 +59,11 @@ export function RightPanelCommentComposer({
 
   useEffect(() => {
     if (!autoFocus) {
-      clearRightPanelCommentFocusTimer(autoFocusTimerRef)
+      clearCommentComposerFocusTimer(autoFocusTimerRef)
       return
     }
-    scheduleRightPanelCommentFocusTimer(autoFocusTimerRef, () => textareaRef.current?.focus())
-    return () => clearRightPanelCommentFocusTimer(autoFocusTimerRef)
+    scheduleCommentComposerFocusTimer(autoFocusTimerRef, () => textareaRef.current?.focus())
+    return () => clearCommentComposerFocusTimer(autoFocusTimerRef)
   }, [autoFocus])
 
   const setTextareaRef = useCallback((node: HTMLTextAreaElement | null) => {
@@ -112,7 +71,7 @@ export function RightPanelCommentComposer({
     if (node === null) {
       // Why: markdown toolbar selection restoration is scoped to this textarea;
       // clearing here prevents stale focus after the composer unmounts.
-      clearRightPanelCommentFocusTimer(selectionTimerRef)
+      clearCommentComposerFocusTimer(selectionTimerRef)
     }
   }, [])
 
@@ -128,7 +87,7 @@ export function RightPanelCommentComposer({
       }
       const next = applyMarkdownAction(body, textarea.selectionStart, textarea.selectionEnd, action)
       setBody(next.value)
-      scheduleRightPanelCommentFocusTimer(selectionTimerRef, () => {
+      scheduleCommentComposerFocusTimer(selectionTimerRef, () => {
         if (!textarea.isConnected) {
           return
         }

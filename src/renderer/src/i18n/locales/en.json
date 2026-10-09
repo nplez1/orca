@@ -14514,7 +14514,7 @@
             "providerJira": "Jira",
             "providerGitlab": "GitLab",
             "refresh": "Refresh issue",
-            "openIn": "Open in {{value0}}",
+            "openIn": "Open on {{value0}}",
             "unavailable": "Couldn't load this {{value0}} issue.",
             "retry": "Retry",
             "noIssue": "No issue is linked to this workspace.",
@@ -14526,7 +14526,12 @@
             "save": "Save",
             "filterLabels": "Filter labels",
             "noLabelsFound": "No labels found",
-            "title": "Issue title"
+            "title": "Issue title",
+            "moreActions": "More issue actions",
+            "unlinkIssue": "Unlink issue from workspace",
+            "unlinkIssueDescription": "Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed.",
+            "linkAnotherIssue": "Link another issue",
+            "folderWorkspaceLink": "A folder workspace keeps the issue it was created from."
           },
           "IssueAssignee": {
             "label": "Assignee",
@@ -18276,6 +18281,15 @@
               "c3b537227a": "Replies are unavailable here."
             }
           }
+        }
+      },
+      "comment": {
+        "composer": {
+          "f3e93f1b3a": "Bold",
+          "705066a871": "Italic",
+          "20fc7f3d3d": "Code",
+          "96d2a26262": "Quote",
+          "564c4d0787": "List"
         }
       }
     },

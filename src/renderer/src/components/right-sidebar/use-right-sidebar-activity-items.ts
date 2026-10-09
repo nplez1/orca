@@ -6,6 +6,7 @@ import { isFolderRepo } from '../../../../shared/repo-kind'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { getVisibleRightSidebarActivityItems } from './right-sidebar-activity-visibility'
 import { resolveIssuePaneLinkedIssue } from './workspace-linked-issue'
+import { providerIconComponent } from './issue-provider-presentation'
 import { getPluginPanelActivityItems } from './plugin-panel-activity-items'
 import {
   collectInstalledPluginTabKeys,
@@ -47,7 +48,10 @@ export function useRightSidebarActivityItems({
   )
   // Why: an issue link is data, not workspace shape — the Issue tab appears and
   // disappears as links are added, removed, or the active workspace changes.
-  const hasLinkedIssue = resolveIssuePaneLinkedIssue(activeWorktree) !== null
+  // Why the provider and not the resolved link: the link is a fresh object every
+  // render, so keying the item list on it would rebuild the tab bar each time.
+  const linkedIssueProvider = resolveIssuePaneLinkedIssue(activeWorktree)?.provider ?? null
+  const hasLinkedIssue = linkedIssueProvider !== null
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   const activeWorkspaceScope = parseWorkspaceKey(activeWorktreeId ?? '')
   const isFolderWorkspace = activeWorkspaceScope?.type === 'folder'
@@ -128,7 +132,7 @@ export function useRightSidebarActivityItems({
       },
       {
         id: 'issue',
-        icon: CircleDot,
+        icon: linkedIssueProvider ? providerIconComponent(linkedIssueProvider) : CircleDot,
         title: translate('auto.components.right.sidebar.index.issue', 'Issue'),
         shortcut: '',
         linkedIssueOnly: true
@@ -147,6 +151,7 @@ export function useRightSidebarActivityItems({
     [
       checksShortcut,
       explorerShortcut,
+      linkedIssueProvider,
       pluginPanelErrors,
       visiblePluginPanels,
       portsShortcut,

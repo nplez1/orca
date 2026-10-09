@@ -4,13 +4,16 @@ import {
   selectPreferredAttachmentIds,
   warnIfMediaResolutionIncomplete
 } from './attachment-discovery'
+import { collectRenderedImageAttachmentIds } from './jira-rendered-html'
 import {
   createMediaMarkdownResolver,
+  createRenderedImageSrcResolver,
   loadIssueImageAttachments,
   type MediaResolutionStats
 } from './attachment-images'
 import type { JiraClientForSite } from './authenticated-request'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
+import type { RenderedJiraHtmlOptions } from './jira-rendered-html'
 
 export type MediaRequest = {
   attachmentField: unknown
@@ -21,17 +24,23 @@ export type MediaRequest = {
 }
 
 /** Pooled: HTML/ADF selection only — no binary downloads. */
-export function collectIssueMediaRequest(raw: JiraRecord): MediaRequest | undefined {
+export function collectIssueMediaRequest(
+  raw: JiraRecord,
+  options?: { renderedHtmlOnly?: boolean }
+): MediaRequest | undefined {
   const fields = asRecord(raw.fields)
   const renderedFields = asRecord(raw.renderedFields)
-  const htmlIds = extractAttachmentContentIdsFromHtml(
-    asString(renderedFields.description) || undefined
-  )
+  const renderedHtml = asString(renderedFields.description)
+  const htmlIds =
+    options?.renderedHtmlOnly === true
+      ? collectRenderedImageAttachmentIds(renderedHtml)
+      : extractAttachmentContentIdsFromHtml(renderedHtml || undefined)
   const mediaAttrs = collectAdfMediaAttrs(fields.description)
   const selection = selectPreferredAttachmentIds({
     renderedHtmlIds: htmlIds,
     attachmentField: fields.attachment,
-    mediaAttrs
+    mediaAttrs,
+    useRenderedHtmlIdsOnly: options?.renderedHtmlOnly === true
   })
   if (selection.needCount === 0 && selection.preferredIds.length === 0) {
     return undefined
@@ -47,6 +56,9 @@ export function collectIssueMediaRequest(raw: JiraRecord): MediaRequest | undefi
 
 export type PreparedMedia = {
   options: AdfToMarkdownOptions
+  /** Same downloads, addressed by attachment id instead of ADF media node — the
+   *  shape Jira's own rendered HTML needs. */
+  htmlOptions: RenderedJiraHtmlOptions
   stats: MediaResolutionStats
   request: MediaRequest
 }
@@ -87,6 +99,7 @@ export async function prepareMediaResolver(
   const resolveMedia = createMediaMarkdownResolver(images, request.preferredIds, stats)
   return {
     options: { resolveMedia },
+    htmlOptions: { resolveImageSrc: createRenderedImageSrcResolver(images, stats) },
     stats,
     request
   }

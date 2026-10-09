@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import {
+  buildIssueUnlinkUpdates,
   buildWorktreeMetaUpdates,
   parseGitLabMergeRequestNumberForMetaField,
   type ResolvedJiraIssueLink,
@@ -87,6 +88,53 @@ function jiraLink(key: string): ResolvedJiraIssueLink {
     }
   }
 }
+
+/** One issue per workspace, stored in whichever slot its provider owns — so a
+ *  clear has to empty all of them, not only the one the caller was looking at. */
+describe('buildIssueUnlinkUpdates', () => {
+  it('clears the GitHub number slot', () => {
+    expect(buildIssueUnlinkUpdates({ linkedIssue: 42 })).toEqual({ linkedIssue: null })
+  })
+
+  it('clears the Linear key and its organization when one is held', () => {
+    const updates = buildIssueUnlinkUpdates({ linkedLinearIssue: 'STA-335' })
+
+    expect(updates).toHaveProperty('linkedIssue', null)
+    for (const key of LINEAR_LINK_KEYS) {
+      expect(updates).toHaveProperty(key, null)
+    }
+  })
+
+  it.each(['github', 'linear', 'jira'] as const)(
+    'clears a created-from %s issue with its read-routing context',
+    (provider) => {
+      const updates = buildIssueUnlinkUpdates({
+        linkedWorkItemProvider: provider,
+        linkedWorkItemType: 'issue'
+      })
+
+      expect(updates).toHaveProperty('linkedWorkItem', null)
+      expect(updates).toHaveProperty('linkedTaskSourceContext', null)
+    }
+  )
+
+  // The work item also records the PR or MR a workspace was created from, which
+  // belongs to the review surfaces and has no editor in this row.
+  it.each(['pr', 'mr'] as const)('leaves a %s work item alone', (type) => {
+    const updates = buildIssueUnlinkUpdates({
+      linkedWorkItemProvider: 'github',
+      linkedWorkItemType: type
+    })
+
+    expect(updates).toEqual({ linkedIssue: null })
+  })
+
+  it('does not emit a Linear clear for a workspace that never held one', () => {
+    const updates = buildIssueUnlinkUpdates({ linkedWorkItemProvider: 'jira' })
+
+    expect(updates).not.toHaveProperty('linkedLinearIssue')
+  })
+})
 
 describe('buildWorktreeMetaUpdates', () => {
   it('writes only the GitLab MR slot in GitLab mode', () => {

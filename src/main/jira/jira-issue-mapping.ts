@@ -10,6 +10,7 @@ import type {
   JiraUser
 } from '../../shared/jira-types'
 import { adfToMarkdownText, textToAdf, type AdfToMarkdownOptions } from './adf-markdown'
+import { renderedJiraHtmlToBody, type RenderedJiraHtmlOptions } from './jira-rendered-html'
 import {
   asRecord,
   asString,
@@ -182,10 +183,32 @@ export function toBodyText(site: JiraSite, text: string): unknown {
   return site.authType === 'server' ? text : textToAdf(text)
 }
 
+/** The description or comment body as markdown.
+ *
+ *  Self-hosted Jira v2 hands back wiki markup, whose macros (`{code}`, `{panel}`,
+ *  `{*}`) render literally as Markdown, and the server's own HTML for it in
+ *  `renderedFields`/`renderedBody`. Prefer that HTML; Cloud has no equivalent and
+ *  keeps the ADF conversion. `renderedHtml` is empty on the summary paths, which
+ *  do not read a body at all. */
+export function mapJiraBody(
+  site: JiraSite,
+  rawBody: unknown,
+  renderedHtml: unknown,
+  adfOptions?: AdfToMarkdownOptions,
+  renderedOptions?: RenderedJiraHtmlOptions
+): string {
+  const html = asString(renderedHtml)
+  if (site.authType === 'server' && html.trim()) {
+    return renderedJiraHtmlToBody(html, { siteUrl: site.siteUrl, ...renderedOptions })
+  }
+  return adfToMarkdownText(rawBody, adfOptions)
+}
+
 export function mapJiraIssue(
   site: JiraSite,
   raw: JiraRecord,
-  adfOptions?: AdfToMarkdownOptions
+  adfOptions?: AdfToMarkdownOptions,
+  renderedOptions?: RenderedJiraHtmlOptions
 ): JiraIssue {
   const fields = asRecord(raw.fields)
   const key = asString(raw.key)
@@ -195,7 +218,13 @@ export function mapJiraIssue(
     siteId: site.id,
     siteName: site.displayName,
     title: asString(fields.summary, key || 'Untitled issue'),
-    description: adfToMarkdownText(fields.description, adfOptions),
+    description: mapJiraBody(
+      site,
+      fields.description,
+      asRecord(raw.renderedFields).description,
+      adfOptions,
+      renderedOptions
+    ),
     url: issueUrl(site, key),
     project: mapProject(fields.project, site),
     issueType: mapIssueType(fields.issuetype),

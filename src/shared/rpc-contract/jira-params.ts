@@ -80,7 +80,10 @@ export const IssueUpdate = z.object({
 export const IssueComment = z.object({
   key: requiredString('Issue key is required'),
   body: requiredString('Comment body is required'),
-  siteId: OptionalString
+  siteId: OptionalString,
+  // Why optional: a client that omits it (an older one, or the CLI) sends text the
+  // host stores verbatim, which is what every pre-composer caller already did.
+  bodyFormat: z.enum(['plain', 'markdown']).optional()
 })
 
 export const ProjectIssueTypes = z.object({

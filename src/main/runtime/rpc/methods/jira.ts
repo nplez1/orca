@@ -132,7 +132,12 @@ export const JIRA_METHODS = [
     name: 'jira.addIssueComment',
     params: IssueComment,
     handler: async (params, { runtime }) =>
-      runtime.jiraAddIssueComment(params.key.trim(), params.body.trim(), params.siteId)
+      runtime.jiraAddIssueComment(
+        params.key.trim(),
+        params.body.trim(),
+        params.siteId,
+        params.bodyFormat
+      )
   }),
   defineMethod({
     name: 'jira.issueComments',

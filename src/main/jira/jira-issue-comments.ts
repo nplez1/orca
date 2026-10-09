@@ -1,9 +1,8 @@
-import type { JiraComment } from '../../shared/jira-types'
+import type { JiraComment, JiraSite } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import {
-  adfToMarkdownText,
   collectAdfMediaAttrs,
   type AdfToMarkdownOptions,
   type JiraAdfMediaAttrs
@@ -12,18 +11,25 @@ import {
   extractAttachmentContentIdsFromHtml,
   selectPreferredAttachmentIds
 } from './attachment-discovery'
-import { mapUser } from './jira-issue-mapping'
+import { collectRenderedImageAttachmentIds } from './jira-rendered-html'
+import { mapJiraBody, mapUser } from './jira-issue-mapping'
 import {
   flushMediaResolutionWarn,
   prepareMediaResolver,
   type MediaRequest
 } from './jira-issue-media'
 import { asRecord, asString, fetchPagedRecords, type JiraRecord } from './jira-record-pages'
+import type { RenderedJiraHtmlOptions } from './jira-rendered-html'
 
-function mapComment(raw: JiraRecord, adfOptions?: AdfToMarkdownOptions): JiraComment {
+function mapComment(
+  raw: JiraRecord,
+  site: JiraSite,
+  adfOptions?: AdfToMarkdownOptions,
+  renderedOptions?: RenderedJiraHtmlOptions
+): JiraComment {
   return {
     id: asString(raw.id),
-    body: adfToMarkdownText(raw.body, adfOptions),
+    body: mapJiraBody(site, raw.body, raw.renderedBody, adfOptions, renderedOptions),
     createdAt: asString(raw.created, new Date().toISOString()),
     updatedAt: asString(raw.updated) || undefined,
     user: mapUser(raw.author)
@@ -32,8 +38,8 @@ function mapComment(raw: JiraRecord, adfOptions?: AdfToMarkdownOptions): JiraCom
 
 /**
  * Pooled comment media collect: attachment metadata JSON stays under the semaphore.
- * Residual: Server/DC comment bodies are wiki markup, not ADF — this only fixes
- * the lookup path; wiki `!filename!` is not rendered as media.
+ * Server/DC comment bodies are wiki markup whose images only appear in
+ * `renderedBody`, so that HTML is the id source for a self-hosted site.
  */
 async function collectCommentMediaRequest(
   client: JiraClientForSite,
@@ -43,8 +49,15 @@ async function collectCommentMediaRequest(
   const htmlIds: string[] = []
   const seen = new Set<string>()
   const mediaAttrs: JiraAdfMediaAttrs[] = []
+  const useRenderedHtmlIdsOnly = client.site.authType === 'server'
   for (const comment of comments) {
-    for (const id of extractAttachmentContentIdsFromHtml(asString(comment.renderedBody))) {
+    const renderedBody = asString(comment.renderedBody)
+    // Why image-only on a self-hosted site: those ids are the whole download list,
+    // so a link to a non-image attachment must not take an image slot.
+    const commentHtmlIds = useRenderedHtmlIdsOnly
+      ? collectRenderedImageAttachmentIds(renderedBody)
+      : extractAttachmentContentIdsFromHtml(renderedBody)
+    for (const id of commentHtmlIds) {
       if (!seen.has(id)) {
         seen.add(id)
         htmlIds.push(id)
@@ -56,9 +69,10 @@ async function collectCommentMediaRequest(
   const needingCount = mediaAttrs.filter(
     (attrs) => !(attrs.url && /^https?:\/\//i.test(attrs.url))
   ).length
-  // Why: selectPreferredAttachmentIds yields nothing without attachment-needing media, so
+  // Why selectPreferredAttachmentIds yields nothing without attachment-needing media, so
   // HTML ids alone can never produce a download — skip the extra metadata request entirely.
-  if (needingCount === 0) {
+  // For a self-hosted site the HTML ids *are* the work list, so they are the gate there.
+  if (useRenderedHtmlIdsOnly ? htmlIds.length === 0 : needingCount === 0) {
     return undefined
   }
 
@@ -79,7 +93,8 @@ async function collectCommentMediaRequest(
   const selection = selectPreferredAttachmentIds({
     renderedHtmlIds: htmlIds,
     attachmentField,
-    mediaAttrs
+    mediaAttrs,
+    useRenderedHtmlIdsOnly
   })
   if (selection.needCount === 0 && selection.preferredIds.length === 0) {
     return undefined
@@ -134,13 +149,15 @@ export async function getIssueComments(
 
   try {
     const prepared = mediaRequest ? await prepareMediaResolver(entry, mediaRequest) : undefined
-    const mapped = comments.map((comment) => mapComment(comment, prepared?.options))
+    const mapped = comments.map((comment) =>
+      mapComment(comment, entry.site, prepared?.options, prepared?.htmlOptions)
+    )
     if (prepared) {
       flushMediaResolutionWarn(entry, prepared)
     }
     return mapped
   } catch (error) {
     console.warn('[jira] getIssueComments media load failed:', error)
-    return comments.map((comment) => mapComment(comment))
+    return comments.map((comment) => mapComment(comment, entry.site))
   }
 }
