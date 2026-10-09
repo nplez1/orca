@@ -1,5 +1,5 @@
 import React from 'react'
-import { Info } from 'lucide-react'
+import { Info, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
@@ -21,7 +21,7 @@ function SessionSummarySubjectBody({
   return (
     <>
       <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-1.5">
-        <Info className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <StickyNote className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {translate('activity.sessionSummary.label', 'Session summary')}
         </span>

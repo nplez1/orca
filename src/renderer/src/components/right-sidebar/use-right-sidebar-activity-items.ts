@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CircleDot, Info, Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
+import { CircleDot, Plug, Files, GitBranch, ListChecks, StickyNote, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -89,7 +89,7 @@ export function useRightSidebarActivityItems({
               // Why: the pane summarizes an agent session in this workspace, so it sits
               // beside Agents rather than with the source-control group.
               id: 'summary' as const,
-              icon: Info,
+              icon: StickyNote,
               title: translate('activity.sessionSummary.label', 'Session summary'),
               shortcut: ''
             }
