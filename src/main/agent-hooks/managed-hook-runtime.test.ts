@@ -132,7 +132,7 @@ describe.runIf(process.platform !== 'win32')('installManagedHooks', () => {
 
       await expect(installManagedHooks(options)).resolves.toEqual({ installers: 0, errors: 0 })
 
-      // Why: no agent config home, no ~/.orca-np install lock, and no GROK_HOME login-shell probe.
+      // Why: no agent config home, no ~/.orca install lock, and no GROK_HOME login-shell probe.
       expect(await readdir(home)).toEqual([SHELL_NAME])
     }
   )
@@ -155,7 +155,9 @@ describe.runIf(process.platform !== 'win32')('installManagedHooks', () => {
       errors: 0
     })
 
-    expect((await readdir(home)).sort()).toEqual(['.claude', '.orca-np', SHELL_NAME])
+    // Why `.orca` beside the fork's `.orca-np`: the install lock is shared with an official
+    // Orca install (both manage the same ~/.claude hooks), so the fork renamed its own home only.
+    expect((await readdir(home)).sort()).toEqual(['.claude', '.orca', '.orca-np', SHELL_NAME])
   })
 
   it('still probes the login shell when Grok is selected', async () => {
@@ -167,6 +169,12 @@ describe.runIf(process.platform !== 'win32')('installManagedHooks', () => {
       errors: 0
     })
 
-    expect((await readdir(home)).sort()).toEqual(['.grok', '.orca-np', SHELL_NAME, SHELL_RUNS_NAME])
+    expect((await readdir(home)).sort()).toEqual([
+      '.grok',
+      '.orca',
+      '.orca-np',
+      SHELL_NAME,
+      SHELL_RUNS_NAME
+    ])
   })
 })

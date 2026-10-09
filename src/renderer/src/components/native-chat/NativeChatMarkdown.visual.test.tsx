@@ -8,7 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callRuntimeRpc = vi.fn()
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
+  callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args),
+  // Why stubbed: the path-search capability module subscribes on import, and this suite only
+  // needs visual rendering behavior.
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 
 import { NativeChatMarkdown } from './NativeChatMarkdown'

@@ -326,6 +326,82 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-09 — merge of upstream `1cda323b6a` (199 commits) into the release line, from
+  `6a7b39c398`** (merge base `e5ade4b868`; merge commit `f94d10ff60`, with this sync's `fix(sync)`
+  and `docs(fork)` commits on top). The pre-flight gate passed and recorded the conflict set; the
+  merge produced **37 conflicted paths** — `no-markers 15, both-rewrote 9, modify/delete 7, union 4,
+  rename-replay 1, duplicate-tail 1`. 15 of them had already been resolved in the working tree by the
+  session that was interrupted mid-merge; those resolutions were reviewed against both stages rather
+  than trusted.
+
+  - **The one substantial convergence went to the fork owner, and upstream won on structure.**
+    Upstream's `b1cd85820b` ("Show multiple reviews and tasks in workspace cards and details")
+    rebuilt the worktree-meta dialog as a linked-items/attachments model in the same week this fork's
+    PRs #52/#64 built a Jira link into the same files — `use-worktree-issue-link.ts`,
+    `WorktreeIssueLinkField.tsx`, `worktree-issue-displacement.ts`, `worktree-meta-updates.ts`. Two
+    implementations of one idea, not a union: upstream's composer accumulates many attachments, the
+    fork's Issue field displaced the one link it held. **Owner's answer: take upstream's model.** The
+    five upstream-deleted paths plus the fork's now-superseded dialog helpers
+    (`use-worktree-meta-save.ts`, `use-worktree-meta-issue-row.ts`, `use-worktree-meta-jira-link.ts`,
+    `issue-link-provider-options.ts`, the dialog test harness and `WorktreeMetaDialog.jira.test.tsx`)
+    are deleted, and the fork's test file is upstream's. Nothing of the feature is lost: upstream
+    ships `provider: 'jira'` attachments with `jiraIdentifier` and a routing `taskSourceContext`, a
+    `jira-issue` composer kind, and a site-aware source with an account chooser whose search rows also
+    resolve a bare key. One fork-only rule had no counterpart and was **re-homed**, not dropped:
+    `buildIssueUnlinkUpdates` → `sidebar/workspace-issue-unlink-updates.ts`, because the Jira issue
+    pane's Unlink must still clear the GitHub number, the Linear key and the created-from work item
+    together. Both decisions are in the ledger.
+  - **Also revisited: the merge-readiness marker.** Upstream moved the review glyph out of the card's
+    metadata row into its new `WorktreeReferenceStack.tsx`, which silently dropped this fork's merge
+    marker (`data-review-merge-marker`) and its `Ready to merge` / `Conflicts` suffix — no conflict
+    pointed at them. Both are re-seated into the stack, and `WorktreeCardStatusSlot`'s accessible
+    label was split so a collection checks summary owns the checks half while the merge blocker still
+    reaches the screen reader.
+  - **Breaks no conflict marker showed, all found by `pnpm tc` and tests.** `main-window-actions.ts`
+    kept upstream's import of the `dashboard-popout-window` module the fork deleted (ledger:
+    *Dashboard and the popout window*) — the serve-mode quit loop closes only the main window again
+    and the two tests that mocked the popout lost that mock. The fork's three Jira board RPC methods
+    were missing the `permission` field upstream made required (`workspace`, like `jira.listIssues`).
+    The orphan-removal helper still invalidated the **global** authorized-roots cache, which is
+    exactly the call upstream's `worktrees-removal-recovery` test forbids now that the call site
+    invalidates per repo. The fork's `runtime-workspace-path-search-capability.ts` subscribes at
+    module scope, so five upstream tests that mock the runtime RPC client needed the fork's
+    `subscribeRuntimeWorkspacePathSearchCapabilityInvalidation` stub — the same repair the deleted
+    `structured-agent-session-accepted-send-capability.test.tsx` had carried. And
+    `ai-vault-session-refresh` kept the host query in its scan key while upstream's new list-request
+    adapter dropped it, so a changed query served the unfiltered cache.
+  - **One identity "fix" was wrong and was reverted.** `managed-hook-install-lock.ts` hard-codes
+    `.orca` for the install-lock parent while the fork's home is `.orca-np`, and this sync first
+    "swept" it. It is deliberate: that lock is a cross-install mutex over the shared `~/.claude`
+    hooks, which an official Orca install manages too. The literal and both test expectations are
+    restored, and the ledger's identity section now says not to sweep it — this is the second time
+    the same sweep has been attempted.
+  - **The hand-unioned locale catalog dropped 8 upstream copy changes.** The i18n union took the
+    base's text for every key only upstream had changed (`settings.chat.description`, the native-chat
+    experimental pane's `description`/`copy`, the experimental search entry, four `components.*`
+    notices). A per-key audit of base/ours/upstream/merged found all 8 and no other drift; the two
+    catalogs were then regenerated rather than merged, and the 23 keys upstream deleted were kept
+    deliberately (a fork code path may still resolve one dynamically; a missing key renders an
+    inline default only when the caller passed one).
+  - **Generated files regenerated, not merged:** `src/cli/bundled-skill-guides.ts`,
+    `en-runtime-required.json`, the non-English locale catalogs. `rpc-params-catalog.generated.ts`
+    was already current.
+  - **Verification.** `pnpm tc` clean. `post-sync.mjs` green (10 checks; the deleted-module surface
+    scan acknowledged below). The full suite ran 118 575 tests: **63 failing across 21 files, of
+    which 57 across 14 are the classes measured on this machine's pre-merge tree** — the
+    `agent-session-*` / `agent-launch-*` / `structured-agent-session-*` family (their test files are
+    byte-identical to upstream's own, so upstream's tests fail here), the relay region test that
+    needs the uninstalled `cloud/` workspace, and three of the four PTY/`bun` files that get no child
+    output. The remaining 6 were this merge's and are fixed: 5 from the module-scope capability
+    subscription above and 1 that the reverted lock sweep broke. `check:dead-classes` clean.
+  - **Named follow-ups.** Two list components now render the SSH settings surface — the fork's
+    `SshTargetList.tsx` is dead in production and the extracted `SshTargetServerList.tsx` duplicates
+    it; consolidate. The fork's bare-key direct add and its site-ambiguity copy did not come across
+    with upstream's composer (ledger, *Linked work items*). And the two retired test inventories
+    (`renderer-node-builtin-boundary.test.ts`, `structured-agent-session-accepted-send-capability.test.tsx`)
+    took the deletion per the *Test inventories retired upstream* entry, so the popout entry in the
+    first and the capability stub in the second are gone with them.
+
 - **2026-10-07 — merge of upstream `e5ade4b868` (148 commits) into the release line, from
   `ed0be2085f`**, on the merge flow (merge commit `7c0a53a148`). Pre-flight proved the tip green and
   predicted **56 conflicted paths** (`both-rewrote 24, modify/delete 19, union 6, rename-replay 3,

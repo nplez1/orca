@@ -52,8 +52,18 @@ const ALLOWLIST = [
   [/orca-ide/, LINUX_WHY, /linux|appimage|docker/i],
   [/orca-ide/, LINUX_WHY, null, /linux|appimage|\.deb|\.rpm|debian|ubuntu|gnome/i],
   [/com\.stably\.orca\.mobile/, 'the released mobile client keeps its upstream bundle id.'],
+  [
+    /com\.stablyai\.orca/,
+    'the pre-rename bundle id, asserted as NOT trusted by this fork\u2019s own helper test.',
+    /computer-use-macos\/Tests\//
+  ],
   [/stablyai\/orca/, 'archive/backup reference to the upstream repository and its artifacts.'],
-  [/orca|\.orca/, 'translated copy stays as it is (LOCAL-PATCHES, "Translated copy").', LOCALES]
+  [/orca|\.orca/, 'translated copy stays as it is (LOCAL-PATCHES, "Translated copy").', LOCALES],
+  [
+    /^\.orca$/,
+    'the managed-hook install lock is a cross-install mutex over the shared `~/.claude` hooks, so it stays at `~/.orca` while the fork\u2019s home is `~/.orca-np`.',
+    /main\/agent-hooks\/managed-hook-(?:runtime|install-lock)\.test\.ts$/
+  ]
 ]
 
 // Rules, in priority order: the first to claim a match owns it, so the ambiguous catch-alls sit below

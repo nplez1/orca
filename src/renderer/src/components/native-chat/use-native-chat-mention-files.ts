@@ -32,10 +32,12 @@ export function useNativeChatMentionFiles(args: {
   )
   const worktreePath = useKnownWorktreeById(worktreeId)?.path ?? null
   const history = useQuickOpenHistory(worktreeId, worktreePath)
+  // Why: an empty @ token needs the complete host catalog; undefined selects unscoped listing
+  // while the hook's query still ranks the returned paths.
   const list = useRuntimeFileListForWorktree({
     enabled,
     worktreeId,
-    query: query ?? '',
+    query: query?.trim() ? query : undefined,
     recentPaths: history
   })
   const failed = list.loadError !== null

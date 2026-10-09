@@ -12,10 +12,60 @@
     "no longer part of the tip..HEAD range."
   ],
   "acknowledged": {
-    "src/main/claude/claude-turn-row-revision.ts": {
-      "supersededBy": "src/main/native-chat/agent-session-timeline/agent-journal-turn-row-revision.ts (writeAgentJournalTurnRow et al.)",
-      "reason": "Upstream moved it, it was not ours to lose: `c0b07d3a71` renames `claude-turn-row-revision.ts` to the provider-neutral `agent-journal-turn-row-revision.ts` (`R068`) and updates both callers in the same commit. The four exports renamed with it — `ClaudeTurnRowTarget`/`ClaudeTurnRowWrite`/`ClaudeTurnRowDelivery` become `AgentJournalTurnRowTarget`/`AgentJournalTurnRowWrite`/`AgentJournalTurnRowDelivery` and `writeClaudeTurnRow` becomes `writeAgentJournalTurnRow`. The live tree references them from `claude-context-facts.ts` and `claude-open-turn.ts` (the same two callers the scan reported as its old referrers) plus `provider-timeline-settlement.ts` and `provider-timeline-turn-decisions.ts`, so no call was dropped in the merge. The fork never modified the file: `git diff 6c693edf40 ed0be2085f` on it and on both callers is empty, which is why the merge took upstream's move cleanly.",
-      "since": "7c0a53a148"
+    "src/main/acp/acp-structured-starts.ts": {
+      "supersededBy": "src/main/provider-process/provider-acquisition-starts.ts (ProviderAcquisitionStarts, ProviderStartAttempt, ProviderAcquisitionConnection)",
+      "reason": "Upstream renamed this module in `c71601f51c` (`R069`) and generalized its connection contract. The live `src/main/acp/acp-structured-session-adapter.ts` imports `ProviderAcquisitionStarts` and `ProviderStartAttempt`, and still uses begin/track/end/retainFailed/stopFailed/failedSessionIds, so the start-cancellation and unproven-exit retention behavior moved without losing an ACP caller.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/main/plugins/plugin-panel-navigation-guard.ts": {
+      "supersededBy": "src/main/window/host-frame-navigation-guard.ts (HostFrameNavigationRegistry, registerHostFrameNavigationGuard, hostFrameKindForName)",
+      "reason": "Upstream renamed this module in `98f0193afb` (`R062`) and broadened it from plugin panels to all host-owned frames. `HostFrameNavigationRegistry` preserves the old registration/srcdoc/navigation containment behavior for `PLUGIN_PANEL_FRAME_NAME_PREFIX`, while also covering chat visuals; `src/main/window/main-window-webview-security.ts` now installs `registerHostFrameNavigationGuard` before frames are created.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/new-workspace/use-smart-workspace-name-field-foundation.ts": {
+      "supersededBy": "src/renderer/src/components/new-workspace/use-work-item-source-foundation.ts (useWorkItemSourceFoundation)",
+      "reason": "Upstream rename `R072` in `69900f0232` moved the foundation into the shared work-item source model. The live `useWorkItemSourceFoundation` keeps the repo/source contexts, provider connections, availability, and state assembly; `use-work-item-source-search.ts` composes and calls it for both workspace creation and attachment editing.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/new-workspace/use-smart-workspace-name-field-presentation.ts": {
+      "supersededBy": "src/renderer/src/components/new-workspace/use-work-item-source-presentation.ts (useWorkItemSourcePresentation)",
+      "reason": "Upstream rename `R084` in `69900f0232` moved presentation into the shared work-item source model. The live `useWorkItemSourcePresentation` retains row construction, Jira/GitHub/GitLab/Linear intent handling, loading state, selection resolution, and command presentation, and is called by `use-work-item-source-search.ts`.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/new-workspace/use-smart-workspace-name-field-state.ts": {
+      "supersededBy": "src/renderer/src/components/new-workspace/use-work-item-source-state.ts (useWorkItemSourceState)",
+      "reason": "Upstream rename `R074` in `69900f0232` moved the state hook into the shared work-item source model. The live `useWorkItemSourceState` retains the mode, provider result/loading state, debounced query, refs, and cross-repo prompt state consumed by `useWorkItemSourceFoundation` and `use-work-item-source-search.ts`.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/sidebar/issue-link-provider-options.ts": {
+      "supersededBy": "src/renderer/src/components/new-workspace/use-smart-workspace-field-availability.ts (useSmartWorkspaceFieldAvailability, whose returned availableModes the composer tabs read), src/renderer/src/components/sidebar/WorkspaceAttachmentSearch.tsx (WorkspaceAttachmentSearch)",
+      "reason": "The fork's provider-menu helper was part of the dialog cluster replaced by upstream commit `b1cd85820b`. The linked-items model now derives connected provider modes in `useSmartWorkspaceFieldAvailability`, renders them through `SmartWorkspaceSourceTabs`, and uses `WorkspaceAttachmentSearch` for the attachment composer; the old issue-provider field and every caller were deleted together.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/sidebar/use-worktree-meta-issue-row.ts": {
+      "supersededBy": "src/renderer/src/components/sidebar/WorkspaceAttachmentSearch.tsx (WorkspaceAttachmentSearch), src/renderer/src/components/new-workspace/work-item-source-selection.ts (resolveWorkItemSourceRow)",
+      "reason": "Upstream commit `b1cd85820b` replaced the single issue row with the linked-items composer. `WorkspaceAttachmentSearch` calls `useWorkItemSourceSearch` and `resolveWorkItemSourceRow`, so provider-specific search results become complete workspace attachments; `WorktreeLinkedItemsField` owns duplicate checking, scope checks, and the linked-item list.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/sidebar/use-worktree-meta-jira-link.ts": {
+      "supersededBy": "src/renderer/src/components/sidebar/WorkspaceAttachmentSearch.tsx (WorkspaceAttachmentSearch), src/renderer/src/components/new-workspace/work-item-source-selection.ts (resolveWorkItemSourceRow), src/renderer/src/components/sidebar/worktree-attachment-source-result.ts (getWorkspaceAttachmentSourceContext)",
+      "reason": "The Jira-specific hook was in the dialog cluster replaced by `b1cd85820b`. Jira is now a first-class attachment provider: `WorkspaceAttachmentSearch` supplies the site-aware Jira source through `useWorkItemSourceSearch`, `resolveWorkItemSourceRow` returns `jiraIdentifier` and `taskSourceContext`, and `getWorkspaceAttachmentSourceContext` preserves the workspace's routing context. This is the linked-items replacement for the old key-to-link hook, not an unreviewed omission.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/sidebar/use-worktree-meta-save.ts": {
+      "supersededBy": "src/renderer/src/components/sidebar/WorktreeMetaDialogDraft.tsx (handleSave), src/renderer/src/components/sidebar/worktree-attachment-editing.ts (buildWorkspaceAttachmentEdits)",
+      "reason": "Upstream commit `b1cd85820b` rebuilt saving around the linked-items draft. `WorktreeMetaDialogDraft.handleSave` writes display name, notes, and attachment edits, while `buildWorkspaceAttachmentEdits` persists `linkedItemsBase` and `linkedItems`; `WorktreeLinkedItemsField` supplies the validated draft. The old save hook and its old dialog caller were deleted as one closed cluster.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/components/sidebar/worktree-meta-dialog.test-harness.tsx": {
+      "supersededBy": "src/renderer/src/components/sidebar/WorktreeMetaDialog.test.tsx and src/renderer/src/components/sidebar/WorktreeMetaDialog.host-scope.test.tsx (inline fixtures and lifecycle setup)",
+      "reason": "This was test-only scaffolding for the deleted issue/PR dialog and had no production behavior to preserve. Upstream commit `b1cd85820b` replaced that dialog model and its suites; the live `WorktreeMetaDialog.test.tsx` and `WorktreeMetaDialog.host-scope.test.tsx` seed the real store and exercise `WorktreeMetaDialogDraft`, `WorktreeLinkedItemsField`, and attachment saving directly. No one-for-one exported helper survives because the old test surface is retired safely with its callers.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/renderer/src/lib/structured-agent-session-paired-admission.ts": {
+      "supersededBy": "src/renderer/src/lib/structured-agent-session-launch-admission.ts (HostAdmittedStructuredLaunch, beginHostAdmittedStructuredLaunch)",
+      "reason": "Upstream commit `c71601f51c` renamed the implementation `R061` and its test `R055` from paired admission to host admission. `HostAdmittedStructuredLaunch` and `beginHostAdmittedStructuredLaunch` retain the old paired admission path while also handling local-host admission, workspace-unresolved routing, and the launch hold; live callers in `structured-agent-session-provisional-tab.ts` and launch tests use the new exports.",
+      "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
     }
   }
 }

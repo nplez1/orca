@@ -1,7 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { removeManagedHookLock } from './managed-hook-lock-claims'
 import {
   cleanupManagedHookLockFiles,
@@ -50,7 +49,9 @@ async function acquireInstallLock(
   suppliedHostIdentity?: string,
   waitTimeoutMs = LOCK_WAIT_TIMEOUT_MS
 ): Promise<() => Promise<void>> {
-  const lockParent = join(home, HOME_DIRECTORY_NAME)
+  // Why `.orca` rather than the fork's own `HOME_DIRECTORY_NAME`: this lock guards the shared
+  // `~/.claude` hooks, which an official Orca install manages too, so both share one lock path.
+  const lockParent = join(home, '.orca')
   const lockPath = join(lockParent, 'managed-hook-install.lock')
   await mkdir(lockParent, { recursive: true })
   const hostIdentity = suppliedHostIdentity ?? (await readManagedHookHostIdentity())

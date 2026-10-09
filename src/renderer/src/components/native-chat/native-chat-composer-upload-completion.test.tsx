@@ -29,7 +29,10 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: vi.fn(async () => ({
     runtimeId: 'paired-host',
     capabilities: ['agent-session.attachments.v1']
-  }))
+  })),
+  // Why stubbed: the path-search capability module subscribes on import, and this suite only
+  // needs attachment upload completion behavior.
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
 }))
 let previousApi: typeof window.api
 beforeEach(async () => {

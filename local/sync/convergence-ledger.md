@@ -258,6 +258,15 @@ keeps adding new `~/.orca` and `orca.exe` references that must be swept each syn
 **Tooling:** `node local/sync/identity-sweep.mjs` reports every remaining violation (allowlisted
 cases are in that script).
 
+**The one deliberate `~/.orca` exception (2026-10-09 sync):** the managed-hook install lock parent
+in `managed-hook-install-lock.ts` stays the literal `.orca` (and `managed-hook-runtime.test.ts`
+asserts both `.orca` and `.orca-np`), because that lock is a **cross-install mutex over the shared
+`~/.claude` hooks**: an official Orca install manages the same hook files, so both must contend on
+one lock path. The fork renamed its own home, not this mutex. This has now been "repaired" twice —
+`identity-sweep.mjs` reports the literal, and a 2026-10-09 resolution changed it to
+`HOME_DIRECTORY_NAME` and swept the test with it, which broke
+`codex-state-db-backfill-recovery.test.ts`. **Do not sweep this one.**
+
 ---
 
 ## pi subagent session boundaries
@@ -502,3 +511,50 @@ independently; upstream's `createCachedDirPathIndex(cache, keys = Object.keys(ca
 pre-computed keys, so the property the fork measured is preserved.
 
 **Do not:** restore the second variant — it re-litigates the same idea every sync.
+
+---
+
+## Linked work items: the worktree-meta dialog
+
+**Paths:** `src/renderer/src/components/sidebar/WorktreeMetaDialog*.tsx`,
+`src/renderer/src/components/sidebar/Worktree{[LinkedItems]Field,LinkedItemRow,ReferenceStack}*`,
+`src/renderer/src/components/sidebar/{use-worktree-meta-*,worktree-attachment-editing,workspace-*attachment*,use-workspace-reference-*}`,
+`src/renderer/src/components/sidebar/WorkspaceAttachment*`
+
+**Decision:** upstream's linked-items model is the dialog. `WorktreeMetaDialog.tsx` is a 9-line
+owner-keyed shell over `WorktreeMetaDialogDraft.tsx`, which renders `WorktreeLinkedItemsField` over a
+`WorkspaceAttachment[]` draft and saves through `buildWorkspaceAttachmentEdits`. **Jira is a
+first-class attachment provider on upstream's side** — `provider: 'jira'` with `jiraIdentifier` and a
+routing `taskSourceContext`, the `jira-issue` composer kind, and a site-aware source
+(`use-jira-url-source.ts` + `use-jira-source-connection.ts`) that offers an account chooser when
+several connected sites match and whose search rows also resolve a bare key. The fork's own
+Jira-link implementation (PRs #52/#64: `use-worktree-issue-link.ts`, `WorktreeIssueLinkField.tsx`,
+`worktree-issue-displacement.ts`, `worktree-meta-updates.ts` and the dialog-side helpers that sat on
+them) is **deleted** — upstream's `b1cd85820b` landed the same feature in the same week, and its
+model is a superset (many items per workspace, an attachment composer, origin tracking).
+
+**Why:** the two implementations were one idea built twice, and a merge of them cannot be
+"union"-ed: the fork's `Issue` field displaces one link, upstream's composer accumulates many. The
+fork owner chose upstream's model on 2026-10-09 after the alternative (re-seating upstream's rework
+into the fork's dialog) was priced.
+
+**What the fork keeps.** One rule had no upstream counterpart and was re-homed to
+`workspace-issue-unlink-updates.ts`: `buildIssueUnlinkUpdates`, which the Jira **issue pane**
+(PR #64, `right-sidebar/use-linked-issue-pane-actions.ts`) uses, clears the GitHub number, the
+Linear key and the created-from `linkedWorkItem`/`linkedTaskSourceContext` **together** on Unlink —
+a workspace holds one issue, so the pane cannot clear only the slot it renders.
+
+**The merge-readiness marker is the second thing to re-seat.** `ReviewIconWithMergeMarker`
+(`worktree-review-helpers.tsx`) and the `hostedReviewMergeVerdictLabel` suffix live on whatever
+renders a review glyph, and upstream moved that from the card's metadata row into
+`WorktreeReferenceStack.tsx` — so a merge that only resolves conflicts silently drops the marker.
+Both sites are now covered: the stack's glyph and its single/summary labels, plus
+`WorktreeCardStatusSlot`'s status lane, where a collection checks summary owns the checks half of
+the label and only the merge reason is appended.
+
+**Do not:** reinstate the fork's dialog modules, or drop `buildIssueUnlinkUpdates`/the marker
+because a conflict did not point at them.
+
+**Named follow-up (2026-10-09):** the fork's bare-key *direct* add (type `ABC-123`, press Enter) and
+its site-ambiguity copy were not ported into upstream's composer — upstream resolves a bare key
+through its search rows instead. Re-add only if that extra step proves annoying.

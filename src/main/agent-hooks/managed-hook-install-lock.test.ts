@@ -14,7 +14,6 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import * as ownerIdentity from './managed-hook-owner-identity'
 import { withManagedHookInstallLock } from './managed-hook-install-lock'
 
@@ -67,7 +66,7 @@ async function createOwnedLock(
   hostIdentity?: string
 ): Promise<void> {
   const lockHostIdentity = hostIdentity ?? (await requireHostIdentity())
-  const lockParent = join(home, HOME_DIRECTORY_NAME)
+  const lockParent = join(home, '.orca')
   const ownerPath = join(lockParent, `managed-hook-install.owner-${STALE_TOKEN}.json`)
   await mkdir(lockParent, { recursive: true })
   await writeFile(
@@ -128,7 +127,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('atomically publishes a complete owner record before entering the installer', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const lockPath = join(lockParent, 'managed-hook-install.lock')
 
     await withManagedHookInstallLock(home, undefined, async () => {
@@ -158,7 +157,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('fails fast instead of stealing an unverifiable legacy directory lock', async () => {
     const home = await createTempHome()
-    await mkdir(join(home, HOME_DIRECTORY_NAME, 'managed-hook-install.lock'), { recursive: true })
+    await mkdir(join(home, '.orca', 'managed-hook-install.lock'), { recursive: true })
     const run = vi.fn()
 
     await expect(withManagedHookInstallLock(home, undefined, run)).rejects.toThrow(
@@ -178,7 +177,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('does not compare PID identities or steal a lock owned by another SSH host', async () => {
     const home = await createTempHome()
-    const lockPath = join(home, HOME_DIRECTORY_NAME, 'managed-hook-install.lock')
+    const lockPath = join(home, '.orca', 'managed-hook-install.lock')
     await createOwnedLock(home, 'stale-process-incarnation', 'another-host-boot')
     const originalLock = await readFile(lockPath, 'utf8')
 
@@ -190,7 +189,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('does not steal a live lock when its owner process probe becomes unavailable', async () => {
     const home = await createTempHome()
-    const lockPath = join(home, HOME_DIRECTORY_NAME, 'managed-hook-install.lock')
+    const lockPath = join(home, '.orca', 'managed-hook-install.lock')
     await createOwnedLock(home, 'another-process-incarnation')
     const originalLock = await readFile(lockPath, 'utf8')
     const selfIdentity = await ownerIdentity.readManagedHookProcessIdentity(process.pid)
@@ -233,7 +232,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('recovers a canonical lock after its previous recovery claimant crashes', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const ownerPath = join(lockParent, `managed-hook-install.owner-${STALE_TOKEN}.json`)
     const claimedOwnerPath = join(
       lockParent,
@@ -265,7 +264,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('fails fast when a recovery claimant disappears before removing the canonical lock', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const lockPath = join(lockParent, 'managed-hook-install.lock')
     const ownerPath = join(lockParent, `managed-hook-install.owner-${STALE_TOKEN}.json`)
     await createOwnedLock(home, 'stale-process-incarnation')
@@ -281,7 +280,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('cleans an unlinked owner draft left by a crashed acquisition', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const staleOwnerEntry = `managed-hook-install.owner-${STALE_TOKEN}.json`
     const ownerPath = join(lockParent, staleOwnerEntry)
     await mkdir(lockParent, { recursive: true })
@@ -304,7 +303,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('does not delete a malformed final owner record that an older relay may still publish', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const staleOwnerEntry = `managed-hook-install.owner-${STALE_TOKEN}.json`
     const ownerPath = join(lockParent, staleOwnerEntry)
     await mkdir(lockParent, { recursive: true })
@@ -320,7 +319,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('does not let a late release delete a replacement owner lock', async () => {
     const home = await createTempHome()
-    const lockPath = join(home, HOME_DIRECTORY_NAME, 'managed-hook-install.lock')
+    const lockPath = join(home, '.orca', 'managed-hook-install.lock')
     let releaseFirst!: () => void
     let markFirstStarted!: () => void
     const firstStarted = new Promise<void>((resolve) => (markFirstStarted = resolve))
@@ -356,7 +355,7 @@ describe.skipIf(process.platform === 'win32')('withManagedHookInstallLock', () =
 
   it('finishes an abandoned same-process release before the next install', async () => {
     const home = await createTempHome()
-    const lockParent = join(home, HOME_DIRECTORY_NAME)
+    const lockParent = join(home, '.orca')
     const lockPath = join(lockParent, 'managed-hook-install.lock')
     fsFailure.canonicalUnlinkPath = lockPath
 

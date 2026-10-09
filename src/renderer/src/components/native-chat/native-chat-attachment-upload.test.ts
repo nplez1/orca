@@ -13,7 +13,12 @@ const mocks = vi.hoisted(() => ({
   callRuntimeRpc: vi.fn()
 }))
 
-vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: mocks.callRuntimeRpc }))
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: mocks.callRuntimeRpc,
+  // Why stubbed: the path-search capability module subscribes on import, and this suite only
+  // needs attachment ownership and upload behavior.
+  subscribeRuntimeWorkspacePathSearchCapabilityInvalidation: () => () => {}
+}))
 
 vi.mock('sonner', () => ({
   toast: {

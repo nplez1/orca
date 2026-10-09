@@ -1,11 +1,12 @@
 # Branch tracker
 
-Last updated **2026-10-07** — `nplez1/main` merged upstream main @ `e5ade4b868` (148 commits) into
-the release line from `ed0be2085f` (merge `7c0a53a148`, fixes `d12baa886c` and `4370252718`). The
-fork's product line and patch series both survive; 56 conflicted paths, four half-applied behaviours
-re-seated and two clean-but-wrong merges repaired, all found by tests. See
-[UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how that is done and
-[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
+Last updated **2026-10-09** — `nplez1/main` merged upstream main @ `1cda323b6a` (199 commits) into
+the release line from `6a7b39c398` (merge `f94d10ff60`). 37 conflicted paths, dominated by one
+convergence decision: upstream rebuilt the worktree-meta dialog as a linked-items model in the same
+week this fork built its Jira link into the same files, so the fork takes upstream's model and
+deletes its own superseded dialog modules. Six further breaks that no conflict marker showed were
+found by `pnpm tc` and the tests. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how
+that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
