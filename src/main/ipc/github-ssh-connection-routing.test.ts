@@ -76,7 +76,36 @@ describe('registerGitHubHandlers', () => {
         owner: 'acme',
         repo: 'orca'
       },
+      {},
       { bypassBranchProtection: false }
+    )
+  })
+
+  it('threads a confirmed admin bypass through pull request merge', async () => {
+    mergePRMock.mockResolvedValue({ ok: true })
+
+    registerGitHubHandlers(store as never, stats as never)
+
+    await handlers['gh:mergePR'](
+      { sender: { id: 1 } },
+      {
+        repoPath: '/workspace/repo',
+        prNumber: 42,
+        method: 'squash',
+        bypassBranchProtection: true
+      }
+    )
+
+    // Why: this repo has no local git options, so the empty argument list must not displace the
+    // options object — a shifted flag meant the host never authorised the bypass it had offered.
+    expect(mergePRMock).toHaveBeenCalledWith(
+      '/workspace/repo',
+      42,
+      'squash',
+      null,
+      null,
+      {},
+      { bypassBranchProtection: true }
     )
   })
 

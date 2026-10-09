@@ -65,13 +65,15 @@ export function registerGitHubPRMutationHandlers(store: Store): void {
       }
     ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
+      // Why: spreading [] would shift the options object into the localGitOptions slot, dropping the bypass.
+      const localGitOptions = getGitHubLocalGitOptionArgs(store, repo)[0] ?? {}
       const result = await mergePR(
         repo.path,
         args.prNumber,
         args.method,
         getGitHubRepoConnectionId(repo),
         args.prRepo ?? null,
-        ...getGitHubLocalGitOptionArgs(store, repo),
+        localGitOptions,
         { bypassBranchProtection: args.bypassBranchProtection === true }
       )
       broadcastSuccessfulPRMutation(result.ok, repo.path, repo.id, args.prNumber, event.sender.id)
