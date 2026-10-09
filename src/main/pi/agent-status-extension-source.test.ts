@@ -627,6 +627,85 @@ describe('getPiAgentStatusExtensionSource', () => {
     }
   })
 
+  it('publishes a later run’s completion after Pi stops emitting agent_settled', async () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness({ kind: 'pi' })
+      const context = { isIdle: vi.fn(() => true) }
+
+      // Run 1 settles the modern way, which used to silence every later run for good.
+      await harness.callHook('agent_start')
+      await harness.callHook('agent_end', undefined, context)
+      await vi.advanceTimersByTimeAsync(0)
+      await harness.callHook('agent_settled')
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Run 2 ends with no settle at all: the pane is idle, so its completion still has to land.
+      await harness.callHook('agent_start')
+      await harness.callHook('agent_end', undefined, context)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const events = harness.fetchMock.mock.calls.map(
+        (call) => JSON.parse(String(call[1]?.body)).payload.hook_event_name
+      )
+      expect(events).toEqual(['agent_start', 'agent_end', 'agent_start', 'agent_end'])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('re-publishes the completion when a message ends after the run already completed', async () => {
+    const harness = createHarness({ kind: 'pi' })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('agent_end', undefined, { isIdle: () => true })
+    await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(2))
+
+    // The re-finalized message is newer truth than the completion: it re-opens the row, so the
+    // completion it displaced has to be published again or the pane stays busy for good.
+    await harness.callHook('message_end', {
+      message: { role: 'assistant', content: [{ type: 'text', text: 'finished' }] }
+    })
+    await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(4))
+
+    const events = harness.fetchMock.mock.calls.map(
+      (call) => JSON.parse(String(call[1]?.body)).payload.hook_event_name
+    )
+    expect(events).toEqual(['agent_start', 'agent_end', 'message_end', 'agent_end'])
+  })
+
+  it('re-publishes the completion when a tool end lands after the run already completed', async () => {
+    const harness = createHarness({ kind: 'pi' })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('agent_end', undefined, { isIdle: () => true })
+    await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(2))
+
+    await harness.callHook('tool_execution_end', { toolName: 'bash' })
+    await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(4))
+
+    const events = harness.fetchMock.mock.calls.map(
+      (call) => JSON.parse(String(call[1]?.body)).payload.hook_event_name
+    )
+    expect(events).toEqual(['agent_start', 'agent_end', 'tool_execution_end', 'agent_end'])
+  })
+
+  it('leaves a run in flight when a message ends before it completes', async () => {
+    const harness = createHarness({ kind: 'pi' })
+
+    await harness.callHook('agent_start')
+    await harness.callHook('message_end', {
+      message: { role: 'assistant', content: [{ type: 'text', text: 'still going' }] }
+    })
+    await vi.waitFor(() => expect(harness.fetchMock).toHaveBeenCalledTimes(2))
+
+    const events = harness.fetchMock.mock.calls.map(
+      (call) => JSON.parse(String(call[1]?.body)).payload.hook_event_name
+    )
+    expect(events).toEqual(['agent_start', 'message_end'])
+  })
+
   it('cancels an ambiguous agent_end when modern Pi resumes work', async () => {
     vi.useFakeTimers()
     try {

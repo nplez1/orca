@@ -14,7 +14,8 @@ import {
 } from './agent-status-subagent-roster-source'
 import {
   getAgentStatusRunCloseOutSourceLines,
-  getAgentStatusSessionBoundaryHandlerSourceLines
+  getAgentStatusSessionBoundaryHandlerSourceLines,
+  getPiLateBusyPostCompletionSourceLines
 } from './agent-status-session-boundary-source'
 
 // Why: keep the generated handler registrations separate from hook transport;
@@ -195,6 +196,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     "    post('tool_execution_end', {",
     '      tool_name: event.toolName,',
     '    })',
+    ...(kind === 'pi' ? ['    republishLateBusyPostCompletion()'] : []),
     '  })',
     '',
     ...approvalHandlers,
@@ -211,6 +213,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    const text = extractAssistantText(event.message)',
     '    if (!text) return',
     "    post('message_end', { role: 'assistant', text })",
+    ...(kind === 'pi' ? ['    republishLateBusyPostCompletion()'] : []),
     '  })',
     '',
     '  // Why: modern Pi stays non-idle across retry/compaction/follow-up work,',
@@ -219,7 +222,9 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '  // returns before the recheck timer is ever armed.',
     '  const AGENT_END_IDLE_RECHECK_MS = 25',
     '  const AGENT_END_IDLE_RECHECK_MAX_MS = 250',
-    '  let agentSettledSupported = false',
+    // Why: a settle is a fact about ONE run. A settle seen for an earlier run must not silence a
+    // later agent_end — a pi that stops emitting agent_settled would strand the pane as working.
+    '  let settledGeneration = -1',
     '  let agentEndIdleRecheckMs = AGENT_END_IDLE_RECHECK_MS',
     '  let pendingAgentEndCheck: ReturnType<typeof setTimeout> | null = null',
     '  let pendingAgentEndContext: { isIdle: () => boolean } | null = null',
@@ -256,11 +261,12 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    return true',
     '  }',
     '',
+    ...getPiLateBusyPostCompletionSourceLines(kind),
     ...getAgentStatusRunCloseOutSourceLines(),
     '  function checkPendingAgentEnd(): void {',
     '    pendingAgentEndCheck = null',
     '    const ctx = pendingAgentEndContext',
-    '    if (!ctx || agentSettledSupported || lifecycleState.completionPostedGeneration === lifecycleState.endedRunGeneration) {',
+    '    if (!ctx || lifecycleState.completionPostedGeneration === lifecycleState.endedRunGeneration) {',
     '      pendingAgentEndContext = null',
     '      return',
     '    }',
@@ -281,7 +287,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '',
     `  onStatus('agent_settled', (${bareCtxParams}) => {`,
     ...captureSessionMetadata,
-    '    agentSettledSupported = true',
+    '    settledGeneration = lifecycleState.runGeneration',
     '    clearPendingAgentEndCheck()',
     '    postAgentEndOnce()',
     '  })',
@@ -297,7 +303,9 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '      postAgentEndOnce()',
     '      return',
     '    }',
-    '    if (agentSettledSupported) return',
+    // Why: this run already settled, so nothing is left to recheck. A settle from an EARLIER run
+    // must not return here — the run that just ended still has to publish its own completion.
+    '    if (settledGeneration === lifecycleState.runGeneration) return',
     "    if (!ctx || typeof ctx.isIdle !== 'function') {",
     '      postAgentEndOnce()',
     '      return',
