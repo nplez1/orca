@@ -15,6 +15,23 @@ export function resolveSessionSummaryHeaderState(
   if (snapshot?.fold.running) {
     return { hint: translate('activity.sessionSummary.updating', 'Updating…'), folding: true }
   }
+  // Why: without a ledger there is nothing on screen, so the hint has to name
+  // why. Falling through to "Up to date" told the reader a session with no
+  // readable transcript was fully summarized.
+  if (!snapshot?.ledger) {
+    if (snapshot?.status === 'failed') {
+      return {
+        hint: translate('activity.sessionSummary.failedHint', 'Could not summarize this session'),
+        folding: false
+      }
+    }
+    if (snapshot?.status === 'unavailable') {
+      return {
+        hint: translate('activity.sessionSummary.noTranscriptHint', 'No readable transcript'),
+        folding: false
+      }
+    }
+  }
   const backlogCount = snapshot?.facts?.backlogCount ?? 0
   if (backlogCount > 0) {
     return {

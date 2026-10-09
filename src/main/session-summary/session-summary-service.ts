@@ -180,6 +180,12 @@ export class SessionSummaryService {
     const controller = new AbortController()
     this.folds.set(paneKey, controller)
     const runtime = this.runtimes.get(paneKey)
+    // Why: the fold is in flight from here, before the transcript read resolves.
+    // Without this the header read "Up to date" for the whole first fold, because
+    // onProgress only fires once a chunk comes back.
+    if (runtime) {
+      runtime.fold = { running: true, completedChunks: 0, totalChunks: 0 }
+    }
     try {
       const entry = this.deps.getAgentStatusEntry(paneKey)
       const identity = identityOf(entry)

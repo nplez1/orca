@@ -89,7 +89,7 @@ describe('SessionSummaryPane', () => {
 
     expect(markup).toContain('Session summary')
     expect(markup).toContain('Up to date')
-    expect(markup).toContain('lucide-info')
+    expect(markup).toContain('lucide-sticky-note')
     expect(markup).toContain('Wiring the right-sidebar tab')
     expect(markup).toContain('Moved the ledger view out of the activity strip')
   })

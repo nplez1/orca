@@ -63,17 +63,30 @@ describe('resolveSessionSummaryAiParams', () => {
   })
 
   it('falls back to the default model when a static agent no longer offers the stored one', () => {
-    const copilot = getCommitMessageAgentSpec('copilot')
+    const amp = getCommitMessageAgentSpec('amp')
     const resolved = resolveSessionSummaryAiParams(
       input({
         sessionSummaryAi: config({
-          agentId: 'copilot',
-          selectedModelByAgent: { copilot: 'copilot-9000' }
+          agentId: 'amp',
+          selectedModelByAgent: { amp: 'amp-9000' }
         })
       })
     )
 
-    expect(resolved?.model).toBe(copilot?.defaultModelId)
+    expect(resolved?.model).toBe(amp?.defaultModelId)
+  })
+
+  it('passes an unknown model through for an agent whose list is probed', () => {
+    const resolved = resolveSessionSummaryAiParams(
+      input({
+        sessionSummaryAi: config({
+          agentId: 'copilot',
+          selectedModelByAgent: { copilot: 'gpt-9' }
+        })
+      })
+    )
+
+    expect(resolved?.model).toBe('gpt-9')
   })
 
   it('falls back to the model default when the stored effort is not offered', () => {

@@ -49,10 +49,29 @@ The summary is a **materialized view** over the session's own provider transcrip
 the agent CLI writes — not a re-reading of the terminal. `session-summary-transcript-source.ts`
 resolves that file per agent type; the fold turns it into a structured ledger.
 
+The fold reads a transcript only for agents it can name a file for, and each agent's file is
+found a different way:
+
+- **Native-chat agents** (Claude/OpenClaude, Codex, Grok, OMP) go through
+  `native-chat/session-file-resolver.ts`, which takes the hook's `transcript_path` when it is
+  host-readable and otherwise searches the agent's own roots by session id.
+- **Pi and Prime Agent** post `session_file` on every hook, so the reported path *is* the
+  transcript; `agent-session-resume.ts` only returns their provider session at all when that
+  path exists.
+- **Copilot** reports no path, but its `session_id` is the name of its session directory:
+  `$COPILOT_HOME/session-state/<id>/events.jsonl`.
+
+Every other agent type returns null and the pane says so. Adding one means naming its parser in
+`HOOK_RESOLVED_TRANSCRIPT_AGENTS` and reaching a readable file — the AI Vault parsers are
+agent-generic (`parseAgentSessionFile` dispatches on `candidate.agent`), so nothing else changes.
+
 - **Lazy by construction.** Opening the pane starts the fold; closing it cancels in-flight
   work. Nothing runs for sessions nobody opens, so there is no background LLM spend.
 - **Cheap facts are always available.** State, timestamps and event counts come from the
-  status entry, so the header hint ("Up to date" / "N events to catch up on") needs no fold.
+  status entry, so the header hint needs no fold. The hint still respects the fold's own state:
+  a fold in flight reads "Updating…" (set when the fold starts, not when its first chunk
+  returns), and a session with no readable transcript or a failed fold says that instead of
+  claiming to be up to date.
 - **Bounded, resumable chunks.** The transcript is split deterministically into slices of at
   most 24k chars or 40 events (`session-summary-fold.ts`), extracted in parallel and merged
   deterministically. Completed extracts are cached, so a fold that is cancelled or fails
@@ -74,7 +93,12 @@ configured it follows the default agent and that agent's default model and effor
 
 A **dynamic** agent ships only a stub model list — Pi advertises `Config default` — so the
 pane asks its CLI once (`<binary> --list-models`, the same probe Native Chat uses), keeps the
-answer and replaces the stub with it. Two rules matter there:
+answer and replaces the stub with it. **Copilot** is dynamic too, but its catalog is only
+documented, not listed: the CLI has no `models` subcommand, so the probe reads
+`copilot help config`, whose `model` setting enumerates the accepted ids. That list is the CLI's
+own and therefore tracks models released after the build, which a pinned array cannot; a machine
+without the binary keeps a pinned snapshot of it (`COPILOT_FALLBACK_MODELS`) that the probe
+replaces the moment it can run. Two rules matter there:
 
 - **The pane keys on the session, not just the pane.** A new agent session can start in the
   pane the user is already focused on, and the key includes the provider session id so the

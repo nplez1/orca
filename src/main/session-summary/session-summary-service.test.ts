@@ -112,6 +112,19 @@ describe('SessionSummaryService', () => {
     expect(updates.some((u) => u.status === 'ready')).toBe(false)
   })
 
+  // The renderer's header reads `fold.running`, and open()'s return value is the
+  // first snapshot it sees. A fold that only reported progress after its first
+  // chunk read as "Up to date" for the whole first fold.
+  it('reports the fold as in flight before the first chunk comes back', async () => {
+    const { store } = testStore()
+    const { service, setBrainReply } = harness(store, events(5))
+    setBrainReply(() => new Promise<string>(() => {}))
+
+    const opened = service.open({ paneKey: 'tab:leaf' })
+
+    expect(opened.fold.running).toBe(true)
+  })
+
   // A pane whose status row was dropped keeps a provider-session remnant
   // (`server-cleanup.ts`): no state, prompt, or timestamps, but a resumable
   // session — which is all the fold needs to summarize a finished agent.
