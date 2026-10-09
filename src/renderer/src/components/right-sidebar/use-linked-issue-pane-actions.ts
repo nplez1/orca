@@ -5,8 +5,7 @@ import { useActiveWorktree } from '@/store/selectors'
 import { openHttpLink } from '@/lib/http-link-routing'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { translate } from '@/i18n/i18n'
-import { buildIssueUnlinkUpdates } from '@/components/sidebar/worktree-meta-updates'
-import { toWorktreeMetaLiveLinks } from '@/components/sidebar/use-worktree-meta-workspace'
+import { buildIssueUnlinkUpdates } from '@/components/sidebar/workspace-issue-unlink-updates'
 
 export type LinkedIssuePaneActions = {
   /** Opens the issue on its provider, honoring Orca's Link Routing setting and
@@ -64,11 +63,9 @@ export function useLinkedIssuePaneActions(): LinkedIssuePaneActions {
     if (!worktree || linkActionsDisabledReason) {
       return
     }
-    void updateWorktreeMeta(
-      worktree.id,
-      buildIssueUnlinkUpdates(toWorktreeMetaLiveLinks(worktree)),
-      { executionHostId: worktree.hostId }
-    ).then((result) => {
+    void updateWorktreeMeta(worktree.id, buildIssueUnlinkUpdates(worktree), {
+      executionHostId: worktree.hostId
+    }).then((result) => {
       if (!result.ok) {
         toast.error(result.error)
       }

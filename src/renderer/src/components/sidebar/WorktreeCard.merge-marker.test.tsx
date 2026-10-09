@@ -11,29 +11,36 @@ let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'pr']
 let hostedReviewCache: Record<string, unknown> = {}
 let settings: Partial<GlobalSettings> | null = null
 
-vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      deleteStateByWorktreeId: {},
-      fetchHostedReviewForBranch: vi.fn(),
-      fetchIssue: vi.fn(),
-      fetchLinearIssue: vi.fn(),
-      gitConflictOperationByWorktree: {},
-      hostedReviewCache,
-      issueCache: {},
-      linearIssueCache: {},
-      openModal: vi.fn(),
-      prCache: {},
-      projectGroups: [],
-      remoteBranchConflictByWorktreeId: {},
-      settings,
-      sshConnectionStates: new Map(),
-      sshTargetLabels: new Map(),
-      updateWorktreeMeta: vi.fn(),
-      workspacePortScan: null,
-      worktreeCardProperties
+vi.mock('@/store', () => {
+  // Why built per call: these read the mutable `let`s above, which each test resets.
+  const buildState = () => ({
+    deleteStateByWorktreeId: {},
+    fetchHostedReviewForBranch: vi.fn(),
+    fetchIssue: vi.fn(),
+    fetchLinearIssue: vi.fn(),
+    gitConflictOperationByWorktree: {},
+    hostedReviewCache,
+    issueCache: {},
+    linearIssueCache: {},
+    openModal: vi.fn(),
+    prCache: {},
+    projectGroups: [],
+    remoteBranchConflictByWorktreeId: {},
+    settings,
+    sshConnectionStates: new Map(),
+    sshTargetLabels: new Map(),
+    updateWorktreeMeta: vi.fn(),
+    workspacePortScan: null,
+    worktreeCardProperties
+  })
+  return {
+    // Why getState: upstream's use-workspace-reference-details reads the store imperatively
+    // while it resolves hovered reference rows, not through a subscription.
+    useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(buildState()), {
+      getState: () => buildState()
     })
-}))
+  }
+})
 
 vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorktree: vi.fn()

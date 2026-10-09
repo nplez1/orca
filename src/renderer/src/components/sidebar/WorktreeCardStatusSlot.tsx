@@ -14,6 +14,11 @@ import { useWorktreeActivityStatus } from './use-worktree-activity-status'
 import { useIsSleepingWorktree } from './use-worktree-sleep-state'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import { getReviewLabel, ReviewIconWithMergeMarker } from './worktree-review-helpers'
+import type { WorkspaceReviewChecksSummary } from '../../../../shared/workspace-review-checks'
+import {
+  WorkspaceReviewChecksIndicator,
+  workspaceReviewChecksLabel
+} from './WorkspaceReviewChecksIndicator'
 
 type WorktreeCardStatusSlotProps = {
   worktreeId: string
@@ -24,6 +29,7 @@ type WorktreeCardStatusSlotProps = {
   onToggleUnread: React.MouseEventHandler<HTMLButtonElement>
   onPointerDown: React.PointerEventHandler<HTMLButtonElement>
   prDisplay?: WorktreeCardPrDisplay | null
+  reviewChecks?: WorkspaceReviewChecksSummary
   newCardStyle?: boolean
   hasBranchIdentity?: boolean
   branchIdentityLabel?: string
@@ -74,31 +80,52 @@ function overlayNewCardUnreadStatus(
   )
 }
 
-function getReviewStatusLabel(review: WorktreeCardPrDisplay): string {
+/** The review's own state, with no checks verdict — the collection summary owns that half. */
+function getReviewStateLabel(review: WorktreeCardPrDisplay): string {
   const label = getReviewLabel(review)
-  const state = review.state
-  const status = review.status
-
-  let base = `${label}: Open`
-  if (state === 'merged') {
-    base = `${label}: Merged`
-  } else if (state === 'closed') {
-    base = `${label}: Closed`
-  } else if (state === 'draft') {
-    base = `${label}: Draft`
-  } else if (status === 'failure') {
-    base = `${label} checks: Failed`
-  } else if (status === 'pending') {
-    base = `${label} checks: Pending`
-  } else if (status === 'success') {
-    base = `${label} checks: Passing`
+  if (review.state === 'merged') {
+    return `${label}: Merged`
   }
+  if (review.state === 'closed') {
+    return `${label}: Closed`
+  }
+  if (review.state === 'draft') {
+    return `${label}: Draft`
+  }
+  return `${label}: Open`
+}
 
+/** This one review's checks verdict. Stated only when no collection summary covers it. */
+function getReviewChecksLabel(review: WorktreeCardPrDisplay): string | null {
+  const label = getReviewLabel(review)
+  if (review.status === 'failure') {
+    return `${label} checks: Failed`
+  }
+  if (review.status === 'pending') {
+    return `${label} checks: Pending`
+  }
+  if (review.status === 'success') {
+    return `${label} checks: Passing`
+  }
+  return null
+}
+
+/** The merge blocker on its own, formed so a card whose checks the collection summary already
+ *  states can still name what is holding the merge back. */
+function getReviewMergeReason(review: WorktreeCardPrDisplay): string | null {
   // Why: the marker says "not mergeable yet" without saying why, and this label is the only
   // place the specific blocker is named — so it has to reach the tooltip and the screen-reader
   // text. Null when the checks half of this same label already says it, or when the provider
   // has not reported a merge state to report.
-  const mergeReason = hostedReviewMergeVerdictLabel(getHostedReviewMergeReadiness(review))
+  return hostedReviewMergeVerdictLabel(getHostedReviewMergeReadiness(review))
+}
+
+function getReviewStatusLabel(review: WorktreeCardPrDisplay): string {
+  const settled = review.state === 'merged' || review.state === 'closed' || review.state === 'draft'
+  const base = settled
+    ? getReviewStateLabel(review)
+    : (getReviewChecksLabel(review) ?? getReviewStateLabel(review))
+  const mergeReason = getReviewMergeReason(review)
   return mergeReason ? `${base} · ${mergeReason}` : base
 }
 
@@ -111,11 +138,13 @@ export function WorktreeCardStatusSlot({
   onToggleUnread,
   onPointerDown,
   prDisplay = null,
+  reviewChecks,
   newCardStyle = false,
   hasBranchIdentity = false,
   branchIdentityLabel,
   className
 }: WorktreeCardStatusSlotProps): React.JSX.Element | null {
+  const collectionChecks = reviewChecks && reviewChecks.total > 1 ? reviewChecks : undefined
   const status = useWorktreeActivityStatus(worktreeId)
   const isSleeping = useIsSleepingWorktree(worktreeId)
   const statusLabel = getWorktreeStatusLabel(status) || status
@@ -127,7 +156,7 @@ export function WorktreeCardStatusSlot({
   const canShowReviewStatus =
     newCardStyle &&
     showStatus &&
-    prDisplay !== null &&
+    (prDisplay !== null || Boolean(collectionChecks)) &&
     !canShowSleepingStatus &&
     QUIET_REVIEW_REPLACEABLE_STATUSES.has(status)
   const canShowBranchStatus =
@@ -135,15 +164,22 @@ export function WorktreeCardStatusSlot({
     showStatus &&
     hasBranchIdentity &&
     prDisplay === null &&
+    !collectionChecks &&
     !canShowSleepingStatus &&
     QUIET_REVIEW_REPLACEABLE_STATUSES.has(status)
   const passiveStatusLabel = canShowSleepingStatus
     ? getSleepingStatusLabel()
-    : canShowReviewStatus && prDisplay
-      ? getReviewStatusLabel(prDisplay)
-      : canShowBranchStatus
-        ? (branchIdentityLabel ?? getDefaultBranchIdentityLabel())
-        : statusLabel
+    : canShowReviewStatus && collectionChecks
+      ? `${workspaceReviewChecksLabel(collectionChecks)}${
+          // Why: the summary states every attached review's checks, so restating one review's
+          // verdict beside it contradicts it. The merge blocker is a separate axis and stays.
+          prDisplay ? (getReviewMergeReason(prDisplay) ?? '') : ''
+        }`
+      : canShowReviewStatus && prDisplay
+        ? getReviewStatusLabel(prDisplay)
+        : canShowBranchStatus
+          ? (branchIdentityLabel ?? getDefaultBranchIdentityLabel())
+          : statusLabel
   const passiveStatusAnnouncement =
     newCardStyle && isUnread ? `${passiveStatusLabel} · Unread` : passiveStatusLabel
   // Why: working and permission already own the new-card status lane, but
@@ -158,13 +194,20 @@ export function WorktreeCardStatusSlot({
       {sleepingStatusIcon}
       <span className="sr-only">{passiveStatusAnnouncement}</span>
     </span>
-  ) : canShowReviewStatus && prDisplay ? (
+  ) : canShowReviewStatus && (collectionChecks || prDisplay) ? (
     <span className={cn('inline-flex size-5 items-center justify-center p-0.5', className)}>
-      <ReviewIconWithMergeMarker
-        review={prDisplay}
-        className={reviewStatusIconClassName}
-        variant="generic"
-      />
+      {collectionChecks ? (
+        <WorkspaceReviewChecksIndicator
+          summary={collectionChecks}
+          className={reviewStatusIconClassName}
+        />
+      ) : prDisplay ? (
+        <ReviewIconWithMergeMarker
+          review={prDisplay}
+          className={reviewStatusIconClassName}
+          variant="generic"
+        />
+      ) : null}
       <span className="sr-only">{passiveStatusAnnouncement}</span>
     </span>
   ) : canShowBranchStatus ? (

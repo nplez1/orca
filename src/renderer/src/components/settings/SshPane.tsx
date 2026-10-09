@@ -10,8 +10,8 @@ import {
   describeSshTerminateOutcome,
   terminateSshSessionsWithReconnect
 } from './ssh-session-termination'
-import { SshTargetList } from './SshTargetList'
 import { setSshTargetHiddenWithReport } from './ssh-target-visibility'
+import { SshTargetServerList } from './SshTargetServerList'
 import { SshTargetDestructiveActions } from './SshTargetDestructiveActions'
 import { SshTargetForm, EMPTY_FORM, type EditingTarget } from './SshTargetForm'
 import { getEditingTargetForSshTarget } from './ssh-target-draft'
@@ -386,19 +386,22 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
         onTerminateSessions={handleTerminateSessions}
       >
         {({ busyActionForTarget, requestRemove, requestResetRelay, requestTerminateSessions }) => (
-          <SshTargetList
+          <SshTargetServerList
             targets={targets}
             connectionStates={sshConnectionStates}
             testingIds={testingIds}
             busyActionForTarget={busyActionForTarget}
-            onConnect={(target) => handleConnect(target.id)}
-            onDisconnect={(target) => handleDisconnect(target.id)}
-            onTerminateSessions={requestTerminateSessions}
-            onResetRelay={requestResetRelay}
-            onTest={(target) => handleTest(target.id)}
+            onConnect={(target) => void handleConnect(target.id)}
+            onDisconnect={(target) => void handleDisconnect(target.id)}
+            onTerminateSessions={(target) =>
+              requestTerminateSessions({ id: target.id, label: target.label })
+            }
+            onResetRelay={(target) => requestResetRelay({ id: target.id, label: target.label })}
+            onTest={(target) => void handleTest(target.id)}
             onEdit={handleEdit}
             onRemove={(target) => requestRemoveTarget(target, requestRemove)}
             onSetHidden={handleSetHidden}
+            onChanged={() => void loadTargets()}
           />
         )}
       </SshTargetDestructiveActions>

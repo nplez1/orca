@@ -160,6 +160,7 @@ export function getTaskSourceCacheScope(
   context: Pick<TaskSourceContext, 'provider' | 'hostId' | 'projectId' | 'projectHostSetupId'> & {
     providerIdentity?: TaskProviderIdentity | null
     repoId?: string | null
+    accountLabel?: string | null
   }
 ): string {
   return [
@@ -168,7 +169,8 @@ export function getTaskSourceCacheScope(
     context.projectId,
     context.projectHostSetupId ?? '',
     context.repoId ?? '',
-    taskProviderIdentityCachePart(context.providerIdentity)
+    taskProviderIdentityCachePart(context.providerIdentity),
+    ...(context.accountLabel?.trim() ? [context.accountLabel.trim()] : [])
   ]
     .map(encodeCachePart)
     .join(':')

@@ -17,10 +17,13 @@ import { EMPTY_AI_VAULT_SESSIONS } from './ai-vault-session-identity'
 import { useAppliedAiVaultScan } from './ai-vault-applied-scan'
 import {
   aiVaultSessionResultCacheKey,
-  cacheAiVaultSessionResult,
-  readCachedAiVaultSessionResult,
   resetAiVaultSessionResultCacheForTest
 } from './ai-vault-session-result-cache'
+import {
+  aiVaultSessionListArgs,
+  cacheAiVaultSessionList,
+  readCachedAiVaultSessionList
+} from './ai-vault-session-list-request'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getAgentSessionIdsKey, resetAiVaultSessionIdsKeyForTest } from './ai-vault-session-ids'
 
@@ -28,6 +31,17 @@ import { getAgentSessionIdsKey, resetAiVaultSessionIdsKeyForTest } from './ai-va
 // Keep the budget at module scope so tab remounts cannot amplify full scans.
 const FORCED_RESCAN_MIN_INTERVAL_MS = 30_000
 let lastForcedRescanAt = 0
+
+/** Takes the shared forced-rescan budget when it is free. Every caller outside the panel that forces
+ *  a scan must take it too, or it would amplify full scans the same way. */
+export function claimAiVaultForcedRescan(): boolean {
+  const now = Date.now()
+  if (lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS > now) {
+    return false
+  }
+  lastForcedRescanAt = now
+  return true
+}
 
 export function resetAiVaultForcedRescanThrottleForTest(): void {
   lastForcedRescanAt = 0
@@ -117,10 +131,11 @@ export function useAiVaultSessionRefresh(
       )
       const cachedResult =
         args.reuseLoadedDepth === true
-          ? readCachedAiVaultSessionResult({
-              key: baseKey,
-              limit: selectedLimit,
-              scopePaths: scopePathsRef.current
+          ? readCachedAiVaultSessionList({
+              scopePaths: scopePathsRef.current,
+              executionHostScope: hostScope,
+              sessionLimit: selectedLimit,
+              ...(hostQueryRef.current ? { query: hostQueryRef.current } : {})
             })
           : null
       if (cachedResult) {
@@ -157,21 +172,20 @@ export function useAiVaultSessionRefresh(
         setLoading(true)
       }
       setError(null)
-      const limit = selectedLimit === 'unlimited' ? undefined : selectedLimit
       const scanKey = `${baseKey}\n${selectedLimit}`
+      const request = {
+        scopePaths: scopePathsRef.current,
+        executionHostScope: hostScope,
+        sessionLimit: selectedLimit,
+        ...(hostQueryRef.current ? { query: hostQueryRef.current } : {})
+      }
       try {
-        const result = await window.api.aiVault.listSessions({
-          includeAntigravityIdeSessions: true,
-          limit,
-          unlimited: selectedLimit === 'unlimited',
-          scopePaths: scopePathsRef.current,
-          // Omitted rather than empty: an absent filter is not a filter that
-          // matches nothing.
-          ...(hostQueryRef.current ? { query: hostQueryRef.current } : {}),
-          executionHostScope: hostScope,
-          force: args.force,
-          requestToken: requestTokenRef.current
-        })
+        const result = await window.api.aiVault.listSessions(
+          aiVaultSessionListArgs(request, {
+            force: args.force,
+            requestToken: requestTokenRef.current
+          })
+        )
         // A superseded scan resolves cancelled rather than rejecting, so the
         // main-process log stays clean; its empty body must not be painted.
         if (result.cancelled || !mountedRef.current || refreshIdRef.current !== refreshId) {
@@ -197,13 +211,7 @@ export function useAiVaultSessionRefresh(
           return
         }
         lastAppliedScanRef.current = { scopeKey: scanKey, scannedAt: result.scannedAt }
-        cacheAiVaultSessionResult({
-          key: baseKey,
-          executionHostScope: hostScope,
-          limit: selectedLimit,
-          result,
-          replaceHostEntries: args.force === true
-        })
+        cacheAiVaultSessionList(request, result, { replaceHostEntries: args.force === true })
         publicationGateRef.current.publish(result, (published) => {
           if (mountedRef.current && scanKey === currentScanScopeKey()) {
             applyScan(published, selectedLimit)
@@ -248,12 +256,11 @@ export function useAiVaultSessionRefresh(
   // until some unrelated later trigger.
   const forcedRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestForcedRescan = useCallback(() => {
-    const waitMs = lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS - Date.now()
-    if (waitMs <= 0) {
-      lastForcedRescanAt = Date.now()
+    if (claimAiVaultForcedRescan()) {
       void refresh({ background: true, force: true })
       return
     }
+    const waitMs = lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS - Date.now()
     if (forcedRescanTimerRef.current !== null) {
       return
     }

@@ -47,7 +47,6 @@ import {
   type WorkspaceLaunchKind
 } from '../../shared/workspace-launch-kind'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { deriveAgentLaunchTerminalViewMode } from './agent-launch-view-mode'
 import { isDefinitiveAgentSessionCreateRefusal } from '../../shared/agent-session-definitive-refusal'
 import {
   decideAgentLaunchMode,
@@ -55,7 +54,8 @@ import {
   resolveAgentLaunchModeOnHost,
   type AgentLaunchModeReceipt,
   type AgentLaunchModeVocabulary,
-  DEFAULT_LAUNCH_VOCABULARY
+  DEFAULT_LAUNCH_VOCABULARY,
+  warnStructuredLaunchDowngrade
 } from './agent-launch-mode'
 import {
   AgentLaunchStructuredSessionRefusedError,
@@ -212,6 +212,7 @@ function published(
   execution: AgentLaunchExecution,
   surface: AgentLaunchPublishedSurface
 ): AgentLaunchPublishedSurface {
+  warnStructuredLaunchDowngrade(execution.intent.agent, surface.receipt)
   execution.onSurfacePublished?.(surface)
   return surface
 }
@@ -351,12 +352,7 @@ async function createTerminalSurface(
     agent: intent.agent,
     ...(startupPrompt ? { startupPrompt } : {}),
     ...terminalLaunchInputs(intent),
-    viewMode: deriveAgentLaunchTerminalViewMode({
-      settings: readAgentLaunchModeSettings(execution.runtime),
-      agent: intent.agent,
-      ...(intent.prompt ? { prompt: intent.prompt } : {}),
-      connectionId: workspace.connectionId
-    })
+    viewMode: 'terminal'
   })
   return {
     outcome: {

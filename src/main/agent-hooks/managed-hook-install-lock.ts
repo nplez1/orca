@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { removeManagedHookLock } from './managed-hook-lock-claims'
 import {
   cleanupManagedHookLockFiles,
@@ -49,7 +50,7 @@ async function acquireInstallLock(
   suppliedHostIdentity?: string,
   waitTimeoutMs = LOCK_WAIT_TIMEOUT_MS
 ): Promise<() => Promise<void>> {
-  const lockParent = join(home, '.orca')
+  const lockParent = join(home, HOME_DIRECTORY_NAME)
   const lockPath = join(lockParent, 'managed-hook-install.lock')
   await mkdir(lockParent, { recursive: true })
   const hostIdentity = suppliedHostIdentity ?? (await readManagedHookHostIdentity())

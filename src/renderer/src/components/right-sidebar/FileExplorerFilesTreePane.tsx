@@ -22,9 +22,7 @@ type FileExplorerFilesTreePaneProps = {
   activeRepo: Repo | null
   worktreePath: string | null
   displayRootPath: string | null
-  visibleFilesWorktreePath: string | null
   explorerView: RightSidebarExplorerView
-  isFilesViewActive: boolean
   activeFileId: string | null
   hasNameFilter: boolean
   canActivateFilteredResults: boolean
@@ -49,9 +47,7 @@ export function FileExplorerFilesTreePane({
   activeRepo,
   worktreePath,
   displayRootPath,
-  visibleFilesWorktreePath,
   explorerView,
-  isFilesViewActive,
   activeFileId,
   hasNameFilter,
   canActivateFilteredResults,
@@ -85,7 +81,8 @@ export function FileExplorerFilesTreePane({
     inlineInputState,
     rowScrolling,
     handlers,
-    nodeCommands
+    nodeCommands,
+    fileDropOwnerRef
   } = paneState
   const { inlineInput, inlineInputIndex, startNew, dismissInlineInput, handleInlineSubmit } =
     inlineInputState
@@ -118,9 +115,8 @@ export function FileExplorerFilesTreePane({
   } = nodeCommands
 
   // Why: the root explorer container must stay mounted for loading, error,
-  // and empty states so the data-native-file-drop-target marker is always
-  // present. Without this, external file drops would have no target surface
-  // when the tree is empty, still loading, or showing a read error.
+  // and empty states so it always owns OS file drops; otherwise an empty,
+  // loading or failed tree would have no drop target.
   const isEmptyState = visibleRowCount === 0 && !inlineInput
   const isNameFilterLoading = nameFilterSource?.relativePaths === null || projectionPending
   const isQuietSearchPending =
@@ -191,14 +187,12 @@ export function FileExplorerFilesTreePane({
           'bg-border',
         isNativeDragOver && explorerView === 'files' && !nativeDropTargetDir && 'bg-border'
       )}
+      ref={fileDropOwnerRef}
       viewportRef={scrollRef}
       viewportTabIndex={-1}
       viewportClassName="h-full min-h-0 py-2"
-      data-native-file-drop-target={isFilesViewActive ? 'file-explorer' : undefined}
-      data-native-file-drop-dir={
-        visibleFilesWorktreePath ? (displayRootPath ?? undefined) : undefined
-      }
       onWheelCapture={handleWheelCapture}
+      onDragOverCapture={rootDragHandlers.onDragOverCapture}
       onDragOver={rootDragHandlers.onDragOver}
       onDragEnter={rootDragHandlers.onDragEnter}
       onDragLeave={rootDragHandlers.onDragLeave}

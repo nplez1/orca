@@ -11,6 +11,7 @@ import {
 import { ensureAutoUpdaterConfigured } from '../window/attach-main-window-services'
 import { focusExistingMainWindow, safelyRevealWindow } from '../window/focus-existing-window'
 import { mainProcessState as state } from './main-process-state'
+import { markUserQuitWindowClose } from '../window/user-quit-window-close'
 import { loadMainWindow } from '../window/createMainWindow'
 import {
   describeInstallDirAclPoison,
@@ -63,12 +64,32 @@ export function openSettingsFromSystemMenu(): void {
   state.pendingOpenSettings.mark(targetWindow.webContents.id, Number.POSITIVE_INFINITY)
 }
 
+/**
+ * A user Quit (menu, tray, renderer-recovery prompt). Under `orca serve` the process is the
+ * server its paired clients use, so a user Quit only closes the desktop windows (#15537);
+ * signals, supervisor stops and update installs still quit through app.quit().
+ */
+export function quitFromUserCommand(): void {
+  if (state.isServeMode) {
+    // Why not getAllWindows(): offscreen browser-automation windows belong to the runtime.
+    // The dashboard popout is gone in this fork, so the main window is the only desktop one.
+    const window = state.mainWindow
+    if (window && !window.isDestroyed()) {
+      // The main window's close carries the user-Quit intent that arms the frozen-renderer deadline.
+      markUserQuitWindowClose(window)
+      window.close()
+    }
+    return
+  }
+  state.isQuitting = true
+  app.quit()
+}
+
 export function quitFromSystemTray(): void {
   if (state.mainWindow && !state.mainWindow.isDestroyed()) {
     showMainWindowFromTray()
   }
-  state.isQuitting = true
-  app.quit()
+  quitFromUserCommand()
 }
 
 export function runUserInitiatedUpdateCheck(options?: UpdateCheckOptions): void {
@@ -184,9 +205,6 @@ export async function showRendererRecoveryPrompt(
       }
       loadMainWindow(state.mainWindow)
     },
-    quit: () => {
-      state.isQuitting = true
-      app.quit()
-    }
+    quit: quitFromUserCommand
   })
 }

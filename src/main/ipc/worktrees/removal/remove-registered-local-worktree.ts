@@ -22,7 +22,7 @@ import {
   removeWorktreeLinkedPaths
 } from '../../worktree-symlinks'
 import { removeStaleWorktreeMaterializationStagingDirectories } from '../../worktree-materialization-staging'
-import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
+import { invalidateAuthorizedRootsCacheForRepo } from '../../filesystem-auth'
 import { runWorktreeChangeInvalidators } from '../../worktree-change-invalidators'
 import {
   formatWorktreeRemovalError,
@@ -261,6 +261,7 @@ async function finishLocalWorktreeRemoval({
           worktreeId: args.worktreeId,
           snapshotPruneBatchId: args.snapshotPruneBatchId
         })
+        invalidateAuthorizedRootsCacheForRepo(store, repoId)
         removalCompleted = true
         return {}
       } else {
@@ -299,7 +300,7 @@ async function finishLocalWorktreeRemoval({
     )
   })
   await withWorktreeRemoveStageSpan('cache_invalidation', 'local', async () => {
-    invalidateAuthorizedRootsCache()
+    invalidateAuthorizedRootsCacheForRepo(store, repoId)
   })
   return removalResult ?? {}
 }

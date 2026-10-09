@@ -10,11 +10,11 @@ import {
   buildRemovedSshTargetCleanupPatch,
   collectHiddenSshTargetIds,
   collectSshTargetGenerations,
-  sshConnectionStatesEqual,
   sshTargetGenerationsEqual,
   sshTargetHiddenIdsEqual,
   sshTargetLabelsEqual
 } from './ssh-target-cleanup'
+import { sshConnectionStatesEqual } from './ssh-connection-state-equality'
 
 export type RemoteWorkspaceSyncStatus = {
   phase: 'idle' | 'pulling' | 'pushing' | 'synced' | 'conflict' | 'error' | 'offline'

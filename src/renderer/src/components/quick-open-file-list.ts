@@ -26,7 +26,7 @@ export type {
   RuntimeFileListTarget
 } from './runtime-file-list-scan-target'
 import { useAppStore } from '@/store'
-import { useWorktreesForRepo } from '@/store/selectors'
+import { useKnownWorktreeById, useWorktreesForRepo } from '@/store/selectors'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
 import {
   getFileExplorerOperationOwnerFromState,
@@ -70,10 +70,8 @@ export function useRuntimeFileListForWorktree({
    */
   recentPaths?: readonly string[]
 }): RuntimeFileListState {
-  const worktree = useAppStore((state) =>
-    // Why: folder workspaces live behind getKnownWorktreeById, not worktreesByRepo.
-    worktreeId ? (state.getKnownWorktreeById(worktreeId) ?? null) : null
-  )
+  // Why: folder workspaces live in the known-worktree catalog, not worktreesByRepo.
+  const worktree = useKnownWorktreeById(worktreeId)
   const worktreePath = worktree?.path ?? null
   const repoWorktrees = useWorktreesForRepo(worktree?.repoId ?? null)
   const [listing, setListing] = useState(NO_LISTING)

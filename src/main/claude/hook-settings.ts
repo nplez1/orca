@@ -6,6 +6,7 @@ import {
   createManagedCommandMatcher,
   getSharedManagedScriptPath,
   isPlainObject,
+  isSafeUnicodeWindowsBatchHookPath,
   MANAGED_HOOK_TIMEOUT_SECONDS,
   removeManagedCommands,
   wrapWindowsPowerShellEncodedCommand,
@@ -121,7 +122,9 @@ export function getWindowsManagedLifecycleHook(scriptPath: string): HookCommandC
   }
   return {
     type: 'command',
-    command: wrapWindowsPowerShellEncodedCommand(getWindowsPowerShellLifecycleCommand(scriptPath)),
+    command: wrapWindowsPowerShellEncodedCommand(getWindowsPowerShellLifecycleCommand(scriptPath), {
+      useProcessPolicyEnvironment: isSafeUnicodeWindowsBatchHookPath(scriptPath)
+    }),
     timeout: MANAGED_HOOK_TIMEOUT_SECONDS
   }
 }

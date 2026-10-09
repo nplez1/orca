@@ -103,8 +103,8 @@ function App(): React.JSX.Element {
             <BrowserWebAuthnAccountDialog />
           </LinkRoutingPreferenceDialogProvider>
         </ConfirmationDialogProvider>
+        <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />
       </TooltipProvider>
-      <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />
       <SkillFreshnessNudge />
       <WorktreeBaseFallbackDialog />
       <PinnedTabCloseDialog />

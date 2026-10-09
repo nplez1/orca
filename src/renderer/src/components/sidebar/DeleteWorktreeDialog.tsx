@@ -166,6 +166,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
     isOpen,
     settings?.deleteRemoteBranchOnWorkspaceDelete ?? false
   )
+  const [isSavingForcePreference, setIsSavingForcePreference] = useState(false)
   const deleteTargets = useMemo(
     () => (canDeleteAllLineage ? lineageDelete.deleteAllTargets : worktrees),
     [canDeleteAllLineage, lineageDelete.deleteAllTargets, worktrees]
@@ -230,7 +231,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (open) {
+      if (open || isSavingForcePreference) {
         return
       }
       const state = useAppStore.getState().deleteStateByWorktreeId
@@ -249,7 +250,14 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
       }
       closeModal()
     },
-    [clearWorktreeDeleteState, closeModal, deleteStateTargets, isBatchDelete, worktreeId]
+    [
+      clearWorktreeDeleteState,
+      closeModal,
+      deleteStateTargets,
+      isBatchDelete,
+      isSavingForcePreference,
+      worktreeId
+    ]
   )
 
   const persistDontAskAgainPreference = useCallback((): void => {
@@ -261,9 +269,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   }, [openSettingsPage, openSettingsTarget, updateSettings])
 
   const handleForceDeletedFromToast = useCallback(
-    (deletedTarget: WorktreeRemovalTarget): void => {
-      onDeleted?.([deletedTarget])
-    },
+    (deletedTarget: WorktreeRemovalTarget): void => onDeleted?.([deletedTarget]),
     [onDeleted]
   )
 
@@ -373,7 +379,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
         <DialogFooter>
           <DeleteWorktreeDialogFooter
             isMainWorktree={isMainWorktree}
-            isDeleting={isDeleting}
+            isDeleting={isDeleting || isSavingForcePreference}
             canForceDelete={canForceDelete}
             isBatchDelete={isBatchDelete}
             worktreeCount={worktrees.length}
@@ -381,6 +387,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
             lineageDeleteTargetCount={lineageDelete.deleteAllTargets.length}
             onCancel={() => handleOpenChange(false)}
             onForceDelete={() => handleDelete(true)}
+            onSavingChange={setIsSavingForcePreference}
             onDelete={canDeleteAllLineage ? handleDeleteAll : () => handleDelete(false)}
             confirmButtonRef={confirmButtonRef}
           />

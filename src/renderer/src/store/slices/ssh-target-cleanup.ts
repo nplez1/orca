@@ -1,5 +1,5 @@
 import type { AppState } from '../types'
-import type { SshConnectionState, SshTarget, SshTargetSummary } from '../../../../shared/ssh-types'
+import type { SshTarget, SshTargetSummary } from '../../../../shared/ssh-types'
 import { sanitizeSshTargetGeneration } from '../../../../shared/ssh-target-generation'
 import {
   collectSshTargetTerminalTabIds,
@@ -7,22 +7,6 @@ import {
   omitRemovedSshTargetRecovery,
   omitRemovedSshTargetTabSessions
 } from './ssh-target-tab-sessions'
-
-export function sshConnectionStatesEqual(
-  a: SshConnectionState | undefined,
-  b: SshConnectionState
-): boolean {
-  return (
-    a?.targetId === b.targetId &&
-    a?.status === b.status &&
-    a?.error === b.error &&
-    a?.reconnectAttempt === b.reconnectAttempt &&
-    a?.providerEpoch === b.providerEpoch &&
-    a?.connectionGeneration === b.connectionGeneration &&
-    a?.supportsFolderDownload === b.supportsFolderDownload &&
-    a?.remotePlatform === b.remotePlatform
-  )
-}
 
 export function sshTargetLabelsEqual(
   labels: Map<string, string>,

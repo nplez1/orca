@@ -12,8 +12,7 @@ import type { RelayContext } from './context'
 // Why: RelayContext is accepted in the constructor for protocol back-compat
 // (see docs/relay-fs-allowlist-removal.md), but no longer consulted on FS ops.
 import { expandTilde } from './context'
-import { DEFAULT_MAX_RESULTS, searchWithRg } from './fs-handler-utils'
-import { searchWithGitGrep } from './fs-handler-git-fallback'
+import { searchRelayFiles } from './fs-handler-search'
 import { ListFilesScanCoordinator } from './fs-list-files-scan-coordinator'
 import { runListFilesScan } from './fs-list-files-fallback-chain'
 import {
@@ -240,35 +239,7 @@ export class FsHandler {
   }
 
   private async search(params: Record<string, unknown>, context?: RequestContext) {
-    const query = params.query as string
-    const rootPath = expandTilde(params.rootPath as string)
-    const caseSensitive = params.caseSensitive as boolean | undefined
-    const wholeWord = params.wholeWord as boolean | undefined
-    const useRegex = params.useRegex as boolean | undefined
-    const includePattern = params.includePattern as string | undefined
-    const excludePattern = params.excludePattern as string | undefined
-    const maxResults = Math.min(
-      (params.maxResults as number) || DEFAULT_MAX_RESULTS,
-      DEFAULT_MAX_RESULTS
-    )
-
-    const options = {
-      caseSensitive,
-      wholeWord,
-      useRegex,
-      includePattern,
-      excludePattern,
-      maxResults,
-      signal: context?.signal
-    }
-    try {
-      return await searchWithRg(rootPath, query, options)
-    } catch (error) {
-      if (!(error instanceof RipgrepUnavailableError)) {
-        throw error
-      }
-      return searchWithGitGrep(rootPath, query, options)
-    }
+    return searchRelayFiles(params, context)
   }
 
   private async listFiles(
@@ -341,6 +312,17 @@ export class FsHandler {
 
   dispose(): void {
     this.watchRegistry.dispose()
-    void this.streamRegistry.disposeAll()
+    void this.disposeFileStreams().catch((error: unknown) => {
+      process.stderr.write(`[relay] file stream shutdown failed: ${String(error)}\n`)
+    })
+  }
+
+  disposeFileStreams = (): Promise<void> => this.streamRegistry.disposeAll()
+
+  disposeWatchers = (): Promise<void> => this.watchRegistry.disposeAndWait()
+
+  reopen(): void {
+    this.streamRegistry.reopen()
+    this.watchRegistry.reopen()
   }
 }

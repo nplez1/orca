@@ -4,7 +4,6 @@ import type { LocalProjectWorktreeGitOptions } from '../../../project-runtime-gi
 import { gitExecFileAsync } from '../../../git/runner'
 import { cleanupLocalOrphanedWorktreeDirectory } from '../../../local-orphaned-worktree-cleanup'
 import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
-import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
 import { preservedBranchCleanupScopeKey } from '../../../../shared/preserved-branch-cleanup'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
 import { preservedBranchCleanupByScope } from './preserved-branch-cleanup'
@@ -60,5 +59,7 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
       hostId: args.removalHostId
     })
   )
-  invalidateAuthorizedRootsCache()
+  // Why no cache invalidation here: the caller owns it, and upstream scoped it to the repo
+  // (`invalidateAuthorizedRootsCacheForRepo`). A global clear here re-invalidated every repo's
+  // allowlist on one orphan removal, which is the narrower call upstream replaced.
 }
