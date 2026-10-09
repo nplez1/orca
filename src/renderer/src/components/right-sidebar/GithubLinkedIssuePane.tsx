@@ -14,6 +14,7 @@ import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import { translate } from '@/i18n/i18n'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
+import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type GithubLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'github' }>
@@ -57,6 +58,7 @@ export function GithubLinkedIssuePane({
     const repoId = resolveGithubRepoId(worktree)
     return repoId ? (s.repos.find((item) => item.id === repoId) ?? null) : null
   })
+  const linkActions = useLinkedIssuePaneActions()
   const [workItem, setWorkItem] = useState<GitHubWorkItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -110,6 +112,10 @@ export function GithubLinkedIssuePane({
           title={linkedIssue.title ?? ''}
           openUrl={linkedIssue.url}
           onRefresh={() => {}}
+          onOpenIssue={linkActions.openIssue}
+          onUnlinkIssue={linkActions.unlinkIssue}
+          onLinkAnotherIssue={linkActions.linkAnotherIssue}
+          linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
         />
         <IssuePaneMessage kind="unavailable" providerLabel="GitHub" />
       </div>
@@ -126,6 +132,10 @@ export function GithubLinkedIssuePane({
         titleLoading={loading && !workItem}
         refreshing={loading}
         onRefresh={load}
+        onOpenIssue={linkActions.openIssue}
+        onUnlinkIssue={linkActions.unlinkIssue}
+        onLinkAnotherIssue={linkActions.linkAnotherIssue}
+        linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
       />
       {!workItem ? (
         loading ? (

@@ -129,7 +129,13 @@ describe('jira RPC methods', () => {
       },
       'site-1'
     )
-    expect(runtime.jiraAddIssueComment).toHaveBeenCalledWith('ABC-3', 'Looks good', 'site-1')
+    // A client that sends no body format reaches the host as plain text.
+    expect(runtime.jiraAddIssueComment).toHaveBeenCalledWith(
+      'ABC-3',
+      'Looks good',
+      'site-1',
+      undefined
+    )
     expect(runtime.jiraIssueComments).toHaveBeenCalledWith('ABC-3', 'site-1')
   })
 

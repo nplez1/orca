@@ -1,9 +1,10 @@
 import type {
+  JiraBoard,
   JiraBoardIssuePage,
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
-  JiraBoard,
   JiraComment,
+  JiraCommentBodyFormat,
   JiraConnectionStatus,
   JiraCreateField,
   JiraCreateIssueArgs,
@@ -65,6 +66,7 @@ export type JiraApi = {
     key: string
     body: string
     siteId?: string
+    bodyFormat?: JiraCommentBodyFormat
   }) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
   issueComments: (args: { key: string; siteId?: string }) => Promise<JiraComment[]>
   listProjects: (args?: { siteId?: JiraSiteSelection }) => Promise<JiraProject[]>

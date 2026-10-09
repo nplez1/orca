@@ -1,9 +1,10 @@
 import { ipcRenderer } from 'electron'
 import type {
+  JiraBoard,
   JiraBoardIssuePage,
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
-  JiraBoard,
+  JiraCommentBodyFormat,
   JiraProjectStatusOrder,
   JiraSiteSelection
 } from '../../shared/jira-types'
@@ -68,6 +69,7 @@ export const jiraApi = {
     key: string
     body: string
     siteId?: string
+    bodyFormat?: JiraCommentBodyFormat
   }): Promise<{ ok: true; id: string } | { ok: false; error: string }> =>
     ipcRenderer.invoke('jira:addIssueComment', args),
 

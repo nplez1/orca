@@ -1,6 +1,15 @@
 import type { JiraAdfMediaAttrs } from './adf-markdown'
 import { MAX_IMAGES, parseImageAttachmentMetas } from './attachment-meta'
 
+// Why shared: the same attachment shapes address an image inside Jira's rendered
+// HTML and inside a thumbnail link there, so the pattern lives in one place.
+const ATTACHMENT_URL_SOURCE = String.raw`\/(?:rest\/api\/\d+\/attachment\/(?:content|thumbnail)|secure\/(?:attachment|thumbnail))\/(\d+)(?:\/|\b|"|'|\?)`
+
+/** The attachment an attachment URL addresses, or null for any other URL. */
+export function attachmentIdFromUrl(url: string): string | null {
+  return new RegExp(ATTACHMENT_URL_SOURCE, 'i').exec(url)?.[1] ?? null
+}
+
 /**
  * Pull attachment content IDs from Jira rendered HTML in document order.
  * Why: thumbnail paths use the same numeric attachment id as content URLs.
@@ -12,8 +21,7 @@ export function extractAttachmentContentIdsFromHtml(html: string | undefined | n
   const ids: string[] = []
   const seen = new Set<string>()
   // content, secure/attachment, thumbnail, and rest thumbnail forms
-  const pattern =
-    /\/(?:rest\/api\/\d+\/attachment\/(?:content|thumbnail)|secure\/(?:attachment|thumbnail))\/(\d+)(?:\/|\b|"|'|\?)/gi
+  const pattern = new RegExp(ATTACHMENT_URL_SOURCE, 'gi')
   let match: RegExpExecArray | null
   while ((match = pattern.exec(html)) !== null) {
     const id = match[1]
@@ -31,7 +39,16 @@ export function selectPreferredAttachmentIds(args: {
   renderedHtmlIds: string[]
   attachmentField: unknown
   mediaAttrs: readonly JiraAdfMediaAttrs[]
+  /** Why: a Server/DC body arrives as rendered HTML, not ADF, so its `<img>`
+   *  attachments are the only images there are — gating them on ADF media nodes
+   *  would download nothing for the one body that needs them. */
+  useRenderedHtmlIdsOnly?: boolean
 }): { preferredIds: string[]; fallbackRan: boolean; needCount: number } {
+  if (args.useRenderedHtmlIdsOnly) {
+    const preferredIds = args.renderedHtmlIds.slice(0, MAX_IMAGES)
+    return { preferredIds, fallbackRan: false, needCount: preferredIds.length }
+  }
+
   const needing = args.mediaAttrs.filter((attrs) => !(attrs.url && /^https?:\/\//i.test(attrs.url)))
   const needCount = needing.length
   if (needCount === 0) {

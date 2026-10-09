@@ -258,6 +258,29 @@ export function keepsLiveJiraWorkItem(
   return keepsLinkedWorkItem(draft.issueInput, draft.issueProvider, live)
 }
 
+/** The writes that clear the issue this workspace is linked to.
+ *
+ *  A workspace holds one issue at a time and stores it in whichever slot its
+ *  provider owns, so a clear has to empty all of them rather than the one the
+ *  caller happens to be looking at: the GitHub number, the Linear key, and the
+ *  created-from work item with its read-routing context. A PR/MR work item is
+ *  left alone — it belongs to the review surfaces, not to this link.
+ *
+ *  Shared by the meta dialog's empty Issue field and the issue pane's Unlink
+ *  action so the two cannot drift. */
+export function buildIssueUnlinkUpdates(live: WorktreeMetaLiveLinks): Partial<WorktreeMeta> {
+  const clearsCreatedFromIssue =
+    live.linkedWorkItemType === 'issue' &&
+    (live.linkedWorkItemProvider === 'github' ||
+      live.linkedWorkItemProvider === 'linear' ||
+      live.linkedWorkItemProvider === 'jira')
+  return {
+    linkedIssue: null,
+    ...(live.linkedLinearIssue ? LINEAR_ISSUE_LINK_CLEARED : {}),
+    ...(clearsCreatedFromIssue ? { linkedWorkItem: null, linkedTaskSourceContext: null } : {})
+  }
+}
+
 function buildIssueLinkUpdates(
   draft: WorktreeMetaDraft,
   current: WorktreeMetaSnapshot,
@@ -297,11 +320,7 @@ function buildIssueLinkUpdates(
     : {}
 
   if (trimmed === '') {
-    return {
-      linkedIssue: null,
-      ...displacedLinear,
-      ...displacedWorkItem
-    }
+    return buildIssueUnlinkUpdates(live)
   }
 
   const parsed = parseIssueLinkInput(trimmed, draft.issueProvider)

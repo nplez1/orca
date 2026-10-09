@@ -19,6 +19,9 @@ const BUNDLED_MAIN_DEPENDENCIES = new Set([
   '@xterm/addon-serialize',
   'tldts',
   'smol-toml',
+  // Why: pure JS with no assets, so bundling beats a Resources/node_modules copy
+  // that the packaging guard would otherwise demand for a bare `parse5` import.
+  'parse5',
   // Why: Windows NSIS deploys app.asar before external resources; bootstrap must
   // not race the later resources/node_modules copy.
   'zod'

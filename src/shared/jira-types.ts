@@ -4,6 +4,11 @@ import type { SecretAtRestProtection } from './secret-at-rest-protection'
 // Bearer auth, REST v2). Older stored sites omit the field and mean 'cloud'.
 export type JiraAuthType = 'cloud' | 'server'
 
+/** How an incoming comment body is written. `plain` is text to store verbatim;
+ *  `markdown` is what Orca's own composer produces and what the host converts
+ *  into the site's own body format. Older clients omit it and mean plain. */
+export type JiraCommentBodyFormat = 'plain' | 'markdown'
+
 export type JiraSite = {
   id: string
   siteUrl: string

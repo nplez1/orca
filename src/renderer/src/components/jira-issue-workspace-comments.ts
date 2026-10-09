@@ -104,7 +104,10 @@ export function useJiraIssueComments({
         providerSettings,
         issueKey,
         bodyState.body,
-        issueSiteId
+        issueSiteId,
+        // Why: this composer is Markdown — its toolbar inserts it and the thread
+        // renders it — so the host has to convert it for the site.
+        'markdown'
       )
       if (!result.ok) {
         throw new Error(result.error)

@@ -18,6 +18,7 @@ import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
+import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
 type JiraLinked = Extract<SupportedWorkspaceLinkedIssue, { provider: 'jira' }>
@@ -68,6 +69,7 @@ export function JiraLinkedIssuePane({
 }): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const viewerAccountId = useAppStore((s) => s.jiraStatus.viewer?.accountId ?? null)
+  const linkActions = useLinkedIssuePaneActions()
   const providerSettings = sourceContext ?? settings
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
@@ -98,6 +100,10 @@ export function JiraLinkedIssuePane({
         titleSaving={detail.pendingField === 'title'}
         refreshing={detail.refreshing}
         onRefresh={() => (displayed ? void detail.refresh() : detail.reload())}
+        onOpenIssue={linkActions.openIssue}
+        onUnlinkIssue={linkActions.unlinkIssue}
+        onLinkAnotherIssue={linkActions.linkAnotherIssue}
+        linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
         onTitleCommit={
           displayed ? (title) => void detail.mutateIssue('title', { title }, { title }) : undefined
         }

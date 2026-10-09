@@ -41,7 +41,9 @@ export async function getIssue(
         `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}?${params.toString()}`
       )
       // Why: keep only JSON under the pool; binary downloads fan out after release.
-      mediaRequest = collectIssueMediaRequest(issue)
+      mediaRequest = collectIssueMediaRequest(issue, {
+        renderedHtmlOnly: entry.site.authType === 'server'
+      })
     } catch (error) {
       if (isAuthError(error)) {
         clearToken(entry.site.id)
@@ -64,7 +66,7 @@ export async function getIssue(
         continue
       }
       const prepared = mediaRequest ? await prepareMediaResolver(entry, mediaRequest) : undefined
-      const mapped = mapJiraIssue(entry.site, issue, prepared?.options)
+      const mapped = mapJiraIssue(entry.site, issue, prepared?.options, prepared?.htmlOptions)
       if (prepared) {
         flushMediaResolutionWarn(entry, prepared)
       }

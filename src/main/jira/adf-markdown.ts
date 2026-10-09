@@ -122,6 +122,28 @@ function renderMediaMarkdown(
   return unresolvedMediaPlaceholder(attrs)
 }
 
+const ADF_MARK_WRAPPERS: Record<string, [string, string]> = {
+  strong: ['**', '**'],
+  em: ['_', '_'],
+  code: ['`', '`']
+}
+
+// Why innermost-first: wrapping outwards yields `**_x_**`, which the renderer reads
+// back as both marks. Without this the mark a body was written with is dropped on
+// the way in, so a bold comment came back plain after a reload.
+const ADF_MARK_ORDER = ['code', 'em', 'strong'] as const
+
+function applyAdfMarks(text: string, marks: unknown): string {
+  if (!text) {
+    return text
+  }
+  const present = new Set(asArray(marks).map((mark) => asString(asRecord(mark).type)))
+  return ADF_MARK_ORDER.filter((type) => present.has(type)).reduce((value, type) => {
+    const [open, close] = ADF_MARK_WRAPPERS[type]
+    return `${open}${value}${close}`
+  }, text)
+}
+
 function renderInline(node: unknown, options?: AdfToMarkdownOptions): string {
   if (!node) {
     return ''
@@ -138,7 +160,7 @@ function renderInline(node: unknown, options?: AdfToMarkdownOptions): string {
 
   const record = node as JiraAdfRecord
   if (typeof record.text === 'string') {
-    return record.text
+    return applyAdfMarks(record.text, record.marks)
   }
   if (record.type === 'hardBreak') {
     return '\n'

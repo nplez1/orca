@@ -127,14 +127,18 @@ describe('JiraLinkedIssuePane', () => {
     fireEvent.change(screen.getByPlaceholderText('Add a Jira comment...'), {
       target: { value: 'Looks good to me' }
     })
-    fireEvent.click(screen.getByText('Comment'))
+    // Why: the send action is an icon-only button, so its accessible name is the
+    // only handle on it.
+    fireEvent.click(screen.getByRole('button', { name: 'Comment' }))
 
     await waitFor(() =>
       expect(mocks.jiraAddIssueComment).toHaveBeenCalledWith(
         null,
         'ABC-1',
         'Looks good to me',
-        'site-1'
+        'site-1',
+        // The host converts the composer's Markdown to the site's own format.
+        'markdown'
       )
     )
     expect(await screen.findByText('Looks good to me')).toBeTruthy()

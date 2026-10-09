@@ -250,3 +250,25 @@ export function createMediaMarkdownResolver(
     return resolved
   }
 }
+
+/** Image sources keyed by attachment id, for Jira's own rendered HTML.
+ *
+ *  Separate from `createMediaMarkdownResolver` because a rendered `<img>` names
+ *  its attachment outright: there is no positional pairing to do and the caller
+ *  keeps the surrounding markup. */
+export function createRenderedImageSrcResolver(
+  images: readonly JiraImageAttachment[],
+  stats?: MediaResolutionStats
+): (attachmentId: string) => string | null {
+  const byId = new Map(images.map((image) => [image.id, image]))
+  return (attachmentId) => {
+    const image = byId.get(attachmentId)
+    if (!image) {
+      return null
+    }
+    if (stats) {
+      stats.attachmentResolvedCount += 1
+    }
+    return image.dataUrl
+  }
+}

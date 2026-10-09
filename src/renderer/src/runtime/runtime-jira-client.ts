@@ -1,6 +1,7 @@
 import type {
   JiraAuthType,
   JiraComment,
+  JiraCommentBodyFormat,
   JiraConnectionStatus,
   JiraCreateField,
   JiraIssue,
@@ -180,10 +181,11 @@ export async function jiraAddIssueComment(
   settings: RuntimeJiraSettings,
   key: string,
   body: string,
-  siteId?: string | null
+  siteId: string | null | undefined,
+  bodyFormat: JiraCommentBodyFormat
 ): Promise<JiraCommentResult> {
   const target = getJiraRuntimeTarget(settings)
-  const args = { key, body, siteId: siteId ?? undefined }
+  const args = { key, body, siteId: siteId ?? undefined, bodyFormat }
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraCommentResult>(target, 'jira.addIssueComment', args, {
         timeoutMs: 30_000
