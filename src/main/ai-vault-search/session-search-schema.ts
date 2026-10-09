@@ -13,7 +13,9 @@ import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
 // Bump to drop and rebuild: the index is a cache over the transcripts, never a source.
 // Schema 7 carries Copilot's typed-prompt titles instead of ones prefixed with the
 // injected `<current_datetime>` context, which unchanged files would otherwise keep.
-export const SESSION_SEARCH_SCHEMA_VERSION = 7
+// Schema 8 adds sub-agent lineage, which the list needs for every row it renders:
+// a schema 7 index would answer every listing with `subagent: null`.
+export const SESSION_SEARCH_SCHEMA_VERSION = 8
 
 // unicode61 keeps `_ . - /` inside tokens so paths and identifiers match exactly;
 // the `identifiers` column carries the split form (see session-search-identifier-split).
@@ -56,7 +58,11 @@ CREATE TABLE IF NOT EXISTS sessions(
   total_tokens INTEGER NOT NULL DEFAULT 0,
   queued_message_count INTEGER NOT NULL DEFAULT 0,
   subagent_transcript_count INTEGER NOT NULL DEFAULT 0,
-  modified_at TEXT
+  modified_at TEXT,
+  -- Sub-agent lineage. A list served from the index has to nest a child under
+  -- its parent exactly as a scanned row does, so these cannot stay on-demand.
+  subagent_parent_session_id TEXT,
+  subagent_agent_type TEXT
 );
 CREATE INDEX IF NOT EXISTS sessions_agent ON sessions(agent);
 CREATE INDEX IF NOT EXISTS sessions_updated_at ON sessions(updated_at);

@@ -71,6 +71,10 @@ function renderRow(
     onResume?: () => void
     resumeHidden?: boolean
     onRequestDelete?: () => void
+    subagentDepth?: number
+    subagentChildCount?: number
+    subagentChildrenExpanded?: boolean
+    onToggleSubagentChildren?: () => void
   } = {}
 ) {
   return render(
@@ -88,6 +92,10 @@ function renderRow(
         resumeDisabled={false}
         resumeHidden={overrides.resumeHidden}
         onToggleDetails={overrides.onToggleDetails ?? vi.fn()}
+        subagentDepth={overrides.subagentDepth}
+        subagentChildCount={overrides.subagentChildCount}
+        subagentChildrenExpanded={overrides.subagentChildrenExpanded}
+        onToggleSubagentChildren={overrides.onToggleSubagentChildren}
         onJumpToOriginalPane={overrides.onJumpToOriginalPane}
         showJumpToWorktree={false}
         onResume={overrides.onResume ?? vi.fn()}
@@ -176,6 +184,42 @@ describe('VaultSessionRow native session actions', () => {
     await user.click(screen.getByTestId('ai-vault-session-more-actions'))
 
     expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+  })
+})
+
+describe('VaultSessionRow subagent disclosure', () => {
+  it('hides the disclosure when the session has no sub-agent rows', () => {
+    renderRow()
+
+    expect(screen.queryByRole('button', { name: /subagent session/i })).toBeNull()
+  })
+
+  it('names the row count and toggles children without expanding details', async () => {
+    const onToggleSubagentChildren = vi.fn()
+    const onToggleDetails = vi.fn()
+    renderRow({ subagentChildCount: 2, onToggleSubagentChildren, onToggleDetails })
+
+    const disclosure = screen.getByRole('button', { name: '2 subagent sessions' })
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+
+    await userEvent.click(disclosure)
+
+    expect(onToggleSubagentChildren).toHaveBeenCalledTimes(1)
+    expect(onToggleDetails).not.toHaveBeenCalled()
+  })
+
+  it('uses the singular label for one sub-agent row', () => {
+    renderRow({ subagentChildCount: 1 })
+
+    expect(screen.getByRole('button', { name: '1 subagent session' })).toBeTruthy()
+  })
+
+  it('indents a nested sub-agent row', () => {
+    const { container } = renderRow({ subagentDepth: 1 })
+
+    const rowElement = container.querySelector('.group\\/session-row')
+    expect(rowElement?.className).toContain('border-l')
+    expect(rowElement?.className).toContain('pl-5')
   })
 })
 

@@ -809,6 +809,8 @@
           },
           "AiVaultSessionRow": {
             "resumeAgentSession": "Resume {{value0}} session",
+            "subagentSession_one": "{{count}} subagent session",
+            "subagentSession_other": "{{count}} subagent sessions",
             "tokenCount": "{{value0}} tok"
           },
           "ChecksPanel": {

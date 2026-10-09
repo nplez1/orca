@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { resolveAbsoluteDirOverride } from '../../shared/absolute-dir-override'
 import { wslGatedReadFile } from '../native-chat/wsl-transcript-fs-access'
 import { WslTranscriptFsError } from '../native-chat/wsl-transcript-fs-gate'
@@ -16,6 +16,17 @@ export function timestampMs(value: unknown): number {
     return Number.NaN
   }
   return value > 1_000_000_000_000 ? value : value * 1000
+}
+
+/**
+ * Session identity a transcript path carries. Pi-family names are
+ * `<stamp>_<uuid>.jsonl` and the uuid is what the header repeats as `id`, so
+ * this is how a lineage path resolves to the parent row's session id.
+ */
+export function sessionIdFromFileName(filePath: string): string {
+  const fileName = basename(filePath, extname(filePath))
+  const match = fileName.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  return match?.[0] ?? fileName
 }
 
 export function parseJsonObject(line: string): Record<string, unknown> | null {

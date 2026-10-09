@@ -14230,7 +14230,9 @@
             "project": "Project",
             "hostScopeAriaLabel": "Session History host: {{value0}}",
             "host": "Host",
-            "noEnabledAgents": "No agents enabled in Settings"
+            "noEnabledAgents": "No agents enabled in Settings",
+            "showSubagentSessions": "Show subagent sessions",
+            "hiddenSubagentSessions": "{{value0}} subagent sessions hidden (parent not loaded)"
           },
           "AiVaultSessionDetails": {
             "originalAsk": "Original ask",
@@ -14334,7 +14336,9 @@
             "deleteReasonNonLocalHost": "Only sessions on this device can be deleted.",
             "deleteReasonSyntheticPath": "This session can't be deleted from Orca.",
             "deleteReasonUnsupportedAgent": "{{value0}} sessions can't be deleted from Orca.",
-            "resumeInNewChat": "Resume in New Chat"
+            "resumeInNewChat": "Resume in New Chat",
+            "subagentSession_one": "{{count}} subagent session",
+            "subagentSession_other": "{{count}} subagent sessions"
           },
           "AiVaultSessionDeleteDialog": {
             "title": "Delete this session?",

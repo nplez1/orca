@@ -5,6 +5,7 @@ import {
   groupAiVaultSessions,
   type AiVaultSessionFilterState
 } from '../../../../shared/ai-vault-session-filters'
+import { nestAiVaultSubagentSessions } from '../../../../shared/ai-vault-subagent-nesting'
 // Why: the pure filter/group/query core now lives in /shared so the mobile
 // package can reuse it (Metro can't import renderer). Re-export for renderer
 // import parity. Not a byte-for-byte move: tokenizeQuery gained quoted
@@ -32,6 +33,10 @@ export type AiVaultSessionListGroup = {
   sessions: AiVaultSession[]
 }
 
+// Shared instance so a list with no sub-agent rows keeps referential identity
+// across rescans and does not re-render every row.
+const NO_SUBAGENT_CHILDREN: ReadonlyMap<string, readonly AiVaultSession[]> = new Map()
+
 export function useAiVaultPanelSessions(
   sessions: readonly AiVaultSession[],
   searching: boolean,
@@ -45,8 +50,9 @@ export function useAiVaultPanelSessions(
     activeProjectKey,
     sessionProjectById,
     projectLabelByKey,
-    hideEmptySessions
-  }: AiVaultSessionFilterState
+    hideEmptySessions,
+    showSubagentSessions
+  }: AiVaultSessionFilterState & { showSubagentSessions: boolean }
 ) {
   const filteredSessions = useMemo(
     () =>
@@ -77,6 +83,20 @@ export function useAiVaultPanelSessions(
       hideEmptySessions
     ]
   )
+  // Why: a sub-agent row belongs under its parent, so it is not a top-level
+  // row and must not be grouped as one. Search stays flat on purpose — a
+  // query is a request for the matching transcripts, sub-agents included.
+  const nesting = useMemo(
+    () =>
+      showSubagentSessions || searching
+        ? {
+            roots: filteredSessions,
+            childrenByParentId: NO_SUBAGENT_CHILDREN,
+            hiddenChildCount: 0
+          }
+        : nestAiVaultSubagentSessions(filteredSessions),
+    [filteredSessions, searching, showSubagentSessions]
+  )
   const groups = useMemo<AiVaultSessionListGroup[]>(
     () =>
       searching
@@ -84,8 +104,13 @@ export function useAiVaultPanelSessions(
           ? []
           : // The results bar above the list carries the count, so this group only holds rows.
             [{ key: 'search-results', label: null, sessions: [...filteredSessions] }]
-        : groupAiVaultSessions(filteredSessions, group, { sessionProjectById, projectLabelByKey }),
-    [searching, filteredSessions, group, projectLabelByKey, sessionProjectById]
+        : groupAiVaultSessions(nesting.roots, group, { sessionProjectById, projectLabelByKey }),
+    [searching, filteredSessions, nesting, group, projectLabelByKey, sessionProjectById]
   )
-  return { filteredSessions, groups }
+  return {
+    filteredSessions,
+    groups,
+    childrenByParentId: nesting.childrenByParentId,
+    hiddenSubagentCount: nesting.hiddenChildCount
+  }
 }

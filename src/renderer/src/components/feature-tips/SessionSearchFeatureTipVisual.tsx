@@ -12,7 +12,8 @@ import { highlightedSearchSnippet } from '@/components/right-sidebar/AiVaultSear
 import { DEFAULT_AI_VAULT_SESSION_LIMIT } from '@/components/right-sidebar/ai-vault-session-limit'
 import {
   DEFAULT_AI_VAULT_GROUP,
-  DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS
+  DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+  DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS
 } from '@/components/right-sidebar/ai-vault-view-defaults'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { translate } from '@/i18n/i18n'
@@ -51,6 +52,8 @@ const DEMO_HEADER_PROPS = {
   availableAgents: AI_VAULT_AGENTS,
   group: DEFAULT_AI_VAULT_GROUP,
   hideEmptySessions: DEFAULT_AI_VAULT_HIDE_EMPTY_SESSIONS,
+  showSubagentSessions: DEFAULT_AI_VAULT_SHOW_SUBAGENT_SESSIONS,
+  hiddenSubagentCount: 0,
   sessionLimit: DEFAULT_AI_VAULT_SESSION_LIMIT,
   adjustmentCount: 0,
   onQueryChange: noop,
@@ -60,6 +63,7 @@ const DEMO_HEADER_PROPS = {
   onAllAgentsEnabledChange: noop,
   onGroupChange: noop,
   onHideEmptySessionsChange: noop,
+  onShowSubagentSessionsChange: noop,
   onSessionLimitChange: noop,
   onReset: noop,
   onRefresh: noop
