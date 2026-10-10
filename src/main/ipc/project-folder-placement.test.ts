@@ -88,6 +88,23 @@ describe('project-folder layout', () => {
     expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe('/Code/orca/feature')
   })
 
+  it("treats a relative root as this repo's own folder", () => {
+    // A relative root resolves against each repo's path, so it is repo-scoped in effect: `..`
+    // points at the container itself and must be adopted, not nested inside.
+    const repo = makeRepo({
+      path: '/code/foo/main',
+      displayName: 'foo',
+      worktreeBasePath: undefined
+    })
+    const pathSettings = getWorktreePathSettings(repo, {
+      ...settings,
+      workspaceDir: '..'
+    })
+
+    expect(computeWorkspaceRoot(repo.path, pathSettings)).toBe('/code/foo')
+    expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe('/code/foo/feature')
+  })
+
   it('does not hand a project the shared root just because the root carries its name', () => {
     // Why: `workspaceDir` may legitimately be `~/orca` while a project is also named `orca`.
     // Adopting the root as that project's folder would put its worktrees beside every other

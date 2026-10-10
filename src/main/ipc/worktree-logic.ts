@@ -227,7 +227,13 @@ export function getWorktreePathSettings(
     ...(isProjectFolderLayout(worktreeLayoutMode)
       ? {
           projectFolderName: resolveProjectFolderName(repo),
-          projectFolderBaseIsRepoScoped: hasRepoWorktreeBasePath(repo)
+          // Why a relative root counts as repo-scoped: it resolves against this repo's own path,
+          // so it is this project's folder in effect. Treating only `worktreeBasePath` as
+          // repo-scoped made `workspaceDir: '..'` nest a folder inside the container it already
+          // had — and flag the repo for a relocation that would nest it again.
+          projectFolderBaseIsRepoScoped:
+            hasRepoWorktreeBasePath(repo) ||
+            isWorkspaceDirRelativeToRepo(repo.path, settings.workspaceDir)
         }
       : {}),
     // Why pass it through rather than resolve here: placement has to agree

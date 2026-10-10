@@ -144,6 +144,10 @@ export class RuntimeRepositoryRelocationController {
           await rename(from, to)
         },
         repairWorktrees: async (movedRepoPath) => {
+          // Why this is a hard requirement rather than a best effort: the move has already happened,
+          // and only repair re-points the linked worktrees at it. `git worktree repair` arrived in
+          // Git 2.29 — the repo's core-workflow baseline is 2.25 — so on an older host this throws a
+          // usage error and the move rolls back, which is the safe outcome but not a friendly one.
           await gitExecFileAsync(['worktree', 'repair'], { cwd: movedRepoPath })
         },
         setRepoPath: (repoId, newPath) => {

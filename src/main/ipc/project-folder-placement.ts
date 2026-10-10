@@ -105,8 +105,11 @@ export function projectContainerRoot(
   ) {
     return baseRoot
   }
-  // Why the container can be the checkout itself, or the base be the checkout: that is no container
-  // at all, and worktrees would land inside the working tree, which git allows without complaint.
+  // Why the container can be the checkout itself: that is no container at all, and worktrees would
+  // land inside the working tree, which git allows without complaint. Returning the base is the
+  // lesser evil there. A *base* that is the checkout is a misconfiguration no layout can repair —
+  // `worktreeBasePath` pointing at the checkout itself — so this keeps the previous behaviour
+  // rather than pretending to solve it.
   if (areWorktreePathsEqual(container, repoPath) || areWorktreePathsEqual(baseRoot, repoPath)) {
     return baseRoot
   }

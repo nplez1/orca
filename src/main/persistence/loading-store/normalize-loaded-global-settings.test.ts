@@ -7,12 +7,22 @@ import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 
-// Simulates a profile created before the dedicated Experimental switch was persisted.
-function normalizeLegacyProfile(overrides: Record<string, unknown>): PersistedState['settings'] {
+// Simulates a profile created before the fields under test were persisted. A profile written
+// before a field existed has no such key at all, which is the only shape that exercises the
+// load-time derivation — seeding from today's defaults would carry the new value in and pass for
+// the wrong reason.
+function normalizeLegacyProfile(
+  overrides: Record<string, unknown>,
+  omit: readonly (keyof GlobalSettings)[] = [
+    'experimentalActivity',
+    'experimentalAgentDashboardPopout'
+  ]
+): PersistedState['settings'] {
   const defaults = getDefaultPersistedState(homedir())
   const settings: Partial<GlobalSettings> = { ...defaults.settings }
-  delete settings.experimentalActivity
-  delete settings.experimentalAgentDashboardPopout
+  for (const key of omit) {
+    delete settings[key]
+  }
   Object.assign(settings, overrides)
   const parsed: PersistedState = { ...defaults, settings: settings as GlobalSettings }
   const noop = (): void => {}
@@ -112,5 +122,50 @@ describe('chat appearance settings', () => {
         nativeChatAppearance: { fontSize: 14, codeFontSize: 12, width: 'comfortable' }
       }).nativeChatAppearance
     ).toBeUndefined()
+  })
+})
+
+describe('worktree layout mode for profiles written before it existed', () => {
+  it('keeps an explicit flat opt-out flat instead of taking the new default', () => {
+    // Why: `nestWorkspaces: false` was a deliberate choice. The mode default is project-folder,
+    // and the persisted settings are spread over the defaults, so without this derivation the
+    // new default would silently move those users into the layout they turned off.
+    const settings = normalizeLegacyProfile({ nestWorkspaces: false }, ['worktreeLayoutMode'])
+
+    expect(settings.worktreeLayoutMode).toBe('flat')
+  })
+
+  it('reads an explicit nested opt-in as repo-nested', () => {
+    const settings = normalizeLegacyProfile({ nestWorkspaces: true }, ['worktreeLayoutMode'])
+
+    expect(settings.worktreeLayoutMode).toBe('repo-nested')
+  })
+
+  it('lets a persisted mode win over the legacy boolean', () => {
+    const settings = normalizeLegacyProfile(
+      { nestWorkspaces: false, worktreeLayoutMode: 'project-folder' },
+      ['worktreeLayoutMode']
+    )
+
+    expect(settings.worktreeLayoutMode).toBe('project-folder')
+  })
+
+  it('gives a fresh install the new default', () => {
+    // A first run has no settings file, so nothing overrides the default.
+    const defaults = getDefaultPersistedState(homedir())
+    const settings: Partial<GlobalSettings> = { ...defaults.settings }
+    delete settings.worktreeLayoutMode
+    const parsed: PersistedState = { ...defaults, settings: settings as GlobalSettings }
+    const noop = (): void => {}
+    const terminal = prepareLoadedTerminalSettings(parsed, noop)
+    const profile = prepareLoadedProfileSettings(parsed, defaults, noop)
+
+    // An existing-but-modeless profile derives from the boolean, which is the same answer the
+    // default gives while `nestWorkspaces` defaults to true.
+    expect(normalizeLoadedGlobalSettings(parsed, terminal, profile).worktreeLayoutMode).toBe(
+      'repo-nested'
+    )
+    // The untouched default object is what a genuinely new install starts from.
+    expect(defaults.settings.worktreeLayoutMode).toBe('project-folder')
   })
 })

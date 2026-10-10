@@ -10,7 +10,10 @@ import {
   isProjectFolderLayout,
   resolveWorktreeLayoutMode
 } from '../../shared/orca-workspace-layout'
-import { resolveConfiguredWorktreeBasePaths } from '../../shared/worktree/configured-worktree-base-path'
+import {
+  isRuntimePathAbsoluteForRepo,
+  resolveConfiguredWorktreeBasePaths
+} from '../../shared/worktree/configured-worktree-base-path'
 import { buildKnownOrcaWorkspaceLayouts } from '../../shared/worktree/ownership'
 import { resolveProjectFolderName } from '../ipc/worktree-logic'
 import type { SessionSearchScopeCatalog } from './session-search-scope-catalog'
@@ -63,6 +66,11 @@ export function managedWorktreeDirectories(
   const configured = new Set(
     resolveConfiguredWorktreeBasePaths(repo).map(normalizeRuntimePathForComparison)
   )
+  // Why a relative root is repo-scoped too: it resolves against this repo's own path, so it is
+  // this project's folder in effect — the same rule placement applies.
+  const baseIsRepoScoped = (layoutPath: string): boolean =>
+    configured.has(normalizeRuntimePathForComparison(layoutPath)) ||
+    !isRuntimePathAbsoluteForRepo(repo.path, settings.workspaceDir)
   const repoName = getRuntimePathBasename(repo.path).replace(/\.git$/, '')
   const directories: string[] = []
   for (const layout of buildKnownOrcaWorkspaceLayouts(settings, repo)) {
@@ -75,7 +83,7 @@ export function managedWorktreeDirectories(
       // Why the same adoption rule placement uses: a repo-scoped base named after the project IS
       // the container, so looking in a folder below it would search the wrong directory.
       const adoptsBase =
-        configured.has(normalizeRuntimePathForComparison(layout.path)) &&
+        baseIsRepoScoped(layout.path) &&
         normalizeRuntimePathForComparison(getRuntimePathBasename(layout.path)) ===
           normalizeRuntimePathForComparison(containerName)
       directories.push(adoptsBase ? layout.path : resolveRuntimePath(layout.path, containerName))
