@@ -61,7 +61,7 @@ export function hasStoredToken(siteId: string): boolean {
   return cachedTokens.has(siteId) || credentialFileHasContent(getTokenPath(siteId))
 }
 
-function normalizeSite(input: unknown): JiraSite | null {
+export function normalizeSite(input: unknown): JiraSite | null {
   if (!input || typeof input !== 'object') {
     return null
   }

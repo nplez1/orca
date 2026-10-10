@@ -10,6 +10,8 @@ import {
   readStoredCredentialToken,
   writeEncryptedCredential
 } from '../integration-credential-file'
+import { readCredentialFileProtection } from '../credential-file-protection'
+import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
 /**
  * The user's configured Jenkins servers, on disk as non-secret profiles
@@ -59,7 +61,7 @@ function readServersFile(): JenkinsServersFile {
   }
 }
 
-function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
+export function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
   const record = asRecord(input)
   if (
     !record ||
@@ -92,6 +94,11 @@ export function listJenkinsServers(): JenkinsServerProfile[] {
 
 export function hasJenkinsServerToken(serverId: string): boolean {
   return existsSync(getTokenPath(serverId))
+}
+
+/** How a server's stored token sits on disk, or null when it has none. */
+export function getJenkinsServerTokenProtection(serverId: string): SecretAtRestProtection | null {
+  return readCredentialFileProtection(getTokenPath(serverId))
 }
 
 /**

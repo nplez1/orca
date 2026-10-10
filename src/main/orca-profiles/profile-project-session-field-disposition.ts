@@ -158,9 +158,9 @@ type UnclassifiedSessionField = Exclude<
 const exhaustive: [UnclassifiedSessionField] extends [never] ? true : never = true
 void exhaustive
 
-export const SESSION_FIELDS = Object.keys(
-  WORKSPACE_SESSION_FIELD_DISPOSITION
-) as (keyof WorkspaceSessionState)[]
+export const SESSION_FIELDS = Object.keys(WORKSPACE_SESSION_FIELD_DISPOSITION).filter(
+  (field): field is keyof WorkspaceSessionState => field in WORKSPACE_SESSION_FIELD_DISPOSITION
+)
 
 export const SESSION_FIELDS_PRUNED_BY_OWNER_KEY = SESSION_FIELDS.filter(
   (field) => WORKSPACE_SESSION_FIELD_DISPOSITION[field].onRepoRemoval === 'prunedByOwnerKey'
