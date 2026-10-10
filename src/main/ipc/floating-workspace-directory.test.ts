@@ -62,7 +62,7 @@ describe('floating workspace directory authorization', () => {
     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'orca-floating-workspace-'))
     homeDir = path.join(tempRoot, 'home')
     userDataDir = path.join(tempRoot, 'user-data')
-    floatingWorkspaceDir = path.join(homeDir, '.orca', 'floating-workspace')
+    floatingWorkspaceDir = path.join(homeDir, '.orca-np', 'floating-workspace')
     await mkdir(homeDir)
     installFakeAppEnvironment({
       getPath: (name) => {

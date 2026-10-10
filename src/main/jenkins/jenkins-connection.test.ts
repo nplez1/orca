@@ -133,7 +133,7 @@ describe('Jenkins server profiles', () => {
     }
     const tokenPath = join(
       tempHome,
-      '.orca',
+      '.orca-np',
       'jenkins-tokens',
       `${Buffer.from(saved.server.id).toString('base64url')}.enc`
     )
