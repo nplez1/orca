@@ -27,6 +27,17 @@ export function createHostSettingsApiKeyPort(input: {
 }): HostSettingsCredentialPort {
   const { kind, id, label, store, canSeal } = input
 
+  // Why swallowed: listing runs to build one payload of many credentials, and a key this host cannot
+  // decrypt is one it cannot send — it must not stop the rest, and it must be reported as unreadable
+  // rather than as absent, because absent means deleted to the other end.
+  const readPayload = (): string | null => {
+    try {
+      return store.read()
+    } catch {
+      return null
+    }
+  }
+
   const protectionOf = (credentialId: string): SecretAtRestProtection | null => {
     if (credentialId !== id || !store.has()) {
       return null
@@ -40,19 +51,13 @@ export function createHostSettingsApiKeyPort(input: {
     kind,
     canSeal,
     protectionOf,
+    unreadableIds: () => (store.has() && readPayload() === null ? [id] : []),
     list: () => {
       const protection = protectionOf(id)
       if (protection === null) {
         return []
       }
-      let payload: string | null
-      try {
-        payload = store.read()
-      } catch {
-        // Why skipped rather than thrown: listing runs to build one payload of many credentials, and
-        // a key this host cannot decrypt is simply one it cannot send.
-        return []
-      }
+      const payload = readPayload()
       if (payload === null) {
         return []
       }

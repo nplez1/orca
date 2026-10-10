@@ -1,5 +1,6 @@
 import type { HostSettingsReplicationPayload } from '../../shared/host-settings-replication'
 import { HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION } from '../../shared/host-settings-replication'
+import { unreadableCredentialIds } from './host-settings-credential-port'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
 
 /**
@@ -15,7 +16,12 @@ export function buildHostSettingsSnapshot(
   previousCredentialIds: readonly string[] = []
 ): HostSettingsReplicationPayload {
   const upserts = ports.flatMap((port) => port.list())
-  const held = new Set(upserts.map((credential) => credential.id))
+  // Why unreadable ids count as held: "absent from upserts" otherwise means "deleted", so a keyring
+  // this machine cannot open for a moment would read as a deletion on every host. Reported separately
+  // and excluded from the removal list, which is the whole difference between a revoked credential and
+  // an unreadable one.
+  const unreadable = unreadableCredentialIds(ports)
+  const held = new Set([...upserts.map((credential) => credential.id), ...unreadable])
   return {
     version: HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,
     baseRevision: null,
@@ -24,7 +30,8 @@ export function buildHostSettingsSnapshot(
     // Why a snapshot still names removals: a host restarts with no revision of its own, so a snapshot
     // is the only push that can clear what it already holds. A removal lost that way would never be
     // re-sent, because the delta after it does not name the credential either.
-    removals: previousCredentialIds.filter((id) => !held.has(id))
+    removals: previousCredentialIds.filter((id) => !held.has(id)),
+    unreadable
   }
 }
 
@@ -43,7 +50,8 @@ export function buildHostSettingsDelta(input: {
   baseRevision: number
 }): HostSettingsReplicationPayload {
   const upserts = input.ports.flatMap((port) => port.list())
-  const held = new Set(upserts.map((credential) => credential.id))
+  const unreadable = unreadableCredentialIds(input.ports)
+  const held = new Set([...upserts.map((credential) => credential.id), ...unreadable])
   return {
     version: HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,
     baseRevision: input.baseRevision,
@@ -51,6 +59,7 @@ export function buildHostSettingsDelta(input: {
     // Why re-send everything rather than only the changed ids: a port reports what it holds, not when
     // it changed, and a wrong "unchanged" leaves a host silently holding a stale credential.
     upserts,
-    removals: input.previousCredentialIds.filter((id) => !held.has(id))
+    removals: input.previousCredentialIds.filter((id) => !held.has(id)),
+    unreadable
   }
 }

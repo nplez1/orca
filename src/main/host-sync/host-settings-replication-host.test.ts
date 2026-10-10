@@ -38,6 +38,7 @@ function fakePort(
     kind: CREDENTIAL_ID,
     held,
     canSeal: () => options.canSeal ?? true,
+    unreadableIds: () => [],
     protectionOf: (id) => (held.has(id) ? writeProtection : null),
     list: () => [],
     apply: (incoming) => {
@@ -85,14 +86,25 @@ describe('the host-settings RPC surface', () => {
     const tooLong = ApplyHostSettingsReplicationParams.safeParse({
       payload: { ...snapshot(1), upserts: [credential({ payload: 'x'.repeat(64_001) })] }
     })
-    const extraKey = ApplyHostSettingsReplicationParams.safeParse({
-      payload: { ...snapshot(1), surprise: true }
+    const unknownCredentialKey = ApplyHostSettingsReplicationParams.safeParse({
+      payload: { ...snapshot(1), upserts: [{ ...credential(), surprise: true }] }
     })
 
     expect(tooMany.success).toBe(false)
     expect(tooLong.success).toBe(false)
-    // Why strict: an unknown key is a newer sender's field this build would silently ignore.
-    expect(extraKey.success).toBe(false)
+    expect(unknownCredentialKey.success).toBe(false)
+  })
+
+  it('tolerates an unknown payload key, because a new optional field must be survivable', () => {
+    // Why not `.strict()` on the payload: refusing it makes a newer sender's optional field an outage,
+    // which is the opposite of what docs/reference/remote-wire-compatibility.md asks for. The credential
+    // itself stays strict — an unknown key there would be a field this build silently ignores on a
+    // secret.
+    expect(
+      ApplyHostSettingsReplicationParams.safeParse({
+        payload: { ...snapshot(1), aFieldFromANewerMain: true }
+      }).success
+    ).toBe(true)
   })
 })
 
@@ -199,6 +211,84 @@ describe('applying a payload on the host', () => {
       report: { outcomes: { [CREDENTIAL_ID]: 'refusedWeakerProtection' } }
     })
     expect(port.held.size).toBe(0)
+  })
+
+  it('lets a re-paired or replacement main take the pin with a snapshot, but not with a delta', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+
+    applyHostSettingsReplication(snapshot(1), {
+      registry: registry(fakePort()),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'main-a'
+    })
+
+    // Why this must be allowed: the fingerprint is derived from the pairing token, and every new pairing
+    // offer mints a fresh one — so re-pairing the same laptop changes it. Refusing forever left a host
+    // nothing could ever configure again, silently.
+    const replacement = applyHostSettingsReplication(snapshot(2), {
+      registry: registry(fakePort()),
+      holdings,
+      now: NOW,
+      callerFingerprint: 'main-b'
+    })
+    expect(replacement).toMatchObject({ decision: 'applied' })
+    expect(holdings.read().mainFingerprint).toBe('main-b')
+
+    // A delta still may not move it, so a second paired client cannot take over by syncing.
+    expect(
+      applyHostSettingsReplication(
+        { ...snapshot(3), baseRevision: 2 },
+        { registry: registry(fakePort()), holdings, now: NOW, callerFingerprint: 'main-a' }
+      )
+    ).toEqual({ decision: 'refusedNotTheMain' })
+  })
+
+  it('does not strand a credential the main holds but could not read', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    const port = fakePort()
+
+    applyHostSettingsReplication(snapshot(1), { registry: registry(port), holdings, now: NOW })
+    // The main's keyring was locked, so it named the credential as unreadable rather than absent.
+    const result = applyHostSettingsReplication(
+      { ...snapshot(2, []), unreadable: [CREDENTIAL_ID] },
+      { registry: registry(port), holdings, now: NOW }
+    )
+
+    expect(result).toMatchObject({ decision: 'applied' })
+    expect(port.held.has(CREDENTIAL_ID)).toBe(true)
+    expect(holdings.read().ids).toEqual([CREDENTIAL_ID])
+  })
+
+  it('keeps going when one removal fails, and does not claim it is gone', () => {
+    const holdings = createInMemoryHostSettingsReplicationHoldings()
+    const stubborn = credential({ id: 'api-key:other' })
+    const port = fakePort()
+    port.held.set(CREDENTIAL_ID, 'old')
+    port.held.set('api-key:other', 'stuck')
+    port.remove = (id: string) => {
+      if (id === 'api-key:other') {
+        throw Object.assign(new Error('busy'), { code: 'EBUSY' })
+      }
+      port.held.delete(id)
+    }
+
+    const result = applyHostSettingsReplication(
+      { ...snapshot(1, [], [CREDENTIAL_ID, 'api-key:other']) },
+      { registry: registry(port), holdings, now: NOW }
+    )
+
+    // Why both outcomes matter: an uncaught throw here used to abort the whole apply, so the second
+    // removal never ran and the main read the failure as an unreachable host.
+    expect(result).toMatchObject({
+      decision: 'applied',
+      report: {
+        outcomes: { [CREDENTIAL_ID]: 'removed', 'api-key:other': 'removalUnverified' }
+      }
+    })
+    expect(stubborn.id).toBe('api-key:other')
+    expect(port.held.has('api-key:other')).toBe(true)
+    expect(holdings.read().ids).toEqual(['api-key:other'])
   })
 
   it('reports an adapter that throws without losing the rest of the payload', () => {

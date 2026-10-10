@@ -255,8 +255,11 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   notifications: 'replicated',
   promptCacheTimerEnabled: 'replicated',
   promptCacheTtlMs: 'replicated',
-  codexManagedAccounts: 'replicated',
-  claudeManagedAccounts: 'replicated',
+  // Why host-local: each account entry carries a managed home path, a WSL distro and a WSL home path
+  // (see `managed-account-types.ts`), so the same list on a host that has neither names directories that
+  // do not exist there. The *active* selections were already host-local for the same reason.
+  codexManagedAccounts: 'hostLocal',
+  claudeManagedAccounts: 'hostLocal',
   // Why telemetry is host-local: it carries an install id, so replicating it merges every machine into
   // one telemetry identity. Only the opt-in itself is a user decision, and that is not separable here.
   telemetry: 'hostLocal',

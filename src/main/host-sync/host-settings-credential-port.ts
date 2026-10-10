@@ -14,6 +14,14 @@ export type HostSettingsCredentialPort = {
   kind: string
   /** Everything this host could send. Empty when it holds none. */
   list(): ReplicatedHostCredential[]
+  /**
+   * Ids this host holds but cannot read right now, so the main can tell "deleted" from "unreadable".
+   *
+   * Why required rather than optional: a port that forgot it would let a transient keyring failure on
+   * the main read as a deletion everywhere, and the host would throw away a working credential. Making
+   * it part of the port means a new adapter has to answer it.
+   */
+  unreadableIds(): string[]
   /** Whether this host can store a value sealed at rest at all. */
   canSeal(): boolean
   /** How the value sits on this host, or null when it holds none. */
@@ -61,4 +69,9 @@ export function createHostSettingsCredentialRegistry(
     forCredentialId: (id) =>
       ordered.find((port) => id === port.kind || id.startsWith(`${port.kind}:`))
   }
+}
+
+/** Ids any port holds but cannot read, across every adapter. */
+export function unreadableCredentialIds(ports: readonly HostSettingsCredentialPort[]): string[] {
+  return ports.flatMap((port) => port.unreadableIds())
 }

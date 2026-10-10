@@ -88,7 +88,12 @@ export function applyHostSettingsPayload(input: {
       try {
         port.remove(credential.id)
       } catch (error) {
+        // Why `applyFailed` and not a refusal: the weaker copy is still on disk, so neither side may
+        // treat this as "the host does not hold it" — a refusal would take it out of both the host's
+        // record and the main's ledger, and nothing would ever clean it up.
         console.warn(`[orca] Could not withdraw downgraded credential ${credential.id}`, error)
+        outcomes[credential.id] = 'applyFailed'
+        continue
       }
       outcomes[credential.id] = 'refusedWeakerProtection'
       continue
@@ -102,7 +107,16 @@ export function applyHostSettingsPayload(input: {
       outcomes[id] = 'refusedUnknownKind'
       continue
     }
-    port.remove(id)
+    // Why per removal: an unlink can fail for reasons that have nothing to do with us — EBUSY under a
+    // Windows antivirus scan, EPERM on a locked file — and an uncaught throw here aborted the whole
+    // apply, so later removals never ran and the upserts that had already landed were never recorded.
+    try {
+      port.remove(id)
+    } catch (error) {
+      console.warn(`[orca] Could not remove replicated credential ${id}`, error)
+      outcomes[id] = 'removalUnverified'
+      continue
+    }
     // Why re-read rather than trust the unlink: "the token is gone" is a security claim, and the
     // only honest evidence for it is the store that would still answer with the token.
     outcomes[id] = port.protectionOf(id) === null ? 'removed' : 'removalUnverified'

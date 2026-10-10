@@ -46,6 +46,22 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
   return {
     kind: HOST_SETTINGS_JENKINS_KIND,
     canSeal: canSealReplicatedCredential,
+    unreadableIds: () => {
+      const unreadable: string[] = []
+      for (const server of listJenkinsServers()) {
+        if (getJenkinsServerTokenProtection(server.id) === null) {
+          continue
+        }
+        try {
+          if (readJenkinsServerToken(server.id) === null) {
+            unreadable.push(`${HOST_SETTINGS_JENKINS_KIND}:${server.id}`)
+          }
+        } catch {
+          unreadable.push(`${HOST_SETTINGS_JENKINS_KIND}:${server.id}`)
+        }
+      }
+      return unreadable
+    },
     protectionOf: (id) => {
       const serverId = serverIdOf(id)
       return serverId === null ? null : getJenkinsServerTokenProtection(serverId)

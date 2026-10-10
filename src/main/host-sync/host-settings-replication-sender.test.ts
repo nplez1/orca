@@ -18,6 +18,7 @@ function port(id: string): HostSettingsCredentialPort {
   return {
     kind: id,
     canSeal: () => true,
+    unreadableIds: () => [],
     protectionOf: () => 'sealed',
     list: () => [credential],
     apply: () => {},
@@ -28,6 +29,7 @@ function port(id: string): HostSettingsCredentialPort {
 const empty: HostSettingsCredentialPort = {
   kind: 'empty',
   canSeal: () => true,
+  unreadableIds: () => [],
   protectionOf: () => null,
   list: () => [],
   apply: () => {},
@@ -35,6 +37,29 @@ const empty: HostSettingsCredentialPort = {
 }
 
 describe('building what the main sends', () => {
+  it('never names an unreadable credential as a removal', () => {
+    // Why this is the dangerous case: "absent from upserts" otherwise means "deleted", so a transient
+    // keyring failure on the main would read as a deletion on every host and the host would throw away
+    // a working credential.
+    const unreadable: HostSettingsCredentialPort = {
+      ...empty,
+      kind: 'api-key:deepseek',
+      unreadableIds: () => ['api-key:deepseek']
+    }
+
+    const snapshot = buildHostSettingsSnapshot([unreadable], 2, ['api-key:deepseek'])
+
+    expect(snapshot.removals).toEqual([])
+    expect(snapshot.unreadable).toEqual(['api-key:deepseek'])
+  })
+
+  it('still names a credential it no longer holds as a removal', () => {
+    const payload = buildHostSettingsSnapshot([empty], 2, ['api-key:deepseek'])
+
+    expect(payload.removals).toEqual(['api-key:deepseek'])
+    expect(payload.unreadable).toEqual([])
+  })
+
   it('sends every held credential as a snapshot a brand-new host can apply', () => {
     const payload = buildHostSettingsSnapshot([port('api-key:deepseek'), port('jira:site-1')], 1)
 

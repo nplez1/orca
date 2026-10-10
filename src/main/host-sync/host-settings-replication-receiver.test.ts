@@ -59,6 +59,7 @@ function fakePort(
     kind: CREDENTIAL_ID,
     held,
     canSeal: () => options.canSeal ?? true,
+    unreadableIds: () => [],
     protectionOf: (id: string) => (id === CREDENTIAL_ID ? held.protection : null),
     list: () => [],
     apply: (incoming: ReplicatedHostCredential) => {

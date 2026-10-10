@@ -22,6 +22,7 @@ function port(held: boolean): HostSettingsCredentialPort {
   return {
     kind: CREDENTIAL_ID,
     canSeal: () => true,
+    unreadableIds: () => [],
     protectionOf: () => (held ? 'sealed' : null),
     list: () =>
       held
@@ -281,6 +282,7 @@ describe('applying what the main sent', () => {
     forCredentialId: () => ({
       kind: CREDENTIAL_ID,
       canSeal: () => true,
+      unreadableIds: () => [],
       protectionOf: () => null,
       list: () => [],
       apply: vi.fn(),

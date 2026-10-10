@@ -55,13 +55,17 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
             undefined,
             CAPABILITY_PROBE_TIMEOUT_MS
           )
+          // Why a failed probe is not a "no": only a status the host actually answered, without the
+          // capability, is evidence it cannot receive. A transport error, a timeout or an internal
+          // error says nothing about the host's build, and treating it as unsupported would stop every
+          // push to a host that was merely busy. The refusal path decides those.
           if (!response.ok) {
-            return false
+            return true
           }
-          const capabilities = readCapabilities(response.result)
-          return capabilities.includes(HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY)
+          return readCapabilities(response.result).includes(
+            HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY
+          )
         } catch {
-          // A probe that cannot run is not evidence the host cannot receive; the refusal path decides.
           return true
         }
       }

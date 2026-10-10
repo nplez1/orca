@@ -50,6 +50,22 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     // Why always true: a Jira token lands in the same safeStorage-backed store as the provider keys,
     // so a host that can hold one of those sealed can hold these.
     canSeal: canSealReplicatedCredential,
+    unreadableIds: () => {
+      const unreadable: string[] = []
+      for (const site of getSiteFile().sites) {
+        if (!hasStoredToken(site.id) || getSiteTokenProtection(site.id) === null) {
+          continue
+        }
+        try {
+          if (readToken(site.id) === null) {
+            unreadable.push(`${HOST_SETTINGS_JIRA_KIND}:${site.id}`)
+          }
+        } catch {
+          unreadable.push(`${HOST_SETTINGS_JIRA_KIND}:${site.id}`)
+        }
+      }
+      return unreadable
+    },
     protectionOf: (id) => {
       const siteId = siteIdOf(id)
       return siteId !== null && hasStoredToken(siteId) ? getSiteTokenProtection(siteId) : null

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
 
@@ -76,10 +76,15 @@ export function createFileHostSettingsReplicationHoldings(
     },
     write: (next) => {
       mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({ version: 1, ...next }, null, 2), {
+      // Why staged then renamed: `writeFileSync` truncates before it writes, so a crash leaves bad
+      // JSON — which reads back as an empty record, dropping the pinned main and every replicated id,
+      // so a revoked credential would stay on the host with nothing left to find it by.
+      const staging = `${path}.tmp-${process.pid}`
+      writeFileSync(staging, JSON.stringify({ version: 1, ...next }, null, 2), {
         encoding: 'utf-8',
         mode: 0o600
       })
+      renameSync(staging, path)
     }
   }
 }

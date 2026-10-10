@@ -19,6 +19,7 @@ function port(held: boolean): HostSettingsCredentialPort {
   return {
     kind: CREDENTIAL_ID,
     canSeal: () => true,
+    unreadableIds: () => [],
     protectionOf: () => (held ? 'sealed' : null),
     list: () =>
       held

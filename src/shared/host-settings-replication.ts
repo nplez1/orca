@@ -64,6 +64,15 @@ export type HostSettingsReplicationPayload = {
   upserts: ReplicatedHostCredential[]
   /** Credential ids the main no longer holds, so the host must drop them. */
   removals: string[]
+  /**
+   * Ids the main still holds but cannot read *right now* — a locked keyring, a denied Keychain ACL.
+   *
+   * Why they travel rather than being inferred: "absent from `upserts`" otherwise means "deleted", so
+   * a transient read failure on the main would read as a deletion everywhere and the host would throw
+   * away a working copy. This is the one signal that separates the two, and it is why the list is part
+   * of the payload rather than a second call.
+   */
+  unreadable?: string[]
 }
 
 /** Whether a host may apply a payload as it stands, or has to ask for a snapshot first. */

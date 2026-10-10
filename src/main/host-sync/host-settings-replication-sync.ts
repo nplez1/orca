@@ -14,6 +14,8 @@ import {
 const APPLY_TIMEOUT_MS = 20_000
 /** Collapses a burst of saves — a settings pane writes several fields — into one delta. */
 const CHANGE_DEBOUNCE_MS = 250
+/** How long to wait before retrying a first push that did not land. */
+const RETRY_DELAY_MS = 2_000
 
 type SendApplyRequest = (
   pairing: PairingOffer,
@@ -70,6 +72,8 @@ export function createHostSettingsReplicationSync(input: {
   ledger?: HostSettingsCredentialLedger
   /** Overridable so a test does not wait on a real timer. */
   scheduleDebounce?: (run: () => void) => () => void
+  /** Overridable so a test does not wait for the retry of a first push that never landed. */
+  scheduleRetry?: (run: () => void) => void
   /** Whether the host advertises replication; forwarded to the transport's probe. */
   supportsReplication?: (environmentId: string) => Promise<boolean>
 }): HostSettingsReplicationSync {
@@ -131,10 +135,13 @@ export function createHostSettingsReplicationSync(input: {
   const pushedGenerations = new Map<string, number>()
   const unsupportedHosts = new Set<string>()
   const queues = new Map<string, Promise<unknown>>()
+  /** One retry per host for a first push that did not land. */
+  const retries = new Map<string, number>()
 
   function enqueue(
     environmentId: string,
-    reason: 'attach' | 'changed'
+    reason: 'attach' | 'changed',
+    transportGeneration: number
   ): Promise<HostSettingsReplicationPublishOutcome> {
     const previous = queues.get(environmentId) ?? Promise.resolve()
     const next = previous
@@ -147,7 +154,7 @@ export function createHostSettingsReplicationSync(input: {
         if (transport.supportsReplication !== undefined) {
           const supported = await transport.supportsReplication(environmentId)
           if (!supported) {
-            stopAsking(environmentId)
+            stopAsking(environmentId, transportGeneration)
             return { kind: 'refused', reason: 'unsupportedMethod' } as const
           }
         }
@@ -160,8 +167,21 @@ export function createHostSettingsReplicationSync(input: {
           outcome.kind === 'refused' &&
           (outcome.reason === 'unsupportedMethod' || outcome.reason === 'notTheMain')
         ) {
-          stopAsking(environmentId)
+          stopAsking(environmentId, transportGeneration)
+          return outcome
         }
+        if (outcome.kind === 'unreachable') {
+          // Why one retry: the first push rides a connection that has just come up, and a socket error
+          // or a timeout there would otherwise leave a freshly paired host empty until some credential
+          // happens to change — the opposite of "install it and start using it".
+          const attempts = retries.get(environmentId) ?? 0
+          if (attempts < 1) {
+            retries.set(environmentId, attempts + 1)
+            scheduleRetry(() => void enqueue(environmentId, reason, transportGeneration))
+            return outcome
+          }
+        }
+        retries.delete(environmentId)
         return outcome
       })
       // Why caught here rather than left to the caller: every call site is a `void enqueue(...)`, so a
@@ -173,13 +193,23 @@ export function createHostSettingsReplicationSync(input: {
     return next
   }
 
-  /** Stop pushing to a host for this connection, without forgetting what it holds. */
-  function stopAsking(environmentId: string): void {
+  /**
+   * Stop pushing to a host for this connection, without forgetting what it holds.
+   *
+   * Why the generation is checked: a push queued on the previous connection can settle after the host
+   * has reconnected, and deleting the new connection's entry there would leave the host attached but
+   * never pushed again.
+   */
+  function stopAsking(environmentId: string, transportGeneration: number): void {
     unsupportedHosts.add(environmentId)
-    connectedGenerations.delete(environmentId)
+    if (connectedGenerations.get(environmentId) === transportGeneration) {
+      connectedGenerations.delete(environmentId)
+    }
   }
 
   const schedule = input.scheduleDebounce ?? defaultDebounce
+  const scheduleRetry =
+    input.scheduleRetry ?? ((run: () => void) => void setTimeout(run, RETRY_DELAY_MS))
   let cancelPending: (() => void) | null = null
 
   return {
@@ -202,7 +232,7 @@ export function createHostSettingsReplicationSync(input: {
       // attempt may have been upgraded or re-paired since, and nothing else would ever ask it again.
       unsupportedHosts.delete(environmentId)
       pushedGenerations.set(environmentId, transportGeneration)
-      void enqueue(environmentId, 'attach')
+      void enqueue(environmentId, 'attach', transportGeneration)
     },
     notifyChanged: () => {
       if (connectedGenerations.size === 0) {
@@ -211,8 +241,8 @@ export function createHostSettingsReplicationSync(input: {
       cancelPending?.()
       cancelPending = schedule(() => {
         cancelPending = null
-        for (const environmentId of connectedGenerations.keys()) {
-          void enqueue(environmentId, 'changed')
+        for (const [environmentId, transportGeneration] of connectedGenerations) {
+          void enqueue(environmentId, 'changed', transportGeneration)
         }
       })
     },
@@ -221,6 +251,7 @@ export function createHostSettingsReplicationSync(input: {
       pushedGenerations.delete(environmentId)
       unsupportedHosts.delete(environmentId)
       queues.delete(environmentId)
+      retries.delete(environmentId)
       publisher.forgetHost(environmentId)
     },
     drain: async () => {

@@ -32,7 +32,7 @@ export type { HostSettingsReplicationApplyResult }
  */
 type HostSettingsIncomingPayload = Pick<
   HostSettingsReplicationPayload,
-  'baseRevision' | 'revision' | 'upserts' | 'removals'
+  'baseRevision' | 'revision' | 'upserts' | 'removals' | 'unreadable'
 > & { version: number }
 
 /** Supplied by the RPC method; the in-memory default is for a test and for a host mid-startup. */
@@ -94,7 +94,14 @@ export function applyHostSettingsReplication(
   if (
     callerFingerprint !== undefined &&
     record.mainFingerprint !== null &&
-    record.mainFingerprint !== callerFingerprint
+    record.mainFingerprint !== callerFingerprint &&
+    // Why a snapshot may replace the pin: the fingerprint is derived from the pairing token, and every
+    // new pairing offer mints a fresh one — so re-pairing the same laptop, or replacing it, changes the
+    // fingerprint. Refusing that forever left a host nothing could ever configure again, silently, which
+    // is worse than the problem the pin solves. A snapshot is the push that establishes a relationship;
+    // a *delta* from a different caller is still refused, so a second paired client cannot delete what
+    // the first configured merely by syncing.
+    payload.baseRevision !== null
   ) {
     return { decision: 'refusedNotTheMain' }
   }
@@ -118,16 +125,24 @@ export function applyHostSettingsReplication(
     baseRevision: payload.baseRevision,
     revision: payload.revision,
     upserts: payload.upserts,
-    removals: payload.removals
+    removals: payload.removals,
+    unreadable: payload.unreadable
   }
 
   // Why a snapshot clears what replication previously put here, and nothing else: the snapshot is
   // authoritative over the set it owns, which is how a removal reaches a host that restarted and no
   // longer has a revision for the delta that carried it. The host's own stores may also hold
   // credentials the user entered on this machine, and those are not in this list.
+  //
+  // Why `unreadable` is excluded: the main still holds those and could not read them for now, so
+  // treating them as absent would delete a working credential on every host because a keyring on one
+  // machine was locked.
   const incoming = new Set(contractPayload.upserts.map((credential) => credential.id))
+  const unreadable = new Set(contractPayload.unreadable ?? [])
   const stranded =
-    contractPayload.baseRevision === null ? record.ids.filter((id) => !incoming.has(id)) : []
+    contractPayload.baseRevision === null
+      ? record.ids.filter((id) => !incoming.has(id) && !unreadable.has(id))
+      : []
 
   const { report, state } = applyHostSettingsPayload({
     payload:
@@ -147,6 +162,14 @@ export function applyHostSettingsReplication(
     record.ids
       .filter((id) => !removed.has(id))
       .concat(
+        // Why an unverified removal is recorded as held: the host demonstrably still has it, and without
+        // this the record would stop naming it — so when the main's own ledger later stops naming it too,
+        // nothing would ever look for it again.
+        Object.entries(report.outcomes)
+          .filter(([, outcome]) => outcome === 'removalUnverified')
+          .map(([id]) => id)
+      )
+      .concat(
         contractPayload.upserts
           // Why these outcomes do not count as held: the host did not take the main's copy, so this is
           // not a replicated holding — it may not be there at all, or it may be the user's own value,
@@ -155,6 +178,7 @@ export function applyHostSettingsReplication(
             const outcome = report.outcomes[credential.id]
             return (
               outcome !== undefined &&
+              outcome !== 'removed' &&
               outcome !== 'refusedUnknownKind' &&
               outcome !== 'refusedWeakerProtection' &&
               outcome !== 'keptHostValue'
@@ -168,13 +192,11 @@ export function applyHostSettingsReplication(
     ids: [...stillHeld],
     revision: contractPayload.revision,
     syncedAt: state.kind === 'neverSynced' || state.kind === 'failed' ? null : state.syncedAt,
-    // Pinned only by the push that establishes the relationship, so an older main that starts with a
-    // delta cannot claim a host mid-conversation with a newer one.
+    // Why the pin follows a snapshot: see the refusal above. A delta never moves it.
     mainFingerprint:
-      record.mainFingerprint ??
-      (callerFingerprint !== undefined && contractPayload.baseRevision === null
+      contractPayload.baseRevision === null && callerFingerprint !== undefined
         ? callerFingerprint
-        : null)
+        : record.mainFingerprint
   })
 
   lastState = state
