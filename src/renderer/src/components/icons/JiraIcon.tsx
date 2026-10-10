@@ -1,7 +1,20 @@
-export function JiraIcon({ className }: { className?: string }): React.JSX.Element {
+export function JiraIcon({
+  size = 24,
+  className
+}: {
+  // Why `number | string`: matches lucide's own `LucideProps`, so this mark can
+  // fill any icon slot a real lucide icon can (`SettingsNavIcon` among them).
+  size?: number | string
+  className?: string
+}): React.JSX.Element {
   return (
     <svg
       viewBox="0 -30.632388516510233 255.324 285.95638851651023"
+      // Why: an svg with a viewBox and no width/height resolves to the 300x150
+      // default object size, so callers that size by `size` (the activity bar)
+      // rendered this mark enormous until the attributes were set.
+      width={size}
+      height={size}
       aria-hidden
       className={className}
       fill="currentColor"

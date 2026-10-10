@@ -123,6 +123,49 @@ describe('comment body conversion', () => {
     expect(markdownToJiraWiki('snake_case_name')).toBe('snake_case_name')
   })
 
+  // Why: the composer's editor is a real Markdown serializer, so it emits
+  // `*italic*` (CommonMark), not the `_italic_` the old textarea inserted.
+  it('reads single-asterisk emphasis as italic, not as wiki bold', () => {
+    expect(markdownToJiraWiki('*italic*')).toBe('{_}italic{_}')
+    expect(markdownToAdf('*italic*')).toEqual({
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'italic', marks: [{ type: 'em' }] }]
+        }
+      ]
+    })
+  })
+
+  it('still reads the underscore form a draft written earlier used', () => {
+    expect(markdownToJiraWiki('_italic_')).toBe('{_}italic{_}')
+  })
+
+  it('does not emphasise an intraword asterisk', () => {
+    expect(markdownToJiraWiki('a*b*c')).toBe('a*b*c')
+  })
+
+  // Why: the editor escapes `&`, `<` and `>` when it serializes, and a comment is
+  // prose — the literal entities must not reach Jira.
+  it('decodes the character references the composer escapes', () => {
+    expect(markdownToJiraWiki('if a &lt; b &amp;&amp; c &gt; d')).toBe('if a < b && c > d')
+    expect(markdownToJiraWiki('&quot;quoted&quot;')).toBe('"quoted"')
+    expect(markdownToJiraWiki('&#39;apos&#39;')).toBe("'apos'")
+  })
+
+  it('leaves an unknown or malformed reference literal', () => {
+    expect(markdownToJiraWiki('&notareal; &amp;')).toBe('&notareal; &')
+  })
+
+  // Why: a code span is verbatim, so characters the user typed there must not be
+  // reinterpreted — the composer's serializer leaves `&` alone inside a span.
+  it('does not decode a character reference inside a code span', () => {
+    expect(markdownToJiraWiki('`a &amp; b`')).toBe('{{a &amp; b}}')
+    expect(markdownToJiraWiki('`&lt;div&gt;`')).toBe('{{&lt;div&gt;}}')
+  })
+
   it('picks the format the site takes', () => {
     expect(markdownCommentBody(site({ authType: 'server' }), '**bold**')).toBe('{*}bold{*}')
     expect(markdownCommentBody(site(), '**bold**')).toEqual({

@@ -68,6 +68,20 @@
   color: var(--foreground);
 }
 
+.rich-markdown-toolbar-button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Why: the comment bubble lives in a sidebar that can shrink to 220px, where a
+   row of five default toolbar buttons plus the send action would not fit. */
+.rich-markdown-toolbar-button.is-compact {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
 .github-markdown-composer .rich-markdown-editor-toolbar {
   padding: 6px 8px;
   background: color-mix(in srgb, var(--background) 92%, transparent);
@@ -85,6 +99,23 @@
 .github-markdown-composer-editor ol,
 .github-markdown-composer-editor blockquote {
   margin: 0.55em 0;
+}
+
+/* Why the compound selectors: `.rich-markdown-editor` sets its own padding and
+   min-height further down this file, so a single-class override would lose on
+   source order regardless of import order. */
+.rich-markdown-editor.comment-composer-editor {
+  min-height: 3.25rem;
+  padding: 8px 10px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rich-markdown-editor.comment-composer-editor p,
+.rich-markdown-editor.comment-composer-editor ul,
+.rich-markdown-editor.comment-composer-editor ol,
+.rich-markdown-editor.comment-composer-editor blockquote {
+  margin: 0.4em 0;
 }
 
 .github-markdown-composer-image-row {

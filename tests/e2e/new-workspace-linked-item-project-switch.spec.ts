@@ -8,8 +8,8 @@
  *
  * Why E2E: the preservation logic lives in useComposerState behind the real
  * ProjectCombobox interaction and main-process repo resolution — a store
- * slice unit test cannot reach the combobox → handleProjectChange → smart
- * field pill re-render path.
+ * slice unit test cannot reach the combobox → handleProjectChange → implied
+ * source re-render path.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -144,12 +144,14 @@ test.describe('New workspace composer linked item across project switches', () =
 
     const composer = orcaPage.getByRole('dialog')
     await expect(composer).toBeVisible()
-    const sourcePill = composer.locator('[data-workspace-source-pill="true"]')
-    await expect(sourcePill).toContainText('RDG-344 Migrate homepage from NuxtJS to NextJS')
+    // Why: a composer opened from a task shows the task as an implied source
+    // rather than as a clearable pill, so the name above it stays editable.
+    const impliedSource = composer.locator('[data-workspace-implied-source="true"]')
+    await expect(impliedSource).toContainText('RDG-344 Migrate homepage from NuxtJS to NextJS')
 
     await switchComposerProject(orcaPage, SECOND_PROJECT_NAME)
 
-    await expect(sourcePill).toContainText('RDG-344 Migrate homepage from NuxtJS to NextJS')
+    await expect(impliedSource).toContainText('RDG-344 Migrate homepage from NuxtJS to NextJS')
   })
 
   test('clears a repo-scoped GitHub issue when the project changes', async ({ orcaPage }) => {
@@ -167,11 +169,13 @@ test.describe('New workspace composer linked item across project switches', () =
 
     const composer = orcaPage.getByRole('dialog')
     await expect(composer).toBeVisible()
-    const sourcePill = composer.locator('[data-workspace-source-pill="true"]')
-    await expect(sourcePill).toContainText('#41 Fix crash on launch')
+    const impliedSource = composer.locator('[data-workspace-implied-source="true"]')
+    await expect(impliedSource).toContainText('#41 Fix crash on launch')
 
     await switchComposerProject(orcaPage, SECOND_PROJECT_NAME)
 
-    await expect(sourcePill).toHaveCount(0)
+    // The link belonged to the project that was switched away from, so the
+    // composer falls back to its own source field instead of asserting one.
+    await expect(impliedSource).toHaveCount(0)
   })
 })

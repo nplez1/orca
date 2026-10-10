@@ -1,6 +1,8 @@
 import React from 'react'
 import { AlertTriangle, Check } from 'lucide-react'
 import SmartWorkspaceNameField from '@/components/new-workspace/SmartWorkspaceNameField'
+import { TaskImpliedSourceNameField } from './TaskImpliedSourceNameField'
+import { resolveImpliedTaskSource } from './implied-task-source'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { shouldShowComposerBaseRefPicker } from './base-ref-picker-visibility'
@@ -22,6 +24,7 @@ type NewWorkspaceComposerNameSectionProps = Pick<
   | 'onSmartJiraIssueSelect'
   | 'onOpenJiraSettings'
   | 'smartNameSelection'
+  | 'impliedTaskSourceUrl'
   | 'onClearSmartNameSelection'
   | 'smartNameGitHubSourceContext'
   | 'smartNameJiraSourceContext'
@@ -59,6 +62,7 @@ export function NewWorkspaceComposerNameSection({
   onSmartJiraIssueSelect,
   onOpenJiraSettings,
   smartNameSelection,
+  impliedTaskSourceUrl = null,
   onClearSmartNameSelection,
   smartNameGitHubSourceContext,
   smartNameJiraSourceContext,
@@ -88,11 +92,16 @@ export function NewWorkspaceComposerNameSection({
       smartNameMode: smartNameMode ?? 'smart',
       smartNameSelectionKind: smartNameSelection?.kind ?? null
     })
+  // Why a source the composer cannot change: the dialog was opened from the
+  // task, so the only decision left is what to call the workspace. Resolved
+  // against the live selection, not a flag, so a source that was dropped or
+  // replaced under the composer stops being presented as the fixed one.
+  const impliedSource = resolveImpliedTaskSource(impliedTaskSourceUrl, smartNameSelection)
   return (
     <div className="min-w-0 space-y-1" data-contextual-tour-target="workspace-creation-name">
       <div className="flex items-center justify-between gap-2">
         <label className="min-w-0 truncate text-xs font-medium text-muted-foreground">
-          {selectedRepoIsGit
+          {selectedRepoIsGit && !impliedSource
             ? translate('auto.components.NewWorkspaceComposerCard.ac3748dcda', 'Create From')
             : translate(
                 'auto.components.NewWorkspaceComposerCard.0ee17638fe',
@@ -112,37 +121,52 @@ export function NewWorkspaceComposerNameSection({
           />
         ) : null}
       </div>
-      <SmartWorkspaceNameField
-        inputRef={nameInputRef}
-        repos={eligibleRepos}
-        repoId={repoId}
-        onRepoChange={onRepoChange}
-        value={name}
-        onValueChange={onNameValueChange}
-        onGitHubItemSelect={onSmartGitHubItemSelect}
-        onGitLabItemSelect={onSmartGitLabItemSelect}
-        onBranchSelect={onSmartBranchSelect}
-        onLinearIssueSelect={onSmartLinearIssueSelect}
-        onJiraIssueSelect={onSmartJiraIssueSelect}
-        onOpenJiraSettings={onOpenJiraSettings}
-        selectedSource={smartNameSelection}
-        onClearSelectedSource={onClearSmartNameSelection}
-        githubSourceContext={smartNameGitHubSourceContext}
-        jiraSourceContext={smartNameJiraSourceContext}
-        disabled={selectedRepoRequiresConnection}
-        disabledPlaceholder={translate(
-          'auto.components.NewWorkspaceComposerCard.connectProjectFirst',
-          'Connect this project first'
-        )}
-        textOnly={!selectedRepoIsGit}
-        branchesEnabled={branchesEnabled}
-        repoBackedSourcesDisabled={repoBackedSourcesDisabled}
-        repoBackedSearchRepos={repoBackedSearchRepos}
-        allowCrossRepoProjectAdd={allowSmartNameAddProject}
-        crossRepoSwitchTarget={smartNameRepoSwitchTarget}
-        onActiveSourceModeChange={onSmartNameModeChange}
-        onPlainEnter={onNamePlainEnter}
-      />
+      {impliedSource ? (
+        <TaskImpliedSourceNameField
+          inputRef={nameInputRef}
+          source={impliedSource}
+          value={name}
+          onValueChange={onNameValueChange}
+          disabled={selectedRepoRequiresConnection}
+          disabledPlaceholder={translate(
+            'auto.components.NewWorkspaceComposerCard.connectProjectFirst',
+            'Connect this project first'
+          )}
+          onPlainEnter={onNamePlainEnter}
+        />
+      ) : (
+        <SmartWorkspaceNameField
+          inputRef={nameInputRef}
+          repos={eligibleRepos}
+          repoId={repoId}
+          onRepoChange={onRepoChange}
+          value={name}
+          onValueChange={onNameValueChange}
+          onGitHubItemSelect={onSmartGitHubItemSelect}
+          onGitLabItemSelect={onSmartGitLabItemSelect}
+          onBranchSelect={onSmartBranchSelect}
+          onLinearIssueSelect={onSmartLinearIssueSelect}
+          onJiraIssueSelect={onSmartJiraIssueSelect}
+          onOpenJiraSettings={onOpenJiraSettings}
+          selectedSource={smartNameSelection}
+          onClearSelectedSource={onClearSmartNameSelection}
+          githubSourceContext={smartNameGitHubSourceContext}
+          jiraSourceContext={smartNameJiraSourceContext}
+          disabled={selectedRepoRequiresConnection}
+          disabledPlaceholder={translate(
+            'auto.components.NewWorkspaceComposerCard.connectProjectFirst',
+            'Connect this project first'
+          )}
+          textOnly={!selectedRepoIsGit}
+          branchesEnabled={branchesEnabled}
+          repoBackedSourcesDisabled={repoBackedSourcesDisabled}
+          repoBackedSearchRepos={repoBackedSearchRepos}
+          allowCrossRepoProjectAdd={allowSmartNameAddProject}
+          crossRepoSwitchTarget={smartNameRepoSwitchTarget}
+          onActiveSourceModeChange={onSmartNameModeChange}
+          onPlainEnter={onNamePlainEnter}
+        />
+      )}
       {forkPushWarning ? (
         <p className="flex items-start gap-1.5 text-[11px] text-yellow-600 dark:text-yellow-500">
           <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden="true" />

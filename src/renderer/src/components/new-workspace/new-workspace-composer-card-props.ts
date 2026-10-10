@@ -82,6 +82,10 @@ export type NewWorkspaceComposerCardProps = {
   onSmartJiraIssueSelect?: (issue: JiraIssue, sourceContext: TaskSourceContext) => void
   onOpenJiraSettings?: () => void
   smartNameSelection: SmartWorkspaceNameSelection | null
+  /** URL of the task the composer was opened from, when there was one. The task
+   *  is then the workspace's source outright: the name stays editable and the
+   *  link is fixed. */
+  impliedTaskSourceUrl?: string | null
   onClearSmartNameSelection: () => void
   canReuseSelectedBranch: boolean
   reuseSelectedBranch: boolean

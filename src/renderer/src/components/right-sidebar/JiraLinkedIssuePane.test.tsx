@@ -124,8 +124,12 @@ describe('JiraLinkedIssuePane', () => {
     )
 
     expect(await screen.findByText('No comments yet.')).toBeTruthy()
-    fireEvent.change(screen.getByPlaceholderText('Add a Jira comment...'), {
-      target: { value: 'Looks good to me' }
+    // Why paste rather than a change event: the composer is a rich editor, so its
+    // body arrives over the clipboard path ProseMirror actually handles.
+    const clipboardData = new DataTransfer()
+    clipboardData.setData('text/plain', 'Looks good to me')
+    fireEvent.paste(screen.getByRole('textbox', { name: 'Add a Jira comment...' }), {
+      clipboardData
     })
     // Why: the send action is an icon-only button, so its accessible name is the
     // only handle on it.

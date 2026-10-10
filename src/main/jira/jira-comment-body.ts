@@ -1,7 +1,7 @@
 import type { JiraSite } from '../../shared/jira-types'
 import type { JiraRecord } from './jira-record-pages'
 
-/** What the composer's toolbar can insert, plus the characters a user types. */
+/** What the composer's editor can emit, plus the characters a user types. */
 type InlineToken =
   | { kind: 'text'; value: string }
   | { kind: 'code'; value: string }
@@ -15,10 +15,11 @@ type Block =
   | { kind: 'code'; language: string; lines: string[] }
 
 // Why this order: an escape first so `\*` never reaches the emphasis branches,
-// then code, so a `**` inside a span stays literal. The underscore branch is
-// boundary-anchored because `a_b_c` is an identifier, not emphasis — the same
-// rule CommonMark applies to intraword underscores.
-const INLINE_TOKEN_PATTERN = /(\\.|`[^`\n]+`|\*\*[^*\n]+\*\*|(?<![\w])_[^_\n]+_(?![\w]))/g
+// then code, so a `**` inside a span stays literal. `**` precedes the single-`*`
+// branch, and both emphasis branches are boundary-anchored because `a_b_c` and
+// `a*b*c` are identifiers, not emphasis — the same rule CommonMark applies.
+const INLINE_TOKEN_PATTERN =
+  /(\\.|`[^`\n]+`|\*\*[^*\n]+\*\*|(?<![\w])\*[^*\n]+\*(?![\w])|(?<![\w])_[^_\n]+_(?![\w]))/g
 const FENCE_PATTERN = /^\s*```(\S*)\s*$/
 const QUOTE_PREFIX_PATTERN = /^>\s?/
 const LIST_PREFIX_PATTERN = /^[-*]\s+/
@@ -33,6 +34,39 @@ const WIKI_WRAPPERS: Record<'bold' | 'italic' | 'code', [string, string]> = {
   bold: ['{*}', '{*}'],
   italic: ['{_}', '{_}'],
   code: ['{{', '}}']
+}
+
+const NAMED_CHARACTER_REFERENCES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: '\u00a0'
+}
+
+function codePointFrom(digits: string, radix: number, raw: string): string {
+  const codePoint = Number.parseInt(digits, radix)
+  const isScalarValue =
+    Number.isFinite(codePoint) &&
+    codePoint >= 0 &&
+    codePoint <= 0x10ffff &&
+    !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+  return isScalarValue ? String.fromCodePoint(codePoint) : raw
+}
+
+/** Why a comment body needs this: the composer's Markdown serializer escapes
+ *  `&`, `<` and `>` as character references, and a comment is prose — `if a < b`
+ *  has to reach Jira as `if a < b`, not as `if a &lt; b`. `&` is left as-is
+ *  rather than double-decoded, so a body that already escaped itself survives. */
+export function decodeCharacterReferences(body: string): string {
+  return body
+    .replace(/&#x([0-9a-f]+);/gi, (raw, hex: string) => codePointFrom(hex, 16, raw))
+    .replace(/&#(\d+);/g, (raw, decimal: string) => codePointFrom(decimal, 10, raw))
+    .replace(
+      /&([a-z]+);/gi,
+      (raw, name: string) => NAMED_CHARACTER_REFERENCES[name.toLowerCase()] ?? raw
+    )
 }
 
 /** Splits one line into literal text and the constructs the toolbar emits. */
@@ -60,7 +94,11 @@ function parseInline(line: string): InlineToken[] {
   if (cursor < line.length) {
     tokens.push({ kind: 'text', value: line.slice(cursor) })
   }
-  return tokens
+  // Why decoding here and not on the whole body: a code span is verbatim, so a
+  // literal `&amp;` the user typed inside one has to survive as those characters.
+  return tokens.map((token) =>
+    token.kind === 'code' ? token : { ...token, value: decodeCharacterReferences(token.value) }
+  )
 }
 
 /** One block per source line (and one per quote/list/code run), so a body with no
