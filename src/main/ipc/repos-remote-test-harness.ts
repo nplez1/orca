@@ -14,6 +14,7 @@ export type ReposIpcMocks = {
   handleMock: ReposIpcSpy
   mockStore: Record<
     | 'getRepos'
+    | 'getSettings'
     | 'addRepo'
     | 'removeProjectForHost'
     | 'getRepo'
@@ -51,6 +52,9 @@ export function createReposIpcMocks(): ReposIpcMocks {
     handleMock: vi.fn(),
     mockStore: {
       getRepos: vi.fn().mockReturnValue([]),
+      // Why legacy by default: the project-folder layout needs an explicit mode, so an
+      // untouched mock keeps the placement every other assertion here was written against.
+      getSettings: vi.fn().mockReturnValue({ workspaceDir: '', nestWorkspaces: true }),
       addRepo: vi.fn(),
       removeProjectForHost: vi.fn(),
       getRepo: vi.fn(),
@@ -239,6 +243,8 @@ export function resetProjectGroupMocks(
   mocks.mockStore.updateProjectHostSetup.mockReset()
   mocks.mockStore.getRepos.mockReset()
   mocks.mockStore.getRepos.mockReturnValue([])
+  mocks.mockStore.getSettings.mockReset()
+  mocks.mockStore.getSettings.mockReturnValue({ workspaceDir: '', nestWorkspaces: true })
   mocks.mockFilesystemProvider.readDir.mockReset()
   mocks.mockFilesystemProvider.readDir.mockResolvedValue([])
   mocks.mockFilesystemProvider.readFile.mockReset()
@@ -264,6 +270,8 @@ export function resetProjectGroupMocks(
 /** Shared reset for the local `repos:add` / `repos:clone` handler suites. */
 export function resetLocalRepoMocks(mocks: ReposIpcMocks): void {
   mocks.mockStore.getRepos.mockReset().mockReturnValue([])
+  mocks.mockStore.getSettings.mockReset()
+  mocks.mockStore.getSettings.mockReturnValue({ workspaceDir: '', nestWorkspaces: true })
   mocks.mockStore.addRepo.mockReset()
   mocks.mockStore.updateRepo.mockReset()
   mocks.mockStore.getProjects.mockReset().mockReturnValue([])

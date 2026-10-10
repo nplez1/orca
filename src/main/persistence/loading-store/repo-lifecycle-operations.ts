@@ -171,6 +171,11 @@ export class RepoLifecycleOperations {
   ): Repo | null {
     return getRepoUpdateOperations(this).updateRepo(id, updates, hostId)
   }
+
+  /** See `RepoUpdatePersistenceOperations.relocateRepoPath` for why this is not a general setter. */
+  relocateRepoPath(id: string, newPath: string): Repo | null {
+    return getRepoUpdateOperations(this).relocateRepoPath(id, newPath)
+  }
 }
 
 export function getRepoOrderOperations(

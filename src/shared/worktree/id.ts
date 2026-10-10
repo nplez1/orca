@@ -89,3 +89,14 @@ export function getWorktreePathBasenameFromId(worktreeId: string): string | null
   const basename = normalizedPath.split(/[\\/]/).findLast(Boolean)?.trim()
   return basename || null
 }
+
+/**
+ * Parse a composite worktreeId ("repoId::worktreePath") into its parts.
+ */
+export function parseWorktreeId(worktreeId: string): { repoId: string; worktreePath: string } {
+  const parsed = splitWorktreeId(worktreeId)
+  if (!parsed) {
+    throw new Error(`Invalid worktreeId: ${worktreeId}`)
+  }
+  return parsed
+}

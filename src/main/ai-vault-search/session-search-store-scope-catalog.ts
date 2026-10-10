@@ -21,7 +21,7 @@ export type SessionSearchScopeStore = {
   })[]
   getAllWorktreeMeta(): Record<string, WorktreeMeta>
   getAllWorktreeMetaForHost?: (executionHostId: ExecutionHostId) => Record<string, WorktreeMeta>
-  getSettings(): Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces'>
+  getSettings(): Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'>
 }
 
 // Filtered by host: a desktop's store also holds its SSH and runtime hosts'
@@ -38,6 +38,10 @@ export function sessionSearchScopeCatalogFromStore(
       .getProjectHostSetups()
       .filter((setup) => normalizeExecutionHostId(setup.hostId) === executionHostId),
     worktreeMeta: readAllWorktreeMetaForHost(store, executionHostId),
-    settings: { workspaceDir: settings.workspaceDir, nestWorkspaces: settings.nestWorkspaces }
+    settings: {
+      workspaceDir: settings.workspaceDir,
+      nestWorkspaces: settings.nestWorkspaces,
+      worktreeLayoutMode: settings.worktreeLayoutMode
+    }
   }
 }

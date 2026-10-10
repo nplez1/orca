@@ -3,15 +3,21 @@ import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, readdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, dirname, join } from 'node:path'
 import type { Store } from '../../persistence'
 import type { Repo } from '../../../shared/repo-types'
+import {
+  isProjectFolderLayout,
+  resolveWorktreeLayoutMode
+} from '../../../shared/orca-workspace-layout'
 import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../shared/constants'
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
 import { probeGitAvailability } from '../../git/git-availability'
 import { gitExecFileAsync } from '../../git/runner'
+import { getInitDefaultBranchName } from '../../git/init-default-branch'
+import { sanitizeWorktreeName } from '../worktree-logic'
 import { detectRepoIconAndUpstream } from '../../repo-icon-autodetect'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
 import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
@@ -50,6 +56,11 @@ function getDefaultCreateProjectParent(store: Store): string {
     'defaultWorktreeLocation',
     settings.workspaceDir ?? ''
   ).trim()
+  // Why: under the project-folder layout the container's parent *is* the workspace dir, so the
+  // "beside the worktree tree" fallback below would place the project outside its own container.
+  if (isProjectFolderLayout(resolveWorktreeLayoutMode(settings))) {
+    return configured || getDefaultWorkspaceDir(home)
+  }
   const isUntouchedDefault =
     normalizeRuntimePathForComparison(configured) ===
     normalizeRuntimePathForComparison(getDefaultWorkspaceDir(home))
@@ -57,6 +68,46 @@ function getDefaultCreateProjectParent(store: Store): string {
     return configured
   }
   return join(home, 'orca', 'projects')
+}
+
+/**
+ * Folder the new project's primary checkout goes in: named for the branch `git init` will
+ * create, so the checkout sits beside the worktrees that land in the same container.
+ */
+async function resolveInitBranchLeaf(parentPath: string): Promise<string> {
+  const branchName = await getInitDefaultBranchName(parentPath)
+  try {
+    return sanitizeWorktreeName(branchName)
+  } catch {
+    return 'main'
+  }
+}
+
+/**
+ * Where `repos:create` puts the checkout. The legacy layouts use `<parent>/<name>`. Under the
+ * project-folder layout the typed name becomes the project container and the checkout inside it
+ * is named for the branch `git init` is about to create, so the primary checkout is a sibling
+ * of the worktrees that will land in the same container.
+ */
+async function resolveCreateTargetPath(
+  store: Store,
+  parentPath: string,
+  name: string
+): Promise<{ path: string } | { error: string }> {
+  if (!isProjectFolderLayout(resolveWorktreeLayoutMode(store.getSettings()))) {
+    return { path: join(parentPath, name) }
+  }
+  let containerName: string
+  try {
+    containerName = sanitizeWorktreeName(name)
+  } catch {
+    // Why surfaced rather than silently cleaned: a name with nothing usable left would create a
+    // folder the user did not ask for, and the container name is what later placement derives from.
+    return { error: `"${name}" cannot be used as a project folder name.` }
+  }
+  // Why: `git config` needs an existing cwd, and the default parent may not exist on a fresh install.
+  await mkdir(parentPath, { recursive: true }).catch(() => {})
+  return { path: join(parentPath, containerName, await resolveInitBranchLeaf(parentPath)) }
 }
 
 export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: Store): void {
@@ -151,7 +202,11 @@ export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: S
         return { error: 'Parent directory must be an absolute path' }
       }
 
-      const targetPath = join(parentPath, name)
+      const resolvedTarget = await resolveCreateTargetPath(store, parentPath, name)
+      if ('error' in resolvedTarget) {
+        return resolvedTarget
+      }
+      const targetPath = resolvedTarget.path
 
       // Dedup by path so a double-click on Create doesn't make two entries for one folder (first of three dedup checks).
       const existing = store.getRepos().find((r) => r.path === targetPath)
@@ -164,8 +219,10 @@ export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: S
       let createdDir = false
       let targetExists = false
       try {
-        // Why: the default parent (~/orca/projects) may not exist on a fresh install; create only the parent before probing the target.
-        await mkdir(parentPath, { recursive: true })
+        // Why: the default parent (~/orca/projects, or the workspace dir) may not exist on a
+        // fresh install; create only the parent before probing the target. Under the
+        // project-folder layout this also creates the project container.
+        await mkdir(dirname(targetPath), { recursive: true })
         await access(targetPath)
         targetExists = true
       } catch (err) {

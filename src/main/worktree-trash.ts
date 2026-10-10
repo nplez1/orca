@@ -82,7 +82,7 @@ async function collectExistingTrashRoots(workspaceRoots: readonly string[]): Pro
 /** Workspace roots of local git repos — the only places Orca ever created worktree trash. */
 export function collectWorktreeTrashSweepRoots(
   repos: readonly Repo[],
-  settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces'>
+  settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'>
 ): string[] {
   const roots = new Set<string>()
   for (const repo of repos) {

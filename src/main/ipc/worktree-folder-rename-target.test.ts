@@ -5,10 +5,30 @@ describe('planWorktreeFolderRename', () => {
   const base = {
     repoId: 'repo1',
     repoPath: '/repos/orca',
-    settings: { nestWorkspaces: false, workspaceDir: '/ws' },
+    settings: { nestWorkspaces: false, workspaceDir: '/ws', worktreeLayoutMode: 'flat' as const },
     platform: 'darwin' as NodeJS.Platform,
     isRemote: false
   }
+
+  it('renames inside the project folder, not a folder named after the checkout', () => {
+    // Why this case exists: the container name comes from the resolved settings. A caller passing
+    // raw global settings loses it, falls back to `basename(repoPath)` — `main` here — and the
+    // same-parent guard then silently skips the rename altogether.
+    const plan = planWorktreeFolderRename({
+      ...base,
+      repoPath: '/ws/orca/main',
+      oldWorktreePath: '/ws/orca/wip-one',
+      newLeaf: 'feature-x',
+      settings: {
+        nestWorkspaces: true,
+        workspaceDir: '/ws',
+        worktreeLayoutMode: 'project-folder',
+        projectFolderName: 'orca'
+      }
+    })
+
+    expect(plan?.newPath).toBe('/ws/orca/feature-x')
+  })
 
   it('plans a same-parent rename to the new branch leaf', () => {
     expect(

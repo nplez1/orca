@@ -67,7 +67,8 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'repo show',
       'repo set',
       'repo set-base-ref',
-      'repo search-refs'
+      'repo search-refs',
+      'repo relocate'
     ],
     load: async () => (await import('./handlers/repo.js')).REPO_HANDLERS
   },

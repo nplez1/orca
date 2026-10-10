@@ -8,6 +8,7 @@ import { useAddRepoCloneFlow } from './useAddRepoCloneFlow'
 import { useAddRepoLocalFolderFlow } from './useAddRepoLocalFolderFlow'
 import { useAddRepoServerPathFlow } from './useAddRepoServerPathFlow'
 import { useAddRepoHostSelection } from './use-add-repo-host-selection'
+import { resolveWorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { useCompleteGitRepoAdd } from './use-complete-git-repo-add'
 import { useCreateProjectDefaults } from './useCreateProjectDefaults'
 import { useAddRepoHostChangeReset } from './use-add-repo-host-change-reset'
@@ -144,7 +145,8 @@ export default React.memo(function AddRepoDialog({
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     sshTargetId: hostSelection.selectedSshTargetId,
     createParent,
-    setCreateParent
+    setCreateParent,
+    worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined
   })
 
   const {
@@ -165,6 +167,7 @@ export default React.memo(function AddRepoDialog({
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     sshTargetId: hostSelection.selectedSshTargetId,
     workspaceDir: settings?.workspaceDir,
+    worktreeLayoutMode: settings ? resolveWorktreeLayoutMode(settings) : undefined,
     fetchWorktrees,
     onGitRepoReady: completeGitRepoAdd
   })

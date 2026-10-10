@@ -25,6 +25,12 @@ export const RepoSetBaseRef = z.object({
   ref: requiredString('Missing base ref')
 })
 
+export const RepoRelocate = z.object({
+  repo: requiredString('Missing repo selector'),
+  /** Report the decision without moving anything. */
+  dryRun: z.boolean().optional()
+})
+
 export const RepoUpdate = createRepoUpdateSchema(RepoSelector.shape)
 
 export const RepoSearchRefs = z.object({

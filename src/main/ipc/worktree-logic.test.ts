@@ -392,7 +392,8 @@ describe('computeWorktreePath', () => {
     ).toBe(posix.resolve('/projects/b/worktrees/feature'))
     expect(getWorktreeCreationLayout(repoA, settings)).toEqual({
       path: '../worktrees',
-      nestWorkspaces: false
+      nestWorkspaces: false,
+      worktreeLayoutMode: 'flat'
     })
   })
 

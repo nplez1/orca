@@ -21,6 +21,7 @@ import {
   RepoCreate,
   RepoIssueCommandWrite,
   RepoPath,
+  RepoRelocate,
   RepoReorder,
   RepoSearchRefs,
   RepoSetBaseRef,
@@ -38,7 +39,10 @@ export const REPO_METHODS = [
       return {
         repos: context.runtime
           .listRepos()
-          .map((repo) => projectRepoVisibilityForClient(repo, context))
+          .map((repo) => projectRepoVisibilityForClient(repo, context)),
+        // Why on a listing: a checkout sitting outside its project folder is something the host can
+        // see for free, and a client only ever learns about it if the listing says so.
+        relocationRequiredRepoIds: context.runtime.findReposRequiringRelocation?.()
       }
     }
   }),
@@ -174,6 +178,15 @@ export const REPO_METHODS = [
         context
       )
     })
+  }),
+  defineMethod({
+    name: 'repo.relocate',
+    permission: 'workspace',
+    params: RepoRelocate,
+    // Why no visibility projection: the result names paths the caller already owns, and the
+    // decision it reports is exactly what it must see to explain a refusal.
+    handler: async (params, { runtime }) =>
+      runtime.relocateRepo(params.repo, { dryRun: params.dryRun === true })
   }),
   defineMethod({
     name: 'repo.rm',

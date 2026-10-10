@@ -7,6 +7,10 @@ export type RuntimeStore = {
   getRepo: Store['getRepo']
   addRepo: Store['addRepo']
   updateRepo: Store['updateRepo']
+  /** See `RepoUpdatePersistenceOperations.relocateRepoPath`: moving a checkout re-keys its ids,
+   *  so it gets this one entry point instead of widening `updateRepo`. */
+  relocateRepoPath?: Store['relocateRepoPath']
+  migrateWorktreeIdentity?: Store['migrateWorktreeIdentity']
   addRetiredWorktreeName?: Store['addRetiredWorktreeName']
   mergeRetiredWorktreeNames?: Store['mergeRetiredWorktreeNames']
   getRetiredWorktreeNameRegistry?: Store['getRetiredWorktreeNameRegistry']
@@ -77,6 +81,7 @@ export type RuntimeStore = {
   getSettings(): {
     workspaceDir: string
     nestWorkspaces: boolean
+    worktreeLayoutMode?: GlobalSettings['worktreeLayoutMode']
     // Read by worktree placement: decides whether this project's worktrees
     // mirror into a WSL distro instead of the Windows drive.
     localWindowsRuntimeDefault?: GlobalSettings['localWindowsRuntimeDefault']

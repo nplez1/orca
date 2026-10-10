@@ -7,6 +7,31 @@ import {
 } from './create-project-defaults'
 
 describe('create project defaults', () => {
+  it('builds the project-folder default under the workspace dir', () => {
+    // Why: the project's container lives inside the workspace dir, so the sibling
+    // orca/projects root would put the checkout outside the root its worktrees use.
+    expect(getDefaultCreateProjectParent('/Users/alice', 'project-folder')).toBe(
+      '/Users/alice/orca/workspaces'
+    )
+    expect(getDefaultCreateProjectParent('C:\\Users\\alice', 'project-folder')).toBe(
+      'C:\\Users\\alice\\orca\\workspaces'
+    )
+  })
+
+  it('shows a home shorthand for both Orca default roots', () => {
+    expect(
+      formatCreateProjectParentSummary({
+        parent: '/Users/alice/orca/workspaces',
+        defaultParent: '/Users/alice/orca/workspaces'
+      })
+    ).toBe('~/orca/workspaces')
+    expect(
+      formatCreateProjectParentSummary({
+        parent: 'C:\\Users\\alice\\orca\\projects',
+        defaultParent: 'C:\\Users\\alice\\orca\\projects'
+      })
+    ).toBe('~/orca/projects')
+  })
   it('builds the POSIX default project parent', () => {
     expect(getDefaultCreateProjectParent('/Users/alice')).toBe('/Users/alice/orca/projects')
   })

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { OptionalString, requiredString } from './rpc-param-primitives'
+import { WORKTREE_LAYOUT_MODES } from '../orca-workspace-layout'
 import {
   LOCAL_EXECUTION_HOST_ID,
   normalizeExecutionHostId,
@@ -70,6 +71,9 @@ export const ProjectHostSetupCreate = z.object({
   kind: z.enum(['git', 'folder']).optional(),
   displayName: OptionalString,
   worktreeBasePath: OptionalString,
+  // Why on status-the-setup calls: the layout mode is a host setting, and these are the only
+  // placement surfaces the CLI has. Documented as global in the flag's help text.
+  worktreeLayoutMode: z.enum(WORKTREE_LAYOUT_MODES).optional(),
   gitUsername: OptionalString,
   setupState: z.enum(['ready', 'not-set-up', 'setting-up', 'error', 'unsupported']).optional(),
   setupMethod: z.enum(['imported-existing-folder', 'cloned', 'provisioned']).optional()
@@ -81,6 +85,7 @@ export const ProjectHostSetupUpdate = z.object({
     displayName: OptionalString,
     path: OptionalString,
     worktreeBasePath: OptionalString,
+    worktreeLayoutMode: z.enum(WORKTREE_LAYOUT_MODES).optional(),
     setupState: z.enum(['ready', 'not-set-up', 'setting-up', 'error', 'unsupported']).optional(),
     setupMethod: z
       .enum(['legacy-repo', 'imported-existing-folder', 'cloned', 'provisioned'])

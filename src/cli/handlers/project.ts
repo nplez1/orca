@@ -11,6 +11,7 @@ import type {
   ProjectHostSetupUpdateResult
 } from '../../shared/project-types'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
+import { WORKTREE_LAYOUT_MODES, type WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import type { RepoKind } from '../../shared/repo-types'
 import type { CommandHandler, HandlerContext } from '../dispatch'
 import {
@@ -88,6 +89,27 @@ function getOptionalRepoKind(flags: Map<string, string | boolean>): RepoKind | u
     return kind
   }
   throw new RuntimeClientError('invalid_argument', '--kind must be git or folder')
+}
+
+function isWorktreeLayoutMode(value: string): value is WorktreeLayoutMode {
+  return WORKTREE_LAYOUT_MODES.some((mode) => mode === value)
+}
+
+/** Host-wide placement for new workspaces; see `applyWorktreeLayoutMode` on the runtime side. */
+function getOptionalWorktreeLayoutMode(
+  flags: Map<string, string | boolean>
+): WorktreeLayoutMode | undefined {
+  const mode = getOptionalStringFlag(flags, 'worktree-layout')
+  if (mode === undefined) {
+    return undefined
+  }
+  if (isWorktreeLayoutMode(mode)) {
+    return mode
+  }
+  throw new RuntimeClientError(
+    'invalid_argument',
+    `--worktree-layout must be one of ${WORKTREE_LAYOUT_MODES.join(', ')}`
+  )
 }
 
 export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
@@ -168,6 +190,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       kind: getOptionalRepoKind(flags),
       displayName: getOptionalStringFlag(flags, 'display-name'),
       worktreeBasePath: getOptionalStringFlag(flags, 'worktree-base-path'),
+      worktreeLayoutMode: getOptionalWorktreeLayoutMode(flags),
       gitUsername: getOptionalStringFlag(flags, 'git-username'),
       setupState: getOptionalSetupState(flags),
       setupMethod: getOptionalIndependentSetupMethod(flags)
@@ -190,6 +213,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
             ? undefined
             : resolveRepoPathArgument(path, cwd, client.isRemote, 'Project setup update'),
         worktreeBasePath: getOptionalStringFlag(flags, 'worktree-base-path'),
+        worktreeLayoutMode: getOptionalWorktreeLayoutMode(flags),
         gitUsername: getOptionalStringFlag(flags, 'git-username'),
         kind: getOptionalRepoKind(flags),
         setupState: getOptionalSetupState(flags),

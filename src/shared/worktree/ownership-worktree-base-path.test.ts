@@ -65,11 +65,13 @@ describe('repo-specific worktree ownership layouts', () => {
 
     expect(buildKnownOrcaWorkspaceLayouts(settings, repoA)[0]).toEqual({
       path: '/projects/a/worktrees',
-      nestWorkspaces: true
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
     })
     expect(buildKnownOrcaWorkspaceLayouts(settings, repoB)[0]).toEqual({
       path: '/projects/b/worktrees',
-      nestWorkspaces: true
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
     })
     expect(
       classifyWorktreeOwnership({
@@ -116,7 +118,8 @@ describe('repo-specific worktree ownership layouts', () => {
 
     expect(layouts[0]).toEqual({
       path: '//wsl.localhost/Ubuntu-24.04/home/jin/src/.orca-worktrees',
-      nestWorkspaces: true
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
     })
     expect(
       classifyWorktreeOwnership({
@@ -140,7 +143,8 @@ describe('repo-specific worktree ownership layouts', () => {
 
     expect(layouts[0]).toEqual({
       path: '//wsl.localhost/Ubuntu-24.04/home/jin/.orca-worktrees',
-      nestWorkspaces: true
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
     })
     expect(
       classifyWorktreeOwnership({
@@ -180,7 +184,8 @@ describe('repo-specific worktree ownership layouts', () => {
 
     expect(buildKnownOrcaWorkspaceLayouts(relativeSettings, repo)[0]).toEqual({
       path: '/remote/worktrees',
-      nestWorkspaces: true
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
     })
     expect(
       buildKnownOrcaWorkspaceLayouts(absoluteSettings, repo).some(

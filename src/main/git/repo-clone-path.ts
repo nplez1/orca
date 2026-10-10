@@ -29,7 +29,14 @@ export function deriveCloneRepoNameFromUrl(url: string): string {
   return repoName
 }
 
-export function deriveValidatedClonePath(args: { url: string; destination: string }): string {
+export function deriveValidatedClonePath(args: {
+  url: string
+  destination: string
+  /** Where the checkout goes, relative to `destination`. Absent uses the URL-derived repo name.
+   *  The project-folder layout passes `<projectFolder>/<branch>`, so the checkout lands inside
+   *  its project folder instead of directly in the destination. */
+  relativeClonePath?: string
+}): string {
   if (
     !args.destination ||
     !isAbsolute(args.destination) ||
@@ -40,7 +47,7 @@ export function deriveValidatedClonePath(args: { url: string; destination: strin
 
   const repoName = deriveCloneRepoNameFromUrl(args.url)
 
-  const clonePath = join(args.destination, repoName)
+  const clonePath = join(args.destination, args.relativeClonePath ?? repoName)
   const resolvedDestination = resolve(args.destination)
   const resolvedClonePath = resolve(clonePath)
   const pathFromDestination = relative(resolvedDestination, resolvedClonePath)

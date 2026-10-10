@@ -10,6 +10,7 @@ import { projectSourceControlAiToLegacyCommitMessageAi } from '../../../shared/s
 import { normalizeUiLanguage } from '../../../shared/ui-language'
 import { normalizeNativeChatShellEnvironmentVariables } from '../../../shared/native-chat-shell-environment'
 import { stripRetiredGlobalSettings } from '../applying-settings/terminal-settings-migrations'
+import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
 import { readLegacySidekickFlag } from '../applying-settings/onboarding-normalization'
 import { normalizeMachineName } from '../../../shared/machine-name'
 import { normalizeDisabledUsageProviders } from '../../../shared/usage-provider-enablement'
@@ -58,6 +59,17 @@ export function normalizeLoadedGlobalSettings(
 
   return {
     ...defaults.settings,
+    // Why: the layout mode postdates every settings file written before it, so a profile that
+    // carries only the legacy boolean has to say what that boolean meant. Deriving it here makes
+    // the persisted object its own marker — an explicit `nestWorkspaces: false` was a deliberate
+    // flat choice, and letting the new default replace it would silently switch those users into
+    // the layout they turned off. A first run has no `parsed.settings` at all, so it takes the
+    // default.
+    worktreeLayoutMode:
+      parsed.settings?.worktreeLayoutMode ??
+      (parsed.settings
+        ? resolveWorktreeLayoutMode({ nestWorkspaces: parsed.settings.nestWorkspaces })
+        : defaults.settings.worktreeLayoutMode),
     // Why (#7977): v1.4.130 onboarding persisted this as a plain boolean, making the
     // old default indistinguishable from a real opt-in. Preserve stored `true`; only
     // the default changed.

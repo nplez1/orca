@@ -32,7 +32,8 @@ const DEFAULT_UPSTREAM_REMOTE = 'upstream'
 const DEFAULT_BRANCH_FALLBACKS = ['main', 'master']
 const GITHUB_HOSTS = new Set(['github.com', 'ssh.github.com'])
 
-function parseRemoteHeadBranch(stdout: string): string | null {
+/** Read the branch a remote's HEAD points at out of `git ls-remote --symref <remote> HEAD`. */
+export function parseRemoteHeadBranch(stdout: string): string | null {
   for (const line of iterateGitOutputLines(stdout)) {
     const match = /^ref:\s+refs\/heads\/(.+?)\s+HEAD$/.exec(line.trim())
     if (match?.[1]) {

@@ -710,6 +710,88 @@ describe('orca cli worktree awareness', () => {
     })
   })
 
+  it('carries --worktree-layout through setup-update so the CLI can set host placement', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
+    queueFixtures(
+      callMock,
+      okFixture('req_project_setup_update_layout', {
+        result: {
+          project: {
+            id: 'github:stablyai/orca',
+            displayName: 'Orca',
+            badgeColor: '#7c3aed',
+            sourceRepoIds: [],
+            createdAt: 1,
+            updatedAt: 1
+          },
+          setup: {
+            id: 'setup-gpu',
+            projectId: 'github:stablyai/orca',
+            hostId: 'runtime:gpu',
+            repoId: '',
+            path: '/srv/orca',
+            displayName: 'Orca',
+            setupState: 'ready',
+            setupMethod: 'provisioned',
+            createdAt: 1,
+            updatedAt: 2
+          }
+        }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'project',
+        'setup-update',
+        '--setup',
+        'setup-gpu',
+        '--worktree-layout',
+        'project-folder',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    // Host-wide, so it rides the only placement surface the CLI has. The runtime applies it to
+    // the host's settings rather than to the setup record.
+    expect(callMock).toHaveBeenCalledWith(
+      'projectHostSetup.update',
+      expect.objectContaining({
+        setupId: 'setup-gpu',
+        updates: expect.objectContaining({ worktreeLayoutMode: 'project-folder' })
+      })
+    )
+  })
+
+  it('rejects an unknown --worktree-layout before contacting any runtime', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+
+    await main(
+      [
+        'project',
+        'setup-update',
+        '--setup',
+        'setup-gpu',
+        '--worktree-layout',
+        'sideways',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    const printed = [...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')
+    expect(printed).toContain('flat, repo-nested, project-folder')
+    expect(JSON.parse(printed).error.code).toBe('invalid_argument')
+    expect(callMock).not.toHaveBeenCalledWith('projectHostSetup.update')
+    expect(process.exitCode).toBe(1)
+
+    process.exitCode = priorExitCode
+  })
+
   it('creates independent project host setup metadata through the project-first runtime API', async () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'gpu')
     queueFixtures(

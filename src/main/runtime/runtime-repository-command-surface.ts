@@ -8,6 +8,7 @@ import type { RuntimeRepositoryHooksCommands } from './runtime-repository-hooks-
 import type { RuntimeRepositoryIssueCommand } from './runtime-repository-issue-command'
 import type { RuntimeRepositoryRefQueries } from './runtime-repository-ref-queries'
 import type { RuntimeRepositoryRegistrationController } from './runtime-repository-registration-controller'
+import type { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 import type { RuntimeRepositorySettingsController } from './runtime-repository-settings-controller'
 import type { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-presets'
 import type { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
@@ -63,6 +64,8 @@ export type RuntimeRepositoryCommandSurface = {
   cloneRepo: RuntimeRepositoryCloneController['clone']
   showRepo: RuntimeRepositorySettingsController['show']
   setRepoBaseRef: RuntimeRepositorySettingsController['setBaseRef']
+  relocateRepo: RuntimeRepositoryRelocationController['relocate']
+  findReposRequiringRelocation: RuntimeRepositoryRelocationController['findReposRequiringRelocation']
   updateRepo: RuntimeRepositorySettingsController['update']
   removeProject: RuntimeRepositorySettingsController['remove']
   reorderRepos: RuntimeRepositorySettingsController['reorder']
@@ -84,6 +87,7 @@ type RuntimeRepositoryCommandOwners = {
   repositoryRegistrations: RuntimeRepositoryRegistrationController
   repositoryClones: RuntimeRepositoryCloneController
   repositorySettings: RuntimeRepositorySettingsController
+  repositoryRelocation: RuntimeRepositoryRelocationController
   repositoryRefQueries: RuntimeRepositoryRefQueries
   hostedReviews: RuntimeHostedReviewCommands
   gitHubRepositoryQueries: RuntimeGitHubRepositoryQueryCommands
@@ -103,6 +107,7 @@ export function installRuntimeRepositoryCommandSurface(
   const registrations = owners.repositoryRegistrations
   const clones = owners.repositoryClones
   const settings = owners.repositorySettings
+  const relocation = owners.repositoryRelocation
   const refs = owners.repositoryRefQueries
   const reviews = owners.hostedReviews
   const queries = owners.gitHubRepositoryQueries
@@ -138,6 +143,8 @@ export function installRuntimeRepositoryCommandSurface(
     cloneRepo: clones.clone.bind(clones),
     showRepo: settings.show.bind(settings),
     setRepoBaseRef: settings.setBaseRef.bind(settings),
+    relocateRepo: relocation.relocate.bind(relocation),
+    findReposRequiringRelocation: relocation.findReposRequiringRelocation.bind(relocation),
     updateRepo: settings.update.bind(settings),
     removeProject: settings.remove.bind(settings),
     reorderRepos: settings.reorder.bind(settings),
