@@ -1,6 +1,6 @@
 import type { NativeChatGlobalSettings } from './native-chat-appearance-settings'
 import type { ExecutionHostId } from './execution-host'
-import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
+import type { OrcaWorkspaceLayout, WorktreeLayoutMode } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
@@ -55,7 +55,12 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   /** Per-host overrides keyed by ExecutionHostId. Effective value for a
    *  host-varying setting is `host override ?? client default`. */
   hostSettingOverrides?: Partial<Record<ExecutionHostId, HostSettingOverrides>>
+  /** Legacy placement switch, still written alongside `worktreeLayoutMode` so an older
+   *  reader (or a paired host on an older build) still computes the same root. */
   nestWorkspaces: boolean
+  /** Placement rule for new workspaces. Kept optional so a settings file written before
+   *  the mode existed stays readable — resolve it with `resolveWorktreeLayoutMode`. */
+  worktreeLayoutMode?: WorktreeLayoutMode
   workspaceDirHistory?: OrcaWorkspaceLayout[]
   refreshLocalBaseRefOnWorktreeCreate: boolean
   /** Set once the user dismisses the "local main is behind" suggestion toast, so
@@ -533,4 +538,4 @@ export type GlobalSettings = NativeChatGlobalSettings & {
 // Re-exported so existing importers keep one entry point; the shape lives in its
 // own file because this one is at the max-lines ceiling.
 export type { GhosttyImportPreview } from './ghostty-import-preview'
-export type { OrcaWorkspaceLayout } from './orca-workspace-layout'
+export type { OrcaWorkspaceLayout, WorktreeLayoutMode } from './orca-workspace-layout'

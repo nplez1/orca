@@ -286,6 +286,23 @@ describe('computeWorktreePath WSL layout', () => {
   // so a tree on the Windows drive costs ~46s across the 9p mount versus ~0.2s
   // native with only the gitdir left behind.
   describe('Windows-drive repo whose project runs in WSL', () => {
+    it('places the project container under the distro mirror root', () => {
+      // Why: the mirror root is <wsl home>/orca/workspaces, so the project-folder layout has to
+      // nest the container under it rather than appending the repo name the nested mode uses.
+      parseWslPathMock.mockReturnValue(null)
+      getWslHomeMock.mockReturnValue('\\\\wsl.localhost\\Ubuntu\\home\\jin')
+
+      expect(
+        computeWorktreePath('feature', 'C:\\Users\\jin\\repo', {
+          nestWorkspaces: true,
+          workspaceDir: 'C:\\workspaces',
+          worktreeLayoutMode: 'project-folder',
+          projectFolderName: 'orca',
+          wslMirrorDistro: 'Ubuntu'
+        })
+      ).toBe('\\\\wsl.localhost\\Ubuntu\\home\\jin\\orca\\workspaces\\orca\\feature')
+    })
+
     it('places worktrees inside the distro', () => {
       parseWslPathMock.mockReturnValue(null)
       getWslHomeMock.mockReturnValue('\\\\wsl.localhost\\Ubuntu\\home\\jin')

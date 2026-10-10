@@ -285,7 +285,11 @@ describe('worktree ownership classification', () => {
     const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
 
     expect(layouts).toHaveLength(LARGE_WORKSPACE_HISTORY_COUNT + 1)
-    expect(layouts[0]).toEqual({ path: '/new/workspaces', nestWorkspaces: true })
+    expect(layouts[0]).toEqual({
+      path: '/new/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'repo-nested'
+    })
     expect(layouts[1]).toEqual({ path: '/history/workspaces-0', nestWorkspaces: true })
     expect(layouts.at(-1)).toEqual({
       path: `/history/workspaces-${LARGE_WORKSPACE_HISTORY_COUNT - 1}`,
@@ -700,5 +704,57 @@ describe('agent scratch worktrees', () => {
         knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
       })
     ).not.toBe('agent-scratch')
+  })
+})
+
+describe('project-folder layouts', () => {
+  it('records the mode alongside the root, and classifies the container as external', () => {
+    const settings = makeSettings({ worktreeLayoutMode: 'project-folder' })
+    const repo = makeRepo()
+
+    expect(buildKnownOrcaWorkspaceLayouts(settings, repo)[0]).toEqual({
+      path: '/orca/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+    // Why external rather than unknown-legacy: the container is not a flat root, so a worktree
+    // placed in it by hand stays subject to the external-visibility policy. Orca's own
+    // worktrees carry creation metadata and classify as orca-managed before this is consulted.
+    expect(
+      classifyWorktreeOwnership({
+        repo,
+        worktree: makeWorktree({ path: '/orca/workspaces/app/feature', isMainWorktree: false }),
+        settings,
+        knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+      })
+    ).toBe('external')
+  })
+
+  it('keeps a workspace created under an older mode classifiable from history', () => {
+    // Why the mode and not just the boolean: the same root under two modes describes two
+    // different placements, and collapsing them would drop one from classification.
+    const settings = makeSettings({
+      worktreeLayoutMode: 'project-folder',
+      workspaceDirHistory: [
+        { path: '/orca/workspaces', nestWorkspaces: true, worktreeLayoutMode: 'repo-nested' }
+      ]
+    })
+    const repo = makeRepo()
+
+    const layouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
+    expect(layouts).toHaveLength(2)
+    expect(layouts.map((layout) => layout.worktreeLayoutMode)).toEqual([
+      'project-folder',
+      'repo-nested'
+    ])
+    // A worktree the nested mode would have placed under the repo name stays external.
+    expect(
+      classifyWorktreeOwnership({
+        repo,
+        worktree: makeWorktree({ path: '/orca/workspaces/app/feature', isMainWorktree: false }),
+        settings,
+        knownOrcaLayouts: layouts
+      })
+    ).not.toBe('unknown-legacy')
   })
 })

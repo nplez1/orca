@@ -22,6 +22,8 @@
     "../src/main/ipc/deferred-emoji-shortcode-dataset.ts",
     "../src/main/ipc/worktree-branch-name.ts",
     "../src/main/ipc/worktree-logic.ts",
+    "../src/main/ipc/project-folder-placement.ts",
+    "../src/main/ipc/worktree-removal-errors.ts",
     "../src/main/ipc/worktree-display-name.ts",
     "../src/main/ipc/worktree-linked-work-item-metadata.ts",
     "../src/main/ipc/worktree-metadata-merge.ts",

@@ -6,8 +6,13 @@ import {
   resolveRuntimePath
 } from '../../shared/cross-platform-path'
 import { isFolderRepo } from '../../shared/repo-kind'
+import {
+  isProjectFolderLayout,
+  resolveWorktreeLayoutMode
+} from '../../shared/orca-workspace-layout'
 import { resolveConfiguredWorktreeBasePaths } from '../../shared/worktree/configured-worktree-base-path'
 import { buildKnownOrcaWorkspaceLayouts } from '../../shared/worktree/ownership'
+import { resolveProjectFolderName } from '../ipc/worktree-logic'
 import type { SessionSearchScopeCatalog } from './session-search-scope-catalog'
 
 type ScopeRepo = SessionSearchScopeCatalog['repos'][number]
@@ -61,7 +66,13 @@ export function managedWorktreeDirectories(
   const repoName = getRuntimePathBasename(repo.path).replace(/\.git$/, '')
   const directories: string[] = []
   for (const layout of buildKnownOrcaWorkspaceLayouts(settings, repo)) {
-    if (configured.has(normalizeRuntimePathForComparison(layout.path))) {
+    const layoutMode = resolveWorktreeLayoutMode(layout)
+    // Why: a project folder nests the project one level below every base — including an
+    // explicitly configured one — so the directory this repo owns is the container, not the
+    // base. Claiming the base would widen the search to every project sharing it.
+    if (isProjectFolderLayout(layoutMode)) {
+      directories.push(resolveRuntimePath(layout.path, resolveProjectFolderName(repo)))
+    } else if (configured.has(normalizeRuntimePathForComparison(layout.path))) {
       directories.push(layout.path)
     } else if (layout.nestWorkspaces && repoName) {
       directories.push(resolveRuntimePath(layout.path, repoName))

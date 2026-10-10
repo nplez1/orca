@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import type { Store } from '../../persistence'
 import type { Repo } from '../../../shared/repo-types'
+import { dirname } from 'node:path'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
 import { getGitCloneFailureMessage } from '../../../shared/git-clone-failure-message'
@@ -25,6 +26,7 @@ import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cac
 import { emitRepoAdded } from './repo-added-telemetry'
 import { notifyReposChanged } from './repos-changed-notification'
 import { runWithClonePathLock } from './clone-path-lock'
+import { resolveCloneTargetPlacement } from './clone-target-placement'
 import { abortActiveRemoteClone, cloneRemoteRepo } from './remote-repo-clone'
 
 type ActiveCloneMetadata = {
@@ -117,8 +119,15 @@ export function registerRepoCloneHandlers(mainWindow: BrowserWindow, store: Stor
   ipcMain.handle(
     'repos:clone',
     async (_event, args: { url: string; destination: string }): Promise<Repo> => {
-      // Why: derive the repo folder name from the URL's last segment, matching default git clone behavior.
-      const clonePath = deriveValidatedClonePath(args)
+      const placement = await resolveCloneTargetPlacement({
+        url: args.url,
+        destination: args.destination,
+        settings: store.getSettings()
+      })
+      const clonePath = deriveValidatedClonePath({
+        ...args,
+        relativeClonePath: placement.relativeClonePath
+      })
       const clonePathKey = getClonePathComparisonKey(clonePath)
       // Remote projects can share this path string without belonging to this clone host.
       const findSaved = (): Repo | undefined =>
@@ -151,6 +160,9 @@ export function registerRepoCloneHandlers(mainWindow: BrowserWindow, store: Stor
           }
           // Why: gitSpawn cwd is args.destination, so it must exist before spawn (fresh installs may lack the defaulted parent).
           await mkdir(args.destination, { recursive: true })
+          // Why: the claim below is non-recursive, so the project folder has to exist first;
+          // today's flat layout is unaffected because dirname(clonePath) is then the destination.
+          await mkdir(dirname(clonePath), { recursive: true })
           claimedTarget = await claimCloneTarget(clonePath)
           // Why: spawn (not execFile) avoids the maxBuffer limit — clone progress on stderr can exceed Node's 1 MB default.
           // Why: --progress forces git to emit progress even when stderr isn't a TTY.
@@ -285,7 +297,10 @@ export function registerRepoCloneHandlers(mainWindow: BrowserWindow, store: Stor
           const repo: Repo = {
             id: randomUUID(),
             path: clonePath,
-            displayName: getRepoName(clonePath),
+            // Why: the checkout's own folder is the branch under a project folder, so the
+            // project's name has to come from the URL instead or every project would be
+            // called after its default branch and share one container.
+            displayName: placement.projectName ?? getRepoName(clonePath),
             badgeColor: DEFAULT_REPO_BADGE_COLOR,
             ...detected,
             addedAt: Date.now(),

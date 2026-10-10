@@ -302,7 +302,7 @@ describe('registerWorktreeHandlers', () => {
     expect(computeWorktreePathMock).toHaveBeenCalledWith(
       'feature',
       '/workspace/repo',
-      { nestWorkspaces: false, workspaceDir: '../worktrees' },
+      { nestWorkspaces: false, workspaceDir: '../worktrees', worktreeLayoutMode: 'flat' },
       '/workspace/worktrees'
     )
     expect(addWorktreeMock).toHaveBeenCalledWith(
@@ -317,7 +317,11 @@ describe('registerWorktreeHandlers', () => {
     expect(store.setWorktreeMeta).toHaveBeenCalledWith(
       'repo-1::../worktrees/feature',
       expect.objectContaining({
-        orcaCreationWorkspaceLayout: { path: '../worktrees', nestWorkspaces: false }
+        orcaCreationWorkspaceLayout: {
+          path: '../worktrees',
+          nestWorkspaces: false,
+          worktreeLayoutMode: 'flat'
+        }
       })
     )
   })

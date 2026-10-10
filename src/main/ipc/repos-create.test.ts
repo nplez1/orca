@@ -519,4 +519,53 @@ describe('repos:create', () => {
     expect(result).toHaveProperty('repo.badgeColor', '#ef4444')
     expect(mockStore.addRepo).not.toHaveBeenCalled()
   })
+
+  // ── project-folder layout ─────────────────────────────────────────
+
+  it('places the primary checkout inside its project folder', async () => {
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: '/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+
+    const result = await callCreate({ parentPath: '/workspaces', name: 'orca', kind: 'git' })
+
+    expect(result).toHaveProperty('repo.path', join('/workspaces', 'orca', 'main'))
+    // Why the project name and not the leaf folder: worktree placement derives the container
+    // from the display name, so a branch-named display name would collapse every project.
+    expect(result).toHaveProperty('repo.displayName', 'orca')
+    // The container must exist before the non-recursive mkdir of the checkout inside it.
+    expect(mkdirMock).toHaveBeenCalledWith(join('/workspaces', 'orca'), { recursive: true })
+  })
+
+  it('names the checkout folder for the branch git init will create', async () => {
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: '/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+    gitExecFileAsyncMock.mockImplementation((args: string[]) =>
+      Promise.resolve({
+        stdout: args[2] === 'init.defaultBranch' ? 'develop\n' : '',
+        stderr: ''
+      })
+    )
+
+    const result = await callCreate({ parentPath: '/workspaces', name: 'homelab', kind: 'git' })
+
+    expect(result).toHaveProperty('repo.path', join('/workspaces', 'homelab', 'develop'))
+  })
+
+  it('defaults the create location to the workspace dir under the project-folder layout', async () => {
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: '/workspaces',
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+
+    // Why not ~/orca/projects: the container lives inside the workspace dir, so the sibling
+    // default would put the checkout outside the root its worktrees are placed under.
+    await expect(callDefaultCreateProjectParent()).resolves.toBe('/workspaces')
+  })
 })

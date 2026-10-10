@@ -52,7 +52,10 @@ type RetirementWriteStore = RetirementRuntimeStore & {
   mergeRetiredWorktreeNamesForNamespace?(namespaceKey: string, names: Iterable<string>): boolean
   getSshTarget?: SshTargetLookup
 }
-type RetirementPathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDir'> & {
+type RetirementPathSettings = Pick<
+  GlobalSettings,
+  'nestWorkspaces' | 'workspaceDir' | 'worktreeLayoutMode'
+> & {
   wslMirrorDistro?: string
 }
 
@@ -131,7 +134,7 @@ async function getRetirementCollisionKey(
     repo.path,
     repo.worktreeBasePath ?? '',
     settings.workspaceDir,
-    settings.nestWorkspaces ? 'nested' : 'flat',
+    settings.worktreeLayoutMode ?? (settings.nestWorkspaces ? 'repo-nested' : 'flat'),
     settings.wslMirrorDistro ?? ''
   ].join('\u0000')
   const cached = collisionKeyCache.get(cacheKey)

@@ -8,6 +8,7 @@ import { normalizeWorktreeVisibilitySourcePreferences } from '../../../shared/wo
 import type { GhAccountBinding } from '../../../shared/github/account-binding'
 import { invalidateGhAccountTokenCache } from '../../github/gh-account-token'
 import { sanitizeRepoUpdatesForPersistence } from './repo-sanitization'
+import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 
 export type RepoUpdateMutationOperations = {
   state: Pick<PersistedState, 'repos' | 'projectGroups'>
@@ -238,6 +239,34 @@ export class RepoUpdatePersistenceOperations {
     Object.assign(repo, sanitizedUpdates)
     this.bumpLocalWorktreeScanGeneration(id)
     this.syncProjectHostSetupCompatibilityState()
+    this.scheduleSave()
+    return this.hydrateRepo(repo)
+  }
+
+  /**
+   * The new `Repo.path` after this repo's primary checkout moved into its project folder.
+   *
+   * Why this is not a general path setter: a repo's path is otherwise immutable because worktree
+   * ids and catalog keys are derived from it, so every writer that got one would have to re-key
+   * them. Relocating a checkout is the one flow that must move it, and it re-keys explicitly —
+   * see `relocatePrimaryCheckout`. Deliberately absent from `updateRepo`'s field list.
+   */
+  relocateRepoPath(id: string, newPath: string): Repo | null {
+    const repo = this.state.repos.find((candidate) => candidate.id === id)
+    if (!repo || !newPath) {
+      return null
+    }
+    // Why keep this in step: it records the checkout locator a folder upgrade proved, so left
+    // behind it would name a directory that no longer exists.
+    if (
+      repo.folderUpgradeGitRootPath &&
+      normalizeRuntimePathForComparison(repo.folderUpgradeGitRootPath) ===
+        normalizeRuntimePathForComparison(repo.path)
+    ) {
+      repo.folderUpgradeGitRootPath = newPath
+    }
+    repo.path = newPath
+    this.bumpLocalWorktreeScanGeneration(id)
     this.scheduleSave()
     return this.hydrateRepo(repo)
   }

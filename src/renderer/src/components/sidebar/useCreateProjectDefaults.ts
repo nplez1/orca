@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { browseRuntimeServerDirectory } from '@/runtime/runtime-server-directory-browser'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
+import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import { getDefaultCreateProjectParent, type GitAvailability } from './create-project-defaults'
 
 const LOCAL_GIT_AVAILABILITY_TIMEOUT_MS = 1500
@@ -48,13 +49,16 @@ export function useCreateProjectDefaults({
   activeRuntimeEnvironmentId,
   sshTargetId,
   createParent,
-  setCreateParent
+  setCreateParent,
+  worktreeLayoutMode
 }: {
   step: AddRepoDialogStep
   activeRuntimeEnvironmentId: string | null | undefined
   sshTargetId?: string | null | undefined
   createParent: string
   setCreateParent: (value: string) => void
+  /** Placement mode, so a runtime host's default parent matches the layout in use. */
+  worktreeLayoutMode?: WorktreeLayoutMode
 }): {
   createDefaultParent: string
   createGitAvailability: GitAvailability
@@ -229,7 +233,7 @@ export function useCreateProjectDefaults({
         ) {
           return
         }
-        const parent = getDefaultCreateProjectParent(result.resolvedPath)
+        const parent = getDefaultCreateProjectParent(result.resolvedPath, worktreeLayoutMode)
         createStepAutoFilledRef.current = true
         autoFilledCreateParentRef.current = { parent, targetKey: `runtime:${runtimeEnvironmentId}` }
         createParentProvenanceRef.current = { parent, targetKey: `runtime:${runtimeEnvironmentId}` }
@@ -250,7 +254,8 @@ export function useCreateProjectDefaults({
     canReplaceCreateParentDefault,
     createParent,
     setCreateParent,
-    step
+    step,
+    worktreeLayoutMode
   ])
 
   useEffect(() => {

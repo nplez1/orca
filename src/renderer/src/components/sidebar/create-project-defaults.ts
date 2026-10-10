@@ -1,16 +1,30 @@
+import {
+  isProjectFolderLayout,
+  type WorktreeLayoutMode
+} from '../../../../shared/orca-workspace-layout'
+
 export type GitAvailability = 'checking' | 'available' | 'unavailable' | 'unknown'
 
 function pathSeparatorFor(pathValue: string): '/' | '\\' {
   return pathValue.includes('\\') ? '\\' : '/'
 }
 
-/** True only for `{home}/orca/projects` on the usual OS home layouts. A configured
- *  directory that merely ends in `orca/projects` (e.g. `/data/orca/projects`) must
- *  stay verbatim — the `~` shorthand would otherwise lie. */
-function isHomeProjectsFallback(pathValue: string): boolean {
-  return /^(?:\/(?:Users|home)\/[^/]+|[A-Za-z]:[\\/]Users[\\/][^\\/]+)[\\/]orca[\\/]projects$/.test(
-    pathValue
-  )
+/** Home-relative shorthand for an Orca-derived default project root, or null for anything else.
+ *  Both shapes are worth showing as `~/…` instead of an absolute path. */
+function homeDefaultRootShorthand(pathValue: string): string | null {
+  if (isHomeOrcaRoot(pathValue, 'projects')) {
+    return '~/orca/projects'
+  }
+  return isHomeOrcaRoot(pathValue, 'workspaces') ? '~/orca/workspaces' : null
+}
+
+/** True only for `{home}/orca/<leaf>` on the usual OS home layouts. A configured directory that
+ *  merely ends in the same segments (e.g. `/data/orca/projects`) must stay verbatim, because the
+ *  `~` shorthand would otherwise lie about where it lives. */
+function isHomeOrcaRoot(pathValue: string, leaf: string): boolean {
+  return new RegExp(
+    `^(?:\\/(?:Users|home)\\/[^/]+|[A-Za-z]:[\\\\/]Users[\\\\/][^\\\\/]+)[\\\\/]orca[\\\\/]${leaf}$`
+  ).test(pathValue)
 }
 
 function trimTrailingSeparators(pathValue: string): string {
@@ -37,12 +51,18 @@ export function joinCreateProjectPath(parentPath: string, childName: string): st
   return `${parent}${separator}${child}`
 }
 
-export function getDefaultCreateProjectParent(homeDir: string): string {
+export function getDefaultCreateProjectParent(
+  homeDir: string,
+  layoutMode: WorktreeLayoutMode = 'repo-nested'
+): string {
   const trimmedHomeDir = trimTrailingSeparators(homeDir.trim())
   if (!trimmedHomeDir) {
     return ''
   }
-  return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'orca'), 'projects')
+  // Why: under the project-folder layout a project's container lives inside the workspace dir,
+  // so the default project root is <home>/orca/workspaces rather than the sibling orca/projects.
+  const rootName = isProjectFolderLayout(layoutMode) ? 'workspaces' : 'projects'
+  return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'orca'), rootName)
 }
 
 export function getCreateProjectDefaultParentAutoFill({
@@ -90,14 +110,13 @@ export function formatCreateProjectParentSummary({
   if (!trimmedParent) {
     return runtimeEnvironmentId || isRemoteHost ? missingServerLocationLabel : missingLocationLabel
   }
-  if (
-    defaultParent &&
-    trimmedParent === defaultParent &&
-    !runtimeEnvironmentId &&
-    !isRemoteHost &&
-    isHomeProjectsFallback(trimmedParent)
-  ) {
-    return '~/orca/projects'
+  if (defaultParent && trimmedParent === defaultParent && !runtimeEnvironmentId && !isRemoteHost) {
+    // Why: a configured directory that merely ends in orca/projects must stay verbatim — the
+    // `~` shorthand would otherwise lie about where it lives.
+    const shorthand = homeDefaultRootShorthand(trimmedParent)
+    if (shorthand) {
+      return shorthand
+    }
   }
   return trimmedParent
 }

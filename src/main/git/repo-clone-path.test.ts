@@ -60,4 +60,38 @@ describe('repo clone path helpers', () => {
       getClonePathComparisonKey('\\\\wsl$\\ubuntu\\home\\user\\repo')
     )
   })
+
+  it('nests the checkout under the project folder when one is given', () => {
+    expect(
+      deriveValidatedClonePath({
+        url: 'https://example.com/orca.git',
+        destination: '/orca/workspaces',
+        relativeClonePath: 'orca/main'
+      })
+    ).toBe(join('/orca/workspaces', 'orca', 'main'))
+  })
+
+  it('refuses a project-folder path that escapes the destination', () => {
+    // Why: the relative path is composed from names the caller sanitized, so escaping it is a
+    // caller bug — and this is the check that turns it into an error instead of a stray clone.
+    expect(() =>
+      deriveValidatedClonePath({
+        url: 'https://example.com/orca.git',
+        destination: '/orca/workspaces',
+        relativeClonePath: '../../elsewhere/main'
+      })
+    ).toThrow('Clone path must be inside the destination directory')
+  })
+
+  it('keeps a leading-slash segment inside the destination rather than resetting to it', () => {
+    // Why asserted rather than rejected: `join` reads the leading slash as a separator, so the
+    // path stays under the destination. Containment, not the caller's spelling, is the boundary.
+    expect(
+      deriveValidatedClonePath({
+        url: 'https://example.com/orca.git',
+        destination: '/orca/workspaces',
+        relativeClonePath: '/orca/main'
+      })
+    ).toBe(join('/orca/workspaces', 'orca', 'main'))
+  })
 })

@@ -17,6 +17,7 @@ import {
 import { isLegacyRepoForExternalWorktreeVisibility } from '../external-worktree-visibility'
 import { shouldShowWorktree } from '../worktree-visibility-resolution'
 import type { GlobalSettings, OrcaWorkspaceLayout } from '../global-settings-types'
+import { layoutModeNestsWorkspaces, resolveWorktreeLayoutMode } from '../orca-workspace-layout'
 import type { Repo } from '../repo-types'
 import type { WorktreeMeta } from './meta-types'
 import type { DetectedWorktree, Worktree, WorktreeOwnership } from './types'
@@ -30,20 +31,28 @@ export {
 export { shouldShowWorktree } from '../worktree-visibility-resolution'
 
 export function buildKnownOrcaWorkspaceLayouts(
-  settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'workspaceDirHistory'>,
+  settings: Pick<
+    GlobalSettings,
+    'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode' | 'workspaceDirHistory'
+  >,
   repo?: Pick<Repo, 'path' | 'connectionId' | 'worktreeBasePath'>
 ): OrcaWorkspaceLayout[] {
+  const worktreeLayoutMode = resolveWorktreeLayoutMode(settings)
+  const nestWorkspaces = layoutModeNestsWorkspaces(worktreeLayoutMode)
   const layouts: OrcaWorkspaceLayout[] = []
   for (const basePath of resolveConfiguredWorktreeBasePaths(repo)) {
-    layouts.push({ path: basePath, nestWorkspaces: settings.nestWorkspaces })
+    layouts.push({ path: basePath, nestWorkspaces, worktreeLayoutMode })
   }
   if (settings.workspaceDir && shouldIncludeWorkspaceLayout(repo, settings.workspaceDir)) {
     layouts.push({
       path: repo
         ? resolveWorkspaceLayoutPath(repo.path, settings.workspaceDir)
         : settings.workspaceDir,
-      nestWorkspaces: settings.nestWorkspaces
+      nestWorkspaces,
+      worktreeLayoutMode
     })
+    // Why: historical entries keep their own recorded mode, so a workspace created under an
+    // older mode stays classifiable after the user switches.
     appendWorkspaceLayouts(
       layouts,
       (settings.workspaceDirHistory ?? [])
@@ -60,7 +69,9 @@ export function buildKnownOrcaWorkspaceLayouts(
 
   const seen = new Set<string>()
   return layouts.filter((layout) => {
-    const key = `${normalizeRuntimePathForComparison(layout.path)}:${layout.nestWorkspaces}`
+    // Why: the mode is part of the identity — the same path under two modes describes two
+    // different placements, and collapsing them would drop one from classification.
+    const key = `${normalizeRuntimePathForComparison(layout.path)}:${resolveWorktreeLayoutMode(layout)}`
     if (seen.has(key)) {
       return false
     }
@@ -89,7 +100,7 @@ function shouldIncludeWorkspaceLayout(
 
 function buildWslWorkspaceLayouts(
   repoPath: string,
-  settings: Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDirHistory'>
+  settings: Pick<GlobalSettings, 'nestWorkspaces' | 'worktreeLayoutMode' | 'workspaceDirHistory'>
 ): OrcaWorkspaceLayout[] {
   const parsed = parseWslUncPath(repoPath)
   if (!parsed) {
@@ -101,11 +112,15 @@ function buildWslWorkspaceLayouts(
     return []
   }
   const root = `//wsl.localhost/${parsed.distro}${linuxHome}/orca/workspaces`
-  const historicalModes = (settings.workspaceDirHistory ?? []).map(
-    (layout) => layout.nestWorkspaces
-  )
-  const modes = [settings.nestWorkspaces, ...historicalModes]
-  return [...new Set(modes)].map((nestWorkspaces) => ({ path: root, nestWorkspaces }))
+  const modes = [
+    resolveWorktreeLayoutMode(settings),
+    ...(settings.workspaceDirHistory ?? []).map((layout) => resolveWorktreeLayoutMode(layout))
+  ]
+  return [...new Set(modes)].map((worktreeLayoutMode) => ({
+    path: root,
+    nestWorkspaces: layoutModeNestsWorkspaces(worktreeLayoutMode),
+    worktreeLayoutMode
+  }))
 }
 
 export function classifyWorktreeOwnership(args: {

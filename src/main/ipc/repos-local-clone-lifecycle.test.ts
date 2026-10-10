@@ -126,6 +126,42 @@ describe('repos:add + repos:clone', () => {
     expect(result).not.toHaveProperty('externalWorktreeVisibility')
   })
 
+  it('nests a clone under the project folder and names the repo after the project', async () => {
+    const destination = await createTempRoot()
+    mockStore.getSettings.mockReturnValue({
+      workspaceDir: destination,
+      nestWorkspaces: true,
+      worktreeLayoutMode: 'project-folder'
+    })
+    // A remote whose HEAD is not `main`, so the folder can only be right if the branch was read.
+    gitExecFileAsyncMock.mockImplementation((args: string[]) =>
+      Promise.resolve({
+        stdout: args[0] === 'ls-remote' ? 'ref: refs/heads/develop\tHEAD\n' : '',
+        stderr: ''
+      })
+    )
+
+    await handlers.get('repos:clone')!(null, {
+      url: 'https://example.com/orca.git',
+      destination
+    })
+
+    const clonePath = join(destination, 'orca', 'develop')
+    expect(gitSpawnMock).toHaveBeenCalledWith(
+      expect.arrayContaining([clonePath]),
+      expect.anything()
+    )
+    expect(mockStore.addRepo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // Why the project name and not the leaf folder: placement derives the container from the
+        // display name, so naming it after the branch would collapse every project's worktrees
+        // into one folder called after the default branch.
+        displayName: 'orca',
+        path: clonePath
+      })
+    )
+  })
+
   it('drops a same-path negative submodule cache before a local clone', async () => {
     const destination = await createTempRoot()
     const clonePath = join(destination, 'orca')

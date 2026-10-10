@@ -4,6 +4,10 @@ import type { Stats } from 'node:fs'
 import type { Store } from '../persistence'
 import type { FileStat, IFilesystemProvider } from '../providers/types'
 import type { GlobalSettings } from '../../shared/global-settings-types'
+import {
+  isProjectFolderLayout,
+  resolveWorktreeLayoutMode
+} from '../../shared/orca-workspace-layout'
 import type { Repo } from '../../shared/repo-types'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { isFolderRepo } from '../../shared/repo-kind'
@@ -107,7 +111,7 @@ function isRuntimePathAbsoluteForRepo(repoPath: string, pathValue: string): bool
 
 function getBaseWatchLayout(
   repo: Repo,
-  pathSettings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces'>,
+  pathSettings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'>,
   connectionId: string | undefined
 ): { workspaceRoot: string; nestWorkspaces: boolean } {
   if (
@@ -122,7 +126,11 @@ function getBaseWatchLayout(
 
   return {
     workspaceRoot: computeWorkspaceRoot(repo.path, pathSettings),
-    nestWorkspaces: pathSettings.nestWorkspaces
+    // Why: in project-folder mode the watched root IS the per-project container, so each
+    // worktree is a direct child — exactly the shape the flat matcher handles. Only
+    // repo-nested interposes a repo-named container between the root and the worktrees.
+    nestWorkspaces:
+      pathSettings.nestWorkspaces && !isProjectFolderLayout(resolveWorktreeLayoutMode(pathSettings))
   }
 }
 

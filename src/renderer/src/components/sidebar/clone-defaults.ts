@@ -1,6 +1,21 @@
-export function getDefaultCloneParent(workspaceDir: string): string {
+import {
+  isProjectFolderLayout,
+  type WorktreeLayoutMode
+} from '../../../../shared/orca-workspace-layout'
+
+export function getDefaultCloneParent(
+  workspaceDir: string,
+  layoutMode: WorktreeLayoutMode = 'repo-nested'
+): string {
   if (!workspaceDir) {
     return ''
+  }
+
+  // Why: under the project-folder layout the destination *is* the workspace dir — the clone path
+  // appends <project>/<branch> itself — so the parent-of-"workspaces" heuristic no longer applies
+  // and would land the checkout outside the worktree root.
+  if (isProjectFolderLayout(layoutMode)) {
+    return workspaceDir
   }
 
   const trimmed = workspaceDir.replace(/[\\/]+$/, '')
@@ -32,6 +47,7 @@ export function getCloneDestinationAutoFill({
   activeRuntimeEnvironmentId,
   sshTargetId,
   workspaceDir,
+  layoutMode,
   cloneStepAutoFilled
 }: {
   step: string
@@ -39,6 +55,7 @@ export function getCloneDestinationAutoFill({
   activeRuntimeEnvironmentId: string | null | undefined
   sshTargetId?: string | null | undefined
   workspaceDir: string | null | undefined
+  layoutMode?: WorktreeLayoutMode
   cloneStepAutoFilled: boolean
 }): { destination: string } | null {
   if (step !== 'clone' || cloneStepAutoFilled || cloneDestination) {
@@ -47,5 +64,5 @@ export function getCloneDestinationAutoFill({
   if (activeRuntimeEnvironmentId?.trim() || sshTargetId?.trim() || !workspaceDir) {
     return null
   }
-  return { destination: getDefaultCloneParent(workspaceDir) }
+  return { destination: getDefaultCloneParent(workspaceDir, layoutMode) }
 }

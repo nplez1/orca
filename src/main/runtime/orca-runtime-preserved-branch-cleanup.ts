@@ -3,6 +3,7 @@ import { OrcaRuntimeWithTerminalDrivers } from './orca-runtime-terminal-drivers'
 import { confirmRunTerminalShellAlone, readRunTerminalClientUse } from './run-terminal-client-use'
 import { ALL_EXECUTION_HOSTS_SCOPE, type ExecutionHostScope } from '../../shared/execution-host'
 import { RuntimePreservedBranchCleanup } from './runtime-preserved-branch-cleanup'
+import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
 import type { IPtyProvider } from '../providers/types'
 import type {
   AgentSessionCreateOperation,
@@ -331,6 +332,19 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
 
   protected readonly repositoryRefQueries = new RuntimeRepositoryRefQueries({
     resolveRepo: (selector) => this.resolveRepoSelector(selector)
+  })
+
+  // Why here and not in a checked mixin: this field's initializer has to run before the owner map
+  // in `orca-runtime-state-fields` installs the command surface, and a subclass's field would run
+  // after it. Every sibling controller in this file is wired the same way.
+  protected readonly repositoryRelocation = new RuntimeRepositoryRelocationController({
+    getStore: () => this.store,
+    resolveRepo: (selector) => this.resolveRepoSelector(selector),
+    getWorktreePs: (limit) => this.getWorktreePs(limit),
+    notifyRepoRelocated: (repoId, oldId, newId) =>
+      this.notifyWorktreeFolderRenamed(repoId, oldId, newId),
+    invalidateResolvedWorktrees: () => this.invalidateResolvedWorktreeCache(),
+    notifyReposChanged: () => this.notifyReposChanged()
   })
 
   protected readonly serverEnvironment = new RuntimeServerEnvironmentCommands()

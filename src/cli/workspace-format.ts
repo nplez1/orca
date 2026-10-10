@@ -153,7 +153,18 @@ export function formatRepoList(result: RuntimeRepoList): string {
   if (result.repos.length === 0) {
     return 'No repos found.'
   }
-  return result.repos.map((repo) => `${repo.id}  ${repo.displayName}  ${repo.path}`).join('\n')
+  const lines = result.repos.map((repo) => `${repo.id}  ${repo.displayName}  ${repo.path}`)
+  // Why a trailing hint rather than a column: a relocation is rare and actionable, and the cue
+  // belongs next to the command that acts on it.
+  const needsRelocation = new Set(result.relocationRequiredRepoIds ?? [])
+  for (const repo of result.repos) {
+    if (needsRelocation.has(repo.id)) {
+      lines.push(
+        `\n${repo.id} is not in its project folder. Run: orca repo relocate --repo ${repo.id}`
+      )
+    }
+  }
+  return lines.join('\n')
 }
 
 export function formatRepoShow(result: { repo: Record<string, unknown> }): string {

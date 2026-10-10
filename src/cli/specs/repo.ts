@@ -43,5 +43,17 @@ export const REPO_COMMAND_SPECS: CommandSpec[] = [
     summary: 'Search branch/tag refs within a repo',
     usage: 'orca repo search-refs --repo <selector> --query <text> [--limit <n>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'repo', 'query', 'limit']
+  },
+  {
+    path: ['repo', 'relocate'],
+    summary: "Move a repo's primary checkout into its project folder",
+    usage: 'orca repo relocate --repo <selector> [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'repo', 'dry-run'],
+    notes: [
+      'For the one-folder-per-project layout: moves the checkout to <project folder>/<default branch>, runs `git worktree repair`, then re-keys the workspace records that name the old path.',
+      "Refuses while a terminal is attached to any of the repo's workspaces, on Windows, on another host, and across volumes.",
+      'Use --dry-run to see the decision without moving anything.'
+    ],
+    examples: ['orca repo relocate --repo path:/path/to/repo --dry-run --json']
   }
 ]
