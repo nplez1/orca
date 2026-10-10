@@ -229,8 +229,10 @@ test.describe('Linear URL workspace entry', () => {
 
     await input.press('Enter')
     const dialog = orcaPage.getByRole('dialog', { name: /Create (Workspace|Worktree)/i })
-    const sourcePill = dialog.locator('[data-workspace-source-pill="true"]')
-    await expect(sourcePill).toContainText(LINEAR_ISSUE.title)
+    // Why: the resolved issue arrives as the composer's implied source, so it is
+    // shown as context rather than as a pill the user would have to clear.
+    const impliedSource = dialog.locator('[data-workspace-implied-source="true"]')
+    await expect(impliedSource).toContainText(LINEAR_ISSUE.title)
     await expect(dialog.getByPlaceholder('Workspace name')).toHaveValue(EXPECTED_WORKSPACE_NAME)
     await expect(dialog.getByRole('button', { name: /Create (Workspace|Worktree)/i })).toBeEnabled()
     await testInfo.attach('linear-url-cmd-j-composer.png', {

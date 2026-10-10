@@ -235,6 +235,9 @@ function QuickTabBody({
     (option) => option.id === cardProps.selectedProjectId
   )
   const isFolderWorkspaceTarget = selectedProjectOption?.kind === 'project-group'
+  // Why: a composer opened from a task already carries that task as the link, so
+  // its source is settled before the dialog renders — the user only names it.
+  const impliedTaskSourceUrl = modalData.linkedWorkItem?.url ?? null
   const primaryActionLabel = isFolderWorkspaceTarget
     ? getFolderWorkspacePrimaryActionLabel()
     : cardProps.selectedRepoIsGit
@@ -306,6 +309,7 @@ function QuickTabBody({
         quickAgent={quickAgent}
         onQuickAgentChange={handleQuickAgentChange}
         {...cardProps}
+        impliedTaskSourceUrl={impliedTaskSourceUrl}
         primaryActionLabel={primaryActionLabel}
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}
         onCreate={() => void handleCreate()}

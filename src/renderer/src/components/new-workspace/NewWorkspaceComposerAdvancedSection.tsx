@@ -12,6 +12,7 @@ import {
 } from '@/lib/text-control-paste'
 import { translate } from '@/i18n/i18n'
 import { ComposerParentWorktreePicker } from './ComposerParentWorktreePicker'
+import { resolveImpliedTaskSource } from './implied-task-source'
 import type { NewWorkspaceComposerCardProps } from './new-workspace-composer-card-props'
 
 function SetupCommandPreview({
@@ -32,6 +33,7 @@ type NewWorkspaceComposerAdvancedSectionProps = Pick<
   NewWorkspaceComposerCardProps,
   | 'advancedOpen'
   | 'smartNameSelection'
+  | 'impliedTaskSourceUrl'
   | 'name'
   | 'onNameValueChange'
   | 'selectedRepoIsGit'
@@ -77,6 +79,7 @@ export function NewWorkspaceComposerAdvancedSection({
   sparseEditing,
   onSparseEditingChange,
   smartNameSelection,
+  impliedTaskSourceUrl = null,
   name,
   onNameValueChange,
   selectedRepoIsGit,
@@ -165,7 +168,12 @@ export function NewWorkspaceComposerAdvancedSection({
               : '-translate-y-1 opacity-0 delay-0'
           )}
         >
-          {smartNameSelection ? (
+          {/* Why: this is the escape hatch for a name parked behind a source
+              pill. When the task implies the source, the main field already IS
+              the name, so repeating it here would be a second editor for the
+              same value. */}
+          {smartNameSelection &&
+          !resolveImpliedTaskSource(impliedTaskSourceUrl, smartNameSelection) ? (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
                 {translate('auto.components.NewWorkspaceComposerCard.2688050e4b', 'Name')}

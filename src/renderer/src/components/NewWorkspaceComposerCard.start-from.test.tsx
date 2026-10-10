@@ -2,6 +2,7 @@
 
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import NewWorkspaceComposerCard from './NewWorkspaceComposerCard'
 
@@ -239,5 +240,81 @@ describe('NewWorkspaceComposerCard start from', () => {
     container = renderCard({ startFromResetHint: 'was origin/main' })
 
     expect(container.textContent).toContain('was origin/main')
+  })
+})
+
+// Why: a composer opened from a task already knows its source. Showing the source
+// picker there parked the name behind an uneditable pill, so shortening the name
+// meant clearing the pill — and clearing the pill dropped the issue link.
+describe('NewWorkspaceComposerCard implied task source', () => {
+  let container: HTMLDivElement | null = null
+  const taskUrl = 'https://example.atlassian.net/browse/RDG-344'
+  const impliedSelection = { kind: 'jira' as const, label: 'ERP-1491', url: taskUrl }
+
+  afterEach(() => {
+    container?.remove()
+    container = null
+  })
+
+  function nameInput(): HTMLInputElement | null {
+    return container?.querySelector<HTMLInputElement>('[data-workspace-name-input="true"]') ?? null
+  }
+
+  it('picks the source picker only while the source is not implied', () => {
+    container = renderCard({ name: 'erp-fix', smartNameSelection: impliedSelection })
+    expect(container.querySelector('[aria-label="workspace name"]')).toBeTruthy()
+    expect(nameInput()).toBeNull()
+
+    container.remove()
+    container = renderCard({
+      name: 'erp-fix',
+      smartNameSelection: impliedSelection,
+      impliedTaskSourceUrl: taskUrl
+    })
+    expect(container.querySelector('[aria-label="workspace name"]')).toBeNull()
+    expect(nameInput()?.value).toBe('erp-fix')
+  })
+
+  it('shows the implied issue as context beside the editable name', () => {
+    container = renderCard({
+      name: 'erp-fix',
+      smartNameSelection: impliedSelection,
+      impliedTaskSourceUrl: taskUrl
+    })
+
+    expect(container.textContent).toContain('ERP-1491')
+  })
+
+  it('renames the workspace without clearing the link', () => {
+    const onNameValueChange = vi.fn()
+    const onClearSmartNameSelection = vi.fn()
+    container = renderCard({
+      name: 'ERP-1491 Long issue title',
+      smartNameSelection: impliedSelection,
+      impliedTaskSourceUrl: taskUrl,
+      onNameValueChange,
+      onClearSmartNameSelection
+    })
+
+    fireEvent.change(nameInput()!, { target: { value: 'short-name' } })
+
+    expect(onNameValueChange).toHaveBeenCalledWith('short-name')
+    expect(onClearSmartNameSelection).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('ERP-1491')
+  })
+
+  // Why: the source can move under the composer — a project switch drops a
+  // repo-scoped link and "create more" resets it. Comparing against the URL the
+  // dialog opened with keeps a replacement source from inheriting the fixed,
+  // non-clearable treatment meant for the task.
+  it('stops treating a replacement source as the implied one', () => {
+    container = renderCard({
+      name: 'another-name',
+      impliedTaskSourceUrl: taskUrl,
+      smartNameSelection: { kind: 'github-issue', label: '#7 Other issue' }
+    })
+
+    expect(container.querySelector('[aria-label="workspace name"]')).toBeTruthy()
+    expect(container.querySelector('[data-workspace-implied-source="true"]')).toBeNull()
   })
 })
