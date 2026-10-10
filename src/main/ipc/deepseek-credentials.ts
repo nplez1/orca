@@ -4,6 +4,7 @@ import {
   hasDeepSeekApiKey,
   saveDeepSeekApiKey
 } from '../deepseek/deepseek-api-key-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service'
 
 export type DeepSeekCredentialsStatus = {
@@ -37,11 +38,13 @@ export function registerDeepSeekCredentialsHandlers(rateLimits: RateLimitService
       throw new Error('DeepSeek API key must be a string')
     }
     saveDeepSeekApiKey(key)
+    noteReplicatedCredentialChanged()
     refreshAfterDeepSeekCredentialChange(rateLimits, 'save')
     return getDeepSeekCredentialsStatus()
   })
   ipcMain.handle('deepseekCredentials:clearApiKey', () => {
     clearDeepSeekApiKey()
+    noteReplicatedCredentialChanged()
     refreshAfterDeepSeekCredentialChange(rateLimits, 'clear')
     return getDeepSeekCredentialsStatus()
   })

@@ -301,6 +301,7 @@ import {
   WorkItemDetails,
   WorkItemsList as WorkItemsListOfGitlabParams
 } from './gitlab-params'
+import { ApplyHostSettingsReplicationParams } from './host-settings-params'
 import {
   HostedReviewCreate,
   HostedReviewCreationEligibility,
@@ -950,6 +951,8 @@ export const RPC_PARAMS_BY_METHOD = {
   'host.pwsh.isAvailable': null,
   'host.wsl.isAvailable': null,
   'host.wsl.listDistros': null,
+  'hostSettings.applyReplication': ApplyHostSettingsReplicationParams,
+  'hostSettings.replicationState': null,
   'hostedReview.create': HostedReviewCreate,
   'hostedReview.createStacked': HostedReviewCreate,
   'hostedReview.forBranch': HostedReviewForBranch,

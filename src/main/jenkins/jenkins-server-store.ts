@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { adoptLegacyHomeStore } from '../home-directory-migration'
 import { asRecord } from '../../shared/jenkins-payload'
 import { isJenkinsUrlUnderBase, normalizeJenkinsBaseUrl } from '../../shared/jenkins-urls'
 import type { JenkinsServerProfile } from '../../shared/jenkins-servers'
@@ -10,11 +10,13 @@ import {
   readStoredCredentialToken,
   writeEncryptedCredential
 } from '../integration-credential-file'
+import { readCredentialFileProtection } from '../credential-file-protection'
+import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
 /**
  * The user's configured Jenkins servers, on disk as non-secret profiles
- * (`~/.orca/jenkins-servers.json`) plus one encrypted API token per server
- * (`~/.orca/jenkins-tokens/<id>.enc`).
+ * (`~/.orca-np/jenkins-servers.json`) plus one encrypted API token per server
+ * (`~/.orca-np/jenkins-tokens/<id>.enc`).
  *
  * Why the split: only the token is a secret, and keeping the profile readable means the settings
  * pane and the URL matcher can work without touching the OS keyring.
@@ -26,14 +28,12 @@ type JenkinsServersFile = {
 }
 
 function getServersFilePath(): string {
-  return join(homedir(), '.orca', 'jenkins-servers.json')
+  return adoptLegacyHomeStore('jenkins-servers.json')
 }
 
 function getTokenPath(serverId: string): string {
   return join(
-    homedir(),
-    '.orca',
-    'jenkins-tokens',
+    adoptLegacyHomeStore('jenkins-tokens'),
     `${Buffer.from(serverId).toString('base64url')}.enc`
   )
 }
@@ -61,7 +61,7 @@ function readServersFile(): JenkinsServersFile {
   }
 }
 
-function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
+export function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
   const record = asRecord(input)
   if (
     !record ||
@@ -79,7 +79,7 @@ function normalizeStoredServer(input: unknown): JenkinsServerProfile | null {
 }
 
 function writeServersFile(file: JenkinsServersFile): void {
-  const dir = join(homedir(), '.orca')
+  const dir = dirname(getServersFilePath())
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true })
   }
@@ -94,6 +94,11 @@ export function listJenkinsServers(): JenkinsServerProfile[] {
 
 export function hasJenkinsServerToken(serverId: string): boolean {
   return existsSync(getTokenPath(serverId))
+}
+
+/** How a server's stored token sits on disk, or null when it has none. */
+export function getJenkinsServerTokenProtection(serverId: string): SecretAtRestProtection | null {
+  return readCredentialFileProtection(getTokenPath(serverId))
 }
 
 /**
@@ -118,7 +123,7 @@ export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: strin
   // Why: write the token first — a profile whose token write failed would look connected and then
   // fail every request with a confusing auth error.
   if (apiToken) {
-    const tokenDir = join(homedir(), '.orca', 'jenkins-tokens')
+    const tokenDir = adoptLegacyHomeStore('jenkins-tokens')
     if (!existsSync(tokenDir)) {
       mkdirSync(tokenDir, { recursive: true })
     }
@@ -130,14 +135,17 @@ export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: strin
 export function removeJenkinsServer(serverId: string): boolean {
   const file = readServersFile()
   const servers = file.servers.filter((server) => server.id !== serverId)
-  if (servers.length === file.servers.length) {
-    return false
-  }
-  writeServersFile({ version: 1, servers })
+  // Why the token is unlinked even when there is no profile to remove: a token left behind by an
+  // earlier partial removal keeps `hasJenkinsServerToken` true, so replication reports the removal as
+  // unverified on every retry and the stray token can never be cleared.
   const tokenPath = getTokenPath(serverId)
   if (existsSync(tokenPath)) {
     unlinkSync(tokenPath)
   }
+  if (servers.length === file.servers.length) {
+    return false
+  }
+  writeServersFile({ version: 1, servers })
   return true
 }
 

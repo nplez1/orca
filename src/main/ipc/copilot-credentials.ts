@@ -5,6 +5,7 @@ import {
   readCopilotCredentials,
   saveCopilotCredentials
 } from '../copilot-credentials/copilot-credentials-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import {
   resolveGhCopilotCredentials,
   type CopilotGhCredentialsResult
@@ -94,12 +95,14 @@ export function registerCopilotCredentialsHandlers(rateLimits: RateLimitService 
         throw new Error('GitHub token is required')
       }
       saveCopilotCredentials({ token: nextToken, enterpriseSlug })
+      noteReplicatedCredentialChanged()
       refreshAfterCopilotCredentialChange(rateLimits, 'save')
       return await getCopilotCredentialsStatus()
     }
   )
   ipcMain.handle('copilotCredentials:clear', async () => {
     clearCopilotCredentials()
+    noteReplicatedCredentialChanged()
     refreshAfterCopilotCredentialChange(rateLimits, 'clear')
     return await getCopilotCredentialsStatus()
   })

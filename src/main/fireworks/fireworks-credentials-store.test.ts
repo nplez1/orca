@@ -39,7 +39,7 @@ vi.mock('../../shared/secure-file', () => ({
   writeSecureFile: writeSecureFileMock
 }))
 
-const storePath = '/home/test/.orca/fireworks-credentials.enc'
+const storePath = '/home/test/.orca-np/fireworks-credentials.enc'
 const envelope = (
   kind: 'encrypted' | 'plaintext',
   value: string,
@@ -256,7 +256,10 @@ describe('fireworks-credentials-store', () => {
   })
 
   it('clears the cached payload and removes the file', async () => {
-    existsSyncMock.mockReturnValueOnce(true)
+    // Why per-path: the store also consults its pre-rename location, so a single
+    // one-shot `true` would be spent before the read it was meant for.
+    let filePresent = true
+    existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(
       Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890', accountIdOverride: null }))
     )
@@ -265,6 +268,7 @@ describe('fireworks-credentials-store', () => {
       apiKey: 'fw_test_1234567890',
       accountIdOverride: null
     })
+    filePresent = false
     store.clearFireworksCredentials()
     expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
     expect(store.readFireworksCredentials()).toBeNull()

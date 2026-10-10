@@ -8,6 +8,7 @@ import type {
   JenkinsServerTestResult
 } from '../../shared/jenkins-servers'
 import { jenkinsGetJson, type JenkinsRequestFailure } from './jenkins-request'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import {
   createJenkinsServerId,
   hasJenkinsServerToken,
@@ -65,11 +66,16 @@ export function saveJenkinsServerFromArgs(args: JenkinsSaveServerArgs): JenkinsS
   // Why: an empty token on an edit means "leave the stored one alone"; a server may also be
   // readable anonymously, which is a legitimate configuration.
   saveJenkinsServer(profile, apiToken.length > 0 ? apiToken : null)
+  noteReplicatedCredentialChanged()
   return { ok: true, server: summarize(profile) }
 }
 
 export function removeJenkinsServerById(serverId: string): boolean {
-  return removeJenkinsServer(serverId)
+  const removed = removeJenkinsServer(serverId)
+  if (removed) {
+    noteReplicatedCredentialChanged()
+  }
+  return removed
 }
 
 function describeProbeFailure(failure: JenkinsRequestFailure, baseUrl: string): string {

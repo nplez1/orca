@@ -41,7 +41,7 @@ vi.mock('../../shared/secure-file', () => ({
   writeSecureFile: writeSecureFileMock
 }))
 
-const storePath = '/home/test/.orca/minimax-api-key.enc'
+const storePath = '/home/test/.orca-np/minimax-api-key.enc'
 const envelope = (kind: 'encrypted' | 'plaintext', value: string): string =>
   `orca-minimax-api-key:v1:${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
 
@@ -233,11 +233,15 @@ describe('minimax-api-key-store', () => {
   })
 
   it('clears the cached key and removes the file', async () => {
-    existsSyncMock.mockReturnValueOnce(true)
+    // Why per-path: the store also consults its pre-rename location, so a single
+    // one-shot `true` would be spent before the read it was meant for.
+    let filePresent = true
+    existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
     safeStorageMock.decryptString.mockReturnValueOnce('sk-preclear')
     const store = await loadStore()
     expect(store.readMiniMaxApiKey()).toBe('sk-preclear')
+    filePresent = false
     store.clearMiniMaxApiKey()
     expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
     expect(store.readMiniMaxApiKey()).toBeNull()

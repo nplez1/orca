@@ -4,6 +4,7 @@ import {
   hasOpenCodeGoApiKey,
   saveOpenCodeGoApiKey
 } from '../opencode/opencode-go-api-key-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service'
 import { refreshAfterCredentialChange } from './credential-change-rate-limit-refresh'
 
@@ -36,11 +37,13 @@ export function registerOpenCodeGoCredentialsHandlers(
       throw new Error('OpenCode Go API key must be a string')
     }
     saveOpenCodeGoApiKey(key)
+    noteReplicatedCredentialChanged()
     refreshAfterOpenCodeGoCredentialChange(rateLimits, false)
     return getOpenCodeGoCredentialsStatus()
   })
   ipcMain.handle('opencodeGoCredentials:clearApiKey', () => {
     clearOpenCodeGoApiKey()
+    noteReplicatedCredentialChanged()
     refreshAfterOpenCodeGoCredentialChange(rateLimits, true)
     return getOpenCodeGoCredentialsStatus()
   })
