@@ -100,14 +100,8 @@ describe('deciding whether a host may apply a payload', () => {
   })
 
   it('refuses a payload version it does not know instead of guessing', () => {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a versioned wire
-    // contract exists precisely so an unknown version can arrive; this builds that payload.
-    const fromANewerMain = {
-      ...payload(),
-      version: 99
-    } as unknown as HostSettingsReplicationPayload
-
-    expect(decideHostSettingsPayload(null, fromANewerMain)).toEqual({
+    // Why built inline: a newer main is exactly what sends a version this build has never seen.
+    expect(decideHostSettingsPayload(null, { ...payload(), version: 99 })).toEqual({
       kind: 'unsupportedVersion'
     })
   })

@@ -4,6 +4,7 @@ import { CLIENT_HOSTED_BROWSER_PAGE_RECORD_VERSION } from '../../shared/client-h
 import type { PersistedClientHostedBrowserPage } from '../../shared/client-hosted-browser-page-record'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import {
+  SESSION_FIELDS,
   SESSION_FIELDS_COPIED_BY_OWNER_KEY,
   SESSION_FIELDS_PRUNED_BY_OWNER_KEY,
   SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY,
@@ -298,18 +299,18 @@ describe('workspace session host-sync disposition census', () => {
   const dispositionOf = (field: keyof WorkspaceSessionState): SessionFieldHostSyncDisposition =>
     WORKSPACE_SESSION_HOST_SYNC_DISPOSITION[field]
 
+  // Why `SESSION_FIELDS`: the key-set test below pins the two tables together, so walking either
+  // list walks both, and this needs no assertion of its own.
   const fieldsWith = (wanted: SessionFieldHostSyncDisposition): (keyof WorkspaceSessionState)[] =>
-    (
-      Object.keys(WORKSPACE_SESSION_HOST_SYNC_DISPOSITION) as (keyof WorkspaceSessionState)[]
-    ).filter((field) => dispositionOf(field) === wanted)
+    SESSION_FIELDS.filter((field) => dispositionOf(field) === wanted)
 
   // Why the direction that matters: a field added to the session state and classified for profile
   // operations but forgotten here is the bug this axis exists to make impossible. A field the host
   // sync table invents is already a compile error, so only this walk needs a runtime test.
   it('gives every field a host-sync disposition, so an unknown key fails here', () => {
-    const unclassified = (
-      Object.keys(WORKSPACE_SESSION_FIELD_DISPOSITION) as (keyof WorkspaceSessionState)[]
-    ).filter((field) => !(field in WORKSPACE_SESSION_HOST_SYNC_DISPOSITION))
+    const unclassified = SESSION_FIELDS.filter(
+      (field) => !(field in WORKSPACE_SESSION_HOST_SYNC_DISPOSITION)
+    )
 
     expect(unclassified).toEqual([])
   })

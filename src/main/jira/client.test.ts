@@ -642,9 +642,9 @@ describe('Jira client credential storage', () => {
 
     // Two PATs (both with empty email) to the same host must not collide onto
     // one id and silently overwrite each other — the viewer identity keys them.
-    const stored = JSON.parse(
-      readFileSync(join(tempHome, '.orca-np', 'jira-sites.json'), 'utf-8')
-    ) as {
+    const sitesFile = readFileSync(join(tempHome, '.orca-np', 'jira-sites.json'), 'utf-8')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: JSON.parse is untyped and this reads only `sites[].accountId`.
+    const stored = JSON.parse(sitesFile) as {
       sites: { accountId: string }[]
     }
     expect(stored.sites).toHaveLength(2)

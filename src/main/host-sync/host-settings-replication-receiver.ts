@@ -11,13 +11,17 @@ import type { HostSettingsCredentialRegistry } from './host-settings-credential-
 /**
  * Whether this host may apply a payload as it stands.
  *
+ * Why the parameter is a loose `version: number` rather than the contract type: the whole point of a
+ * versioned payload is that a build can be handed one it does not know, and that payload cannot be
+ * typed as a version this build defines.
+ *
  * Why a revision gate rather than a queue: a host that was offline while several deltas were
  * produced cannot be caught up by replaying them in the order they happen to arrive, and a silent
  * out-of-order apply is worse than one extra snapshot.
  */
 export function decideHostSettingsPayload(
   hostRevision: number | null,
-  payload: HostSettingsReplicationPayload
+  payload: Pick<HostSettingsReplicationPayload, 'baseRevision'> & { version: number }
 ): HostSettingsPayloadDecision {
   if (payload.version !== HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION) {
     return { kind: 'unsupportedVersion' }

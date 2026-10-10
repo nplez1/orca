@@ -158,7 +158,7 @@ type UnclassifiedSessionField = Exclude<
 const exhaustive: [UnclassifiedSessionField] extends [never] ? true : never = true
 void exhaustive
 
-const SESSION_FIELDS = Object.keys(
+export const SESSION_FIELDS = Object.keys(
   WORKSPACE_SESSION_FIELD_DISPOSITION
 ) as (keyof WorkspaceSessionState)[]
 
@@ -236,9 +236,8 @@ type SessionFieldHostSyncKeysMatchDispositionKeys = [
 const hostSyncKeysMatch: SessionFieldHostSyncKeysMatchDispositionKeys = true
 void hostSyncKeysMatch
 
-const SESSION_HOST_SYNC_FIELDS = Object.keys(
-  WORKSPACE_SESSION_HOST_SYNC_DISPOSITION
-) as (keyof WorkspaceSessionState)[]
+// Why `SESSION_FIELDS` rather than a second `Object.keys` list: the two tables are pinned to the same
+// key set by the assertion above and by test, so walking either one walks both.
 
 // Why the explicit return type: the table's own type has no `replicated` member today, so indexing
 // it directly narrows away the very value these filters test for and the comparison stops compiling.
@@ -249,10 +248,10 @@ function hostSyncDispositionOf(
 }
 
 /** The fields a host applies from the main, either always or only when it holds nothing. */
-export const SESSION_FIELDS_REPLICATED_TO_HOSTS = SESSION_HOST_SYNC_FIELDS.filter(
+export const SESSION_FIELDS_REPLICATED_TO_HOSTS = SESSION_FIELDS.filter(
   (field) => hostSyncDispositionOf(field) === 'replicated'
 )
 
-export const SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY = SESSION_HOST_SYNC_FIELDS.filter(
+export const SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY = SESSION_FIELDS.filter(
   (field) => hostSyncDispositionOf(field) === 'replicatedOnlyIfEmpty'
 )
