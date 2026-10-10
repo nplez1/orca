@@ -39,7 +39,7 @@ vi.mock('../../shared/secure-file', () => ({
   writeSecureFile: writeSecureFileMock
 }))
 
-const storePath = '/home/test/.orca/deepseek-api-key.enc'
+const storePath = '/home/test/.orca-np/deepseek-api-key.enc'
 const envelope = (
   kind: 'encrypted' | 'plaintext',
   value: string,
@@ -185,11 +185,15 @@ describe('deepseek-api-key-store', () => {
   })
 
   it('clears the cached key and removes the file', async () => {
-    existsSyncMock.mockReturnValueOnce(true)
+    // Why per-path: the store also consults its pre-rename location, so a single
+    // one-shot `true` would be spent before the read it was meant for.
+    let filePresent = true
+    existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
     safeStorageMock.decryptString.mockReturnValueOnce('sk-preclear')
     const store = await loadStore()
     expect(store.readDeepSeekApiKey()).toBe('sk-preclear')
+    filePresent = false
     store.clearDeepSeekApiKey()
     expect(rmSyncMock).toHaveBeenCalledWith(storePath, { force: true })
     expect(store.readDeepSeekApiKey()).toBeNull()

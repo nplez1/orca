@@ -81,7 +81,7 @@ export function getDefaultFloatingWorkspacePath(): string {
 }
 
 /**
- * The Floating Workspace folder (`~/.orca/floating-workspace`): where its terminals and agents
+ * The Floating Workspace folder (`~/.orca-np/floating-workspace`): where its terminals and agents
  * start by default, and where its markdown notes always live (even when the start directory is
  * pointed elsewhere). Created and authorized on first use.
  *

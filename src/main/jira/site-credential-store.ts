@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { adoptLegacyHomeStore } from '../home-directory-migration'
 import { getSecretStore } from '../../shared/secret-store'
 import { readCredentialFileProtection } from '../credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
@@ -25,16 +25,12 @@ const cachedTokens = new Map<string, string>()
 // failing reads without re-touching the keychain on every status poll.
 export const credentialErrors = new Map<string, string>()
 
-function getOrcaDir(): string {
-  return join(homedir(), '.orca')
-}
-
 function getSiteFilePath(): string {
-  return join(getOrcaDir(), 'jira-sites.json')
+  return adoptLegacyHomeStore('jira-sites.json')
 }
 
 function getTokenDir(): string {
-  return join(getOrcaDir(), 'jira-tokens')
+  return adoptLegacyHomeStore('jira-tokens')
 }
 
 function getTokenPath(siteId: string): string {
@@ -42,10 +38,7 @@ function getTokenPath(siteId: string): string {
 }
 
 function ensureOrcaDir(): void {
-  const dir = getOrcaDir()
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
+  mkdirSync(dirname(getSiteFilePath()), { recursive: true })
 }
 
 function ensureTokenDir(): void {
@@ -68,7 +61,7 @@ export function hasStoredToken(siteId: string): boolean {
   return cachedTokens.has(siteId) || credentialFileHasContent(getTokenPath(siteId))
 }
 
-function normalizeSite(input: unknown): JiraSite | null {
+export function normalizeSite(input: unknown): JiraSite | null {
   if (!input || typeof input !== 'object') {
     return null
   }

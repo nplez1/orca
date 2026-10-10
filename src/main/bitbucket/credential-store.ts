@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname } from 'node:path'
+import { adoptLegacyHomeStore } from '../home-directory-migration'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
@@ -50,23 +50,16 @@ let metadataLoadedFromDisk = false
 let cachedSecret: BitbucketStoredSecret | null = null
 let credentialError: string | null = null
 
-function getOrcaDir(): string {
-  return join(homedir(), '.orca')
-}
-
 function getMetadataPath(): string {
-  return join(getOrcaDir(), 'bitbucket-credential.json')
+  return adoptLegacyHomeStore('bitbucket-credential.json')
 }
 
 function getSecretPath(): string {
-  return join(getOrcaDir(), 'bitbucket-credential.enc')
+  return adoptLegacyHomeStore('bitbucket-credential.enc')
 }
 
 function ensureOrcaDir(): void {
-  const dir = getOrcaDir()
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
+  mkdirSync(dirname(getMetadataPath()), { recursive: true })
 }
 
 // Why: hand-edited or truncated JSON must not put a non-string into an auth

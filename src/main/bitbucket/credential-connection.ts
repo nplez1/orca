@@ -6,6 +6,7 @@ import {
   type BitbucketAuthConfig
 } from './bitbucket-auth-config'
 import { accountNameFromUser, fetchBitbucketUserResult } from './user-request'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import {
   clearStoredBitbucketCredential,
   getStoredBitbucketMetadata,
@@ -73,11 +74,13 @@ export async function connectBitbucket(
     accessToken: config.accessToken,
     apiToken: config.apiToken
   })
+  noteReplicatedCredentialChanged()
   return { ok: true, account }
 }
 
 export function disconnectBitbucket(): void {
   clearStoredBitbucketCredential()
+  noteReplicatedCredentialChanged()
 }
 
 // Reads env vars and plaintext metadata only — never decrypts — so the Settings

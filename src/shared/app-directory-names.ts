@@ -19,3 +19,10 @@ export const DEV_APP_DATA_DIRECTORY_NAME = 'orca-np-dev'
 
 /** The home-directory child holding keybindings, provider credentials, and agent hooks. */
 export const HOME_DIRECTORY_NAME = '.orca-np'
+
+/**
+ * The home-directory child this build used before `HOME_DIRECTORY_NAME`, and the one an official
+ * Orca install still owns. Never written to except as the fallback in `home-directory-migration`,
+ * which reads it once to adopt a store this build left behind.
+ */
+export const LEGACY_HOME_DIRECTORY_NAME = '.orca'

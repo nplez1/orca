@@ -1,7 +1,6 @@
 import { safeStorage } from 'electron'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { adoptLegacyHomeStore } from '../home-directory-migration'
 import {
   hardenExistingSecureFile,
   isUnreadableError,
@@ -37,12 +36,8 @@ export function createEncryptedApiKeyFileStore({
     payload: Buffer
   }
 
-  function getOrcaDir(): string {
-    return join(homedir(), '.orca')
-  }
-
   function getApiKeyPath(): string {
-    return join(getOrcaDir(), fileName)
+    return adoptLegacyHomeStore(fileName)
   }
 
   function encodeApiKeyEnvelope(kind: ApiKeyEnvelope['kind'], payload: Buffer): string {

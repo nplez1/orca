@@ -27,6 +27,15 @@ type SessionFieldDisposition = {
   onTransfer: SessionFieldTransferDisposition
 }
 
+/** What host-settings replication does with a field when the main replicates to a paired host. */
+export type SessionFieldHostSyncDisposition =
+  /** The main's value wins and the host applies it. */
+  | 'replicated'
+  /** Never leaves or arrives: it describes the host it is stored on. */
+  | 'hostLocal'
+  /** Fills a host that holds nothing, and never overwrites a deliberate local value. */
+  | 'replicatedOnlyIfEmpty'
+
 /**
  * Every persisted session field, and what the repo-removal and project-transfer paths owe it.
  *
@@ -149,9 +158,9 @@ type UnclassifiedSessionField = Exclude<
 const exhaustive: [UnclassifiedSessionField] extends [never] ? true : never = true
 void exhaustive
 
-const SESSION_FIELDS = Object.keys(
-  WORKSPACE_SESSION_FIELD_DISPOSITION
-) as (keyof WorkspaceSessionState)[]
+export const SESSION_FIELDS = Object.keys(WORKSPACE_SESSION_FIELD_DISPOSITION).filter(
+  (field): field is keyof WorkspaceSessionState => field in WORKSPACE_SESSION_FIELD_DISPOSITION
+)
 
 export const SESSION_FIELDS_PRUNED_BY_OWNER_KEY = SESSION_FIELDS.filter(
   (field) => WORKSPACE_SESSION_FIELD_DISPOSITION[field].onRepoRemoval === 'prunedByOwnerKey'
@@ -159,4 +168,93 @@ export const SESSION_FIELDS_PRUNED_BY_OWNER_KEY = SESSION_FIELDS.filter(
 
 export const SESSION_FIELDS_COPIED_BY_OWNER_KEY = SESSION_FIELDS.filter(
   (field) => WORKSPACE_SESSION_FIELD_DISPOSITION[field].onTransfer === 'copiedByOwnerKey'
+)
+
+/**
+ * The `onHostSync` axis of every persisted session field: what one host replicates to another.
+ *
+ * Why a sibling table rather than a third key on `WORKSPACE_SESSION_FIELD_DISPOSITION`: those two
+ * axes are per-field *profile* operations and every entry's comment explains them as a pair, so a
+ * third key would mean rewriting all thirty-five comments to say nothing new. The two tables are
+ * held to the same key set at both levels instead — the `satisfies` below is exhaustive over
+ * `WorkspaceSessionState`, and `SessionFieldHostSyncKeysMatchDispositionKeys` refuses a table that
+ * disagrees with its sibling — so a field added to one and forgotten in the other is a compile
+ * error, which is the contract the whole table exists to keep.
+ *
+ * Almost everything here is `hostLocal`, and deliberately: the issue is settings and credentials,
+ * not the workspace view. Which terminals, tabs and worktrees a host has open is local UI state,
+ * and replicating it would fight the user on the machine they are sitting at. The two `...History`
+ * maps are the exception, because they fill in a host that has nothing of its own.
+ */
+export const WORKSPACE_SESSION_HOST_SYNC_DISPOSITION = {
+  activeRepoId: 'hostLocal',
+  activeWorkspaceKey: 'hostLocal',
+  activeWorkspaceExecutionHostId: 'hostLocal',
+  activeWorktreeId: 'hostLocal',
+  activeTabId: 'hostLocal',
+  tabsByWorktree: 'hostLocal',
+  terminalLayoutsByTabId: 'hostLocal',
+  localOnlyScrollbackByTabId: 'hostLocal',
+  activeWorktreeIdsOnShutdown: 'hostLocal',
+  openFilesByWorktree: 'hostLocal',
+  activeFileIdByWorktree: 'hostLocal',
+  markdownFrontmatterVisible: 'hostLocal',
+  browserTabsByWorktree: 'hostLocal',
+  browserPagesByWorkspace: 'hostLocal',
+  activeBrowserTabIdByWorktree: 'hostLocal',
+  clientHostedBrowserPagesByWorktree: 'hostLocal',
+  clientHostedBrowserCloseIntentsByEnvironment: 'hostLocal',
+  activeTabTypeByWorktree: 'hostLocal',
+  browserUrlHistory: 'replicatedOnlyIfEmpty',
+  // Why host-local despite its name: the value stores a worktree id and an absolute file path, so it
+  // resolves on this machine only — the table's first rule, applied to something that reads like
+  // history.
+  workspaceDocHistory: 'hostLocal',
+  activeTabIdByWorktree: 'hostLocal',
+  unifiedTabs: 'hostLocal',
+  tabGroups: 'hostLocal',
+  tabGroupLayouts: 'hostLocal',
+  activeGroupIdByWorktree: 'hostLocal',
+  activeConnectionIdsAtShutdown: 'hostLocal',
+  remoteSessionIdsByTabId: 'hostLocal',
+  lastVisitedAtByWorktreeId: 'hostLocal',
+  defaultTerminalTabsAppliedByWorktreeId: 'hostLocal',
+  sleepingAgentSessionsByPaneKey: 'hostLocal',
+  terminalPtyIncarnationsByPaneKey: 'hostLocal',
+  terminalTopologyRevisionByRepoId: 'hostLocal',
+  terminalSurfaceTombstonesByPaneKey: 'hostLocal',
+  closedTerminalTabTombstonesByTabId: 'hostLocal'
+} as const satisfies Record<keyof WorkspaceSessionState, SessionFieldHostSyncDisposition>
+
+// Why: the two tables are one contract, so neither may gain a key the other has not seen.
+type SessionFieldHostSyncKeysMatchDispositionKeys = [
+  keyof typeof WORKSPACE_SESSION_HOST_SYNC_DISPOSITION
+] extends [keyof typeof WORKSPACE_SESSION_FIELD_DISPOSITION]
+  ? [keyof typeof WORKSPACE_SESSION_FIELD_DISPOSITION] extends [
+      keyof typeof WORKSPACE_SESSION_HOST_SYNC_DISPOSITION
+    ]
+    ? true
+    : never
+  : never
+const hostSyncKeysMatch: SessionFieldHostSyncKeysMatchDispositionKeys = true
+void hostSyncKeysMatch
+
+// Why `SESSION_FIELDS` rather than a second `Object.keys` list: the two tables are pinned to the same
+// key set by the assertion above and by test, so walking either one walks both.
+
+// Why the explicit return type: the table's own type has no `replicated` member today, so indexing
+// it directly narrows away the very value these filters test for and the comparison stops compiling.
+function hostSyncDispositionOf(
+  field: keyof WorkspaceSessionState
+): SessionFieldHostSyncDisposition {
+  return WORKSPACE_SESSION_HOST_SYNC_DISPOSITION[field]
+}
+
+/** The fields a host applies from the main, either always or only when it holds nothing. */
+export const SESSION_FIELDS_REPLICATED_TO_HOSTS = SESSION_FIELDS.filter(
+  (field) => hostSyncDispositionOf(field) === 'replicated'
+)
+
+export const SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY = SESSION_FIELDS.filter(
+  (field) => hostSyncDispositionOf(field) === 'replicatedOnlyIfEmpty'
 )

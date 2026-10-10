@@ -14,7 +14,7 @@ describe('floating workspace launch directory', () => {
 
   beforeEach(() => {
     homeDir = mkdtempSync(path.join(tmpdir(), 'orca-floating-launch-dir-'))
-    launchDirectory = path.join(homeDir, '.orca', 'floating-workspace')
+    launchDirectory = path.join(homeDir, '.orca-np', 'floating-workspace')
   })
 
   afterEach(() => {

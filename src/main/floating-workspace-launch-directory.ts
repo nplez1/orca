@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { resolveHomeStorePathIn } from './home-directory-migration'
 
 /**
  * The Floating Workspace's own directory: where its terminals and agents start.
  *
- * It lives beside Orca's config (`.orca`) rather than in app data so it is easy to find and edit,
- * and outside every repository so instructions written there reach floating launches only.
+ * It lives beside Orca's config (`~/.orca-np`) rather than in app data so it is easy to find and
+ * edit, and outside every repository so instructions written there reach floating launches only.
  */
 const FLOATING_WORKSPACE_DIRECTORY_NAME = 'floating-workspace'
 
@@ -31,17 +32,19 @@ Add your instructions outside this comment, then delete the comment.
 const seededDirectories = new Set<string>()
 
 export function resolveFloatingWorkspaceLaunchDirectory(homeDir: string = homedir()): string {
-  return path.join(homeDir, '.orca', FLOATING_WORKSPACE_DIRECTORY_NAME)
+  return resolveHomeStorePathIn(homeDir, FLOATING_WORKSPACE_DIRECTORY_NAME)
 }
 
-export function ensureFloatingWorkspaceLaunchDirectorySync(homeDir?: string): string {
+export function ensureFloatingWorkspaceLaunchDirectorySync(homeDir: string = homedir()): string {
   const directory = resolveFloatingWorkspaceLaunchDirectory(homeDir)
   mkdirSync(directory, { recursive: true })
   seedAgentInstructionsOnce(directory)
   return directory
 }
 
-export async function ensureFloatingWorkspaceLaunchDirectory(homeDir?: string): Promise<string> {
+export async function ensureFloatingWorkspaceLaunchDirectory(
+  homeDir: string = homedir()
+): Promise<string> {
   const directory = resolveFloatingWorkspaceLaunchDirectory(homeDir)
   await mkdir(directory, { recursive: true })
   seedAgentInstructionsOnce(directory)
