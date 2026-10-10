@@ -190,6 +190,58 @@ describe('publishing to a paired host', () => {
     expect(publisher.readLedger().hostsByCredential[CREDENTIAL_ID]).toEqual([HOST])
   })
 
+  it('keeps a removal the host could not verify in the next payload, so it is retried', async () => {
+    const held = { value: true }
+    const transport = acceptingTransport((payload) => {
+      if (payload.removals.length === 0) {
+        return null
+      }
+      return {
+        kind: 'applied',
+        report: {
+          revision: payload.revision,
+          outcomes: Object.fromEntries(payload.removals.map((id) => [id, 'removalUnverified']))
+        },
+        state: {
+          kind: 'partial',
+          revision: payload.revision,
+          syncedAt: 1,
+          refusals: [...payload.removals]
+        }
+      }
+    })
+    const publisher = createHostSettingsReplicationPublisher({
+      ports: [
+        {
+          ...port(true),
+          list: () =>
+            held.value
+              ? [
+                  {
+                    id: CREDENTIAL_ID,
+                    kind: CREDENTIAL_ID,
+                    label: 'DeepSeek API key',
+                    protection: 'sealed',
+                    onlyIfEmpty: false,
+                    payload: 'sk-live'
+                  }
+                ]
+              : []
+        }
+      ],
+      transport
+    })
+
+    await publisher.publish(HOST, 'attach')
+    held.value = false
+    await publisher.publish(HOST, 'changed')
+    await publisher.publish(HOST, 'changed')
+
+    // Why it must be re-sent: otherwise a host that stays connected for days keeps a credential the
+    // user has revoked, and the main reports `synced` while it is still there.
+    expect(transport.sent[2]?.removals).toEqual([CREDENTIAL_ID])
+  })
+
   it('never records a credential the host refused to hold', async () => {
     const transport = acceptingTransport(() => ({
       kind: 'applied',

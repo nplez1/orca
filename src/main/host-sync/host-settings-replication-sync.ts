@@ -133,7 +133,6 @@ export function createHostSettingsReplicationSync(input: {
 
   const connectedGenerations = new Map<string, number>()
   const pushedGenerations = new Map<string, number>()
-  const unsupportedHosts = new Set<string>()
   const queues = new Map<string, Promise<unknown>>()
   /** One retry per host for a first push that did not land. */
   const retries = new Map<string, number>()
@@ -196,12 +195,12 @@ export function createHostSettingsReplicationSync(input: {
   /**
    * Stop pushing to a host for this connection, without forgetting what it holds.
    *
-   * Why the generation is checked: a push queued on the previous connection can settle after the host
-   * has reconnected, and deleting the new connection's entry there would leave the host attached but
-   * never pushed again.
+   * Why nothing else is needed to make "stop" stick: dropping the attachment is what stops the retries,
+   * because `notifyChanged` only walks attached hosts and a re-attach needs a new connection. The
+   * generation is checked because a push queued on the previous connection can settle after the host has
+   * reconnected, and deleting the new connection's entry there would leave it attached but never pushed.
    */
   function stopAsking(environmentId: string, transportGeneration: number): void {
-    unsupportedHosts.add(environmentId)
     if (connectedGenerations.get(environmentId) === transportGeneration) {
       connectedGenerations.delete(environmentId)
     }
@@ -230,7 +229,6 @@ export function createHostSettingsReplicationSync(input: {
       }
       // Why per connection rather than for the life of the process: a host that refused the first
       // attempt may have been upgraded or re-paired since, and nothing else would ever ask it again.
-      unsupportedHosts.delete(environmentId)
       pushedGenerations.set(environmentId, transportGeneration)
       void enqueue(environmentId, 'attach', transportGeneration)
     },
@@ -249,7 +247,6 @@ export function createHostSettingsReplicationSync(input: {
     forgetHost: (environmentId) => {
       connectedGenerations.delete(environmentId)
       pushedGenerations.delete(environmentId)
-      unsupportedHosts.delete(environmentId)
       queues.delete(environmentId)
       retries.delete(environmentId)
       publisher.forgetHost(environmentId)

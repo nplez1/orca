@@ -183,12 +183,21 @@ export function createHostSettingsReplicationPublisher(input: {
       // Why only what applied rather than everything sent: a host that refused a credential, or kept
       // its own value, must not be told to delete it later — that would take a credential the user set
       // up on that host with the removal of one this host never received.
+      //
+      // Why the unreadable and unverified ids are carried too: both are ids the host may still hold. The
+      // main could not read one, and it could not prove the other's removal, so neither may drop out of
+      // this record — dropping them stops the removal being re-sent, and a host that stays connected for
+      // days would keep a credential the user revoked while the main reported `synced`.
       const applied = recordOutcome(environmentId, payload, result.report)
+      const unverified = Object.entries(result.report.outcomes)
+        .filter(([, outcome]) => outcome === 'removalUnverified')
+        .map(([id]) => id)
+      const carried = [...new Set([...applied, ...(payload.unreadable ?? []), ...unverified])]
       if ((epochs.get(environmentId) ?? 0) !== epoch) {
         // The host was forgotten while this push was in flight; its outcome is no longer ours to keep.
         return { kind: 'refused', reason: 'needsSnapshot' }
       }
-      records.set(environmentId, { revision: payload.revision, credentialIds: applied })
+      records.set(environmentId, { revision: payload.revision, credentialIds: carried })
       return result.state.kind === 'synced'
         ? { kind: 'synced', revision: payload.revision, state: result.state }
         : { kind: 'partial', revision: payload.revision, report: result.report }
