@@ -88,6 +88,19 @@ describe('project-folder layout', () => {
     expect(computeWorktreePath('feature', repo.path, pathSettings)).toBe('/Code/orca/feature')
   })
 
+  it('does not hand a project the shared root just because the root carries its name', () => {
+    // Why: `workspaceDir` may legitimately be `~/orca` while a project is also named `orca`.
+    // Adopting the root as that project's folder would put its worktrees beside every other
+    // project's folders, so only a repo-scoped base is trusted.
+    const repo = makeRepo({ path: '/Users/me/orca/main', displayName: 'orca' })
+    const pathSettings = getWorktreePathSettings(repo, {
+      ...settings,
+      workspaceDir: '/Users/me/orca'
+    })
+
+    expect(computeWorkspaceRoot(repo.path, pathSettings)).toBe('/Users/me/orca/orca')
+  })
+
   it('adds the container when the base is the container parent', () => {
     const repo = makeRepo({
       path: '/Code/orca/main',

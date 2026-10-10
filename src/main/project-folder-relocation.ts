@@ -6,6 +6,8 @@
  * The planner is pure so `--dry-run` can report the same decision the action would make.
  */
 import type { GlobalSettings } from '../shared/global-settings-types'
+import { stat } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../shared/execution-host'
 import { isProjectFolderLayout, resolveWorktreeLayoutMode } from '../shared/orca-workspace-layout'
 import { isFolderRepo } from '../shared/repo-kind'
@@ -143,6 +145,45 @@ export function planPrimaryCheckoutRelocation(args: {
   }
 }
 
+/**
+ * Whether `rename` can move between these two paths at all.
+ *
+ * Exported because the executor takes it as a dependency: a caller wiring the real move has to use
+ * this rather than its own comparison, or the two drift and a refusal looks real when it is not.
+ *
+ * Why the nearest existing ancestor rather than `dirname(to)`: the container is created by this
+ * move, so it usually does not exist yet, and stat'ing a missing path is not a volume answer. The
+ * ancestor that does exist is on the volume the container will be created on.
+ */
+export async function isSameVolume(from: string, to: string): Promise<boolean> {
+  try {
+    const [fromStats, targetParentStats] = await Promise.all([
+      stat(from),
+      stat(await nearestExistingAncestor(dirname(to)))
+    ])
+    return fromStats.dev === targetParentStats.dev
+  } catch {
+    // An unreadable path is not a volume answer, so refuse the move rather than assume one.
+    return false
+  }
+}
+
+async function nearestExistingAncestor(path: string): Promise<string> {
+  let candidate = path
+  for (;;) {
+    try {
+      await stat(candidate)
+      return candidate
+    } catch {
+      const parent = dirname(candidate)
+      if (parent === candidate) {
+        return candidate
+      }
+      candidate = parent
+    }
+  }
+}
+
 export type RelocationDependencies = {
   pathExists: (path: string) => Promise<boolean>
   /** False when a `rename` would cross volumes, where it fails outright. */
@@ -203,6 +244,10 @@ export async function relocatePrimaryCheckout(args: {
     deps.setRepoPath(repo.id, to)
   } catch (error) {
     await deps.moveDirectory(to, from).catch(() => {})
+    // Why repair again: the repair above may already have pointed every linked worktree's gitdir at
+    // the new path, so moving the directory back without this leaves them all broken — the failure
+    // would then be worse than not having moved at all.
+    await deps.repairWorktrees(from).catch(() => {})
     throw error
   }
   // Order after the records: the worktree id is derived from the path, so re-keying before the

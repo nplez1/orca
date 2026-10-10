@@ -80,7 +80,12 @@ function containsEmoji(input: string): boolean {
 export function projectContainerRoot(
   baseRoot: string,
   repoPath: string,
-  settings: { worktreeLayoutMode?: WorktreeLayoutMode; projectFolderName?: string }
+  settings: {
+    worktreeLayoutMode?: WorktreeLayoutMode
+    projectFolderName?: string
+    /** True when `baseRoot` came from this repo's own `worktreeBasePath`. */
+    projectFolderBaseIsRepoScoped?: boolean
+  }
 ): string {
   if (!isProjectFolderLayout(resolveWorktreeLayoutMode(settings))) {
     return baseRoot
@@ -89,17 +94,20 @@ export function projectContainerRoot(
   const containerName =
     settings.projectFolderName ?? pathOps.basename(repoPath).replace(/\.git$/, '')
   const container = pathOps.join(baseRoot, containerName)
-  // Why the base can already be the container, in two ways — and why the simpler test is the
-  // right one: a base that is a folder named after the project *is* that project's folder,
-  // whether it sits at the checkout's parent (the hand-built `<container>/<defaultBranch>`
-  // shape) or somewhere else entirely with the checkout outside it.
-  // The second case is the checkout itself, which is no container at all: worktrees would land
-  // inside the working tree, and git creates those without complaint.
+  // Why a base named after the project is that project's folder — but only a repo-scoped one: the
+  // global root can legitimately carry a project's name (a `~/orca` workspace root with a project
+  // named `orca`), and adopting it would hand that project the shared root, putting its worktrees
+  // beside every other project's folders.
   // Name comparison reuses the path comparator so it folds case where the filesystem does.
   if (
-    areWorktreePathsEqual(containerName, pathOps.basename(baseRoot)) ||
-    areWorktreePathsEqual(container, repoPath)
+    settings.projectFolderBaseIsRepoScoped &&
+    areWorktreePathsEqual(containerName, pathOps.basename(baseRoot))
   ) {
+    return baseRoot
+  }
+  // Why the container can be the checkout itself, or the base be the checkout: that is no container
+  // at all, and worktrees would land inside the working tree, which git allows without complaint.
+  if (areWorktreePathsEqual(container, repoPath) || areWorktreePathsEqual(baseRoot, repoPath)) {
     return baseRoot
   }
   return container

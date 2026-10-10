@@ -26,6 +26,8 @@ type WorktreePathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDi
   /** Container leaf for the 'project-folder' mode. Resolved from the repo's display name by
    *  `getWorktreePathSettings`; a caller that omits it falls back to the checkout's folder. */
   projectFolderName?: string
+  /** Whether that container's base came from this repo's own `worktreeBasePath`. */
+  projectFolderBaseIsRepoScoped?: boolean
   /** Distro to mirror the workspace root into when the repo itself sits on a
    *  Windows drive but this project's git runs in WSL. Omitted = today's
    *  placement, so any caller that cannot resolve the runtime is unaffected. */
@@ -38,10 +40,12 @@ type WorkspaceRootSettings = {
   wslMirrorDistro?: string
   worktreeLayoutMode?: WorktreeLayoutMode
   projectFolderName?: string
+  projectFolderBaseIsRepoScoped?: boolean
 }
 type WorktreeLayoutSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDir'> & {
   worktreeLayoutMode?: WorktreeLayoutMode
   projectFolderName?: string
+  projectFolderBaseIsRepoScoped?: boolean
   wslMirrorDistro?: string
 }
 type WorktreeBasePathRepo = Pick<Repo, 'path' | 'worktreeBasePath'> & {
@@ -221,7 +225,10 @@ export function getWorktreePathSettings(
     workspaceDir: getEffectiveWorktreeBasePath(repo, settings),
     worktreeLayoutMode,
     ...(isProjectFolderLayout(worktreeLayoutMode)
-      ? { projectFolderName: resolveProjectFolderName(repo) }
+      ? {
+          projectFolderName: resolveProjectFolderName(repo),
+          projectFolderBaseIsRepoScoped: hasRepoWorktreeBasePath(repo)
+        }
       : {}),
     // Why pass it through rather than resolve here: placement has to agree
     // across create, allowed-roots and watch-targets, so the distro is

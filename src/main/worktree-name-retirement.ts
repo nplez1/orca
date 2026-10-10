@@ -135,6 +135,7 @@ async function getRetirementCollisionKey(
     repo.worktreeBasePath ?? '',
     settings.workspaceDir,
     settings.worktreeLayoutMode ?? (settings.nestWorkspaces ? 'repo-nested' : 'flat'),
+    repo.displayName ?? '',
     settings.wslMirrorDistro ?? ''
   ].join('\u0000')
   const cached = collisionKeyCache.get(cacheKey)

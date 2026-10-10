@@ -10,7 +10,10 @@ import type { ProjectRuntimeResolutionStore } from './local-project-runtime-reso
 // `localWindowsRuntimeDefault` is listed because the mirror distro is resolved
 // from it plus the project catalog: a store that omits it prepares a different
 // root than the create path uses.
-type WorktreeRootPreparationSettings = Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces'> &
+type WorktreeRootPreparationSettings = Pick<
+  GlobalSettings,
+  'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode'
+> &
   Partial<Pick<GlobalSettings, 'localWindowsRuntimeDefault'>>
 type WorktreeRootPreparationStore = {
   getSettings: () => WorktreeRootPreparationSettings

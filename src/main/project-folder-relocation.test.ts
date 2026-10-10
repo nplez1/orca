@@ -221,6 +221,8 @@ describe('relocatePrimaryCheckout', () => {
 
     // Why: a checkout whose records still point at the old path is worse than an unmoved one.
     expect(deps.moveDirectory).toHaveBeenLastCalledWith('/ws/homelab/main', '/Code/homelab')
+    // And the repair already ran against the new path, so the original has to be repaired back.
+    expect(deps.repairWorktrees).toHaveBeenLastCalledWith('/Code/homelab')
     expect(deps.setRepoPath).not.toHaveBeenCalled()
     expect(deps.migrateWorktreeIdentity).not.toHaveBeenCalled()
     expect(deps.notifyRepoRelocated).not.toHaveBeenCalled()

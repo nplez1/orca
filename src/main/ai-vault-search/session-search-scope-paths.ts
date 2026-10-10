@@ -71,7 +71,14 @@ export function managedWorktreeDirectories(
     // explicitly configured one — so the directory this repo owns is the container, not the
     // base. Claiming the base would widen the search to every project sharing it.
     if (isProjectFolderLayout(layoutMode)) {
-      directories.push(resolveRuntimePath(layout.path, resolveProjectFolderName(repo)))
+      const containerName = resolveProjectFolderName(repo)
+      // Why the same adoption rule placement uses: a repo-scoped base named after the project IS
+      // the container, so looking in a folder below it would search the wrong directory.
+      const adoptsBase =
+        configured.has(normalizeRuntimePathForComparison(layout.path)) &&
+        normalizeRuntimePathForComparison(getRuntimePathBasename(layout.path)) ===
+          normalizeRuntimePathForComparison(containerName)
+      directories.push(adoptsBase ? layout.path : resolveRuntimePath(layout.path, containerName))
     } else if (configured.has(normalizeRuntimePathForComparison(layout.path))) {
       directories.push(layout.path)
     } else if (layout.nestWorkspaces && repoName) {

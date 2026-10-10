@@ -14,6 +14,7 @@ import {
 } from '../../shared/worktree/id'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { planWorktreeFolderRename } from '../ipc/worktree-folder-rename-target'
+import { getWorktreePathSettings } from '../ipc/worktree-logic'
 
 export type FirstWorkFolderRenameDeps = {
   getRepo: (repoId: string) => Repo | undefined
@@ -55,7 +56,10 @@ export async function renameWorktreeFolderOnFirstWork(
       ? `${FOLDER_WORKSPACE_INSTANCE_SEPARATOR}${worktreeId.split(FOLDER_WORKSPACE_INSTANCE_SEPARATOR).at(-1)}`
       : undefined,
     newLeaf,
-    settings: deps.getSettings(),
+    // Why the resolved placement settings rather than raw global settings: the container name and
+    // the effective base live there, so passing the raw object would fall back to
+    // `basename(repoPath)` and compute a container named after the checkout's folder.
+    settings: getWorktreePathSettings(repo, deps.getSettings()),
     platform: process.platform,
     isRemote: getRepoExecutionHostId(repo) !== LOCAL_EXECUTION_HOST_ID
   })

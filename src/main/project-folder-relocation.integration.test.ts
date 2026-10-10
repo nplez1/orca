@@ -6,15 +6,16 @@
  * fixture is the shape the feature exists for, a checkout outside its project folder with the
  * worktrees already inside it.
  */
-import { mkdir, mkdtemp, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from './git/runner'
 import { runProcessSync } from '../shared/child-process/run-process'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import {
+  isSameVolume,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
   type RelocationDependencies
@@ -37,7 +38,9 @@ function git(cwd: string, ...args: string[]): void {
 function realDeps(overrides: Partial<RelocationDependencies> = {}): RelocationDependencies {
   return {
     pathExists: async (path) => existsSync(path),
-    isSameVolume: async (from, to) => (await stat(from)).dev === (await stat(dirname(to))).dev,
+    // The production rule, not a copy of it: a local reimplementation is how the original
+    // fixtures came to hide a broken volume check.
+    isSameVolume: (from, to) => isSameVolume(from, to),
     hasLiveSessions: async () => false,
     makeDirectory: async (path) => {
       await mkdir(path, { recursive: true })
@@ -158,6 +161,36 @@ describe('relocating a primary checkout with linked worktrees', () => {
       cwd: join(container, 'wip-one')
     })
     expect(afterRepair.code, afterRepair.stderr).toBe(0)
+  })
+
+  it('creates the container it is moving into', async () => {
+    // A checkout with no worktrees yet: the container does not exist, which is the normal first
+    // relocation. The volume check has to answer without stat'ing the missing container, or it
+    // reports a cross-volume move that is not one.
+    const bare = join(root, 'Code', 'solo')
+    const soloContainer = join(root, 'orca', 'workspaces', 'solo')
+    await mkdir(bare, { recursive: true })
+    git(bare, 'init', '-q')
+    git(bare, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+    git(bare, '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'init')
+    expect(existsSync(soloContainer)).toBe(false)
+
+    const outcome = await relocatePrimaryCheckout({
+      repo: { id: 'repo-solo', path: bare },
+      plan: {
+        containerPath: soloContainer,
+        targetPath: join(soloContainer, 'main'),
+        defaultBranchName: 'main'
+      },
+      deps: realDeps()
+    })
+
+    expect(outcome).toEqual({
+      kind: 'relocated',
+      from: bare,
+      to: join(soloContainer, 'main')
+    })
+    expect(existsSync(join(soloContainer, 'main'))).toBe(true)
   })
 
   it('refuses to move anything while a terminal is attached', async () => {

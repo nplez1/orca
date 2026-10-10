@@ -5,7 +5,6 @@
  * decision to the real filesystem, git, and store, and owns the host-scoped refusals.
  */
 import { mkdir, rename, stat } from 'node:fs/promises'
-import { dirname } from 'node:path'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
@@ -15,6 +14,7 @@ import { gitExecFileAsync } from '../git/runner'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import {
   isCheckoutOutsideProjectFolder,
+  isSameVolume,
   planPrimaryCheckoutRelocation,
   relocatePrimaryCheckout,
   type RelocationDecision,
@@ -210,17 +210,6 @@ async function pathExists(path: string): Promise<boolean> {
     await stat(path)
     return true
   } catch {
-    return false
-  }
-}
-
-/** Why `dirname(to)`: the target does not exist yet, and `rename` cannot cross a volume. */
-async function isSameVolume(from: string, to: string): Promise<boolean> {
-  try {
-    const [fromStats, targetParentStats] = await Promise.all([stat(from), stat(dirname(to))])
-    return fromStats.dev === targetParentStats.dev
-  } catch {
-    // An unreadable path is not a volume answer, so refuse the move rather than assume one.
     return false
   }
 }
