@@ -3,13 +3,14 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   renameSync,
   rmSync,
   statSync,
   writeFileSync
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME } from '../shared/app-directory-names'
 
 /**
@@ -109,11 +110,16 @@ export function adoptLegacyHomeStoreIn(
       markAdoptionDecided(marker)
       return current
     }
+    // Why no fallback to the pre-rename path: the stores write through the path they resolve, and the
+    // pre-rename path is an official install's — a failed migration that answered with it would let
+    // this build overwrite that install's own credential file. A store that reads as unconfigured
+    // after a loud warning is recoverable; a clobbered install is not. The marker is deliberately left
+    // unwritten so the next run tries the copy again.
     console.warn(
-      `[orca] Could not move ${[segment, ...segments].join('/')} into ${HOME_DIRECTORY_NAME}; using the copy in ${LEGACY_HOME_DIRECTORY_NAME}`,
+      `[orca] Could not move ${[segment, ...segments].join('/')} into ${HOME_DIRECTORY_NAME}, so it is not being used. Its copy in ${LEGACY_HOME_DIRECTORY_NAME} is untouched.`,
       error
     )
-    return legacy
+    return current
   }
 }
 
@@ -140,18 +146,39 @@ export function adoptLegacyHomeStore(segment: string, ...segments: string[]): st
 
 function adoptLegacyCopy(legacy: string, current: string): void {
   mkdirSync(dirname(current), { recursive: true })
-  if (!statSync(legacy).isDirectory()) {
-    // Why copyFileSync: it carries the source's permissions, so a 0600 credential stays 0600.
-    copyFileSync(legacy, current)
-    return
-  }
-  // Why staged: a half-copied directory would otherwise be adopted as complete on the next run.
+  sweepAbandonedStaging(dirname(current), basename(current))
+  // Why every copy is staged then renamed, files included: a crash mid-copy otherwise leaves a
+  // truncated file that the next run adopts as complete, and a half-copied credential that cannot be
+  // decrypted is indistinguishable from one an official install wrote.
   const staging = `${current}.migrating-${process.pid}`
   rmSync(staging, { recursive: true, force: true })
   try {
-    cpSync(legacy, staging, { recursive: true })
+    if (statSync(legacy).isDirectory()) {
+      cpSync(legacy, staging, { recursive: true })
+    } else {
+      // Why copyFileSync: it carries the source's permissions, so a 0600 credential stays 0600.
+      copyFileSync(legacy, staging)
+    }
     renameSync(staging, current)
   } finally {
     rmSync(staging, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Remove staging left by a run that died mid-copy.
+ *
+ * Why this matters more than the disk space: a staged directory is a full copy of a credential store,
+ * including the tokens, and it is named after a process id that will never run again.
+ */
+function sweepAbandonedStaging(directory: string, baseName: string): void {
+  try {
+    for (const entry of readdirSync(directory)) {
+      if (entry.startsWith(`${baseName}.migrating-`) && !entry.endsWith(`-${process.pid}`)) {
+        rmSync(join(directory, entry), { recursive: true, force: true })
+      }
+    }
+  } catch {
+    // A directory we cannot list is one we cannot clean; the copy below still has to run.
   }
 }

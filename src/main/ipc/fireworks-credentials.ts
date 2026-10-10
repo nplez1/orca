@@ -5,6 +5,7 @@ import {
   readFireworksCredentials,
   saveFireworksCredentials
 } from '../fireworks/fireworks-credentials-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import type { RateLimitService } from '../rate-limits/service'
 
 export type FireworksCredentialsStatus = {
@@ -63,12 +64,14 @@ export function registerFireworksCredentialsHandlers(rateLimits: RateLimitServic
         throw new Error('Fireworks API key is required')
       }
       saveFireworksCredentials({ apiKey: nextApiKey, accountIdOverride: trimmedOverride || null })
+      noteReplicatedCredentialChanged()
       refreshAfterFireworksCredentialChange(rateLimits, 'save')
       return getFireworksCredentialsStatus()
     }
   )
   ipcMain.handle('fireworksCredentials:clear', () => {
     clearFireworksCredentials()
+    noteReplicatedCredentialChanged()
     refreshAfterFireworksCredentialChange(rateLimits, 'clear')
     return getFireworksCredentialsStatus()
   })

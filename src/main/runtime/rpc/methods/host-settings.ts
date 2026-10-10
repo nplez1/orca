@@ -3,7 +3,17 @@ import {
   applyHostSettingsReplication,
   getHostSettingsReplication
 } from '../../../host-sync/host-settings-replication-host'
+import { createFileHostSettingsReplicationHoldings } from '../../../host-sync/host-settings-replication-holdings'
 import { defineMethod } from '../core'
+
+// Why resolved once per process: it names a file under userData, and rebuilding it per request would
+// re-resolve the app environment on every push for no gain.
+let holdings: ReturnType<typeof createFileHostSettingsReplicationHoldings> | null = null
+
+function replicationHoldings(): ReturnType<typeof createFileHostSettingsReplicationHoldings> {
+  holdings ??= createFileHostSettingsReplicationHoldings()
+  return holdings
+}
 
 /**
  * Settings and credential replication, as a paired main drives it on this host.
@@ -18,7 +28,8 @@ export const HOST_SETTINGS_METHODS = [
     name: 'hostSettings.applyReplication',
     permission: 'accounts-admin',
     params: ApplyHostSettingsReplicationParams,
-    handler: (params) => applyHostSettingsReplication(params.payload)
+    handler: (params) =>
+      applyHostSettingsReplication(params.payload, { holdings: replicationHoldings() })
   }),
   defineMethod({
     name: 'hostSettings.replicationState',

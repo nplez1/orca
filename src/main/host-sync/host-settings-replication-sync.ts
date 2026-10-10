@@ -49,7 +49,7 @@ export type HostSettingsReplicationSync = {
  * Why the pre-method host is learned from its own refusal rather than from an advertised capability:
  * the diagnostics the main observes here carry a host's connection state but not its capability list,
  * so asking first would mean a second RPC on every attach to answer a question the apply itself
- * answers. The refusal costs one failed call per host per connection, and that host is them remembered
+ * answers. The refusal costs one failed call per host per connection, and that host is then remembered
  * so a reconnect does not repeat it.
  *
  * Why a per-host queue rather than fire-and-forget: two pushes to one host that overlap would build

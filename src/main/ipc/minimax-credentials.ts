@@ -11,6 +11,7 @@ import {
   hasMiniMaxApiKey,
   saveMiniMaxApiKey
 } from '../minimax/minimax-api-key-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import { clearMiniMaxSessionCookieJar } from '../rate-limits/minimax/minimax-request-context'
 import { refreshAfterCredentialChange } from './credential-change-rate-limit-refresh'
 import type { RateLimitService } from '../rate-limits/service'
@@ -57,11 +58,13 @@ export function registerMiniMaxCredentialsHandlers(rateLimits: RateLimitService 
       throw new Error('MiniMax session cookie must be a string')
     }
     saveMiniMaxSessionCookie(cookie)
+    noteReplicatedCredentialChanged()
     refreshAfterMiniMaxCredentialChange(rateLimits, 'save')
     return getMiniMaxCredentialsStatus()
   })
   ipcMain.handle('minimaxCredentials:clearCookie', async () => {
     clearMiniMaxSessionCookie()
+    noteReplicatedCredentialChanged()
     try {
       await clearMiniMaxSessionCookieJar()
     } catch (error) {
@@ -75,11 +78,13 @@ export function registerMiniMaxCredentialsHandlers(rateLimits: RateLimitService 
       throw new Error('MiniMax API key must be a string')
     }
     saveMiniMaxApiKey(key)
+    noteReplicatedCredentialChanged()
     refreshAfterMiniMaxCredentialChange(rateLimits, 'save')
     return getMiniMaxCredentialsStatus()
   })
   ipcMain.handle('minimaxCredentials:clearApiKey', () => {
     clearMiniMaxApiKey()
+    noteReplicatedCredentialChanged()
     refreshAfterMiniMaxCredentialChange(rateLimits, 'clear')
     return getMiniMaxCredentialsStatus()
   })

@@ -18,6 +18,7 @@ import type {
 import { isRuntimeEnvironmentCapabilityPaused } from './runtime-environment-capability-evidence'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
 import { publishRuntimeEnvironmentDiagnostics } from './runtime-environment-diagnostics-broadcast'
+import { getHostSettingsReplicationSync } from '../host-sync/host-settings-replication-driver'
 import {
   advanceRuntimeEnvironmentTransportGeneration,
   getRuntimeEnvironmentTransportGeneration
@@ -221,6 +222,14 @@ function getSharedControlConnection(
           if (getRuntimeEnvironmentTransportGeneration(environmentId) !== transportGeneration) {
             return
           }
+          // Why here: this is the one place the main learns a paired host's connection state, and a
+          // `ready` state on a new transport generation is exactly "a new host just attached" — the
+          // moment its credentials have to arrive for its task pane to work.
+          getHostSettingsReplicationSync().observeConnection({
+            environmentId,
+            transportGeneration,
+            state: diagnostics.state
+          })
           publishRuntimeEnvironmentDiagnostics({
             environmentId,
             transportGeneration,

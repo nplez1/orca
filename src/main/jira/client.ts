@@ -8,6 +8,7 @@ import type {
   JiraViewer
 } from '../../shared/jira-types'
 import { clearAttachmentImagesForSite } from './attachment-image-cache'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import { acquire, release } from './request-queue'
 import {
   credentialErrors,
@@ -133,6 +134,7 @@ export async function connect(
       authType
     }
     saveToken(id, apiToken)
+    noteReplicatedCredentialChanged()
     const file = getSiteFile()
     writeSiteFile({
       version: 1,
@@ -154,6 +156,7 @@ export function disconnect(siteId?: string): void {
   for (const id of ids) {
     deleteToken(id)
   }
+  noteReplicatedCredentialChanged()
   // Why: drop cached attachment data URLs for disconnected sites so main does
   // not retain multi-MB strings after logout.
   clearAttachmentImagesForSite(siteId)
@@ -206,6 +209,7 @@ export async function testConnection(
 
 export function clearToken(siteId: string): void {
   deleteToken(siteId)
+  noteReplicatedCredentialChanged()
   // Why: auth failure removes the site; drop cached attachment data URLs too.
   clearAttachmentImagesForSite(siteId)
   const file = getSiteFile()

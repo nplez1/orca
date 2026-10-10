@@ -4,8 +4,7 @@ import { z } from 'zod'
  * Params for pushing replicated settings and credentials onto a paired host.
  *
  * Why the caps: this is the one method whose body carries other people's secrets, so every array and
- * string is bounded here rather than trusted to the transport's frame limit. A host that receives a
- * truncated payload refuses it by name — `deserializeHostSettingsPayload` in the receiving module.
+ * string is bounded here rather than trusted to the transport's frame limit.
  */
 
 const CREDENTIAL_ID_MAX = 300
@@ -27,9 +26,11 @@ export const ReplicatedHostCredentialParams = z
 
 export const HostSettingsReplicationPayloadParams = z
   .object({
-    // Why a literal and not a range: a build that does not know this version must refuse the payload,
-    // so the schema is what a newer sender fails against rather than a runtime check afterwards.
-    version: z.literal(1),
+    // Why a range and not `z.literal(1)`: a literal makes a newer sender fail schema validation, which
+    // reaches the main as a generic refusal and is retried forever. Accepting any integer lets
+    // `decideHostSettingsPayload` refuse the version by name, which the main maps to a refusal it stops
+    // retrying. See `docs/reference/remote-wire-compatibility.md`.
+    version: z.number().int().nonnegative(),
     baseRevision: z.number().int().nonnegative().nullable(),
     revision: z.number().int().nonnegative(),
     upserts: z.array(ReplicatedHostCredentialParams).max(MAX_CREDENTIALS_PER_PAYLOAD),

@@ -5,6 +5,7 @@ import {
   hasZcodePlanApiKey,
   saveZcodePlanApiKey
 } from '../zcode/zcode-plan-api-key-store'
+import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import { hasZcodeCliPlanCredentials } from '../rate-limits/zcode-usage-fetcher'
 import type { RateLimitService } from '../rate-limits/service'
 import type { ZcodePlanCredentialsStatus } from '../../shared/zcode-plan-sites'
@@ -38,11 +39,13 @@ export function registerZcodePlanCredentialsHandlers(rateLimits: RateLimitServic
       throw new Error('GLM Coding Plan API key must be a string')
     }
     saveZcodePlanApiKey(key)
+    noteReplicatedCredentialChanged()
     refreshAfterZcodePlanCredentialChange(rateLimits, 'save')
     return getZcodePlanCredentialsStatus()
   })
   ipcMain.handle('zcodePlanCredentials:clearApiKey', () => {
     clearZcodePlanApiKey()
+    noteReplicatedCredentialChanged()
     refreshAfterZcodePlanCredentialChange(rateLimits, 'clear')
     return getZcodePlanCredentialsStatus()
   })

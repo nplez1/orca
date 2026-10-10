@@ -105,33 +105,41 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   activeRuntimeEnvironmentId: 'hostLocal',
   defaultRepoSelection: 'hostLocal',
 
-  // ---- hostLocal: one-shot migration and defaulting bookkeeping ----------------------
+  // ---- one-shot flags that MUST follow the value they guard -------------------------------
+  // Why replicated rather than host-local: each flag says "this install already applied the new
+  // default". A host that inherits the *value* but not the flag runs its own migration and overwrites
+  // the replicated value with the default. Flags whose value is host-local (the shell and runtime ones
+  // above) stay host-local for the opposite reason.
+  autoRenameBranchFromWorkDefaultedOn: 'replicated',
+  primarySelectionMiddleClickPasteDefaultedForLinux: 'replicated',
+  primarySelectionMiddleClickPasteDefaultedForTerminalDefaults: 'replicated',
+  terminalTuiScrollSensitivityDefaultedToOne: 'replicated',
+  terminalCursorStyleDefaultedToBlock: 'replicated',
+  terminalRightClickToPasteDefaultedForPlatform: 'replicated',
+  terminalAllowOsc52ClipboardDefaultedOnForAllUsers: 'replicated',
+  floatingTerminalDefaultedForAllUsers: 'replicated',
+  claudeAgentTeamsDefaultDisabledMigrated: 'replicated',
+  agentYoloDefaultsMigrated: 'replicated',
+  terminalMacOptionAsAltMigrated: 'replicated',
+  agentsSidebarMigratedFromExperimental: 'replicated',
+  experimentalActivityDefaultedOffForAllUsers: 'replicated',
+  tabSwitchKeybindingSeed: 'replicated',
+  visibleTaskProvidersDefaultedForJira: 'replicated',
+
+  // ---- hostLocal: one-shot bookkeeping for a value that is itself host-local ---------------
   // Why not replicatedOnlyIfEmpty: "this install already ran the migration" is a fact about this
   // install. A host that inherits the flag skips its own migration and keeps stale state.
-  autoRenameBranchFromWorkDefaultedOn: 'hostLocal',
-  primarySelectionMiddleClickPasteDefaultedForLinux: 'hostLocal',
-  primarySelectionMiddleClickPasteDefaultedForTerminalDefaults: 'hostLocal',
-  terminalTuiScrollSensitivityDefaultedToOne: 'hostLocal',
-  terminalCursorStyleDefaultedToBlock: 'hostLocal',
-  terminalRightClickToPasteDefaultedForPlatform: 'hostLocal',
-  terminalAllowOsc52ClipboardDefaultedOnForAllUsers: 'hostLocal',
   localAccountRuntimeDefaultedToAutoForAllUsers: 'hostLocal',
-  floatingTerminalDefaultedForAllUsers: 'hostLocal',
   floatingTerminalCwdMigratedToAppWorkspace: 'hostLocal',
-  claudeAgentTeamsDefaultDisabledMigrated: 'hostLocal',
-  agentYoloDefaultsMigrated: 'hostLocal',
-  terminalMacOptionAsAltMigrated: 'hostLocal',
-  agentsSidebarMigratedFromExperimental: 'hostLocal',
-  experimentalActivityDefaultedOffForAllUsers: 'hostLocal',
-  tabSwitchKeybindingSeed: 'hostLocal',
-  visibleTaskProvidersDefaultedForJira: 'hostLocal',
 
   // ---- replicatedOnlyIfEmpty: accumulated state that fills a host with nothing -------
-  workspaceDirHistory: 'replicatedOnlyIfEmpty',
+  workspaceDirHistory: 'hostLocal',
   localBaseRefSuggestionDismissed: 'replicatedOnlyIfEmpty',
   openLinksInAppPreferencePrompted: 'replicatedOnlyIfEmpty',
-  terminalScopeHistoryByWorktree: 'replicatedOnlyIfEmpty',
-  codexSharedServerWarning: 'replicatedOnlyIfEmpty',
+  // Why these two replicate despite their names: they are boolean preferences a user set, not
+  // accumulated history, so the only-if-empty rule would leave a host with nothing applied.
+  terminalScopeHistoryByWorktree: 'replicated',
+  codexSharedServerWarning: 'replicated',
   dismissedSkillFreshnessNudges: 'replicatedOnlyIfEmpty',
   agentsSidebarIntroShown: 'replicatedOnlyIfEmpty',
 
@@ -249,16 +257,31 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   promptCacheTtlMs: 'replicated',
   codexManagedAccounts: 'replicated',
   claudeManagedAccounts: 'replicated',
-  terminalHiddenWorktreeRetentionBudget: 'replicated',
-  browserGuestWorktreeRetentionBudget: 'replicated',
-  terminalMainSideEffectAuthority: 'replicated',
-  terminalHiddenDeliveryGate: 'replicated',
-  terminalModelQueryAuthority: 'replicated',
+  // Why telemetry is host-local: it carries an install id, so replicating it merges every machine into
+  // one telemetry identity. Only the opt-in itself is a user decision, and that is not separable here.
+  telemetry: 'hostLocal',
+  // Why voice is host-local: it carries a models directory, a microphone device id, and a flag for
+  // whether an OpenAI key is configured — the last of which would claim a key this host does not have.
+  voice: 'hostLocal',
+  // Why these two are host-local despite holding secrets: they are secrets in a plaintext settings file
+  // with no ledger and no revocation, so replicating them would put a credential on a host that
+  // `revokeReplicatedCredential` cannot reach. They belong in a credential port first.
+  opencodeSessionCookie: 'hostLocal',
+  agentDefaultEnv: 'hostLocal',
+  // Why consent to run plugin code is per machine: it is a statement about what the user trusts *this*
+  // install to execute.
+  pluginConsents: 'hostLocal',
+  // Why the terminal troubleshooting kill switches stay local: they are escape hatches for a fault on a
+  // particular machine, and a host that inherits one is silently in a different mode from the main.
+  terminalHiddenWorktreeRetentionBudget: 'hostLocal',
+  browserGuestWorktreeRetentionBudget: 'hostLocal',
+  terminalMainSideEffectAuthority: 'hostLocal',
+  terminalHiddenDeliveryGate: 'hostLocal',
+  terminalModelQueryAuthority: 'hostLocal',
   defaultTuiAgent: 'replicated',
   disabledTuiAgents: 'replicated',
   pluginSystemEnabled: 'replicated',
   disabledPlugins: 'replicated',
-  pluginConsents: 'replicated',
   skipDeleteWorktreeConfirm: 'replicated',
   deleteRemoteBranchOnWorkspaceDelete: 'replicated',
   alwaysForceDeleteWorktrees: 'replicated',
@@ -266,7 +289,6 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   skipDeleteAutomationConfirm: 'replicated',
   skipDeleteArtifactConfirm: 'replicated',
   skipCodexRateLimitResetConfirm: 'replicated',
-  opencodeSessionCookie: 'replicated',
   opencodeWorkspaceId: 'replicated',
   minimaxGroupId: 'replicated',
   minimaxUsageModels: 'replicated',
@@ -275,7 +297,6 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   geminiCliOAuthEnabled: 'replicated',
   disabledUsageProviders: 'replicated',
   agentDefaultArgs: 'replicated',
-  agentDefaultEnv: 'replicated',
   agentStatusHooksEnabled: 'replicated',
   agentStateRulesLiveUpdates: 'replicated',
   agentWorkspaceTrustEnabled: 'replicated',
@@ -304,8 +325,6 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   sourceControlAi: 'replicated',
   sessionSummaryAi: 'replicated',
   gitlabProjects: 'replicated',
-  telemetry: 'replicated',
-  voice: 'replicated',
   aiVaultSearch: 'replicated',
   defaultTaskViewPreset: 'replicated',
   defaultTaskSource: 'replicated',

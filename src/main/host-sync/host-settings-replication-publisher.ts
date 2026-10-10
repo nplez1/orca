@@ -67,12 +67,22 @@ export type HostSettingsReplicationPublisher = {
   forgetHost(environmentId: string): void
 }
 
+/** Outcomes where the receiving host demonstrably does not hold the value. */
+const HOST_DID_NOT_TAKE: readonly string[] = [
+  'keptHostValue',
+  'refusedWeakerProtection',
+  'refusedUnknownKind'
+]
+
 export function createHostSettingsReplicationPublisher(input: {
   ports: readonly HostSettingsCredentialPort[]
   transport: HostSettingsReplicationTransport
   ledger?: HostSettingsCredentialLedger
 }): HostSettingsReplicationPublisher {
   const records = new Map<string, HostRecord>()
+  // Why an epoch per host: `forgetHost` can run while a publish is in flight, and recording that
+  // publish's outcome afterwards would put a forgotten host back in the ledger.
+  const epochs = new Map<string, number>()
   let ledger = input.ledger ?? EMPTY_HOST_SETTINGS_CREDENTIAL_LEDGER
   let nextRevision = 1
 
@@ -102,8 +112,16 @@ export function createHostSettingsReplicationPublisher(input: {
     report: HostSettingsApplyReport
   ): string[] {
     nextRevision = Math.max(nextRevision, payload.revision + 1)
+    // Why the ledger errs toward listing too much: it is what revocation deletes from, so a host that
+    // actually holds a credential is a correctness problem, while deleting a credential a host does not
+    // hold is a no-op. Only the outcomes where the host demonstrably did not take the value are
+    // excluded — including an outcome name this build does not know, which is a failure of ours to
+    // interpret rather than evidence the write did not happen.
     const applied = payload.upserts
-      .filter((credential) => report.outcomes[credential.id] === 'applied')
+      .filter(
+        (credential) =>
+          !HOST_DID_NOT_TAKE.includes(report.outcomes[credential.id] ?? 'applyFailedUnknown')
+      )
       .map((credential) => credential.id)
     ledger = recordCredentialHoldings(ledger, { credentialIds: applied, hostId: environmentId })
     for (const id of payload.removals) {
@@ -118,9 +136,11 @@ export function createHostSettingsReplicationPublisher(input: {
     readLedger: () => ledger,
     forgetHost: (environmentId) => {
       records.delete(environmentId)
+      epochs.set(environmentId, (epochs.get(environmentId) ?? 0) + 1)
       ledger = forgetHostHoldings(ledger, environmentId)
     },
     publish: async (environmentId, reason) => {
+      const epoch = epochs.get(environmentId) ?? 0
       let payload = buildPayload(environmentId, reason)
       let result = await input.transport.send(environmentId, payload)
       if (result.kind === 'needsSnapshot') {
@@ -149,6 +169,10 @@ export function createHostSettingsReplicationPublisher(input: {
       // its own value, must not be told to delete it later — that would take a credential the user set
       // up on that host with the removal of one this host never received.
       const applied = recordOutcome(environmentId, payload, result.report)
+      if ((epochs.get(environmentId) ?? 0) !== epoch) {
+        // The host was forgotten while this push was in flight; its outcome is no longer ours to keep.
+        return { kind: 'refused', reason: 'needsSnapshot' }
+      }
       records.set(environmentId, { revision: payload.revision, credentialIds: applied })
       return result.state.kind === 'synced'
         ? { kind: 'synced', revision: payload.revision, state: result.state }

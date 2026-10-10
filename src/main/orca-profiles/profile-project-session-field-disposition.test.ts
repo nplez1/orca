@@ -335,9 +335,6 @@ describe('workspace session host-sync disposition census', () => {
   // session state now means editing this array, which is a reviewed change.
   it('replicates nothing but history, and only into a host that has none', () => {
     expect(SESSION_FIELDS_REPLICATED_TO_HOSTS).toEqual([])
-    expect(SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY).toEqual([
-      'browserUrlHistory',
-      'workspaceDocHistory'
-    ])
+    expect(SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY).toEqual(['browserUrlHistory'])
   })
 })

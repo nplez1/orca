@@ -39,11 +39,8 @@ describe('global settings host-sync disposition census', () => {
     // The only list small enough to name outright. Everything else here is a deliberate preference
     // (replicated) or a fact about one machine (hostLocal), and both are read from the table itself.
     expect(SETTINGS_FIELDS_REPLICATED_ONLY_IF_EMPTY).toEqual([
-      'workspaceDirHistory',
       'localBaseRefSuggestionDismissed',
       'openLinksInAppPreferencePrompted',
-      'terminalScopeHistoryByWorktree',
-      'codexSharedServerWarning',
       'dismissedSkillFreshnessNudges',
       'agentsSidebarIntroShown'
     ])

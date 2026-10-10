@@ -84,6 +84,11 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
       if (decoded === null) {
         throw new Error('Jenkins server payload is malformed')
       }
+      // Why cross-check the id against the payload: see the Jira adapter — a mismatch would be written
+      // under the body's id and recorded under the id the main sent.
+      if (credential.id !== `${HOST_SETTINGS_JENKINS_KIND}:${decoded.server.id}`) {
+        throw new Error('Jenkins server payload does not match the credential it arrived as')
+      }
       saveJenkinsServer(decoded.server, decoded.token)
     },
     remove: (id) => {

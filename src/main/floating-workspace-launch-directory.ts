@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { adoptLegacyHomeStoreIn, resolveHomeStorePathIn } from './home-directory-migration'
+import { resolveHomeStorePathIn } from './home-directory-migration'
 
 /**
  * The Floating Workspace's own directory: where its terminals and agents start.
@@ -36,7 +36,7 @@ export function resolveFloatingWorkspaceLaunchDirectory(homeDir: string = homedi
 }
 
 export function ensureFloatingWorkspaceLaunchDirectorySync(homeDir: string = homedir()): string {
-  const directory = adoptLegacyHomeStoreIn(homeDir, FLOATING_WORKSPACE_DIRECTORY_NAME)
+  const directory = resolveFloatingWorkspaceLaunchDirectory(homeDir)
   mkdirSync(directory, { recursive: true })
   seedAgentInstructionsOnce(directory)
   return directory
@@ -45,7 +45,7 @@ export function ensureFloatingWorkspaceLaunchDirectorySync(homeDir: string = hom
 export async function ensureFloatingWorkspaceLaunchDirectory(
   homeDir: string = homedir()
 ): Promise<string> {
-  const directory = adoptLegacyHomeStoreIn(homeDir, FLOATING_WORKSPACE_DIRECTORY_NAME)
+  const directory = resolveFloatingWorkspaceLaunchDirectory(homeDir)
   await mkdir(directory, { recursive: true })
   seedAgentInstructionsOnce(directory)
   return directory

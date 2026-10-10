@@ -1,7 +1,7 @@
 # Host settings replication: one main machine, subordinate paired hosts
 
-**Status: the home-directory prerequisite is done. Replication itself is proposed — nothing in the
-rest of this document is implemented.**
+**Status: the home-directory prerequisite and the replication machinery are implemented; the trigger
+that pushes automatically is wired and the settings inventory is audited. See the branch's PR.**
 
 Promoted from the fork owner's working note, whose durable copy is
 [nplez1/orca#54](https://github.com/nplez1/orca/issues/54). The prerequisite landed as
@@ -56,7 +56,11 @@ This is an extension of machinery already in the tree, not a new subsystem:
 
 ## Field disposition: the third axis
 
-Add `onHostSync` to the disposition table, with three values:
+Add `onHostSync` to the disposition table, with three values. In the tree it is a **sibling** table for
+the session fields — `WORKSPACE_SESSION_HOST_SYNC_DISPOSITION` beside `WORKSPACE_SESSION_FIELD_DISPOSITION`,
+held to the same key set at compile time — because the two existing axes are per-field *profile*
+operations and every entry's comment explains them as a pair. `GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION`
+carries the same three values for all 245 persisted settings.
 
 | Value                 | Meaning                                                                            | Examples                                                                                                                   |
 | --------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |

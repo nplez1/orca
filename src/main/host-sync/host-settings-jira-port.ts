@@ -88,6 +88,12 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
       if (decoded === null) {
         throw new Error('Jira site payload is malformed')
       }
+      // Why cross-check the id against the payload: a payload whose id names one site while its body
+      // carries another would be written under the body's id, and the main would then record a holding
+      // against the id it sent — so revocation would verify the wrong site and report it removed.
+      if (credential.id !== `${HOST_SETTINGS_JIRA_KIND}:${decoded.site.id}`) {
+        throw new Error('Jira site payload does not match the credential it arrived as')
+      }
       saveToken(decoded.site.id, decoded.token)
       // Why merge rather than replace: the file also records which site this host is looking at, and
       // a replicated site list must not move that.

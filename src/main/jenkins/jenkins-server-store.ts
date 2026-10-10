@@ -135,14 +135,17 @@ export function saveJenkinsServer(profile: JenkinsServerProfile, apiToken: strin
 export function removeJenkinsServer(serverId: string): boolean {
   const file = readServersFile()
   const servers = file.servers.filter((server) => server.id !== serverId)
-  if (servers.length === file.servers.length) {
-    return false
-  }
-  writeServersFile({ version: 1, servers })
+  // Why the token is unlinked even when there is no profile to remove: a token left behind by an
+  // earlier partial removal keeps `hasJenkinsServerToken` true, so replication reports the removal as
+  // unverified on every retry and the stray token can never be cleared.
   const tokenPath = getTokenPath(serverId)
   if (existsSync(tokenPath)) {
     unlinkSync(tokenPath)
   }
+  if (servers.length === file.servers.length) {
+    return false
+  }
+  writeServersFile({ version: 1, servers })
   return true
 }
 

@@ -206,7 +206,10 @@ export const WORKSPACE_SESSION_HOST_SYNC_DISPOSITION = {
   clientHostedBrowserCloseIntentsByEnvironment: 'hostLocal',
   activeTabTypeByWorktree: 'hostLocal',
   browserUrlHistory: 'replicatedOnlyIfEmpty',
-  workspaceDocHistory: 'replicatedOnlyIfEmpty',
+  // Why host-local despite its name: the value stores a worktree id and an absolute file path, so it
+  // resolves on this machine only — the table's first rule, applied to something that reads like
+  // history.
+  workspaceDocHistory: 'hostLocal',
   activeTabIdByWorktree: 'hostLocal',
   unifiedTabs: 'hostLocal',
   tabGroups: 'hostLocal',

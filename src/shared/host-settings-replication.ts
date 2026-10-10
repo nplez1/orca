@@ -86,6 +86,11 @@ export type HostSettingsApplyOutcome =
   | 'refusedWeakerProtection'
   /** No adapter is registered for the payload's `kind`. */
   | 'refusedUnknownKind'
+  /**
+   * The adapter threw. Distinct from a refusal because the write may have partly landed, so the main
+   * must treat this host as possibly holding the credential rather than as not holding it.
+   */
+  | 'applyFailed'
   | 'removed'
   /** Deletion could not be proven against the host's own store, so it is not reported as gone. */
   | 'removalUnverified'
@@ -111,7 +116,13 @@ export type HostSettingsSyncState =
   | { kind: 'partial'; revision: number; syncedAt: number; refusals: string[] }
   | { kind: 'failed'; reason: string; failedAt: number }
 
-/** Whether a host holds a replicated copy at all — the gate for "not synced" in the UI. */
+/**
+ * Whether a host holds a replicated copy at all — the gate for "not synced" in the UI.
+ *
+ * Why `partial` counts: a host that took some of what the main sent has synced, and the refusals in its
+ * own state are what say what it did not take. Calling that "not synced" would contradict a refusal
+ * list the pane is showing beside it.
+ */
 export function hostSettingsHasSynced(state: HostSettingsSyncState): boolean {
-  return state.kind === 'synced'
+  return state.kind === 'synced' || state.kind === 'partial'
 }

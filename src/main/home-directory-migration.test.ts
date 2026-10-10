@@ -60,7 +60,11 @@ describe('home directory migration', () => {
     expect(readFileSync(join(currentDir(), 'sites.json'), 'utf-8')).toBe('{"sites":["ours"]}')
   })
 
-  it('falls back to the pre-rename copy when it cannot be adopted, rather than losing it', () => {
+  // Why the fork home rather than the pre-rename copy: the stores write through the path they resolve,
+  // and that path belongs to an official install — answering with it would let this build overwrite
+  // that install's own credential file. A store that reads as unconfigured after a loud warning is
+  // recoverable; a clobbered install is not.
+  it('uses the fork home, and warns, when the pre-rename copy cannot be adopted', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     mkdirSync(legacyDir(), { recursive: true })
     writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["only-copy"]}')
@@ -68,8 +72,10 @@ describe('home directory migration', () => {
     // POSIX permissions that a root or Windows runner ignores.
     writeFileSync(currentDir(), 'not a directory')
 
-    expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(join(legacyDir(), 'sites.json'))
+    expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(join(currentDir(), 'sites.json'))
     expect(console.warn).toHaveBeenCalled()
+    // The pre-rename copy is not ours to consume, so it must survive a failed adoption intact.
+    expect(readFileSync(join(legacyDir(), 'sites.json'), 'utf-8')).toBe('{"sites":["only-copy"]}')
   })
 
   // Why: adoption keyed on "the fork's copy is missing" would resurrect a credential the user had

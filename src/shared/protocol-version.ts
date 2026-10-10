@@ -1,3 +1,4 @@
+import { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY } from './host-settings-replication'
 import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
 import {
   AUTOMATION_RUNTIME_CAPABILITIES,
@@ -170,8 +171,6 @@ export const WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY =
   'worktree.archive-failure-blocking.v1' as const
 export const CODEX_RESET_CREDIT_RUNTIME_CAPABILITY = 'accounts.codex-reset-credit.v1' as const
 export const ACCOUNT_IMPORT_RUNTIME_CAPABILITY = 'accounts.import-host-credentials.v1' as const
-import { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY } from './host-settings-replication'
-
 export { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY }
 export const ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY = 'accounts.antigravity-native.v1' as const
 export const DATA_ACCOUNT_RUNTIME_CAPABILITY = 'accounts.managed-data-profiles.v1' as const

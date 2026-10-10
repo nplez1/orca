@@ -69,13 +69,27 @@ export function applyHostSettingsPayload(input: {
       outcomes[credential.id] = 'refusedWeakerProtection'
       continue
     }
-    port.apply(credential)
+    try {
+      port.apply(credential)
+    } catch (error) {
+      // Why per item, and why a failure is still recorded as possibly held: an adapter that throws
+      // partway through (a malformed payload, a full disk) may already have written the value, and one
+      // throwing credential must not stop the rest of the payload from being applied — nor abort the
+      // whole RPC, which the main would read as "unreachable" and leave the ledger with nothing.
+      console.warn(`[orca] Could not apply replicated credential ${credential.id}`, error)
+      outcomes[credential.id] = 'applyFailed'
+      continue
+    }
     // Why re-read the store instead of trusting the adapter: a store whose keyring is unavailable at
     // write time falls back to plaintext, so an adapter that believes it can seal is not evidence that
     // the value landed sealed. If it did not, the weaker copy is removed rather than left behind — a
     // silent protection downgrade is the one outcome this policy exists to prevent.
     if (credential.protection === 'sealed' && port.protectionOf(credential.id) !== 'sealed') {
-      port.remove(credential.id)
+      try {
+        port.remove(credential.id)
+      } catch (error) {
+        console.warn(`[orca] Could not withdraw downgraded credential ${credential.id}`, error)
+      }
       outcomes[credential.id] = 'refusedWeakerProtection'
       continue
     }
