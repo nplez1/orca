@@ -11,6 +11,7 @@ import {
   writeSiteFile
 } from '../jira/site-credential-store'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
+import { canSealReplicatedCredential } from './host-settings-credential-port'
 
 /**
  * Jira sites and their tokens, as one credential per site.
@@ -48,7 +49,7 @@ export function createHostSettingsJiraPort(): HostSettingsCredentialPort {
     kind: HOST_SETTINGS_JIRA_KIND,
     // Why always true: a Jira token lands in the same safeStorage-backed store as the provider keys,
     // so a host that can hold one of those sealed can hold these.
-    canSeal: () => true,
+    canSeal: canSealReplicatedCredential,
     protectionOf: (id) => {
       const siteId = siteIdOf(id)
       return siteId !== null && hasStoredToken(siteId) ? getSiteTokenProtection(siteId) : null

@@ -1,4 +1,3 @@
-import { safeStorage } from 'electron'
 import {
   clearDeepSeekApiKey,
   getDeepSeekApiKeyProtection,
@@ -28,9 +27,14 @@ import {
   saveZcodePlanApiKey
 } from '../zcode/zcode-plan-api-key-store'
 import { createHostSettingsApiKeyPort } from './host-settings-api-key-port'
-import type { HostSettingsCredentialPort } from './host-settings-credential-port'
+import {
+  canSealReplicatedCredential,
+  type HostSettingsCredentialPort
+} from './host-settings-credential-port'
 
-const canSeal = (): boolean => safeStorage.isEncryptionAvailable()
+// Why one answer for every port: a store that can only write plaintext must not report that it can
+// seal, or the receiver would accept a downgrade the policy means to refuse.
+const canSeal = canSealReplicatedCredential
 
 /**
  * The provider keys this host can replicate.

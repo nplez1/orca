@@ -1,3 +1,4 @@
+import { getSecretStore } from '../../shared/secret-store'
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
@@ -24,6 +25,19 @@ export type HostSettingsCredentialPort = {
 export type HostSettingsCredentialRegistry = {
   /** The adapter that owns a credential id, or undefined when this build has none. */
   forCredentialId(id: string): HostSettingsCredentialPort | undefined
+}
+
+/**
+ * Whether this host can actually protect a secret at rest, not merely call an encryptor.
+ *
+ * Why not `safeStorage.isEncryptionAvailable()` alone: on Linux with the `basic_text` backend that
+ * answers true and encrypts with a fixed, published key, which is not protection. Every port has to
+ * answer the same question the same way, or a store that can only write plaintext would report that
+ * it can seal and defeat the refusal the replication policy is built on.
+ */
+export function canSealReplicatedCredential(): boolean {
+  const store = getSecretStore()
+  return store.isEncryptionAvailable() && store.describeProtectionGap() === null
 }
 
 /**

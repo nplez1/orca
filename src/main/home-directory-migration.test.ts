@@ -71,4 +71,42 @@ describe('home directory migration', () => {
     expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(join(legacyDir(), 'sites.json'))
     expect(console.warn).toHaveBeenCalled()
   })
+
+  // Why: adoption keyed on "the fork's copy is missing" would resurrect a credential the user had
+  // just deleted, and replication would then push it back to every paired host. The decision has to be
+  // recorded, not inferred.
+  it('does not bring back a store the user deleted', () => {
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["kept"]}')
+
+    const adopted = adoptLegacyHomeStoreIn(home, 'sites.json')
+    expect(existsSync(adopted)).toBe(true)
+
+    rmSync(adopted)
+
+    expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(adopted)
+    expect(existsSync(adopted)).toBe(false)
+  })
+
+  // Why: once this install has resolved a store, the pre-rename path is an official install's; a file
+  // appearing there afterwards is that install's data, not ours to take.
+  it('never adopts a pre-rename file that appears after the decision was made', () => {
+    expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(join(currentDir(), 'sites.json'))
+
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), '{"sites":["official"]}')
+
+    expect(adoptLegacyHomeStoreIn(home, 'sites.json')).toBe(join(currentDir(), 'sites.json'))
+    expect(existsSync(join(currentDir(), 'sites.json'))).toBe(false)
+  })
+
+  it('decides each store separately, so one marker cannot block another', () => {
+    mkdirSync(legacyDir(), { recursive: true })
+    writeFileSync(join(legacyDir(), 'sites.json'), 'sites')
+    writeFileSync(join(legacyDir(), 'tokens.enc'), 'tokens')
+
+    adoptLegacyHomeStoreIn(home, 'sites.json')
+
+    expect(readFileSync(adoptLegacyHomeStoreIn(home, 'tokens.enc'), 'utf-8')).toBe('tokens')
+  })
 })

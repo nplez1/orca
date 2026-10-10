@@ -150,12 +150,12 @@ export function createHostSettingsReplicationSync(input: {
         connectedGenerations.delete(environmentId)
         return
       }
-      if (unsupportedHosts.has(environmentId)) {
-        return
-      }
       if (pushedGenerations.get(environmentId) === transportGeneration) {
         return
       }
+      // Why per generation rather than for the life of the process: a host that refused the first
+      // attempt may have been upgraded or re-paired since, and nothing else would ever ask it again.
+      unsupportedHosts.delete(environmentId)
       pushedGenerations.set(environmentId, transportGeneration)
       connectedGenerations.set(environmentId, transportGeneration)
       void enqueue(environmentId, 'attach')

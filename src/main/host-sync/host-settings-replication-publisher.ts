@@ -80,7 +80,7 @@ export function createHostSettingsReplicationPublisher(input: {
     const record = records.get(environmentId)
     const revision = nextRevision
     return reason === 'attach' || record === undefined
-      ? buildHostSettingsSnapshot(input.ports, revision)
+      ? buildHostSettingsSnapshot(input.ports, revision, record?.credentialIds ?? [])
       : buildHostSettingsDelta({
           ports: input.ports,
           previousCredentialIds: record.credentialIds,
@@ -100,7 +100,7 @@ export function createHostSettingsReplicationPublisher(input: {
     environmentId: string,
     payload: HostSettingsReplicationPayload,
     report: HostSettingsApplyReport
-  ): void {
+  ): string[] {
     nextRevision = Math.max(nextRevision, payload.revision + 1)
     const applied = payload.upserts
       .filter((credential) => report.outcomes[credential.id] === 'applied')
@@ -111,6 +111,7 @@ export function createHostSettingsReplicationPublisher(input: {
         ledger = forgetCredentialHoldings(ledger, id, [environmentId])
       }
     }
+    return applied
   }
 
   return {
@@ -123,9 +124,15 @@ export function createHostSettingsReplicationPublisher(input: {
       let payload = buildPayload(environmentId, reason)
       let result = await input.transport.send(environmentId, payload)
       if (result.kind === 'needsSnapshot') {
-        // One retry, with a fresh revision: a host that rejected a delta is not told the same
-        // revision twice, or its own revision gate would refuse the snapshot as a replay.
-        payload = buildHostSettingsSnapshot(input.ports, payload.revision + 1)
+        // One retry, with a fresh revision and the same removal list: a host that rejected a delta is
+        // not told the same revision twice, or its own revision gate would refuse the snapshot as a
+        // replay. The removals come back with the snapshot because this is the last push that names
+        // what the host should no longer hold.
+        payload = buildHostSettingsSnapshot(
+          input.ports,
+          payload.revision + 1,
+          records.get(environmentId)?.credentialIds ?? []
+        )
         result = await input.transport.send(environmentId, payload)
       }
       if (result.kind === 'unreachable') {
@@ -138,11 +145,11 @@ export function createHostSettingsReplicationPublisher(input: {
       ) {
         return { kind: 'refused', reason: result.kind }
       }
-      recordOutcome(environmentId, payload, result.report)
-      records.set(environmentId, {
-        revision: payload.revision,
-        credentialIds: payload.upserts.map((credential) => credential.id)
-      })
+      // Why only what applied rather than everything sent: a host that refused a credential, or kept
+      // its own value, must not be told to delete it later — that would take a credential the user set
+      // up on that host with the removal of one this host never received.
+      const applied = recordOutcome(environmentId, payload, result.report)
+      records.set(environmentId, { revision: payload.revision, credentialIds: applied })
       return result.state.kind === 'synced'
         ? { kind: 'synced', revision: payload.revision, state: result.state }
         : { kind: 'partial', revision: payload.revision, report: result.report }

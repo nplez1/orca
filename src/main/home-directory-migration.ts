@@ -1,4 +1,13 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { HOME_DIRECTORY_NAME, LEGACY_HOME_DIRECTORY_NAME } from '../shared/app-directory-names'
@@ -37,12 +46,31 @@ function resolveLegacyHomeStorePathIn(
   return join(home, LEGACY_HOME_DIRECTORY_NAME, segment, ...segments)
 }
 
+/** Where this install records the stores it has already decided about. */
+const ADOPTION_MARKER_DIRECTORY = '.adopted'
+
+function adoptionMarkerPathIn(home: string, segments: readonly string[]): string {
+  // Why the separators are folded into the file name: one marker per store path, so deciding about
+  // `jira-sites.json` never has to know what was decided about `jira-tokens`.
+  return join(home, HOME_DIRECTORY_NAME, ADOPTION_MARKER_DIRECTORY, segments.join('__'))
+}
+
 /**
- * The path a store should read and write, having adopted its pre-rename copy on first use.
+ * The path a store should read and write, having adopted its pre-rename copy once.
+ *
+ * Why the decision is recorded rather than inferred from the paths: "the fork's copy is missing" is
+ * also true for a store the user has just deleted, so inferring it lets a deleted credential reappear
+ * from the pre-rename copy on the next read — and replication then pushes the resurrected credential
+ * to every paired host.
+ *
+ * Why the marker is written even when there was nothing to adopt: once this install has resolved a
+ * store, the pre-rename path belongs to an official install. Adopting a file that appears there
+ * afterwards would take that install's data.
  *
  * Returns the legacy path only when the copy could not be made — a read-only or full disk must not
- * look like a connection the user never configured. That fallback writes to the shared directory,
- * which is exactly what the rename exists to stop, so it is a degraded path and not a stable state.
+ * look like a connection the user never configured. No marker is written in that case, so the next
+ * run tries again. It is a degraded path and not a stable state: it writes to the shared directory,
+ * which is exactly what the rename exists to stop.
  *
  * A segment is required so the home directory itself can never be adopted: that would take an
  * official install's whole state along with this build's stores.
@@ -55,19 +83,30 @@ export function adoptLegacyHomeStoreIn(
   ...segments: string[]
 ): string {
   const current = resolveHomeStorePathIn(home, segment, ...segments)
+  const marker = adoptionMarkerPathIn(home, [segment, ...segments])
+  if (existsSync(marker)) {
+    return current
+  }
+  // Why this comes before the legacy path: the fork's own copy may be *newer* than the pre-rename one
+  // — a user who has been on the renamed build keeps writing here — so adopting over it would lose
+  // more than it recovers.
   if (existsSync(current)) {
+    markAdoptionDecided(marker)
     return current
   }
   const legacy = resolveLegacyHomeStorePathIn(home, segment, ...segments)
   if (!existsSync(legacy)) {
+    markAdoptionDecided(marker)
     return current
   }
   try {
     adoptLegacyCopy(legacy, current)
+    markAdoptionDecided(marker)
     return current
   } catch (error) {
     if (existsSync(current)) {
       // Why: two processes can adopt the same store at once; the loser reads the winner's copy.
+      markAdoptionDecided(marker)
       return current
     }
     console.warn(
@@ -75,6 +114,22 @@ export function adoptLegacyHomeStoreIn(
       error
     )
     return legacy
+  }
+}
+
+function markAdoptionDecided(marker: string): void {
+  try {
+    mkdirSync(dirname(marker), { recursive: true })
+    writeFileSync(marker, '', { flag: 'wx' })
+  } catch (error) {
+    // Why not fatal: an unwritable marker costs one redundant adoption check next run, while throwing
+    // here would take the store's own caller down over a bookkeeping file. EEXIST is the normal case —
+    // another process decided the same store first.
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+    if (code !== 'EEXIST') {
+      console.warn('[orca] Could not record that a pre-rename store has been considered', error)
+    }
   }
 }
 

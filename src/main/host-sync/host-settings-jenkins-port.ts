@@ -9,6 +9,7 @@ import {
   saveJenkinsServer
 } from '../jenkins/jenkins-server-store'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
+import { canSealReplicatedCredential } from './host-settings-credential-port'
 
 /**
  * Jenkins servers and their tokens, as one credential per server.
@@ -44,7 +45,7 @@ function decode(payload: string): JenkinsServerReplicationPayload | null {
 export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
   return {
     kind: HOST_SETTINGS_JENKINS_KIND,
-    canSeal: () => true,
+    canSeal: canSealReplicatedCredential,
     protectionOf: (id) => {
       const serverId = serverIdOf(id)
       return serverId === null ? null : getJenkinsServerTokenProtection(serverId)
@@ -56,7 +57,14 @@ export function createHostSettingsJenkinsPort(): HostSettingsCredentialPort {
         if (protection === null) {
           continue
         }
-        const token = readJenkinsServerToken(server.id)
+        let token: string | null
+        try {
+          token = readJenkinsServerToken(server.id)
+        } catch {
+          // Why skipped: a token this host cannot decrypt is one it cannot send, and it must not stop
+          // the other servers from replicating — the same rule the Jira adapter follows.
+          continue
+        }
         if (token === null) {
           continue
         }

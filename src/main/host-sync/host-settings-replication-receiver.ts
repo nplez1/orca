@@ -70,6 +70,15 @@ export function applyHostSettingsPayload(input: {
       continue
     }
     port.apply(credential)
+    // Why re-read the store instead of trusting the adapter: a store whose keyring is unavailable at
+    // write time falls back to plaintext, so an adapter that believes it can seal is not evidence that
+    // the value landed sealed. If it did not, the weaker copy is removed rather than left behind — a
+    // silent protection downgrade is the one outcome this policy exists to prevent.
+    if (credential.protection === 'sealed' && port.protectionOf(credential.id) !== 'sealed') {
+      port.remove(credential.id)
+      outcomes[credential.id] = 'refusedWeakerProtection'
+      continue
+    }
     outcomes[credential.id] = 'applied'
   }
 

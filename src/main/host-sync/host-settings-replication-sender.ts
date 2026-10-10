@@ -11,14 +11,20 @@ import type { HostSettingsCredentialPort } from './host-settings-credential-port
  */
 export function buildHostSettingsSnapshot(
   ports: readonly HostSettingsCredentialPort[],
-  revision: number
+  revision: number,
+  previousCredentialIds: readonly string[] = []
 ): HostSettingsReplicationPayload {
+  const upserts = ports.flatMap((port) => port.list())
+  const held = new Set(upserts.map((credential) => credential.id))
   return {
     version: HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,
     baseRevision: null,
     revision,
-    upserts: ports.flatMap((port) => port.list()),
-    removals: []
+    upserts,
+    // Why a snapshot still names removals: a host restarts with no revision of its own, so a snapshot
+    // is the only push that can clear what it already holds. A removal lost that way would never be
+    // re-sent, because the delta after it does not name the credential either.
+    removals: previousCredentialIds.filter((id) => !held.has(id))
   }
 }
 
