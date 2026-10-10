@@ -32,6 +32,8 @@ export type HostSettingsReplicationApplyResult =
   | { decision: 'applied'; report: HostSettingsApplyReport; state: HostSettingsSyncState }
   | { decision: 'needsSnapshot'; reason: 'revisionGap' | 'unknownBase' }
   | { decision: 'unsupportedVersion' }
+  /** This host is already configured by a different paired caller. */
+  | { decision: 'refusedNotTheMain' }
 
 /** A credential the main wants a paired host to hold, in the form its adapter owns. */
 export type ReplicatedHostCredential = {

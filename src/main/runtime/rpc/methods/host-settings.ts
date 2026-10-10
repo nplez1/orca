@@ -28,8 +28,16 @@ export const HOST_SETTINGS_METHODS = [
     name: 'hostSettings.applyReplication',
     permission: 'accounts-admin',
     params: ApplyHostSettingsReplicationParams,
-    handler: (params) =>
-      applyHostSettingsReplication(params.payload, { holdings: replicationHoldings() })
+    handler: (params, ctx) =>
+      applyHostSettingsReplication(params.payload, {
+        holdings: replicationHoldings(),
+        // Why this identity and not the socket's: it is the paired caller the transport authenticated
+        // and durable saved state can name, so it is what a host can pin "the main" to. Absent for an
+        // in-process owner, which is the user at this machine and always allowed.
+        ...(ctx.authenticatedCallerFingerprint === undefined
+          ? {}
+          : { callerFingerprint: ctx.authenticatedCallerFingerprint })
+      })
   }),
   defineMethod({
     name: 'hostSettings.replicationState',
@@ -37,6 +45,6 @@ export const HOST_SETTINGS_METHODS = [
     params: null,
     // Why separate from `status.get`: a host that has never synced must be able to say so without the
     // main having to infer it from an empty credential list, which reads as "you have no integrations".
-    handler: () => getHostSettingsReplication()
+    handler: () => getHostSettingsReplication(replicationHoldings())
   })
 ]

@@ -36,8 +36,14 @@ export type HostSettingsCredentialRegistry = {
  * it can seal and defeat the refusal the replication policy is built on.
  */
 export function canSealReplicatedCredential(): boolean {
-  const store = getSecretStore()
-  return store.isEncryptionAvailable() && store.describeProtectionGap() === null
+  try {
+    const store = getSecretStore()
+    return store.isEncryptionAvailable() && store.describeProtectionGap() === null
+  } catch {
+    // Why false rather than throwing: an unset or unavailable store cannot protect anything, and
+    // "cannot seal" is the answer that refuses a credential instead of writing it in the clear.
+    return false
+  }
 }
 
 /**

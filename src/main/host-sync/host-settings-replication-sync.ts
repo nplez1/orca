@@ -23,7 +23,12 @@ type SendApplyRequest = (
 ) => Promise<RuntimeRpcResponse<HostSettingsReplicationApplyResult>>
 
 /** The decisions a host may answer with, at runtime as well as in the type. */
-const APPLY_DECISIONS: readonly string[] = ['applied', 'needsSnapshot', 'unsupportedVersion']
+const APPLY_DECISIONS: readonly string[] = [
+  'applied',
+  'needsSnapshot',
+  'unsupportedVersion',
+  'refusedNotTheMain'
+]
 
 export type HostSettingsReplicationConnectionObservation = {
   environmentId: string
@@ -65,8 +70,13 @@ export function createHostSettingsReplicationSync(input: {
   ledger?: HostSettingsCredentialLedger
   /** Overridable so a test does not wait on a real timer. */
   scheduleDebounce?: (run: () => void) => () => void
+  /** Whether the host advertises replication; forwarded to the transport's probe. */
+  supportsReplication?: (environmentId: string) => Promise<boolean>
 }): HostSettingsReplicationSync {
   const transport: HostSettingsReplicationTransport = {
+    ...(input.supportsReplication === undefined
+      ? {}
+      : { supportsReplication: input.supportsReplication }),
     send: async (environmentId, payload) => {
       let pairing: PairingOffer
       try {
@@ -105,6 +115,8 @@ export function createHostSettingsReplicationSync(input: {
           return { kind: 'needsSnapshot', reason: result.reason }
         case 'unsupportedVersion':
           return { kind: 'unsupportedVersion' }
+        case 'refusedNotTheMain':
+          return { kind: 'refusedNotTheMain' }
       }
     }
   }
@@ -127,16 +139,44 @@ export function createHostSettingsReplicationSync(input: {
     const previous = queues.get(environmentId) ?? Promise.resolve()
     const next = previous
       .catch(() => undefined)
-      .then(() => publisher.publish(environmentId, reason))
+      .then(async () => {
+        // Why probe before pushing rather than only learning from a refusal: the capability is the
+        // negotiation this wire expects, and a host that does not advertise it should not be sent a
+        // payload it will only reject. The refusal path below stays as the fallback for a host whose
+        // advertisement is wrong or absent.
+        if (transport.supportsReplication !== undefined) {
+          const supported = await transport.supportsReplication(environmentId)
+          if (!supported) {
+            stopAsking(environmentId)
+            return { kind: 'refused', reason: 'unsupportedMethod' } as const
+          }
+        }
+        return await publisher.publish(environmentId, reason)
+      })
       .then((outcome) => {
-        if (outcome.kind === 'refused' && outcome.reason === 'unsupportedMethod') {
-          unsupportedHosts.add(environmentId)
-          connectedGenerations.delete(environmentId)
+        // Why `notTheMain` also stops the asking: another paired caller has already configured this
+        // host, so retrying would only fight it. A new connection clears this and tries again.
+        if (
+          outcome.kind === 'refused' &&
+          (outcome.reason === 'unsupportedMethod' || outcome.reason === 'notTheMain')
+        ) {
+          stopAsking(environmentId)
         }
         return outcome
       })
+      // Why caught here rather than left to the caller: every call site is a `void enqueue(...)`, so a
+      // throw would surface as an unhandled rejection and take the process's error handling with it.
+      .catch((error): HostSettingsReplicationPublishOutcome => {
+        return { kind: 'unreachable', detail: describe(error) }
+      })
     queues.set(environmentId, next)
     return next
+  }
+
+  /** Stop pushing to a host for this connection, without forgetting what it holds. */
+  function stopAsking(environmentId: string): void {
+    unsupportedHosts.add(environmentId)
+    connectedGenerations.delete(environmentId)
   }
 
   const schedule = input.scheduleDebounce ?? defaultDebounce
@@ -150,14 +190,18 @@ export function createHostSettingsReplicationSync(input: {
         connectedGenerations.delete(environmentId)
         return
       }
-      if (pushedGenerations.get(environmentId) === transportGeneration) {
+      // Why attachment rather than the generation decides the early return: a generation is only bumped
+      // when the pairing changes, so a host that dropped and reconnected on the same pairing would be
+      // skipped here and then silently stop receiving deltas, having been dropped from the set above.
+      const reattached = !connectedGenerations.has(environmentId)
+      connectedGenerations.set(environmentId, transportGeneration)
+      if (pushedGenerations.get(environmentId) === transportGeneration && !reattached) {
         return
       }
-      // Why per generation rather than for the life of the process: a host that refused the first
+      // Why per connection rather than for the life of the process: a host that refused the first
       // attempt may have been upgraded or re-paired since, and nothing else would ever ask it again.
       unsupportedHosts.delete(environmentId)
       pushedGenerations.set(environmentId, transportGeneration)
-      connectedGenerations.set(environmentId, transportGeneration)
       void enqueue(environmentId, 'attach')
     },
     notifyChanged: () => {

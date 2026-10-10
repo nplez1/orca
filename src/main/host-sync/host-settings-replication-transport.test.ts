@@ -4,6 +4,7 @@ import type {
   HostSettingsReplicationPayload
 } from '../../shared/host-settings-replication'
 import type { HostSettingsCredentialPort } from './host-settings-credential-port'
+import { createInMemoryHostSettingsReplicationHoldings } from './host-settings-replication-holdings'
 import {
   applyHostSettingsReplication,
   getHostSettingsReplication,
@@ -269,8 +270,11 @@ describe('publishing to a paired host', () => {
 })
 
 describe('applying what the main sent', () => {
+  let holdings = createInMemoryHostSettingsReplicationHoldings()
+
   beforeEach(() => {
     resetHostSettingsReplication()
+    holdings = createInMemoryHostSettingsReplicationHoldings()
   })
 
   const registry = {
@@ -304,29 +308,29 @@ describe('applying what the main sent', () => {
   }
 
   it('says it has never synced before it is sent anything', () => {
-    expect(getHostSettingsReplication()).toEqual({
+    expect(getHostSettingsReplication(holdings)).toEqual({
       revision: null,
       state: { kind: 'neverSynced' }
     })
   })
 
   it('applies a snapshot and remembers the revision it reached', () => {
-    const result = applyHostSettingsReplication(snapshot(4), { registry, now: 99 })
+    const result = applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
     expect(result).toMatchObject({ decision: 'applied' })
-    expect(getHostSettingsReplication()).toMatchObject({ revision: 4 })
+    expect(getHostSettingsReplication(holdings)).toMatchObject({ revision: 4 })
   })
 
   it('asks for a snapshot instead of applying a delta past a gap, and keeps its revision', () => {
-    applyHostSettingsReplication(snapshot(4), { registry, now: 99 })
+    applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
     const result = applyHostSettingsReplication(
       { ...snapshot(9), baseRevision: 7 },
-      { registry, now: 100 }
+      { registry, holdings, now: 100 }
     )
 
     expect(result).toEqual({ decision: 'needsSnapshot', reason: 'revisionGap' })
-    expect(getHostSettingsReplication()).toMatchObject({ revision: 4 })
+    expect(getHostSettingsReplication(holdings)).toMatchObject({ revision: 4 })
   })
 
   it('refuses a version it does not know without advancing its revision', () => {
@@ -334,21 +338,21 @@ describe('applying what the main sent', () => {
     // and a round trip is how that payload arrives rather than how a test would write it.
     const fromANewerMain = JSON.parse(JSON.stringify({ ...snapshot(1), version: 2 }))
 
-    const result = applyHostSettingsReplication(fromANewerMain, { registry, now: 99 })
+    const result = applyHostSettingsReplication(fromANewerMain, { registry, holdings, now: 99 })
 
     expect(result).toEqual({ decision: 'unsupportedVersion' })
-    expect(getHostSettingsReplication().revision).toBeNull()
+    expect(getHostSettingsReplication(holdings).revision).toBeNull()
   })
 
   it('applies a delta whose base is the revision it holds', () => {
-    applyHostSettingsReplication(snapshot(4), { registry, now: 99 })
+    applyHostSettingsReplication(snapshot(4), { registry, holdings, now: 99 })
 
     const result = applyHostSettingsReplication(
       { ...snapshot(5), baseRevision: 4 },
-      { registry, now: 100 }
+      { registry, holdings, now: 100 }
     )
 
     expect(result).toMatchObject({ decision: 'applied' })
-    expect(getHostSettingsReplication().revision).toBe(5)
+    expect(getHostSettingsReplication(holdings).revision).toBe(5)
   })
 })
