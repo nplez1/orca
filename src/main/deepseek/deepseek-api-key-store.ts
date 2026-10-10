@@ -11,6 +11,8 @@ export function hasDeepSeekApiKey(): boolean {
   return deepSeekApiKeyStore.has()
 }
 
+export const getDeepSeekApiKeyProtection = deepSeekApiKeyStore.protection
+
 export function saveDeepSeekApiKey(key: string): void {
   deepSeekApiKeyStore.save(key)
 }
