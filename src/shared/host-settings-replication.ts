@@ -15,7 +15,23 @@ import type { SecretAtRestProtection } from './secret-at-rest-protection'
 
 export const HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY = 'host.settings.replicate.v1' as const
 
+/** The method a paired main applies a payload with, and the one it reads sync state from. */
+export const HOST_SETTINGS_APPLY_METHOD = 'hostSettings.applyReplication'
+export const HOST_SETTINGS_STATE_METHOD = 'hostSettings.replicationState'
+
 export const HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION = 1
+
+/**
+ * What the host answers an apply with.
+ *
+ * Why in the shared contract rather than beside the host's handler: the main has to interpret this to
+ * decide whether to record a holding or retry with a snapshot, and importing the host module for the
+ * type would drag the credential registry — and Electron — into the client side of the wire.
+ */
+export type HostSettingsReplicationApplyResult =
+  | { decision: 'applied'; report: HostSettingsApplyReport; state: HostSettingsSyncState }
+  | { decision: 'needsSnapshot'; reason: 'revisionGap' | 'unknownBase' }
+  | { decision: 'unsupportedVersion' }
 
 /** A credential the main wants a paired host to hold, in the form its adapter owns. */
 export type ReplicatedHostCredential = {

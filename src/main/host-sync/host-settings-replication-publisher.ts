@@ -27,6 +27,8 @@ export type HostSettingsReplicationSendResult =
   | { kind: 'applied'; report: HostSettingsApplyReport; state: HostSettingsSyncState }
   | { kind: 'needsSnapshot'; reason: 'revisionGap' | 'unknownBase' }
   | { kind: 'unsupportedVersion' }
+  /** This host predates the method, or its caller may not use it. Learned once per connection. */
+  | { kind: 'unsupportedMethod' }
   | { kind: 'unreachable'; detail: string }
 
 export type HostSettingsReplicationTransport = {
@@ -40,7 +42,7 @@ export type HostSettingsReplicationPublishOutcome =
   | { kind: 'synced'; revision: number; state: HostSettingsSyncState }
   /** The host took some of it and refused the rest; the report names what and why. */
   | { kind: 'partial'; revision: number; report: HostSettingsApplyReport }
-  | { kind: 'refused'; reason: 'unsupportedVersion' | 'needsSnapshot' }
+  | { kind: 'refused'; reason: 'unsupportedVersion' | 'needsSnapshot' | 'unsupportedMethod' }
   | { kind: 'unreachable'; detail: string }
 
 /** Per host: the revision it last applied, and the credential ids that payload carried. */
@@ -129,7 +131,11 @@ export function createHostSettingsReplicationPublisher(input: {
       if (result.kind === 'unreachable') {
         return { kind: 'unreachable', detail: result.detail }
       }
-      if (result.kind === 'unsupportedVersion' || result.kind === 'needsSnapshot') {
+      if (
+        result.kind === 'unsupportedVersion' ||
+        result.kind === 'needsSnapshot' ||
+        result.kind === 'unsupportedMethod'
+      ) {
         return { kind: 'refused', reason: result.kind }
       }
       recordOutcome(environmentId, payload, result.report)

@@ -1,6 +1,6 @@
 import {
   HOST_SETTINGS_REPLICATION_PAYLOAD_VERSION,
-  type HostSettingsApplyReport,
+  type HostSettingsReplicationApplyResult,
   type HostSettingsReplicationPayload,
   type HostSettingsSyncState
 } from '../../shared/host-settings-replication'
@@ -19,10 +19,7 @@ import {
  * whose staleness is harder to reason about than its absence.
  */
 
-export type HostSettingsReplicationApplyResult =
-  | { decision: 'applied'; report: HostSettingsApplyReport; state: HostSettingsSyncState }
-  | { decision: 'needsSnapshot'; reason: 'revisionGap' | 'unknownBase' }
-  | { decision: 'unsupportedVersion' }
+export type { HostSettingsReplicationApplyResult }
 
 let hostRevision: number | null = null
 
