@@ -6,6 +6,32 @@ import type { PiAgentKind } from '../../shared/pi-agent-kind'
 // Pi replaces the registration for /new, resume and fork, and again for /reload, which keeps the session.
 function getPiSessionShutdownHandlerSourceLines(): string[] {
   return [
+    // Why: a registration's own cleanup cannot sit behind the ownership fence — a child
+    // registration is refused the pane's status handlers, and refusing it here would leave its bus
+    // armed and its runs in the holding map, which the pane then holds on forever. Nothing in this
+    // handler reads or writes pane state: it closes exactly what this registration armed.
+    "  pi.on('session_shutdown', (event) => {",
+    '    const reason = (event as { reason?: unknown } | null)?.reason',
+    '    const target = (event as { targetSessionFile?: unknown } | null)?.targetSessionFile',
+    // Why: /reload and a resume of the file already open keep the session, and its children still report to it.
+    "    const keepsSession = reason === 'reload' || (reason === 'resume' && typeof target === 'string' && target === sessionMetadata.session_file)",
+    // Why: the registration that bound the old bus can still be called while Pi replaces it, so it
+    // is refused from here on — and ONLY it. Another registration keeps its own, so no session’s
+    // shutdown can silence another session’s bus.
+    '    piAsyncSubagentRegistration.closed = true',
+    // Why: close exactly the callbacks THIS registration armed. A superseded registration owns no
+    // binding (the run now live on that bus took it over), so its shutdown leaves that bus reporting.
+    '    piAsyncSubagentCloseBus(piAsyncSubagentRegistration)',
+    // Why: on a reload or same-file resume this registration stops being called while its session
+    // keeps running, so a child it reported before naming that session belongs to the kept one.
+    // Otherwise its un-attributed children go with it: holding them would pin a pane nothing can clear.
+    '    if (keepsSession) {',
+    "      piAsyncSubagentAdoptHeldRuns(piAsyncSubagentRegistration, typeof sessionMetadata.session_file === 'string' ? sessionMetadata.session_file : null)",
+    '    } else {',
+    '      piAsyncSubagentDropHeldRuns(piAsyncSubagentRegistration)',
+    '    }',
+    '  })',
+    '',
     "  onStatus('session_shutdown', (event) => {",
     '    clearPendingAgentEndCheck()',
     '    if (isOmpRuntime()) {',
@@ -23,31 +49,15 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     // LOCAL(nplez1): Pi hands the factory it re-runs after this a FRESH `pi.events` for every
     // reload, resume and fork, so the next registration has to be allowed to arm that bus. Only
     // upstream's roster keys off the evaluation and is reset here; this lane's binding is keyed by
-    // the bus it armed, and is closed below with the registration that armed it. Children are not
-    // reset either, since they are keyed by the session that owns them.
+    // the bus it armed, and is closed with the registration that armed it (see the handler above).
     '    subagentChannelsBound = false',
     '    subagentRunnerExitBound = false',
-    // Why: the registration that bound the old bus can still be called while Pi replaces it, so it
-    // is refused from here on — and ONLY it. Another registration keeps its own, so no session’s
-    // shutdown can silence another session’s bus. Its children are not cleared either: they are
-    // keyed by the session that owns them, so the next session’s posts read its own bucket and this
-    // one keeps its own.
-    '    piAsyncSubagentRegistration.closed = true',
-    // Why: close exactly the callbacks THIS registration armed. A superseded registration owns no
-    // binding (the run now live on that bus took it over), so its shutdown leaves that bus reporting.
-    '    piAsyncSubagentCloseBus(piAsyncSubagentRegistration)',
     // Why: on quit the PTY's exit clears the pane, and a done here would notify on every quit.
     "    if (keepsSession || reason === 'quit') {",
-    // Why: on a reload or same-file resume this registration stops being called while its session
-    // keeps running, so a child it reported before naming that session belongs to the kept one.
-    "      if (keepsSession) piAsyncSubagentAdoptHeldRuns(piAsyncSubagentRegistration, typeof sessionMetadata.session_file === 'string' ? sessionMetadata.session_file : null)",
     // Why: this registration's queue outlives it and would deliver stale posts after the next one's.
     '      resetPostQueue()',
     '      return',
     '    }',
-    // Why: a session that ends without ever naming itself takes its un-attributed children with it;
-    // holding them would pin a pane nothing else can clear.
-    '    piAsyncSubagentDropHeldRuns(piAsyncSubagentRegistration)',
     // Also a Pi too old to give a reason: its children would otherwise hold the pane for good.
     '    closeOutRun(sessionMetadata.session_file)',
     // Why: pi-subagents can still emit here until Pi invalidates this registration.
