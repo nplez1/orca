@@ -6,8 +6,12 @@ import type { WorkspaceSessionState } from '../../shared/workspace-session-state
 import {
   SESSION_FIELDS_COPIED_BY_OWNER_KEY,
   SESSION_FIELDS_PRUNED_BY_OWNER_KEY,
-  WORKSPACE_SESSION_FIELD_DISPOSITION
+  SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY,
+  SESSION_FIELDS_REPLICATED_TO_HOSTS,
+  WORKSPACE_SESSION_FIELD_DISPOSITION,
+  WORKSPACE_SESSION_HOST_SYNC_DISPOSITION
 } from './profile-project-session-field-disposition'
+import type { SessionFieldHostSyncDisposition } from './profile-project-session-field-disposition'
 import { removeRepoFromWorkspaceSession } from './profile-project-session-state'
 import { extractSessionForTransfer } from './profile-project-session-transfer'
 
@@ -285,5 +289,54 @@ describe('workspace session field disposition census', () => {
     )
 
     expect(unclassified).toEqual([])
+  })
+})
+
+describe('workspace session host-sync disposition census', () => {
+  // Why the explicit return type: the table has no `replicated` member today, so indexing it
+  // directly narrows the union and the membership checks below stop compiling.
+  const dispositionOf = (field: keyof WorkspaceSessionState): SessionFieldHostSyncDisposition =>
+    WORKSPACE_SESSION_HOST_SYNC_DISPOSITION[field]
+
+  const fieldsWith = (wanted: SessionFieldHostSyncDisposition): (keyof WorkspaceSessionState)[] =>
+    (
+      Object.keys(WORKSPACE_SESSION_HOST_SYNC_DISPOSITION) as (keyof WorkspaceSessionState)[]
+    ).filter((field) => dispositionOf(field) === wanted)
+
+  // Why the direction that matters: a field added to the session state and classified for profile
+  // operations but forgotten here is the bug this axis exists to make impossible. A field the host
+  // sync table invents is already a compile error, so only this walk needs a runtime test.
+  it('gives every field a host-sync disposition, so an unknown key fails here', () => {
+    const unclassified = (
+      Object.keys(WORKSPACE_SESSION_FIELD_DISPOSITION) as (keyof WorkspaceSessionState)[]
+    ).filter((field) => !(field in WORKSPACE_SESSION_HOST_SYNC_DISPOSITION))
+
+    expect(unclassified).toEqual([])
+  })
+
+  it('holds exactly the same fields as the profile-operation table', () => {
+    expect(Object.keys(WORKSPACE_SESSION_HOST_SYNC_DISPOSITION).sort()).toEqual(
+      Object.keys(WORKSPACE_SESSION_FIELD_DISPOSITION).sort()
+    )
+  })
+
+  it('partitions the fields between host-local and replicated', () => {
+    const total =
+      fieldsWith('replicated').length +
+      fieldsWith('replicatedOnlyIfEmpty').length +
+      fieldsWith('hostLocal').length
+
+    expect(total).toBe(Object.keys(WORKSPACE_SESSION_HOST_SYNC_DISPOSITION).length)
+  })
+
+  // Why spelled out rather than derived: the tests above iterate these lists, so a field quietly
+  // reclassified keeps its list membership consistent and the suite stays green. Replicating
+  // session state now means editing this array, which is a reviewed change.
+  it('replicates nothing but history, and only into a host that has none', () => {
+    expect(SESSION_FIELDS_REPLICATED_TO_HOSTS).toEqual([])
+    expect(SESSION_FIELDS_REPLICATED_ONLY_IF_EMPTY).toEqual([
+      'browserUrlHistory',
+      'workspaceDocHistory'
+    ])
   })
 })
