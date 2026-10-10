@@ -207,6 +207,14 @@ This fork ships as **Orca NP** — its own bundle id, data directory, home direc
 [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) § `local(identity)`). Launch and point at **Orca NP**, never
 the upstream `Orca` app. If a path or launcher looks like upstream's, stop and check.
 
+## Host settings replication
+
+One machine is authoritative for settings and provider credentials and replicates them to its
+subordinate paired hosts. The design, the field-disposition contract, and the open questions are in
+[`docs/reference/host-settings-replication.md`](./docs/reference/host-settings-replication.md) —
+read it before changing how a host resolves a setting, a provider credential, or the fork's own home
+directory.
+
 ## Project skills
 
 This repo's agent skills are tracked by the `local(skills)` patch at
