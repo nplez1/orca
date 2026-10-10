@@ -63,7 +63,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     path: ['project', 'setup-create'],
     summary: 'Create independent project host setup metadata',
     usage:
-      'orca project setup-create --project <id> --host <host-id> [--setup-id <id>] [--path <path>] [--kind git|folder] [--display-name <name>] [--worktree-base-path <path>] [--git-username <name>] [--state ready|not-set-up|setting-up|error|unsupported] [--method imported-existing-folder|cloned|provisioned] [--json]',
+      'orca project setup-create --project <id> --host <host-id> [--setup-id <id>] [--path <path>] [--kind git|folder] [--display-name <name>] [--worktree-base-path <path>] [--worktree-layout flat|repo-nested|project-folder] [--git-username <name>] [--state ready|not-set-up|setting-up|error|unsupported] [--method imported-existing-folder|cloned|provisioned] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'project',
@@ -73,6 +73,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'kind',
       'display-name',
       'worktree-base-path',
+      'worktree-layout',
       'git-username',
       'state',
       'method'
@@ -80,7 +81,8 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Creates setup metadata without registering a repo compatibility record.',
       '--host runtime:<environment-id> targets that paired Orca server; use the id from `orca environment list`, not the environment name.',
-      'Use setup-existing-folder when Orca should import and manage an actual checkout path now.'
+      'Use setup-existing-folder when Orca should import and manage an actual checkout path now.',
+      '--worktree-layout is a host-wide setting, not part of the setup record: it applies to every project on that host.'
     ],
     examples: [
       'orca project setup-create --project github:stablyai/orca --host runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3 --state setting-up --method provisioned --json'
@@ -90,13 +92,14 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     path: ['project', 'setup-update'],
     summary: 'Update project host setup metadata',
     usage:
-      'orca project setup-update --setup <setup-id> [--display-name <name>] [--path <path>] [--worktree-base-path <path>] [--git-username <name>] [--kind git|folder] [--state ready|not-set-up|setting-up|error|unsupported] [--method legacy-repo|imported-existing-folder|cloned|provisioned] [--json]',
+      'orca project setup-update --setup <setup-id> [--display-name <name>] [--path <path>] [--worktree-base-path <path>] [--worktree-layout flat|repo-nested|project-folder] [--git-username <name>] [--kind git|folder] [--state ready|not-set-up|setting-up|error|unsupported] [--method legacy-repo|imported-existing-folder|cloned|provisioned] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'setup',
       'display-name',
       'path',
       'worktree-base-path',
+      'worktree-layout',
       'git-username',
       'kind',
       'state',
@@ -104,7 +107,8 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       'Repo-backed setups mirror safe fields onto the repo record.',
-      'Path and availability state changes are only supported for independent setup records.'
+      'Path and availability state changes are only supported for independent setup records.',
+      '--worktree-layout is a host-wide setting, not part of the setup record: it applies to every project on that host.'
     ],
     examples: [
       'orca project setup-update --setup github:stablyai/orca::gpu --display-name "GPU VM"',

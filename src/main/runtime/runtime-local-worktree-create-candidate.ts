@@ -1,4 +1,5 @@
 import type { Repo } from '../../shared/repo-types'
+import type { WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import { WorktreeCreateCollisionError } from '../../shared/new-workspace/worktree-create-collision'
 import type { CreateWorktreeArgs } from '../../shared/worktree/create-types'
 import type { getPRForBranch } from '../github/client'
@@ -49,7 +50,11 @@ export type RuntimeLocalWorktreeCreateCandidate = {
 export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
   request: RuntimeManagedWorktreeCreateArgs
   repo: Repo
-  settings: ReturnType<typeof getWorktreePathSettings> & {
+  /** Branch naming plus the placement keys the retired-name registry probes with. */
+  settings: {
+    nestWorkspaces: boolean
+    workspaceDir: string
+    worktreeLayoutMode?: WorktreeLayoutMode
     branchPrefix: string
     branchPrefixCustom?: string
   }

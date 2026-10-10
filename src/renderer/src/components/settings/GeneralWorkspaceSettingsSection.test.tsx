@@ -62,6 +62,56 @@ function getSegment(label: string, visibility: 'show' | 'hide' = 'show'): HTMLBu
   return control
 }
 
+function getLayoutOption(label: string): HTMLButtonElement | null {
+  const group = container.querySelector('[role="radiogroup"][aria-label="Workspace Layout"]')
+  if (!group) {
+    return null
+  }
+  const options = [...group.querySelectorAll('button')].filter(
+    (button): button is HTMLButtonElement => button instanceof HTMLButtonElement
+  )
+  return options.find((button) => button.textContent === label) ?? null
+}
+
+describe('GeneralWorkspaceSettingsSection layout control', () => {
+  it('starts on the project-folder option every install now defaults to', () => {
+    renderSection(vi.fn())
+
+    expect(getLayoutOption('One folder per project')?.getAttribute('aria-checked')).toBe('true')
+    expect(getLayoutOption('Flat')?.getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('writes the mode and the legacy boolean when the shape changes', async () => {
+    const updateSettings = vi.fn()
+    renderSection(updateSettings)
+
+    await act(async () => {
+      getLayoutOption('Flat')?.click()
+    })
+
+    // Why the boolean as well: an older reader of these settings only understands it, so leaving
+    // it stale would let the same host place worktrees two different ways.
+    expect(updateSettings).toHaveBeenCalledWith({
+      worktreeLayoutMode: 'flat',
+      nestWorkspaces: false
+    })
+  })
+
+  it('writes a still-nesting mode as a true boolean', async () => {
+    const updateSettings = vi.fn()
+    renderSection(updateSettings)
+
+    await act(async () => {
+      getLayoutOption('Nest Workspaces')?.click()
+    })
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      worktreeLayoutMode: 'repo-nested',
+      nestWorkspaces: true
+    })
+  })
+})
+
 describe('GeneralWorkspaceSettingsSection external visibility', () => {
   it('exposes a stable deep-link target for global defaults', () => {
     renderSection(vi.fn())

@@ -1,4 +1,5 @@
 import type { GlobalSettings, OrcaWorkspaceLayout } from '../../../shared/global-settings-types'
+import { resolveWorktreeLayoutMode } from '../../../shared/orca-workspace-layout'
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import {
   legacyTerminalScrollbackBytesToRows,
@@ -15,22 +16,34 @@ export function buildWorkspaceDirHistoryForUpdate(
   current: GlobalSettings,
   updates: Partial<GlobalSettings>
 ): OrcaWorkspaceLayout[] | null {
-  if (!('workspaceDir' in updates) && !('nestWorkspaces' in updates)) {
+  if (
+    !('workspaceDir' in updates) &&
+    !('nestWorkspaces' in updates) &&
+    !('worktreeLayoutMode' in updates)
+  ) {
     return null
   }
   const nextPath = updates.workspaceDir ?? current.workspaceDir
   const nextNestWorkspaces = updates.nestWorkspaces ?? current.nestWorkspaces
+  const nextMode = resolveWorktreeLayoutMode({
+    worktreeLayoutMode: updates.worktreeLayoutMode ?? undefined,
+    nestWorkspaces: nextNestWorkspaces
+  })
   if (
     normalizeRuntimePathForComparison(nextPath) ===
       normalizeRuntimePathForComparison(current.workspaceDir) &&
-    nextNestWorkspaces === current.nestWorkspaces
+    nextNestWorkspaces === current.nestWorkspaces &&
+    nextMode === resolveWorktreeLayoutMode(current)
   ) {
     return null
   }
 
-  const previousLayout = {
+  // Why: the previous layout is recorded with the mode it was actually using, so a workspace
+  // created before the switch stays classifiable from history alone.
+  const previousLayout: OrcaWorkspaceLayout = {
     path: current.workspaceDir,
-    nestWorkspaces: current.nestWorkspaces
+    nestWorkspaces: current.nestWorkspaces,
+    worktreeLayoutMode: resolveWorktreeLayoutMode(current)
   }
   const existing = current.workspaceDirHistory ?? []
   const next = [...existing]
@@ -132,7 +145,9 @@ export function migrateTerminalTuiScrollSensitivityDefault(settings: GlobalSetti
 }
 
 export function getWorkspaceLayoutHistoryKey(layout: OrcaWorkspaceLayout): string {
-  return `${normalizeRuntimePathForComparison(layout.path)}:${layout.nestWorkspaces}`
+  // Why the mode and not just the boolean: the same path under two modes is two placements,
+  // and keying on the boolean alone would collapse them into one history entry.
+  return `${normalizeRuntimePathForComparison(layout.path)}:${resolveWorktreeLayoutMode(layout)}`
 }
 
 export function migrateAgentYoloDefaults(

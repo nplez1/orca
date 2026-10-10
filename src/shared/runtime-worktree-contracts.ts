@@ -162,7 +162,11 @@ export type RuntimeWorktreePsConditionalResult =
   | RuntimeWorktreePsSnapshotResult
   | RuntimeWorktreePsUnchangedResult
 
-export type RuntimeRepoList = { repos: Repo[] }
+export type RuntimeRepoList = {
+  repos: Repo[]
+  /** Repos whose checkout is outside its project folder, so a client can say so unprompted. */
+  relocationRequiredRepoIds?: string[]
+}
 
 export type RuntimeRepoSearchRefs = {
   refs: string[]

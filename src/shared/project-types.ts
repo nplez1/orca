@@ -4,6 +4,7 @@ import type { GitRemoteIdentity } from './git-remote-identity'
 import type { LocalWindowsRuntimePreference } from './project-execution-runtime'
 import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { RepoSourceControlAiOverrides } from './source-control-ai-types'
+import type { WorktreeLayoutMode } from './orca-workspace-layout'
 import type { Repo, RepoKind } from './repo-types'
 
 export type ProjectProviderIdentity = {
@@ -84,6 +85,9 @@ export type ProjectHostSetupCreateArgs = {
   kind?: RepoKind
   displayName?: string
   worktreeBasePath?: string
+  /** Host-level placement mode for new workspaces. It rides this call because the CLI has no
+   *  settings command, so project setup is the only placement surface it exposes. */
+  worktreeLayoutMode?: WorktreeLayoutMode
   gitUsername?: string
   setupState?: ProjectHostSetupState
   setupMethod?: Exclude<ProjectHostSetupMethod, 'legacy-repo'>
@@ -111,7 +115,10 @@ export type ProjectHostSetupUpdateArgs = {
       | 'gitUsername'
       | 'kind'
     >
-  >
+  > & {
+    /** Host-level placement mode, applied to the host rather than to this setup record. */
+    worktreeLayoutMode?: WorktreeLayoutMode
+  }
 }
 
 export type ProjectHostSetupDeleteArgs = {

@@ -1,4 +1,5 @@
 import type { RuntimeRepoList, RuntimeRepoSearchRefs } from '../../shared/runtime-types'
+import type { RuntimeRepoRelocationResult } from '../../shared/repo-relocation-contracts'
 import type { CommandHandler } from '../dispatch'
 import { formatRepoList, formatRepoRefs, formatRepoShow, printResult } from '../format'
 import { getOptionalPositiveIntegerFlag, getRequiredStringFlag } from '../flags'
@@ -52,5 +53,42 @@ export const REPO_HANDLERS: Record<string, CommandHandler> = {
       limit: getOptionalPositiveIntegerFlag(flags, 'limit')
     })
     printResult(result, json, formatRepoRefs)
+  },
+  'repo relocate': async ({ flags, client, json }) => {
+    const result = await client.call<RuntimeRepoRelocationResult>('repo.relocate', {
+      repo: getRequiredStringFlag(flags, 'repo'),
+      dryRun: flags.has('dry-run') ? true : undefined
+    })
+    printResult(result, json, formatRepoRelocation)
   }
+}
+
+/** One line per answer a caller can act on: what it decided, or what it refused to do. */
+function formatRepoRelocation(result: RuntimeRepoRelocationResult): string {
+  if (result.decision !== 'ready') {
+    return `Not applicable: ${REPO_RELOCATION_MESSAGES[result.decision]}`
+  }
+  const plan = result.plan
+  if (!plan) {
+    return 'Not applicable.'
+  }
+  if (!result.outcome) {
+    return `Would move ${result.repoId} to ${plan.targetPath}`
+  }
+  if (result.outcome.kind === 'relocated') {
+    return `Moved ${result.outcome.from} to ${result.outcome.to}`
+  }
+  return `Refused: ${REPO_RELOCATION_MESSAGES[result.outcome.kind]}`
+}
+
+const REPO_RELOCATION_MESSAGES: Record<string, string> = {
+  'not-project-folder-layout': 'this host is not using the one-folder-per-project layout',
+  'already-in-container': 'its checkout is already inside its project folder',
+  'remote-host': 'its checkout belongs to another execution host',
+  windows: 'Windows is not supported yet',
+  'not-a-git-repo': 'folder workspaces have no checkout to move',
+  'unknown-default-branch': 'its default branch could not be resolved',
+  'live-sessions': 'a terminal is still attached to one of its workspaces',
+  'target-exists': 'the destination already exists',
+  'cross-volume': 'the destination is on a different volume'
 }

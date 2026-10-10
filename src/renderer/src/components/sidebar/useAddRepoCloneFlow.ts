@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
+import type { WorktreeLayoutMode } from '../../../../shared/orca-workspace-layout'
 import type { Repo } from '../../../../shared/repo-types'
 import { getCloneDestinationAutoFill } from './clone-defaults'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
@@ -18,6 +19,7 @@ export function useAddRepoCloneFlow({
   activeRuntimeEnvironmentId,
   sshTargetId,
   workspaceDir,
+  worktreeLayoutMode,
   fetchWorktrees,
   onGitRepoReady
 }: {
@@ -27,6 +29,8 @@ export function useAddRepoCloneFlow({
   activeRuntimeEnvironmentId: string | null | undefined
   sshTargetId?: string | null
   workspaceDir: string | null | undefined
+  /** Placement mode, so the default destination lands the checkout inside its project folder. */
+  worktreeLayoutMode?: WorktreeLayoutMode
   fetchWorktrees: (
     repoId: string,
     options?: { requireAuthoritative?: boolean; executionHostId?: ExecutionHostId }
@@ -78,6 +82,7 @@ export function useAddRepoCloneFlow({
     activeRuntimeEnvironmentId,
     sshTargetId,
     workspaceDir,
+    layoutMode: worktreeLayoutMode,
     cloneStepAutoFilled: cloneStepAutoFilledRef.current
   })
   if (step !== 'clone') {

@@ -21,7 +21,13 @@ import {
 } from '../../shared/execution-host'
 import { getProjectIdForProviderIdentity } from '../../shared/project-host-setup-projection'
 import { getProjectHostSetupForRepo } from '../../shared/project-host-setup-lookup'
+import {
+  layoutModeNestsWorkspaces,
+  resolveWorktreeLayoutMode,
+  type WorktreeLayoutMode
+} from '../../shared/orca-workspace-layout'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktree-base-directory-watcher'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import type { RuntimeStore } from './runtime-store-contract'
 
@@ -85,7 +91,13 @@ export class RuntimeProjectHostSetupController {
     if (!store?.createProjectHostSetup) {
       throw new Error('runtime_unavailable')
     }
-    const result = store.createProjectHostSetup(args)
+    // Why before the setup write: the mode is a host setting rather than a setup field, so a
+    // rejected settings write should fail the command instead of leaving a created setup whose
+    // requested layout silently did not apply.
+    this.applyWorktreeLayoutMode(args.worktreeLayoutMode)
+    const { worktreeLayoutMode: _mode, ...setupArgs } = args
+    void _mode
+    const result = store.createProjectHostSetup(setupArgs)
     if (!result) {
       throw new Error(`Project not found: ${args.projectId}`)
     }
@@ -131,15 +143,52 @@ export class RuntimeProjectHostSetupController {
     if (!store?.updateProjectHostSetup) {
       throw new Error('runtime_unavailable')
     }
-    const result = store.updateProjectHostSetup(args)
+    this.applyWorktreeLayoutMode(args.updates.worktreeLayoutMode)
+    const { worktreeLayoutMode: _mode, ...updates } = args.updates
+    void _mode
+    const result = store.updateProjectHostSetup({ ...args, updates })
     if (!result) {
       throw new Error(`Project host setup not found: ${args.setupId}`)
     }
-    if ('worktreeBasePath' in args.updates && result.repo) {
+    if ('worktreeBasePath' in updates && result.repo) {
       void prepareLocalWorktreeRootForRepo(store, result.repo)
       invalidateAuthorizedRootsCache()
     }
     return result
+  }
+
+  /**
+   * Write the host-level layout mode these setup calls can carry. Returns whether it changed.
+   *
+   * Why here: the CLI has no settings command, so `orca project setup-create|setup-update` is the
+   * only placement surface it exposes. The value is global — it applies to every project on this
+   * host, not to the setup record being written.
+   */
+  private applyWorktreeLayoutMode(mode: WorktreeLayoutMode | undefined): boolean {
+    if (!mode) {
+      return false
+    }
+    const store = this.deps.getStore()
+    if (!store?.updateSettings || !store.getSettings) {
+      throw new Error('runtime_unavailable')
+    }
+    if (resolveWorktreeLayoutMode(store.getSettings()) === mode) {
+      return false
+    }
+    // Why the boolean too: an older reader of these settings only understands it, so leaving it
+    // stale would make the same host place worktrees two different ways.
+    store.updateSettings(
+      { worktreeLayoutMode: mode, nestWorkspaces: layoutModeNestsWorkspaces(mode) },
+      { notifyListeners: true }
+    )
+    // Why: placement is derived from the mode, so every root and watch target derived from the
+    // previous one is now stale. Mirrors what the Settings pane does for the same change.
+    for (const repo of this.deps.listRepos()) {
+      void prepareLocalWorktreeRootForRepo(store, repo)
+    }
+    scheduleCurrentWorktreeBaseDirectoryWatcherSync()
+    invalidateAuthorizedRootsCache()
+    return true
   }
 
   deleteSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {

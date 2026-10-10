@@ -1,8 +1,17 @@
 import type React from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import {
+  layoutModeNestsWorkspaces,
+  resolveWorktreeLayoutMode,
+  type WorktreeLayoutMode
+} from '../../../../shared/orca-workspace-layout'
 import { OpenInMenuSetting } from './OpenInMenuSetting'
 import { SearchableSetting } from './SearchableSetting'
-import { SettingsSubsectionHeader, SettingsSwitchRow } from './SettingsFormControls'
+import {
+  SettingsSegmentedControl,
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
+} from './SettingsFormControls'
 import { WorkspaceDirectorySetting } from './WorkspaceDirectorySetting'
 import { translate } from '@/i18n/i18n'
 import { GlobalWorktreeVisibilitySourcesSetting } from './GlobalWorktreeVisibilitySourcesSetting'
@@ -78,26 +87,60 @@ export function GeneralWorkspaceSettingsSection({
 
       <SearchableSetting
         title={translate(
-          'auto.components.settings.GeneralWorkspaceSettingsSection.ba3480642f',
-          'Nest Workspaces'
+          'auto.components.settings.GeneralWorkspaceSettingsSection.f9b2070017',
+          'Workspace Layout'
         )}
         description={translate(
-          'auto.components.settings.GeneralWorkspaceSettingsSection.4fbf910ded',
-          'Create workspaces inside a repo-named subfolder.'
+          'auto.components.settings.GeneralWorkspaceSettingsSection.0cda18153c',
+          "Where each project's main checkout and its workspaces are created."
         )}
-        keywords={['nested', 'subfolder', 'directory']}
+        keywords={['nested', 'subfolder', 'directory', 'layout', 'project folder', 'flat']}
       >
-        <SettingsSwitchRow
-          label={translate(
-            'auto.components.settings.GeneralWorkspaceSettingsSection.ba3480642f',
-            'Nest Workspaces'
+        <SettingsSegmentedControl<WorktreeLayoutMode>
+          size="sm"
+          value={resolveWorktreeLayoutMode(settings)}
+          ariaLabel={translate(
+            'auto.components.settings.GeneralWorkspaceSettingsSection.f9b2070017',
+            'Workspace Layout'
           )}
-          description={translate(
-            'auto.components.settings.GeneralWorkspaceSettingsSection.4fbf910ded',
-            'Create workspaces inside a repo-named subfolder.'
-          )}
-          checked={settings.nestWorkspaces}
-          onChange={() => updateSettings({ nestWorkspaces: !settings.nestWorkspaces })}
+          options={[
+            {
+              value: 'project-folder',
+              label: translate(
+                'auto.components.settings.GeneralWorkspaceSettingsSection.b266f3f40e',
+                'One folder per project'
+              )
+            },
+            {
+              // Why the legacy label and description are reused: this is the shape the old
+              // "Nest Workspaces" switch selected, so the phrasing is already translated in
+              // every locale and already familiar to anyone who used that switch.
+              value: 'repo-nested',
+              label: translate(
+                'auto.components.settings.GeneralWorkspaceSettingsSection.ba3480642f',
+                'Nest Workspaces'
+              ),
+              tooltip: translate(
+                'auto.components.settings.GeneralWorkspaceSettingsSection.4fbf910ded',
+                'Create workspaces inside a repo-named subfolder.'
+              )
+            },
+            {
+              value: 'flat',
+              label: translate(
+                'auto.components.settings.GeneralWorkspaceSettingsSection.9285cedcf2',
+                'Flat'
+              )
+            }
+          ]}
+          onChange={(next) => {
+            // Why the boolean too: an older reader of these settings only understands it, so
+            // leaving it stale would let the same host place worktrees two different ways.
+            updateSettings({
+              worktreeLayoutMode: next,
+              nestWorkspaces: layoutModeNestsWorkspaces(next)
+            })
+          }}
         />
       </SearchableSetting>
 

@@ -47,9 +47,9 @@ function makeRepo(index: number, overrides: Partial<Repo> = {}): Repo {
   } as Repo
 }
 
-function makeStore(repos: Repo[]) {
+function makeStore(repos: Repo[], overrides: Partial<GlobalSettings> = {}) {
   return {
-    getSettings: () => settings,
+    getSettings: () => ({ ...settings, ...overrides }),
     getRepos: () => repos
   }
 }
@@ -149,6 +149,20 @@ describe('worktree base directory watch target resolution', () => {
     expect([...([...targets.values()][0]?.repos.keys() ?? [])]).toEqual(
       repos.map((repo) => repo.id)
     )
+  })
+
+  it('watches the per-project container as a flat root under the project-folder layout', async () => {
+    const repo = makeRepo(0)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the resolver reaches the store only through getSettings/getRepos, which makeStore provides.
+    const store = makeStore([repo], { worktreeLayoutMode: 'project-folder' }) as never
+    const targets = await buildWorktreeBaseDirectoryWatchTargets(store)
+
+    const base = [...targets.values()][0]
+    expect([base?.kind, base?.path]).toEqual(['base', join(WORKTREE_ROOT, 'Project-0')])
+    // Why flat rather than nested: the watched root already IS this project's folder, so its
+    // worktrees are its direct children. The nested matcher would look for a further repo-named
+    // level that project-folder placement never creates.
+    expect([...base!.repos.values()][0]?.nestWorkspaces).toBe(false)
   })
 
   it('isolates missing paths to the affected repo', async () => {

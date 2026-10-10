@@ -1,7 +1,10 @@
 import { paneIdentity } from './runtime-terminal-pane-identity'
 import { randomUUID } from 'node:crypto'
 import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-lookup'
-import { resolveWorktreeCreateDisplayNameRequest } from '../ipc/worktree-logic'
+import {
+  getWorktreeCreationLayout,
+  resolveWorktreeCreateDisplayNameRequest
+} from '../ipc/worktree-logic'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import type { CreateWorktreeResult } from '../../shared/worktree/create-types'
 import type { Repo } from '../../shared/repo-types'
@@ -78,10 +81,9 @@ export async function createRuntimeFolderWorktree(args: {
     createdAt: now,
     orcaCreatedAt: now,
     orcaCreationSource: 'runtime',
-    orcaCreationWorkspaceLayout: {
-      path: settings.workspaceDir,
-      nestWorkspaces: settings.nestWorkspaces
-    },
+    // Why the shared helper: hand-building this record dropped the layout mode, leaving a
+    // record whose nestWorkspaces disagrees with the mode it was actually created under.
+    orcaCreationWorkspaceLayout: getWorktreeCreationLayout(repo, settings),
     ...(request.automationProvenance ? { automationProvenance: request.automationProvenance } : {}),
     ...(request.cliProvenance ? { cliProvenance: request.cliProvenance } : {}),
     creatorProvenance: request.creatorProvenance ?? { kind: 'host' },

@@ -1,9 +1,10 @@
 import { posix } from 'node:path'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import { WORKTREE_ID_SEPARATOR } from '../../shared/worktree/id'
-import { computeWorktreePath } from './worktree-logic'
+import { computeWorktreePath, type getWorktreePathSettings } from './worktree-logic'
 
-type WorktreePathSettings = Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDir'>
+/** The resolved placement settings, so a caller cannot drop the container name by passing raw
+ *  global settings — `ReturnType` keeps this in step with `getWorktreePathSettings`. */
+type WorktreePathSettings = ReturnType<typeof getWorktreePathSettings>
 
 export type WorktreeFolderRenamePlan = {
   oldPath: string

@@ -17,7 +17,10 @@ export type SessionSearchScopeCatalog = {
   >[]
   /** Registered workspaces of this host, keyed by worktree id. */
   worktreeMeta: Readonly<Record<string, Pick<WorktreeMeta, 'projectId' | 'priorWorktreeIds'>>>
-  settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'workspaceDirHistory'>
+  settings: Pick<
+    GlobalSettings,
+    'workspaceDir' | 'nestWorkspaces' | 'worktreeLayoutMode' | 'workspaceDirHistory'
+  >
 }
 
 /** Bound to one execution host by whoever installs it: the host that answers. */
