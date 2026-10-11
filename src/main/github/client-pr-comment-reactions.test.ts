@@ -386,6 +386,57 @@ describe('GitHub GraphQL rate-limit guard', () => {
     ])
   })
 
+  it('applies the same keep-rule on the REST fallback, flag or no flag', async () => {
+    const reviews = [
+      {
+        id: 55,
+        user: { login: 'ana', avatar_url: 'https://avatar', type: 'User' },
+        body: '',
+        state: 'CHANGES_REQUESTED',
+        submitted_at: '2026-04-02T00:00:00Z',
+        html_url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-55'
+      },
+      {
+        id: 57,
+        user: { login: 'jo', avatar_url: 'https://avatar', type: 'User' },
+        body: '',
+        state: 'COMMENTED',
+        submitted_at: '2026-04-02T00:00:01Z',
+        html_url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-57'
+      },
+      {
+        id: 58,
+        user: { login: 'mo', avatar_url: 'https://avatar', type: 'User' },
+        body: '',
+        state: 'SOMETHING_ELSE',
+        submitted_at: '2026-04-02T00:00:02Z',
+        html_url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-58'
+      }
+    ]
+    const arrange = (): void => {
+      rateLimitGuardMock.mockImplementation(((bucket: string) =>
+        bucket === 'graphql'
+          ? { blocked: true, remaining: 4, limit: 5000, resetAt: 1_800_000_000 }
+          : { blocked: false }) as () => RateLimitGuardResult)
+      getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+      ghExecFileAsyncMock
+        .mockResolvedValueOnce({ stdout: '[]' })
+        .mockResolvedValueOnce({ stdout: JSON.stringify(reviews) })
+    }
+
+    arrange()
+    // The bodyless decision is the only entry a verdict renderer needs; the bodyless neutral
+    // review and the unrecognised state are noise on both sides of the rule.
+    await expect(getPRComments('/repo-root', 7, { includeReviewVerdicts: true })).resolves.toEqual([
+      expect.objectContaining({ id: 55, reviewState: 'CHANGES_REQUESTED' })
+    ])
+
+    ghExecFileAsyncMock.mockReset()
+    rateLimitGuardMock.mockReset()
+    arrange()
+    await expect(getPRComments('/repo-root', 7)).resolves.toEqual([])
+  })
+
   it('adds and removes PR comment reactions through GraphQL', async () => {
     getOwnerRepoMock.mockResolvedValue({ owner: 'acme', repo: 'widgets' })
     ghExecFileAsyncMock.mockResolvedValue({ stdout: '{}', stderr: '' })

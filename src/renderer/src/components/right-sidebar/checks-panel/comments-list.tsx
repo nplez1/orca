@@ -35,7 +35,6 @@ import {
 
 export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
   const {
-    comments,
     commentsLoading,
     reviewKind = 'PR',
     commentsDisabled,
@@ -309,7 +308,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
             onSelect={setCommentFilter}
           />
         )}
-        {comments.length >= 100 && (
+        {listComments.length >= 100 && (
           <div className="mt-1.5 text-[10px] text-muted-foreground">
             {translate(
               'auto.components.right.sidebar.checks.panel.content.751f7c6e5c',

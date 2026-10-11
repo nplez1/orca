@@ -81,6 +81,9 @@ export async function getPRComments(
         ),
         reviewThreadsFetch,
         // Why: review summaries (approve/request-changes/general) live under pulls/{n}/reviews, not issue comments or threads.
+        // Why the known limit: REST paginates oldest-first with no `sort`, so this is the *first*
+        // hundred submissions and a PR with more than that truncates before its newest decision.
+        // REST only runs when GraphQL did not answer; the GraphQL selection reads `last: 100`.
         ghExecFileAsync(
           ['api', ...cacheArgs, `${base}/pulls/${prNumber}/reviews?per_page=100`],
           ghOptions
@@ -139,7 +142,7 @@ export async function getPRComments(
         databaseId: number
         author: { __typename?: string; login: string; avatarUrl: string } | null
         body: string
-        /** Present on `reviews` nodes only — a review submission's verdict, GraphQL-only here. */
+        /** Present on review submissions. GraphQL and REST spell the verdicts the same way. */
         state?: string | null
         createdAt: string
         url: string
@@ -239,8 +242,8 @@ export async function getPRComments(
         }
       }
 
-      // Review summaries (REST) — the fallback when GraphQL did not answer. Empty-body reviews are
-      // kept for the same reason as above; the renderer decides what reads as a comment.
+      // Review summaries (REST) — the fallback when GraphQL did not answer. Same keep-rule as the
+      // GraphQL path, so the two cannot disagree about what counts as a verdict.
       type RESTReview = {
         id: number
         user: { login: string; avatar_url: string; type?: string } | null
