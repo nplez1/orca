@@ -1,14 +1,12 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <a href="https://github.com/nplez1/orca"><img src="../../resources/build/icon.png" alt="Orca NP" width="64" valign="middle" /></a> Orca NP
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub Star 数" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="所有版本的总下载量" /></a>
+  <a href="https://github.com/nplez1/orca"><img src="https://img.shields.io/github/stars/nplez1/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub Star 数" /></a>
+  <a href="https://github.com/nplez1/orca/releases"><img src="https://img.shields.io/github/v/release/nplez1/orca?style=flat&amp;label=release&amp;color=08C" alt="Orca NP 最新版本" /></a>
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="许可证: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="加入 Orca Discord" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="在 X 上关注 Orca" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="支持的平台：macOS、Windows 和 Linux" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows-4493F8?style=flat-square" alt="Orca NP 构建：macOS 与 Windows" />
 </p>
 
 <p align="center">
@@ -16,17 +14,81 @@
 </p>
 
 <p align="center">
+  <strong>🔱 这是 <a href="#这个-fork-有何不同">Orca NP</a> —— <a href="https://github.com/stablyai/orca">stablyai/orca</a> 的一个 fork，拥有自己的特性、修复和发布版本。</strong><br/>
+  <sub>可与官方 Orca 并存安装 · <a href="https://github.com/nplez1/orca/releases/latest">下载最新的 Orca NP 构建</a> · <a href="#这个-fork-有何不同">查看有何不同 ↓</a></sub>
+</p>
+
+<p align="center">
   <strong>面向 100x 构建者的 AI 编排器。</strong><br/>
   并排运行 Codex、Claude Code、OpenCode 或 Pi — 每个都在自己的 worktree 中运行，并在一个地方统一跟踪。
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>下载 Orca</ins></a></h3>
+<h3 align="center"><a href="https://github.com/nplez1/orca/releases/latest"><ins>下载 Orca NP</ins></a></h3>
 
 <p align="center">
   <img src="../assets/readme-hero.jpg" alt="Orca 桌面应用在并行 worktree 中运行智能体，角落里是 Orca 移动 companion 应用" width="960" />
 </p>
 
+## 这个 Fork 有何不同
+
+Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fork 专属的特性与修复。下方的上游特性列表依然适用（此处未发布构建的除外 —— 见[安装](#安装)）；以下是 Orca NP 在其之上新增的内容。完整列表见[已合并的 Pull Request](https://github.com/nplez1/orca/pulls?q=is%3Apr+is%3Amerged)，fork 专属的补丁系列记录在 [`LOCAL-PATCHES.md`](../../LOCAL-PATCHES.md) 中。
+
+### 任务、Issue 与 Jira
+
+- **Jira 看板视图** —— 选择默认看板后，Jira 标签页会显示列、当前冲刺和待办列表，支持在列之间拖动、筛选框和优先级配色。
+- **右侧边栏的关联 Issue** —— 由 Jira、Linear 或 GitHub Issue 创建的工作区会多出一个 Issue 标签页，显示状态、负责人、优先级、标签、描述和“打开”按钮。Jira Issue 还支持取消关联/重新关联、实时 Markdown 评论框，并能正确渲染自托管 Jira（Server/Data Center）的描述。
+- **将工作区关联到 Jira Issue** —— 在其详情对话框中通过 key 或 URL 关联；任务页面会显示已关联工作区的标记，并打开现有工作区，而不是创建重复的工作区。
+
+### Pull Request 评审与 CI
+
+- **行内 GitHub PR 评论** —— 评论显示在编辑器中对应行的下方，支持回复、解决和折叠（仅当你的 checkout 与 PR 的 head 提交一致时显示）。
+- **一眼看清合并就绪状态** —— PR 图标保留 CI 颜色，并为待处理的审批、冲突或阻塞添加一个圆点，原因显示在提示中。支持 GitHub、GitLab、Bitbucket、Azure DevOps 和 Gitea。
+- **Checks 面板中的评审结论** —— 显示带评审者姓名的 Approved / Changes requested，且面板会在 CI 变化时更新，而不必切换标签页。
+- **Jenkins 构建详情** —— 展开 Jenkins 检查即可查看各阶段、正在运行或失败的阶段以及构建信息。
+- **需评审 PR 的管理员合并** —— 如果你的账号可以绕过分支保护，会在一次说明将跳过哪些检查的确认后提供 Merge。
+
+### 智能体
+
+- **会话摘要** —— 在右侧边栏以文字概述一次智能体会话（活动、目标、计划、阻塞项、时间线），并有独立的智能体/模型设置。同样覆盖 Pi、Copilot、OpenCode 和 Cursor 的会话。
+- **更准确的智能体状态** —— 辅助子智能体结束时，Pi 的行不再卡在“Working”，也不会变成“Done”；Copilot CLI 不再为自动批准的提示发出“needs you”；等待你回答的 Grok 子智能体会让其所在行保持等待状态。
+- **一键启动默认智能体** —— 标签栏的 `+` 按钮会启动你的默认智能体；长按或使用箭头可打开完整菜单。
+- **Agent Dashboard 成为页面** —— 在主窗口中打开，支持后退/前进，点击卡片会打开该智能体的工作区。
+- **智能体会话历史** —— “All”现在会列出所有会话，子智能体会话嵌套在其父会话下，开启转录索引后现有转录也可搜索。
+- **支持更多提供商的用量追踪** —— 在状态栏显示 Copilot Enterprise 的 AI 额度预算、DeepSeek 余额和 Fireworks.ai 花费，并提供按提供商关闭的开关，可停止轮询和凭据读取。
+
+### 工作区与布局
+
+- **每个项目一个文件夹** —— 主 checkout 及其所有 worktree 与共享的 `AGENTS.md` 一起放在同一个文件夹中；`orca repo relocate` 会把现有 checkout 移入其中。
+- **跨机器的工作区分组** —— 两台主机上的同一分支合并为一张带主机下拉菜单的卡片。
+- **状态筛选** —— 在侧边栏和 Cmd+J 中隐藏选定的状态，看板仍显示全部。
+- **“Setting up…”指示** —— 在仓库的 setup 脚本运行期间显示，也包括未启动智能体的工作区。
+- **共享目录模式** —— 为 worktree 之间共享的目录选择符号链接、APFS 克隆、复制或跳过。
+- **浮动工作区** —— 拥有独立的主目录、标题栏上的拖动手柄，以及与主标签栏相同的智能体启动控件。
+- **隐藏自动导入的 SSH 主机** —— 从选择器和状态栏中隐藏；隐藏的主机仍会列在设置中。
+- **更快、更诚实的文件筛选** —— Explore 的文件名筛选基于预先构建的索引搜索整个工作区，结果不完整时会明确提示，而不是显示“no files match”。
+- **主机间设置复制** _（基础能力）_ —— 一台机器的设置和提供商凭据可以复制到已配对的主机。
+
+### 可靠性
+
+- 从 Dock 启动打包版应用时，git 钩子和 ssh-agent 认证可以正常工作，因为 git 现在能读取你的 shell 配置文件中的 export。
+- macOS computer use 权限不再分散到两个辅助程序身份上。
+- 在 Copilot CLI 中右键粘贴只会粘贴一次，而不是两次。
+- 可选的“Log UI hangs”诊断会写入包含焦点、睡眠和 CPU 信息的卡顿记录，帮助排查彩虹球。
+
+### 运行方式
+
+- **独立身份** —— Orca NP 使用自己的应用 ID（`com.nplez1.orca`）、数据目录、主目录（`~/.orca-np`）和 CLI（`orca-np`），因此可以与官方 Orca 并存安装和运行，互不共享状态。
+- **独立的发布与更新** —— 构建以 `v<上游版本>-np.<n>` 打标签，应用内更新器跟随[本仓库的发布](https://github.com/nplez1/orca/releases)，而不是上游的。
+- **签名** —— macOS 构建已签名并通过公证；Windows 安装程序未签名，因此安装时 SmartScreen 会警告一次。
+- **无遥测** —— 发布说明称这些构建不发送诊断或使用数据。
+- **全新配置** —— Orca NP 无法读取官方 Orca 安装的仓库、凭据或已配对设备；这种隔离是有意为之，因此请单独将手机与 Orca NP 配对。
+- **跟进上游** —— 定期合并上游 `main`（流程见 [`UPSTREAM-SYNC-RUNBOOK.md`](../../UPSTREAM-SYNC-RUNBOOK.md)），因此该 fork 也会获得上游的特性与修复。
+
+---
+
 ## 特性
+
+下方的特性列表属于上游 Orca；其中的“Docs”链接指向 onorca.dev 上的上游文档，并不涵盖上文的 fork 专属特性。
 
 <table>
 <tr>
@@ -164,7 +226,7 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 - **[丰富仓库预览](https://www.onorca.dev/docs/editing/markdown)** — 在工作区中预览 Markdown、图片、PDF 和仓库文档。
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 当工作流需要真实交互时，让智能体操作桌面应用和可见 UI。
 - **[通知与未读状态](https://www.onorca.dev/docs/notifications)** — 第一时间知道智能体何时完成或需要关注，并可将会话标记为未读，稍后再回来处理。
-- **还有很多很多** — 我们每天发布新功能，这个列表永远跟不上。[更新日志](https://github.com/stablyai/orca/releases)才是真正的功能列表。
+- **还有很多很多** —— 我们每天发布，所以这个列表总是落后。本 fork 真正的特性列表是 [Orca NP 的发布](https://github.com/nplez1/orca/releases)，其继承的部分则见[上游的发布](https://github.com/stablyai/orca/releases)。
 
 ---
 
@@ -211,24 +273,16 @@ VS Code 的编辑器，处处自动保存 — 把文件或图片直接拖入智�
 
 ## 安装
 
-### 桌面端 — macOS、Windows、Linux
+### 桌面端 — macOS、Windows
 
-- **[从 onOrca.dev 下载](https://onorca.dev/download)**
-- 或直接获取安装包：[macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [全部构建](https://github.com/stablyai/orca/releases/latest)
+- **[下载最新的 Orca NP 版本](https://github.com/nplez1/orca/releases/latest)**
+- 或直接获取构建：[macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [全部构建](https://github.com/nplez1/orca/releases)
 
-_也可以通过包管理器安装：_
-
-```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
-```
+Orca NP 可与官方 Orca 并存安装，并通过本仓库的发布自动更新。这个 fork 不发布 Linux 构建，也不提供 Homebrew/AUR 包 —— 在 Linux 上请[从源码构建](../../.github/CONTRIBUTING.md)，或使用[上游 Orca](https://github.com/stablyai/orca/releases/latest)。
 
 ### 移动 Companion 应用 — iOS、Android
 
-与桌面应用配对，用手机监控并指挥你的智能体。
+将 Orca 移动应用与 Orca NP 配对，即可用手机监控和操控你的智能体。这些应用由上游 Orca 发布，可与 Orca NP 配合使用。
 
 - **iOS:** [从 App Store 下载](https://apps.apple.com/us/app/orca-ide/id6766130217)
 - **Android:** [下载 APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk)
@@ -237,15 +291,10 @@ yay -S stably-orca-bin
 
 ## 社区与支持
 
-- **Discord:** 加入 **[Discord](https://discord.gg/fzjDKHxv8Q)** 社区。
-- **Twitter / X:** 关注 **[@orca_build](https://x.com/orca_build)** 获取更新和公告。
-- **微信:** 扫码加入 Orca 社区微信第 11 群。
-
-  <img src="../assets/wechat-qr-group11.jpg" alt="Orca 社区微信第 11 群二维码" width="160" />
-
-- **反馈与想法:** 我们发布很快。缺少什么功能？[提交功能请求](https://github.com/stablyai/orca/issues)。
-- **隐私:** 查看[隐私与遥测文档](https://www.onorca.dev/docs/telemetry)，了解 Orca 收集哪些匿名使用数据以及如何退出。
-- **支持我们:** 给这个仓库点 [Star](https://github.com/stablyai/orca)，关注我们的日常发布。
+- **Orca NP 的 Issue 与想法：** 与本 fork 相关的问题请[提交 Issue](https://github.com/nplez1/orca/issues)。
+- **上游社区：** 本 fork 继承的部分由上游 Orca 的渠道覆盖 —— [Discord](https://discord.gg/fzjDKHxv8Q)、[X 上的 @orca_build](https://x.com/orca_build)，以及在官方 Orca 中同样可复现的 bug 请提交到[上游 Issue](https://github.com/stablyai/orca/issues)。
+- **文档：** [onorca.dev/docs](https://www.onorca.dev/docs) 是上游 Orca 的文档。
+- **支持我们：** 给本仓库点个 [Star](https://github.com/nplez1/orca) 以关注这个 fork，或给[上游](https://github.com/stablyai/orca)点 Star。
 
 ---
 
@@ -253,8 +302,8 @@ yay -S stably-orca-bin
 
 想要贡献代码或在本地运行？请参阅我们的 [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) 指南。
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca 贡献者" />
+<a href="https://github.com/nplez1/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nplez1/orca" alt="Orca 贡献者" />
 </a>
 
 ## 许可证

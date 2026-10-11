@@ -1,14 +1,12 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <a href="https://github.com/nplez1/orca"><img src="../../resources/build/icon.png" alt="Orca NP" width="64" valign="middle" /></a> Orca NP
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub スター数" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="全リリースの合計ダウンロード数" /></a>
+  <a href="https://github.com/nplez1/orca"><img src="https://img.shields.io/github/stars/nplez1/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub スター数" /></a>
+  <a href="https://github.com/nplez1/orca/releases"><img src="https://img.shields.io/github/v/release/nplez1/orca?style=flat&amp;label=release&amp;color=08C" alt="Orca NP の最新リリース" /></a>
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="ライセンス: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Orca の Discord に参加" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="X で Orca をフォロー" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="対応プラットフォーム: macOS、Windows、Linux" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows-4493F8?style=flat-square" alt="Orca NP のビルド: macOS と Windows" />
 </p>
 
 <p align="center">
@@ -16,17 +14,81 @@
 </p>
 
 <p align="center">
+  <strong>🔱 これは <a href="#このフォークの違い">Orca NP</a> です — 独自の機能・修正・リリースを持つ <a href="https://github.com/stablyai/orca">stablyai/orca</a> のフォークです。</strong><br/>
+  <sub>公式の Orca と並べてインストールできます · <a href="https://github.com/nplez1/orca/releases/latest">最新の Orca NP ビルドをダウンロード</a> · <a href="#このフォークの違い">違いを見る ↓</a></sub>
+</p>
+
+<p align="center">
   <strong>100x ビルダーのための AI オーケストレーター。</strong><br/>
   Codex、Claude Code、OpenCode、Pi を並べて実行 — それぞれを専用のワークツリーで動かし、1 か所で追跡できます。
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>Orca をダウンロード</ins></a></h3>
+<h3 align="center"><a href="https://github.com/nplez1/orca/releases/latest"><ins>Orca NP をダウンロード</ins></a></h3>
 
 <p align="center">
   <img src="../assets/readme-hero.jpg" alt="並列ワークツリーでエージェントを実行する Orca デスクトップアプリと、隅に表示された Orca モバイル companion アプリ" width="960" />
 </p>
 
+## このフォークの違い
+
+Orca NP は [stablyai/orca](https://github.com/stablyai/orca) に、フォーク独自の機能と修正を重ねたものです。下記のアップストリームの機能一覧はそのまま使えます（ここでビルドが公開されていないものを除く — [インストール](#インストール)を参照）。以下が Orca NP が追加する内容です。全リストは[マージ済みのプルリクエスト](https://github.com/nplez1/orca/pulls?q=is%3Apr+is%3Amerged)にあり、フォーク独自のパッチ群は [`LOCAL-PATCHES.md`](../../LOCAL-PATCHES.md) に記載されています。
+
+### タスク、Issue、Jira
+
+- **Jira ボードビュー** — 既定のボードを選ぶと、Jira タブに列、アクティブなスプリント、バックログが表示されます。列間のドラッグ移動、フィルター欄、優先度の色分けに対応します。
+- **右サイドバーのリンク済み Issue** — Jira、Linear、GitHub の Issue から作成したワークスペースには、ステータス、担当者、優先度、ラベル、説明、「開く」ボタンを備えた Issue タブが付きます。Jira Issue ではリンク解除／再リンク、ライブ Markdown コメント欄、セルフホスト版 Jira（Server/Data Center）の説明の正しい表示にも対応します。
+- **ワークスペースを Jira Issue にリンク** — 詳細ダイアログからキーまたは URL で指定できます。タスクページには紐づいたワークスペースのチップが表示され、重複して作成せず既存のワークスペースを開きます。
+
+### プルリクエストのレビューと CI
+
+- **インライン GitHub PR コメント** — コメントはエディタ内の該当行の下に表示され、返信・解決・折りたたみができます（チェックアウトが PR の head コミットと一致する場合のみ表示）。
+- **マージ可否をひと目で** — PR アイコンは CI の色を保ったまま、未完了の承認・コンフリクト・ブロックがあるとドットが付き、理由はツールチップに表示されます。GitHub、GitLab、Bitbucket、Azure DevOps、Gitea で動作します。
+- **Checks パネルにレビュー結果** — レビュアー名付きで Approved / Changes requested を表示し、タブを切り替えなくても CI の変化に合わせてパネルが更新されます。
+- **Jenkins ビルドの詳細** — Jenkins のチェックを展開すると、各ステージ、実行中または失敗したステージ、ビルド情報を確認できます。
+- **レビュー必須 PR の管理者マージ** — アカウントがブランチ保護をバイパスできる場合、スキップされる内容を示す確認の後に Merge が表示されます。
+
+### エージェント
+
+- **セッション要約** — エージェントのセッションを文章にまとめたブリーフ（アクティビティ、目標、計画、ブロッカー、タイムライン）を右サイドバーに表示し、専用のエージェント／モデル設定を持ちます。Pi、Copilot、OpenCode、Cursor のセッションにも対応します。
+- **より正確なエージェント状態** — Pi の行は、補助サブエージェントが終了しても「Working」のままになったり「Done」になったりしません。Copilot CLI は自動承認されたプロンプトで「needs you」を出さなくなりました。あなたの回答を待つ Grok のサブエージェントは、その行を待機中のまま保ちます。
+- **ワンクリックで既定のエージェント** — タブバーの `+` ボタンで既定のエージェントを起動します。長押しするかシェブロンで完全なメニューを開けます。
+- **ページとしての Agent Dashboard** — メインウィンドウで戻る／進む付きで開き、カードをクリックするとそのエージェントのワークスペースが開きます。
+- **エージェントのセッション履歴** — 「All」がすべてのセッションを一覧表示し、サブエージェントのセッションは親の下に入れ子になり、トランスクリプトのインデックス化で既存のトランスクリプトも検索できます。
+- **より多くのプロバイダーで使用量を追跡** — Copilot Enterprise の AI クレジット予算、DeepSeek の残高、Fireworks.ai の支出をステータスバーに表示。プロバイダーごとのオフスイッチでポーリングと認証情報の読み取りを止められます。
+
+### ワークスペースとレイアウト
+
+- **プロジェクトごとに 1 フォルダ** — メインのチェックアウトとすべてのワークツリーを、共有の `AGENTS.md` と一緒に 1 つのフォルダにまとめます。`orca repo relocate` で既存のチェックアウトを移動できます。
+- **マシンをまたぐワークスペースのグループ化** — 2 つのホスト上の同じブランチが、ホスト切り替えドロップダウン付きの 1 枚のカードになります。
+- **ステータスフィルター** — 選んだステータスをサイドバーと Cmd+J から隠せます。ボードは引き続きすべてを表示します。
+- **「Setting up…」インジケーター** — リポジトリのセットアップスクリプト実行中に表示されます。エージェントなしで開始したワークスペースも対象です。
+- **共有ディレクトリのモード** — ワークツリー間で共有するディレクトリを、シンボリックリンク、APFS クローン、コピー、スキップから選べます。
+- **フローティングワークスペース** — 専用のホームフォルダ、タイトルバーのドラッグハンドル、メインのタブバーと同じエージェント起動コントロールを備えます。
+- **自動インポートされた SSH ホストを非表示に** — ピッカーとステータスバーから隠せます。非表示のホストは設定に残ります。
+- **より速く正直なファイルフィルター** — Explore のファイル名フィルターは、構築済みのインデックスからワークスペース全体を検索し、結果が部分的なときは「no files match」ではなくその旨を表示します。
+- **ホスト間の設定レプリケーション** _(基盤のみ)_ — 1 台のマシンの設定とプロバイダーの認証情報を、ペアリング済みのホストにレプリケートできます。
+
+### 信頼性
+
+- パッケージ版アプリを Dock から起動しても、git がシェルプロファイルの export を参照するため、git フックと ssh-agent 認証が動作します。
+- macOS の computer use の権限が、2 つのヘルパー ID に分裂しなくなりました。
+- Copilot CLI への右クリック貼り付けが 2 回ではなく 1 回だけ貼り付けられます。
+- オプトインの「Log UI hangs」診断は、フォーカス、スリープ、CPU の情報付きでフリーズの記録を書き出し、ビーチボールの原因調査に役立ちます。
+
+### 実行について
+
+- **独自のアイデンティティ** — Orca NP は独自のアプリ ID（`com.nplez1.orca`）、データディレクトリ、ホームディレクトリ（`~/.orca-np`）、CLI（`orca-np`）を使うため、公式の Orca と状態を共有せずに並べてインストール・実行できます。
+- **独自のリリースとアップデート** — ビルドは `v<アップストリームのバージョン>-np.<n>` のタグが付き、アプリ内アップデーターはアップストリームではなく[このリポジトリのリリース](https://github.com/nplez1/orca/releases)を参照します。
+- **署名** — macOS ビルドは署名・公証済みです。Windows のインストーラーは未署名のため、インストール時に SmartScreen が 1 回警告します。
+- **テレメトリーなし** — リリースノートによると、ビルドは診断データも利用データも送信しません。
+- **新しいプロファイル** — Orca NP は、公式 Orca のインストールのリポジトリ、認証情報、ペアリング済みデバイスを読み取れません。この分離は意図的なものなので、スマートフォンは Orca NP と別途ペアリングしてください。
+- **アップストリームに追従** — アップストリームの `main` を定期的にマージしています（手順は [`UPSTREAM-SYNC-RUNBOOK.md`](../../UPSTREAM-SYNC-RUNBOOK.md)）。そのためフォークもアップストリームの機能と修正を受け取れます。
+
+---
+
 ## 機能
+
+以下の機能一覧はアップストリームの Orca のものです。「Docs」リンクは onorca.dev にあるアップストリームのドキュメントへ移動し、上記のフォーク独自機能は扱っていません。
 
 <table>
 <tr>
@@ -164,7 +226,7 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 - **[リッチなリポジトリプレビュー](https://www.onorca.dev/docs/editing/markdown)** — Markdown、画像、PDF、リポジトリ文書をワークスペース内でプレビューできます。
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 実際の操作が必要なワークフローでは、エージェントにデスクトップアプリや画面上の UI を操作させられます。
 - **[通知と未読ステータス](https://www.onorca.dev/docs/notifications)** — エージェントの完了や要対応をすぐに把握し、スレッドを未読に戻して後で確認できます。
-- **その他、まだまだたくさん** — 毎日リリースしているので、このリストは常に追いついていません。本当の機能一覧は[チェンジログ](https://github.com/stablyai/orca/releases)です。
+- **その他、まだまだたくさん** — 毎日リリースしているので、このリストは常に追いついていません。このフォークの本当の機能一覧は [Orca NP のリリース](https://github.com/nplez1/orca/releases)、継承している部分は[アップストリームのリリース](https://github.com/stablyai/orca/releases)です。
 
 ---
 
@@ -211,24 +273,16 @@ PR、Issue、プロジェクトボードをアプリ内で閲覧 — 任意の�
 
 ## インストール
 
-### デスクトップ — macOS, Windows, Linux
+### デスクトップ — macOS, Windows
 
-- **[onOrca.dev からダウンロード](https://onorca.dev/download)**
-- またはビルドを直接入手: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [すべてのビルド](https://github.com/stablyai/orca/releases/latest)
+- **[最新の Orca NP リリースをダウンロード](https://github.com/nplez1/orca/releases/latest)**
+- またはビルドを直接入手: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [すべてのビルド](https://github.com/nplez1/orca/releases)
 
-_パッケージマネージャーからもインストールできます:_
-
-```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
-```
+Orca NP は公式の Orca と並べてインストールでき、このリポジトリのリリースから自動更新されます。このフォークは Linux ビルドも Homebrew/AUR パッケージも公開していません。Linux では[ソースからビルド](../../.github/CONTRIBUTING.md)するか、[アップストリームの Orca](https://github.com/stablyai/orca/releases/latest) を使ってください。
 
 ### モバイル Companion — iOS, Android
 
-デスクトップアプリとペアリングして、スマートフォンからエージェントを監視・操作できます。
+Orca のモバイルアプリを Orca NP とペアリングして、スマートフォンからエージェントを監視・操作できます。アプリはアップストリームの Orca が公開しており、Orca NP でも動作します。
 
 - **iOS:** [App Store からダウンロード](https://apps.apple.com/us/app/orca-ide/id6766130217)
 - **Android:** [APK をダウンロード](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk)
@@ -237,11 +291,10 @@ yay -S stably-orca-bin
 
 ## コミュニティとサポート
 
-- **Discord:** **[Discord](https://discord.gg/fzjDKHxv8Q)** のコミュニティに参加してください。
-- **Twitter / X:** アップデートやお知らせは **[@orca_build](https://x.com/orca_build)** をフォローしてください。
-- **フィードバックとアイデア:** 私たちは高速にリリースしています。足りない機能がありますか？[機能リクエストを送信](https://github.com/stablyai/orca/issues)してください。
-- **プライバシー:** Orca が収集する匿名の利用データとオプトアウトの方法については、[プライバシーとテレメトリーのドキュメント](https://www.onorca.dev/docs/telemetry)をご覧ください。
-- **応援する:** 毎日のリリースを追うために、このリポジトリに[スター](https://github.com/stablyai/orca)を付けてください。
+- **Orca NP の Issue とアイデア:** このフォーク固有の件は [Issue を作成](https://github.com/nplez1/orca/issues)してください。
+- **アップストリームのコミュニティ:** このフォークが継承する部分は、アップストリーム Orca のチャンネルが対象です — [Discord](https://discord.gg/fzjDKHxv8Q)、[X の @orca_build](https://x.com/orca_build)、公式 Orca でも再現するバグは[アップストリームの Issue](https://github.com/stablyai/orca/issues) へ。
+- **ドキュメント:** [onorca.dev/docs](https://www.onorca.dev/docs) はアップストリームの Orca のドキュメントです。
+- **応援する:** このフォークを追うにはこのリポジトリに[スター](https://github.com/nplez1/orca)を、または[アップストリーム](https://github.com/stablyai/orca)に付けてください。
 
 ---
 
@@ -249,8 +302,8 @@ yay -S stably-orca-bin
 
 貢献したい、またはローカルで実行したいですか？ [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) ガイドをご覧ください。
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca のコントリビューター" />
+<a href="https://github.com/nplez1/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nplez1/orca" alt="Orca のコントリビューター" />
 </a>
 
 ## ライセンス

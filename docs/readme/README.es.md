@@ -1,14 +1,12 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <a href="https://github.com/nplez1/orca"><img src="../../resources/build/icon.png" alt="Orca NP" width="64" valign="middle" /></a> Orca NP
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="Estrellas en GitHub" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="Descargas totales en todas las versiones" /></a>
+  <a href="https://github.com/nplez1/orca"><img src="https://img.shields.io/github/stars/nplez1/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="Estrellas en GitHub" /></a>
+  <a href="https://github.com/nplez1/orca/releases"><img src="https://img.shields.io/github/v/release/nplez1/orca?style=flat&amp;label=release&amp;color=08C" alt="Última versión de Orca NP" /></a>
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="Licencia: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Únete al Discord de Orca" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="Sigue a Orca en X" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Plataformas compatibles: macOS, Windows y Linux" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows-4493F8?style=flat-square" alt="Builds de Orca NP: macOS y Windows" />
 </p>
 
 <p align="center">
@@ -16,17 +14,81 @@
 </p>
 
 <p align="center">
+  <strong>🔱 Este es <a href="#qué-hay-de-distinto-en-este-fork">Orca NP</a>: un fork de <a href="https://github.com/stablyai/orca">stablyai/orca</a> con sus propias funciones, correcciones y versiones.</strong><br/>
+  <sub>Se instala junto al Orca oficial · <a href="https://github.com/nplez1/orca/releases/latest">Descarga la última build de Orca NP</a> · <a href="#qué-hay-de-distinto-en-este-fork">Mira qué es diferente ↓</a></sub>
+</p>
+
+<p align="center">
   <strong>El orquestador de IA para desarrolladores 100x.</strong><br/>
   Ejecuta Codex, Claude Code, OpenCode u Pi en paralelo — cada uno en su propio worktree, supervisados desde un solo lugar.
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>Descargar Orca</ins></a></h3>
+<h3 align="center"><a href="https://github.com/nplez1/orca/releases/latest"><ins>Descargar Orca NP</ins></a></h3>
 
 <p align="center">
   <img src="../assets/readme-hero.jpg" alt="La app de escritorio de Orca ejecutando agentes en worktrees paralelos, con la app companion móvil de Orca en la esquina" width="960" />
 </p>
 
+## Qué hay de distinto en este fork
+
+Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de funciones y correcciones exclusivas del fork. La lista de funciones de upstream de más abajo sigue vigente (salvo donde aquí no se publica una build; consulta [Instalación](#instalación)); esto es lo que Orca NP añade encima. La lista completa está en los [pull requests fusionados](https://github.com/nplez1/orca/pulls?q=is%3Apr+is%3Amerged), y la serie de parches exclusivos del fork está documentada en [`LOCAL-PATCHES.md`](../../LOCAL-PATCHES.md).
+
+### Tareas, issues y Jira
+
+- **Vista de tablero de Jira** — elige un tablero predeterminado y la pestaña de Jira muestra columnas, el sprint activo y el backlog, con arrastrar y soltar entre columnas, un cuadro de filtro y colores por prioridad.
+- **Issue vinculado en la barra lateral derecha** — un workspace creado desde un issue de Jira, Linear o GitHub recibe una pestaña Issue con estado, responsable, prioridad, etiquetas, descripción y un botón Abrir. Los issues de Jira también permiten desvincular/revincular, tienen un cuadro de comentarios en Markdown en vivo y muestran correctamente las descripciones de Jira autoalojado (Server/Data Center).
+- **Vincula un workspace a un issue de Jira** con la clave o la URL desde su diálogo de detalles; la página de Tareas muestra un chip de workspace asociado y abre el workspace existente en lugar de crear un duplicado.
+
+### Revisión de pull requests y CI
+
+- **Comentarios de PR de GitHub en línea** — los comentarios aparecen bajo su línea en el editor, con responder, resolver y contraer (solo se muestran cuando tu checkout coincide con el commit head del PR).
+- **Estado de fusión de un vistazo** — el icono del PR conserva el color de CI y añade un punto para aprobaciones pendientes, conflictos o bloqueos, con el motivo en el tooltip. Funciona con GitHub, GitLab, Bitbucket, Azure DevOps y Gitea.
+- **Veredictos de revisión en el panel de Checks** — Aprobado / Cambios solicitados con los nombres de los revisores, y el panel se actualiza cuando cambia la CI en vez de esperar a cambiar de pestaña.
+- **Detalles de builds de Jenkins** — expande un check de Jenkins para ver sus etapas, cuál está en ejecución o ha fallado, y los datos de la build.
+- **Fusión como admin de PRs que requieren revisión** — si tu cuenta puede saltarse la protección de rama, se ofrece Merge tras una confirmación que indica qué se omite.
+
+### Agentes
+
+- **Resúmenes de sesión** — un informe escrito de una sesión de agente (actividad, objetivo, plan, bloqueos, cronología) en la barra lateral derecha, con su propio ajuste de agente/modelo. También cubre sesiones de Pi, Copilot, OpenCode y Cursor.
+- **Estado de agentes más preciso** — las filas de Pi ya no se quedan en «Working» ni pasan a «Done» cuando termina un sub-agente auxiliar; Copilot CLI ya no pide tu atención por prompts autoaprobados; un sub-agente de Grok que espera tu respuesta mantiene su fila en espera.
+- **Agente predeterminado con un clic** — el botón `+` de la barra de pestañas lanza tu agente predeterminado; mantenlo pulsado o usa la flecha para abrir el menú completo.
+- **Agent Dashboard como página** — se abre en la ventana principal con atrás/adelante, y al hacer clic en una tarjeta se abre el workspace de ese agente.
+- **Historial de sesiones de agentes** — «All» ahora lista todas las sesiones, las sesiones de sub-agentes se anidan bajo su sesión padre, y la indexación de transcripciones hace buscables las transcripciones existentes.
+- **Seguimiento de uso para más proveedores** — presupuestos de créditos de IA de Copilot Enterprise, saldo de DeepSeek y gasto de Fireworks.ai en la barra de estado, además de un interruptor por proveedor que detiene el sondeo y la lectura de credenciales.
+
+### Workspaces y organización
+
+- **Una carpeta por proyecto** — el checkout principal y todos sus worktrees viven juntos en una carpeta con un `AGENTS.md` compartido; `orca repo relocate` mueve allí los checkouts existentes.
+- **Workspaces agrupados entre máquinas** — la misma rama en dos hosts se convierte en una sola tarjeta con un menú desplegable de host.
+- **Filtro de estado** — oculta los estados elegidos de la barra lateral y de Cmd+J mientras el tablero sigue mostrándolo todo.
+- **Indicador «Setting up…»** mientras se ejecuta el script de configuración de un repo, también en workspaces iniciados sin agente.
+- **Modos de directorios compartidos** — enlace simbólico, clon APFS, copia u omitir para los directorios compartidos entre worktrees.
+- **Workspace flotante** — una carpeta propia, un asa de arrastre en la barra de título y el mismo control de lanzamiento de agentes que la barra de pestañas principal.
+- **Oculta los hosts SSH importados automáticamente** de los selectores y la barra de estado; los hosts ocultos siguen listados en Ajustes.
+- **Filtro de archivos más rápido y honesto** — el filtro por nombre de Explore busca en todo el workspace desde un índice precalculado, y avisa cuando los resultados son parciales en lugar de decir «no files match».
+- **Replicación de ajustes entre hosts** _(base preparada)_ — los ajustes y las credenciales de proveedores de una máquina pueden replicarse a los hosts emparejados.
+
+### Fiabilidad
+
+- Los hooks de git y la autenticación de ssh-agent funcionan cuando la app empaquetada se abre desde el Dock, porque git ahora ve las variables exportadas de tu perfil de shell.
+- Los permisos de computer use en macOS ya no se dividen entre dos identidades del helper.
+- Pegar con clic derecho en Copilot CLI pega una vez, no dos.
+- Un diagnóstico opcional «Log UI hangs» escribe registros de bloqueos, con contexto de foco, suspensión y CPU, para ayudar a rastrear los beachballs.
+
+### Cómo se ejecuta
+
+- **Identidad propia** — Orca NP usa su propio app id (`com.nplez1.orca`), directorio de datos, directorio home (`~/.orca-np`) y CLI (`orca-np`), así que se instala y se ejecuta junto a un Orca oficial sin compartir estado.
+- **Versiones y actualizaciones propias** — las builds se etiquetan `v<versión de upstream>-np.<n>` y el actualizador integrado sigue las [versiones de este repositorio](https://github.com/nplez1/orca/releases), no las de upstream.
+- **Firma** — las builds de macOS están firmadas y notarizadas; el instalador de Windows no está firmado, así que SmartScreen avisa una vez al instalar.
+- **Sin telemetría** — las notas de la versión indican que las builds no envían diagnósticos ni datos de uso.
+- **Perfil nuevo** — Orca NP no puede leer los repos, credenciales ni dispositivos emparejados de una instalación oficial de Orca; esa separación es deliberada, así que empareja tu teléfono con Orca NP por separado.
+- **Sigue a upstream** — `main` de upstream se fusiona con regularidad (el procedimiento está en [`UPSTREAM-SYNC-RUNBOOK.md`](../../UPSTREAM-SYNC-RUNBOOK.md)), así que el fork también recibe las funciones y correcciones de upstream.
+
+---
+
 ## Características
+
+La lista de funciones de abajo es la de Orca upstream; sus enlaces «Docs» llevan a la documentación de upstream en onorca.dev, que no cubre las funciones exclusivas del fork de arriba.
 
 <table>
 <tr>
@@ -164,7 +226,7 @@ Los agentes también manejan Orca — automatiza cualquier flujo de trabajo con 
 - **[Previews ricos del repo](https://www.onorca.dev/docs/editing/markdown)** — Previsualiza Markdown, imágenes, PDFs y documentos del repo en el workspace.
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — Deja que los agentes manejen apps de escritorio y UI visible cuando un flujo de trabajo necesita interacción real.
 - **[Notificaciones y estado de no leído](https://www.onorca.dev/docs/notifications)** — Entérate cuando un agente termine o necesite tu atención, y marca hilos como no leídos para retomarlos después.
-- **Y muchas, muchas más** — lanzamos a diario, así que esta lista siempre va atrasada. El [changelog](https://github.com/stablyai/orca/releases) es la verdadera lista de funciones.
+- **Y muchas, muchas más** — lanzamos a diario, así que esta lista siempre va atrasada. Las [versiones de Orca NP](https://github.com/nplez1/orca/releases) son la verdadera lista de funciones de este fork, y las [de upstream](https://github.com/stablyai/orca/releases) lo son para todo lo que hereda.
 
 ---
 
@@ -211,24 +273,16 @@ Funciona con **cualquier agente CLI** — si corre en una terminal, corre en Orc
 
 ## Instalación
 
-### Escritorio — macOS, Windows, Linux
+### Escritorio — macOS, Windows
 
-- **[Descarga desde onOrca.dev](https://onorca.dev/download)**
-- O descarga un build directamente: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [Todos los builds](https://github.com/stablyai/orca/releases/latest)
+- **[Descarga la última versión de Orca NP](https://github.com/nplez1/orca/releases/latest)**
+- O descarga un build directamente: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [Todos los builds](https://github.com/nplez1/orca/releases)
 
-_O mediante un gestor de paquetes:_
-
-```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
-```
+Orca NP se instala junto a un Orca oficial y se actualiza desde las versiones de este repositorio. Este fork no publica un build para Linux ni un paquete de Homebrew/AUR: en Linux, [compila desde el código fuente](../../.github/CONTRIBUTING.md) o usa [Orca upstream](https://github.com/stablyai/orca/releases/latest).
 
 ### App companion móvil — iOS, Android
 
-Vincúlala con tu app de escritorio para supervisar y dirigir a tus agentes desde el teléfono.
+Vincula la app móvil de Orca con Orca NP para supervisar y dirigir a tus agentes desde el teléfono. Las apps las publica Orca upstream y funcionan con Orca NP.
 
 - **iOS:** [Descargar desde App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
 - **Android:** [Descargar el APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk)
@@ -237,11 +291,10 @@ Vincúlala con tu app de escritorio para supervisar y dirigir a tus agentes desd
 
 ## Comunidad y soporte
 
-- **Discord:** Únete a la comunidad en **[Discord](https://discord.gg/fzjDKHxv8Q)**.
-- **Twitter / X:** Sigue a **[@orca_build](https://x.com/orca_build)** para novedades y anuncios.
-- **Feedback e ideas:** Lanzamos rápido. ¿Te falta algo? [Pide una nueva feature](https://github.com/stablyai/orca/issues).
-- **Privacidad:** Consulta la [documentación de privacidad y telemetría](https://www.onorca.dev/docs/telemetry) para saber qué datos anónimos de uso recopila Orca y cómo desactivar su envío.
-- **Muéstranos tu apoyo:** Dale una [estrella](https://github.com/stablyai/orca) a este repo para seguir nuestros lanzamientos diarios.
+- **Issues e ideas de Orca NP:** [Abre un issue](https://github.com/nplez1/orca/issues) para cualquier cosa específica de este fork.
+- **Comunidad de upstream:** los canales de Orca upstream cubren todo lo que este fork hereda: [Discord](https://discord.gg/fzjDKHxv8Q), [@orca_build en X](https://x.com/orca_build) y los [issues de upstream](https://github.com/stablyai/orca/issues) para bugs que también se reproducen en el Orca oficial.
+- **Docs:** [onorca.dev/docs](https://www.onorca.dev/docs) documenta Orca upstream.
+- **Muéstranos tu apoyo:** Dale una [estrella](https://github.com/nplez1/orca) a este repo para seguir el fork, o a [upstream](https://github.com/stablyai/orca).
 
 ---
 
@@ -249,8 +302,8 @@ Vincúlala con tu app de escritorio para supervisar y dirigir a tus agentes desd
 
 ¿Quieres contribuir o ejecutar Orca localmente? Consulta nuestra guía [CONTRIBUTING.md](../../.github/CONTRIBUTING.md).
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Contribuidores de Orca" />
+<a href="https://github.com/nplez1/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nplez1/orca" alt="Contribuidores de Orca" />
 </a>
 
 ## Licencia

@@ -1,14 +1,12 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="../../resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <a href="https://github.com/nplez1/orca"><img src="../../resources/build/icon.png" alt="Orca NP" width="64" valign="middle" /></a> Orca NP
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub 스타" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="../assets/readme-downloads.svg" alt="전체 릴리스 누적 다운로드 수" /></a>
+  <a href="https://github.com/nplez1/orca"><img src="https://img.shields.io/github/stars/nplez1/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub 스타" /></a>
+  <a href="https://github.com/nplez1/orca/releases"><img src="https://img.shields.io/github/v/release/nplez1/orca?style=flat&amp;label=release&amp;color=08C" alt="Orca NP 최신 릴리스" /></a>
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="라이선스: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Orca Discord 참여" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="X에서 Orca 팔로우" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="지원 플랫폼: macOS, Windows, Linux" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows-4493F8?style=flat-square" alt="Orca NP 빌드: macOS 및 Windows" />
 </p>
 
 <p align="center">
@@ -16,17 +14,81 @@
 </p>
 
 <p align="center">
+  <strong>🔱 이것은 <a href="#이-포크의-차이점">Orca NP</a>입니다 — 자체 기능, 수정, 릴리스를 갖춘 <a href="https://github.com/stablyai/orca">stablyai/orca</a>의 포크입니다.</strong><br/>
+  <sub>공식 Orca와 나란히 설치됩니다 · <a href="https://github.com/nplez1/orca/releases/latest">최신 Orca NP 빌드 다운로드</a> · <a href="#이-포크의-차이점">달라진 점 보기 ↓</a></sub>
+</p>
+
+<p align="center">
   <strong>100x 빌더를 위한 AI 오케스트레이터.</strong><br/>
   Codex, Claude Code, OpenCode, Pi를 나란히 실행하세요. — 각 에이전트는 자체 worktree에서 실행되고 한곳에서 추적됩니다.
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>Orca 다운로드</ins></a></h3>
+<h3 align="center"><a href="https://github.com/nplez1/orca/releases/latest"><ins>Orca NP 다운로드</ins></a></h3>
 
 <p align="center">
   <img src="../assets/readme-hero.jpg" alt="병렬 worktree에서 에이전트를 실행 중인 Orca 데스크톱 앱과 한쪽 모서리에 보이는 Orca 모바일 companion 앱" width="960" />
 </p>
 
+## 이 포크의 차이점
+
+Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 기능과 수정을 더한 것입니다. 아래 업스트림 기능 목록은 그대로 적용됩니다(여기서 빌드를 배포하지 않는 경우 제외 — [설치](#설치) 참고). 다음은 Orca NP가 그 위에 추가한 내용입니다. 전체 목록은 [병합된 풀 리퀘스트](https://github.com/nplez1/orca/pulls?q=is%3Apr+is%3Amerged)에 있으며, 포크 전용 패치 시리즈는 [`LOCAL-PATCHES.md`](../../LOCAL-PATCHES.md)에 문서화되어 있습니다.
+
+### 작업, 이슈, Jira
+
+- **Jira 보드 뷰** — 기본 보드를 고르면 Jira 탭에 컬럼, 활성 스프린트, 백로그가 표시되며, 컬럼 간 드래그 이동, 필터 입력란, 우선순위 색상을 지원합니다.
+- **오른쪽 사이드바의 연결된 이슈** — Jira, Linear, GitHub 이슈에서 만든 워크스페이스에는 상태, 담당자, 우선순위, 라벨, 설명, 열기 버튼이 있는 Issue 탭이 생깁니다. Jira 이슈는 연결 해제/재연결, 실시간 Markdown 댓글 입력란을 제공하며, 자체 호스팅 Jira(Server/Data Center)의 설명도 올바르게 렌더링합니다.
+- **워크스페이스를 Jira 이슈에 연결** — 세부 정보 대화상자에서 키 또는 URL로 연결할 수 있습니다. 작업 페이지에는 연결된 워크스페이스 칩이 표시되며, 중복 생성 대신 기존 워크스페이스를 엽니다.
+
+### 풀 리퀘스트 리뷰와 CI
+
+- **인라인 GitHub PR 댓글** — 댓글이 에디터의 해당 줄 아래에 표시되며 답글, 해결, 접기를 지원합니다(체크아웃이 PR의 head 커밋과 일치할 때만 표시).
+- **병합 준비 상태를 한눈에** — PR 아이콘은 CI 색상을 유지하면서, 대기 중인 승인·충돌·차단이 있으면 점이 추가되고 이유는 툴팁에 표시됩니다. GitHub, GitLab, Bitbucket, Azure DevOps, Gitea에서 동작합니다.
+- **Checks 패널의 리뷰 판정** — 리뷰어 이름과 함께 Approved / Changes requested를 표시하며, 탭을 전환하지 않아도 CI가 바뀌면 패널이 갱신됩니다.
+- **Jenkins 빌드 상세** — Jenkins 체크를 펼치면 단계, 실행 중이거나 실패한 단계, 빌드 정보를 볼 수 있습니다.
+- **리뷰가 필요한 PR의 관리자 병합** — 계정이 브랜치 보호를 우회할 수 있다면, 건너뛰는 항목을 알려 주는 확인 후에 Merge가 제공됩니다.
+
+### 에이전트
+
+- **세션 요약** — 에이전트 세션을 글로 정리한 브리프(활동, 목표, 계획, 블로커, 타임라인)를 오른쪽 사이드바에 표시하며, 전용 에이전트/모델 설정이 있습니다. Pi, Copilot, OpenCode, Cursor 세션도 지원합니다.
+- **더 정확한 에이전트 상태** — 보조 서브 에이전트가 끝나도 Pi 행이 "Working"에 머물거나 "Done"으로 바뀌지 않습니다. Copilot CLI는 자동 승인된 프롬프트에 "needs you"를 띄우지 않습니다. 사용자의 응답을 기다리는 Grok 서브 에이전트는 해당 행을 대기 상태로 유지합니다.
+- **한 번에 기본 에이전트 실행** — 탭 바의 `+` 버튼이 기본 에이전트를 실행합니다. 길게 누르거나 셰브론을 사용하면 전체 메뉴가 열립니다.
+- **페이지로 열리는 Agent Dashboard** — 메인 창에서 뒤로/앞으로 이동과 함께 열리며, 카드를 클릭하면 해당 에이전트의 워크스페이스가 열립니다.
+- **에이전트 세션 기록** — "All"이 모든 세션을 나열하고, 서브 에이전트 세션은 부모 아래에 중첩되며, 트랜스크립트 인덱싱으로 기존 트랜스크립트도 검색할 수 있습니다.
+- **더 많은 제공자의 사용량 추적** — Copilot Enterprise AI 크레딧 예산, DeepSeek 잔액, Fireworks.ai 지출을 상태 표시줄에 표시하며, 제공자별 끄기 스위치로 폴링과 자격 증명 읽기를 중단할 수 있습니다.
+
+### 워크스페이스와 레이아웃
+
+- **프로젝트당 폴더 하나** — 메인 체크아웃과 모든 worktree가 공유 `AGENTS.md`와 함께 하나의 폴더에 모입니다. `orca repo relocate`가 기존 체크아웃을 그 폴더로 옮깁니다.
+- **머신을 넘나드는 워크스페이스 그룹화** — 두 호스트의 같은 브랜치가 호스트 드롭다운이 있는 카드 하나로 합쳐집니다.
+- **상태 필터** — 선택한 상태를 사이드바와 Cmd+J에서 숨기며, 보드는 계속 모든 것을 보여 줍니다.
+- **"Setting up…" 표시** — 저장소 설정 스크립트가 실행되는 동안 표시되며, 에이전트 없이 시작한 워크스페이스도 포함됩니다.
+- **공유 디렉터리 모드** — worktree 간 공유 디렉터리를 심볼릭 링크, APFS 클론, 복사, 건너뛰기 중에서 선택합니다.
+- **플로팅 워크스페이스** — 전용 홈 폴더, 제목 표시줄의 드래그 핸들, 메인 탭 바와 동일한 에이전트 실행 컨트롤을 갖습니다.
+- **자동으로 가져온 SSH 호스트 숨기기** — 선택기와 상태 표시줄에서 숨길 수 있으며, 숨긴 호스트는 설정에 계속 나열됩니다.
+- **더 빠르고 정직한 파일 필터** — Explore의 파일 이름 필터는 미리 만든 인덱스로 워크스페이스 전체를 검색하며, 결과가 일부일 때 "no files match" 대신 그렇게 알려 줍니다.
+- **호스트 간 설정 복제** _(기반 작업)_ — 한 머신의 설정과 제공자 자격 증명을 페어링된 호스트로 복제할 수 있습니다.
+
+### 안정성
+
+- 패키징된 앱을 Dock에서 실행해도 git이 셸 프로필의 export를 인식하므로 git 훅과 ssh-agent 인증이 동작합니다.
+- macOS computer use 권한이 더 이상 두 개의 헬퍼 ID로 나뉘지 않습니다.
+- Copilot CLI에서 우클릭 붙여넣기가 두 번이 아니라 한 번만 붙여넣습니다.
+- 선택형 "Log UI hangs" 진단은 포커스, 절전, CPU 정보와 함께 멈춤 기록을 남겨 비치볼 원인 추적을 돕습니다.
+
+### 실행 방식
+
+- **고유한 정체성** — Orca NP는 자체 앱 ID(`com.nplez1.orca`), 데이터 디렉터리, 홈 디렉터리(`~/.orca-np`), CLI(`orca-np`)를 사용하므로 공식 Orca와 상태를 공유하지 않고 나란히 설치·실행됩니다.
+- **자체 릴리스와 업데이트** — 빌드는 `v<업스트림 버전>-np.<n>` 태그를 달며, 앱 내 업데이터는 업스트림이 아니라 [이 저장소의 릴리스](https://github.com/nplez1/orca/releases)를 따릅니다.
+- **서명** — macOS 빌드는 서명 및 공증되어 있습니다. Windows 설치 프로그램은 서명되지 않아 설치 시 SmartScreen이 한 번 경고합니다.
+- **텔레메트리 없음** — 릴리스 노트에 따르면 빌드는 진단 정보나 사용 데이터를 전송하지 않습니다.
+- **새 프로필** — Orca NP는 공식 Orca 설치의 저장소, 자격 증명, 페어링된 기기를 읽을 수 없습니다. 이 분리는 의도된 것이므로 휴대폰은 Orca NP와 따로 페어링하세요.
+- **업스트림 추적** — 업스트림 `main`을 정기적으로 병합합니다(절차는 [`UPSTREAM-SYNC-RUNBOOK.md`](../../UPSTREAM-SYNC-RUNBOOK.md)에 있음). 그래서 포크도 업스트림의 기능과 수정을 받습니다.
+
+---
+
 ## 기능
+
+아래 기능 목록은 업스트림 Orca의 것입니다. "Docs" 링크는 onorca.dev의 업스트림 문서로 이동하며, 위의 포크 전용 기능은 다루지 않습니다.
 
 <table>
 <tr>
@@ -164,7 +226,7 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 - **[풍부한 리포지토리 미리보기](https://www.onorca.dev/docs/editing/markdown)** — Markdown, 이미지, PDF, 리포지토리 문서를 워크스페이스에서 미리 볼 수 있습니다.
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — 워크플로에 실제 상호작용이 필요할 때 에이전트가 데스크톱 앱과 화면에 보이는 UI를 직접 조작하게 하세요.
 - **[알림과 읽지 않음 상태](https://www.onorca.dev/docs/notifications)** — 에이전트가 완료되거나 주의가 필요할 때 알림을 받고, 스레드를 읽지 않음으로 표시해 나중에 다시 확인하세요.
-- **그리고 훨씬 더 많은 기능** — 새로운 기능이 매일 출시되므로 이 목록은 늘 한 발 늦습니다. 진짜 기능은 [체인지로그](https://github.com/stablyai/orca/releases)에서 확인하세요.
+- **그 외에도 정말 많습니다** — 매일 릴리스하므로 이 목록은 늘 뒤처져 있습니다. 이 포크의 실제 기능 목록은 [Orca NP 릴리스](https://github.com/nplez1/orca/releases)이고, 물려받은 부분은 [업스트림 릴리스](https://github.com/stablyai/orca/releases)입니다.
 
 ---
 
@@ -213,24 +275,16 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 
 ## 설치
 
-### 데스크톱 — macOS, Windows, Linux
+### 데스크톱 — macOS, Windows
 
-- **[onOrca.dev에서 다운로드](https://onorca.dev/download)**
-- 또는 빌드를 직접 받기: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [전체 빌드](https://github.com/stablyai/orca/releases/latest)
+- **[최신 Orca NP 릴리스 다운로드](https://github.com/nplez1/orca/releases/latest)**
+- 또는 빌드를 직접 받기: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [모든 빌드](https://github.com/nplez1/orca/releases)
 
-_또는 패키지 매니저로 설치:_
-
-```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
-```
+Orca NP는 공식 Orca와 나란히 설치되며 이 저장소의 릴리스로 자동 업데이트됩니다. 이 포크는 Linux 빌드나 Homebrew/AUR 패키지를 배포하지 않습니다. Linux에서는 [소스에서 빌드](../../.github/CONTRIBUTING.md)하거나 [업스트림 Orca](https://github.com/stablyai/orca/releases/latest)를 사용하세요.
 
 ### 모바일 Companion — iOS, Android
 
-데스크톱 앱과 페어링해 휴대폰에서 에이전트를 모니터링하고 조종하세요.
+Orca 모바일 앱을 Orca NP와 페어링해 휴대폰에서 에이전트를 모니터링하고 조종하세요. 앱은 업스트림 Orca가 배포하며 Orca NP와 함께 동작합니다.
 
 - **iOS:** [App Store에서 다운로드](https://apps.apple.com/us/app/orca-ide/id6766130217)
 - **Android:** [APK 0.0.52 다운로드](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [설치 가이드](https://www.onorca.dev/docs/android-apk)
@@ -239,15 +293,10 @@ yay -S stably-orca-bin
 
 ## 커뮤니티와 지원
 
-- **Discord:** **[Discord](https://discord.gg/fzjDKHxv8Q)** 커뮤니티에 참여하세요.
-- **Twitter / X:** 업데이트와 공지는 **[@orca_build](https://x.com/orca_build)** 를 팔로우하세요.
-- **WeChat:** QR 코드를 스캔해 Orca 커뮤니티 WeChat 그룹 11에 참여하세요.
-
-  <img src="../assets/wechat-qr-group11.jpg" alt="Orca 커뮤니티 WeChat 그룹 11 QR 코드" width="160" />
-
-- **피드백과 아이디어:** 우리는 빠르게 출시합니다. 필요한 기능이 있나요? [새 기능을 요청](https://github.com/stablyai/orca/issues)하세요.
-- **개인정보 보호:** Orca가 수집하는 익명 사용 데이터와 수집 거부 방법은 [개인정보 및 텔레메트리 문서](https://www.onorca.dev/docs/telemetry)를 참고하세요.
-- **응원하기:** 이 리포지토리에 [Star](https://github.com/stablyai/orca)를 눌러 매일 공개되는 릴리스 소식을 확인해 주세요.
+- **Orca NP 이슈 및 아이디어:** 이 포크에만 해당하는 내용은 [이슈를 열어](https://github.com/nplez1/orca/issues) 주세요.
+- **업스트림 커뮤니티:** 이 포크가 물려받은 부분은 업스트림 Orca의 채널에서 다룹니다 — [Discord](https://discord.gg/fzjDKHxv8Q), [X의 @orca_build](https://x.com/orca_build), 공식 Orca에서도 재현되는 버그는 [업스트림 이슈](https://github.com/stablyai/orca/issues)로 보내 주세요.
+- **문서:** [onorca.dev/docs](https://www.onorca.dev/docs)는 업스트림 Orca의 문서입니다.
+- **응원하기:** 이 포크를 따라가려면 이 저장소에 [스타](https://github.com/nplez1/orca)를, 또는 [업스트림](https://github.com/stablyai/orca)에 눌러 주세요.
 
 ---
 
@@ -255,17 +304,13 @@ yay -S stably-orca-bin
 
 기여하거나 로컬에서 실행하고 싶으신가요? [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) 가이드를 확인하세요.
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca 기여자" />
+<a href="https://github.com/nplez1/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nplez1/orca" alt="Orca 기여자" />
 </a>
-
-<p align="center">
-  <img src="../assets/star-history.png" alt="stablyai/orca GitHub Star 히스토리 차트" width="880" />
-</p>
 
 ## 서명된 빌드
 
-Windows 코드 서명은 [SignPath.io](https://signpath.io)가 후원·제공하며, 인증서는 [SignPath Foundation](https://signpath.org)에서 제공합니다.
+Orca NP의 Windows 설치 프로그램은 서명되지 않았습니다. 업스트림 Orca의 Windows 빌드는 [SignPath.io](https://signpath.io)가 후원/제공하는 코드 서명으로 서명되며, 인증서는 [SignPath Foundation](https://signpath.org)에서 발급합니다.
 
 ## 라이선스
 

@@ -1,14 +1,12 @@
 <h1 align="center">
-  <a href="https://onOrca.dev"><img src="resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
+  <a href="https://github.com/nplez1/orca"><img src="resources/build/icon.png" alt="Orca NP" width="64" valign="middle" /></a> Orca NP
 </h1>
 
 <p align="center">
-  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub stars" /></a>
-  <a href="https://github.com/stablyai/orca/releases"><img src="docs/assets/readme-downloads.svg" alt="Total downloads across all releases" /></a>
+  <a href="https://github.com/nplez1/orca"><img src="https://img.shields.io/github/stars/nplez1/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub stars" /></a>
+  <a href="https://github.com/nplez1/orca/releases"><img src="https://img.shields.io/github/v/release/nplez1/orca?style=flat&amp;label=release&amp;color=08C" alt="Latest Orca NP release" /></a>
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
-  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Join the Orca Discord" /></a>
-  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="Follow Orca on X" /></a>
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms: macOS, Windows, and Linux" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows-4493F8?style=flat-square" alt="Orca NP builds: macOS and Windows" />
 </p>
 
 <p align="center">
@@ -16,17 +14,81 @@
 </p>
 
 <p align="center">
+  <strong>🔱 This is <a href="#whats-different-in-this-fork">Orca NP</a> — a fork of <a href="https://github.com/stablyai/orca">stablyai/orca</a> with its own features, fixes, and releases.</strong><br/>
+  <sub>Installs beside the official Orca · <a href="https://github.com/nplez1/orca/releases/latest">Download the latest Orca NP build</a> · <a href="#whats-different-in-this-fork">See what's different ↓</a></sub>
+</p>
+
+<p align="center">
   <strong>The AI Orchestrator for 100x builders.</strong><br/>
   Run Codex, ClaudeCode, OpenCode or Pi side-by-side — each in its own worktree, tracked in one place.
 </p>
 
-<h3 align="center"><a href="https://onorca.dev/download"><ins>Download Orca</ins></a></h3>
+<h3 align="center"><a href="https://github.com/nplez1/orca/releases/latest"><ins>Download Orca NP</ins></a></h3>
 
 <p align="center">
   <img src="docs/assets/readme-hero.jpg" alt="Orca desktop app running agents in parallel worktrees, with the Orca mobile companion app in the corner" width="960" />
 </p>
 
+## What's different in this fork
+
+Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fork-only features and fixes. The upstream feature list below still applies (except where a build isn't published here — see [Install](#install)); this is what Orca NP adds on top. The full list is in the [merged pull requests](https://github.com/nplez1/orca/pulls?q=is%3Apr+is%3Amerged), and the fork-only patch series is documented in [`LOCAL-PATCHES.md`](LOCAL-PATCHES.md).
+
+### Tasks, issues, and Jira
+
+- **Jira board view** — pick a default board and the Jira tab shows columns, the active sprint, and the backlog, with drag-to-move between columns, a filter box, and priority colors.
+- **Linked issue in the right sidebar** — a workspace created from a Jira, Linear, or GitHub issue gets an Issue tab with status, assignee, priority, labels, description, and an Open button. Jira issues also get unlink/re-link, a live Markdown comment box, and correct rendering of self-hosted Jira (Server/Data Center) descriptions.
+- **Link a workspace to a Jira issue** by key or URL from its details dialog; the Tasks page shows an attached-workspace chip and opens the existing workspace instead of creating a duplicate.
+
+### Pull request review and CI
+
+- **Inline GitHub PR comments** — comments appear under their line in the editor, with reply, resolve, and collapse (shown only when your checkout matches the PR's head commit).
+- **Merge readiness at a glance** — the PR icon keeps its CI color and adds a dot for outstanding approvals, conflicts, or blocks, with the reason in the tooltip. Works across GitHub, GitLab, Bitbucket, Azure DevOps, and Gitea.
+- **Review verdicts in the Checks panel** — Approved / Changes requested with reviewer names, and the panel updates when CI changes instead of waiting for a tab switch.
+- **Jenkins build details** — expand a Jenkins check to see its stages, which one is running or failed, and the build facts.
+- **Admin merge for review-gated PRs** — if your account may bypass branch protection, Merge is offered after a confirmation that names what gets skipped.
+
+### Agents
+
+- **Session summaries** — a written brief of an agent session (activity, goal, plan, blockers, timeline) in the right sidebar, with its own agent/model setting. Covers Pi, Copilot, OpenCode, and Cursor sessions as well.
+- **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting.
+- **One-click default agent** — the `+` button in the tab bar launches your default agent; hold it or use the chevron for the full menu.
+- **Agent Dashboard as a page** — opens in the main window with back/forward, and clicking a card opens that agent's workspace.
+- **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable.
+- **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads.
+
+### Workspaces and layout
+
+- **One folder per project** — the main checkout and all its worktrees live together under one folder with a shared `AGENTS.md`; `orca repo relocate` moves existing checkouts into it.
+- **Grouped workspaces across machines** — the same branch on two hosts becomes one card with a host dropdown.
+- **Status filter** — hide chosen statuses from the sidebar and Cmd+J while the board still shows everything.
+- **"Setting up…" indicator** while a repo's setup script runs, including for workspaces started without an agent.
+- **Shared-directory modes** — symlink, APFS clone, copy, or skip for directories shared between worktrees.
+- **Floating workspace** — a home folder of its own, a drag handle on the titlebar, and the same agent launch control as the main tab bar.
+- **Hide auto-imported SSH hosts** from pickers and the status bar; hidden hosts stay listed under Settings.
+- **Faster, honest file filter** — the Explore filename filter searches the whole workspace from a prebuilt index and says so when results are partial instead of "no files match".
+- **Host settings replication** _(groundwork)_ — one machine's settings and provider credentials can be replicated to paired hosts.
+
+### Reliability
+
+- Git hooks and ssh-agent auth work when the packaged app is launched from the Dock, because git now sees the exports from your shell profile.
+- macOS computer-use permissions no longer split across two helper identities.
+- Right-click paste into Copilot CLI pastes once, not twice.
+- An opt-in "Log UI hangs" diagnostic writes stall records, with focus, sleep, and CPU context, to help track down beachballs.
+
+### Running it
+
+- **Own identity** — Orca NP uses its own app id (`com.nplez1.orca`), data directory, home directory (`~/.orca-np`), and CLI (`orca-np`), so it installs and runs beside an official Orca without sharing state.
+- **Own releases and updates** — builds are tagged `v<upstream version>-np.<n>` and the in-app updater follows [this repository's releases](https://github.com/nplez1/orca/releases), not upstream's.
+- **Signing** — macOS builds are signed and notarized; the Windows installer is unsigned, so SmartScreen warns once on install.
+- **No telemetry** — the release notes state that builds send no diagnostics or usage data.
+- **Fresh profile** — Orca NP cannot read an official Orca install's repos, credentials, or paired devices; that separation is deliberate, so pair your phone with Orca NP separately.
+- **Tracks upstream** — upstream `main` is merged in regularly (the procedure is in [`UPSTREAM-SYNC-RUNBOOK.md`](UPSTREAM-SYNC-RUNBOOK.md)), so the fork receives upstream features and fixes too.
+
+---
+
 ## Features
+
+The feature wall below is upstream Orca's; its "Docs" links go to upstream's documentation at onorca.dev, which doesn't cover the fork-only features above.
 
 <table>
 <tr>
@@ -164,7 +226,7 @@ Agents drive Orca too — script every workflow with `orca worktree create`, `sn
 - **[Rich repo previews](https://www.onorca.dev/docs/editing/markdown)** — Preview Markdown, images, PDFs, and repo docs in the workspace.
 - **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — Let agents operate desktop apps and visible UI when a workflow needs real interaction.
 - **[Notifications and unread state](https://www.onorca.dev/docs/notifications)** — Know when an agent finishes or needs attention, then mark threads unread to come back later.
-- **And many, many more** — we ship daily, so this list is perpetually behind. The [changelog](https://github.com/stablyai/orca/releases) is the real feature list.
+- **And many, many more** — we ship daily, so this list is perpetually behind. The [Orca NP releases](https://github.com/nplez1/orca/releases) are the real feature list for this fork, and [upstream's](https://github.com/stablyai/orca/releases) for everything it inherits.
 
 ---
 
@@ -214,24 +276,16 @@ Works with **any CLI agent** — if it runs in a terminal, it runs in Orca.
 
 ## Install
 
-### Desktop — macOS, Windows, Linux
+### Desktop — macOS, Windows
 
-- **[Download from onOrca.dev](https://onorca.dev/download)**
-- Or grab a build directly: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [All builds](https://github.com/stablyai/orca/releases/latest)
+- **[Download the latest Orca NP release](https://github.com/nplez1/orca/releases/latest)**
+- Or grab a build directly: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [All builds](https://github.com/nplez1/orca/releases)
 
-_Or via a package manager:_
-
-```bash
-# macOS (Homebrew)
-brew install --cask stablyai/orca/orca
-
-# Arch Linux (AUR) — or stably-orca-git to build from source
-yay -S stably-orca-bin
-```
+Orca NP installs beside an official Orca and updates itself from this repository's releases. This fork does not publish a Linux build or a Homebrew/AUR package — on Linux, [build from source](.github/CONTRIBUTING.md) or use [upstream Orca](https://github.com/stablyai/orca/releases/latest).
 
 ### Mobile Companion — iOS, Android
 
-Pair with your desktop app to monitor and steer your agents from your phone.
+Pair the Orca mobile app with Orca NP to monitor and steer your agents from your phone. The apps are published by upstream Orca and work with Orca NP.
 
 - **iOS:** [Download on the App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
 - **Android:** [Download APK 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [Install guide](https://www.onorca.dev/docs/android-apk)
@@ -240,15 +294,14 @@ Pair with your desktop app to monitor and steer your agents from your phone.
 
 ## Community &amp; Support
 
-- **Discord:** Join the community on **[Discord](https://discord.gg/fzjDKHxv8Q)**.
-- **Twitter / X:** Follow **[@orca_build](https://x.com/orca_build)** for updates and announcements.
-- **WeChat:** Scan to join the Orca community WeChat group 11.
+- **Orca NP issues &amp; ideas:** [Open an issue](https://github.com/nplez1/orca/issues) for anything specific to this fork.
+- **Upstream community:** upstream Orca's channels cover everything this fork inherits — [Discord](https://discord.gg/fzjDKHxv8Q), [@orca_build on X](https://x.com/orca_build), and [upstream issues](https://github.com/stablyai/orca/issues) for bugs that also reproduce in official Orca.
+- **Upstream WeChat group:** scan to join Orca community WeChat group 11.
 
   <img src="docs/assets/wechat-qr-group11.jpg" alt="WeChat group 11 QR code for the Orca community" width="160" />
 
-- **Feedback &amp; Ideas:** We ship fast. Missing something? [Request a new feature](https://github.com/stablyai/orca/issues).
-- **Privacy:** See the [privacy &amp; telemetry docs](https://www.onorca.dev/docs/telemetry) for what anonymous usage data Orca collects and how to opt out.
-- **Show Support:** [Star](https://github.com/stablyai/orca) this repo to follow along with our daily ships.
+- **Docs:** [onorca.dev/docs](https://www.onorca.dev/docs) documents upstream Orca.
+- **Show support:** [Star](https://github.com/nplez1/orca) this repo to follow the fork, or [upstream](https://github.com/stablyai/orca).
 
 ---
 
@@ -259,17 +312,13 @@ Want to contribute or run locally? See our [CONTRIBUTING.md](.github/CONTRIBUTIN
 The relay that pairs the mobile app with a desktop host is also in this repository under
 [`cloud/`](cloud/README.md), with a separate pnpm workspace and setup guide.
 
-<a href="https://github.com/stablyai/orca/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca contributors" />
+<a href="https://github.com/nplez1/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nplez1/orca" alt="Orca NP contributors" />
 </a>
-
-<p align="center">
-  <img src="docs/assets/star-history.png" alt="GitHub star history chart for stablyai/orca" width="880" />
-</p>
 
 ## Signed Builds
 
-Windows code signing sponored/provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+Orca NP's Windows installer is unsigned. Upstream Orca's Windows builds are signed with code signing sponsored by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
 ## License
 
