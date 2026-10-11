@@ -23,7 +23,7 @@ const manifestContract = join(
 /**
  * The document, the route chunks and the images the route tree imports. Derived rather than
  * pinned, because a flat number stops agreeing with the chunk ceiling as routes are added: at 128
- * and 42 images, 18 routes are already allowed 98 chunks, and 98 + 42 + 1 is 141, so the asset
+ * and 49 images, 18 routes are already allowed 103 chunks, and 103 + 49 + 1 is 153, so the asset
  * count would have failed first and named the count rather than the split that caused it. Written
  * as chunks + images + the document, a bundle at the chunk ceiling sits exactly at this one, so
  * the chunk ceiling always trips first and the failure says what actually grew.
@@ -57,7 +57,7 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
  * `routes.slice(0, n)` for every n, which is what the fence below is derived from rather than
  * fitted to. The spread it shows is 1 to 10: `pr` and `web` add one script each, `session` adds ten.
  * The root `./_layout.tsx` (the page's web sibling of the native root) sorts first; with it the
- * swept tree reads 74 scripts at 16 routes.
+ * swept tree reads 79 scripts at 16 routes.
  *
  * This table is the fence's only input, so a route added to the tree stales it and the pins beside
  * the fence fail until it is re-measured. That is the point: the bound is re-derived, never bumped.
@@ -65,20 +65,20 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP = [
   ['./_layout.tsx', 3],
   ['./h/[hostId]/[...page].tsx', 7],
-  ['./h/[hostId]/accounts.tsx', 9],
-  ['./h/[hostId]/agent-history/[worktreeId].tsx', 14],
-  ['./h/[hostId]/edit.tsx', 19],
-  ['./h/[hostId]/files/[worktreeId].tsx', 24],
-  ['./h/[hostId]/files/preview/[worktreeId].tsx', 32],
-  ['./h/[hostId]/history/[worktreeId].tsx', 34],
-  ['./h/[hostId]/index.tsx', 39],
-  ['./h/[hostId]/pr/[worktreeId].tsx', 40],
-  ['./h/[hostId]/review/[worktreeId].tsx', 48],
-  ['./h/[hostId]/session/[worktreeId].tsx', 58],
-  ['./h/[hostId]/source-control/[worktreeId].tsx', 63],
-  ['./h/[hostId]/tasks.tsx', 71],
-  ['./h/[hostId]/web.tsx', 72],
-  ['./h/_layout.tsx', 74]
+  ['./h/[hostId]/accounts.tsx', 10],
+  ['./h/[hostId]/agent-history/[worktreeId].tsx', 15],
+  ['./h/[hostId]/edit.tsx', 20],
+  ['./h/[hostId]/files/[worktreeId].tsx', 26],
+  ['./h/[hostId]/files/preview/[worktreeId].tsx', 34],
+  ['./h/[hostId]/history/[worktreeId].tsx', 36],
+  ['./h/[hostId]/index.tsx', 41],
+  ['./h/[hostId]/pr/[worktreeId].tsx', 42],
+  ['./h/[hostId]/review/[worktreeId].tsx', 52],
+  ['./h/[hostId]/session/[worktreeId].tsx', 62],
+  ['./h/[hostId]/source-control/[worktreeId].tsx', 67],
+  ['./h/[hostId]/tasks.tsx', 75],
+  ['./h/[hostId]/web.tsx', 76],
+  ['./h/_layout.tsx', 79]
 ]
 
 const sweptScripts = MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP.map(([, scripts]) => scripts)
@@ -195,7 +195,7 @@ export async function readMobileWebBundleMaxAssets() {
  * The derived ceiling is only a budget while it stays inside the map the phone can hold: the
  * shells return null for a manifest over MOBILE_WEB_BUNDLE_MAX_ASSETS rather than dropping the
  * extra assets, so a route count that pushes the chunk envelope plus images plus the document past
- * it would pass this build and fail on the device with nothing to read. At today's 42 images that
+ * it would pass this build and fail on the device with nothing to read. At today's 49 images that
  * is 29 routes, inside what Phase C adds, which is why this is a build failure and not a comment.
  * The envelope grants the worst swept route to each one past the sweep, so re-measuring a tree
  * whose routes share more moves that crossing out again.

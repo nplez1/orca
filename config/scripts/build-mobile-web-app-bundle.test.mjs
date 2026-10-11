@@ -573,15 +573,15 @@ describe('the Phase C budget', () => {
     const CHUNKED_ALONG_THE_ENGINE = 172
     expect(WITH_ONE_ARTIFACT).toBeLessThanOrEqual(mobileWebAppBundleMaxChunks(ROUTES))
     expect(CHUNKED_ALONG_THE_ENGINE).toBeGreaterThan(mobileWebAppBundleMaxChunks(ROUTES))
-    // And the assets that came with it: 215 against the 113 this head's envelope allows, of the
+    // And the assets that came with it: 215 against the 126 this head's envelope allows, of the
     // 256 the shell will load.
     expect(mobileWebAppBundleMaxAssets(ROUTES, 42)).toBeLessThan(CHUNKED_ALONG_THE_ENGINE + 42 + 1)
   })
 
   it('derives the asset ceiling so the chunk ceiling is always the one that trips first', () => {
     // A bundle's assets are its chunks, its images and the document. Asserting one constant under
-    // another did not say that: with 42 images, the 98 chunks 18 routes are allowed plus 42 plus
-    // the document is 141 assets, over the flat 128 the ceiling used to be, so from 18 routes on
+    // another did not say that: with 42 images, the 103 chunks 18 routes are allowed plus 42 plus
+    // the document is 146 assets, over the flat 128 the ceiling used to be, so from 18 routes on
     // the asset count failed first and named the wrong thing.
     for (const routeCount of [14, 18, 24, 40]) {
       for (const imageCount of [0, 42, 120]) {
@@ -613,14 +613,14 @@ describe('the Phase C budget', () => {
 
   it('fails the build when the derived ceiling passes what the phone will accept', async () => {
     // The shell hands back null for a manifest over its own ceiling, so a derived ceiling above
-    // that ships a green build no device can open. At the 42 images the tree carries, the envelope
-    // plus 42 plus the document crosses 256 at 30 routes, which Phase C reaches. The crossing came
+    // that ships a green build no device can open. At the 49 images the tree carries, the envelope
+    // plus 49 plus the document crosses 256 at 29 routes, which Phase C reaches. The crossing came
     // in from 50 with the envelope: it grants the worst swept route to each one past the sweep,
     // where `4r + 16` granted four, so re-measuring a tree whose routes share more moves it out.
     expect(await readMobileWebBundleMaxAssets()).toBe(MOBILE_WEB_BUNDLE_MAX_ASSETS)
-    expect(assertAssetCeilingFitsShell(29, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toBe(251)
-    expect(() => assertAssetCeilingFitsShell(30, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toThrow(
-      /261 .*256/
+    expect(assertAssetCeilingFitsShell(28, 49, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toBe(253)
+    expect(() => assertAssetCeilingFitsShell(29, 49, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toThrow(
+      /263 .*256/
     )
   })
 })
