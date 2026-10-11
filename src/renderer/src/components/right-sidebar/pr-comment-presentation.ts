@@ -41,6 +41,8 @@ export type PRCommentPresentationClasses = {
   audienceTab: string
   audienceTabActive: string
   sectionTriageLabel: string
+  /** Short-lived mark on the comment a verdict click jumped to. */
+  commentRowHighlight: string
   statusBadgeResolved: string
   statusBadgeQueued: string
   commentHeaderPrimary: string
@@ -113,6 +115,12 @@ const COMMENT_CARD_DIVIDER = 'border-border dark:border-border/60'
 // Why: placeholders used bg-muted on bg-secondary cards — same grey in light mode.
 const COMMENT_AVATAR =
   'shrink-0 rounded-full border border-border bg-background object-cover shadow-xs dark:shadow-none'
+
+// Why: a verdict click is a "take me there" jump, so the landing comment is marked with an inset
+// ring plus a wash rather than a pulse; `motion-reduce` drops the fade for users who asked for no
+// motion. The mark is short-lived, and the reduced-motion path clears it on the next interaction.
+const COMMENT_ROW_HIGHLIGHT =
+  'bg-accent/70 ring-2 ring-inset ring-ring/60 transition-[background-color,box-shadow] duration-500 motion-reduce:transition-none'
 
 const RESOLVED_SECTION_LABEL =
   'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground'
@@ -188,6 +196,7 @@ export function getPRCommentPresentationClasses(
         'flex h-7 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors',
       audienceTabActive: 'bg-muted text-foreground',
       sectionTriageLabel: cn('px-3 pt-2', RESOLVED_SECTION_LABEL),
+      commentRowHighlight: COMMENT_ROW_HIGHLIGHT,
       statusBadgeResolved:
         'shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground',
       statusBadgeQueued:
@@ -238,6 +247,7 @@ export function getPRCommentPresentationClasses(
       'flex h-7 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors',
     audienceTabActive: 'bg-muted text-foreground shadow-xs',
     sectionTriageLabel: cn('px-3 pt-1', RESOLVED_SECTION_LABEL),
+    commentRowHighlight: COMMENT_ROW_HIGHLIGHT,
     statusBadgeResolved:
       'shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground',
     statusBadgeQueued:

@@ -301,6 +301,7 @@ export function ChecksPanelActiveContent({
         commentsInlineEnabled={commentsInlineEnabled}
         onToggleCommentsInline={activeWorktreeId ? handleToggleCommentsInline : undefined}
         commentsInlineBlocked={inlineMismatch !== null}
+        reviewVerdictsEnabled={activeReview?.provider === 'github'}
         commentsInlineHeadMismatch={
           inlineMismatch
             ? {

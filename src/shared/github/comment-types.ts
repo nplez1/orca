@@ -16,6 +16,30 @@ export type GitHubReaction = {
   viewerHasReacted?: boolean
 }
 
+/** A review submission's verdict. GraphQL `PullRequestReviewState` and REST `pulls/{n}/reviews`
+ *  agree on these spellings. */
+export type GitHubReviewState =
+  | 'APPROVED'
+  | 'CHANGES_REQUESTED'
+  | 'COMMENTED'
+  | 'DISMISSED'
+  | 'PENDING'
+
+/** Unknown host spellings degrade to `undefined`, which reads as "not a verdict" — never as a
+ *  verdict the panel would have to guess the meaning of. */
+export function parseGitHubReviewState(state: unknown): GitHubReviewState | undefined {
+  switch (state) {
+    case 'APPROVED':
+    case 'CHANGES_REQUESTED':
+    case 'COMMENTED':
+    case 'DISMISSED':
+    case 'PENDING':
+      return state
+    default:
+      return undefined
+  }
+}
+
 export type PRComment = {
   id: number
   author: string
@@ -39,6 +63,10 @@ export type PRComment = {
   line?: number
   /** Start line of the review annotation range (1-based). Absent for single-line comments. */
   startLine?: number
+  /** The verdict this entry carries as a review submission. Absent for conversation comments and
+   *  inline review comments, which have no verdict of their own. Present on a review submission
+   *  even when it has an empty body — an approval with no comment is a verdict, not noise. */
+  reviewState?: GitHubReviewState
   /** True when GitHub identifies the author as a bot (REST `user.type === 'Bot'` or
    *  GraphQL `__typename === 'Bot'`). Preferred over login-string heuristics because
    *  third-party review bots (e.g. qodo-ai-reviewer, coderabbitai) don't follow a

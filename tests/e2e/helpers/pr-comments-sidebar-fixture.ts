@@ -46,12 +46,20 @@ export const FIXTURE_COMMENTS: PRComment[] = [
 ]
 
 /** Seed an open PR on e2e-secondary with mixed comment triage states for sidebar tests. */
-export async function seedPRCommentsSidebarFixture(page: Page): Promise<PRCommentsSidebarSeed> {
+export async function seedPRCommentsSidebarFixture(
+  page: Page,
+  options: {
+    /** Overrides the default triage fixtures — used by specs that need review verdicts. */
+    comments?: PRComment[]
+    title?: string
+  } = {}
+): Promise<PRCommentsSidebarSeed> {
   const seed = {
-    fixtureComments: FIXTURE_COMMENTS,
+    fixtureComments: options.comments ?? FIXTURE_COMMENTS,
+    prTitle: options.title ?? 'E2E PR comments sidebar',
     sourceControlAiDefaults: getDefaultSourceControlAiSettings()
   }
-  return page.evaluate(async ({ fixtureComments, sourceControlAiDefaults }) => {
+  return page.evaluate(async ({ fixtureComments, prTitle, sourceControlAiDefaults }) => {
     const store = window.__store
     if (!store) {
       throw new Error('window.__store is not available')
@@ -76,7 +84,7 @@ export async function seedPRCommentsSidebarFixture(page: Page): Promise<PRCommen
     const prNumber = 73
     const pr: PRInfo = {
       number: prNumber,
-      title: 'E2E PR comments sidebar',
+      title: prTitle,
       state: 'open',
       url: `https://github.com/acme/orca/pull/${prNumber}`,
       checksStatus: 'pending',

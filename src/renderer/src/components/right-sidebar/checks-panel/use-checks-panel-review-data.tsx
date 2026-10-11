@@ -193,6 +193,11 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
     prNumber,
     pr?.headSha,
     pr?.prRepo,
+    // Why: the review verdicts ride on this payload, so a decision or activity change on the PR has
+    // to re-read it — otherwise an approval landing while the panel is open never appears. GitHub
+    // bumps `updated_at` on review submission, so this is the cheap "the PR changed" signal.
+    pr?.reviewDecision,
+    pr?.updatedAt,
     prCacheKey,
     branch,
     isPanelVisible,

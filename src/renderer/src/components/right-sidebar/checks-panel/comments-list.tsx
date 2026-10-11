@@ -19,13 +19,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import {
-  getPRCommentAudienceEmptyLabel,
-  getPrCommentAudienceFilters
-} from '@/lib/pr-comment-audience-labels'
+import { getPRCommentAudienceEmptyLabel } from '@/lib/pr-comment-audience-labels'
 import { translate } from '@/i18n/i18n'
 import { ResolvedCommentGroupsSection } from './comment-group'
+import { CommentsAudienceTabs } from './comments-audience-tabs'
 import { CommentsInlineHeadMismatchNotice, CommentsInlineToggle } from './comments-inline-controls'
+import { ReviewVerdictsBlock } from './review-verdicts'
 import {
   getPRCommentsListDisplayModeLabel,
   PR_COMMENT_LIST_DISPLAY_MODES,
@@ -53,10 +52,18 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
     commentsInlineEnabled,
     onToggleCommentsInline,
     commentsInlineBlocked,
-    commentsInlineHeadMismatch
+    commentsInlineHeadMismatch,
+    reviewVerdictsEnabled
   } = props
   const {
     presentation,
+    listRef,
+    listComments,
+    verdicts,
+    revealComment,
+    highlightedCommentId,
+    resolvedSectionOpen,
+    setResolvedSectionOpen,
     commentFilter,
     setCommentFilter,
     displayMode,
@@ -81,7 +88,12 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
     now
   } = useCommentsListState(props)
   return (
-    <div className="border-t border-border">
+    <div className="border-t border-border" ref={listRef}>
+      {/* Why: the section's own summary, above its header — "who decided what" belongs with the
+          conversation, and the checks stay the first thing after the PR header. */}
+      {reviewVerdictsEnabled ? (
+        <ReviewVerdictsBlock verdicts={verdicts} onJumpToComment={revealComment} />
+      ) : null}
       {/* Header */}
       <div
         className={cn(
@@ -96,8 +108,8 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
           <span className={presentation.sectionHeaderLabel}>
             {translate('auto.components.right.sidebar.checks.panel.content.94557d68e2', 'Comments')}
           </span>
-          {comments.length > 0 && (
-            <span className={presentation.sectionCount}>{comments.length}</span>
+          {listComments.length > 0 && (
+            <span className={presentation.sectionCount}>{listComments.length}</span>
           )}
           <div className="-mr-1 ml-auto flex items-center gap-0.5">
             {onToggleCommentsInline ? (
@@ -210,7 +222,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                 )}
               </>
             )}
-            {comments.length > 0 && (
+            {listComments.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -254,7 +266,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                     variant="ghost"
                     size="icon-xs"
                     aria-label={
-                      comments.length === 0
+                      listComments.length === 0
                         ? translate(
                             'auto.components.right.sidebar.checks.panel.content.7440d09d2c',
                             'Start conversation'
@@ -275,7 +287,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                 <TooltipContent side="top" sideOffset={4}>
                   {commentsDisabled && commentsDisabledReason
                     ? commentsDisabledReason
-                    : comments.length === 0
+                    : listComments.length === 0
                       ? translate(
                           'auto.components.right.sidebar.checks.panel.content.7440d09d2c',
                           'Start conversation'
@@ -289,27 +301,13 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
             )}
           </div>
         </div>
-        {comments.length > 0 && (
-          <div className={presentation.audienceTabs}>
-            {getPrCommentAudienceFilters().map((filter) => {
-              const isActive = commentFilter === filter.value
-              return (
-                <button
-                  key={filter.value}
-                  type="button"
-                  className={cn(
-                    presentation.audienceTab,
-                    isActive && presentation.audienceTabActive
-                  )}
-                  aria-pressed={isActive}
-                  onClick={() => setCommentFilter(filter.value)}
-                >
-                  <span>{filter.label}</span>
-                  <span className="tabular-nums">{commentCounts[filter.value]}</span>
-                </button>
-              )
-            })}
-          </div>
+        {listComments.length > 0 && (
+          <CommentsAudienceTabs
+            presentation={presentation}
+            filter={commentFilter}
+            counts={commentCounts}
+            onSelect={setCommentFilter}
+          />
         )}
         {comments.length >= 100 && (
           <div className="mt-1.5 text-[10px] text-muted-foreground">
@@ -331,13 +329,13 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
       ) : null}
 
       {/* List */}
-      {commentsLoading && comments.length === 0 ? (
+      {commentsLoading && listComments.length === 0 ? (
         <div className="flex items-center justify-center py-6">
           <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
         </div>
-      ) : comments.length === 0 && isAddingComment && onAddComment ? (
+      ) : listComments.length === 0 && isAddingComment && onAddComment ? (
         renderAddCommentComposer(true)
-      ) : comments.length === 0 ? (
+      ) : listComments.length === 0 ? (
         !onAddComment && (
           <div className="flex items-center justify-center py-5 text-[11px] text-muted-foreground">
             {translate(
@@ -377,6 +375,9 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                 replyDisabled={commentsDisabled}
                 replyDisabledReason={commentsDisabledReason}
                 presentation={presentation}
+                highlightedCommentId={highlightedCommentId}
+                open={resolvedSectionOpen}
+                onOpenChange={setResolvedSectionOpen}
                 onResolve={onResolve}
                 onStartReply={setReplyingCommentId}
                 onCancelReply={(commentId) =>
@@ -391,7 +392,10 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
           )}
         </div>
       )}
-      {onAddComment && comments.length > 0 && isAddingComment && renderAddCommentComposer(false)}
+      {onAddComment &&
+        listComments.length > 0 &&
+        isAddingComment &&
+        renderAddCommentComposer(false)}
     </div>
   )
 }

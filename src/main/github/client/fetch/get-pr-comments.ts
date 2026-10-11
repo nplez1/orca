@@ -1,4 +1,4 @@
-import type { PRComment } from '../../../../shared/github/comment-types'
+import { parseGitHubReviewState, type PRComment } from '../../../../shared/github/comment-types'
 import { GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE } from '../../../../shared/work-items'
 import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../../gh-utils'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
@@ -125,6 +125,8 @@ export async function getPRComments(
         databaseId: number
         author: { __typename?: string; login: string; avatarUrl: string } | null
         body: string
+        /** Present on `reviews` nodes only — a review submission's verdict, GraphQL-only here. */
+        state?: string | null
         createdAt: string
         url: string
         reactionGroups?: GitHubGraphQLReactionGroup[] | null
@@ -163,21 +165,33 @@ export async function getPRComments(
         if (graphQLIssueComments.length > 0) {
           issueComments = graphQLIssueComments
         }
-        // Why: leave undefined when the payload is incomplete so the REST review summaries stay in use.
+        // Why: a verdict is the single most important event on a PR, so reviews survive here even
+        // with an empty body (the panel drops them from the timeline, not from the verdict list).
+        // An entry that is neither a comment nor a recognizable verdict is the noise the old
+        // body-only filter was there to remove, and a pending review has no numeric id at all,
+        // so it cannot be anchored, keyed, or reacted to.
+        // Leaving this undefined when the payload is incomplete keeps the REST review summaries in use.
         graphQLReviewSummaries = pullRequest
-          ? (pullRequest.reviews?.nodes ?? [])
-              .filter((review) => review.body?.trim())
-              .map((review): PRComment => ({
+          ? (pullRequest.reviews?.nodes ?? []).reduce<PRComment[]>((reviews, review) => {
+              const body = review.body ?? ''
+              const reviewState = parseGitHubReviewState(review.state)
+              if (!review.databaseId || (!body.trim() && reviewState === undefined)) {
+                return reviews
+              }
+              reviews.push({
                 id: review.databaseId,
                 author: review.author?.login ?? 'ghost',
                 authorAvatarUrl: review.author?.avatarUrl ?? '',
-                body: review.body,
+                body,
                 createdAt: review.createdAt,
                 url: review.url,
                 isBot: review.author?.__typename === 'Bot',
+                reviewState,
                 reactionSubjectId: review.id,
                 reactions: mapGraphQLReactionGroups(review.reactionGroups)
-              }))
+              })
+              return reviews
+            }, [])
           : undefined
 
         const threads = pullRequest?.reviewThreads?.nodes ?? []
@@ -209,7 +223,8 @@ export async function getPRComments(
         }
       }
 
-      // Review summaries (REST); skip empty-body reviews (e.g. approvals with no comment) as noise.
+      // Review summaries (REST) — the fallback when GraphQL did not answer. Empty-body reviews are
+      // kept for the same reason as above; the renderer decides what reads as a comment.
       type RESTReview = {
         id: number
         user: { login: string; avatar_url: string; type?: string } | null
@@ -223,16 +238,26 @@ export async function getPRComments(
         reviewSummaries = graphQLReviewSummaries
       } else if (reviewsResult.status === 'fulfilled') {
         reviewSummaries = (JSON.parse(reviewsResult.value.stdout) as RESTReview[])
-          .filter((r) => r.body?.trim())
-          .map((r): PRComment => ({
-            id: r.id,
-            author: r.user?.login ?? 'ghost',
-            authorAvatarUrl: r.user?.avatar_url ?? '',
-            body: r.body,
-            createdAt: r.submitted_at,
-            url: r.html_url,
-            isBot: r.user?.type === 'Bot'
-          }))
+          .filter((r) => r.id != null)
+          .reduce<PRComment[]>((reviews, r) => {
+            const body = r.body ?? ''
+            const reviewState = parseGitHubReviewState(r.state)
+            // Why: the same "neither a comment nor a recognizable verdict" rule as the GraphQL path.
+            if (!body.trim() && reviewState === undefined) {
+              return reviews
+            }
+            reviews.push({
+              id: r.id,
+              author: r.user?.login ?? 'ghost',
+              authorAvatarUrl: r.user?.avatar_url ?? '',
+              body,
+              createdAt: r.submitted_at,
+              url: r.html_url,
+              isBot: r.user?.type === 'Bot',
+              reviewState
+            })
+            return reviews
+          }, [])
       } else {
         console.warn('Failed to fetch review summaries:', reviewsResult.reason)
       }

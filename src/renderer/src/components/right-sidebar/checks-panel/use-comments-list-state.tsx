@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
@@ -17,6 +17,15 @@ import {
   partitionPRCommentGroupsForTriage,
   sortPRCommentGroupsByRecency
 } from '@/lib/pr-comment-action-state'
+import {
+  scrollElementBottomIntoView,
+  scrollElementCenterIntoView
+} from '@/lib/element-scroll-reveal'
+import {
+  filterPRCommentListEntries,
+  getPRReviewVerdicts
+} from '../../../../../shared/pr-review-verdicts'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { getPRCommentPresentationClasses } from '../pr-comment-presentation'
 import type { GitHubReactionContent, PRComment } from '../../../../../shared/github/comment-types'
 import {
@@ -31,6 +40,9 @@ import { usePRBotAuthorOverrides } from '@/lib/pr-bot-author-overrides'
 import { translate } from '@/i18n/i18n'
 import { PRCommentGroupView } from './comment-group'
 import { useNow } from '@/hooks/use-now'
+
+/** How long a jumped-to comment stays marked before the mark clears itself. */
+export const PR_COMMENT_REVEAL_HIGHLIGHT_MS = 1500
 
 export type PRCommentsListDisplayMode = 'triage' | 'timeline'
 export const PR_COMMENT_LIST_DISPLAY_MODES: PRCommentsListDisplayMode[] = ['triage', 'timeline']
@@ -62,6 +74,9 @@ export type PRCommentsListProps = {
   /** True when the head rule suppresses inline comments, so the header explains the absence. */
   commentsInlineBlocked?: boolean
   commentsInlineHeadMismatch?: { worktreeHeadOid: string; commentsHeadSha: string } | null
+  /** Whether this review context reports verdicts. GitHub only for now: the GitLab client has no
+   *  approval state mapped onto the comments payload. */
+  reviewVerdictsEnabled?: boolean
   /** Opens a review comment in the code. Absent when there is nowhere to place it. */
   onOpenCommentInCode?: (comment: PRComment) => void
   onSetReaction?: (
@@ -86,59 +101,30 @@ export function useCommentsListState({
   onSetReaction,
   onResolveSelectedCommentsWithAI
 }: PRCommentsListProps) {
-  function findVerticalScrollParent(element: HTMLElement): HTMLElement | null {
-    let parent = element.parentElement
-    while (parent) {
-      const style = window.getComputedStyle(parent)
-      const canScroll = style.overflowY === 'auto' || style.overflowY === 'scroll'
-      if (canScroll && parent.scrollHeight > parent.clientHeight) {
-        return parent
-      }
-      parent = parent.parentElement
-    }
-    return null
-  }
-
-  function scrollElementBottomIntoView(element: HTMLElement): void {
-    const scrollParent = findVerticalScrollParent(element)
-    if (!scrollParent) {
-      element.scrollIntoView({ block: 'end', behavior: 'smooth' })
-      return
-    }
-
-    const padding = 8
-    const parentRect = scrollParent.getBoundingClientRect()
-    const elementRect = element.getBoundingClientRect()
-    const bottomOverflow = elementRect.bottom - parentRect.bottom + padding
-    if (bottomOverflow > 0) {
-      scrollParent.scrollTo({
-        top: scrollParent.scrollTop + bottomOverflow,
-        behavior: 'smooth'
-      })
-      return
-    }
-
-    const topOverflow = elementRect.top - parentRect.top - padding
-    if (topOverflow < 0) {
-      scrollParent.scrollTo({
-        top: Math.max(0, scrollParent.scrollTop + topOverflow),
-        behavior: 'smooth'
-      })
-    }
-  }
-
+  const listRef = useRef<HTMLDivElement>(null)
   const presentation = React.useMemo(() => getPRCommentPresentationClasses(), [])
-  const now = useNow(60_000, comments.length > 0)
+  // Why: a review submission with no body is a verdict, not a comment — it must not be counted,
+  // grouped, queued for the agent, or rendered as an empty card.
+  const listComments = React.useMemo(() => filterPRCommentListEntries(comments), [comments])
+  const now = useNow(60_000, listComments.length > 0)
+  const prefersReducedMotion = usePrefersReducedMotion()
   const [commentFilter, setCommentFilter] = useState<PRCommentAudienceFilter>('all')
   const [displayMode, setDisplayMode] = useState<PRCommentsListDisplayMode>('triage')
   const [replyingCommentId, setReplyingCommentId] = useState<number | null>(null)
   const [isAddingComment, setIsAddingComment] = useState(false)
+  const [resolvedSectionOpen, setResolvedSectionOpen] = useState(false)
+  const [highlightedCommentId, setHighlightedCommentId] = useState<number | null>(null)
+  const [pendingRevealId, setPendingRevealId] = useState<number | null>(null)
   const addCommentSurfaceRef = useRef<HTMLDivElement>(null)
   const shouldScrollAddCommentRef = useRef(false)
   const botAuthorOverrides = usePRBotAuthorOverrides()
-  const commentCounts = React.useMemo(
-    () => getPRCommentAudienceCounts(comments, botAuthorOverrides),
+  const verdicts = React.useMemo(
+    () => getPRReviewVerdicts(comments, botAuthorOverrides),
     [botAuthorOverrides, comments]
+  )
+  const commentCounts = React.useMemo(
+    () => getPRCommentAudienceCounts(listComments, botAuthorOverrides),
+    [botAuthorOverrides, listComments]
   )
   const {
     isSelectingForAI,
@@ -149,10 +135,10 @@ export function useCommentsListState({
     addGroupToSelection,
     clearSelection,
     toggleGroupSelection
-  } = usePRCommentsListSelection(comments, selectionContextKey, selectionClearRequest)
+  } = usePRCommentsListSelection(listComments, selectionContextKey, selectionClearRequest)
   const visibleComments = React.useMemo(
-    () => filterPRCommentsByAudience(comments, commentFilter, botAuthorOverrides),
-    [botAuthorOverrides, commentFilter, comments]
+    () => filterPRCommentsByAudience(listComments, commentFilter, botAuthorOverrides),
+    [botAuthorOverrides, commentFilter, listComments]
   )
   const groups = React.useMemo(() => groupPRComments(visibleComments), [visibleComments])
   const triageGroups = React.useMemo(
@@ -166,6 +152,71 @@ export function useCommentsListState({
     onResolveSelectedCommentsWithAI && selectableGroups.length > 0
   )
   const selectedCommentQueueCount = selectedGroups.length
+
+  const revealComment = useCallback((commentId: number) => {
+    setPendingRevealId(commentId)
+  }, [])
+
+  // Why a layout effect: this one reads the DOM it just committed and scrolls it, so running it
+  // after paint would show the reader a frame at the old position.
+  useLayoutEffect(() => {
+    const targetId = pendingRevealId
+    if (targetId === null) {
+      return
+    }
+    // Why: the audience filter can hide the target, and silently doing nothing is the dead click
+    // this jump exists to avoid — clicking a verdict is an explicit request to see that comment.
+    if (commentFilter !== 'all' && !visibleComments.some((comment) => comment.id === targetId)) {
+      setCommentFilter('all')
+      return
+    }
+    const element = listRef.current?.querySelector<HTMLElement>(
+      `[data-pr-comment-id="${targetId}"]`
+    )
+    if (!element) {
+      // Why: in triage the target can sit inside the collapsed Resolved section, where it has no
+      // layout to scroll to until the section opens.
+      if (displayMode === 'triage' && !resolvedSectionOpen && triageGroups.resolved.length > 0) {
+        setResolvedSectionOpen(true)
+        return
+      }
+      setPendingRevealId(null)
+      return
+    }
+    setPendingRevealId(null)
+    scrollElementCenterIntoView(element)
+    setHighlightedCommentId(targetId)
+  }, [
+    pendingRevealId,
+    commentFilter,
+    visibleComments,
+    displayMode,
+    resolvedSectionOpen,
+    triageGroups
+  ])
+
+  useEffect(() => {
+    if (highlightedCommentId === null) {
+      return
+    }
+    // Why: reduced motion gets a static mark instead of a timed fade, cleared by the reader's next
+    // interaction in the comment area rather than by a clock.
+    if (prefersReducedMotion) {
+      const container = listRef.current
+      if (!container) {
+        return
+      }
+      const clearHighlight = (): void => setHighlightedCommentId(null)
+      const events = ['pointerdown', 'wheel', 'keydown'] as const
+      events.forEach((event) => container.addEventListener(event, clearHighlight, { once: true }))
+      return () => events.forEach((event) => container.removeEventListener(event, clearHighlight))
+    }
+    const timer = window.setTimeout(
+      () => setHighlightedCommentId(null),
+      PR_COMMENT_REVEAL_HIGHLIGHT_MS
+    )
+    return () => window.clearTimeout(timer)
+  }, [highlightedCommentId, prefersReducedMotion])
 
   useEffect(() => {
     if (!isAddingComment || !shouldScrollAddCommentRef.current) {
@@ -246,6 +297,7 @@ export function useCommentsListState({
         replyDisabled={commentsDisabled}
         replyDisabledReason={commentsDisabledReason}
         presentation={presentation}
+        highlightedCommentId={highlightedCommentId}
         onResolve={onResolve}
         onStartReply={setReplyingCommentId}
         onCancelReply={(commentId) =>
@@ -298,6 +350,13 @@ export function useCommentsListState({
 
   return {
     presentation,
+    listRef,
+    listComments,
+    verdicts,
+    revealComment,
+    highlightedCommentId,
+    resolvedSectionOpen,
+    setResolvedSectionOpen,
     commentFilter,
     setCommentFilter,
     displayMode,

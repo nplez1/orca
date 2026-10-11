@@ -13991,6 +13991,15 @@
                 "unsupported": {
                   "title": "{{reviewLabelCap}} not supported here",
                   "body": "This repository provider does not support creating a {{reviewLabel}} from Orca."
+                },
+                "verdicts": {
+                  "0bf5a253a984": "Changes requested",
+                  "543f808ca47b": "Approved",
+                  "c040f814f131": "Commented",
+                  "c9f1d84c1d34": "Dismissed",
+                  "3aa4a3edaf3c": "Pending",
+                  "35c764378830": "Reviewed",
+                  "47c8e272bfb7": "Review verdicts"
                 }
               },
               "comment": {
