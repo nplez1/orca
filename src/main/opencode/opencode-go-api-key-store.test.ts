@@ -4,6 +4,16 @@ import { tmpdir } from 'node:os'
 import type * as NodeFs from 'node:fs'
 import type * as NodeOs from 'node:os'
 import { join } from 'node:path'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+
+// Why the sealing mock is a SecretStore and no longer an `electron` module: the stores
+// depend on the host port now, so the test installs the port instead of stubbing Electron.
+const secretStoreMock = vi.hoisted(() => ({
+  isEncryptionAvailable: () => true,
+  encryptString: (key: string) => Buffer.from(`encrypted:${key}`),
+  decryptString: (bytes: Buffer) => bytes.toString().slice('encrypted:'.length),
+  describeProtectionGap: () => null
+}))
 
 const home = vi.hoisted(() => {
   const state: { directory: string; readError: Error | null } = { directory: '', readError: null }
@@ -25,20 +35,17 @@ vi.mock('node:fs', async (importOriginal) => {
     }
   }
 })
-vi.mock('electron', () => ({
-  safeStorage: {
-    isEncryptionAvailable: () => true,
-    encryptString: (key: string) => Buffer.from(`encrypted:${key}`),
-    decryptString: (bytes: Buffer) => bytes.toString().slice('encrypted:'.length)
-  }
-}))
 
 beforeEach(() => {
   home.readError = null
   home.directory = mkdtempSync(join(tmpdir(), 'orca-go-key-store-'))
   vi.resetModules()
+  setSecretStore(secretStoreMock)
 })
-afterEach(() => rmSync(home.directory, { recursive: true, force: true }))
+afterEach(() => {
+  _resetSecretStoreForTests()
+  rmSync(home.directory, { recursive: true, force: true })
+})
 
 describe('OpenCode Go main-owned API key file', () => {
   it('persists a versioned encrypted envelope, reads it after restart, and clears it', async () => {

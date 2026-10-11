@@ -1,5 +1,5 @@
-import { safeStorage } from 'electron'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { getSecretStore } from '../../shared/secret-store'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
 import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-file'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
@@ -46,10 +46,14 @@ function readEnvelope(envelope: ZcodePlanApiKeyEnvelope): string {
   if (envelope.kind === 'plaintext') {
     return envelope.payload.toString('utf8')
   }
-  if (!safeStorage.isEncryptionAvailable()) {
+  // Why only a sealed envelope consults the port: a plaintext one is the host's own bytes
+  // and needs no sealing facility, so a plaintext store stays readable even where no store
+  // was ever installed.
+  const store = getSecretStore()
+  if (!store.isEncryptionAvailable()) {
     throw new Error('GLM Coding Plan API key could not be decrypted')
   }
-  return safeStorage.decryptString(envelope.payload)
+  return store.decryptString(envelope.payload)
 }
 
 export function hasZcodePlanApiKey(): boolean {
@@ -91,16 +95,17 @@ export function saveZcodePlanApiKey(key: string): void {
   if (/[\r\n]/.test(trimmed)) {
     throw new Error('GLM Coding Plan API key must be a single line')
   }
-  if (safeStorage.isEncryptionAvailable()) {
+  const store = getSecretStore()
+  if (store.isEncryptionAvailable()) {
     writeSecureFile(
       getZcodePlanApiKeyPath(),
-      encodeApiKeyEnvelope('encrypted', safeStorage.encryptString(trimmed))
+      encodeApiKeyEnvelope('encrypted', store.encryptString(trimmed))
     )
     cachedZcodePlanApiKey = trimmed
     return
   }
   console.warn(
-    '[zcode] safeStorage encryption unavailable — storing GLM Coding Plan API key in plaintext'
+    '[zcode] secret encryption unavailable — storing GLM Coding Plan API key in plaintext'
   )
   const keyPath = getZcodePlanApiKeyPath()
   // Why: capture the previous envelope — writeSecureFile has already replaced
