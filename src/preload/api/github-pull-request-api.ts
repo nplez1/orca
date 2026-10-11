@@ -102,6 +102,8 @@ export type GithubPullRequestApi = {
     prNumber: number
     prRepo?: GitHubOwnerRepo | null
     noCache?: boolean
+    /** Opt in to review-verdict entries; see `getPRComments`. */
+    includeReviewVerdicts?: boolean
   }) => Promise<PRComment[]>
   setPRCommentReaction: (args: {
     repoPath: string

@@ -70,7 +70,8 @@ export const GITHUB_PULL_REQUEST_METHODS = [
     params: PullRequest,
     handler: async (params, { runtime }) =>
       runtime.getRepoPRComments(params.repo, params.prNumber, params.prRepo ?? null, {
-        noCache: params.noCache
+        noCache: params.noCache,
+        includeReviewVerdicts: params.includeReviewVerdicts
       })
   }),
   defineMethod({

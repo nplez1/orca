@@ -493,7 +493,7 @@ describe('registerGitHubHandlers', () => {
     expect(getPRCommentsMock).toHaveBeenCalledWith(
       '/workspace/repo',
       42,
-      { noCache: true, prRepo },
+      { noCache: true, prRepo, includeReviewVerdicts: false },
       null,
       localGitOptions
     )

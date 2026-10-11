@@ -120,7 +120,7 @@ describe('GitHub GraphQL rate-limit guard', () => {
       })
     ])
     expect(ghExecFileAsyncMock.mock.calls[0]?.[0]).toEqual(
-      expect.arrayContaining([expect.stringContaining('reviews(first: 100)')])
+      expect.arrayContaining([expect.stringContaining('reviews(last: 100)')])
     )
   })
 
@@ -248,7 +248,7 @@ describe('GitHub GraphQL rate-limit guard', () => {
     ])
   })
 
-  it('keeps a review that carries a verdict but no comment body', async () => {
+  it('keeps a bodyless approval only for a caller that renders verdicts', async () => {
     getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
     ghExecFileAsyncMock
       .mockResolvedValueOnce({
@@ -283,9 +283,18 @@ describe('GitHub GraphQL rate-limit guard', () => {
                       databaseId: 47,
                       author: { __typename: 'User', login: 'jo', avatarUrl: 'https://avatar' },
                       body: '',
-                      state: 'SOMETHING_ELSE',
+                      state: 'COMMENTED',
                       createdAt: '2026-04-02T00:00:02Z',
                       url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-47'
+                    },
+                    {
+                      id: 'PRR_48',
+                      databaseId: 48,
+                      author: { __typename: 'User', login: 'mo', avatarUrl: 'https://avatar' },
+                      body: '',
+                      state: 'SOMETHING_ELSE',
+                      createdAt: '2026-04-02T00:00:03Z',
+                      url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-48'
                     }
                   ]
                 }
@@ -297,13 +306,50 @@ describe('GitHub GraphQL rate-limit guard', () => {
       .mockResolvedValueOnce({ stdout: '[]' })
       .mockResolvedValueOnce({ stdout: '[]' })
 
-    await expect(getPRComments('/repo-root', 7)).resolves.toEqual([
-      // Why: a review with no numeric id cannot be anchored or keyed, and a bodyless review whose
-      // state the host does not recognize is neither a comment nor a verdict — the old
-      // body-only filter's intent, kept for exactly that entry.
+    await expect(getPRComments('/repo-root', 7, { includeReviewVerdicts: true })).resolves.toEqual([
+      // Only a bodyless *decision* survives here: a review with no body and no decision is how
+      // GitHub submits inline comments, and a review with no numeric id cannot be anchored at all.
       expect.objectContaining({ id: 45, body: '', reviewState: 'APPROVED' })
     ])
     expect(ghExecFileAsyncMock.mock.calls[0]?.[0]?.join(' ')).toContain('state')
+    // Why `last` in the selection: a 100-review cap has to keep the newest submissions.
+    expect(ghExecFileAsyncMock.mock.calls[0]?.[0]?.join(' ')).toContain('reviews(last: 100)')
+  })
+
+  it('drops every bodyless review for a caller that does not ask for verdicts', async () => {
+    getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+    ghExecFileAsyncMock
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({
+          data: {
+            repository: {
+              pullRequest: {
+                reviewThreads: { nodes: [] },
+                comments: { nodes: [] },
+                reviews: {
+                  nodes: [
+                    {
+                      id: 'PRR_45',
+                      databaseId: 45,
+                      author: { __typename: 'User', login: 'ana', avatarUrl: 'https://avatar' },
+                      body: '',
+                      state: 'APPROVED',
+                      createdAt: '2026-04-02T00:00:00Z',
+                      url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-45'
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        })
+      })
+      .mockResolvedValueOnce({ stdout: '[]' })
+      .mockResolvedValueOnce({ stdout: '[]' })
+
+    // Why the default stays: the PR page, the item dialog and mobile read this same payload as
+    // comments, where a bodyless approval would be an empty card.
+    await expect(getPRComments('/repo-root', 7)).resolves.toEqual([])
   })
 
   it('maps review state from the REST fallback when GraphQL has no pull request', async () => {
@@ -333,7 +379,7 @@ describe('GitHub GraphQL rate-limit guard', () => {
       ])
     })
 
-    await expect(getPRComments('/repo-root', 7)).resolves.toEqual([
+    await expect(getPRComments('/repo-root', 7, { includeReviewVerdicts: true })).resolves.toEqual([
       expect.objectContaining({ id: 55, body: '', reviewState: 'CHANGES_REQUESTED' }),
       // An unmapped host spelling reads as "no verdict", never as a verdict to guess at.
       expect.objectContaining({ id: 56, reviewState: undefined })

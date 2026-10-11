@@ -149,6 +149,8 @@ export const ghPullRequestsAndWorkItemsApi = {
     prNumber: number
     prRepo?: GitHubOwnerRepo | null
     noCache?: boolean
+    /** Opt in to review-verdict entries; see `getPRComments`. */
+    includeReviewVerdicts?: boolean
   }) => ipcRenderer.invoke('gh:prComments', args),
   setPRCommentReaction: (args: {
     repoPath: string

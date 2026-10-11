@@ -1,4 +1,5 @@
 import { parseGitHubReviewState, type PRComment } from '../../../../shared/github/comment-types'
+import { isReportableReviewSubmission } from '../../../../shared/pr-review-verdicts'
 import { GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE } from '../../../../shared/work-items'
 import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../../gh-utils'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
@@ -14,7 +15,20 @@ import { REVIEW_THREADS_QUERY } from './pr-review-threads-query'
 export async function getPRComments(
   repoPath: string,
   prNumber: number,
-  options?: { noCache?: boolean; prRepo?: GitHubApiRepository | null },
+  options?: {
+    noCache?: boolean
+    prRepo?: GitHubApiRepository | null
+    /**
+     * Whether this caller renders review verdicts.
+     *
+     * Why opt-in: a review submitted with no comment is a verdict the Checks panel must show and an
+     * empty card everywhere else — the PR page, the issue dialog and mobile all read this same
+     * payload as comments. Only the Checks panel asks for the verdict-only entries; everyone else
+     * keeps the pre-existing "must carry a body" rule, and a peer that predates the flag is
+     * unaffected because the default is off.
+     */
+    includeReviewVerdicts?: boolean
+  },
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {}
 ): Promise<PRComment[]> {
@@ -165,17 +179,19 @@ export async function getPRComments(
         if (graphQLIssueComments.length > 0) {
           issueComments = graphQLIssueComments
         }
-        // Why: a verdict is the single most important event on a PR, so reviews survive here even
-        // with an empty body (the panel drops them from the timeline, not from the verdict list).
-        // An entry that is neither a comment nor a recognizable verdict is the noise the old
-        // body-only filter was there to remove, and a pending review has no numeric id at all,
-        // so it cannot be anchored, keyed, or reacted to.
+        // Why: a verdict is the single most important event on a PR, so a review survives here even
+        // with an empty body — but only for a caller that renders verdicts, and only when it
+        // decides something (a bodyless `COMMENTED` review is how GitHub submits inline comments).
+        // A pending review has no numeric id, so it cannot be anchored, keyed, or reacted to.
         // Leaving this undefined when the payload is incomplete keeps the REST review summaries in use.
         graphQLReviewSummaries = pullRequest
           ? (pullRequest.reviews?.nodes ?? []).reduce<PRComment[]>((reviews, review) => {
               const body = review.body ?? ''
               const reviewState = parseGitHubReviewState(review.state)
-              if (!review.databaseId || (!body.trim() && reviewState === undefined)) {
+              const reportable = options?.includeReviewVerdicts
+                ? isReportableReviewSubmission(body, reviewState)
+                : body.trim().length > 0
+              if (!review.databaseId || !reportable) {
                 return reviews
               }
               reviews.push({
@@ -242,8 +258,11 @@ export async function getPRComments(
           .reduce<PRComment[]>((reviews, r) => {
             const body = r.body ?? ''
             const reviewState = parseGitHubReviewState(r.state)
-            // Why: the same "neither a comment nor a recognizable verdict" rule as the GraphQL path.
-            if (!body.trim() && reviewState === undefined) {
+            // Why: the same keep-rule as the GraphQL path, so the fallback cannot disagree with it.
+            const reportable = options?.includeReviewVerdicts
+              ? isReportableReviewSubmission(body, reviewState)
+              : body.trim().length > 0
+            if (!reportable) {
               return reviews
             }
             reviews.push({

@@ -48,8 +48,22 @@ export function filterPRCommentListEntries(comments: readonly PRComment[]): PRCo
  * until it is dismissed or changed — so `COMMENTED`/`PENDING` only supersede each other. Without
  * this, approve-then-comment would render as a neutral review and hide a live approval.
  */
-function isDecisiveReviewState(state: GitHubReviewState): boolean {
-  return state !== 'COMMENTED' && state !== 'PENDING'
+export function isDecisiveReviewState(state: GitHubReviewState | undefined): boolean {
+  return state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED'
+}
+
+/**
+ * Whether a review submission is worth carrying at all.
+ *
+ * GitHub submits a bodyless `COMMENTED` review for every batch of inline comments, so a review
+ * with no body is only a verdict when it decides something. Anything else has no comment to show
+ * and no decision to report — which is what the old body-only filter was really removing.
+ */
+export function isReportableReviewSubmission(
+  body: string,
+  state: GitHubReviewState | undefined
+): boolean {
+  return body.trim().length > 0 || isDecisiveReviewState(state)
 }
 
 function verdictTimestamp(createdAt: string): number {
@@ -87,6 +101,11 @@ export function getPRReviewVerdicts(
   for (const comment of comments) {
     const state = comment.reviewState
     if (state === undefined) {
+      continue
+    }
+    // Why: a bodyless neutral review is the vehicle for an inline comment, not a verdict. An older
+    // host that still publishes them must not turn every reply into a "Commented" row.
+    if (comment.body.trim().length === 0 && !isDecisiveReviewState(state)) {
       continue
     }
     const login = comment.author.trim()

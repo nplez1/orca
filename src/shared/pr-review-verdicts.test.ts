@@ -3,7 +3,8 @@ import type { PRComment } from './github/comment-types'
 import {
   filterPRCommentListEntries,
   getPRReviewVerdicts,
-  isPRReviewVerdictOnlyComment
+  isPRReviewVerdictOnlyComment,
+  isReportableReviewSubmission
 } from './pr-review-verdicts'
 
 function comment(overrides: Partial<PRComment>): PRComment {
@@ -51,7 +52,13 @@ describe('pr review verdicts', () => {
         reviewState: 'CHANGES_REQUESTED',
         createdAt: '2026-05-01T00:00:00Z'
       }),
-      comment({ id: 3, author: 'kim', reviewState: 'COMMENTED', createdAt: '2026-05-04T00:00:00Z' })
+      comment({
+        id: 3,
+        author: 'kim',
+        body: 'A neutral review summary',
+        reviewState: 'COMMENTED',
+        createdAt: '2026-05-04T00:00:00Z'
+      })
     ])
 
     expect(verdicts.map((verdict) => verdict.state)).toEqual([
@@ -89,13 +96,41 @@ describe('pr review verdicts', () => {
       comment({
         id: 1,
         author: 'ana',
+        body: 'A review summary',
         reviewState: 'COMMENTED',
         createdAt: '2026-05-01T00:00:00Z'
       }),
-      comment({ id: 2, author: 'ana', reviewState: 'PENDING', createdAt: '2026-05-02T00:00:00Z' })
+      comment({
+        id: 2,
+        author: 'ana',
+        body: 'Still drafting',
+        reviewState: 'PENDING',
+        createdAt: '2026-05-02T00:00:00Z'
+      })
     ])
 
     expect(verdicts).toEqual([expect.objectContaining({ id: 2, state: 'PENDING' })])
+  })
+
+  it('treats a bodyless neutral review as no verdict at all', () => {
+    // Why: GitHub submits a bodyless `COMMENTED` review for a batch of inline comments, so calling
+    // one a verdict would credit every inline-comment submission with a "Commented" row.
+    expect(
+      getPRReviewVerdicts([
+        comment({ id: 1, author: 'ana', reviewState: 'COMMENTED' }),
+        comment({ id: 2, author: 'sam', reviewState: 'PENDING' })
+      ])
+    ).toEqual([])
+    // A decision with no body is the case this feature exists for, and it still counts.
+    expect(
+      getPRReviewVerdicts([comment({ id: 3, author: 'kim', reviewState: 'APPROVED' })])
+    ).toEqual([expect.objectContaining({ id: 3, state: 'APPROVED', hasBody: false })])
+
+    expect(isReportableReviewSubmission('', 'APPROVED')).toBe(true)
+    expect(isReportableReviewSubmission('', 'DISMISSED')).toBe(true)
+    expect(isReportableReviewSubmission('', 'COMMENTED')).toBe(false)
+    expect(isReportableReviewSubmission('', undefined)).toBe(false)
+    expect(isReportableReviewSubmission('a comment', 'COMMENTED')).toBe(true)
   })
 
   it('reports a dismissed review without implying approval', () => {
