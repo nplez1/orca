@@ -148,6 +148,9 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   nativeChatAutoName: 'replicated',
   worktreeVisibilityDefaults: 'replicated',
   nestWorkspaces: 'replicated',
+  // Why replicated, like `nestWorkspaces`: the two encode one placement rule, and their whole point
+  // is that a host on an older build computing from the legacy switch lands on the same root.
+  worktreeLayoutMode: 'replicated',
   refreshLocalBaseRefOnWorktreeCreate: 'replicated',
   autoRenameBranchFromWork: 'replicated',
   branchPrefix: 'replicated',
