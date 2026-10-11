@@ -1,5 +1,5 @@
 import React from 'react'
-import { CircleDot } from 'lucide-react'
+import { CircleDot, Github } from 'lucide-react'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { getWorkspaceAttachmentKey } from '../../../../shared/workspace-attachment-normalization'
@@ -75,6 +75,11 @@ function ReferenceGlyph({
   }
   if (item.provider === 'jira') {
     return <JiraIcon className="text-muted-foreground" />
+  }
+  // Why: GitHub tasks wear the provider mark the issue pane tab uses; GitLab's issues
+  // keep the shared circle glyph.
+  if (item.type === 'issue' && item.provider === 'github') {
+    return <Github className="text-muted-foreground" />
   }
   return <CircleDot className="text-muted-foreground" />
 }

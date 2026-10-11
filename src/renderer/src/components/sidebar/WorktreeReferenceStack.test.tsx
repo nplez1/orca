@@ -30,6 +30,27 @@ describe('fixed workspace reference stacks', () => {
     expect(container.textContent).toContain('Linked Linear ENG-1')
     expect(container.textContent).not.toContain('1 linked')
   })
+  it('wears the GitHub provider mark for a GitHub task, and the issue circle for every other provider', () => {
+    const githubIssue: WorkspaceAttachment = { provider: 'github', type: 'issue', number: 12 }
+    const gitlabIssue: WorkspaceAttachment = { provider: 'gitlab', type: 'issue', number: 13 }
+    const { container } = render(
+      <>
+        <WorktreeReferenceStack items={[githubIssue]} />
+        <WorktreeReferenceStack items={[gitlabIssue]} />
+        <WorktreeCardMetaBadges
+          issue={{ number: 14, title: 'Legacy linked task' }}
+          linearIssue={null}
+          review={null}
+          comment={null}
+        />
+      </>
+    )
+    const fronts = container.querySelectorAll('[data-reference-front] svg')
+    expect(fronts[0].classList.contains('lucide-github')).toBe(true)
+    expect(fronts[1].classList.contains('lucide-circle-dot')).toBe(true)
+    // The legacy single-issue badge is a GitHub link too.
+    expect(container.querySelectorAll('.lucide-github')).toHaveLength(2)
+  })
   it('prioritizes the review needing attention over a legacy primary and preserves sibling states', () => {
     const items = [referenceAttachment(1), referenceAttachment(2), referenceAttachment(3)]
     const details = Object.fromEntries(

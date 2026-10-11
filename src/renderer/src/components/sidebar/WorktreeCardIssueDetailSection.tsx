@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { CircleDot, Copy, Ellipsis, ExternalLink, Globe, MonitorUp, Pencil } from 'lucide-react'
+import { Copy, Ellipsis, ExternalLink, Github, Globe, MonitorUp, Pencil } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import {
   WorktreeCardDetailSection,
@@ -63,7 +63,7 @@ export function WorktreeCardIssueDetailSection({
   return (
     <WorktreeCardDetailSection>
       <DetailHeader
-        icon={<CircleDot className="size-3 text-muted-foreground" />}
+        icon={<Github className="size-3 text-muted-foreground" />}
         label={translate(
           'auto.components.sidebar.WorktreeCardMeta.e97d8f2876',
           'Issue #{{value0}}',
