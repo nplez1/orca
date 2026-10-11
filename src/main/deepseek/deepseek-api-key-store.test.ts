@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import type * as DeepSeekApiKeyStore from './deepseek-api-key-store'
 
-const safeStorageMock = vi.hoisted(() => ({
+const secretStoreMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value)),
   decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
 }))
-
-const electronMock = vi.hoisted(() => ({
-  safeStorage: safeStorageMock
-}))
-
-vi.mock('electron', () => electronMock)
 
 const existsSyncMock = vi.fn()
 const readFileSyncMock = vi.fn()
@@ -47,6 +42,7 @@ const envelope = (
 ): string => `${prefix}${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
 
 async function loadStore(): Promise<typeof DeepSeekApiKeyStore> {
+  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
   return await import('./deepseek-api-key-store')
 }
 
@@ -57,15 +53,16 @@ describe('deepseek-api-key-store', () => {
     rmSyncMock.mockReset()
     hardenExistingSecureFileMock.mockReset()
     writeSecureFileMock.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReset()
-    safeStorageMock.encryptString.mockReset()
-    safeStorageMock.decryptString.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
-    safeStorageMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    safeStorageMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
+    secretStoreMock.isEncryptionAvailable.mockReset()
+    secretStoreMock.encryptString.mockReset()
+    secretStoreMock.decryptString.mockReset()
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
+    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
+    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
   })
 
   afterEach(() => {
+    _resetSecretStoreForTests()
     vi.resetModules()
   })
 
@@ -98,11 +95,11 @@ describe('deepseek-api-key-store', () => {
     warn.mockRestore()
   })
 
-  it('writes the key using safeStorage when encryption is available', async () => {
+  it('writes the key through the secret store when encryption is available', async () => {
     existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
     store.saveDeepSeekApiKey('sk-deepseek-1234567890')
-    expect(safeStorageMock.encryptString).toHaveBeenCalledWith('sk-deepseek-1234567890')
+    expect(secretStoreMock.encryptString).toHaveBeenCalledWith('sk-deepseek-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
       envelope('encrypted', 'sk-deepseek-1234567890'),
@@ -110,9 +107,9 @@ describe('deepseek-api-key-store', () => {
     )
   })
 
-  it('warns and writes plaintext when safeStorage is unavailable', async () => {
+  it('warns and writes plaintext when the secret store cannot seal', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     const store = await loadStore()
     store.saveDeepSeekApiKey('sk-deepseek-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
@@ -120,7 +117,7 @@ describe('deepseek-api-key-store', () => {
       envelope('plaintext', 'sk-deepseek-1234567890'),
       { durable: true }
     )
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('safeStorage encryption unavailable'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('secret encryption unavailable'))
     warn.mockRestore()
   })
 
@@ -129,10 +126,50 @@ describe('deepseek-api-key-store', () => {
     expect(() => store.saveDeepSeekApiKey('   ')).toThrow('DeepSeek API key is required')
   })
 
+  it('refuses to seal when no secret store is installed', async () => {
+    // Why this test exists: the global test setup installs a store, so dropping it is the only
+    // way to reach the uninstalled path — and a save consults the port unconditionally.
+    _resetSecretStoreForTests()
+    vi.resetModules()
+    const store = await import('./deepseek-api-key-store')
+
+    expect(() => store.saveDeepSeekApiKey('sk-plain')).toThrow(/SecretStore not initialized/)
+  })
+
+  it('reads a plaintext envelope with no secret store installed at all', async () => {
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReturnValue(Buffer.from(envelope('plaintext', 'sk-plain')))
+    _resetSecretStoreForTests()
+    vi.resetModules()
+    const store = await import('./deepseek-api-key-store')
+
+    expect(store.readDeepSeekApiKey()).toBe('sk-plain')
+  })
+
+  it('classifies a sealed envelope read with no store installed as a decrypt failure', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'sk-sealed')))
+    _resetSecretStoreForTests()
+    vi.resetModules()
+    const store = await import('./deepseek-api-key-store')
+
+    // Why the port's own error is logged and not surfaced: an uninstalled store is unreachable
+    // in production (main-process-preflight and orcad-entry both install one) and this read is
+    // read-only, so the caller's decrypt classification stands — the siblings fetch the store
+    // inside the same try too (openai-api-key-store, integration-credential-file).
+    expect(() => store.readDeepSeekApiKey()).toThrow('could not be decrypted')
+    expect(error).toHaveBeenCalledWith(
+      '[deepseek] failed to decode/decrypt API key',
+      expect.objectContaining({ message: expect.stringContaining('SecretStore not initialized') })
+    )
+    error.mockRestore()
+  })
+
   it('reads decrypted key from disk and caches it', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValue('sk-cached-key')
+    secretStoreMock.decryptString.mockReturnValue('sk-cached-key')
     const store = await loadStore()
     const first = store.readDeepSeekApiKey()
     const second = store.readDeepSeekApiKey()
@@ -140,8 +177,8 @@ describe('deepseek-api-key-store', () => {
     expect(second).toBe(first)
     expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
     expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledTimes(1)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
+    expect(secretStoreMock.decryptString).toHaveBeenCalledTimes(1)
+    expect(secretStoreMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
   })
 
   it('returns null when no file exists', async () => {
@@ -150,8 +187,8 @@ describe('deepseek-api-key-store', () => {
     expect(store.readDeepSeekApiKey()).toBeNull()
   })
 
-  it('throws for encrypted envelopes when safeStorage is unavailable', async () => {
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+  it('throws for encrypted envelopes when the secret store cannot seal', async () => {
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
     const store = await loadStore()
@@ -161,14 +198,14 @@ describe('deepseek-api-key-store', () => {
   it('throws when decryption fails', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockImplementation(() => {
+    secretStoreMock.decryptString.mockImplementation(() => {
       throw new Error('boom')
     })
     const store = await loadStore()
     expect(() => store.readDeepSeekApiKey()).toThrow('DeepSeek API key could not be decrypted')
   })
 
-  it('throws for non-envelope files (legacy safeStorage bytes with no prefix)', async () => {
+  it('throws for non-envelope files (legacy sealed bytes with no prefix)', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from('raw-bytes-without-envelope'))
     const store = await loadStore()
@@ -190,7 +227,7 @@ describe('deepseek-api-key-store', () => {
     let filePresent = true
     existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValueOnce('sk-preclear')
+    secretStoreMock.decryptString.mockReturnValueOnce('sk-preclear')
     const store = await loadStore()
     expect(store.readDeepSeekApiKey()).toBe('sk-preclear')
     filePresent = false

@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import type * as FireworksCredentialsStore from './fireworks-credentials-store'
 
-const safeStorageMock = vi.hoisted(() => ({
+const secretStoreMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value)),
   decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
 }))
-
-const electronMock = vi.hoisted(() => ({
-  safeStorage: safeStorageMock
-}))
-
-vi.mock('electron', () => electronMock)
 
 const existsSyncMock = vi.fn()
 const readFileSyncMock = vi.fn()
@@ -49,6 +44,7 @@ const jsonEnvelope = (payload: unknown, kind: 'encrypted' | 'plaintext' = 'encry
   envelope(kind, JSON.stringify(payload))
 
 async function loadStore(): Promise<typeof FireworksCredentialsStore> {
+  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
   return await import('./fireworks-credentials-store')
 }
 
@@ -59,15 +55,16 @@ describe('fireworks-credentials-store', () => {
     rmSyncMock.mockReset()
     hardenExistingSecureFileMock.mockReset()
     writeSecureFileMock.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReset()
-    safeStorageMock.encryptString.mockReset()
-    safeStorageMock.decryptString.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
-    safeStorageMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    safeStorageMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
+    secretStoreMock.isEncryptionAvailable.mockReset()
+    secretStoreMock.encryptString.mockReset()
+    secretStoreMock.decryptString.mockReset()
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
+    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
+    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
   })
 
   afterEach(() => {
+    _resetSecretStoreForTests()
     vi.resetModules()
   })
 
@@ -103,7 +100,7 @@ describe('fireworks-credentials-store', () => {
   it('writes both fields as one encrypted JSON payload', async () => {
     const store = await loadStore()
     store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: null })
-    expect(safeStorageMock.encryptString).toHaveBeenCalledWith(
+    expect(secretStoreMock.encryptString).toHaveBeenCalledWith(
       '{"apiKey":"fw_test_1234567890","accountIdOverride":null}'
     )
     expect(writeSecureFileMock).toHaveBeenCalledWith(
@@ -141,9 +138,9 @@ describe('fireworks-credentials-store', () => {
     expect(writeSecureFileMock).not.toHaveBeenCalled()
   })
 
-  it('warns and writes a plaintext envelope when safeStorage is unavailable', async () => {
+  it('warns and writes a plaintext envelope when the secret store cannot seal', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     const store = await loadStore()
     store.saveFireworksCredentials({ apiKey: 'fw_test_1234567890', accountIdOverride: null })
     expect(writeSecureFileMock).toHaveBeenCalledWith(
@@ -152,7 +149,7 @@ describe('fireworks-credentials-store', () => {
       { durable: true }
     )
     expect(warn).toHaveBeenCalledWith(
-      '[fireworks] safeStorage encryption unavailable — storing Fireworks API key in plaintext'
+      '[fireworks] secret encryption unavailable — storing Fireworks API key in plaintext'
     )
     warn.mockRestore()
   })
@@ -172,7 +169,7 @@ describe('fireworks-credentials-store', () => {
       accountIdOverride: 'acct-42'
     })
     expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledTimes(1)
+    expect(secretStoreMock.decryptString).toHaveBeenCalledTimes(1)
   })
 
   it('normalizes a missing or blank override to null when reading', async () => {
@@ -191,8 +188,8 @@ describe('fireworks-credentials-store', () => {
     expect(store.readFireworksCredentials()).toBeNull()
   })
 
-  it('throws when safeStorage is unavailable for an encrypted payload', async () => {
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+  it('throws when the secret store cannot seal an encrypted payload', async () => {
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(
       Buffer.from(jsonEnvelope({ apiKey: 'fw_test_1234567890', accountIdOverride: null }))

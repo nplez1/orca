@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import type * as MiniMaxApiKeyStore from './minimax-api-key-store'
 
-const safeStorageMock = vi.hoisted(() => ({
+const secretStoreMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value)),
   decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
 }))
-
-const electronMock = vi.hoisted(() => ({
-  safeStorage: safeStorageMock
-}))
-
-vi.mock('electron', () => electronMock)
 
 const existsSyncMock = vi.fn()
 const readFileSyncMock = vi.fn()
@@ -46,6 +41,7 @@ const envelope = (kind: 'encrypted' | 'plaintext', value: string): string =>
   `orca-minimax-api-key:v1:${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
 
 async function loadStore(): Promise<typeof MiniMaxApiKeyStore> {
+  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
   return await import('./minimax-api-key-store')
 }
 
@@ -56,15 +52,16 @@ describe('minimax-api-key-store', () => {
     rmSyncMock.mockReset()
     hardenExistingSecureFileMock.mockReset()
     writeSecureFileMock.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReset()
-    safeStorageMock.encryptString.mockReset()
-    safeStorageMock.decryptString.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
-    safeStorageMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    safeStorageMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
+    secretStoreMock.isEncryptionAvailable.mockReset()
+    secretStoreMock.encryptString.mockReset()
+    secretStoreMock.decryptString.mockReset()
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
+    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
+    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
   })
 
   afterEach(() => {
+    _resetSecretStoreForTests()
     vi.resetModules()
   })
 
@@ -97,11 +94,11 @@ describe('minimax-api-key-store', () => {
     warn.mockRestore()
   })
 
-  it('writes the key using safeStorage when encryption is available', async () => {
+  it('writes the key through the secret store when encryption is available', async () => {
     existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
     store.saveMiniMaxApiKey('sk-test-1234567890')
-    expect(safeStorageMock.encryptString).toHaveBeenCalledWith('sk-test-1234567890')
+    expect(secretStoreMock.encryptString).toHaveBeenCalledWith('sk-test-1234567890')
     expect(writeSecureFileMock).toHaveBeenCalledWith(
       storePath,
       envelope('encrypted', 'sk-test-1234567890'),
@@ -109,9 +106,9 @@ describe('minimax-api-key-store', () => {
     )
   })
 
-  it('warns and writes plaintext when safeStorage is unavailable', async () => {
+  it('warns and writes plaintext when the secret store cannot seal', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
     store.saveMiniMaxApiKey('sk-test-1234567890')
@@ -120,7 +117,7 @@ describe('minimax-api-key-store', () => {
       envelope('plaintext', 'sk-test-1234567890'),
       { durable: true }
     )
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('safeStorage encryption unavailable'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('secret encryption unavailable'))
     warn.mockRestore()
   })
 
@@ -152,8 +149,8 @@ describe('minimax-api-key-store', () => {
       readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'sk-test-1234567890')))
       const store = await loadStore()
       store.getMiniMaxApiKeyProtection()
-      expect(safeStorageMock.decryptString).not.toHaveBeenCalled()
-      expect(safeStorageMock.isEncryptionAvailable).not.toHaveBeenCalled()
+      expect(secretStoreMock.decryptString).not.toHaveBeenCalled()
+      expect(secretStoreMock.isEncryptionAvailable).not.toHaveBeenCalled()
     })
 
     it('reports null for an unreadable envelope rather than guessing', async () => {
@@ -172,7 +169,7 @@ describe('minimax-api-key-store', () => {
   it('reads decrypted key from disk and caches it', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValue('sk-cached-key')
+    secretStoreMock.decryptString.mockReturnValue('sk-cached-key')
     const store = await loadStore()
     const first = store.readMiniMaxApiKey()
     const second = store.readMiniMaxApiKey()
@@ -180,8 +177,8 @@ describe('minimax-api-key-store', () => {
     expect(second).toBe(first)
     expect(hardenExistingSecureFileMock).toHaveBeenCalledTimes(1)
     expect(hardenExistingSecureFileMock).toHaveBeenCalledWith(storePath)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledTimes(1)
-    expect(safeStorageMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
+    expect(secretStoreMock.decryptString).toHaveBeenCalledTimes(1)
+    expect(secretStoreMock.decryptString).toHaveBeenCalledWith(Buffer.from('encrypted-payload'))
   })
 
   it('returns null when no file exists', async () => {
@@ -190,8 +187,8 @@ describe('minimax-api-key-store', () => {
     expect(store.readMiniMaxApiKey()).toBeNull()
   })
 
-  it('throws for encrypted envelopes when safeStorage is unavailable', async () => {
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+  it('throws for encrypted envelopes when the secret store cannot seal', async () => {
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
     const store = await loadStore()
@@ -201,14 +198,14 @@ describe('minimax-api-key-store', () => {
   it('throws when decryption fails', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockImplementation(() => {
+    secretStoreMock.decryptString.mockImplementation(() => {
       throw new Error('boom')
     })
     const store = await loadStore()
     expect(() => store.readMiniMaxApiKey()).toThrow(/could not be decrypted/)
   })
 
-  it('throws for non-envelope files (legacy safeStorage bytes with no prefix)', async () => {
+  it('throws for non-envelope files (legacy sealed bytes with no prefix)', async () => {
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from('raw-bytes-without-envelope'))
     const store = await loadStore()
@@ -223,7 +220,7 @@ describe('minimax-api-key-store', () => {
       throw Object.assign(new Error('resource busy'), { code: 'EBUSY' })
     })
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValueOnce('sk-after-retry')
+    secretStoreMock.decryptString.mockReturnValueOnce('sk-after-retry')
     const store = await loadStore()
     expect(() => store.readMiniMaxApiKey()).toThrow('MiniMax API key file could not be read')
     expect(error).not.toHaveBeenCalled()
@@ -238,7 +235,7 @@ describe('minimax-api-key-store', () => {
     let filePresent = true
     existsSyncMock.mockImplementation((path: string) => path === storePath && filePresent)
     readFileSyncMock.mockReturnValueOnce(Buffer.from(envelope('encrypted', 'encrypted-payload')))
-    safeStorageMock.decryptString.mockReturnValueOnce('sk-preclear')
+    secretStoreMock.decryptString.mockReturnValueOnce('sk-preclear')
     const store = await loadStore()
     expect(store.readMiniMaxApiKey()).toBe('sk-preclear')
     filePresent = false

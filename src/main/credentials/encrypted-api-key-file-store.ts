@@ -1,5 +1,5 @@
-import { safeStorage } from 'electron'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { getSecretStore } from '../../shared/secret-store'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
 import {
   hardenExistingSecureFile,
@@ -68,10 +68,14 @@ export function createEncryptedApiKeyFileStore({
     if (envelope.kind === 'plaintext') {
       return envelope.payload.toString('utf8')
     }
-    if (!safeStorage.isEncryptionAvailable()) {
+    // Why only a sealed envelope consults the port: a plaintext one is the host's own bytes
+    // and needs no sealing facility, so a plaintext store stays readable even where no store
+    // was ever installed.
+    const store = getSecretStore()
+    if (!store.isEncryptionAvailable()) {
       throw new Error(`${providerLabel} API key could not be decrypted`)
     }
-    return safeStorage.decryptString(envelope.payload)
+    return store.decryptString(envelope.payload)
   }
 
   function has(): boolean {
@@ -110,17 +114,18 @@ export function createEncryptedApiKeyFileStore({
     if (!trimmed) {
       throw new Error(`${providerLabel} API key is required`)
     }
-    if (safeStorage.isEncryptionAvailable()) {
+    const store = getSecretStore()
+    if (store.isEncryptionAvailable()) {
       writeSecureFile(
         getApiKeyPath(),
-        encodeApiKeyEnvelope('encrypted', safeStorage.encryptString(trimmed)),
+        encodeApiKeyEnvelope('encrypted', store.encryptString(trimmed)),
         { durable: true }
       )
       cachedApiKey = trimmed
       return
     }
     console.warn(
-      `[${logScope}] safeStorage encryption unavailable — storing ${providerLabel} API key in plaintext`
+      `[${logScope}] secret encryption unavailable — storing ${providerLabel} API key in plaintext`
     )
     writeSecureFile(
       getApiKeyPath(),

@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
 import type * as ZcodePlanApiKeyStore from './zcode-plan-api-key-store'
 
-const safeStorageMock = vi.hoisted(() => ({
+const secretStoreMock = vi.hoisted(() => ({
   isEncryptionAvailable: vi.fn(() => true),
   encryptString: vi.fn((value: string) => Buffer.from(value)),
   decryptString: vi.fn((value: Buffer) => value.toString('utf8'))
 }))
-
-const electronMock = vi.hoisted(() => ({
-  safeStorage: safeStorageMock
-}))
-
-vi.mock('electron', () => electronMock)
 
 const existsSyncMock = vi.fn()
 const readFileSyncMock = vi.fn()
@@ -44,6 +39,7 @@ const envelope = (kind: 'encrypted' | 'plaintext', value: string): string =>
   `orca-zcode-plan-api-key:v1:${kind}:${Buffer.from(value, 'utf8').toString('base64')}`
 
 async function loadStore(): Promise<typeof ZcodePlanApiKeyStore> {
+  setSecretStore({ ...secretStoreMock, describeProtectionGap: () => null })
   return await import('./zcode-plan-api-key-store')
 }
 
@@ -55,12 +51,12 @@ describe('zcode-plan-api-key-store', () => {
     hardenExistingSecureFileMock.mockReset()
     writeSecureFileMock.mockReset()
     writeSecureFileMock.mockReturnValue(true)
-    safeStorageMock.isEncryptionAvailable.mockReset()
-    safeStorageMock.encryptString.mockReset()
-    safeStorageMock.decryptString.mockReset()
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
-    safeStorageMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
-    safeStorageMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
+    secretStoreMock.isEncryptionAvailable.mockReset()
+    secretStoreMock.encryptString.mockReset()
+    secretStoreMock.decryptString.mockReset()
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(true)
+    secretStoreMock.encryptString.mockImplementation((value: string) => Buffer.from(value))
+    secretStoreMock.decryptString.mockImplementation((value: Buffer) => value.toString('utf8'))
     homedirMock.mockReturnValue('/home/test')
     vi.resetModules()
   })
@@ -86,27 +82,64 @@ describe('zcode-plan-api-key-store', () => {
     expect(store.readZcodePlanApiKey()).toBe('glm-secret')
   })
 
-  it('warns and writes plaintext when safeStorage is unavailable', async () => {
+  it('warns and writes plaintext when the secret store cannot seal', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
 
     store.saveZcodePlanApiKey('glm-secret')
 
     expect(writeSecureFileMock).toHaveBeenCalledWith(storePath, envelope('plaintext', 'glm-secret'))
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('safeStorage encryption unavailable'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('secret encryption unavailable'))
     warn.mockRestore()
   })
 
-  it('reads a plaintext envelope back without requiring safeStorage', async () => {
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+  it('reads a plaintext envelope back without requiring the secret store', async () => {
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('plaintext', 'glm-secret')))
     const store = await loadStore()
 
     expect(store.readZcodePlanApiKey()).toBe('glm-secret')
-    expect(safeStorageMock.decryptString).not.toHaveBeenCalled()
+    expect(secretStoreMock.decryptString).not.toHaveBeenCalled()
+  })
+
+  it('refuses to seal when no secret store is installed', async () => {
+    // Why this test exists: the global test setup installs a store, so dropping it is the only
+    // way to reach the uninstalled path — and a save consults the port unconditionally.
+    _resetSecretStoreForTests()
+    const store = await import('./zcode-plan-api-key-store')
+
+    expect(() => store.saveZcodePlanApiKey('glm-secret')).toThrow(/SecretStore not initialized/)
+  })
+
+  it('reads a plaintext envelope with no secret store installed at all', async () => {
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReturnValue(Buffer.from(envelope('plaintext', 'glm-secret')))
+    _resetSecretStoreForTests()
+    const store = await import('./zcode-plan-api-key-store')
+
+    expect(store.readZcodePlanApiKey()).toBe('glm-secret')
+  })
+
+  it('classifies a sealed envelope read with no store installed as a decrypt failure', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    existsSyncMock.mockReturnValue(true)
+    readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'glm-secret')))
+    _resetSecretStoreForTests()
+    const store = await import('./zcode-plan-api-key-store')
+
+    // Why the port's own error is logged and not surfaced: an uninstalled store is unreachable
+    // in production (main-process-preflight and orcad-entry both install one) and this read is
+    // read-only, so the caller's decrypt classification stands — the siblings fetch the store
+    // inside the same try too (openai-api-key-store, integration-credential-file).
+    expect(() => store.readZcodePlanApiKey()).toThrow('could not be decrypted')
+    expect(error).toHaveBeenCalledWith(
+      '[zcode] failed to decode/decrypt GLM Coding Plan API key',
+      expect.objectContaining({ message: expect.stringContaining('SecretStore not initialized') })
+    )
+    error.mockRestore()
   })
 
   it.each(['encrypted', 'plaintext'] as const)(
@@ -118,7 +151,7 @@ describe('zcode-plan-api-key-store', () => {
       expect(store.getZcodePlanApiKeyProtection()).toBe(
         kind === 'encrypted' ? 'sealed' : 'plaintext'
       )
-      expect(safeStorageMock.decryptString).not.toHaveBeenCalled()
+      expect(secretStoreMock.decryptString).not.toHaveBeenCalled()
     }
   )
 
@@ -138,7 +171,7 @@ describe('zcode-plan-api-key-store', () => {
 
   it('refuses to keep an unrestricted plaintext key when hardening fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     writeSecureFileMock.mockReturnValue(false)
     existsSyncMock.mockReturnValue(false)
     const store = await loadStore()
@@ -152,7 +185,7 @@ describe('zcode-plan-api-key-store', () => {
 
   it('restores the previous envelope when a plaintext replacement cannot be restricted', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     const previous = Buffer.from(envelope('encrypted', 'old-key'))
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(previous)
@@ -170,8 +203,8 @@ describe('zcode-plan-api-key-store', () => {
     warn.mockRestore()
   })
 
-  it('refuses to decrypt an encrypted envelope once safeStorage becomes unavailable', async () => {
-    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+  it('refuses to decrypt an encrypted envelope once the secret store cannot seal', async () => {
+    secretStoreMock.isEncryptionAvailable.mockReturnValue(false)
     existsSyncMock.mockReturnValue(true)
     readFileSyncMock.mockReturnValue(Buffer.from(envelope('encrypted', 'glm-secret')))
     const store = await loadStore()
@@ -202,5 +235,6 @@ describe('zcode-plan-api-key-store', () => {
 })
 
 afterEach(() => {
+  _resetSecretStoreForTests()
   vi.restoreAllMocks()
 })
