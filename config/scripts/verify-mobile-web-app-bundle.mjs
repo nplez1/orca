@@ -43,7 +43,7 @@ export function mobileWebAppBundleMaxAssets(routeCount, imageCount) {
  * refused asset on a phone. Splitting barely moves it — the same code is emitted in more files —
  * so shrinking this still means cutting code.
  *
- * This head reads 7,686,714 bytes of the 9,437,184 here, 81.5%, leaving 1,750,470. A reading and
+ * This head reads 7,960,086 bytes of the 9,437,184 here, 84.4%, leaving 1,477,098. A reading and
  * not a pin: nothing asserts it, because the number moves with every build. It is here so the
  * generation that spends the rest can see it was already this close.
  */
@@ -55,9 +55,9 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
  * A chunk is emitted per distinct set of importers, not per route, so a route's marginal cost is
  * what it fails to share rather than what it weighs. Re-measured on this head by building
  * `routes.slice(0, n)` for every n, which is what the fence below is derived from rather than
- * fitted to. The spread it shows is 1 to 10: `pr` and `web` add one script each, `session` adds ten.
- * The root `./_layout.tsx` (the page's web sibling of the native root) sorts first; with it the
- * swept tree reads 79 scripts at 16 routes.
+ * fitted to. The spread it shows is 1 to 10: `pr` and `web` add one script each, `review` and
+ * `session` add ten. The root `./_layout.tsx` (the page's web sibling of the native root) sorts
+ * first; with it the swept tree reads 79 scripts at 16 routes.
  *
  * This table is the fence's only input, so a route added to the tree stales it and the pins beside
  * the fence fail until it is re-measured. That is the point: the bound is re-derived, never bumped.

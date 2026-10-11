@@ -474,7 +474,25 @@ pnpm run sync:localization-runtime-catalog
     fork's SecretStore, which the `skipIf(platform !== 'win32')` guard hid on macOS. `aba543909a`
     fixed that, and the re-review of it returned **ship-ready with no blocking findings**, confirming
     every repair in the series and finding **no weakened assertions** anywhere. Both substitutions are
-    recorded because the gate's whole value is that it is checkable.
+    recorded because the gate's whole value is that it is checkable. A third pass reviewed the
+    bundle fix below and returned **ship-ready with no blocking findings**, having independently
+    re-measured the sweep table row by row.
+  - **The mobile web bundle fence was re-measured, not bumped.** Release run 26 failed at
+    `verify-mobile-web-app-bundle`: 129 assets against a derived budget of 128 for 16 routes and 49
+    images. The ceiling is derived from `MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP`, and this sync's
+    upstream mobile changes moved the swept tree from **74 to 79** scripts at the same 16 routes —
+    past the margin of four, which is the file's own trigger for a re-measurement rather than a
+    bump. The table was re-measured by building `routes.slice(0, n)` for every n, as its comment
+    prescribes, and its two crossing pins were re-derived at the tree's 49 images (`maxChunks(28) =
+    203` → 253 assets pass; `maxChunks(29) = 213` → 263 > the shell's 256, throws). The margin stays
+    4 and every contract constant is untouched; the fence now sits exactly one margin above the
+    build, on both sides.
+  - **Open (2026-10-11 sync): two consecutive syncs have grown that sweep by five, and nothing has
+    diagnosed which module the chunks come from.** The ledger already asks for the one diagnostic
+    pass that would name it; this sync added a second five-chunk step, so the third will re-measure
+    a table whose growth is still unexplained. The ratchet is doing its job — the two-sided margin
+    test pins the envelope to within four of the build, so it is real growth rather than accumulated
+    slack — but a re-measurement is not a diagnosis.
   - **Left failing, and proved not ours:** `pnpm run audit:code-quality:native` reports five
     `import(no-cycle)` warnings — `mobile/src/transport/client-context.tsx`,
     `mobile/src/transport/host-client-hooks.ts`, `mobile/src/terminal/document/fit-scale.ts` (x2)
