@@ -1,5 +1,13 @@
 import React from 'react'
-import { CircleDot, ExternalLink, GitMerge, GitPullRequest, Link2, Plus } from 'lucide-react'
+import {
+  CircleDot,
+  ExternalLink,
+  Github,
+  GitMerge,
+  GitPullRequest,
+  Link2,
+  Plus
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
@@ -118,6 +126,8 @@ export function WorktreeCardLinkedItemsSection({
                           <GitMerge className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                         ) : item.type === 'pr' ? (
                           <GitPullRequest className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                        ) : item.type === 'issue' && item.provider === 'github' ? (
+                          <Github className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                         ) : (
                           <CircleDot className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                         )}

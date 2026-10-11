@@ -1,5 +1,5 @@
 import React from 'react'
-import { CalendarClock, CircleDot, Link2, SquareTerminal, StickyNote } from 'lucide-react'
+import { CalendarClock, Github, Link2, SquareTerminal, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
@@ -159,7 +159,7 @@ export const WorktreeCardMetaBadges = React.forwardRef<
               { value0: issue.number }
             )}
           >
-            <CircleDot className="text-muted-foreground" />
+            <Github className="text-muted-foreground" />
           </MetaIconBadge>
         )
       )}
