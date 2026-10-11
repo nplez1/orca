@@ -10,6 +10,7 @@ import type {
   JiraIssueCommentComposer,
   JiraIssueWorkspaceContent
 } from './jira-issue-workspace-content'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 type PendingRead<T> = {
@@ -134,8 +135,9 @@ async function render(selected: JiraIssue | null): Promise<void> {
     mountedRoot.render(
       <JiraIssueWorkspace
         issue={selected}
+        issueWorkspaceAttachmentIndex={buildJiraIssueWorkspaceAttachmentIndex([])}
         sourceContext={sourceContext}
-        onUse={() => {}}
+        onOpenOrStartWorkspace={() => {}}
         onClose={() => {}}
       />
     )

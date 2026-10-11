@@ -871,6 +871,15 @@
           }
         }
       },
+      "jira": {
+        "issue": {
+          "workspace": {
+            "open": {
+              "failed": "无法打开关联到该议题的工作区。"
+            }
+          }
+        }
+      },
       "linear": {
         "usage": {
           "examples": {
@@ -1479,6 +1488,7 @@
         "b0b92666c9": "评论",
         "a585fd204e": "添加 Jira 评论...",
         "2441be6f9f": "启动工作区",
+        "showWorkspace": "显示工作区",
         "9178090e26": "还没有评论。",
         "5cd09beaf9": "重试",
         "9a980b06b9": "评论",
@@ -2269,6 +2279,8 @@
         "linearModeHasWorktreeTooltip": "已关联 Orca 工作区的 Linear 工单",
         "linearEmptyHasWorktree": "还没有关联到 Orca 工作区的 Linear 工单。从 Linear 议题开始工作后会显示在这里。",
         "linearOpenAttachedWorkspace": "打开关联到 {{value0}} 的工作区",
+        "jiraOpenAttachedWorkspace": "打开关联到 {{value0}} 的工作区",
+        "jiraShowWorkspace": "显示工作区",
         "linearWorktreesColumn": "工作区",
         "jiraSortAscending": "升序",
         "jiraSortDescending": "降序",

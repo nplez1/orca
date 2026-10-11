@@ -47,7 +47,8 @@ export function TaskPageJiraContent({
     displayedJiraStatusOrder,
     sortedJiraIssues,
     setJiraConnectOpen,
-    handleUseJiraItem
+    jiraIssueAttachmentIndex,
+    handleOpenOrUseJiraItem
   } = model
   const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
@@ -120,7 +121,8 @@ export function TaskPageJiraContent({
       />
       <JiraIssueWorkspace
         issue={selectedJiraIssue}
-        onUse={handleUseJiraItem}
+        issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
+        onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailSourceContext}
         refreshSignal={jiraDetailRefreshSignal}
@@ -209,8 +211,9 @@ export function TaskPageJiraContent({
           formatUpdatedAt={formatRelativeTime}
           getStatusTone={getJiraStatusTone}
           issues={sortedJiraIssues}
+          issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
           onOpenIssue={openJiraDetailPage}
-          onStartWorkspace={handleUseJiraItem}
+          onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
           selectedIssue={selectedJiraIssue}
           showSiteContext={selectedJiraSiteId === 'all'}
           statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
@@ -219,7 +222,8 @@ export function TaskPageJiraContent({
       </div>
       <JiraIssueWorkspace
         issue={selectedJiraIssue}
-        onUse={handleUseJiraItem}
+        issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
+        onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailSourceContext}
         refreshSignal={jiraDetailRefreshSignal}

@@ -871,6 +871,15 @@
           }
         }
       },
+      "jira": {
+        "issue": {
+          "workspace": {
+            "open": {
+              "failed": "この Issue にリンクされたワークスペースを開けませんでした。"
+            }
+          }
+        }
+      },
       "linear": {
         "usage": {
           "examples": {
@@ -1479,6 +1488,7 @@
         "b0b92666c9": "コメント",
         "a585fd204e": "Jira コメントを追加…",
         "2441be6f9f": "ワークスペースを開始",
+        "showWorkspace": "ワークスペースを表示",
         "9178090e26": "コメントはまだありません。",
         "5cd09beaf9": "再試行",
         "9a980b06b9": "コメント",
@@ -2269,6 +2279,8 @@
         "linearModeHasWorktreeTooltip": "Orca ワークスペースにリンクされた Linear チケット",
         "linearEmptyHasWorktree": "Orca ワークスペースにリンクされた Linear チケットはまだありません。Linear の Issue から作業を開始すると、ここに表示されます。",
         "linearOpenAttachedWorkspace": "{{value0}} にリンクされたワークスペースを開く",
+        "jiraOpenAttachedWorkspace": "{{value0}} にリンクされたワークスペースを開く",
+        "jiraShowWorkspace": "ワークスペースを表示",
         "linearWorktreesColumn": "ワークスペース",
         "jiraSortAscending": "昇順",
         "jiraSortDescending": "降順",

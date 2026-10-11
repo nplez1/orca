@@ -1,6 +1,12 @@
 import type { DragEvent, JSX } from 'react'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
+import {
+  findJiraIssueWorkspaceAttachmentInIndex,
+  type JiraIssueWorkspaceAttachmentIndex
+} from '@/lib/jira-issue-workspace-attachment'
+import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
+import { JiraAttachedWorkspaceChip } from './JiraAttachedWorkspaceChip'
 import { getJiraStatusTone } from '../../task-page-jira-status-tone'
 import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
@@ -11,6 +17,7 @@ type TaskPageJiraBoardColumnsProps = {
   columns: TaskPageJiraBoardColumn[]
   otherIssues: JiraIssue[]
   selectedIssue: JiraIssue | null
+  issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   draggingIssueKey: string | null
   updatingIssueKey: string | null
   onOpenIssue: (issue: JiraIssue) => void
@@ -30,6 +37,7 @@ function isSelected(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean 
 }
 
 function JiraBoardCard({
+  attachedWorkspaceLabel,
   issue,
   selected,
   dragging,
@@ -38,6 +46,7 @@ function JiraBoardCard({
   onDragStart,
   onDragEnd
 }: {
+  attachedWorkspaceLabel: string | null
   issue: JiraIssue
   selected: boolean
   dragging: boolean
@@ -104,9 +113,14 @@ function JiraBoardCard({
           {issue.assignee?.displayName ??
             translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
         </span>
-        {issue.priority?.name ? (
-          <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0 text-[10px]" />
-        ) : null}
+        <div className="flex min-w-0 items-center gap-2">
+          {attachedWorkspaceLabel ? (
+            <JiraAttachedWorkspaceChip label={attachedWorkspaceLabel} />
+          ) : null}
+          {issue.priority?.name ? (
+            <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0 text-[10px]" />
+          ) : null}
+        </div>
       </div>
     </div>
   )
@@ -116,6 +130,7 @@ export function TaskPageJiraBoardColumns({
   columns,
   otherIssues,
   selectedIssue,
+  issueWorkspaceAttachmentIndex,
   draggingIssueKey,
   updatingIssueKey,
   onOpenIssue,
@@ -152,18 +167,25 @@ export function TaskPageJiraBoardColumns({
             {translate('auto.components.TaskPage.jiraBoardEmptyColumn', 'No issues')}
           </p>
         ) : null}
-        {issues.map((issue) => (
-          <JiraBoardCard
-            key={`${issue.siteId ?? 'site'}:${issue.key}`}
-            issue={issue}
-            selected={isSelected(issue, selectedIssue)}
-            dragging={draggingIssueKey === issue.key}
-            updating={updatingIssueKey === issue.key}
-            onOpenIssue={onOpenIssue}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-          />
-        ))}
+        {issues.map((issue) => {
+          const attached = findJiraIssueWorkspaceAttachmentInIndex(
+            issueWorkspaceAttachmentIndex,
+            issue
+          )
+          return (
+            <JiraBoardCard
+              key={`${issue.siteId ?? 'site'}:${issue.key}`}
+              attachedWorkspaceLabel={attached ? getWorktreeAttachmentLabel(attached) : null}
+              issue={issue}
+              selected={isSelected(issue, selectedIssue)}
+              dragging={draggingIssueKey === issue.key}
+              updating={updatingIssueKey === issue.key}
+              onOpenIssue={onOpenIssue}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+            />
+          )
+        })}
       </div>
     </section>
   )

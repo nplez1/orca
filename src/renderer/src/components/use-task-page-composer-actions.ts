@@ -1,5 +1,5 @@
 import type { TaskPageJiraListEffectsModel } from './use-task-page-jira-list-effects'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../../shared/linear/workspace-types'
 import type { JiraIssue } from '../../../shared/jira-types'
@@ -7,6 +7,9 @@ import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import { useAppStore } from '@/store'
 import { openLinearIssueWorkspaceOrStart } from '@/lib/linear-issue-workspace-open'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { openJiraIssueWorkspaceOrStart } from '@/lib/jira-issue-workspace-open'
+import { folderWorkspaceToWorktree } from '../../../shared/folder-workspace-worktree'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { bindTaskPageJiraItemSourceContext } from './task-page-jira-item-source-context'
@@ -16,6 +19,8 @@ import { getJiraIssueWorkspaceSeed } from './task-page-source-context'
 export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) {
   const {
     setTaskResumeState,
+    allWorktrees,
+    folderWorkspaces,
     openModal,
     updateSettings,
     selectLinearWorkspace,
@@ -228,6 +233,23 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     },
     [openComposerForJiraItem]
   )
+  const handleOpenOrUseJiraItem = useCallback(
+    (issue: JiraIssue): void => {
+      if (openJiraIssueWorkspaceOrStart(issue, () => handleUseJiraItem(issue)) === 'opened') {
+        useAppStore.getState().recordFeatureInteraction('jira-tasks')
+      }
+    },
+    [handleUseJiraItem]
+  )
+  // Why: one pass over workspaces per list render; per-row scans re-read every attachment list.
+  const jiraIssueAttachmentIndex = useMemo(
+    () =>
+      buildJiraIssueWorkspaceAttachmentIndex([
+        ...allWorktrees,
+        ...folderWorkspaces.map(folderWorkspaceToWorktree)
+      ]),
+    [allWorktrees, folderWorkspaces]
+  )
   const taskPageListChromeHidden = shouldHideTaskPageListChrome({
     taskSource,
     hasGitHubDetail: Boolean(dialogWorkItem),
@@ -237,6 +259,7 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     hasLinearProjectContext: Boolean(selectedLinearProject),
     hasLinearViewContext: Boolean(selectedLinearCustomView)
   })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the TaskPage hook chain hands each stage a wider model than it declares, and this intersection names exactly the members this stage adds.
   const nextModel = model as typeof model & {
     openComposerForLinearItem: typeof openComposerForLinearItem
     handleUseLinearItem: typeof handleUseLinearItem
@@ -246,7 +269,8 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     handleLinearScopeOpen: typeof handleLinearScopeOpen
     handleLinearAccessConnected: typeof handleLinearAccessConnected
     openComposerForJiraItem: typeof openComposerForJiraItem
-    handleUseJiraItem: typeof handleUseJiraItem
+    handleOpenOrUseJiraItem: typeof handleOpenOrUseJiraItem
+    jiraIssueAttachmentIndex: typeof jiraIssueAttachmentIndex
     taskPageListChromeHidden: typeof taskPageListChromeHidden
   }
   nextModel.openComposerForLinearItem = openComposerForLinearItem
@@ -257,7 +281,8 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
   nextModel.handleLinearScopeOpen = handleLinearScopeOpen
   nextModel.handleLinearAccessConnected = handleLinearAccessConnected
   nextModel.openComposerForJiraItem = openComposerForJiraItem
-  nextModel.handleUseJiraItem = handleUseJiraItem
+  nextModel.handleOpenOrUseJiraItem = handleOpenOrUseJiraItem
+  nextModel.jiraIssueAttachmentIndex = jiraIssueAttachmentIndex
   nextModel.taskPageListChromeHidden = taskPageListChromeHidden
   return nextModel
 }

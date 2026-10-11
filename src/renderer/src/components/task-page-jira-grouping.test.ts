@@ -10,11 +10,13 @@ import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { sortJiraIssues } from './jira-issue-sorter'
 import { groupJiraIssuesByStatus, TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import {
   getSingleJiraProjectScope,
   loadTaskPageJiraProjectStatusOrder
 } from './task-page-jira-status-order'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import type { Worktree } from '../../../shared/worktree/types'
 
 const { jiraGetProjectStatusOrderMock } = vi.hoisted(() => ({
   jiraGetProjectStatusOrderMock: vi.fn()
@@ -58,6 +60,38 @@ function jiraIssue(
 
 function statusOrder(statusIdsByColumn: string[][]): JiraProjectStatusOrder {
   return { statusIdsByColumn }
+}
+
+const EMPTY_ATTACHMENT_INDEX = buildJiraIssueWorkspaceAttachmentIndex([])
+
+function attachedWorkspace(key: string, displayName: string): Worktree {
+  return {
+    id: 'wt-attached',
+    repoId: 'repo-1',
+    path: '/tmp/repo-1/wt-attached',
+    head: 'abc123',
+    branch: 'refs/heads/alp-1-fix-payments',
+    isBare: false,
+    isMainWorktree: false,
+    displayName,
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    linkedWorkItem: {
+      provider: 'jira',
+      type: 'issue',
+      number: 0,
+      title: key,
+      url: `https://example.atlassian.net/browse/${key}`,
+      jiraIdentifier: key
+    },
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0
+  }
 }
 
 describe('Jira issue status grouping', () => {
@@ -180,7 +214,8 @@ describe('Jira issue status grouping', () => {
             jiraIssue('ALP-4', 'Unranked issue', '1', 'To Do')
           ],
           onOpenIssue: vi.fn(),
-          onStartWorkspace: vi.fn(),
+          onOpenOrStartWorkspace: vi.fn(),
+          issueWorkspaceAttachmentIndex: EMPTY_ATTACHMENT_INDEX,
           selectedIssue: null,
           showSiteContext: false,
           statusOrder: null
@@ -227,7 +262,8 @@ describe('Jira issue status grouping', () => {
             jiraIssue('ALP-2', 'Second issue', '1', 'To Do')
           ],
           onOpenIssue: vi.fn(),
-          onStartWorkspace: vi.fn(),
+          onOpenOrStartWorkspace: vi.fn(),
+          issueWorkspaceAttachmentIndex: EMPTY_ATTACHMENT_INDEX,
           selectedIssue: null,
           showSiteContext: false,
           statusOrder: null
@@ -246,5 +282,44 @@ describe('Jira issue status grouping', () => {
 
     await user.click(trigger)
     expect(screen.getByText('First issue')).toBeInTheDocument()
+  })
+
+  it('shows an attached-workspace chip and flips the row action to Show workspace', async () => {
+    const user = userEvent.setup()
+    const onOpenOrStartWorkspace = vi.fn()
+    render(
+      React.createElement(
+        TooltipProvider,
+        null,
+        React.createElement(TaskPageJiraIssueList, {
+          formatUpdatedAt: () => 'today',
+          getStatusTone: () => 'border-border',
+          issues: [
+            jiraIssue('ALP-1', 'Attached issue', '1', 'To Do'),
+            jiraIssue('ALP-2', 'Unattached issue', '1', 'To Do')
+          ],
+          issueWorkspaceAttachmentIndex: buildJiraIssueWorkspaceAttachmentIndex([
+            attachedWorkspace('ALP-1', 'Attached workspace')
+          ]),
+          onOpenIssue: vi.fn(),
+          onOpenOrStartWorkspace,
+          selectedIssue: null,
+          showSiteContext: false,
+          statusOrder: null,
+          groupByStatus: false
+        })
+      )
+    )
+
+    // One chip, on the title line, at every width.
+    expect(screen.getByText('Attached workspace')).toBeInTheDocument()
+
+    // The action flips only for the row whose issue has a workspace.
+    const attachedAction = screen.getByLabelText('Open workspace attached to ALP-1')
+    expect(screen.getByLabelText('Start workspace from ALP-2')).toBeInTheDocument()
+
+    await user.click(attachedAction)
+    expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(expect.objectContaining({ key: 'ALP-1' }))
+    expect(attachedAction.querySelector('.lucide-folder-open')).not.toBeNull()
   })
 })

@@ -871,6 +871,15 @@
           }
         }
       },
+      "jira": {
+        "issue": {
+          "workspace": {
+            "open": {
+              "failed": "이 이슈에 연결된 워크스페이스를 열 수 없습니다."
+            }
+          }
+        }
+      },
       "linear": {
         "usage": {
           "examples": {
@@ -1479,6 +1488,7 @@
         "b0b92666c9": "댓글",
         "a585fd204e": "Jira 댓글 추가...",
         "2441be6f9f": "워크스페이스 시작",
+        "showWorkspace": "워크스페이스 표시",
         "9178090e26": "아직 댓글이 없습니다.",
         "5cd09beaf9": "다시 시도",
         "9a980b06b9": "댓글",
@@ -2269,6 +2279,8 @@
         "linearModeHasWorktreeTooltip": "Orca 워크스페이스에 연결된 Linear 티켓",
         "linearEmptyHasWorktree": "아직 Orca 워크스페이스에 연결된 Linear 티켓이 없습니다. Linear 이슈에서 작업을 시작하면 여기에 표시됩니다.",
         "linearOpenAttachedWorkspace": "{{value0}}에 연결된 워크스페이스 열기",
+        "jiraOpenAttachedWorkspace": "{{value0}}에 연결된 워크스페이스 열기",
+        "jiraShowWorkspace": "워크스페이스 표시",
         "linearWorktreesColumn": "워크스페이스",
         "jiraSortAscending": "오름차순",
         "jiraSortDescending": "내림차순",

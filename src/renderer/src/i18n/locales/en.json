@@ -1124,6 +1124,15 @@
           }
         }
       },
+      "jira": {
+        "issue": {
+          "workspace": {
+            "open": {
+              "failed": "Unable to open the workspace attached to this issue."
+            }
+          }
+        }
+      },
       "linear": {
         "usage": {
           "examples": {
@@ -1746,6 +1755,7 @@
         "b0b92666c9": "Comment",
         "a585fd204e": "Add a Jira comment...",
         "2441be6f9f": "Start workspace",
+        "showWorkspace": "Show workspace",
         "9178090e26": "No comments yet.",
         "5cd09beaf9": "Retry",
         "9a980b06b9": "Comments",
@@ -2596,6 +2606,8 @@
         "linearModeHasWorktreeTooltip": "Linear tickets linked to an Orca workspace",
         "linearEmptyHasWorktree": "No Linear tickets are linked to an Orca workspace yet. Start work from a Linear issue to see it here.",
         "linearOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
+        "jiraOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
+        "jiraShowWorkspace": "Show workspace",
         "linearWorktreesColumn": "Workspaces",
         "16d73d88ad": "Backlog",
         "jiraBacklogCount": "Backlog · {{value0}} issues",
