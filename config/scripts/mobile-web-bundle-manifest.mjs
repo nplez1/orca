@@ -68,7 +68,7 @@ export function hashedAsset(bytes, extension) {
   }
 }
 
-function readIntegerConstant(source, name, file = 'src/shared/protocol-version.ts') {
+function readIntegerConstant(source, name, file = 'src/shared/runtime-protocol-versions.ts') {
   const match = new RegExp(`export const ${name} = (\\d+)`).exec(source)
   if (!match) {
     throw new Error(`[mobile-web-bundle-manifest] ${name} not found in ${file}`)
@@ -77,11 +77,16 @@ function readIntegerConstant(source, name, file = 'src/shared/protocol-version.t
 }
 
 /**
- * Parsed rather than imported because protocol-version.ts is TypeScript and this script runs on
- * bare node during packaging, before any build output exists.
+ * Parsed rather than imported because the source is TypeScript and this script runs on bare node
+ * during packaging, before any build output exists. The version constants live in
+ * `runtime-protocol-versions.ts`, which `protocol-version.ts` re-exports — pointing this at
+ * `protocol-version.ts` silently throws, since that file no longer declares them.
  */
 export async function readProtocolWindow() {
-  const source = await readFile(join(projectDir, 'src', 'shared', 'protocol-version.ts'), 'utf8')
+  const source = await readFile(
+    join(projectDir, 'src', 'shared', 'runtime-protocol-versions.ts'),
+    'utf8'
+  )
   return {
     runtimeProtocolVersion: readIntegerConstant(source, 'RUNTIME_PROTOCOL_VERSION'),
     // The bundle is a client: the floor it cares about is the oldest host protocol it can talk to.

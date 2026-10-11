@@ -9,7 +9,7 @@ import {
   reconcileReadoptedSshRepoRows
 } from '../slices/superseded-ssh-repo-rows'
 import { getRepoHostIdentity } from '../slices/repo-host-identity'
-import { getActiveRuntimeTarget, settingsForRuntimeOwner } from '../../runtime/runtime-rpc-client'
+import { runtimeTargetForOwnerEnvironment } from '../../runtime/runtime-client-target'
 import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
@@ -18,12 +18,9 @@ import type { RepoSlice } from './repo-state'
 import { arrayElementsUnchanged } from '../catalog-identity'
 import {
   awaitLatestLocalRepoCatalogFetch,
-  captureRuntimeRepoCatalogConnectionFence,
-  claimRepoCatalogGeneration,
-  isLatestRepoCatalogGeneration,
-  isRuntimeRepoCatalogConnectionFenceCurrent,
   startLocalRepoCatalogFetch
 } from './repo-catalog-fencing'
+import { claimHostCatalogFence, isHostCatalogFenceCurrent } from '../host-catalog-fencing'
 import {
   fetchRepoCatalogForTarget,
   filterSetupsForPrunedRepoRows,
@@ -37,7 +34,6 @@ import {
   mergeProjectHostSetupCompatibility,
   projectCompatibilityFromRepos
 } from '../projects/project-compatibility-core'
-import { getRuntimeTargetHostId } from '../runtime-target-host'
 import { mergeFetchedProjectCompatibilityForHost } from '../projects/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
 
@@ -92,42 +88,23 @@ export function createRepoCatalogActions(
       }),
 
     fetchRepos: async (options) => {
-      const target = getActiveRuntimeTarget(
-        settingsForRuntimeOwner(get().settings, options?.runtimeEnvironmentId)
-      )
+      const target = runtimeTargetForOwnerEnvironment(options.runtimeEnvironmentId)
       const settleLocalCatalog: (outcome: LocalRepoCatalogFetchOutcome) => void =
         target.kind === 'local' ? startLocalRepoCatalogFetch(get) : () => undefined
       let localCatalogOutcome: LocalRepoCatalogFetchOutcome = { status: 'fulfilled' }
       // Why: overlapping repos:changed fetches can resolve out of order; a stale one must not overwrite a newer result and resurrect deleted projects (#7020).
-      let generation = 0
-      set((s) => {
-        generation = s.reposFetchGeneration + 1
-        return { reposFetchGeneration: generation }
-      })
-      const targetHostId = getRuntimeTargetHostId(target)
-      const connectionFence =
-        target.kind === 'environment'
-          ? captureRuntimeRepoCatalogConnectionFence(target.environmentId)
-          : undefined
-      claimRepoCatalogGeneration(get, targetHostId, generation)
+      set((s) => ({ reposFetchGeneration: s.reposFetchGeneration + 1 }))
+      const fence = claimHostCatalogFence(get, 'repos', target)
       try {
         const catalog = await fetchRepoCatalogForTarget(target)
-        // A newer same-host fetch superseded us while we awaited — drop this stale result.
-        if (
-          !isLatestRepoCatalogGeneration(get, targetHostId, generation) ||
-          (connectionFence !== undefined &&
-            !isRuntimeRepoCatalogConnectionFenceCurrent(connectionFence))
-        ) {
+        // A newer same-host fetch or a replaced connection superseded us — drop this stale result.
+        if (!isHostCatalogFenceCurrent(get, fence)) {
           return
         }
         let finalizedHostRepos: Repo[] = []
         set((s) => {
           // Why: an in-flight fetch for a just-removed env would re-add purged repos and stick; skip only when the env was tombstoned, not merely unhydrated (#8881).
-          if (
-            isRemovedRuntimeHostId(catalog.hostId, s.removedRuntimeEnvironmentIds) ||
-            (connectionFence !== undefined &&
-              !isRuntimeRepoCatalogConnectionFenceCurrent(connectionFence))
-          ) {
+          if (isRemovedRuntimeHostId(catalog.hostId, s.removedRuntimeEnvironmentIds)) {
             return s
           }
           // Why: re-adoption leaves a stale row on the old SSH target id (a ghost that fails "SSH target not found"); drop rows a live-host sibling supersedes.
@@ -173,10 +150,13 @@ export function createRepoCatalogActions(
             )
           }
         })
-        scheduleSafeAutoForkSync(get, finalizedHostRepos)
+        scheduleSafeAutoForkSync(finalizedHostRepos)
       } catch (err) {
         localCatalogOutcome = { status: 'rejected', reason: err }
         console.error('Failed to fetch repos:', err)
+        if (options.throwOnError) {
+          throw err
+        }
       } finally {
         settleLocalCatalog(localCatalogOutcome)
       }

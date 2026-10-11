@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, FolderSearch } from 'lucide-react'
 import { toast } from 'sonner'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { FloatingTerminalTriggerLocation } from '../../../../shared/ui-chrome-types'
 import { Button } from '../ui/button'
@@ -78,7 +79,10 @@ export function FloatingWorkspacePane({
     if (!resolvedFloatingWorkspacePath) {
       return
     }
-    const result = await window.api.shell.openInFileManager(resolvedFloatingWorkspacePath)
+    const result = await window.api.shell.openInFileManager(
+      resolvedFloatingWorkspacePath,
+      LOCAL_EXECUTION_HOST_ID
+    )
     if (!result.ok) {
       toast.error(
         translate(

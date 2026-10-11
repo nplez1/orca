@@ -54,6 +54,7 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
     linkedPR,
     linkedReviewNumber,
     localExecutionScope,
+    ownerTarget,
     panelContextKey,
     pr,
     prCacheKey,
@@ -279,7 +280,7 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
           context.connectionId,
           undefined,
           {
-            runtimeTargetSettings: context.runtimeTargetSettings
+            runtimeTarget: context.runtimeTarget
           }
         )
       } catch (error) {
@@ -293,7 +294,7 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
       return DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS
     }
     const hostKey = getCommitMessageModelDiscoveryHostKeyForScope(
-      getRuntimeGitScope(settings, repo?.connectionId)
+      getRuntimeGitScope(ownerTarget ?? { kind: 'local' }, repo?.connectionId)
     )
     const resolved = resolveSourceControlAiForOperation({
       settings,
@@ -309,7 +310,7 @@ export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {
           repo,
           prCreationProductDefaults: DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS
         })
-  }, [repo, settings])
+  }, [ownerTarget, repo, settings])
   const sourceControlAiActionsVisible = useMemo(
     () => (settings ? resolveSourceControlAiEnabled({ settings, repo }) : false),
     [repo, settings]

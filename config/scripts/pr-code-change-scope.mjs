@@ -51,7 +51,6 @@ const GIT_COMPAT_PREFIXES = [
   'src/shared/review-head-tracking-ref',
   'src/shared/worktree/local-base-branch-fast-forward',
   'src/main/git/',
-  'src/relay/git-',
   'config/scripts/git-binary-compatibility'
 ]
 
@@ -150,8 +149,7 @@ const ORCAD_BROWSER_PREFIXES = [
 const MOBILE_WEB_APP_PREFIXES = [
   'config/scripts/build-mobile-web-app',
   'config/scripts/run-mobile-web-app-checks',
-  'config/scripts/script-child-process.mjs',
-  'src/shared/child-process/',
+  'src/packages/process-host/',
   'config/scripts/verify-mobile-web-app-bundle',
   'config/scripts/mobile-web-app-',
   'config/scripts/mobile-web-bundle-',
@@ -164,7 +162,9 @@ const MOBILE_WEB_APP_PREFIXES = [
   'mobile/packages/',
   'mobile/package.json',
   'mobile/pnpm-lock.yaml',
-  'mobile/modules/orca-mobile-web-shell/'
+  'mobile/modules/orca-mobile-web-shell/',
+  // Chat visuals on both mobile surfaces are built from it; their in-page links check runs here.
+  'src/shared/native-chat-visual-shell'
 ]
 
 function changesMobileWebApp(changedFiles) {
@@ -214,7 +214,7 @@ const CROSS_VERSION_WIRE_PREFIXES = [
   'src/shared/orchestration-rpc-contract.ts',
   'src/main/runtime/rpc/methods/agent-launch',
   'src/main/runtime/rpc/methods/ai-vault.ts',
-  'src/main/runtime/rpc/methods/browser-tab-create-schema',
+  'src/shared/rpc-contract/browser-tab-create-params',
   'src/main/runtime/rpc/methods/session-tabs.ts',
   'src/main/runtime/rpc/methods/structured-agent-session',
   'src/main/runtime/rpc/methods/terminal',
@@ -243,9 +243,11 @@ const CROSS_VERSION_WIRE_PREFIXES = [
 ]
 
 const MANAGED_HOOK_PREFIXES = [
-  'config/scripts/smoke-managed-hook-runtime-node18',
+  'config/scripts/smoke-process-host-node18',
+  'config/scripts/packaged-process-host-fixture',
+  'src/packages/process-host/',
   'config/scripts/build-relay',
-  'src/relay/',
+  'src/wsl-guest/',
   'src/shared/agent-hook',
   'src/main/agent-hooks/'
 ]
@@ -319,7 +321,7 @@ const SHARED_PACKAGE_PREFIXES = [
 const LINUX_PACKAGE_PREFIXES = [
   ...SHARED_PACKAGE_PREFIXES,
   'config/scripts/package-linux-formats',
-  'config/scripts/script-child-process.mjs',
+  'config/scripts/process-failure-message.mjs',
   'config/scripts/space-sharing-copy.mjs',
   '.github/actions/prepare-linux-package-fixture/',
   'config/docker/cli-launch-contract/',
@@ -355,6 +357,7 @@ const LINUX_PACKAGE_TESTS = [
 ]
 
 const WINDOWS_PACKAGE_TESTS = [
+  'src/main/zcode/zcode-plan-api-key-store-native-windows.test.ts',
   ...LINUX_PACKAGE_TESTS,
   'config/scripts/rebuild-native-deps.test.mjs',
   'config/scripts/rebuild-native-deps-windows-process-tree.test.mjs',
@@ -363,13 +366,14 @@ const WINDOWS_PACKAGE_TESTS = [
   'config/scripts/ensure-native-runtime-job-ownership.test.mjs',
   'config/scripts/verify-packaged-node-pty-job-ownership.test.mjs',
   'config/scripts/windows-pe-machine.test.mjs',
+  'config/scripts/build-windows-cli-launcher.test.mjs',
   'config/scripts/script-module-dependencies.test.mjs',
   'src/main/windows-registry-addon.test.ts',
   'src/main/providers/windows-conpty-wide-char-duplication.node-pty.test.ts',
   'src/main/providers/pty-repaint-wide-char-buffer.node-pty.test.ts',
-  'src/shared/child-process/windows-command-line.win32.test.ts',
-  'src/shared/child-process/windows-cmd-shim-resolution.test.ts',
-  'src/shared/child-process/windows-cmd-shim-resolution.win32.test.ts',
+  'src/shared/__tests__/process-host/windows-command-line.win32.test.ts',
+  'src/shared/__tests__/process-host/windows-cmd-shim-resolution.test.ts',
+  'src/shared/__tests__/process-host/windows-cmd-shim-resolution.win32.test.ts',
   'src/main/agent-hooks/windows-hook-payload-delivery.test.ts',
   'src/main/jcode/hook-gate-script.test.ts',
   'src/main/agent-hooks/windows-direct-cmd-hook-command.test.ts',
@@ -406,8 +410,6 @@ const WINDOWS_PACKAGE_TESTS = [
   'src/main/ipc/pty-spawn-env-codex-resume-provenance.test.ts',
   'src/main/ipc/preflight-provider-command-selection.test.ts',
   'src/main/ipc/preflight-runnable-local-cli.test.ts',
-  'src/relay/windows-port-scan.win32.test.ts',
-  'src/main/ssh/ssh-relay-upload-stage-windows-identity.test.ts',
   'src/main/ssh/remote-node-runtime-store-windows.test.ts'
 ]
 
@@ -523,7 +525,11 @@ function jobDetector(job) {
       return (files) => files.some((file) => matchesPrefix(file, GIT_COMPAT_PREFIXES))
     case 'codex_index_heal_contract':
       return (files) =>
-        files.some((file) => matchesPrefix(file, CODEX_INDEX_HEAL_CONTRACT_PREFIXES))
+        files.some(
+          (file) =>
+            file !== 'src/main/codex/codex-app-server-client.test.ts' &&
+            matchesPrefix(file, CODEX_INDEX_HEAL_CONTRACT_PREFIXES)
+        )
     case 'xterm_patch_sync':
       return (files) => files.some((file) => matchesPrefix(file, XTERM_PREFIXES))
     case 'shell_contracts':
@@ -565,9 +571,12 @@ function isProductBundlePath(file, extraPrefixes) {
   return matchesPrefix(file, extraPrefixes)
 }
 
-// This shared fixture is consumed only by unit suites and their placement rig.
+// These shared fixtures are consumed only by unit tests.
 export function isUnitTestSupportSource(file) {
-  return file === 'src/renderer/src/runtime/web-session-tabs-sync-test-harness.ts'
+  return (
+    file === 'src/renderer/src/runtime/web-session-tabs-sync-test-harness.ts' ||
+    file === 'src/renderer/src/components/native-chat/NativeChatStructuredSession.test-harness.tsx'
+  )
 }
 
 function isTestFile(file) {

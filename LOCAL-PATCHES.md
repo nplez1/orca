@@ -326,6 +326,157 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-11 — merge of upstream `cc5c85fb7a` (386 commits) into the release line, from
+  `cce80247fb`** (merge base `1cda323b6a`, rollback tag `archive/pre-sync-cce80247fb`). Pre-flight
+  passed and recorded the conflict set; the merge produced **102 conflicted paths** — `both-rewrote
+  49, modify/delete 20, union 17, duplicate-tail 6, add/add 6, rename-replay 4`.
+
+  - **The substantial convergence was the SSH relay, and taking upstream's removal was the fork
+    owner's decision.** Upstream deleted the entire relay (`2b4b60a87e` the server, `ff27338299` the
+    client path — together ~158k lines) and now serves SSH hosts from orcad; `31b2b17d9b` moved the
+    WSL guest bundle sources out of `src/relay` into `src/wsl-guest`. The fork's investment in the
+    relay was three commits against 467 files upstream had abandoned, so the removal was adopted
+    rather than reverted: 36 relay-related paths resolved to deletion, plus
+    `src/shared/ssh-ai-vault-relay.ts` and the fork's six `src/wsl-guest/` additions — dead code by
+    then, since every consumer of them was a deleted relay file. See ledger § "SSH relay removal".
+  - **Repo detection went to upstream's generator shape**, retiring the fork's parallel async copy
+    of `repo-detection.ts` and `repo-git-marker-scan.ts` (`b63d39ebe5` reached the same goal with one
+    body serving sync and async callers). The ledger entry now records the four filesystem steps
+    upstream still runs synchronously as an **Open** item.
+  - **Owner routing:** upstream deleted `getActiveRuntimeTarget` and `settingsForRuntimeOwner`
+    outright and added `check-owner-routing-ratchet.mjs`, which fails on any use. The fork's six
+    `runtime-compatibility-cache` re-exports were kept, and the two fork-only callers
+    (`runtime-file-path-search-client.ts`, `preserved-branch-removal-completion.ts`) plus the
+    fork's extracted listing helper were migrated to `runtimeTargetForOwnerEnvironment`.
+  - **The fork's hidden-SSH-host UI was re-homed, not dropped.** Upstream's restructure removed the
+    relay-era `onResetRelay`/`onTerminateSessions` props the fork's render relied on, which left
+    `setSshTargetHiddenWithReport` with no entry point on the first pass. It is wired again:
+    `SshPane.tsx` takes upstream's post-relay shape but renders the fork-only `SshTargetList.tsx`,
+    and `SshTargetCard.tsx` carries `onSetHidden`, the hidden badge and `SshTargetVisibilityToggle`.
+    Taking upstream's inline card retired `SshTargetCardActions.tsx`, and `SshTargetServerList.tsx`
+    went too — it was a duplicate of `SshTargetList.tsx`. The card's Host-Node notes and
+    "terminals until reset" line were common-ancestor copy upstream deleted with the relay, not
+    fork features. See ledger § "SSH settings pane".
+  - **Feature changes this sync made, recorded as follow-ups rather than left silent.** The fork's
+    relay-side half of the explorer name filter (#34) died with the relay; the main-side half is
+    intact. `StatusBarProviderSegment.tsx` keeps the fork's credits display, re-homed into
+    upstream's sections-map structure. `agent-status-extension-async-subagents.test.ts` is the
+    fork's suite, so upstream's newer cases (including the workflow-key naming test) are not
+    covered here yet.
+  - **The fork's repo-catalog connection fence converged onto upstream's, losing nothing.** Upstream
+    `63b3f15cc4` (*every repo catalog uses the host-catalog fence*, #27116) is upstream's own fix for
+    what the fork filed as #20811 and implemented as `claimRepoCatalogGeneration` plus
+    `captureRuntimeRepoCatalogConnectionFence`: its `claimHostCatalogFence` /
+    `isHostCatalogFenceCurrent` replace both mechanisms, and its `failed` flag replaces the fork's
+    `incomplete` so a dropped catalog is no longer treated as an answer. `repo-catalog-fencing.ts`,
+    `repo-catalog-actions.ts` and `all-host-repo-catalog-actions.ts` are byte-identical to upstream's
+    now. The upstream-bound branch `fix/repo-catalog-connection-fence` is therefore superseded.
+  - **Open (2026-10-11 sync): the fork's Jira/Linear surfaces still route by the Active Server
+    setting.** Upstream's new `check-owner-routing-ratchet.mjs` fails on any renderer read of
+    `settings.activeRuntimeEnvironmentId`. Thirteen fork-only files trip it —
+    `jira-issue-workspace-detail-state.ts`, `jira-issue-workspace-side-data.ts`,
+    `linear-issue-edit-rows.tsx`, `right-sidebar/JiraLinkedIssuePane.tsx`,
+    `right-sidebar/LinearLinkedIssuePane.tsx`, `right-sidebar/use-linked-issue-pane-actions.ts`,
+    `settings/JiraBoardSettings.tsx`, `tab-bar/use-tab-bar-default-agent.ts`,
+    `task-page-jira-board-page-fetch.ts`, `task-page/jira/Board.tsx`,
+    `use-task-page-jira-board-pages.ts`, `use-task-page-jira-board.ts` and
+    `runtime/runtime-jira-board-client.ts`. They keep their pre-sync *routing target* — which host
+    they talk to is unchanged — and are registered in `config/focus-setting-read-baseline.txt` at
+    their current counts so the ratchet holds the line. Routing them by the resource's owner is the
+    follow-up. The repair did change their *implementation*, though: the source is now a
+    `defaultScopeSource(...)` value, and because that allocates on every call it must be
+    `useMemo`-stabilised at each call site, or it re-triggers the hooks that list `providerSettings`
+    as a dependency and re-fetches on every render (see "Silent losses" below).
+  - **Silent losses found only after the merge was first committed, and repaired.** Three classes —
+    none visible to a conflict marker, a typecheck, or a `node-runtime`-only test run, so the fork's
+    own release line would have shipped all three:
+    - *A whole file deleted though both sides had it.*
+      `components/settings/AgentDashboardExperimentalSetting.tsx` was present at `cce80247fb` **and**
+      at upstream and absent from the merge, as was the `ExperimentalPane.tsx` block that mounted
+      it. Found by sweeping `git diff --diff-filter=D --name-only cce80247fb <merge>` against
+      upstream: one hit out of 1014 deletions. Take the fork's variant — the merged
+      `global-settings-types.ts` and the fork's test both use
+      `experimentalAgentDashboardCardClickAction`, which upstream had replaced with
+      `experimentalAgentDashboardMode`.
+    - *Upstream behaviour dropped when the fork's side won a file.* Confirmed for
+      `right-sidebar/ai-vault-session-refresh.ts`, which lost upstream's `c2c63e7f9a` (#27383)
+      conditional paired-runtime history refresh — the renderer stopped sending `afterFingerprint`,
+      so history was re-downloaded in full on every refresh — and for the zcode plan API-key store
+      publication race and the kiro hook service, whose upstream tests pass at `cc5c85fb7a` and fail
+      here. The detector is upstream's own test: **run every new upstream test against the merged
+      tree before trusting a sync.**
+    - *A hidden dependency on a source file's contents.* `config/scripts/mobile-web-bundle-manifest.mjs`
+      regex-scrapes `src/shared/protocol-version.ts` for `export const RUNTIME_PROTOCOL_VERSION = (\d+)`.
+      Splitting that file to satisfy `max-lines` moved the line and silently broke
+      `readProtocolWindow()`, which `build:mobile-web` — and so `build:desktop` and every
+      `build:release*` script — depends on. **When moving a declaration out of a file, grep
+      `config/scripts/` for regex readers of that file.**
+  - **Test evidence for the next sync: `--project node-runtime` is not the suite.** `pnpm test` runs
+    two projects and `node-runtime` is a curated include list; the `bun` project runs everything
+    else, including most renderer, `config/scripts` and packaging tests. A `node-runtime`-only run
+    reports green while whole features are missing — that is exactly how the three losses above
+    survived the first pass. Run both, or run `pnpm test`.
+  - **Two contradictory repairs inside one sync, resolved FORK-first.** `zcode-plan-api-key-store.ts`
+    was first changed to upstream's `safeStorage`, which broke its own suite; it was reverted to the
+    fork's `getSecretStore` port (fork #75, *depend on the SecretStore port instead of Electron's
+    safeStorage*, and `secret-store.ts`'s rule that core modules never import `electron`), and the
+    three sibling suites were re-pointed with `setSecretStore`/`_resetSecretStoreForTests` instead.
+    47 tests pass across them. **Do not re-introduce `safeStorage` in the zcode store.**
+  - **Other re-points this sync made, none of them behaviour changes.**
+    `runtime-home-hook-command.ts` had its POSIX branch half-reverted to the `.orca` literal while
+    the Windows branch kept the fork's rename; both now use `${HOME_DIRECTORY_NAME}` again, matching
+    `cce80247fb`. `managed-hook-install-lock.ts` stays the one deliberate `.orca` exception
+    (cross-install mutex) — do not sweep it. `config/ts-nocheck-baseline.txt` gained
+    `orca-runtime-owned-controllers.ts`, the module extracted from
+    `orca-runtime-preserved-branch-cleanup.ts` for the `max-lines` budget: it inherits that file's
+    `@ts-nocheck` and belongs to the same deliberately-untyped split-runtime mixin family, so the
+    entry is a family membership rather than a new suppression. `host-operation-ownership.ts` gained
+    `hostSettings: 'host'` for the fork's own `hostSettings.applyReplication`/`replicationState` RPC
+    namespace (fork #70); `host-operation-ownership.test.ts` classifies every method in the generated
+    RPC catalog, so completeness is test-enforced.
+  - **Pre-existing, and fixed because the review found it while reading this sync's diff.**
+    `runtime-home-hook-command.ts`'s PowerShell branch spelled `'.${HOME_DIRECTORY_NAME}\…'`, which
+    rendered `..orca-np` — `HOME_DIRECTORY_NAME` already carries its leading dot — so `Test-Path`
+    never matched and the managed hook silently fell through to the fallback for every PowerShell hook
+    caller. Byte-identical at `cce80247fb` (a `local(identity)` slip, not a merge casualty),
+    root-caused only because the review re-read the file when the POSIX branch was restored. Fixed
+    here too: `zcode-plan-api-key-store-native-windows.test.ts` mocked `electron`'s `safeStorage`
+    while the fork-first resolution settled the store on `getSecretStore`, and never installed a store
+    of its own, so it inherited the setup file's sealing default and would have failed on the first
+    Windows run — hidden by `skipIf(platform !== 'win32')`. It now installs the same plaintext-forcing
+    store as its three siblings.
+  - **Pre-existing, found while classifying and deliberately left alone.** `zcode/hook-service.ts`
+    installs to `${remoteHome}/.orca/agent-hooks/...` while its dsh twin uses `HOME_DIRECTORY_NAME` —
+    byte-identical at the merge base and at both parents, so it is identity backlog, not a merge
+    casualty. `config/scripts/command-code-transcript-scan-benchmark.mjs` and
+    `mobile-agent-status-projection-benchmark.mjs` are stale regex readers whose constants moved —
+    also stale identically at both parents, so upstream's to fix, worth an upstream-facing note.
+  - **Review gate (recorded, because the mandated reviewer was unavailable).** The sync's standing
+    gate is Opus 5.5 at high reasoning. Its review of the first committed revision (`1262ebae7f`)
+    returned *not ready to ship* with three blockers — the Jira `defaultScopeSource` re-fetch loop,
+    the `mobile-web-bundle-manifest.mjs` scraper broken by the `protocol-version.ts` split, and the
+    dropped AI Vault `afterFingerprint` path — plus two should-fixes. All five were repaired. The
+    mandated re-review then could not run: the `github-copilot` allowance was exhausted mid-session
+    (HTTP 429). On the fork owner's explicit direction the re-review was run by
+    **`xiaomi/mimo-v2.6-pro` at high reasoning as a substitute**, and that substitution is recorded
+    here rather than left implicit. Its verdict on the final revision: one ship-blocking finding —
+    the upstream-new, Windows-only `zcode-plan-api-key-store-native-windows.test.ts` still pinned
+    `~/.orca` while the store resolves `~/.orca-np` through `adoptLegacyHomeStore`, which the
+    `skipIf(platform !== 'win32')` guard hid on macOS — now re-pointed to `HOME_DIRECTORY_NAME` like
+    its three siblings. It confirmed every other repair, found **no weakened assertions**, and gave
+    explicit sign-off on the `ts-nocheck` entry, recording the typed alternative as chain-wide work
+    rather than a sync repair.
+  - **Left failing, and proved not ours:** `pnpm run audit:code-quality:native` reports five
+    `import(no-cycle)` warnings — `mobile/src/transport/client-context.tsx`,
+    `mobile/src/transport/host-client-hooks.ts`, `mobile/src/terminal/document/fit-scale.ts` (x2)
+    and `mobile/src/terminal/document/mouse-report-cell.ts`. All five files, the plugin config and
+    the resolved oxlint version are byte-identical to both `HEAD` and upstream, and the same five
+    warnings reproduce on the pre-merge tip `cce80247fb` in a clean worktree. **Watch the trap:** it
+    is only visible with `mobile/node_modules` installed — without it oxlint cannot resolve the
+    mobile graph and the command silently exits 0, which made a first pass here read as "introduced
+    by this merge". Breaking the cycles would mean restructuring upstream-owned mobile files, so it
+    is carried as fork-wide debt rather than taken on as this sync's divergence.
+
 - **2026-10-09 — merge of upstream `1cda323b6a` (199 commits) into the release line, from
   `6a7b39c398`** (merge base `e5ade4b868`; merge commit `f94d10ff60`, with this sync's `fix(sync)`
   and `docs(fork)` commits on top). The pre-flight gate passed and recorded the conflict set; the

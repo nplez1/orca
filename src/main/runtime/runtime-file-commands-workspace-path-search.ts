@@ -23,7 +23,8 @@ import { searchQuickOpenFilePaths } from '../ipc/filesystem-search-file-paths'
 import { runtimeFileRouteForTarget } from './runtime-file-command-target'
 import type { IFilesystemProvider } from '../providers/types'
 import { parseWslPath } from '../wsl'
-import { RuntimeFileCommandsWithSearchLocalRuntimeFiles } from './runtime-file-commands-search-local-runtime-files'
+import { RuntimeFileSearch } from './runtime-file-search'
+import type { RuntimeFileCommandHost } from './runtime-file-command-host'
 
 type WorkspacePathSearchOptions = {
   query: string
@@ -36,7 +37,10 @@ type WorkspacePathSearchOptions = {
   maxContentBytes?: number
 }
 
-export class RuntimeFileCommandsWithWorkspacePathSearch extends RuntimeFileCommandsWithSearchLocalRuntimeFiles {
+export class RuntimeFileCommandsWithWorkspacePathSearch extends RuntimeFileSearch {
+  constructor(protected readonly workspaceHost: RuntimeFileCommandHost) {
+    super(workspaceHost)
+  }
   async searchWorkspacePathNameFilter(
     worktreeSelector: string,
     options: WorkspacePathSearchOptions
@@ -45,7 +49,7 @@ export class RuntimeFileCommandsWithWorkspacePathSearch extends RuntimeFileComma
     if (!query.ok || !query.query.trim()) {
       throw new Error('Invalid remote workspace path search query')
     }
-    const target = await this.host.resolveRuntimeFileTarget(worktreeSelector)
+    const target = await this.workspaceHost.resolveRuntimeFileTarget(worktreeSelector)
     const route = runtimeFileRouteForTarget(target)
     const rootPath = target.worktree.path
     const descriptor = RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR
@@ -56,7 +60,7 @@ export class RuntimeFileCommandsWithWorkspacePathSearch extends RuntimeFileComma
     )
     const request = createWorkspacePathSearchRequest({
       rootPath,
-      runtimeId: this.host.getRuntimeId(),
+      runtimeId: this.workspaceHost.getRuntimeId(),
       route: route.kind === 'ssh' ? route : null,
       query: query.query,
       limit,
@@ -86,7 +90,7 @@ export class RuntimeFileCommandsWithWorkspacePathSearch extends RuntimeFileComma
         remoteResponse ??
         (await this.searchRemoteLegacyWorkspacePaths(route.provider, rootPath, request, options))
     } else {
-      const result = await searchQuickOpenFilePaths(rootPath, this.host.requireStore(), {
+      const result = await searchQuickOpenFilePaths(rootPath, this.workspaceHost.requireStore(), {
         query: query.query,
         limit,
         excludePaths: options.excludePaths,

@@ -2,6 +2,7 @@ import type { MutableRefObject } from 'react'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listing-limits'
 import { cancelRuntimeFileList, listRuntimeFiles } from '@/runtime/runtime-file-client'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
 import {
   NO_LISTING,
@@ -32,7 +33,7 @@ export function startRuntimeUnscopedFileListing(args: {
   const requestAbortController = new AbortController()
   const requestOperationOwner = args.operationOwnerRef.current
   const requestContext = {
-    settings: { activeRuntimeEnvironmentId: args.runtimeEnvironmentId },
+    target: runtimeTargetForOwnerEnvironment(args.runtimeEnvironmentId),
     worktreeId: args.worktreeId,
     worktreePath: args.worktreePath,
     connectionId: args.connectionId

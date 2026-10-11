@@ -49,7 +49,7 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: false,
+        hasSshHost: false,
         hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'plugin:orca-samples.my-plugin/dashboard'])
@@ -58,7 +58,7 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: true,
+        hasSshHost: true,
         hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])
@@ -69,7 +69,7 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: false,
+        hasSshHost: false,
         hasLinkedIssue: true
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'issue', 'plugin:orca-samples.my-plugin/dashboard'])
@@ -80,7 +80,7 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: true,
-        isSshRepo: true,
+        hasSshHost: true,
         hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual([
@@ -95,7 +95,7 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: false,
-        isSshRepo: true,
+        hasSshHost: true,
         hasLinkedIssue: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])

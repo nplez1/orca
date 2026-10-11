@@ -3,9 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   jiraCreateIssue,
-  jiraGetBoardOverview,
-  jiraListBoardIssues,
-  jiraListBoards,
   jiraGetIssue,
   jiraIssueComments,
   jiraListAssignableUsers,
@@ -30,9 +27,6 @@ const jiraListAssignableUsersLocal = vi.fn()
 const jiraSearchUsersLocal = vi.fn()
 const jiraProjectUsersLocal = vi.fn()
 const jiraCreateIssueLocal = vi.fn()
-const jiraListBoardsLocal = vi.fn()
-const jiraGetBoardOverviewLocal = vi.fn()
-const jiraListBoardIssuesLocal = vi.fn()
 const jiraReadStatusLocal = vi.fn()
 const jiraLookupIssueSummaryLocal = vi.fn()
 const jiraCancelIssueSummaryLocal = vi.fn()
@@ -46,9 +40,6 @@ beforeEach(() => {
   jiraSearchUsersLocal.mockReset()
   jiraProjectUsersLocal.mockReset()
   jiraCreateIssueLocal.mockReset()
-  jiraListBoardsLocal.mockReset()
-  jiraGetBoardOverviewLocal.mockReset()
-  jiraListBoardIssuesLocal.mockReset()
   jiraReadStatusLocal.mockReset()
   jiraLookupIssueSummaryLocal.mockReset()
   jiraCancelIssueSummaryLocal.mockReset()
@@ -64,10 +55,7 @@ beforeEach(() => {
         listAssignableUsers: jiraListAssignableUsersLocal,
         searchUsers: jiraSearchUsersLocal,
         listAssignableUsersForProject: jiraProjectUsersLocal,
-        createIssue: jiraCreateIssueLocal,
-        listBoards: jiraListBoardsLocal,
-        getBoardOverview: jiraGetBoardOverviewLocal,
-        listBoardIssues: jiraListBoardIssuesLocal
+        createIssue: jiraCreateIssueLocal
       },
       runtimeEnvironments: {
         call: runtimeCall,
@@ -189,7 +177,9 @@ describe('runtime Jira client search bounds', () => {
   })
 
   it('rejects oversized local Jira search before IPC', async () => {
-    await expect(jiraSearchIssues(null, 'secret-token-value'.repeat(1024), 30)).resolves.toEqual([])
+    await expect(
+      jiraSearchIssues({ kind: 'local' }, 'secret-token-value'.repeat(1024), 30)
+    ).resolves.toEqual([])
 
     expect(jiraSearchIssuesLocal).not.toHaveBeenCalled()
     expect(runtimeCall).not.toHaveBeenCalled()
@@ -198,7 +188,7 @@ describe('runtime Jira client search bounds', () => {
   it('rejects oversized runtime Jira assignee search before RPC', async () => {
     await expect(
       jiraListAssignableUsers(
-        { activeRuntimeEnvironmentId: 'env-1' },
+        { kind: 'environment', environmentId: 'env-1' },
         'ORCA-1',
         'x'.repeat(9 * 1024),
         'site-1'
@@ -212,7 +202,7 @@ describe('runtime Jira client search bounds', () => {
   it('routes local Jira user search through IPC', async () => {
     jiraSearchUsersLocal.mockResolvedValue([{ accountId: 'account-1', displayName: 'Ada' }])
 
-    await expect(jiraSearchUsers(null, 'Ada', 'site-1')).resolves.toEqual([
+    await expect(jiraSearchUsers({ kind: 'local' }, 'Ada', 'site-1')).resolves.toEqual([
       { accountId: 'account-1', displayName: 'Ada' }
     ])
 
@@ -234,7 +224,7 @@ describe('runtime Jira client search bounds', () => {
     })
 
     await expect(
-      jiraSearchUsers({ activeRuntimeEnvironmentId: 'env-1' }, 'Ada', 'site-1')
+      jiraSearchUsers({ kind: 'environment', environmentId: 'env-1' }, 'Ada', 'site-1')
     ).resolves.toEqual([{ accountId: 'account-1', displayName: 'Ada' }])
     expect(runtimeCall).toHaveBeenNthCalledWith(
       1,
@@ -253,9 +243,9 @@ describe('runtime Jira client search bounds', () => {
   it('degrades remote Jira user search when the host lacks the capability', async () => {
     runtimeCall.mockResolvedValue(createRuntimeStatusWithoutJiraUserFieldsCapability())
 
-    await expect(jiraSearchUsers({ activeRuntimeEnvironmentId: 'env-1' }, 'Ada')).resolves.toEqual(
-      []
-    )
+    await expect(
+      jiraSearchUsers({ kind: 'environment', environmentId: 'env-1' }, 'Ada')
+    ).resolves.toEqual([])
     expect(runtimeCall).toHaveBeenCalledTimes(1)
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'jira.searchUsers' })
@@ -267,7 +257,7 @@ describe('runtime Jira client search bounds', () => {
 
     await expect(
       jiraCreateIssue(
-        { activeRuntimeEnvironmentId: 'env-1' },
+        { kind: 'environment', environmentId: 'env-1' },
         {
           projectId: 'project-1',
           issueTypeId: 'type-1',
@@ -297,7 +287,7 @@ describe('runtime Jira client search bounds', () => {
 
     await expect(
       jiraCreateIssue(
-        { activeRuntimeEnvironmentId: 'env-1' },
+        { kind: 'environment', environmentId: 'env-1' },
         { projectId: 'project-1', issueTypeId: 'type-1', title: 'Issue' }
       )
     ).resolves.toMatchObject({ ok: true, key: 'ORCA-1' })
@@ -321,7 +311,7 @@ describe('runtime Jira client search bounds', () => {
 
     await expect(
       jiraCreateIssue(
-        { activeRuntimeEnvironmentId: 'env-1' },
+        { kind: 'environment', environmentId: 'env-1' },
         {
           projectId: 'project-1',
           issueTypeId: 'type-1',
@@ -350,13 +340,13 @@ describe('runtime Jira client search bounds', () => {
 
   it('uses project-scoped search locally and rejects oversized queries before IPC', async () => {
     jiraProjectUsersLocal.mockResolvedValue([])
-    await jiraListAssignableUsersForProject(null, '100', 'Ada', 'site-1')
+    await jiraListAssignableUsersForProject({ kind: 'local' }, '100', 'Ada', 'site-1')
     expect(jiraProjectUsersLocal).toHaveBeenCalledWith({
       projectIdOrKey: '100',
       query: 'Ada',
       siteId: 'site-1'
     })
-    await jiraListAssignableUsersForProject(null, '100', 'x'.repeat(20_000), 'site-1')
+    await jiraListAssignableUsersForProject({ kind: 'local' }, '100', 'x'.repeat(20_000), 'site-1')
     expect(jiraProjectUsersLocal).toHaveBeenCalledTimes(1)
   })
 
@@ -367,7 +357,7 @@ describe('runtime Jira client search bounds', () => {
         : { id: 'rpc-1', ok: true, result: [], _meta: { runtimeId: 'remote-runtime' } }
     )
     await jiraListAssignableUsersForProject(
-      { activeRuntimeEnvironmentId: 'env-1' },
+      { kind: 'environment', environmentId: 'env-1' },
       '100',
       'Ada',
       'site-1'
@@ -384,7 +374,7 @@ describe('runtime Jira client search bounds', () => {
     runtimeCall.mockReset().mockResolvedValue(createRuntimeStatusWithoutJiraUserFieldsCapability())
     await expect(
       jiraListAssignableUsersForProject(
-        { activeRuntimeEnvironmentId: 'env-1' },
+        { kind: 'environment', environmentId: 'env-1' },
         '100',
         'Ada',
         'site-1'
@@ -393,59 +383,6 @@ describe('runtime Jira client search bounds', () => {
     expect(runtimeCall).toHaveBeenCalledTimes(1)
     expect(runtimeCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'jira.searchUsers' })
-    )
-  })
-
-  it('routes Jira board metadata and issue pages to local and paired-runtime owners', async () => {
-    const selection = { boardId: '42', siteId: 'site-1' }
-    const issuePage = {
-      boardId: '42',
-      siteId: 'site-1',
-      scope: 'backlog' as const,
-      pageToken: 'cursor-1',
-      startAt: 100,
-      maxResults: 100
-    }
-    jiraListBoardsLocal.mockResolvedValue([{ id: '42', name: 'Payments' }])
-    jiraGetBoardOverviewLocal.mockResolvedValue({
-      board: { id: '42' },
-      columns: [],
-      activeSprints: []
-    })
-    jiraListBoardIssuesLocal.mockResolvedValue({
-      issues: [],
-      startAt: 100,
-      nextPageToken: 'cursor-2',
-      total: null,
-      isLast: false
-    })
-
-    await jiraListBoards(null, 'site-1')
-    await jiraGetBoardOverview(null, '42', 'site-1')
-    await jiraListBoardIssues(null, issuePage)
-
-    expect(jiraListBoardsLocal).toHaveBeenCalledWith({ siteId: 'site-1' })
-    expect(jiraGetBoardOverviewLocal).toHaveBeenCalledWith(selection)
-    expect(jiraListBoardIssuesLocal).toHaveBeenCalledWith(issuePage)
-
-    runtimeCall.mockImplementation(async (args: { method: string }) => {
-      if (args.method === 'status.get') {
-        return createCompatibleRuntimeStatusResponse()
-      }
-      return {
-        id: 'rpc-1',
-        ok: true,
-        result: [],
-        _meta: { runtimeId: 'remote-runtime' }
-      }
-    })
-    await jiraListBoards({ activeRuntimeEnvironmentId: 'env-1' }, 'site-1')
-    expect(runtimeCall).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: 'jira.listBoards',
-        params: { siteId: 'site-1' },
-        selector: 'env-1'
-      })
     )
   })
 
@@ -473,10 +410,10 @@ describe('runtime Jira client search bounds', () => {
     )
 
     await expect(
-      jiraGetIssue({ activeRuntimeEnvironmentId: 'env-1' }, 'ORCA-1', 'site-1')
+      jiraGetIssue({ kind: 'environment', environmentId: 'env-1' }, 'ORCA-1', 'site-1')
     ).resolves.toMatchObject({ key: 'ORCA-1' })
     await expect(
-      jiraIssueComments({ activeRuntimeEnvironmentId: 'env-1' }, 'ORCA-1', 'site-1')
+      jiraIssueComments({ kind: 'environment', environmentId: 'env-1' }, 'ORCA-1', 'site-1')
     ).resolves.toMatchObject([{ id: 'comment-1' }])
 
     expect(runtimeSubscribe).toHaveBeenNthCalledWith(

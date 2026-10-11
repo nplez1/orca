@@ -45,7 +45,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     }
     this.token = randomUUID()
     this.endpointFileWritten = false
-    this.lastWrittenJson = null
+    this.closeStatusSnapshotWriter()
     if (this.statusHooksEnabled) {
       this.initializeStatusHookOwner()
       // Why: the listener must not bind before durable state is readable.
@@ -248,7 +248,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.endpointFileWritten = false
     this.statusCacheHydrationReady = Promise.resolve()
     this.lastStatusFilePath = null
-    this.lastWrittenJson = null
+    this.closeStatusSnapshotWriter()
     this.runtimeObservedStatusPaneKeys.clear()
     this.paneKeyByTerminalHandle.clear()
     this.hydratedAuthorityCommitments = Object.freeze([])

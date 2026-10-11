@@ -8,6 +8,7 @@ import {
   issueMatchesTaskPageJiraBoardQuery,
   type TaskPageJiraBoardFilter
 } from './task-page-jira-board-model'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { useTaskPageJiraBoardPages } from './use-task-page-jira-board-pages'
 import {
   patchTaskPageJiraBoardCache,
@@ -24,7 +25,10 @@ function describeError(error: unknown): string {
 }
 
 export function useTaskPageJiraBoard(model: TaskPageJiraBoardModel, selection: JiraBoardSelection) {
-  const providerSettings = model.jiraTaskSourceContext ?? model.settings
+  const providerSettings = useMemo(
+    () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
+    [model.jiraTaskSourceContext, model.settings]
+  )
   const viewerAccountId = getTaskPageJiraBoardViewerAccountId(model.jiraStatus, selection.siteId)
   const cacheKey = taskPageJiraBoardCacheKey(selection)
   const [cacheSnapshot] = useState(() => readTaskPageJiraBoardCache(cacheKey))

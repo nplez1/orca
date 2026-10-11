@@ -336,7 +336,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   defaultTaskSource: 'replicated',
   visibleTaskProviders: 'replicated',
   defaultLinearTeamSelection: 'replicated',
-  defaultJiraBoard: 'replicated'
+  defaultJiraBoard: 'replicated',
+  claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>
 
 /** Keys a host applies from the main, either always or only when it holds nothing. */

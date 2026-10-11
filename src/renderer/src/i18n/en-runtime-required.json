@@ -1157,17 +1157,21 @@
           "566d9a99ab": "_token=…; minimax_group_id_v2=…",
           "5e08b0fe57": "Stored locally and sent only to platform.minimax.io for usage refreshes.",
           "79418c782a": "Open platform.minimax.io/console/usage in your browser, sign in, then copy the Cookie request header from DevTools (Network → any remains request → Cookie).",
+          "79e484c3b2": "Optional account switcher for the shared Claude auth files.",
           "7ce0e1907c": "). Find it in your browser's DevTools → Network → any opencode.ai request → Cookie header. OpenCode Go auth is web-based and shared across Windows and WSL terminals.",
+          "854ebbcc45": "Orca will delete the managed Claude auth for this saved account. If it is currently active, Orca falls back to the system default Claude login.",
           "8951c5309f": "auth=Fe26.2**…",
           "9107406589": "Could not load Claude accounts.",
           "922b51e02d": "Fe26.2**…",
           "a7e38affcd": "Fe26.2**… token or auth=Fe26.2**… header",
           "b10cb4f696": "adding",
           "b11078a9c2": "wsl",
+          "b15ce90870": "{{value0}} -> {{value1}}. Restart live Claude terminals before continuing old sessions.",
           "b2b1aa936d": "Paste your opencode.ai session cookie for rate limit fetching.",
           "b43e761fe5": "MiniMax cookie update failed.",
           "b8c2905c2b": "Could not load Codex accounts.",
-          "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in."
+          "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in.",
+          "remoteScopeLocalAccountsKept": "Accounts managed on this desktop are unchanged. Switch the default runtime back to Local desktop to view them."
         },
         "AdvancedNetworkSettingsSection": {
           "d93c7cd531": "Configure app-level network routing.",
@@ -1237,6 +1241,9 @@
           "b5c0479e21": "Unmodified user agent",
           "d420c43729": "Imported {{value0}} cookies from {{value1}}{{value2}} into {{value3}}."
         },
+        "BrowserTerminalLinkActionsSetting": {
+          "description": "Show available actions when you click a link in the terminal or a chat transcript. Turn this off to require {{modifier}}-click in the terminal."
+        },
         "BrowserUsePane": {
           "de9b2f32f3": "Enable",
           "e44c5d681e": "From"
@@ -1282,11 +1289,15 @@
           "9762364929": "Uses APFS clone-copy on macOS when possible, otherwise symlinks configured folders or files into created worktrees.",
           "a05bcdaf57": "Agents View",
           "agentDashboard": {
+            "copy": "Adds an Agent Dashboard entry to the left sidebar. Monitor agents that need you, are working, or are done, with optional idle agents.",
+            "description": "Kanban board for monitoring agents across worktrees as a full view in the main area.",
             "modeAriaLabel": "Agent Dashboard open mode",
             "modeCopy": "Show the dashboard as an in-window board beside the sidebar or a separate pop-out window.",
             "modeInWindow": "In-window",
             "modeLabel": "Open as",
-            "modePopout": "Pop-out"
+            "modePopout": "Pop-out",
+            "title": "Agent Dashboard",
+            "toggleLabel": "Toggle Agent Dashboard"
           },
           "f63ea281e3": "Threaded left-sidebar feed for agent completions and blocking states.",
           "fb82ea1d7a": "Automatically materialize configured files or folders into newly created worktrees.",
@@ -1447,6 +1458,9 @@
           "c541f67790": "Generate QR Code",
           "d536b5e20d": "Choose which network address to advertise in the QR code. Use your LAN address for same-network pairing, or an overlay network address (Tailscale, ZeroTier) for cross-network access."
         },
+        "MobilePairingConnectionOptions": {
+          "signInRequired": "Relay only — LAN does not need an account."
+        },
         "MobilePane": {
           "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale. Regenerate to try again."
         },
@@ -1552,7 +1566,6 @@
           "1826bd0608": "Saved Servers",
           "54ebacc600": "Server name",
           "55fcc964cd": "on the server and paste the printed pairing URL.",
-          "7b5986c8df": "Saved {{value0}}. Use Active Server to switch when ready.",
           "8cf8790697": "Saved servers route this browser through a paired Orca runtime.",
           "960e901ae4": "orca serve --pairing-address <host>",
           "9bc9b83474": "Pairing code",
@@ -1605,20 +1618,50 @@
           "fde7ff2cc3": "packages/web shared/ui"
         },
         "SshPane": {
+          "025e107643": "Failed to end remote terminals",
+          "2c4ee7332b": "Failed to reset remote relay",
+          "3879cbaa52": "Terminal timeout must be between 60 and {{value0}} seconds, or keep terminals alive until reset.",
+          "90e308c98b": "Remote terminals ended",
           "94c5284560": "Targets",
-          "a7d28dff81": "Add a remote host to connect to it in Orca."
+          "a7d28dff81": "Add a remote host to connect to it in Orca.",
+          "db2e48975e": "Remote relay reset",
+          "terminateUnverifiable": "{{terminals}} remote terminal(s) could not be reached. Reconnect to end them."
         },
         "SshTargetCard": {
           "47e94bd6ba": "connected",
-          "f0871e6bfb": "connect"
+          "762a48c662": "Reset remote relay",
+          "8ce71262f4": "terminals until reset",
+          "97dea4e8cf": "Resetting remote relay",
+          "a883f5a00f": "terminal timeout: {{value0}}",
+          "c77f1abfe3": "Ending remote terminals",
+          "da16e108e6": "End remote terminals",
+          "f0871e6bfb": "connect",
+          "hostNodeFallback": "Unsupported configuration: Orca-managed Node isn’t available for this connection, so Orca runs on this host’s Node.js with terminal support installed by npm on the host.",
+          "hostNodeUnsupported": "Unsupported configuration: Orca runs on this host’s Node.js with terminal support installed by npm on the host. Set Runtime to Auto in this host’s SSH settings to use Orca-managed Node."
+        },
+        "SshTargetDestructiveActions": {
+          "26be00392d": "This force-stops the remote relay for this SSH target. Active remote terminals and port forwards for this target will end.",
+          "570a7a0574": "Reset Remote Relay?",
+          "7e66942808": "This will stop active terminal sessions on this SSH target. Reconnecting will not restore them.",
+          "accf177a03": "End Remote Terminals?"
         },
         "SshTargetForm": {
           "137e88ce8d": "Remote terminals keep running after Orca disconnects from this host.",
+          "1b19b00e93": "Bounded timeouts must be between 60 seconds and 7 days.",
           "29af933cd5": "New SSH Target",
           "4a342f44c1": "Advanced Connection",
+          "55c56cf2c7": "Timeout after disconnect (seconds)",
+          "71fc546097": "Keep terminals alive until reset",
+          "7c13f58c91": "Until reset",
           "92f80edbfd": "Remote Terminal Persistence",
+          "b574994adc": "Use End Remote Terminals or Reset Relay when you want to stop them.",
           "e9609ddca6": "Proxy, jump host, and connection reuse",
-          "f2331ce599": "Edit SSH Target"
+          "f2331ce599": "Edit SSH Target",
+          "remoteRuntime": "Runtime",
+          "remoteRuntimeAuto": "Auto",
+          "remoteRuntimeHelp": "Which Node.js runs Orca on this host. Orca-managed Node uploads its own and needs no npm; Host Node uses the Node.js already installed there.",
+          "remoteRuntimeHostNode": "Host Node",
+          "remoteRuntimePinnedNode": "Orca-managed Node"
         },
         "TerminalAppearanceSection": {
           "16c471ee03": "on",
@@ -1906,14 +1949,6 @@
             "vm": "vm"
           }
         },
-        "runtime": {
-          "environments": {
-            "search": {
-              "3517fb2ec0": "Active Server",
-              "4575341c77": "Choose local desktop, add a saved remote Orca server, or generate a pairing URL."
-            }
-          }
-        },
         "settingOwnership": {
           "clientDefaultProjectScopes": "Client default + project scopes",
           "terminalQuickCommands": "Commands are saved on this client, then scoped globally or to a project setup so they run from the selected terminal context."
@@ -1929,10 +1964,21 @@
           }
         },
         "sshHostServer": {
+          "olderTerminals_one": "{{count}} terminal started by an older version of Orca is still running on this host, and it doesn’t stop on its own. Close it in that version of Orca or end it on the host, then reconnect.",
+          "olderTerminals_other": "{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect.",
+          "retry": "Runs the relay this session; it moves to a managed server on a later connect.",
+          "terminalsElsewhere": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
+          "terminalsElsewhereUncounted": "Runs the relay while terminals another Orca desktop or session opened on this host are running.",
           "terminalsElsewhere_one": "Runs the relay while {{count}} terminal another Orca desktop or session opened on this host is running.",
           "terminalsElsewhere_other": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
+          "terminalsLive": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server.",
+          "terminalsLiveUncounted": "Runs the relay until its open terminals are closed, then moves to a managed server.",
           "terminalsLive_one": "Runs the relay until its {{count}} open terminal is closed, then moves to a managed server.",
-          "terminalsLive_other": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server."
+          "terminalsLive_other": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server.",
+          "terminalsUnverifiable": "Runs the relay: Orca couldn’t confirm its terminals are closed. It moves on a later connect.",
+          "tunnelUnavailable": "Runs the relay: this host’s SSH server doesn’t allow port forwarding, and Orca couldn’t reach a managed server through the SSH session either.",
+          "unavailable": "Runs the relay: a managed Orca server can’t run on this host ({{reason}}).",
+          "unavailableUnknown": "Runs the relay: a managed Orca server can’t run on this host."
         },
         "terminal": {
           "advanced": {
@@ -2015,7 +2061,8 @@
           "serverName": "Server name",
           "sshConfigPickerBulkHint": "Bulk sync stays in Settings → SSH",
           "sshConfigPickerDescription": "Pick a host to fill the form. Nothing is saved until you click Save.",
-          "sshPersistenceDefault": "Remote terminals on this host stay alive until you end them or reset the relay."
+          "sshPersistenceDefault": "Remote terminals on this host stay alive until you end them or reset the relay.",
+          "sshRelayGraceInvalid": "Terminal timeout must be between 60 and {{value0}} seconds."
         },
         "AddRepoHostSelector": {
           "addRemoteHostTooltip": "Choose SSH for a machine you can log into, or remote server for an Orca server.",
@@ -2523,6 +2570,7 @@
             "629251f4b6": "Open OpenCode Go usage details",
             "68efc0345c": "gemini",
             "76b06d4da5": "claude",
+            "8295903d17": "Restart live Claude terminals before continuing old conversations after switching.",
             "a28a5dd9b1": "error",
             "antigravityUsageDetails": "Open Antigravity usage details",
             "d2375976eb": "Open Gemini usage details",
@@ -2732,9 +2780,6 @@
             "ptyAllocationLimit": "Your system cannot allocate any more pty devices. Close some terminals you are not using, in Orca or another program, then try again.",
             "terminalProcessLimit": "Your system cannot start another terminal process. Close unused terminals or quit unused processes, then try again."
           },
-          "TerminalRemoteRuntimeReconnectBanner": {
-            "retryingBody": "Orca will retry for up to one minute. This terminal will resume if the connection returns."
-          },
           "TerminalSessionStateSaveFailureDialog": {
             "678c780a2c": "Disk space is unavailable",
             "e2fcf07c0d": "Orca could not save this terminal session because local storage is full or not writable. Open the disk space analyzer to find workspace storage you can clean up."
@@ -2803,9 +2848,11 @@
             "41d594d01e": "{{value0}} workspace{{value1}} could not be removed",
             "4719327c9c": "All cleanup suggestions are ignored.",
             "4b93a235d8": "Suggested",
+            "4cc5b73efe": "Finding workspaces...",
             "592fbab446": "Sorted by oldest activity",
             "5bf2e88480": "{{value0}}/{{value1}} {{value2}} scanned",
             "73690b0031": "Unselect all in {{value0}}",
+            "7b7bde5181": "Checked workspaces so far: {{value0}}",
             "8b74d4ea6e": "Scanning worktrees and git state, then combining open tab, terminal, live agent, and remote availability signals before suggesting deletions.",
             "93b7381d50": "Filters",
             "97c772c4fe": "No inactive workspaces found in checked repositories.",
@@ -2881,7 +2928,9 @@
         "nativeDropTempCopyFailed_other": "Orca couldn't copy {{count}} dropped files."
       },
       "useIpcEvents": {
+        "291c8ed902": "Browser tabs are unavailable while a remote runtime is active",
         "60428567b4": "Local terminal reveal is unavailable while a remote runtime is active",
+        "f45fa2b03c": "Browser profiles are unavailable while a remote runtime is active",
         "f6300deb8b": "New Browser Tab"
       },
       "useSettingsNavigationMetadata": {
@@ -2989,12 +3038,26 @@
     },
     "ssh": {
       "managedServerMove": {
+        "close": "Close",
+        "confirm": "Move",
+        "failed": "Could not move {{host}}: {{reason}}",
+        "moved": "{{host}} now runs a managed Orca server.",
+        "notNow": "Not now",
+        "offer": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminals will restart.",
+        "offerUncounted": "Move {{host}} to a managed Orca server for more reliable connections. Its open terminals will restart.",
         "offer_one": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminal will restart.",
         "offer_other": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminals will restart.",
+        "refusedLive": "Not moved: {{count}} terminals on {{host}} are still running.",
         "refusedLive_one": "Not moved: {{count}} terminal on {{host}} is still running.",
         "refusedLive_other": "Not moved: {{count}} terminals on {{host}} are still running.",
+        "refusedUnverifiable": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped.",
+        "refusedUnverifiableUncounted": "Not moved: Orca couldn’t confirm that the terminals on {{host}} stopped.",
         "refusedUnverifiable_one": "Not moved: Orca couldn’t confirm that {{count}} terminal on {{host}} stopped.",
-        "refusedUnverifiable_other": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped."
+        "refusedUnverifiable_other": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped.",
+        "retry": "Try again",
+        "running": "Moving {{host}} to a managed Orca server…",
+        "stayed": "{{host}} still runs the relay. SSH Hosts in Settings shows why.",
+        "title": "Move to managed server"
       }
     },
     "store": {
@@ -3152,6 +3215,8 @@
         "chooseClaudeAccount": "Choose or add one in Claude Accounts settings.",
         "chooseClaudeAccountThenRunCommand": "Choose or add one in Claude Accounts settings, then run /{{command}} again.",
         "chooseClaudeAccountThenSend": "Choose or add one in Claude Accounts settings, then send your message again.",
+        "claudeAccountFolderMissing": "The selected Claude account's folder is missing. Sign in to it again or choose another account.",
+        "claudeAccountSetupFailed": "The selected Claude account could not be set up. Try again or choose another account.",
         "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
         "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
         "cliMissing": "{{agent}} wasn't found on the computer running this chat. Install it, or check its Command in Settings → Agents.",
@@ -3216,6 +3281,9 @@
         "other": "Other…"
       },
       "queuedMessages": {
+        "awaitingAnswerHold": "Waiting for your answer",
+        "editAlreadySent": "Already sent — your text is still in the composer.",
+        "from": "From {{names}}",
         "pausedKept": "Not sent yet — press Send to send it.",
         "queuePausedCleared": "Queue paused after you cleared the conversation",
         "sendConfirmBody_one": "You are about to send a message. Do you want to clear the {{count}} message previously queued?",
@@ -3289,6 +3357,8 @@
         "usedManySummary": "Used {{toolCount}} tools",
         "usedOneSummary": "Used 1 tool"
       },
+      "visualClose": "Close visualization",
+      "visualOpenInSidebar": "Open in sidebar",
       "writeNotice": {
         "agentRefused": "The agent turned this down.",
         "agentStarting": "The agent is still starting.",
@@ -3463,6 +3533,14 @@
     "findPath": "Find a folder…",
     "finishEditing": "Save or cancel the preset to continue creating your workspace.",
     "pathHelp": "One repository-relative directory per line. Spaces within a path are preserved."
+  },
+  "terminal": {
+    "codexSharedServerBanner": {
+      "dismiss": "Dismiss",
+      "dontShowAgain": "Don't show again",
+      "learnMore": "Learn more",
+      "openNewTerminal": "Open new terminal"
+    }
   },
   "tray": {
     "activityWaiting": "Orca - activity waiting"

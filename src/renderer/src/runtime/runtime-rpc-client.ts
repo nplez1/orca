@@ -26,11 +26,7 @@ export {
   markRuntimeEnvironmentCompatible,
   subscribeRuntimeWorkspacePathSearchCapabilityInvalidation
 } from './runtime-compatibility-cache'
-export {
-  getActiveRuntimeTarget,
-  settingsForRuntimeOwner,
-  type RuntimeClientTarget
-} from './runtime-client-target'
+export { type RuntimeClientTarget } from './runtime-client-target'
 export {
   hasRuntimeRpcErrorCode,
   RuntimeRpcCallError,

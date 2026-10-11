@@ -42,6 +42,7 @@ import { normalizeMuseEvent } from './providers/muse-events'
 import { normalizeDshEvent } from './providers/dsh-events'
 import { normalizeZCodeEvent } from './providers/zcode-events'
 import { normalizeJcodeEvent } from './providers/jcode-events'
+import { normalizeKiroEvent } from './providers/kiro-events'
 
 export type ProviderDispatchResult = {
   payload: ParsedAgentStatusPayload | null
@@ -250,7 +251,10 @@ export function normalizeProviderEvent(input: {
         resolvedPromptText = promptText
       }
       payload = normalizeJcodeEvent(state, eventName, resolvedPromptText, paneKey, hookPayload)
+      break
     }
+    case 'kiro':
+      payload = normalizeKiroEvent(state, eventName, promptText, paneKey, hookPayload)
   }
 
   // Why: a provider that owns its roster still cannot answer for a child blocked on a human answer —

@@ -68,6 +68,7 @@ export type RuntimeWorktreePsSummary = {
   linkedLinearIssue: string | null
   linkedGitLabMR: number | null
   linkedGitLabIssue: number | null
+  linkedItems?: Worktree['linkedItems']
   comment: string
   isPinned: boolean
   isActive: boolean

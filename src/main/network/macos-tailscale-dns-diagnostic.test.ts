@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import {
   __resetMacTailscaleDnsDiagnosticCacheForTests,
   parseMacTailscaleDnsDiagnostic,
@@ -9,7 +9,7 @@ import {
   withMacTailscaleDnsHintForDiagnostic
 } from './macos-tailscale-dns-diagnostic'
 
-vi.mock('../../shared/child-process/run-process', () => ({
+vi.mock('@orca/process-host', () => ({
   runProcess: vi.fn()
 }))
 

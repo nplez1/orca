@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client-types'
 import type { listRuntimeFiles } from '@/runtime/runtime-file-client'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 import {
   mergeQuickOpenRecentCandidates,
   useQuickOpenRecentCache
@@ -29,7 +30,7 @@ function useRecentValidationRequest(args: {
   const { excludeRequest, includeIgnoredFiles, includeDotfiles } = args.scope
   const context = useMemo(
     () => ({
-      settings: { activeRuntimeEnvironmentId: runtimeEnvironmentId },
+      target: runtimeTargetForOwnerEnvironment(runtimeEnvironmentId),
       worktreeId: worktreeId ?? '',
       worktreePath: worktreePath ?? '',
       connectionId

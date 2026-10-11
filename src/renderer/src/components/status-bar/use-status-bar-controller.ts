@@ -6,7 +6,10 @@ import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { normalizeUsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
 import { getStatusBarUsageProjection } from './status-bar-usage-projection'
-import { getUsageProviderAccountsSectionId } from './usage-provider-settings-target'
+import {
+  getUsageProviderAccountsSectionId,
+  usageRowSignInOpensSettings
+} from './usage-provider-settings-target'
 import { useStatusBarMenuFocusHandoff } from './ProviderDetailsMenu'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { useStatusBarDensity } from './status-bar-density'
@@ -135,6 +138,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     openSettingsTarget({ pane: 'accounts', repoId: null, sectionId })
     openSettingsPage()
   }
+  const canSignInFromUsageRow = (provider: ProviderRateLimits['provider']): boolean =>
+    usageRowSignInOpensSettings(provider, settings)
   const handleUsageMenuOpenChange = (nextOpen: boolean): void => {
     if (nextOpen) {
       usageMenuFocusHandoff.reset()
@@ -147,6 +152,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     anyFetching,
     anyVisible,
     barRef,
+    canSignInFromUsageRow,
     collapseUsage,
     collapsedUsageProviders,
     compact,

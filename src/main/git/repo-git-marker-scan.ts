@@ -1,6 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
-import { realpath } from 'node:fs'
-import type { Stats } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { normalizeRuntimePathSeparators } from '../../shared/cross-platform-path'
 import { resolveGitMetadataPath } from '../../shared/git-metadata-path'
@@ -10,63 +8,46 @@ export type GitMarkerScanResult =
   | { status: 'valid'; rootPath: string }
   | { status: 'absent' | 'invalid' }
 
-function realpathNative(path: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    realpath.native(path, (error, resolvedPath) => {
-      if (error) {
-        reject(error)
-        return
-      }
-      resolve(resolvedPath)
-    })
-  })
-}
-
-/**
- * Filesystem fallback for genuine Git metadata when git cannot answer cleanly.
- *
- * Why every step is async: this walks one directory per ancestor up to the filesystem root, so on
- * a FileProvider, redirector, or network path each step is a round trip. Done with sync fs it
- * blocked the main thread for the whole walk — the cost that made repo detection freeze on exactly
- * the machines whose paths are slowest.
- */
-export async function scanGitMarker(path: string): Promise<GitMarkerScanResult> {
-  const realPath = await resolveRealPath(path)
+/** Filesystem fallback for genuine Git metadata when git cannot answer cleanly. */
+export function scanGitMarkerSync(path: string): GitMarkerScanResult {
+  const realPath = resolveRealPathSync(path)
   if (realPath && realPath !== path) {
-    const [lexicalScan, realPathScan] = await Promise.all([
-      scanGitMarkerAncestors(path),
-      scanGitMarkerAncestors(realPath)
-    ])
+    const lexicalScan = scanGitMarkerAncestorsSync(path)
+    const realPathScan = scanGitMarkerAncestorsSync(realPath)
     if (
       lexicalScan.status === 'valid' &&
       realPathScan.status === 'valid' &&
-      (await pathsReferToSameEntry(lexicalScan.rootPath, realPathScan.rootPath))
+      pathsReferToSameEntry(lexicalScan.rootPath, realPathScan.rootPath)
     ) {
       // Why: preserve lexical spellings, but let a cross-repo symlink bind to its real target.
       return lexicalScan
     }
     return realPathScan
   }
-  return scanGitMarkerAncestors(path)
+  return scanGitMarkerAncestorsSync(path)
 }
 
-export async function resolveRealPath(path: string): Promise<string | null> {
+export function resolveRealPathSync(path: string): string | null {
   try {
-    return await realpathNative(path)
+    return realpathSync.native(path)
   } catch {
-    return null
+    try {
+      return realpathSync(path)
+    } catch {
+      return null
+    }
   }
 }
 
-async function scanGitMarkerAncestors(path: string): Promise<GitMarkerScanResult> {
+function scanGitMarkerAncestorsSync(path: string): GitMarkerScanResult {
   for (const candidate of ancestorDirectories(path)) {
-    if (!(await isInsideDotGitMarker(candidate, path))) {
-      const worktreeMarker = await scanWorktreeMarker(candidate)
+    if (!isInsideDotGitMarker(candidate, path)) {
+      const worktreeMarker = scanWorktreeMarkerSync(candidate)
       if (worktreeMarker.status !== 'absent') {
         return worktreeMarker
       }
     }
-    if (await hasValidBareRepoMarker(candidate)) {
+    if (hasValidBareRepoMarkerSync(candidate)) {
       return { status: 'valid', rootPath: candidate }
     }
   }
@@ -86,7 +67,7 @@ function ancestorDirectories(path: string): string[] {
   }
 }
 
-async function isInsideDotGitMarker(rootPath: string, targetPath: string): Promise<boolean> {
+function isInsideDotGitMarker(rootPath: string, targetPath: string): boolean {
   const relativePath = relative(rootPath, targetPath)
   if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
     return false
@@ -101,15 +82,15 @@ async function isInsideDotGitMarker(rootPath: string, targetPath: string): Promi
   return pathsReferToSameEntry(join(rootPath, firstSegment), join(rootPath, '.git'))
 }
 
-async function pathsReferToSameEntry(leftPath: string, rightPath: string): Promise<boolean> {
+function pathsReferToSameEntry(leftPath: string, rightPath: string): boolean {
   try {
-    const leftStat = await stat(leftPath)
-    const rightStat = await stat(rightPath)
+    const leftStat = statSync(leftPath)
+    const rightStat = statSync(rightPath)
     if (leftStat.ino !== 0 && leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino) {
       return true
     }
-    const leftRealPath = normalizeRuntimePathSeparators(await realpathNative(leftPath))
-    const rightRealPath = normalizeRuntimePathSeparators(await realpathNative(rightPath))
+    const leftRealPath = normalizeRuntimePathSeparators(realpathSync.native(leftPath))
+    const rightRealPath = normalizeRuntimePathSeparators(realpathSync.native(rightPath))
     return process.platform === 'win32'
       ? leftRealPath.toLowerCase() === rightRealPath.toLowerCase()
       : leftRealPath === rightRealPath
@@ -118,28 +99,28 @@ async function pathsReferToSameEntry(leftPath: string, rightPath: string): Promi
   }
 }
 
-async function scanWorktreeMarker(worktreePath: string): Promise<GitMarkerScanResult> {
+function scanWorktreeMarkerSync(worktreePath: string): GitMarkerScanResult {
   const dotGit = join(worktreePath, '.git')
-  let marker: Stats
+  let marker: ReturnType<typeof statSync>
   try {
-    marker = await stat(dotGit)
+    marker = statSync(dotGit)
   } catch {
     return { status: 'absent' }
   }
 
   if (marker.isDirectory()) {
-    return (await hasValidGitDirectory(dotGit))
+    return hasValidGitDirectorySync(dotGit)
       ? { status: 'valid', rootPath: worktreePath }
       : { status: 'invalid' }
   }
   if (marker.isFile()) {
     let gitDir: string | null
     try {
-      gitDir = parseGitdirFile(worktreePath, await readFile(dotGit, 'utf8'))
+      gitDir = parseGitdirFile(worktreePath, readFileSync(dotGit, 'utf8'))
     } catch {
       return { status: 'invalid' }
     }
-    return gitDir !== null && (await hasValidGitDirectory(gitDir))
+    return gitDir !== null && hasValidGitDirectorySync(gitDir)
       ? { status: 'valid', rootPath: worktreePath }
       : { status: 'invalid' }
   }
@@ -151,51 +132,44 @@ function parseGitdirFile(basePath: string, content: string): string | null {
   return payload === null ? null : resolveGitMetadataPath(basePath, payload)
 }
 
-async function hasValidGitDirectory(gitDir: string): Promise<boolean> {
-  // Why: keep the original short-circuit — the linked-worktree probe costs extra stats.
-  if (await hasValidCommonGitDirectory(gitDir)) {
-    return true
-  }
-  return hasValidLinkedWorktreeGitDirectory(gitDir)
+function hasValidGitDirectorySync(gitDir: string): boolean {
+  return hasValidCommonGitDirectorySync(gitDir) || hasValidLinkedWorktreeGitDirectorySync(gitDir)
 }
 
-async function hasValidCommonGitDirectory(gitDir: string): Promise<boolean> {
+function hasValidCommonGitDirectorySync(gitDir: string): boolean {
   try {
     return (
-      (await stat(join(gitDir, 'HEAD'))).isFile() &&
-      (await stat(join(gitDir, 'objects'))).isDirectory() &&
-      (await stat(join(gitDir, 'refs'))).isDirectory()
+      statSync(join(gitDir, 'HEAD')).isFile() &&
+      statSync(join(gitDir, 'objects')).isDirectory() &&
+      statSync(join(gitDir, 'refs')).isDirectory()
     )
   } catch {
     return false
   }
 }
 
-async function hasValidLinkedWorktreeGitDirectory(gitDir: string): Promise<boolean> {
+function hasValidLinkedWorktreeGitDirectorySync(gitDir: string): boolean {
   try {
-    if (
-      !(await stat(join(gitDir, 'HEAD'))).isFile() ||
-      !(await stat(join(gitDir, 'commondir'))).isFile()
-    ) {
+    if (!statSync(join(gitDir, 'HEAD')).isFile() || !statSync(join(gitDir, 'commondir')).isFile()) {
       return false
     }
     const commonDir = resolveGitMetadataPath(
       gitDir,
-      await readFile(join(gitDir, 'commondir'), 'utf8')
+      readFileSync(join(gitDir, 'commondir'), 'utf8')
     )
-    return commonDir !== null && (await hasValidCommonGitDirectory(commonDir))
+    return commonDir !== null && hasValidCommonGitDirectorySync(commonDir)
   } catch {
     return false
   }
 }
 
-async function hasValidBareRepoMarker(path: string): Promise<boolean> {
-  return (await hasValidCommonGitDirectory(path)) && !(await gitConfigDeclaresNonBare(path))
+function hasValidBareRepoMarkerSync(path: string): boolean {
+  return hasValidCommonGitDirectorySync(path) && !gitConfigDeclaresNonBare(path)
 }
 
-async function gitConfigDeclaresNonBare(gitDir: string): Promise<boolean> {
+function gitConfigDeclaresNonBare(gitDir: string): boolean {
   try {
-    const config = await readFile(join(gitDir, 'config'), 'utf8')
+    const config = readFileSync(join(gitDir, 'config'), 'utf8')
     let inCoreSection = false
     for (const line of config.split(/\r?\n/)) {
       const section = line.match(/^\s*\[([^\]]+)\]/)

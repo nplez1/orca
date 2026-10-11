@@ -1,0 +1,153 @@
+// @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
+import { ALL_EXECUTION_HOSTS_SCOPE } from '../../shared/execution-host'
+import type { OrcaRuntimeWithPreservedBranchCleanup } from './orca-runtime-preserved-branch-cleanup'
+import { RuntimeAccountController } from './runtime-account-controller'
+import { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
+import { RuntimeMobileDictationController } from './runtime-mobile-dictation-controller'
+import { RuntimeMobileSpeechCatalog } from './runtime-mobile-speech-catalog'
+import { RuntimeNestedRepoImport } from './runtime-nested-repo-import'
+import { RuntimeProjectGroupController } from './runtime-project-group-controller'
+import { RuntimeProjectHostSetupController } from './runtime-project-host-setup-controller'
+import { RuntimeRepositoryCloneController } from './runtime-repository-clone-controller'
+import { RuntimeRepositoryForkBackfill } from './runtime-repository-fork-backfill'
+import { RuntimeRepositoryRefQueries } from './runtime-repository-ref-queries'
+import { RuntimeRepositoryRegistrationController } from './runtime-repository-registration-controller'
+import { RuntimeRepositoryRelocationController } from './runtime-repository-relocation-controller'
+import { RuntimeRepositorySettingsController } from './runtime-repository-settings-controller'
+import { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-presets'
+import { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
+import { RuntimeWorkspaceSessionController } from './runtime-workspace-session-controller'
+import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
+import { addRemoteRepoFromPath } from '../ipc/repos/remote-repo-registration'
+import { teardownFolderWorkspacePtys } from './folder-workspace-pty-teardown'
+import { countRepoTerminalsNotKnownExited } from './project-removal-impact'
+
+export function installOrcaRuntimeOwnedControllers(
+  runtime: OrcaRuntimeWithPreservedBranchCleanup
+): void {
+  runtime.accounts = new RuntimeAccountController()
+
+  runtime.mobileSpeech = new RuntimeMobileSpeechCatalog(() => runtime.store)
+
+  runtime.mobileDictation = new RuntimeMobileDictationController(() => runtime.store)
+
+  runtime.projectHostSetups = new RuntimeProjectHostSetupController({
+    getStore: () => runtime.store,
+    listRepos: () => runtime.listRepos(),
+    addRepo: (path, kind, hostId) => runtime.addRepo(path, kind, hostId),
+    addRemoteRepo: async (remote) => {
+      // The same registration the desktop IPC handler uses, so both surfaces agree on SSH hosts.
+      const result = await addRemoteRepoFromPath(runtime.requireStore(), remote)
+      if ('error' in result) {
+        throw new Error(result.error)
+      }
+      runtime.invalidateResolvedWorktreeCache()
+      runtime.invalidateWorktreeScanCacheForRepo(result.repo.id)
+      runtime.notifyReposChanged()
+      return result.repo
+    },
+    cloneRepo: (url, destination, hostId) => runtime.cloneRepo(url, destination, hostId),
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    notifyReposChanged: () => runtime.notifyReposChanged(),
+    countLiveTerminalsForRepo: (repo) =>
+      countRepoTerminalsNotKnownExited(repo, runtime.ptysById.values(), (ptyId) =>
+        runtime.isPtyKnownExited(ptyId)
+      )
+  })
+
+  runtime.projectGroups = new RuntimeProjectGroupController({
+    getStore: () => runtime.store,
+    resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
+    notifyReposChanged: () => runtime.notifyReposChanged(),
+    resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
+    teardownFolderWorkspacePtys: (worktreeId, connectionId) =>
+      teardownFolderWorkspacePtys(
+        {
+          runtime,
+          getSshProvider: runtime.getSshProviderFn,
+          getLocalProvider: () => runtime.getLocalProvider(),
+          onPtyStopped: runtime.onPtyStopped
+        },
+        worktreeId,
+        connectionId
+      ),
+    cleanupRemovedFolderWorkspaceState: (worktreeId) => {
+      if (runtime.store) {
+        runtime.removeWorktreeMetadataAndHistory(runtime.store, worktreeId)
+      }
+      // Why every host after the local-only hub: this store mints folder ids, so none is shared.
+      runtime.dropAgentStatusForRemovedWorktreeFn?.(worktreeId, ALL_EXECUTION_HOSTS_SCOPE)
+    }
+  })
+
+  runtime.nestedRepoImport = new RuntimeNestedRepoImport({
+    getStore: () => runtime.store,
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    notifyReposChanged: () => runtime.notifyReposChanged()
+  })
+
+  runtime.repositoryRegistrations = new RuntimeRepositoryRegistrationController({
+    getStore: () => runtime.store,
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    notifyReposChanged: () => runtime.notifyReposChanged()
+  })
+
+  runtime.repositoryClones = new RuntimeRepositoryCloneController({
+    getStore: () => runtime.store,
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    notifyReposChanged: () => runtime.notifyReposChanged()
+  })
+
+  runtime.repositorySettings = new RuntimeRepositorySettingsController({
+    getStore: () => runtime.store,
+    resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
+    forgetTerminalTopology: (repoId) => runtime.terminalTopologyRevisionByRepoId.delete(repoId),
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    notifyReposChanged: () => runtime.notifyReposChanged()
+  })
+
+  runtime.repositorySparsePresets = new RuntimeRepositorySparsePresets({
+    getStore: () => runtime.store,
+    resolveRepo: (selector) => runtime.resolveRepoSelector(selector)
+  })
+
+  runtime.repositoryRefQueries = new RuntimeRepositoryRefQueries({
+    resolveRepo: (selector) => runtime.resolveRepoSelector(selector)
+  })
+
+  // Why here and not in a checked mixin: this field's initializer has to run before the owner map
+  // in `orca-runtime-state-fields` installs the command surface, and a subclass's field would run
+  // after it. Every sibling controller in this file is wired the same way.
+  runtime.repositoryRelocation = new RuntimeRepositoryRelocationController({
+    getStore: () => runtime.store,
+    resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
+    getWorktreePs: (limit) => runtime.getWorktreePs(limit),
+    notifyRepoRelocated: (repoId, oldId, newId) =>
+      runtime.notifyWorktreeFolderRenamed(repoId, oldId, newId),
+    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
+    notifyReposChanged: () => runtime.notifyReposChanged()
+  })
+
+  runtime.serverEnvironment = new RuntimeServerEnvironmentCommands()
+
+  runtime.repositoryForkBackfill = new RuntimeRepositoryForkBackfill(
+    () => runtime.store,
+    () => runtime.notifyReposChanged()
+  )
+
+  runtime.workspaceSessions = new RuntimeWorkspaceSessionController({
+    getStore: () => runtime.store,
+    resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
+    hasRuntimeOwnedPtyCandidate: (session, worktreeId, tabs) =>
+      runtime.workspaceSessionWorktreeHasRuntimeOwnedPtyCandidate(session, worktreeId, tabs)
+  })
+
+  runtime.aiVault = new RuntimeAiVaultCommands(() => runtime.prepareAiVaultSessionResumeFn)
+
+  runtime.claudeAgentTeams = new ClaudeAgentTeamsService()
+}

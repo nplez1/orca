@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '../ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { SshTargetCard } from './SshTargetCard'
+import { SshTargetServerStatus } from './SshTargetServerStatus'
+import { SshTargetsEmptyState } from './SshTargetsEmptyState'
 import type { SshTargetBusyAction } from './ssh-target-action-state'
 import { translate } from '@/i18n/i18n'
 
@@ -17,15 +19,13 @@ export type SshTargetListProps = {
   connectionStates: Map<string, SshConnectionState>
   testingIds: Set<string>
   busyActionForTarget: (targetId: string) => SshTargetBusyAction | undefined
-  /** Handlers take no target: this list already binds each row. */
-  onConnect: (target: SshTarget) => void | Promise<void>
-  onDisconnect: (target: SshTarget) => void | Promise<void>
-  onTerminateSessions: (target: SshTarget) => void
-  onResetRelay: (target: SshTarget) => void
-  onTest: (target: SshTarget) => void | Promise<void>
+  onConnect: (targetId: string) => void | Promise<void>
+  onDisconnect: (targetId: string) => void | Promise<void>
+  onTest: (targetId: string) => void | Promise<void>
   onEdit: (target: SshTarget) => void
   onRemove: (target: SshTarget) => void
   onSetHidden: (target: SshTarget, hidden: boolean) => void | Promise<void>
+  onChanged: () => void
 }
 
 /**
@@ -43,46 +43,41 @@ export function SshTargetList({
   busyActionForTarget,
   onConnect,
   onDisconnect,
-  onTerminateSessions,
-  onResetRelay,
   onTest,
   onEdit,
   onRemove,
-  onSetHidden
+  onSetHidden,
+  onChanged
 }: SshTargetListProps): React.JSX.Element {
   const [hiddenExpanded, setHiddenExpanded] = useState(false)
   const visibleTargets = targets.filter((target) => !isSshTargetHidden(target))
   const hiddenTargets = targets.filter((target) => isSshTargetHidden(target))
 
-  const renderTargetCard = (target: SshTarget): React.JSX.Element => (
-    <SshTargetCard
-      key={target.id}
-      target={target}
-      state={connectionStates.get(target.id)}
-      testing={testingIds.has(target.id)}
-      busyAction={busyActionForTarget(target.id)}
-      onConnect={() => onConnect(target)}
-      onDisconnect={() => onDisconnect(target)}
-      onTerminateSessions={() => onTerminateSessions(target)}
-      onResetRelay={() => onResetRelay(target)}
-      onTest={() => onTest(target)}
-      onEdit={() => onEdit(target)}
-      onRemove={() => onRemove(target)}
-      onSetHidden={(hidden) => onSetHidden(target, hidden)}
-    />
+  const renderTarget = (target: SshTarget): React.JSX.Element => (
+    <div key={target.id} className="space-y-1">
+      <SshTargetCard
+        target={target}
+        state={connectionStates.get(target.id)}
+        testing={testingIds.has(target.id)}
+        busyAction={busyActionForTarget(target.id)}
+        onConnect={onConnect}
+        onDisconnect={onDisconnect}
+        onTest={onTest}
+        onEdit={onEdit}
+        onRemove={() => onRemove(target)}
+        onSetHidden={(hidden) => onSetHidden(target, hidden)}
+      />
+      <SshTargetServerStatus target={target} onChanged={onChanged} />
+    </div>
   )
 
   if (targets.length === 0) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-5 text-sm text-muted-foreground">
-        {translate('auto.components.settings.SshPane.c0f1c80166', 'No SSH targets configured.')}
-      </div>
-    )
+    return <SshTargetsEmptyState />
   }
 
   return (
     <>
-      <div className="space-y-2">{visibleTargets.map(renderTargetCard)}</div>
+      <div className="space-y-2">{visibleTargets.map(renderTarget)}</div>
       {hiddenTargets.length > 0 ? (
         <Collapsible open={hiddenExpanded} onOpenChange={setHiddenExpanded}>
           <CollapsibleTrigger asChild>
@@ -105,7 +100,7 @@ export function SshTargetList({
                   'These hosts come from your SSH config. They stay out of the lists where you pick a host, but anything already running on them keeps working.'
                 )}
               </p>
-              {hiddenTargets.map(renderTargetCard)}
+              {hiddenTargets.map(renderTarget)}
             </div>
           </CollapsibleContent>
         </Collapsible>

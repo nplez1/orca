@@ -17,6 +17,8 @@ export type FileStat = {
   type: 'file' | 'directory' | 'symlink'
   mtime: number
   mtimeMs?: number
+  /** Local only: SSH hosts do not report it. */
+  ctimeMs?: number
   dev?: number
   ino?: number
   nlink?: number

@@ -11,6 +11,7 @@ import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../../../shared/execution-host'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import { getFolderWorkspaceHostIdentity } from '../../../../../../shared/folder-workspace-worktree'
 import { getHostDisplayLabelOverrides } from '../../../../../../shared/host-setting-overrides'
 import { buildRows } from '../grouping/build-rows'
 import { mergeSameBranchRows } from '../grouping/branch-groups'
@@ -58,6 +59,7 @@ function collectRenderedSidebarRowKeys(sectionRows: ReturnType<typeof addHostSec
     } else if (row.type === 'item') {
       keys.add(row.rowKey)
     } else if (row.type === 'folder-workspace') {
+      keys.add(getFolderWorkspaceHostIdentity(row.folderWorkspace))
       keys.add(folderWorkspaceKey(row.folderWorkspace.id))
     } else if (row.type === 'pending-creation') {
       keys.add(`pending:${row.creationId}`)

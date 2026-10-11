@@ -48,13 +48,14 @@ export function useAiVaultSessionCopyActions(): AiVaultSessionCopyActions {
   )
 
   const revealSessionLog = useCallback(
-    (session: AiVaultSession): void => void window.api.shell.openPath(session.filePath),
+    (session: AiVaultSession): void =>
+      void window.api.shell.openPath(session.filePath, session.executionHostId),
     []
   )
 
   const openSessionCwd = useCallback((session: AiVaultSession): void => {
     if (session.cwd) {
-      void window.api.shell.openPath(session.cwd)
+      void window.api.shell.openPath(session.cwd, session.executionHostId)
     }
   }, [])
 

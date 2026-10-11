@@ -16,6 +16,7 @@ import type {
   RuntimeMobileSessionTerminalClientTab
 } from './runtime-mobile-session-tab-contracts'
 import type { CliStatusCaller } from './orchestration-caller-status'
+import type { RuntimeHostDescriptor } from './runtime-host-descriptor'
 
 export type * from './runtime-mobile-session-tab-contracts'
 
@@ -96,6 +97,8 @@ export type RuntimeStatus = {
   hostPlatform?: NodeJS.Platform
   /** Optional display name reported by the answering runtime. */
   machineName?: string
+  /** Absent from older hosts and from hosts whose profile could not persist an installation id. */
+  hostDescriptor?: RuntimeHostDescriptor
   terminalWindowsShell?: string | null
   deviceScope?: DeviceScope
   floatingWorkspaceEnabled?: boolean

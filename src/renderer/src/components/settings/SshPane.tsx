@@ -3,15 +3,11 @@ import { toast } from 'sonner'
 import { Plus, Upload } from 'lucide-react'
 import type { SshTarget } from '../../../../shared/ssh-types'
 import { useAppStore } from '@/store'
+import { sshTargetConnectFailureText } from '@/ssh/ssh-connect-failure-text'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { Button } from '../ui/button'
-import { removeSshTargetWithBestEffortCleanup } from './ssh-target-remove'
-import {
-  describeSshTerminateOutcome,
-  terminateSshSessionsWithReconnect
-} from './ssh-session-termination'
 import { setSshTargetHiddenWithReport } from './ssh-target-visibility'
-import { SshTargetServerList } from './SshTargetServerList'
+import { SshTargetList } from './SshTargetList'
 import { SshTargetDestructiveActions } from './SshTargetDestructiveActions'
 import { SshTargetForm, EMPTY_FORM, type EditingTarget } from './SshTargetForm'
 import { getEditingTargetForSshTarget } from './ssh-target-draft'
@@ -169,7 +165,7 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
 
   const handleRemove = async (id: string): Promise<void> => {
     try {
-      await removeSshTargetWithBestEffortCleanup(window.api.ssh, id)
+      await window.api.ssh.removeTarget({ id })
       // Why: a deleted passphrase-gated target may still have deferred
       // reconnect metadata; clear it so focused SSH tabs stop retrying it.
       clearRemovedSshTargetState(id)
@@ -194,8 +190,7 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
     setShowForm(true)
   }
 
-  // Why no workspace dialog here: hiding changes nothing about the host's workspaces
-  // or sessions, so it needs no confirmation — unlike removal, which orphans them.
+  // Why no workspace dialog: hiding leaves the host's workspaces and sessions untouched.
   const handleSetHidden = async (target: SshTarget, hidden: boolean): Promise<void> => {
     const report = await setSshTargetHiddenWithReport(window.api.ssh, target, hidden)
     if (!mountedRef.current) {
@@ -213,9 +208,11 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
       recordFeatureInteraction('ssh')
     } catch (err) {
       toast.error(
-        err instanceof Error
-          ? err.message
-          : translate('auto.components.settings.SshPane.e95d5ae10e', 'Connection failed')
+        sshTargetConnectFailureText(
+          targetId,
+          err,
+          translate('auto.components.settings.SshPane.e95d5ae10e', 'Connection failed')
+        )
       )
     }
   }
@@ -230,45 +227,6 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
           ? err.message
           : translate('auto.components.settings.SshPane.a43de1d3ee', 'Disconnect failed')
       )
-    }
-  }
-
-  const handleTerminateSessions = async (targetId: string): Promise<void> => {
-    try {
-      const report = describeSshTerminateOutcome(await terminateSshSessionsWithReconnect(targetId))
-      toast[report.level](report.message)
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : translate(
-              'auto.components.settings.SshPane.025e107643',
-              'Failed to end remote terminals'
-            )
-      )
-    }
-  }
-
-  const handleResetRelay = async (targetId: string): Promise<void> => {
-    try {
-      await window.api.ssh.resetRelay({ targetId })
-      if (mountedRef.current) {
-        toast.success(
-          translate('auto.components.settings.SshPane.db2e48975e', 'Remote relay reset')
-        )
-      }
-      await loadTargets()
-    } catch (err) {
-      if (mountedRef.current) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : translate(
-                'auto.components.settings.SshPane.2c4ee7332b',
-                'Failed to reset remote relay'
-              )
-        )
-      }
     }
   }
 
@@ -379,25 +337,16 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
         </div>
       </div>
 
-      <SshTargetDestructiveActions
-        connectionStates={sshConnectionStates}
-        onRemove={handleRemove}
-        onResetRelay={handleResetRelay}
-        onTerminateSessions={handleTerminateSessions}
-      >
-        {({ busyActionForTarget, requestRemove, requestResetRelay, requestTerminateSessions }) => (
-          <SshTargetServerList
+      <SshTargetDestructiveActions onRemove={handleRemove}>
+        {({ busyActionForTarget, requestRemove }) => (
+          <SshTargetList
             targets={targets}
             connectionStates={sshConnectionStates}
             testingIds={testingIds}
             busyActionForTarget={busyActionForTarget}
-            onConnect={(target) => void handleConnect(target.id)}
-            onDisconnect={(target) => void handleDisconnect(target.id)}
-            onTerminateSessions={(target) =>
-              requestTerminateSessions({ id: target.id, label: target.label })
-            }
-            onResetRelay={(target) => requestResetRelay({ id: target.id, label: target.label })}
-            onTest={(target) => void handleTest(target.id)}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onTest={handleTest}
             onEdit={handleEdit}
             onRemove={(target) => requestRemoveTarget(target, requestRemove)}
             onSetHidden={handleSetHidden}

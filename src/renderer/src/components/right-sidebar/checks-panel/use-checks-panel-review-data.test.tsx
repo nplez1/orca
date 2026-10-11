@@ -34,6 +34,7 @@ const fetchPRComments = vi.fn<
 >(async () => [])
 const fetchPRCheckDetails = vi.fn<() => Promise<null>>(async () => null)
 const setComments = vi.fn()
+const setCommentsError = vi.fn()
 const setCommentsLoading = vi.fn()
 // Why stable identities: an unstable callback would re-run the effect for a reason that has
 // nothing to do with the review state this test is about.
@@ -52,8 +53,9 @@ function Probe({ pr, prCacheKey }: { pr: PRInfo; prCacheKey: string }): null {
     prCacheKey,
     prNumber: pr.number,
     repo,
-    settings: null,
+    activeWorktree: null,
     setComments,
+    setCommentsError,
     setCommentsLoading
   })
   return null

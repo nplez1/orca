@@ -19,7 +19,7 @@ import {
   RipgrepUnavailableError
 } from '../../shared/ripgrep-process-availability'
 import { spawnBundledRipgrep } from '../ripgrep/bundled-ripgrep-spawn'
-import { QuickOpenSubprocessPathAccumulator } from '../../shared/quick-open-listing-limits'
+import { QuickOpenSubprocessPathAccumulator } from '../../shared/quick-open-subprocess-path-accumulator'
 import { toWindowsWslPath } from '../wsl'
 
 /**

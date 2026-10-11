@@ -51,7 +51,10 @@ describe('JiraBoardSettings', () => {
     )
     await waitFor(() =>
       expect(mocks.jiraListBoards).toHaveBeenCalledWith(
-        { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId },
+        {
+          kind: 'default-scope',
+          settings: { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }
+        },
         'site-1',
         undefined
       )
@@ -93,7 +96,10 @@ describe('JiraBoardSettings', () => {
 
     await waitFor(() =>
       expect(mocks.jiraListBoards).toHaveBeenCalledWith(
-        { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId },
+        {
+          kind: 'default-scope',
+          settings: { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }
+        },
         'site-1',
         'Nebulite'
       )

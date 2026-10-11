@@ -31,7 +31,10 @@ const badgeVariants = cva(
         statusWarning:
           'h-4 gap-1 rounded border-status-warning-border bg-status-warning-background px-1.5 text-[9px] font-medium leading-none text-status-warning [&>svg]:size-2.5',
         statusDanger:
-          'h-4 gap-1 rounded border-destructive/25 bg-destructive/5 px-1.5 text-[9px] font-medium leading-none text-destructive [&>svg]:size-2.5'
+          'h-4 gap-1 rounded border-destructive/25 bg-destructive/5 px-1.5 text-[9px] font-medium leading-none text-destructive [&>svg]:size-2.5',
+        /** A skill or file sitting inline in the chat message box, ringed while selected. */
+        promptPill:
+          'max-w-full border-border bg-secondary px-1.5 py-0 align-baseline text-muted-foreground data-[selected=true]:ring-1 data-[selected=true]:ring-ring'
       }
     },
     defaultVariants: {

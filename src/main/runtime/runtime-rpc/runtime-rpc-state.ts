@@ -7,8 +7,10 @@ import type { RpcTransport } from '../rpc/transport'
 import type { WebSocket } from 'ws'
 import type { DeviceRegistry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
+import type { RuntimeHostDescriptor } from '../../../shared/runtime-host-descriptor'
 import type { UnpairedDeviceAuthThrottle } from '../rpc/unpaired-device-auth-throttle'
 import type { MobileSocketWiring } from '../rpc/mobile-socket-wiring'
+import type { MobileDesktopRelay } from '../mobile-desktop-relay/mobile-desktop-relay'
 import { RelayRevokeOutbox } from '../relay/relay-revoke-outbox'
 import { PushUnregisterOutbox } from '../push/push-unregister-outbox'
 import { RuntimeBinaryMessageRouter } from '../runtime-binary-message-router'
@@ -60,6 +62,7 @@ export class RuntimeRpcState {
   protected readonly pushUnregisterOutbox: PushUnregisterOutbox
   protected deviceRegistry: DeviceRegistry | null = null
   protected e2eeKeypair: E2EEKeypair | null = null
+  protected hostDescriptor: RuntimeHostDescriptor | null = null
   protected pairingInitializationFailure: PairingOfferUnavailable | null = null
   protected tlsFingerprint: string | null = null
   protected activeTransports: RpcTransport[] = []
@@ -70,6 +73,10 @@ export class RuntimeRpcState {
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
   protected detachWebSocketWiring: (() => void) | null = null
   protected mobileRelayPairingProvider: MobileRelayPairingProvider | null = null
+  // Why: only a desktop with configured servers relays; headless serve leaves this unset.
+  protected mobileDesktopRelay: MobileDesktopRelay | null = null
+  // Why: lets an automatic mint install a provider whose launch-time construction failed.
+  protected mobileRelayPairingProviderInstaller: (() => Promise<unknown>) | null = null
   protected mobileRelayPairingOfferQueue: Promise<void> = Promise.resolve()
   protected mobileRelayPairingOfferInFlight: {
     generation: number

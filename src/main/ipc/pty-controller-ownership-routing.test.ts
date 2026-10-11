@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { toSshExecutionHostId } from '../../shared/execution-host'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
-import { SshPlainShellPtyProvider } from '../providers/ssh-plain-shell-pty-provider'
 import {
   registerPtyHandlers,
   registerSshPtyProvider,
@@ -84,7 +84,7 @@ describe('registerPtyHandlers', () => {
     const sshProvider = createAgentClaimProvider({})
     setLocalPtyProvider(localProvider as never)
     registerSshPtyProvider(connectionId, sshProvider as never)
-    setPtyOwnership(ptyId, connectionId)
+    setPtyOwnership(ptyId, toSshExecutionHostId(connectionId))
     const controller = registerAgentClaimController()
 
     unregisterSshPtyProvider(connectionId)
@@ -114,7 +114,7 @@ describe('registerPtyHandlers', () => {
         .mockResolvedValue(writeUnverifiable('transport_settlement_lost', true))
     }
     registerSshPtyProvider(connectionId, provider as never)
-    setPtyOwnership(ptyId, connectionId)
+    setPtyOwnership(ptyId, toSshExecutionHostId(connectionId))
     const controller = registerAgentClaimController() as unknown as SettledControllerDouble
     try {
       expect(controller.writeWithSettlement).toBeTypeOf('function')
@@ -136,7 +136,7 @@ describe('registerPtyHandlers', () => {
     // A provider predating the settled contract, reached through the production registry.
     delete provider.writeWithSettlement
     registerSshPtyProvider(connectionId, provider as never)
-    setPtyOwnership(ptyId, connectionId)
+    setPtyOwnership(ptyId, toSshExecutionHostId(connectionId))
     const controller = registerAgentClaimController() as unknown as SettledControllerDouble
     try {
       // Synchronous by construction: the refusal happens before any effect is attempted.
@@ -193,7 +193,7 @@ describe('registerPtyHandlers', () => {
       const ptyId = `ssh:${connectionId}@@remote-pty`
       setLocalPtyProvider(new LocalPtyProvider())
       registerSshPtyProvider(connectionId, createAgentClaimProvider({}) as never)
-      setPtyOwnership(ptyId, connectionId)
+      setPtyOwnership(ptyId, toSshExecutionHostId(connectionId))
       const controller = registerAgentClaimController()
       try {
         await expect(controller.probePtyLiveness(ptyId)).resolves.toBeNull()
@@ -205,28 +205,6 @@ describe('registerPtyHandlers', () => {
         unregisterSshPtyProvider(connectionId)
         clearPtyOwnershipForConnection(connectionId)
         clearProviderPtyState(ptyId)
-      }
-    })
-
-    it('answers unknown for an earlier relay PTY once the target is in plain SSH mode', async () => {
-      // Why: rung D never saw that PTY; it may still run on the earlier relay.
-      const connectionId = 'ssh-plain-1'
-      const ptyId = `ssh:${connectionId}@@prior-relay-pty`
-      setLocalPtyProvider(new LocalPtyProvider())
-      const openShell = vi.fn(async () => {
-        throw new Error('no shell in this test')
-      })
-      const mode = { reason: 'no_runtime' as const, message: 'plain' }
-      registerSshPtyProvider(
-        connectionId,
-        new SshPlainShellPtyProvider(connectionId, openShell, mode, true, 1)
-      )
-      const controller = registerAgentClaimController()
-      try {
-        await expect(controller.probePtyLiveness(ptyId)).resolves.toBeNull()
-        await expect(controller.attach(ptyId)).resolves.toBe(false)
-      } finally {
-        unregisterSshPtyProvider(connectionId)
       }
     })
 
@@ -260,7 +238,7 @@ describe('registerPtyHandlers', () => {
     const controller = registerAgentClaimController()
     const daemonPtyId = 'repo-1::/tmp/wt@@1a2b3c4d'
     const ownedSshPtyId = 'owned-remote-pty'
-    setPtyOwnership(ownedSshPtyId, 'ssh-attach')
+    setPtyOwnership(ownedSshPtyId, 'ssh:ssh-attach')
     try {
       // Local daemon session: attach flows to the provider.
       await expect(controller.attach(daemonPtyId)).resolves.toBe(true)

@@ -201,7 +201,7 @@ describe('TaskPageJiraBoard', () => {
     expect(await screen.findByText('1 loaded')).toBeTruthy()
     expect(await screen.findByText('ABC-2 title')).toBeTruthy()
     expect(mocks.jiraListBoardIssues).toHaveBeenCalledWith(
-      model.settings,
+      { kind: 'default-scope', settings: model.settings },
       expect.objectContaining({ boardId: '42', scope: 'backlog', siteId: 'site-1' })
     )
   })
@@ -448,7 +448,7 @@ describe('TaskPageJiraBoard', () => {
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
-        model.settings,
+        { kind: 'default-scope', settings: model.settings },
         sprintIssue.key,
         { transitionId: 'start-work' },
         sprintIssue.siteId

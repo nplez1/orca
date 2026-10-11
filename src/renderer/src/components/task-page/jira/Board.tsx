@@ -28,6 +28,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
 import {
@@ -73,7 +74,10 @@ export function TaskPageJiraBoard({
     updateJiraBoardViewPreferences({ activeView: view })
   }, [])
   const legacyRuntimeFallbackApplied = useRef(false)
-  const providerSettings = model.jiraTaskSourceContext ?? model.settings
+  const providerSettings = useMemo(
+    () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
+    [model.jiraTaskSourceContext, model.settings]
+  )
   const filteredColumns = useMemo(
     () => groupTaskPageJiraBoardIssues(board.overview?.columns ?? [], board.sprintIssues),
     [board.overview?.columns, board.sprintIssues]

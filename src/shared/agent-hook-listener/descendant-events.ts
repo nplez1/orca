@@ -148,6 +148,8 @@ const DESCENDANT_PROVIDERS: Record<AgentHookSource, DescendantProviderAdapter | 
   // Why null: these sources emit no descendant lifecycle facts, same as qoder above.
   'qoder-cn': null,
   'qwen-code': null,
+  // Why null: kiro emits no descendant lifecycle facts either.
+  kiro: null,
   codebuddy: null,
   muse: null,
   grok: {

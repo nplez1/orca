@@ -12,7 +12,7 @@ import {
   hasCachedLegacyQuickOpenInventory,
   searchLegacyQuickOpenInventory
 } from './runtime-legacy-quick-open-inventory'
-import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
 import { searchRuntimeNameFilterPaths } from './runtime-workspace-path-search-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
@@ -41,7 +41,7 @@ export async function searchRuntimeFilePaths(
     correlationId?: WorkspacePathSearchCorrelationId
   }
 ): Promise<FilePathSearchResult> {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment') {
     if (!context.worktreePath) {
       return { files: [], totalCount: null, truncated: false }

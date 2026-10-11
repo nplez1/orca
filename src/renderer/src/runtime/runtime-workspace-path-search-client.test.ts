@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { searchRuntimeFilePaths } from './runtime-file-path-search-client'
+import { runtimeTargetForOwnerEnvironment } from './runtime-client-target'
 import {
   fsSearch,
   runtimeEnvironmentCall,
@@ -100,7 +101,7 @@ function installStatus(
 
 function context(environmentId = 'env-1') {
   return {
-    settings: { activeRuntimeEnvironmentId: environmentId },
+    target: runtimeTargetForOwnerEnvironment(environmentId),
     worktreeId: 'wt-1',
     worktreePath: '/remote/repo'
   }

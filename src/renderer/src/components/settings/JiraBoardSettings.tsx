@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { JiraBoard, JiraSiteSelection } from '../../../../shared/jira-types'
 import { Button } from '@/components/ui/button'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
@@ -38,7 +39,7 @@ export function JiraBoardSettings({
       ? 'all'
       : (jiraStatus.selectedSiteId ?? jiraStatus.activeSiteId ?? undefined)
   const runtimeSettings = useMemo<RuntimeJiraSettings>(
-    () => ({ activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }),
+    () => defaultScopeSource({ activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }),
     [settings.activeRuntimeEnvironmentId]
   )
   const selectedBoard = settings.defaultJiraBoard

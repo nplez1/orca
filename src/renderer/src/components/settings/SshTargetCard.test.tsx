@@ -28,7 +28,8 @@ const HOST_KEY_ERROR =
 
 async function renderCard(
   state: SshConnectionState | undefined,
-  renderedTarget: SshTarget = target
+  cardTarget: SshTarget = target,
+  onSetHidden: (hidden: boolean) => void = vi.fn()
 ): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -36,17 +37,15 @@ async function renderCard(
     createRoot(container).render(
       <TooltipProvider>
         <SshTargetCard
-          target={renderedTarget}
+          target={cardTarget}
           state={state}
           testing={false}
           onConnect={vi.fn()}
           onDisconnect={vi.fn()}
-          onTerminateSessions={vi.fn()}
-          onResetRelay={vi.fn()}
           onTest={vi.fn()}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
-          onSetHidden={vi.fn()}
+          onSetHidden={onSetHidden}
         />
       </TooltipProvider>
     )
@@ -90,6 +89,20 @@ describe('the connection error on an SSH target card', () => {
   })
 })
 
+describe('an SSH host its managed server does not serve', () => {
+  it('leaves the reason to the translated status line instead of repeating main’s English', async () => {
+    const container = await renderCard({
+      targetId: 'target-1',
+      status: 'error',
+      error: 'This SSH host isn’t supported by this version of Orca.',
+      reconnectAttempt: 0,
+      managedServer: { kind: 'relay', reason: 'orcad_unavailable', detail: 'unsupported_host' }
+    })
+
+    expect(container.textContent).not.toContain('This SSH host isn’t supported')
+  })
+})
+
 describe('the lifecycle action on an SSH target card', () => {
   it('offers removal, not hiding, for a host the user added in Orca', async () => {
     const container = await renderCard(undefined, target)
@@ -117,27 +130,7 @@ describe('the lifecycle action on an SSH target card', () => {
 
   it('unhides without asking for confirmation', async () => {
     const onSetHidden = vi.fn()
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    await act(async () => {
-      createRoot(container).render(
-        <TooltipProvider>
-          <SshTargetCard
-            target={{ ...importedTarget, hidden: true }}
-            state={undefined}
-            testing={false}
-            onConnect={vi.fn()}
-            onDisconnect={vi.fn()}
-            onTerminateSessions={vi.fn()}
-            onResetRelay={vi.fn()}
-            onTest={vi.fn()}
-            onEdit={vi.fn()}
-            onRemove={vi.fn()}
-            onSetHidden={onSetHidden}
-          />
-        </TooltipProvider>
-      )
-    })
+    const container = await renderCard(undefined, { ...importedTarget, hidden: true }, onSetHidden)
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[aria-label="Unhide host"]')?.click()
@@ -145,39 +138,19 @@ describe('the lifecycle action on an SSH target card', () => {
 
     expect(onSetHidden).toHaveBeenCalledWith(false)
   })
-})
 
-describe('the Host Node runtime on an SSH target card', () => {
-  const connected: SshConnectionState = {
-    targetId: 'target-1',
-    status: 'connected',
-    error: null,
-    reconnectAttempt: 0
-  }
+  it('blocks the other actions while a hide is landing', async () => {
+    const container = await renderCard(undefined, importedTarget, () => new Promise(() => {}))
 
-  it('marks a relay running on the opt-in Host Node runtime as unsupported', async () => {
-    const container = await renderCard(
-      { ...connected, hostNodeRuntime: true },
-      { ...target, remoteRuntime: 'legacy' }
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Hide host"]')?.click()
+    })
+
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="Edit target"]')?.disabled).toBe(
+      true
     )
-
-    const note = container.querySelector('[data-ssh-host-node-runtime]')
-    expect(note?.textContent).toContain('Unsupported configuration')
-    expect(note?.textContent).toContain('Set Runtime to Auto')
-  })
-
-  it('marks an Auto host that fell back to Host Node without advice it already follows', async () => {
-    const container = await renderCard({ ...connected, hostNodeRuntime: true })
-
-    const note = container.querySelector('[data-ssh-host-node-runtime]')
-    expect(note?.textContent).toContain('Unsupported configuration')
-    expect(note?.textContent).toContain('Orca-managed Node isn’t available')
-    expect(note?.textContent).not.toContain('Set Runtime to Auto')
-  })
-
-  it('says nothing about the runtime on a default connect', async () => {
-    const container = await renderCard(connected)
-
-    expect(container.querySelector('[data-ssh-host-node-runtime]')).toBeNull()
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="Hide host"]')?.disabled).toBe(
+      true
+    )
   })
 })

@@ -137,7 +137,7 @@ describe('JiraLinkedIssuePane', () => {
 
     await waitFor(() =>
       expect(mocks.jiraAddIssueComment).toHaveBeenCalledWith(
-        null,
+        { kind: 'default-scope', settings: null },
         'ABC-1',
         'Looks good to me',
         'site-1',

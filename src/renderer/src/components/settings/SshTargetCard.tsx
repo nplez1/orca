@@ -1,15 +1,17 @@
 import { useCallback, useRef, useState } from 'react'
-import { Server } from 'lucide-react'
+import { Loader2, MonitorSmartphone, Pencil, Server, ServerOff, Trash2 } from 'lucide-react'
 import {
-  DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS,
   isAutoImportedSshTarget,
+  isSshTargetHidden,
   type SshConnectionState,
   type SshConnectionStatus,
   type SshTarget
 } from '../../../../shared/ssh-types'
 import { Badge } from '../ui/badge'
-import { SshTargetCardActions } from './SshTargetCardActions'
-import type { SshTargetBusyAction } from './ssh-target-action-state'
+import { Button } from '../ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
+import { SshTargetVisibilityToggle } from './SshTargetVisibilityToggle'
+import { isSshTargetConnecting, type SshTargetBusyAction } from './ssh-target-action-state'
 import { translate } from '@/i18n/i18n'
 
 // ── Shared status helpers ────────────────────────────────────────────
@@ -26,9 +28,6 @@ export const STATUS_LABELS: Record<SshConnectionStatus, string> = {
     return translate('auto.components.settings.SshTargetCard.18968ede9e', 'Error')
   }
 }
-
-// Why separate: rung D connects without the Orca remote server, and the card must say so.
-export const PLAIN_SSH_STATUS_LABEL = 'Connected (plain SSH)'
 
 export function statusColor(status: SshConnectionStatus): string {
   switch (status) {
@@ -47,31 +46,6 @@ export function statusColor(status: SshConnectionStatus): string {
   }
 }
 
-function formatGraceDuration(seconds: number): string {
-  if (seconds % 86_400 === 0) {
-    return `${seconds / 86_400}d`
-  }
-  if (seconds % 3_600 === 0) {
-    return `${seconds / 3_600}h`
-  }
-  if (seconds % 60 === 0) {
-    return `${seconds / 60}m`
-  }
-  return `${seconds}s`
-}
-
-function formatTerminalPersistence(target: SshTarget): string {
-  const graceSeconds = target.relayGracePeriodSeconds ?? DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS
-  if (graceSeconds === 0) {
-    return translate('auto.components.settings.SshTargetCard.8ce71262f4', 'terminals until reset')
-  }
-  return translate(
-    'auto.components.settings.SshTargetCard.a883f5a00f',
-    'terminal timeout: {{value0}}',
-    { value0: formatGraceDuration(graceSeconds) }
-  )
-}
-
 // ── SshTargetCard ────────────────────────────────────────────────────
 
 type SshTargetCardProps = {
@@ -79,14 +53,11 @@ type SshTargetCardProps = {
   state: SshConnectionState | undefined
   testing: boolean
   busyAction?: SshTargetBusyAction
-  /** Handlers take no target: the caller already binds this card's row. */
-  onConnect: () => void | Promise<void>
-  onDisconnect: () => void | Promise<void>
-  onTerminateSessions: () => void | Promise<void>
-  onResetRelay: () => void | Promise<void>
-  onTest: () => void | Promise<void>
-  onEdit: () => void
-  onRemove: () => void
+  onConnect: (targetId: string) => void | Promise<void>
+  onDisconnect: (targetId: string) => void | Promise<void>
+  onTest: (targetId: string) => void | Promise<void>
+  onEdit: (target: SshTarget) => void
+  onRemove: (targetId: string) => void
   onSetHidden: (hidden: boolean) => void | Promise<void>
 }
 
@@ -97,34 +68,25 @@ export function SshTargetCard({
   busyAction,
   onConnect,
   onDisconnect,
-  onTerminateSessions,
-  onResetRelay,
   onTest,
   onEdit,
   onRemove,
   onSetHidden
 }: SshTargetCardProps): React.JSX.Element {
   const status: SshConnectionStatus = state?.status ?? 'disconnected'
-  const [actionInFlight, setActionInFlight] = useState<
-    'connect' | 'disconnect' | 'terminate' | 'reset' | null
-  >(null)
-  // Why: hiding is not a destructive action, so it does not join the shared busy
-  // registry — but it does have to block the other buttons while it lands.
+  const [actionInFlight, setActionInFlight] = useState<'connect' | 'disconnect' | null>(null)
+  // Why: hiding is not destructive, so it skips the shared busy registry but still blocks this row.
   const [visibilityInFlight, setVisibilityInFlight] = useState(false)
   const hasActionInFlight =
     actionInFlight !== null || busyAction !== undefined || visibilityInFlight
-  const terminateInFlight = actionInFlight === 'terminate' || busyAction === 'terminate'
-  const resetInFlight = actionInFlight === 'reset' || busyAction === 'reset'
   const removeInFlight = busyAction === 'remove'
-  const hidden = target.hidden === true
-  // Why: deletion cannot stick for a host ~/.ssh/config keeps re-importing, so a discovered
-  // host is hidden instead. A host the user added in Orca has no such source and is removed.
+  const hidden = isSshTargetHidden(target)
+  // Why: ~/.ssh/config re-imports a discovered host on every sync, so it is hidden, not removed.
   const hideable = isAutoImportedSshTarget(target)
   const mountedRef = useRef(true)
   const endpoint = target.username
     ? `${target.username}@${target.host}:${target.port}`
     : `${target.host}:${target.port}`
-  const terminalPersistence = formatTerminalPersistence(target)
 
   const handleCardRef = useCallback((node: HTMLDivElement | null): void => {
     // Why: SSH target actions can resolve after the card is removed; the root
@@ -143,7 +105,7 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('connect')
-    void Promise.resolve(onConnect()).finally(clearActionInFlight)
+    void Promise.resolve(onConnect(target.id)).finally(clearActionInFlight)
   }
 
   const handleDisconnect = (): void => {
@@ -151,23 +113,7 @@ export function SshTargetCard({
       return
     }
     setActionInFlight('disconnect')
-    void Promise.resolve(onDisconnect()).finally(clearActionInFlight)
-  }
-
-  const handleTerminateSessions = (): void => {
-    if (actionInFlight) {
-      return
-    }
-    setActionInFlight('terminate')
-    void Promise.resolve(onTerminateSessions()).finally(clearActionInFlight)
-  }
-
-  const handleResetRelay = (): void => {
-    if (actionInFlight) {
-      return
-    }
-    setActionInFlight('reset')
-    void Promise.resolve(onResetRelay()).finally(clearActionInFlight)
+    void Promise.resolve(onDisconnect(target.id)).finally(clearActionInFlight)
   }
 
   const handleSetHidden = (next: boolean): void => {
@@ -181,6 +127,68 @@ export function SshTargetCard({
       }
     })
   }
+
+  const renderSecondaryIconActions = (): React.JSX.Element => (
+    <div className="flex items-center gap-1">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onEdit(target)}
+            className="size-7"
+            disabled={hasActionInFlight}
+            aria-label={translate(
+              'auto.components.settings.SshTargetCard.3d8af2949f',
+              'Edit target'
+            )}
+          >
+            <Pencil className="size-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={4}>
+          {translate('auto.components.settings.SshTargetCard.3d8af2949f', 'Edit target')}
+        </TooltipContent>
+      </Tooltip>
+      {hideable ? (
+        <SshTargetVisibilityToggle
+          hidden={hidden}
+          disabled={hasActionInFlight}
+          busy={visibilityInFlight}
+          onSetHidden={handleSetHidden}
+        />
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemove(target.id)}
+              className="size-7 text-muted-foreground hover:text-red-400"
+              disabled={hasActionInFlight}
+              aria-label={
+                removeInFlight
+                  ? translate(
+                      'auto.components.settings.SshTargetCard.3d21a22d0e',
+                      'Removing target'
+                    )
+                  : translate('auto.components.settings.SshTargetCard.7f7b3d7ab4', 'Remove target')
+              }
+            >
+              {removeInFlight ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Trash2 className="size-3" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={4}>
+            {translate('auto.components.settings.SshTargetCard.7f7b3d7ab4', 'Remove target')}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  )
 
   return (
     <div
@@ -200,69 +208,77 @@ export function SshTargetCard({
             </Badge>
           ) : null}
           <span className={`size-2 shrink-0 rounded-full ${statusColor(status)}`} />
-          <span className="text-[11px] text-muted-foreground">
-            {status === 'connected' && state?.plainSsh
-              ? PLAIN_SSH_STATUS_LABEL
-              : STATUS_LABELS[status]}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{STATUS_LABELS[status]}</span>
         </div>
         <p className="truncate text-xs text-muted-foreground">
           {endpoint}
           {target.identityFile ? ` \u2022 ${target.identityFile}` : ''}
-          {` \u2022 ${terminalPersistence}`}
         </p>
         {/* Why not truncate: host key failures put the remedy (`ssh-keygen -R <host>`) at the end,
             and a one-line clamp with no tooltip made it unreachable even on hover. */}
-        {state?.error ? (
+        {/* An unserved host's status line below says why, translated; this is its English twin. */}
+        {state?.error && state.managedServer?.kind !== 'relay' ? (
           <p className="mt-0.5 text-xs text-red-400 [overflow-wrap:anywhere]">{state.error}</p>
-        ) : null}
-        {status === 'connected' && state?.plainSsh ? (
-          <p
-            data-ssh-plain-reason={state.plainSsh.reason}
-            className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]"
-          >
-            {state.plainSsh.message}
-          </p>
-        ) : null}
-        {status === 'connected' && state?.hostNodeRuntime ? (
-          <p
-            data-ssh-host-node-runtime=""
-            className="mt-0.5 text-xs text-status-warning [overflow-wrap:anywhere]"
-          >
-            {/* Why two: only an opt-in can be undone in settings; Auto lands here when Orca-managed Node couldn't run. */}
-            {target.remoteRuntime === 'legacy'
-              ? translate(
-                  'auto.components.settings.SshTargetCard.hostNodeUnsupported',
-                  'Unsupported configuration: Orca runs on this host’s Node.js with terminal support installed by npm on the host. Set Runtime to Auto in this host’s SSH settings to use Orca-managed Node.'
-                )
-              : translate(
-                  'auto.components.settings.SshTargetCard.hostNodeFallback',
-                  'Unsupported configuration: Orca-managed Node isn’t available for this connection, so Orca runs on this host’s Node.js with terminal support installed by npm on the host.'
-                )}
-          </p>
         ) : null}
       </div>
 
-      <SshTargetCardActions
-        status={status}
-        testing={testing}
-        actionInFlight={actionInFlight}
-        hasActionInFlight={hasActionInFlight}
-        terminateInFlight={terminateInFlight}
-        resetInFlight={resetInFlight}
-        removeInFlight={removeInFlight}
-        hidden={hidden}
-        hideable={hideable}
-        visibilityInFlight={visibilityInFlight}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        onTerminateSessions={handleTerminateSessions}
-        onResetRelay={handleResetRelay}
-        onTest={() => onTest()}
-        onEdit={onEdit}
-        onRemove={onRemove}
-        onSetHidden={handleSetHidden}
-      />
+      <div className="flex shrink-0 items-center gap-1">
+        {status === 'connected' ? (
+          <>
+            {renderSecondaryIconActions()}
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={handleDisconnect}
+              className="gap-1.5"
+              disabled={hasActionInFlight}
+            >
+              <ServerOff className="size-3" />
+              {translate('auto.components.settings.SshTargetCard.4c86f30877', 'Disconnect')}
+            </Button>
+          </>
+        ) : isSshTargetConnecting(status) ? (
+          <>
+            {renderSecondaryIconActions()}
+            <Button variant="ghost" size="xs" disabled className="gap-1.5">
+              <Loader2 className="size-3 animate-spin" />
+              {translate('auto.components.settings.SshTargetCard.1810b51482', 'Connecting')}
+            </Button>
+          </>
+        ) : (
+          <>
+            {renderSecondaryIconActions()}
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => onTest(target.id)}
+              disabled={testing || hasActionInFlight}
+              className="gap-1.5"
+            >
+              {testing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <MonitorSmartphone className="size-3" />
+              )}
+              {translate('auto.components.settings.SshTargetCard.0e53e9f8e8', 'Test')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={handleConnect}
+              className="gap-1.5"
+              disabled={hasActionInFlight}
+            >
+              {actionInFlight === 'connect' ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Server className="size-3" />
+              )}
+              {translate('auto.components.settings.SshTargetCard.ec6543cee9', 'Connect')}
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

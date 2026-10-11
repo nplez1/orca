@@ -14,6 +14,7 @@ import {
   loadJiraBoardViewPreferences,
   updateJiraBoardViewPreferences
 } from './jira-board-view-storage'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
   const { settings, jiraConnected, selectedJiraSiteId, taskSource, jiraTaskSourceContext } = model
   const [jiraBoardViewMode, setJiraBoardViewModeState] = useState<'board' | 'list'>(
@@ -62,7 +63,7 @@ export function useTaskPageJiraListState(model: TaskPageLinearViewStateModel) {
         try {
           return [
             siteId,
-            await jiraListPriorities(jiraTaskSourceContext ?? settings, siteId)
+            await jiraListPriorities(jiraTaskSourceContext ?? defaultScopeSource(settings), siteId)
           ] as const
         } catch {
           return [siteId, [] as JiraPriority[]] as const

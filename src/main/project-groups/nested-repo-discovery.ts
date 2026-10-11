@@ -1,7 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { NestedRepoCandidate, NestedRepoScanResult } from '../../shared/project-group-types'
-import { isGitRepo } from '../git/repo'
+import { isGitRepoAsync } from '../git/repo'
 import {
   isIgnoredNestedRepoDirectory,
   normalizeNestedRepoScanOptions,
@@ -61,7 +61,7 @@ export async function scanNestedRepos(args: {
     // Why: the marker stat is cheap and local, so it short-circuits the git probe for the many
     // non-repo candidates a nested scan walks past. OR is commutative, so the answer is unchanged.
     isSelectedPathGitRepo: async (path: string) =>
-      (await hasGitMarker(path)) || (await isGitRepo(path))
+      (await hasGitMarker(path)) || (await isGitRepoAsync(path))
   }
   const buildResult = (selectedPathKind: NestedRepoScanResult['selectedPathKind']) => ({
     selectedPath: args.path,

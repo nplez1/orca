@@ -109,7 +109,8 @@ export default React.memo(function AddRepoDialog({
     (repoId, executionHostId) => completeGitRepoAdd(repoId, 'ssh_remote_path', executionHostId),
     scanNestedRepos,
     showRemoteNestedRepoReview,
-    trackRemoteNestedScanResult
+    trackRemoteNestedScanResult,
+    selectedRuntimeEnvironmentId
   )
   const {
     createName,

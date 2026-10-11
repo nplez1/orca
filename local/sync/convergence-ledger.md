@@ -15,6 +15,26 @@ Rules for using it:
 
 ---
 
+## SSH relay removal: upstream's orcad model wins
+
+**Paths:** `src/relay/**`, `src/wsl-guest/**`, `src/shared/ssh-ai-vault-relay.ts`, `src/main/providers/ssh-filesystem-*.ts`, `src/main/runtime/runtime-file-commands-search-remote-quick-*`
+
+**Decision:** Upstream's deletion of the SSH relay stands. The 2026-10-11 sync takes the whole
+`src/relay/` removal (`2b4b60a87e` the server, `ff27338299` the client path) instead of reverting
+it, and the fork's WSL guest sources follow upstream into `src/wsl-guest/` (`31b2b17d9b`). SSH hosts
+are served by orcad; there is no relay on this branch.
+
+**Why:** the fork's own investment in the relay is three commits (explorer name filter #34,
+agent-status #26, the ai-vault session-history pair) against 467 files and ~158k lines upstream has
+abandoned. Reverting would make the fork the sole maintainer of the subsystem and re-open the same
+~100-file conflict set at every future sync.
+
+**Do not:** reintroduce `src/relay/` or a relay client path; leave fork-added relay files at the old
+flat `src/relay/` path instead of relocating them under `src/wsl-guest/`; or keep citing the
+fork's relay-era SSH docs as describing this branch.
+
+---
+
 ## Credential and key stores
 
 **Paths:** `src/main/credentials/**`, `src/main/{deepseek,fireworks,copilot-credentials,minimax,zcode,opencode}/**key*store*`, `src/main/rate-limits/service/service-{configuration,fetch-targets}.ts`
@@ -36,18 +56,28 @@ transient read failure.
 
 **Paths:** `src/main/git/repo-detection.ts`, `src/main/git/command-runner/**`, `src/main/ipc/repos/local-repo-registration.ts`, `src/main/git/repo-default-base-ref.ts`
 
-**Decision:** async execution **and** upstream's consolidated shape. `probeGitRepo` returns
-`Promise<GitRepoProbe>` from one combined `rev-parse`; `isGitRepoFromProbe`,
-`inspectGitRepoForRegistration` and the root helpers are async; callers await
-(`await inspectGitRepoForRegistration(...)`). `getGitRepoRoot` parses git's output with
-`indexOf('\n')` so a path containing a newline survives.
+**Decision:** upstream's generator shape (`probeGitRepo` / the `*Commands` helpers as
+`Generator<GitRepoCommand, T, string>`, run by `runGitRepoCommands` / `runGitRepoCommandsSync`),
+with upstream's sync entry points (`isGitRepo`, `inspectGitRepoForRegistration`, `getGitRepoRoot`,
+`getLinkedWorktreeMainRepoRoot`) kept alongside `isGitRepoAsync`,
+`inspectGitRepoForRegistrationAsync` and `getGitRepoRootAsync`. Callers take the variant they need.
+`repo-git-marker-scan.ts` is upstream's sync `scanGitMarkerSync` / `resolveRealPathSync` again,
+because the generator runs the marker scan synchronously.
 
-**Why:** the fork's `ea059d2afc` moved this off the main thread deliberately (WSL/network paths are
-the slowest); upstream's single spawn and `records.length === 4` newline fallback are fixes this
-fork does not want to lose.
+**Why:** upstream's `b63d39ebe5` reached the same goal the fork's `ea059d2afc` did — git execution
+off the main thread — with one body serving sync and async callers, so the fork's parallel async
+copy of both files was superseded rather than merged. `getGitRepoRoot` still parses git's output
+with `indexOf('\n')`, so a path containing a newline survives.
 
-**Do not:** make these functions sync, or split the newline handling back into
-`split('\n')`.
+**Open (2026-10-11 sync):** upstream's shape still runs four filesystem steps synchronously even
+through the async entry points — the `statSync` entry checks (`repo-detection.ts:33,97,155,205`),
+the ancestor `scanGitMarkerSync` walk (`:51`, `:193`) and `resolveRealPathSync` (`:201`). Those are
+precisely the steps that freeze on a dead WSL or network mount, which is the case `ea059d2afc` was
+written for. Extending `GitRepoCommands` to carry the fs steps is the follow-up.
+
+**Do not:** reintroduce a second async copy of `repo-detection.ts` or `repo-git-marker-scan.ts`.
+Upstream rewrote `repo-detection.ts` the day before this sync, so a fork copy re-conflicts at every
+future sync and drops upstream's single decision tree.
 
 ---
 
@@ -558,3 +588,29 @@ because a conflict did not point at them.
 **Named follow-up (2026-10-09):** the fork's bare-key *direct* add (type `ABC-123`, press Enter) and
 its site-ambiguity copy were not ported into upstream's composer — upstream resolves a bare key
 through its search rows instead. Re-add only if that extra step proves annoying.
+
+---
+
+## SSH settings pane: upstream's inline card wins, hidden hosts ride on top
+
+**Paths:** `src/renderer/src/components/settings/SshPane.tsx`, `SshTargetCard.tsx`,
+`SshTargetList.tsx`, `SshTargetVisibilityToggle.tsx`, `ssh-target-visibility.ts`
+
+**Decision:** `SshPane.tsx` and `SshTargetCard.tsx` take upstream's post-relay shape — an inline,
+self-contained card with no terminate-sessions or reset-relay buttons, `sshTargetConnectFailureText`
+for connect errors, and a direct `window.api.ssh.removeTarget({ id })`. The fork's
+hide-auto-imported-hosts feature (PR #9, `cad3e4df59`) is re-expressed on top as an
+`onSetHidden(hidden)` prop, a "Hidden" badge, and a `SshTargetVisibilityToggle` that replaces the
+trash button for `isAutoImportedSshTarget` hosts. The collapsible "Hidden (N)" section stays in the
+fork-only `SshTargetList.tsx`, so the fork's change to upstream's `SshPane.tsx` is one block swap.
+
+**Why:** the relay is gone on this branch, so `onResetRelay`/`onTerminateSessions` had no meaning
+left, and keeping the fork's parallel `SshTargetCardActions.tsx` would have re-conflicted at every
+sync against a card upstream had already flattened. Hiding is a separate, still-shipping fork
+feature: a discovered `~/.ssh/config` host could only be removed and the next import brought it
+back, so Hide is the durable "not on this machine's Orca". Losing its entry point would have been a
+regression of a merged PR, not a tidy-up.
+
+**Do not:** reintroduce `SshTargetCardActions.tsx` or a second list component —
+`SshTargetServerList.tsx` was a duplicate of `SshTargetList.tsx` and is deleted; or drop
+`onSetHidden`/the toggle when upstream rewrites the card again.

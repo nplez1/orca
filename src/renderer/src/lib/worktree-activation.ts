@@ -36,6 +36,8 @@ import {
   revealFolderWorkspaceInSidebar,
   revealWorktreeInSidebarForActivation
 } from './worktree-activation-sidebar-reveal'
+import { isFloatingWorkspaceId } from '../../../shared/floating-workspace-worktree'
+import { revealFloatingWorkspacePanel } from './floating-workspace-panel-reveal'
 
 /**
  * Shared activation sequence used by the worktree palette and add-repo/worktree dialogs.
@@ -190,6 +192,11 @@ export function activateAndRevealWorktree(
   opts?: WorktreeActivationOptions
 ): ActivateAndRevealResult | false {
   const state = useAppStore.getState()
+  // The floating workspace owns a separate panel, never the main window's selection.
+  if (isFloatingWorkspaceId(worktreeId)) {
+    revealFloatingWorkspacePanel(state)
+    return { primaryTabId: null }
+  }
   const wt = state.getKnownWorktreeById(worktreeId, opts?.executionHostId)
   if (!wt) {
     return false

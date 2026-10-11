@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { formatAgentCliFailureMessage } from '../text-generation/source-control-agent-failure'
 import {
   __resetMacTailscaleDnsDiagnosticCacheForTests,
@@ -9,7 +9,7 @@ import {
   withMacTailscaleDnsHintForDiagnostic
 } from './macos-tailscale-dns-diagnostic'
 
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: vi.fn() }))
+vi.mock('@orca/process-host', () => ({ runProcess: vi.fn() }))
 
 const MAGIC_DNS = 'DNS configuration\n  nameserver[0] : 100.100.100.100\n'
 const PUBLIC_DNS = 'DNS configuration\n  nameserver[0] : 1.1.1.1\n'

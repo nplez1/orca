@@ -1,5 +1,7 @@
 import { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY } from './host-settings-replication'
+export * from './runtime-protocol-versions'
 import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
+import { SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY } from './ssh-target-management'
 import {
   AUTOMATION_RUNTIME_CAPABILITIES,
   AUTOMATION_RUNTIME_CLIENT_CAPABILITIES
@@ -45,20 +47,11 @@ import { AGENT_SESSION_RESUME_RUNTIME_CAPABILITIES } from './agent-session-resum
 import { QODER_OWNED_TERMINAL_CREATE_CAPABILITY } from './qoder-terminal-create-capability'
 import { AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY } from './agent-session-continue-interrupted-capability'
 import { ORCAD_RUNTIME_CAPABILITIES } from './orcad-runtime-capabilities'
-export {
-  AGENT_SESSION_CURSOR_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_KIMI_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_OPENCODE2_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_MUSE_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_DSH_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_CODEBUDDY_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QODER_CN_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QWEN_CODE_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_QODER_RESUME_RUNTIME_CAPABILITY,
-  AGENT_SESSION_ZCODE_RESUME_RUNTIME_CAPABILITY
-} from './agent-session-resume-runtime-capabilities'
+// Why a star: every resume capability is part of the runtime contract this module re-exports.
+export * from './agent-session-resume-runtime-capabilities'
 import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { AGENT_SESSION_STOP_RUNTIME_CAPABILITIES } from './agent-session-stop-capabilities'
+import { AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES } from './agent-session-create-capabilities'
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 import { WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY } from './workspace-path-search-contract'
 import { SKILL_RUNTIME_CAPABILITIES } from './skill-install-capability'
@@ -67,34 +60,12 @@ import {
   AGENT_LAUNCH_RUNTIME_CAPABILITY
 } from './agent-launch-runtime-capability'
 
-// Why: declares the Orca runtime RPC compatibility contract. Desktop,
-// headless server, CLI, and mobile builds may drift in app version, but
-// they must agree on this protocol range before runtime RPCs are allowed.
-//
-// Bump RUNTIME_PROTOCOL_VERSION when:
-//   - You remove an RPC method or required parameter that clients use.
-//   - You change the meaning (units, nullability) of an existing field
-//     clients read.
-//   - You change encrypted framing, terminal stream framing, or auth.
-// Do NOT bump for:
-//   - Adding new RPC methods.
-//   - Adding new optional fields on existing methods.
-//   - Adding new ignorable event types.
-//
-// Bump MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION when a runtime server must
-// refuse older clients. Bump MIN_COMPATIBLE_RUNTIME_SERVER_VERSION when
-// this client build requires a newer server. Exact app-version equality is
-// never required; these numbers define the supported compatibility window.
-
-export const RUNTIME_PROTOCOL_VERSION = 3
-export const MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION = 2
-export const MIN_COMPATIBLE_RUNTIME_SERVER_VERSION = 2
-
 export const WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY =
   WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY
 export const PROJECT_HOST_SETUP_RUNTIME_CAPABILITY = 'project-host-setup.v1' as const
 export const TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY = 'task-source-context.v1' as const
 export const WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY = 'workspace-run-context.v1' as const
+export const WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY = 'worktree.provisioned-root.v1' as const
 export const WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY =
   'worktree.linked-work-item-context.v1' as const
 export const WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY =
@@ -171,7 +142,8 @@ export const WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY =
   'worktree.archive-failure-blocking.v1' as const
 export const CODEX_RESET_CREDIT_RUNTIME_CAPABILITY = 'accounts.codex-reset-credit.v1' as const
 export const ACCOUNT_IMPORT_RUNTIME_CAPABILITY = 'accounts.import-host-credentials.v1' as const
-export { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY }
+// Why: `orca account add claude` signs in to an account folder the host creates first.
+export const CLAUDE_SIGN_IN_RUNTIME_CAPABILITY = 'accounts.claude-sign-in.v1' as const
 export const ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY = 'accounts.antigravity-native.v1' as const
 export const DATA_ACCOUNT_RUNTIME_CAPABILITY = 'accounts.managed-data-profiles.v1' as const
 // Why: older hosts cannot reconcile terminal.create's mutation after losing the reply, so clients may only retry unknown outcomes when advertised.
@@ -255,6 +227,12 @@ export const AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY =
 // gates the rollout.
 export const AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY =
   'agent-session.queued-messages.v1' as const
+// Why: a host advertising this edits a queued card in place (`agentSession.queuedMessageUpdate`)
+// and holds it from automatic delivery while edited (`agentSession.queuedMessageEditHold`). Apart
+// from queued-messages.v1: kept and agent-mail cards are editable with mid-turn queueing still off.
+// A client offers Edit only when the host advertises it; there is no copy-and-delete fallback.
+export const AGENT_SESSION_QUEUED_MESSAGE_EDIT_RUNTIME_CAPABILITY =
+  'agent-session.queued-message-edit.v1' as const
 // Why: `agentSession.conversationCommand`'s params are strict, so an older host rejects
 // `delivery`. A host advertising this holds a /compact sent while the agent works as a queued
 // card instead of refusing it. Clients ask only when queued-messages.v1 is advertised too:
@@ -316,6 +294,23 @@ export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
 // would re-show that row as a normal workspace, so the host leaves such rows out of its listings.
 export const WORKTREE_BACKGROUND_REMOVAL_RUNTIME_CAPABILITY =
   'worktree.background-removal.v1' as const
+// Why: older hosts discard preflight.detectAgents params and probe their own PATH, so a client
+// must not read that answer as the workspace's (a WSL project on a Windows host differs).
+export const PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY =
+  'preflight.workspace-scoped.v1' as const
+// Why: an older host answers its own agents for a workspace another runtime owns; one with this
+// refuses with WORKSPACE_ON_OTHER_RUNTIME, so a client may let it decide for a shared repo id.
+export const PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY =
+  'preflight.other-runtime-refusal.v1' as const
+/** What such a host answers, instead of probing itself, for another runtime's workspace. */
+export const WORKSPACE_ON_OTHER_RUNTIME = 'workspace_on_other_runtime'
+// Hosts without this capability have no workspacePorts.scanHost/killHost; their scan and Stop act
+// only on the endpoint itself, never on a workspace's SSH host.
+export const WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY =
+  'workspace-ports.host-scoped.v1' as const
+// Hosts without this capability ignore a request's expectedRuntimeSource; the CLI's pre-send probe
+// is then the only fence.
+export const RUNTIME_SOURCE_FENCE_RUNTIME_CAPABILITY = 'runtime-source-fence.v1' as const
 // Hosts without this capability have no notifications.registerPush RPC.
 export const NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY = 'notifications.remote-push.v1' as const
 
@@ -335,19 +330,15 @@ export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
 export const ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY =
   'git.antigravity-configured-model.v1' as const
 
-// Why: `agentSession.create` is a strict object, so an older host refuses a payload carrying the
-// reserved `tabId` rather than ignoring it. A client sends the field only to a host advertising this.
-export const AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY =
-  'agentSession.create.tab-id.v1' as const
-
 export const RUNTIME_CAPABILITIES = [
   ...ORCAD_RUNTIME_CAPABILITIES,
   QODER_OWNED_TERMINAL_CREATE_CAPABILITY,
   ...AGENT_SESSION_STOP_RUNTIME_CAPABILITIES,
-  AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY,
+  ...AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES,
   ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY,
   'files.pathsExist',
   WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY,
+  'files.resolve-terminal-path.cross-workspace.v1',
   'runtime.status.compat.v1',
   'runtime.environments.v1',
   REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
@@ -367,6 +358,7 @@ export const RUNTIME_CAPABILITIES = [
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
+  WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY,
   ...WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES,
   WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
@@ -400,6 +392,7 @@ export const RUNTIME_CAPABILITIES = [
   AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
   AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY,
+  AGENT_SESSION_QUEUED_MESSAGE_EDIT_RUNTIME_CAPABILITY,
   AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY,
   ...STRUCTURED_AGENT_SESSION_SURFACE_RUNTIME_CAPABILITIES,
   ...AGENT_SESSION_ATTENTION_RUNTIME_CAPABILITIES,
@@ -420,18 +413,20 @@ export const RUNTIME_CAPABILITIES = [
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY,
+  CLAUDE_SIGN_IN_RUNTIME_CAPABILITY,
   ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY,
   DATA_ACCOUNT_RUNTIME_CAPABILITY,
   CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
   ...SKILL_RUNTIME_CAPABILITIES,
   ...AUTOMATION_RUNTIME_CAPABILITIES,
   NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY,
+  'pairing.delegated-mobile-devices.v1',
+  PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY,
+  PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY,
+  WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY,
+  RUNTIME_SOURCE_FENCE_RUNTIME_CAPABILITY,
+  SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY,
   ...AGENT_LAUNCH_RUNTIME_CAPABILITIES
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
-
-// COMPAT(mobileProtocolAliases): added 2026-05-15 for mobile builds that
-// still read desktop/mobile names; remove once mobile reads runtime names.
-export const DESKTOP_PROTOCOL_VERSION = RUNTIME_PROTOCOL_VERSION
-export const MIN_COMPATIBLE_MOBILE_VERSION = MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION

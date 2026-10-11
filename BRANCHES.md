@@ -142,6 +142,12 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ### fix/repo-catalog-connection-fence
 
+- **Superseded on 2026-10-11 — do not open this.** Upstream landed `63b3f15cc4` (*every repo
+  catalog uses the host-catalog fence*, #27116), its own fix for #20811: `claimHostCatalogFence` /
+  `isHostCatalogFenceCurrent` removed both the fork's per-host generation map and its connection
+  fence, and upstream's `failed` flag keeps repo-scoped UI from being validated for a host that
+  never answered. The 2026-10-11 sync took upstream's side in full, so the branch has nothing left
+  to contribute upstream. Its fix is already on `nplez1/main` either way.
 - **Why:** an all-hosts repo catalog fetch could outlive the connection it started on, letting a
   catalog fetched over the old connection overwrite the new one's. Also fixes repo-scoped UI being
   validated for a host that never answered.

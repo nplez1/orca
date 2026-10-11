@@ -1,0 +1,155 @@
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import { join } from 'node:path'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
+import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import type * as WindowsAcl from '../../shared/secure-path-windows-acl'
+import type * as Store from './zcode-plan-api-key-store'
+
+type NativeCase = {
+  home: string
+  fault: 'none' | 'before-restore' | 'after-restore' | 'competing'
+  reject: boolean
+  writes: number
+  renames: number
+  stages: number
+  nativeOutcomes: boolean[]
+  directories: boolean[]
+}
+const state = vi.hoisted((): NativeCase => ({
+  home: '',
+  fault: 'none',
+  reject: false,
+  writes: 0,
+  renames: 0,
+  stages: 0,
+  nativeOutcomes: [],
+  directories: []
+}))
+// Why a plain object and not vi.fn mocks: these rollback tests never assert on the sealing
+// calls — they force the plaintext path so the store's rollback is what runs. The store reads the
+// fork's SecretStore port, not Electron's safeStorage, so mocking `electron` did nothing and left
+// this suite on the setup file's sealing default.
+const secretStoreMock = {
+  isEncryptionAvailable: () => false,
+  encryptString: (value: string) => Buffer.from(value),
+  decryptString: (value: Buffer) => value.toString('utf8'),
+  describeProtectionGap: () => null
+}
+
+vi.mock('node:os', async (original) => ({
+  ...(await original<typeof os>()),
+  homedir: () => state.home
+}))
+vi.mock('node:fs', async (original) => {
+  const real = await original<typeof fs>()
+  return {
+    ...real,
+    writeFileSync: (...args: Parameters<typeof fs.writeFileSync>) => {
+      if (++state.writes === 2 && state.fault === 'before-restore') {
+        throw new Error('Synthetic restore staging failure')
+      }
+      return real.writeFileSync(...args)
+    },
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => {
+      real.renameSync(...args)
+      if (++state.renames === 2 && state.fault === 'after-restore') {
+        throw new Error('Synthetic failure after restore publication')
+      }
+    }
+  }
+})
+vi.mock('../../shared/secure-path-windows-acl', async (original) => {
+  const real = await original<typeof WindowsAcl>()
+  const files = await vi.importActual<typeof fs>('node:fs')
+  return {
+    ...real,
+    restrictWindowsPathSync: (...args: Parameters<typeof WindowsAcl.restrictWindowsPathSync>) => {
+      const outcome = real.restrictWindowsPathSync(...args)
+      state.nativeOutcomes.push(outcome)
+      if (state.fault === 'competing' && args[0].endsWith('.tmp') && ++state.stages === 2) {
+        const competing = join(state.home, HOME_DIRECTORY_NAME, 'competing-key')
+        files.writeFileSync(competing, envelope('synthetic-competing'))
+        expect(real.restrictWindowsPathSync(competing, false)).toBe(true)
+        files.renameSync(competing, join(state.home, HOME_DIRECTORY_NAME, 'zcode-plan-api-key.enc'))
+      }
+      return state.reject ? false : outcome
+    },
+    bestEffortRestrictWindowsPath: (
+      path: string,
+      directory: boolean,
+      settled?: (restricted: boolean) => void
+    ) =>
+      real.bestEffortRestrictWindowsPath(path, directory, (restricted) => {
+        state.directories.push(restricted)
+        settled?.(restricted)
+      })
+  }
+})
+
+const envelope = (key: string) =>
+  `orca-zcode-plan-api-key:v1:plaintext:${Buffer.from(key).toString('base64')}`
+let store: typeof Store
+let keyPath: string
+
+describe.skipIf(process.platform !== 'win32')('native Windows Coding Plan rollback', () => {
+  beforeEach(async () => {
+    state.home = fs.mkdtempSync(join(os.tmpdir(), 'orca-native-plan-'))
+    state.fault = 'none'
+    state.reject = false
+    state.writes = 0
+    state.renames = 0
+    state.stages = 0
+    state.nativeOutcomes = []
+    state.directories = []
+    keyPath = join(state.home, HOME_DIRECTORY_NAME, 'zcode-plan-api-key.enc')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.resetModules()
+    setSecretStore(secretStoreMock)
+    store = await import('./zcode-plan-api-key-store')
+    store.saveZcodePlanApiKey('synthetic-previous')
+    expect(fs.readFileSync(keyPath, 'utf8')).toBe(envelope('synthetic-previous'))
+    expect(state.nativeOutcomes.length).toBeGreaterThan(0)
+    expect(state.nativeOutcomes.every(Boolean)).toBe(true)
+    await vi.waitFor(
+      () => {
+        expect(state.directories.length).toBeGreaterThan(0)
+        expect(state.directories.every(Boolean)).toBe(true)
+      },
+      { timeout: 15_000 }
+    )
+    state.writes = 0
+    state.renames = 0
+    state.stages = 0
+    state.reject = true
+  })
+
+  afterEach(() => {
+    _resetSecretStoreForTests()
+    vi.restoreAllMocks()
+    fs.rmSync(state.home, { recursive: true, force: true })
+  })
+
+  it.each(['before-restore', 'after-restore', 'competing'] as const)(
+    'preserves the file contract after %s with real file and directory ACLs',
+    (fault) => {
+      state.fault = fault
+      expect(() => store.saveZcodePlanApiKey('synthetic-rejected')).toThrow(
+        'could not be stored securely'
+      )
+      if (fault === 'before-restore') {
+        expect(fs.existsSync(keyPath)).toBe(false)
+      } else {
+        expect(fs.readFileSync(keyPath, 'utf8')).toBe(
+          envelope(fault === 'competing' ? 'synthetic-competing' : 'synthetic-previous')
+        )
+      }
+      expect(
+        fs.readdirSync(join(state.home, HOME_DIRECTORY_NAME)).some((name) => name.endsWith('.tmp'))
+      ).toBe(false)
+      expect(state.nativeOutcomes.every(Boolean)).toBe(true)
+    },
+    30_000
+  )
+})

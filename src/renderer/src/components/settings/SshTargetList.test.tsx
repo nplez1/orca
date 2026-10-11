@@ -44,12 +44,11 @@ async function renderList(targets: SshTarget[]): Promise<HTMLElement> {
           busyActionForTarget={() => undefined}
           onConnect={vi.fn()}
           onDisconnect={vi.fn()}
-          onTerminateSessions={vi.fn()}
-          onResetRelay={vi.fn()}
           onTest={vi.fn()}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
           onSetHidden={vi.fn()}
+          onChanged={vi.fn()}
         />
       </TooltipProvider>
     )

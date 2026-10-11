@@ -10,6 +10,7 @@ import type {
   JiraTransition,
   JiraUser
 } from '../../../shared/jira-types'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 
 const mocks = vi.hoisted(() => ({
@@ -56,11 +57,13 @@ function issue(): JiraIssue {
   }
 }
 
+const DEFAULT_SCOPE_SOURCE = defaultScopeSource(null)
+
 function Probe(): React.JSX.Element {
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
     fetchKey: 'ABC-1',
-    providerSettings: null
+    providerSettings: DEFAULT_SCOPE_SOURCE
   })
   return <div data-testid="key">{detail.displayed?.key ?? 'loading'}</div>
 }
@@ -82,7 +85,7 @@ describe('useJiraIssueWorkspaceDetail with a bare fetch key', () => {
     render(<Probe />)
 
     await waitFor(() => expect(screen.getByTestId('key').textContent).toBe('ABC-1'))
-    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(null, 'ABC-1', undefined)
+    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(DEFAULT_SCOPE_SOURCE, 'ABC-1', undefined)
   })
 
   it('keeps the fetched issue when the side-data load advances its own request', async () => {

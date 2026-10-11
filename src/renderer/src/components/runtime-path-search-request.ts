@@ -8,6 +8,7 @@ import {
 } from '../../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchCorrelationId } from '../../../shared/workspace-path-search-instrumentation'
 import { cancelRuntimeFileList, searchRuntimeFilePaths } from '@/runtime/runtime-file-client'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'
 import { recordRendererPathSearchDuration } from './right-sidebar/file-explorer-name-filter-timing'
 import {
@@ -107,7 +108,7 @@ export function scheduleRuntimeFilePathSearch(args: {
   args.consumerSequenceRef.current += 1
   const consumer = { consumerId, sequence: args.consumerSequenceRef.current }
   const requestContext = {
-    settings: { activeRuntimeEnvironmentId: runtimeEnvironmentId },
+    target: runtimeTargetForOwnerEnvironment(runtimeEnvironmentId),
     worktreeId,
     worktreePath,
     connectionId

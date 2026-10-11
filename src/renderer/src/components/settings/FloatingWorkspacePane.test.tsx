@@ -82,7 +82,7 @@ describe('FloatingWorkspacePane terminal directory', () => {
     fireEvent.click(revealButton)
 
     await waitFor(() => {
-      expect(openInFileManagerMock).toHaveBeenCalledWith(FLOATING_WORKSPACE_DIRECTORY)
+      expect(openInFileManagerMock).toHaveBeenCalledWith(FLOATING_WORKSPACE_DIRECTORY, 'local')
     })
   })
 })

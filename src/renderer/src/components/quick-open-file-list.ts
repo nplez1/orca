@@ -117,7 +117,8 @@ export function useRuntimeFileListForWorktree({
   const operationRoute = getFileExplorerOperationRoute(operationOwner)
   const operationRouteAvailable = operationRoute !== null
   const connectionId = operationRoute?.connectionId
-  const runtimeEnvironmentId = operationRoute?.settings.activeRuntimeEnvironmentId ?? null
+  const runtimeEnvironmentId =
+    operationOwner.kind === 'runtime' ? operationOwner.environmentId : null
   const activeTargetStatus = useAppStore((state) =>
     connectionId ? state.sshConnectionStates.get(connectionId)?.status : undefined
   )

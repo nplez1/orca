@@ -8,7 +8,7 @@ import {
   getRuntimeFileSearchRejectedField
 } from './runtime-file-search-bounds'
 import { validateLegacyQuickOpenRecentCandidates } from './runtime-legacy-quick-open-inventory'
-import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
 export async function searchRuntimeFiles(
@@ -20,7 +20,7 @@ export async function searchRuntimeFiles(
   if (getRuntimeFileSearchRejectedField(options)) {
     return createEmptyRuntimeFileSearchResult()
   }
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     const requestToken = createBrowserUuid()
     const cancel = (): void => {
@@ -69,7 +69,7 @@ export async function listRuntimeFiles(
     signal?: AbortSignal
   }
 ): Promise<string[]> {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     return window.api.fs.listFiles({
       ...(args.includeIgnored === undefined ? {} : { includeIgnored: args.includeIgnored }),
@@ -155,7 +155,7 @@ export function cancelRuntimeFileList(
   context: RuntimeFileOperationArgs,
   requestToken: string
 ): void {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     void window.api.fs.cancelListFiles({ requestToken }).catch(() => {
       /* cancellation is advisory; the request path has its own timeouts */

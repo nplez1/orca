@@ -9,6 +9,11 @@ import { resolveIssuePaneLinkedIssue } from './workspace-linked-issue'
 import { providerIconComponent } from './issue-provider-presentation'
 import { getPluginPanelActivityItems } from './plugin-panel-activity-items'
 import {
+  getPortsPanelOwnerKey,
+  portsPanelHostForOwnerKey,
+  portsPanelReachesSshHost
+} from './ports-panel-host'
+import {
   collectInstalledPluginTabKeys,
   usePluginPanels,
   usePluginPanelsStore,
@@ -56,7 +61,13 @@ export function useRightSidebarActivityItems({
   const activeWorkspaceScope = parseWorkspaceKey(activeWorktreeId ?? '')
   const isFolderWorkspace = activeWorkspaceScope?.type === 'folder'
   const isFolder = isFolderWorkspace || (activeRepo ? isFolderRepo(activeRepo) : false)
-  const isSshRepo = Boolean(activeRepo?.connectionId)
+  // Why the owner: a managed server's workspace names its server, not an SSH connection.
+  const hasSshHost = useAppStore((s) =>
+    portsPanelReachesSshHost(
+      portsPanelHostForOwnerKey(getPortsPanelOwnerKey(s, activeWorktreeId)),
+      s.runtimeEnvironments
+    )
+  )
   const pluginSystemEnabled = useAppStore((s) => s.settings?.pluginSystemEnabled === true)
   const pluginPanels = usePluginPanels()
   const visiblePluginPanels = useMemo(
@@ -164,10 +175,10 @@ export function useRightSidebarActivityItems({
       getVisibleRightSidebarActivityItems(activityItems, {
         isFolder,
         isFolderWorkspace,
-        isSshRepo,
+        hasSshHost,
         hasLinkedIssue
       }),
-    [activityItems, isFolder, isFolderWorkspace, isSshRepo, hasLinkedIssue]
+    [activityItems, isFolder, isFolderWorkspace, hasSshHost, hasLinkedIssue]
   )
 
   const activeFolderWorkspaceKey = isFolderWorkspace ? (activeWorktreeId ?? null) : null

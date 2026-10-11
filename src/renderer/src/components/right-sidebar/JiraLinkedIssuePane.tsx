@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { useJiraIssueWorkspaceDetail } from '@/components/jira-issue-workspace-detail-state'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { useAppStore } from '@/store'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { cn } from '@/lib/utils'
 import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -70,7 +71,10 @@ export function JiraLinkedIssuePane({
   const settings = useAppStore((s) => s.settings)
   const viewerAccountId = useAppStore((s) => s.jiraStatus.viewer?.accountId ?? null)
   const linkActions = useLinkedIssuePaneActions()
-  const providerSettings = sourceContext ?? settings
+  const providerSettings = useMemo(
+    () => sourceContext ?? defaultScopeSource(settings),
+    [sourceContext, settings]
+  )
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
     // Why: the workspace persists only the issue key; the hook hydrates the rest.

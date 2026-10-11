@@ -1,4 +1,4 @@
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 const TAILSCALE_MAGIC_DNS = '100.100.100.100'
 const CACHE_TTL_MS = 5 * 60 * 1000
@@ -79,7 +79,7 @@ function beginMacTailscaleDnsDiagnosticProbe(): Promise<void> {
   if (inFlightProbe) {
     return inFlightProbe
   }
-  inFlightProbe = runProcess({
+  const probe = runProcess({
     program: '/usr/sbin/scutil',
     args: ['--dns'],
     timeoutMs: SCUTIL_PROBE_TIMEOUT_MS,
@@ -102,7 +102,8 @@ function beginMacTailscaleDnsDiagnosticProbe(): Promise<void> {
     .finally(() => {
       inFlightProbe = null
     })
-  return inFlightProbe
+  inFlightProbe = probe
+  return probe
 }
 
 /** Warm the cache off the main thread so the first failed request can still carry the hint. */

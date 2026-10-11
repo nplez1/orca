@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from './git/runner'
-import { runProcessSync } from '../shared/child-process/run-process'
+import { runProcessSync } from '@orca/process-host'
 import { getRepoMainWorktreeId } from '../shared/worktree/id'
 import {
   isSameVolume,

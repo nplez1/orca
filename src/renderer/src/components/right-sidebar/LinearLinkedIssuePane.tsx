@@ -3,6 +3,7 @@ import { LinearIssueTextEditor } from '@/components/LinearIssueTextEditor'
 import { LinearIssueCommentFooter } from '@/components/LinearItemDrawer'
 import { LinearIssueEditRows } from '@/components/linear-issue-edit-rows'
 import { useLinearIssueWorkspaceDetail } from '@/components/linear-issue-workspace-detail-state'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 import { useAppStore } from '@/store'
 import type { LinearComment, LinearIssue } from '../../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -106,7 +107,7 @@ function LinearLinkedIssueDetail({
   onRefresh: () => void
 }): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
-  const providerSettings = sourceContext ?? settings
+  const providerSettings = sourceContext ?? defaultScopeSource(settings)
   const linkActions = useLinkedIssuePaneActions()
   const requestKey = `${sourceContext?.hostId ?? settings?.activeRuntimeEnvironmentId ?? 'local'}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })

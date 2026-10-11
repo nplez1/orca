@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { checksPanelAsyncResultKey } from '../checks-panel-async-result-key'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
+import { checksPanelLoadErrorMessage } from './checks-panel-forge-owner'
+import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
 import type { PRInfo } from '../../../../../shared/github/pull-request-types'
@@ -21,8 +23,9 @@ type ChecksPanelReviewDataInput = Pick<
     | 'gitLabProjectRefRef'
     | 'isPanelVisible'
     | 'repo'
-    | 'settings'
+    | 'activeWorktree'
     | 'setComments'
+    | 'setCommentsError'
     | 'setCommentsLoading'
   > &
   Pick<ChecksPanelComposerState, 'isCurrentAsyncResult'>
@@ -40,8 +43,9 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
     prCacheKey,
     prNumber,
     repo,
-    settings,
+    activeWorktree,
     setComments,
+    setCommentsError,
     setCommentsLoading
   } = model
   // Fetch comments once when PR changes (no polling — comments change infrequently).
@@ -89,6 +93,9 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
         }
         console.warn('Failed to fetch PR comments:', err)
         setComments([])
+        setCommentsError(
+          checksPanelLoadErrorMessage(err, forgeOwnerHostIdForWorkspace(repo, activeWorktree))
+        )
       } finally {
         if (
           isCurrentAsyncResult(
@@ -109,7 +116,9 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
       branch,
       isCurrentAsyncResult,
       setCommentsLoading,
-      setComments
+      setComments,
+      setCommentsError,
+      activeWorktree
     ]
   )
 
@@ -119,12 +128,10 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
         return null
       }
       if (check.gitlabJobId) {
-        // Why: `settings` (not ownerSettings) is what fetched the job list, so the
-        // job id and its trace always resolve against the same host.
         return loadGitLabJobLogDetails({
           repoPath: repo.path,
           repoId: repo.id,
-          settings,
+          repoOwnerExecutionHostId: forgeOwnerHostIdForWorkspace(repo, activeWorktree),
           check,
           projectRef: gitLabProjectRefRef.current
         })
@@ -143,7 +150,7 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
         )
       )
     },
-    [fetchPRCheckDetails, pr?.prRepo, repo, settings, gitLabProjectRefRef]
+    [fetchPRCheckDetails, pr?.prRepo, repo, activeWorktree, gitLabProjectRefRef]
   )
 
   // Why: read at call time — the ref is filled by an async MR fetch, so a value prop would be stale.

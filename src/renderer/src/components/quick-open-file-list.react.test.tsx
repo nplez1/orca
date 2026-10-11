@@ -256,7 +256,7 @@ describe('useRuntimeFileListForWorktree', () => {
         worktreeId: workspaceKey,
         worktreePath: '/srv/platform',
         connectionId: 'ssh-1',
-        settings: expect.objectContaining({ activeRuntimeEnvironmentId: null })
+        target: { kind: 'local' }
       }),
       {
         rootPath: '/srv/platform',
@@ -326,7 +326,7 @@ describe('useRuntimeFileListForWorktree', () => {
 
       expect(searchRuntimeFilePathsMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment', environmentId: 'env-1' },
           worktreeId: workspaceKey,
           worktreePath: '/srv/platform'
         }),
@@ -456,7 +456,7 @@ describe('useRuntimeFileListForWorktree', () => {
 
       expect(searchRuntimeFilePathsMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment', environmentId: 'env-1' },
           worktreeId: 'wt-remote',
           worktreePath: '/srv/remote'
         }),

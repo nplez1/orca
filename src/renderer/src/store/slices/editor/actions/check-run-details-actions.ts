@@ -13,7 +13,7 @@ import {
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { checkDetailsErrorAction } from '@/lib/check-details-error-action'
-import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
+import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { findWorktreeById, getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import type { OpenFile } from '../types/open-file'
 import { openWorkspaceEditorItem } from '../tabs/workspace-editor-item'
@@ -181,7 +181,7 @@ export function createCheckRunDetailsActions(
           ? await loadGitLabJobLogDetails({
               repoPath: repo.path,
               repoId: repo.id,
-              settings: getSettingsForWorktreeRuntimeOwner(state, file.worktreeId),
+              repoOwnerExecutionHostId: forgeOwnerHostIdForWorkspace(repo, worktree),
               check,
               // Why: a fork MR's job lives in the source project, not the repo's own.
               projectRef: checkRunDetails.gitlabProjectRef ?? null

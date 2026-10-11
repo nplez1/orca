@@ -12,9 +12,24 @@ import {
 } from '../../../../shared/protocol-version'
 import { remoteRuntimeClientCapabilities } from '../../../../shared/remote-runtime-client-capabilities'
 import { REPO_SEARCH_REFS_MAX_LIMIT } from '../../../../shared/repo-search-limits'
+import { SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY } from '../../../../shared/ssh-target-management'
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
   return { id: 'req-1', authToken: 'tok', method, params }
+}
+
+function makeRepoUpdateResult<T extends Record<string, unknown>>(
+  updates: T
+): T & { id: string; path: string } {
+  return { id: 'repo-1', path: '/srv/repo', ...updates }
+}
+
+function makeRepoUpdateRuntime(result: unknown): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fixture only exposes RPC members under test.
+  return {
+    getRuntimeId: () => 'test-runtime',
+    updateRepo: vi.fn().mockResolvedValue(result)
+  } as unknown as OrcaRuntimeService
 }
 
 describe('repo RPC methods', () => {
@@ -158,6 +173,49 @@ describe('repo RPC methods', () => {
     expect((currentResponse as { result: { repo: typeof repo } }).result.repo).not.toHaveProperty(
       'externalWorktreeVisibility'
     )
+  })
+
+  it('advertises server SSH target management so clients can gate the remote project flow', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY)
+  })
+
+  // Harvested from the community PR #8492 by @jae-heo.
+  it('adds an existing folder on one of the server SSH targets as a project', async () => {
+    const repo = {
+      id: 'repo-p8',
+      path: '/srv/project',
+      displayName: 'project',
+      badgeColor: '#737373',
+      addedAt: 1,
+      connectionId: 'ssh-p8',
+      kind: 'git' as const
+    }
+    const runtime = new OrcaRuntimeService(null)
+    const addSshRepo = vi.spyOn(runtime, 'addSshRepo').mockResolvedValue(repo)
+    const addRepo = vi.spyOn(runtime, 'addRepo')
+    const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('repo.addRemote', { connectionId: 'ssh-p8', remotePath: '/srv/project' }),
+      { clientCapabilities: [WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY] }
+    )
+
+    expect(addSshRepo).toHaveBeenCalledWith({ connectionId: 'ssh-p8', remotePath: '/srv/project' })
+    expect(addRepo).not.toHaveBeenCalled()
+    expect(response).toMatchObject({ ok: true, result: { repo: { connectionId: 'ssh-p8' } } })
+  })
+
+  it('refuses a remote project without an SSH target rather than adding a server path', async () => {
+    const runtime = new OrcaRuntimeService(null)
+    const addSshRepo = vi.spyOn(runtime, 'addSshRepo')
+    const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('repo.addRemote', { remotePath: '/srv/project' })
+    )
+
+    expect(response).toMatchObject({ ok: false })
+    expect(addSshRepo).not.toHaveBeenCalled()
   })
 
   it('updates project runtime preferences on the runtime server', async () => {
@@ -401,14 +459,7 @@ describe('repo RPC methods', () => {
   })
 
   it('persists GitHub issue source preference updates', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({
-        id: 'repo-1',
-        path: '/srv/repo',
-        issueSourcePreference: 'origin'
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(makeRepoUpdateResult({ issueSourcePreference: 'origin' }))
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -428,16 +479,15 @@ describe('repo RPC methods', () => {
   })
 
   it('persists shared directory materialization mode updates', async () => {
-    const runtime = new OrcaRuntimeService(null)
-    vi.spyOn(runtime, 'updateRepo').mockResolvedValue({
-      id: 'repo-1',
-      path: '/srv/repo',
-      displayName: 'repo',
-      badgeColor: '#000000',
-      addedAt: 0,
-      externalWorktreeVisibility: 'show',
-      sharedDirectoriesMode: 'apfs-copy'
-    })
+    const runtime = makeRepoUpdateRuntime(
+      makeRepoUpdateResult({
+        displayName: 'repo',
+        badgeColor: '#000000',
+        addedAt: 0,
+        externalWorktreeVisibility: 'show',
+        sharedDirectoriesMode: 'apfs-copy'
+      })
+    )
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -473,14 +523,7 @@ describe('repo RPC methods', () => {
   })
 
   it('persists fork sync mode updates', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({
-        id: 'repo-1',
-        path: '/srv/repo',
-        forkSyncMode: 'safe-auto'
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(makeRepoUpdateResult({ forkSyncMode: 'safe-auto' }))
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -500,15 +543,14 @@ describe('repo RPC methods', () => {
   })
 
   it('persists normalized ghAccount bindings and clear sentinels', async () => {
-    const runtime = new OrcaRuntimeService(null)
-    vi.spyOn(runtime, 'updateRepo').mockResolvedValue({
-      id: 'repo-1',
-      path: '/srv/repo',
-      displayName: 'repo',
-      badgeColor: '#000000',
-      addedAt: 0,
-      ghAccount: { host: 'github.com', user: 'Alice' }
-    })
+    const runtime = makeRepoUpdateRuntime(
+      makeRepoUpdateResult({
+        displayName: 'repo',
+        badgeColor: '#000000',
+        addedAt: 0,
+        ghAccount: { host: 'github.com', user: 'Alice' }
+      })
+    )
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -537,14 +579,7 @@ describe('repo RPC methods', () => {
   })
 
   it('persists agent worktree visibility updates', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({
-        id: 'repo-1',
-        path: '/srv/repo',
-        agentWorktreeVisibility: 'show'
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(makeRepoUpdateResult({ agentWorktreeVisibility: 'show' }))
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -564,10 +599,7 @@ describe('repo RPC methods', () => {
   })
 
   it('validates additive source settings at the remote RPC boundary', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({ id: 'repo-1', path: '/srv/repo' })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(makeRepoUpdateResult({}))
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     await dispatcher.dispatch(
@@ -596,10 +628,7 @@ describe('repo RPC methods', () => {
   })
 
   it('passes the null visibility sentinel through to clear a repository override', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({ id: 'repo-1', path: '/srv/repo' })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(makeRepoUpdateResult({}))
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     await dispatcher.dispatch(
@@ -615,14 +644,9 @@ describe('repo RPC methods', () => {
   })
 
   it('persists resolved GitHub upstream metadata updates', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      updateRepo: vi.fn().mockResolvedValue({
-        id: 'repo-1',
-        path: '/srv/repo',
-        upstream: { owner: 'stablyai', repo: 'orca' }
-      })
-    } as unknown as OrcaRuntimeService
+    const runtime = makeRepoUpdateRuntime(
+      makeRepoUpdateResult({ upstream: { owner: 'stablyai', repo: 'orca' } })
+    )
     const dispatcher = new RpcDispatcher({ runtime, methods: REPO_METHODS })
 
     const response = await dispatcher.dispatch(

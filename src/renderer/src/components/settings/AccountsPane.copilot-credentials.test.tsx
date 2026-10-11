@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { useAppStore } from '../../store'
 import { AccountsPane } from './AccountsPane'
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 
 const mocks = vi.hoisted(() => ({
   copilotGetStatus: vi.fn(),
@@ -90,7 +91,8 @@ function renderPane(): void {
   render(
     React.createElement(AccountsPane, {
       settings: getDefaultSettings('/tmp'),
-      updateSettings: vi.fn()
+      updateSettings: vi.fn(),
+      hostScope: LOCAL_SETTINGS_HOST_SCOPE
     })
   )
 }
