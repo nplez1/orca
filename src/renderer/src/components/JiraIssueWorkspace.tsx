@@ -4,6 +4,11 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { useAppStore } from '@/store'
 import type { JiraIssue } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import {
+  findJiraIssueWorkspaceAttachmentInIndex,
+  type JiraIssueWorkspaceAttachmentIndex
+} from '@/lib/jira-issue-workspace-attachment'
+import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { translate } from '@/i18n/i18n'
 import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
 import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
@@ -12,7 +17,10 @@ import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state
 
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
-  onUse: (issue: JiraIssue) => void
+  /** Workspaces already attached to Jira issues, so the primary action can show the
+   *  one belonging to this issue instead of offering to start a duplicate. */
+  issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
   refreshSignal?: number
@@ -20,7 +28,8 @@ type JiraIssueWorkspaceProps = {
 
 export default function JiraIssueWorkspace({
   issue,
-  onUse,
+  issueWorkspaceAttachmentIndex,
+  onOpenOrStartWorkspace,
   onClose,
   sourceContext,
   refreshSignal = 0
@@ -34,6 +43,15 @@ export default function JiraIssueWorkspace({
     refreshSignal
   })
   const { displayed } = detail
+  // Why derived from `displayed` and not the selected issue: the buttons below send
+  // `displayed`, and the detail hook keeps the previous issue for a render after the
+  // selection changes — so anything else could label one issue and open another's.
+  const attachedWorkspace = displayed
+    ? findJiraIssueWorkspaceAttachmentInIndex(issueWorkspaceAttachmentIndex, displayed)
+    : null
+  const attachedWorkspaceLabel = attachedWorkspace
+    ? getWorktreeAttachmentLabel(attachedWorkspace)
+    : null
   const actionItems = useMemo(
     () => (displayed ? getJiraIssueWorkspaceActions(displayed) : []),
     [displayed]
@@ -65,9 +83,10 @@ export default function JiraIssueWorkspace({
         {displayed ? (
           <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
             <JiraIssueWorkspaceHeader
+              attachedWorkspaceLabel={attachedWorkspaceLabel}
               displayed={displayed}
               issueLoading={detail.issueLoading}
-              onUse={onUse}
+              onOpenOrStartWorkspace={onOpenOrStartWorkspace}
               onClose={onClose}
             />
 
@@ -93,7 +112,8 @@ export default function JiraIssueWorkspace({
               commentsError={detail.commentsError}
               commentsLoading={detail.commentsLoading}
               retryComments={detail.retryComments}
-              onUse={onUse}
+              attachedWorkspaceLabel={attachedWorkspaceLabel}
+              onOpenOrStartWorkspace={onOpenOrStartWorkspace}
               actionItems={actionItems}
             />
 

@@ -5,7 +5,8 @@ export type TaskPageJiraBoardModel = Pick<
   | 'settings'
   | 'jiraTaskSourceContext'
   | 'jiraStatus'
+  | 'jiraIssueAttachmentIndex'
   | 'selectedJiraIssue'
   | 'openJiraDetailPage'
-  | 'handleUseJiraItem'
+  | 'handleOpenOrUseJiraItem'
 >

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronRight, ExternalLink, FolderOpen } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -7,6 +7,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import type { Worktree } from '../../../shared/worktree/types'
+import {
+  findJiraIssueWorkspaceAttachmentInIndex,
+  type JiraIssueWorkspaceAttachmentIndex
+} from '@/lib/jira-issue-workspace-attachment'
+import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
+import { JiraAttachedWorkspaceChip } from '@/components/task-page/jira/JiraAttachedWorkspaceChip'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '@/components/task-page-jira-priority-tone'
 
@@ -20,8 +27,9 @@ type TaskPageJiraIssueListProps = {
   formatUpdatedAt: (updatedAt: string) => string
   getStatusTone: (categoryKey: string) => string
   issues: JiraIssue[]
+  issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   onOpenIssue: (issue: JiraIssue) => void
-  onStartWorkspace: (issue: JiraIssue) => void
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
   selectedIssue: JiraIssue | null
   showSiteContext: boolean
   statusDirection?: 'asc' | 'desc'
@@ -88,23 +96,28 @@ function isSelectedIssue(issue: JiraIssue, selectedIssue: JiraIssue | null): boo
 }
 
 function JiraIssueRow({
+  attachedWorkspace,
   formatUpdatedAt,
   getStatusTone,
   issue,
   onOpenIssue,
-  onStartWorkspace,
+  onOpenOrStartWorkspace,
   selected,
   showSiteContext
 }: {
+  attachedWorkspace: Worktree | null
   formatUpdatedAt: (updatedAt: string) => string
   getStatusTone: (categoryKey: string) => string
   issue: JiraIssue
   onOpenIssue: (issue: JiraIssue) => void
-  onStartWorkspace: (issue: JiraIssue) => void
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
   selected: boolean
   showSiteContext: boolean
 }): React.JSX.Element {
   const labels = issue.labels.slice(0, 3)
+  const attachedWorkspaceLabel = attachedWorkspace
+    ? getWorktreeAttachmentLabel(attachedWorkspace)
+    : null
   const contextLabel =
     showSiteContext && issue.siteName
       ? `${issue.siteName} / ${issue.project.key}`
@@ -141,6 +154,9 @@ function JiraIssueRow({
       </span>
 
       <div className="min-w-0">
+        {/* Why the title line and not a metadata row: those rows are breakpoint
+            exclusive, so between md and lg neither renders and an attached row would
+            show nothing until hover. */}
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground md:hidden">
             {issue.key}
@@ -148,6 +164,9 @@ function JiraIssueRow({
           <h3 className="min-w-0 truncate text-[13px] font-medium text-foreground">
             {issue.title}
           </h3>
+          {attachedWorkspaceLabel ? (
+            <JiraAttachedWorkspaceChip label={attachedWorkspaceLabel} />
+          ) : null}
         </div>
         <div className="mt-1 flex min-w-0 items-center gap-1.5 md:!hidden">
           <span
@@ -233,23 +252,39 @@ function JiraIssueRow({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
+              // Why: solid primary when a workspace is already linked so Show reads stronger than Start.
+              variant={attachedWorkspace ? 'default' : 'ghost'}
               size="icon-xs"
+              data-contextual-tour-target="tasks-start-workspace"
               onClick={(event) => {
                 event.stopPropagation()
-                onStartWorkspace(issue)
+                onOpenOrStartWorkspace(issue)
               }}
-              aria-label={translate(
-                'auto.components.TaskPage.ff90d0abc7',
-                'Start workspace from {{value0}}',
-                { value0: issue.key }
-              )}
+              aria-label={
+                attachedWorkspace
+                  ? translate(
+                      'auto.components.TaskPage.jiraOpenAttachedWorkspace',
+                      'Open workspace attached to {{value0}}',
+                      { value0: issue.key }
+                    )
+                  : translate(
+                      'auto.components.TaskPage.ff90d0abc7',
+                      'Start workspace from {{value0}}',
+                      { value0: issue.key }
+                    )
+              }
             >
-              <ArrowRight className="size-3.5" />
+              {attachedWorkspace ? (
+                <FolderOpen className="size-3.5" />
+              ) : (
+                <ArrowRight className="size-3.5" />
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
+            {attachedWorkspace
+              ? translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')
+              : translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
           </TooltipContent>
         </Tooltip>
         <Tooltip>
@@ -282,9 +317,10 @@ function JiraIssueRow({
 export function TaskPageJiraIssueList({
   formatUpdatedAt,
   getStatusTone,
+  issueWorkspaceAttachmentIndex,
   issues,
   onOpenIssue,
-  onStartWorkspace,
+  onOpenOrStartWorkspace,
   selectedIssue,
   showSiteContext,
   statusDirection = 'asc',
@@ -296,19 +332,26 @@ export function TaskPageJiraIssueList({
     () => (groupByStatus ? groupJiraIssuesByStatus(issues, statusOrder, statusDirection) : []),
     [groupByStatus, issues, statusDirection, statusOrder]
   )
+  const rowProps = (issue: JiraIssue): React.ComponentProps<typeof JiraIssueRow> => ({
+    attachedWorkspace: findJiraIssueWorkspaceAttachmentInIndex(
+      issueWorkspaceAttachmentIndex,
+      issue
+    ),
+    formatUpdatedAt,
+    getStatusTone,
+    issue,
+    onOpenIssue,
+    onOpenOrStartWorkspace,
+    selected: isSelectedIssue(issue, selectedIssue),
+    showSiteContext
+  })
   if (!groupByStatus) {
     return (
       <div className="divide-y divide-border/50">
         {issues.map((issue) => (
           <JiraIssueRow
             key={`${issue.siteId ?? 'site'}:${issue.id || issue.key}`}
-            formatUpdatedAt={formatUpdatedAt}
-            getStatusTone={getStatusTone}
-            issue={issue}
-            onOpenIssue={onOpenIssue}
-            onStartWorkspace={onStartWorkspace}
-            selected={isSelectedIssue(issue, selectedIssue)}
-            showSiteContext={showSiteContext}
+            {...rowProps(issue)}
           />
         ))}
       </div>
@@ -358,13 +401,7 @@ export function TaskPageJiraIssueList({
               {section.issues.map((issue) => (
                 <JiraIssueRow
                   key={`${issue.siteId ?? 'site'}:${issue.id || issue.key}`}
-                  formatUpdatedAt={formatUpdatedAt}
-                  getStatusTone={getStatusTone}
-                  issue={issue}
-                  onOpenIssue={onOpenIssue}
-                  onStartWorkspace={onStartWorkspace}
-                  selected={isSelectedIssue(issue, selectedIssue)}
-                  showSiteContext={showSiteContext}
+                  {...rowProps(issue)}
                 />
               ))}
             </CollapsibleContent>

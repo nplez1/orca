@@ -1,4 +1,4 @@
-import { ArrowRight, LoaderCircle, X } from 'lucide-react'
+import { ArrowRight, FolderOpen, LoaderCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -26,14 +26,16 @@ function jiraStatusClass(categoryKey: string): string {
 
 /** Header row for an open Jira issue: key, summary, and workspace actions. */
 export function JiraIssueWorkspaceHeader({
+  attachedWorkspaceLabel,
   displayed,
   issueLoading,
-  onUse,
+  onOpenOrStartWorkspace,
   onClose
 }: {
+  attachedWorkspaceLabel: string | null
   displayed: JiraIssue
   issueLoading: boolean
-  onUse: (issue: JiraIssue) => void
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
   onClose: () => void
 }): React.JSX.Element {
   return (
@@ -52,12 +54,18 @@ export function JiraIssueWorkspaceHeader({
           </h2>
         </div>
         <Button
-          onClick={() => onUse(displayed)}
+          onClick={() => onOpenOrStartWorkspace(displayed)}
           className="hidden shrink-0 gap-2 sm:inline-flex"
           size="sm"
         >
-          {translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
-          <ArrowRight className="size-4" />
+          {attachedWorkspaceLabel
+            ? translate('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
+            : translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
+          {attachedWorkspaceLabel ? (
+            <FolderOpen className="size-4" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
         </Button>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -871,6 +871,15 @@
           }
         }
       },
+      "jira": {
+        "issue": {
+          "workspace": {
+            "open": {
+              "failed": "No se pudo abrir el espacio de trabajo vinculado a este issue."
+            }
+          }
+        }
+      },
       "linear": {
         "usage": {
           "examples": {
@@ -1479,6 +1488,7 @@
         "b0b92666c9": "Comentar",
         "a585fd204e": "Agregar un comentario de Jira...",
         "2441be6f9f": "Iniciar espacio de trabajo",
+        "showWorkspace": "Mostrar espacio de trabajo",
         "9178090e26": "Aún no hay comentarios.",
         "5cd09beaf9": "Reintentar",
         "9a980b06b9": "Comentarios",
@@ -2269,6 +2279,8 @@
         "linearModeHasWorktreeTooltip": "Tickets de Linear vinculados a un espacio de trabajo de Orca",
         "linearEmptyHasWorktree": "Aún no hay tickets de Linear vinculados a un espacio de trabajo de Orca. Inicia el trabajo desde un issue de Linear para verlo aquí.",
         "linearOpenAttachedWorkspace": "Abrir el espacio de trabajo vinculado a {{value0}}",
+        "jiraOpenAttachedWorkspace": "Abrir el espacio de trabajo vinculado a {{value0}}",
+        "jiraShowWorkspace": "Mostrar espacio de trabajo",
         "linearWorktreesColumn": "Espacios de trabajo",
         "jiraSortAscending": "ascendente",
         "jiraSortDescending": "descendente",

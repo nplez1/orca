@@ -209,8 +209,9 @@ export function TaskPageJiraBoard({
               board={board}
               statusOrder={statusOrder}
               selectedIssue={model.selectedJiraIssue}
+              issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
               onOpenIssue={model.openJiraDetailPage}
-              onStartWorkspace={model.handleUseJiraItem}
+              onOpenOrStartWorkspace={model.handleOpenOrUseJiraItem}
             />
           ) : (
             <section
@@ -255,6 +256,7 @@ export function TaskPageJiraBoard({
                   columns={filteredColumns.columns}
                   otherIssues={filteredColumns.otherIssues}
                   selectedIssue={model.selectedJiraIssue}
+                  issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
                   draggingIssueKey={draggingIssueKey}
                   updatingIssueKey={movingIssueKey}
                   dragOverColumnKey={dragOverColumnKey}

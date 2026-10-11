@@ -11,6 +11,8 @@ import type {
 } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardModel } from './Board'
 import { TaskPageJiraBoard } from './Board'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   clearTaskPageJiraBoardCache,
@@ -70,6 +72,36 @@ const otherAssigneeIssue = issue('ABC-9', '1', {
 })
 const backlogIssue = issue('ABC-2', '1')
 const cachedIssue = issue('ABC-7', '1')
+
+function attachedWorktree(key: string, displayName: string): Worktree {
+  return {
+    id: `wt-${key}`,
+    repoId: 'repo-1',
+    path: `/tmp/repo-1/wt-${key}`,
+    head: 'abc123',
+    branch: 'refs/heads/feature',
+    isBare: false,
+    isMainWorktree: false,
+    displayName,
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    linkedWorkItem: {
+      provider: 'jira',
+      type: 'issue',
+      number: 0,
+      title: key,
+      url: `https://example.atlassian.net/browse/${key}`,
+      jiraIdentifier: key
+    },
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0
+  }
+}
 const startTransition: JiraTransition = {
   id: 'start-work',
   name: 'Start work',
@@ -101,8 +133,9 @@ const model: TaskPageJiraBoardModel = {
     activeSiteId: 'site-1'
   },
   selectedJiraIssue: null,
+  jiraIssueAttachmentIndex: buildJiraIssueWorkspaceAttachmentIndex([]),
   openJiraDetailPage: vi.fn(),
-  handleUseJiraItem: vi.fn()
+  handleOpenOrUseJiraItem: vi.fn()
 }
 
 function boardTree(
@@ -171,6 +204,20 @@ describe('TaskPageJiraBoard', () => {
       model.settings,
       expect.objectContaining({ boardId: '42', scope: 'backlog', siteId: 'site-1' })
     )
+  })
+
+  it('marks a board card whose issue already has a workspace', async () => {
+    renderBoard({
+      model: {
+        ...model,
+        jiraIssueAttachmentIndex: buildJiraIssueWorkspaceAttachmentIndex([
+          attachedWorktree('ABC-1', 'abc-1-fix-payments')
+        ])
+      }
+    })
+
+    expect(await screen.findByText('ABC-1 title')).toBeTruthy()
+    expect(screen.getByText('abc-1-fix-payments')).toBeTruthy()
   })
 
   it('opens on the viewer filter and only widens to every issue on demand', async () => {

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-react'
+import { ArrowRight, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { CommentComposer } from '@/components/comment-composer'
@@ -29,7 +29,8 @@ export function JiraIssueWorkspaceContent({
   commentsError,
   commentsLoading,
   retryComments,
-  onUse,
+  attachedWorkspaceLabel,
+  onOpenOrStartWorkspace,
   actionItems
 }: {
   displayed: JiraIssue
@@ -44,7 +45,8 @@ export function JiraIssueWorkspaceContent({
   commentsError: string | null
   commentsLoading: boolean
   retryComments: () => void
-  onUse: (issue: JiraIssue) => void
+  attachedWorkspaceLabel: string | null
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
   actionItems: JiraIssueWorkspaceAction[]
 }): React.JSX.Element {
   return (
@@ -165,11 +167,17 @@ export function JiraIssueWorkspaceContent({
 
       <aside className="border-t border-border/50 bg-muted/20 px-3 py-3 xl:border-l xl:border-t-0">
         <Button
-          onClick={() => onUse(displayed)}
+          onClick={() => onOpenOrStartWorkspace(displayed)}
           className="mb-3 w-full justify-center gap-2 sm:hidden"
         >
-          {translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
-          <ArrowRight className="size-4" />
+          {attachedWorkspaceLabel
+            ? translate('auto.components.JiraIssueWorkspace.showWorkspace', 'Show workspace')
+            : translate('auto.components.JiraIssueWorkspace.2441be6f9f', 'Start workspace')}
+          {attachedWorkspaceLabel ? (
+            <FolderOpen className="size-4" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
         </Button>
         <div className="grid gap-1">
           {actionItems.map((item) => {

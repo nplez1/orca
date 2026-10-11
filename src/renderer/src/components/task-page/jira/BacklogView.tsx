@@ -1,5 +1,6 @@
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/jira-types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
+import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -13,16 +14,18 @@ type TaskPageJiraBacklogViewProps = {
   board: TaskPageJiraBoardState
   statusOrder: JiraProjectStatusOrder | null
   selectedIssue: JiraIssue | null
+  issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   onOpenIssue: (issue: JiraIssue) => void
-  onStartWorkspace: (issue: JiraIssue) => void
+  onOpenOrStartWorkspace: (issue: JiraIssue) => void
 }
 
 export function TaskPageJiraBacklogView({
   board,
   statusOrder,
   selectedIssue,
+  issueWorkspaceAttachmentIndex,
   onOpenIssue,
-  onStartWorkspace
+  onOpenOrStartWorkspace
 }: TaskPageJiraBacklogViewProps): React.JSX.Element {
   const backlogTitle =
     board.backlogTotal === null
@@ -88,8 +91,9 @@ export function TaskPageJiraBacklogView({
           formatUpdatedAt={formatRelativeTime}
           getStatusTone={getJiraStatusTone}
           issues={board.backlogIssues}
+          issueWorkspaceAttachmentIndex={issueWorkspaceAttachmentIndex}
           onOpenIssue={onOpenIssue}
-          onStartWorkspace={onStartWorkspace}
+          onOpenOrStartWorkspace={onOpenOrStartWorkspace}
           selectedIssue={selectedIssue}
           showSiteContext={false}
           statusOrder={statusOrder}

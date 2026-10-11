@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../shared/jira-types'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 const mocks = vi.hoisted(() => ({
@@ -77,6 +78,8 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+const EMPTY_ATTACHMENT_INDEX = buildJiraIssueWorkspaceAttachmentIndex([])
+
 describe('JiraIssueWorkspace refresh signal', () => {
   it('refreshes the selected issue after a board transition without replacing the selection', async () => {
     const selectedIssue = issue('1', 'Ready')
@@ -87,20 +90,32 @@ describe('JiraIssueWorkspace refresh signal', () => {
     mocks.jiraListPriorities.mockResolvedValue([])
     mocks.jiraListTransitions.mockResolvedValue([])
 
-    const onUse = vi.fn()
+    const onOpenOrStartWorkspace = vi.fn()
     const onClose = vi.fn()
     const view = render(
-      <JiraIssueWorkspace issue={selectedIssue} onUse={onUse} onClose={onClose} refreshSignal={0} />
+      <JiraIssueWorkspace
+        issue={selectedIssue}
+        issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
+        onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+        onClose={onClose}
+        refreshSignal={0}
+      />
     )
 
     await waitFor(() => expect(screen.getByTestId('issue-status').textContent).toBe('Ready'))
     view.rerender(
-      <JiraIssueWorkspace issue={selectedIssue} onUse={onUse} onClose={onClose} refreshSignal={1} />
+      <JiraIssueWorkspace
+        issue={selectedIssue}
+        issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
+        onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+        onClose={onClose}
+        refreshSignal={1}
+      />
     )
 
     await waitFor(() => expect(screen.getByTestId('issue-status').textContent).toBe('In Progress'))
     expect(onClose).not.toHaveBeenCalled()
-    expect(onUse).not.toHaveBeenCalled()
+    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
     expect(mocks.patchJiraIssue).toHaveBeenCalledWith('ABC-1', movedIssue, {
       sourceContext: undefined
     })
