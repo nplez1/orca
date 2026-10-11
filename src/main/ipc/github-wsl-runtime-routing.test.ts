@@ -322,6 +322,15 @@ describe('registerGitHubHandlers', () => {
       prRepo,
       noCache: true
     })
+    // Why a second call: the opt-in has to survive the IPC hop, or the Checks panel loses its
+    // verdict block with nothing in a log to say why.
+    await handlers['gh:prComments'](null, {
+      repoPath: '/workspace/repo',
+      prNumber: 42,
+      prRepo,
+      noCache: true,
+      includeReviewVerdicts: true
+    })
     await handlers['gh:setPRCommentReaction'](null, {
       repoPath: '/workspace/repo',
       reactionSubjectId: ' IC_1 ',
@@ -490,10 +499,19 @@ describe('registerGitHubHandlers', () => {
       null,
       localGitOptions
     )
-    expect(getPRCommentsMock).toHaveBeenCalledWith(
+    expect(getPRCommentsMock).toHaveBeenNthCalledWith(
+      1,
       '/workspace/repo',
       42,
-      { noCache: true, prRepo },
+      { noCache: true, prRepo, includeReviewVerdicts: false },
+      null,
+      localGitOptions
+    )
+    expect(getPRCommentsMock).toHaveBeenNthCalledWith(
+      2,
+      '/workspace/repo',
+      42,
+      { noCache: true, prRepo, includeReviewVerdicts: true },
       null,
       localGitOptions
     )

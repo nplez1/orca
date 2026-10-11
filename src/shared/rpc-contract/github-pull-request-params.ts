@@ -28,6 +28,9 @@ export const PrForBranch = RepoSelector.extend({
 export const PullRequest = RepoSelector.extend({
   prNumber: z.number().int().positive(),
   noCache: z.boolean().optional(),
+  // Why: opt-in and optional, so a peer that predates review verdicts sends nothing and keeps the
+  // payload it already knows (comments only).
+  includeReviewVerdicts: z.boolean().optional(),
   prRepo: SlugRepo.nullable().optional()
 })
 

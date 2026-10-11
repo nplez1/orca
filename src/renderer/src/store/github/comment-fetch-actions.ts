@@ -60,18 +60,22 @@ export const createCommentFetchActions = (
                   repo: requestContext.target.runtimeRepoId,
                   prNumber,
                   prRepo: options?.prRepo ?? null,
-                  noCache: options?.force
+                  noCache: options?.force,
+                  // Why: the Checks panel is the only surface that renders review verdicts, and it
+                  // is the only reader that should receive verdict-only entries.
+                  includeReviewVerdicts: true
                 },
                 { timeoutMs: 30_000 }
               )
-            : ((await window.api.gh.prComments({
+            : await window.api.gh.prComments({
                 repoPath,
                 repoId,
                 prNumber,
                 prRepo: options?.prRepo ?? null,
                 noCache: options?.force,
+                includeReviewVerdicts: true,
                 sourceContext: options?.sourceContext
-              })) as PRComment[])
+              })
         set((s) => ({
           commentsCache: withBoundedCacheEntry(s.commentsCache, cacheKey, {
             // Why: the cache key is per-repo/PR, not per-head, so the head the comments were

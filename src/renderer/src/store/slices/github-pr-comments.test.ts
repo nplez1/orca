@@ -54,7 +54,10 @@ describe('createGitHubSlice.fetchPRComments', () => {
       repoId,
       prNumber: 12,
       prRepo: { owner: 'Acme', repo: 'Widgets' },
-      noCache: true
+      noCache: true,
+      // Why: the Checks panel is the only surface that renders review verdicts, so it is the only
+      // reader that opts in to verdict-only entries.
+      includeReviewVerdicts: true
     })
   })
 
@@ -95,7 +98,8 @@ describe('createGitHubSlice.fetchPRComments', () => {
         repo: repoId,
         prNumber: 12,
         prRepo: { owner: 'Acme', repo: 'Widgets' },
-        noCache: true
+        noCache: true,
+        includeReviewVerdicts: true
       },
       timeoutMs: 30_000
     })
@@ -134,6 +138,7 @@ describe('createGitHubSlice.fetchPRComments', () => {
       prNumber: 12,
       prRepo: { owner: 'Acme', repo: 'Widgets' },
       noCache: true,
+      includeReviewVerdicts: true,
       sourceContext: undefined
     })
     expect(
@@ -174,7 +179,8 @@ describe('createGitHubSlice.fetchPRComments', () => {
         repo: 'runtime-repo-id',
         prNumber: 12,
         prRepo: { owner: 'Acme', repo: 'Widgets' },
-        noCache: true
+        noCache: true,
+        includeReviewVerdicts: true
       },
       timeoutMs: 30_000
     })

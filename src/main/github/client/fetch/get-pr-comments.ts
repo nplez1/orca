@@ -1,4 +1,5 @@
-import type { PRComment } from '../../../../shared/github/comment-types'
+import { parseGitHubReviewState, type PRComment } from '../../../../shared/github/comment-types'
+import { isReportableReviewSubmission } from '../../../../shared/pr-review-verdicts'
 import { GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE } from '../../../../shared/work-items'
 import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../../gh-utils'
 import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
@@ -14,7 +15,20 @@ import { REVIEW_THREADS_QUERY } from './pr-review-threads-query'
 export async function getPRComments(
   repoPath: string,
   prNumber: number,
-  options?: { noCache?: boolean; prRepo?: GitHubApiRepository | null },
+  options?: {
+    noCache?: boolean
+    prRepo?: GitHubApiRepository | null
+    /**
+     * Whether this caller renders review verdicts.
+     *
+     * Why opt-in: a review submitted with no comment is a verdict the Checks panel must show and an
+     * empty card everywhere else — the PR page, the issue dialog and mobile all read this same
+     * payload as comments. Only the Checks panel asks for the verdict-only entries; everyone else
+     * keeps the pre-existing "must carry a body" rule, and a peer that predates the flag is
+     * unaffected because the default is off.
+     */
+    includeReviewVerdicts?: boolean
+  },
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {}
 ): Promise<PRComment[]> {
@@ -67,6 +81,9 @@ export async function getPRComments(
         ),
         reviewThreadsFetch,
         // Why: review summaries (approve/request-changes/general) live under pulls/{n}/reviews, not issue comments or threads.
+        // Why the known limit: REST paginates oldest-first with no `sort`, so this is the *first*
+        // hundred submissions and a PR with more than that truncates before its newest decision.
+        // REST only runs when GraphQL did not answer; the GraphQL selection reads `last: 100`.
         ghExecFileAsync(
           ['api', ...cacheArgs, `${base}/pulls/${prNumber}/reviews?per_page=100`],
           ghOptions
@@ -125,6 +142,8 @@ export async function getPRComments(
         databaseId: number
         author: { __typename?: string; login: string; avatarUrl: string } | null
         body: string
+        /** Present on review submissions. GraphQL and REST spell the verdicts the same way. */
+        state?: string | null
         createdAt: string
         url: string
         reactionGroups?: GitHubGraphQLReactionGroup[] | null
@@ -163,21 +182,35 @@ export async function getPRComments(
         if (graphQLIssueComments.length > 0) {
           issueComments = graphQLIssueComments
         }
-        // Why: leave undefined when the payload is incomplete so the REST review summaries stay in use.
+        // Why: a verdict is the single most important event on a PR, so a review survives here even
+        // with an empty body — but only for a caller that renders verdicts, and only when it
+        // decides something (a bodyless `COMMENTED` review is how GitHub submits inline comments).
+        // A pending review has no numeric id, so it cannot be anchored, keyed, or reacted to.
+        // Leaving this undefined when the payload is incomplete keeps the REST review summaries in use.
         graphQLReviewSummaries = pullRequest
-          ? (pullRequest.reviews?.nodes ?? [])
-              .filter((review) => review.body?.trim())
-              .map((review): PRComment => ({
+          ? (pullRequest.reviews?.nodes ?? []).reduce<PRComment[]>((reviews, review) => {
+              const body = review.body ?? ''
+              const reviewState = parseGitHubReviewState(review.state)
+              const reportable = options?.includeReviewVerdicts
+                ? isReportableReviewSubmission(body, reviewState)
+                : body.trim().length > 0
+              if (!review.databaseId || !reportable) {
+                return reviews
+              }
+              reviews.push({
                 id: review.databaseId,
                 author: review.author?.login ?? 'ghost',
                 authorAvatarUrl: review.author?.avatarUrl ?? '',
-                body: review.body,
+                body,
                 createdAt: review.createdAt,
                 url: review.url,
                 isBot: review.author?.__typename === 'Bot',
+                reviewState,
                 reactionSubjectId: review.id,
                 reactions: mapGraphQLReactionGroups(review.reactionGroups)
-              }))
+              })
+              return reviews
+            }, [])
           : undefined
 
         const threads = pullRequest?.reviewThreads?.nodes ?? []
@@ -209,7 +242,8 @@ export async function getPRComments(
         }
       }
 
-      // Review summaries (REST); skip empty-body reviews (e.g. approvals with no comment) as noise.
+      // Review summaries (REST) — the fallback when GraphQL did not answer. Same keep-rule as the
+      // GraphQL path, so the two cannot disagree about what counts as a verdict.
       type RESTReview = {
         id: number
         user: { login: string; avatar_url: string; type?: string } | null
@@ -223,16 +257,29 @@ export async function getPRComments(
         reviewSummaries = graphQLReviewSummaries
       } else if (reviewsResult.status === 'fulfilled') {
         reviewSummaries = (JSON.parse(reviewsResult.value.stdout) as RESTReview[])
-          .filter((r) => r.body?.trim())
-          .map((r): PRComment => ({
-            id: r.id,
-            author: r.user?.login ?? 'ghost',
-            authorAvatarUrl: r.user?.avatar_url ?? '',
-            body: r.body,
-            createdAt: r.submitted_at,
-            url: r.html_url,
-            isBot: r.user?.type === 'Bot'
-          }))
+          .filter((r) => r.id != null)
+          .reduce<PRComment[]>((reviews, r) => {
+            const body = r.body ?? ''
+            const reviewState = parseGitHubReviewState(r.state)
+            // Why: the same keep-rule as the GraphQL path, so the fallback cannot disagree with it.
+            const reportable = options?.includeReviewVerdicts
+              ? isReportableReviewSubmission(body, reviewState)
+              : body.trim().length > 0
+            if (!reportable) {
+              return reviews
+            }
+            reviews.push({
+              id: r.id,
+              author: r.user?.login ?? 'ghost',
+              authorAvatarUrl: r.user?.avatar_url ?? '',
+              body,
+              createdAt: r.submitted_at,
+              url: r.html_url,
+              isBot: r.user?.type === 'Bot',
+              reviewState
+            })
+            return reviews
+          }, [])
       } else {
         console.warn('Failed to fetch review summaries:', reviewsResult.reason)
       }

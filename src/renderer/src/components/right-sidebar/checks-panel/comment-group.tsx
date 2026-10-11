@@ -18,7 +18,11 @@ import {
   type PRCommentPresentationClasses
 } from '../pr-comment-presentation'
 import type { GitHubReactionContent, PRComment } from '../../../../../shared/github/comment-types'
-import { getPRCommentGroupId, type PRCommentGroup } from '../../../../../shared/pr-comment-groups'
+import {
+  getPRCommentGroupId,
+  getPRCommentGroupRoot,
+  type PRCommentGroup
+} from '../../../../../shared/pr-comment-groups'
 import type { PRCommentGroupActionState } from '@/lib/pr-comment-action-state'
 import {
   RightPanelCommentComposer,
@@ -26,6 +30,8 @@ import {
 } from '../right-panel-comment-composer'
 import { CommentRow } from './comment-row'
 import { translate } from '@/i18n/i18n'
+
+const RESOLVED_SECTION_VALUE = 'resolved-all'
 
 export function PRCommentGroupView({
   group,
@@ -38,6 +44,7 @@ export function PRCommentGroupView({
   replyDisabled,
   replyDisabledReason,
   presentation,
+  highlightedCommentId,
   onResolve,
   onStartReply,
   onCancelReply,
@@ -58,6 +65,8 @@ export function PRCommentGroupView({
   replyDisabled?: boolean
   replyDisabledReason?: string
   presentation: PRCommentPresentationClasses
+  /** Comment a verdict click jumped to; marked so the reader can see where they landed. */
+  highlightedCommentId?: number | null
   onResolve?: (threadId: string, resolve: boolean) => boolean | Promise<boolean>
   onStartReply?: (commentId: number) => void
   onCancelReply?: (commentId: number) => void
@@ -100,11 +109,18 @@ export function PRCommentGroupView({
       </div>
     ) : null
   const startReply = onStartReply ? (comment: PRComment) => onStartReply(comment.id) : undefined
+  // Why: the mark belongs on the card, not the row — a row-level ring would be clipped by the
+  // card's `overflow-clip` in the cards variant.
+  const isRevealHighlighted =
+    highlightedCommentId != null &&
+    (getPRCommentGroupRoot(group).id === highlightedCommentId ||
+      (group.kind === 'thread' && group.replies.some((reply) => reply.id === highlightedCommentId)))
   const surfaceClassName = cn(
     getPRCommentGroupSurfaceClasses(presentation, actionState, {
       queued: isQueued
     }),
-    group.kind === 'standalone' ? presentation.groupStandalone : presentation.groupThread
+    group.kind === 'standalone' ? presentation.groupStandalone : presentation.groupThread,
+    isRevealHighlighted && presentation.commentRowHighlight
   )
   const sharedRowProps = {
     botAuthorOverrides,
@@ -198,6 +214,9 @@ export function ResolvedCommentGroupsSection({
   replyDisabled,
   replyDisabledReason,
   presentation,
+  highlightedCommentId,
+  open,
+  onOpenChange,
   onResolve,
   onStartReply,
   onCancelReply,
@@ -214,6 +233,10 @@ export function ResolvedCommentGroupsSection({
   replyDisabled?: boolean
   replyDisabledReason?: string
   presentation: PRCommentPresentationClasses
+  highlightedCommentId?: number | null
+  /** Controlled so a verdict jump can expand the section before scrolling to a comment inside it. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onResolve?: (threadId: string, resolve: boolean) => boolean | Promise<boolean>
   onStartReply?: (commentId: number) => void
   onCancelReply?: (commentId: number) => void
@@ -232,7 +255,12 @@ export function ResolvedCommentGroupsSection({
   }
   return (
     <div className={presentation.resolvedSection}>
-      <Accordion type="single" collapsible>
+      <Accordion
+        type="single"
+        collapsible
+        value={open ? RESOLVED_SECTION_VALUE : ''}
+        onValueChange={(value) => onOpenChange?.(value === RESOLVED_SECTION_VALUE)}
+      >
         <AccordionItem value="resolved-all" className="border-b-0">
           <AccordionTrigger className={presentation.resolvedSectionTrigger}>
             <span className="min-w-0 truncate">
@@ -256,6 +284,7 @@ export function ResolvedCommentGroupsSection({
                 replyDisabled={replyDisabled}
                 replyDisabledReason={replyDisabledReason}
                 presentation={presentation}
+                highlightedCommentId={highlightedCommentId}
                 onResolve={onResolve}
                 onStartReply={onStartReply}
                 onCancelReply={onCancelReply}

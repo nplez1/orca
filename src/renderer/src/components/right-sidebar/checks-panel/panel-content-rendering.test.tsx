@@ -3,6 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { PRComment } from '../../../../../shared/github/comment-types'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import type { ChecksPanelEmptyContentModel } from './empty-content-props'
 import { ChecksPanelReviewHeader } from '../ChecksPanel'
@@ -98,6 +99,17 @@ describe('checks panel concrete content', () => {
   })
 
   it('renders the active review header and empty check/comment sections with accessible actions', () => {
+    // A review that carried a verdict but no comment body: the panel shows the verdict and reports
+    // no comments, which is exactly the case the data path used to drop on the floor.
+    const approvalWithoutBody: PRComment = {
+      id: 45,
+      author: 'ana',
+      authorAvatarUrl: '',
+      body: '',
+      createdAt: '2026-05-14T00:00:00Z',
+      url: 'https://github.com/orca/app/pull/42#pullrequestreview-45',
+      reviewState: 'APPROVED'
+    }
     const model = {
       activeConnectionId: null,
       activeConflictReview: null,
@@ -122,7 +134,7 @@ describe('checks panel concrete content', () => {
       checksLoading: false,
       claimedCommentResolutionRef: { current: null },
       commentResolutionLaunchAcceptedRef: { current: false },
-      comments: [],
+      comments: [approvalWithoutBody],
       commentsDisabledReason: undefined,
       commentsLoading: false,
       commentsSelectionClearRequest: null,
@@ -191,5 +203,14 @@ describe('checks panel concrete content', () => {
     expect(screen.getByRole('button', { name: '#42' }).getAttribute('title')).toContain(
       'Open on GitHub'
     )
+
+    // The verdicts block is the comment section's own summary, above its header.
+    const verdicts = screen.getByText('Review verdicts')
+    expect(screen.getByText('Approved')).toBeTruthy()
+    expect(verdicts.compareDocumentPosition(screen.getByText('Comments'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+    // A verdict with no comment body is not clickable.
+    expect(screen.queryByRole('button', { name: /Approved/ })).toBeNull()
   })
 })

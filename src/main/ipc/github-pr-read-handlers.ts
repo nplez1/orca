@@ -108,13 +108,18 @@ export function registerGitHubPRReadHandlers(store: Store): void {
         prNumber: number
         prRepo?: GitHubOwnerRepo | null
         noCache?: boolean
+        includeReviewVerdicts?: boolean
       }
     ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
       return getPRComments(
         repo.path,
         args.prNumber,
-        { noCache: args.noCache, prRepo: args.prRepo ?? null },
+        {
+          noCache: args.noCache,
+          prRepo: args.prRepo ?? null,
+          includeReviewVerdicts: args.includeReviewVerdicts === true
+        },
         getGitHubRepoConnectionId(repo),
         ...getGitHubLocalGitOptionArgs(store, repo)
       )

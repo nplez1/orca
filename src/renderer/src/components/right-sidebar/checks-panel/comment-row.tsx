@@ -296,6 +296,7 @@ export function CommentRow({
 
   return (
     <div
+      data-pr-comment-id={comment.id}
       className={cn(
         'group/comment min-w-0',
         presentation.commentRow,

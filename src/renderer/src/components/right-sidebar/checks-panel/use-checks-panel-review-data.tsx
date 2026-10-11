@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { checksPanelAsyncResultKey } from '../checks-panel-async-result-key'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
@@ -148,6 +148,10 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
 
   // Why: read at call time — the ref is filled by an async MR fetch, so a value prop would be stale.
   const getGitLabProjectRef = useCallback(() => gitLabProjectRefRef.current, [gitLabProjectRefRef])
+  // Why: `fetchPRComments` serves a five-minute renderer cache, so re-reading the payload after the
+  // PR's review state moved has to ask for fresh data — otherwise an approval that lands while the
+  // panel is open never appears, which is the entire point of watching those fields.
+  const reviewRevisionRef = useRef<{ prCacheKey: string; revision: string } | null>(null)
 
   useEffect(() => {
     if (activeGitLabReview) {
@@ -165,8 +169,18 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
       pr?.prRepo,
       pr?.headSha
     )
+    const revision = `${pr?.reviewDecision ?? ''}|${pr?.updatedAt ?? ''}`
+    const previousRevision = reviewRevisionRef.current
+    // Why the prCacheKey check: switching PRs also changes the revision, and a first read of a PR has
+    // no reason to bypass the cache.
+    const reviewStateMoved =
+      previousRevision !== null &&
+      previousRevision.prCacheKey === prCacheKey &&
+      previousRevision.revision !== revision
+    reviewRevisionRef.current = { prCacheKey, revision }
     setCommentsLoading(true)
     void fetchPRComments(repo.path, prNumber, {
+      force: reviewStateMoved,
       repoId: repo.id,
       prRepo: pr?.prRepo,
       headSha: pr?.headSha
@@ -193,6 +207,11 @@ export function useChecksPanelReviewData(model: ChecksPanelReviewDataInput) {
     prNumber,
     pr?.headSha,
     pr?.prRepo,
+    // Why: the review verdicts ride on this payload, so a decision or activity change on the PR has
+    // to re-read it — otherwise an approval landing while the panel is open never appears. GitHub
+    // bumps `updated_at` on review submission, so this is the cheap "the PR changed" signal.
+    pr?.reviewDecision,
+    pr?.updatedAt,
     prCacheKey,
     branch,
     isPanelVisible,
