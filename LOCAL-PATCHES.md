@@ -445,8 +445,9 @@ pnpm run sync:localization-runtime-catalog
     of its own, so it inherited the setup file's sealing default and would have failed on the first
     Windows run — hidden by `skipIf(platform !== 'win32')`. It now installs the same plaintext-forcing
     store as its three siblings.
-  - **Pre-existing, found while classifying and deliberately left alone.** `zcode/hook-service.ts`
-    installs to `${remoteHome}/.orca/agent-hooks/...` while its dsh twin uses `HOME_DIRECTORY_NAME` —
+  - **Pre-existing, found while classifying and deliberately left alone.** `zcode/hook-service.ts:145`
+    installs to `${remoteHome}/.orca/agent-hooks/...` — and `kiro/hook-service.ts:218` spells the same
+    remote path — while their dsh twins use `HOME_DIRECTORY_NAME` —
     byte-identical at the merge base and at both parents, so it is identity backlog, not a merge
     casualty. `config/scripts/command-code-transcript-scan-benchmark.mjs` and
     `mobile-agent-status-projection-benchmark.mjs` are stale regex readers whose constants moved —
@@ -465,7 +466,15 @@ pnpm run sync:localization-runtime-catalog
     `skipIf(platform !== 'win32')` guard hid on macOS — now re-pointed to `HOME_DIRECTORY_NAME` like
     its three siblings. It confirmed every other repair, found **no weakened assertions**, and gave
     explicit sign-off on the `ts-nocheck` entry, recording the typed alternative as chain-wide work
-    rather than a sync repair.
+    rather than a sync repair. Two further passes followed, each after a round of fixes, both by the
+    same substitute model: `ff8ea42b23` fixed that Windows-store blocker and, on the reviewer's
+    reading, a pre-existing `..orca-np` PowerShell hook path (the constant already carries its
+    leading dot, so `Test-Path` never matched); its re-review returned one further blocker — the same
+    Windows-only store suite still mocking `electron`'s `safeStorage` instead of installing the
+    fork's SecretStore, which the `skipIf(platform !== 'win32')` guard hid on macOS. `aba543909a`
+    fixed that, and the re-review of it returned **ship-ready with no blocking findings**, confirming
+    every repair in the series and finding **no weakened assertions** anywhere. Both substitutions are
+    recorded because the gate's whole value is that it is checkable.
   - **Left failing, and proved not ours:** `pnpm run audit:code-quality:native` reports five
     `import(no-cycle)` warnings — `mobile/src/transport/client-context.tsx`,
     `mobile/src/transport/host-client-hooks.ts`, `mobile/src/terminal/document/fit-scale.ts` (x2)
