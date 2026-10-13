@@ -1,0 +1,8 @@
+Copilot needs information.
+Which folder should I use: alpha or beta?
+Folder:
+❯ alpha
+  beta
+   Other (type your answer)
+ ↑/↓ select · enter accept · ctrl+d decline · esc cancel
+○ Asking user  Waiting for response

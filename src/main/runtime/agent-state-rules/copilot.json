@@ -1,0 +1,53 @@
+{
+  "id": "copilot",
+  "engineVersion": 1,
+  "anchors": [
+    {
+      "id": "blocked_approval_run_command",
+      "why": "A shell command's approval dialog, verbatim from CLI 1.0.97: `Do you want to run this command?` over a Yes / tell-Copilot-differently pair. Copilot's hooks never report the dialog - `permission_prompt` also fires for requests it approves itself - so the screen is the only witness.",
+      "when": {
+        "region": "text",
+        "find": { "lastOf": "do you want to run this command" },
+        "after": { "contains": "enter to select" }
+      },
+      "answer": { "state": "blocked", "reason": "agent-approval-prompt" }
+    },
+    {
+      "id": "blocked_approval_access",
+      "why": "A URL access approval, the same dialog for a different subject: `Do you want to allow this access?`. Captured separately from the command wording, so neither is generalised from the other.",
+      "when": {
+        "region": "text",
+        "find": { "lastOf": "do you want to allow this access" },
+        "after": { "contains": "enter to select" }
+      },
+      "answer": { "state": "blocked", "reason": "agent-approval-prompt" }
+    },
+    {
+      "id": "blocked_approval_deny_option",
+      "why": "Both captured approval dialogs offer the identical denial option, `No, and tell Copilot what to do differently (Esc to stop)`. It is a UI label, not prose, so it catches an approval whose question is worded a third way.",
+      "when": {
+        "region": "text",
+        "find": { "lastOf": "tell copilot what to do differently" },
+        "after": { "contains": "enter to select" }
+      },
+      "answer": { "state": "blocked", "reason": "agent-approval-prompt" }
+    },
+    {
+      "id": "blocked_question",
+      "why": "Copilot's question dialog opens with `Copilot needs information.` and closes with the select/accept controls, while its status row reads `Asking user` (captured from CLI 1.0.97). `ask_user` reaches Orca only as a postToolUse, i.e. after the answer, so nothing but the screen reports the wait.",
+      "when": {
+        "region": "text",
+        "find": { "lastOf": "copilot needs information" },
+        "after": { "contains": "ctrl+d decline" }
+      },
+      "answer": { "state": "blocked", "reason": "agent-interactive-prompt" }
+    },
+    {
+      "id": "blocked_question_controls",
+      "why": "The select/accept controls are unique to Copilot's question dialog, so they catch it even if the header is reworded. The agent asks often enough that a phrasing change must not silence the prompt.",
+      "when": { "region": "text", "find": { "lastOf": "ctrl+d decline" } },
+      "answer": { "state": "blocked", "reason": "agent-interactive-prompt" }
+    }
+  ],
+  "rules": []
+}

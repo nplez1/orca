@@ -3,6 +3,7 @@ import antigravity from './antigravity.json'
 import claude from './claude.json'
 import cline from './cline.json'
 import codex from './codex.json'
+import copilot from './copilot.json'
 import cursor from './cursor.json'
 import dsh from './dsh.json'
 import gemini from './gemini.json'
@@ -40,6 +41,7 @@ export const BUNDLED_AGENT_STATE_RULE_FILES: readonly AgentStateRulesFile[] =
     claude,
     cline,
     codex,
+    copilot,
     cursor,
     dsh,
     gemini,
