@@ -11,6 +11,7 @@ import { useWorktreeCardLinkedDetails } from './use-worktree-card-linked-details
 import { useWorktreeCardReviewDetails } from './use-worktree-card-review-details'
 import { useWorktreeCardSecondaryDetails } from './use-worktree-card-secondary-details'
 import { useWorktreeCardWorkspaceActions } from './use-worktree-card-workspace-actions'
+import { useWorktreeCardEphemeralLease } from './worktree-card-ephemeral-lease'
 
 export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
   const { worktree, repo } = props
@@ -33,6 +34,8 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     linearIssueFallbackEntry: review.linearIssueFallbackEntry,
     prDisplay: review.prDisplay
   })
+  // Why: a lease is a fact about the host this card runs on, so it is read once here and handed to the presentation.
+  const ephemeralLease = useWorktreeCardEphemeralLease(worktree.id)
 
   const showStatus = foundation.cardProps.includes('status')
   const showIssue = foundation.cardProps.includes('issue')
@@ -163,6 +166,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     detailsHoverControl,
     referenceDetails,
     reviewChecks,
+    ephemeralLease,
     showStatus,
     showIssue,
     showLinearIssue,

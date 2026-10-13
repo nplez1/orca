@@ -17,6 +17,7 @@ import {
   stopEphemeralVmRuntimeCleanup,
   suspendEphemeralVmRuntime
 } from '../ephemeral-vm-runtime-service'
+import { extendEphemeralVmRuntimeLease } from '../ephemeral-vm-runtime-extend'
 import { removeEphemeralVmRuntimeSshTarget } from '../ephemeral-vm-runtime-ssh-cleanup'
 import {
   buildEphemeralVmRecipeCleanupCommand,
@@ -47,6 +48,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:suspendWorkspace')
   ipcMain.removeHandler('ephemeralVm:resumeWorkspace')
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
+  ipcMain.removeHandler('ephemeralVm:extendLifetime')
 
   ipcMain.handle('ephemeralVm:listRuntimes', (): EphemeralVmRuntimeRecord[] => {
     return listEphemeralVmRuntimes(app.getPath('userData'))
@@ -244,6 +246,21 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
         }
       }
       return result.runtime
+    }
+  )
+
+  ipcMain.handle(
+    'ephemeralVm:extendLifetime',
+    async (
+      _event,
+      args: { runtimeId: string; lifetime: string }
+    ): Promise<EphemeralVmRuntimeRecord> => {
+      return extendEphemeralVmRuntimeLease({
+        userDataPath: app.getPath('userData'),
+        store,
+        runtimeId: args.runtimeId,
+        lifetime: args.lifetime
+      })
     }
   )
 

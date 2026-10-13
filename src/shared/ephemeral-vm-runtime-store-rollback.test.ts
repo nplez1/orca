@@ -148,6 +148,67 @@ describe('ephemeral VM runtime store rollback projection', () => {
     expect(listEphemeralVmRuntimes(userDataPath)).toEqual([runtime])
   })
 
+  it('keeps a runtime with both a provisioned root and an extend hook readable by an older build', () => {
+    const userDataPath = makeUserDataPath()
+    const runtime = runtimeRecord({
+      recipe: { ...runtimeRecord().recipe!, checkoutMode: 'orca-worktree' },
+      extend: './extend.sh',
+      extendDurations: ['1h', '4h', '1d']
+    })
+
+    upsertEphemeralVmRuntime(userDataPath, runtime)
+
+    const persisted = JSON.parse(readFileSync(getEphemeralVmRuntimeStorePath(userDataPath), 'utf8'))
+    expect(RollbackEphemeralVmRuntimeStoreSchema.safeParse(persisted).success).toBe(true)
+    // Why: the recipe snapshot is strict in an older build, so a checkoutMode left in the store file
+    // would make every runtime in the file unreadable there. The record itself is not strict, so the
+    // extend hook rides along at the top level and a build that predates it simply ignores it.
+    expect(persisted.runtimes[0].recipe).not.toHaveProperty('checkoutMode')
+    expect(persisted.runtimes[0]).toMatchObject({
+      extend: './extend.sh',
+      extendDurations: ['1h', '4h', '1d']
+    })
+
+    // The sidecar entry must carry nothing but the checkout-mode keys an older build's strict entry
+    // schema accepts — adding a newer key here would cost that build the checkout mode as well.
+    const sidecar = JSON.parse(
+      readFileSync(getEphemeralVmRuntimeFeatureStorePath(userDataPath), 'utf8')
+    )
+    expect(sidecar.records).toEqual([
+      expect.objectContaining({
+        id: runtime.id,
+        recipeId: runtime.recipeId,
+        recipeCheckoutMode: 'orca-worktree'
+      })
+    ])
+    expect(sidecar.records[0]).not.toHaveProperty('recipeExtend')
+    expect(sidecar.records[0]).not.toHaveProperty('recipeExtendDurations')
+
+    const readBack = listEphemeralVmRuntimes(userDataPath)
+    expect(readBack).toEqual([runtime])
+  })
+
+  it('restores the extend hook for several runtimes at once', () => {
+    const userDataPath = makeUserDataPath()
+    const first = runtimeRecord({
+      id: 'first-extend-runtime',
+      extend: './first.sh',
+      extendDurations: ['1h']
+    })
+    const second = runtimeRecord({
+      id: 'second-extend-runtime',
+      createdAt: 2_000,
+      updatedAt: 2_000,
+      extend: './second.sh',
+      extendDurations: ['2h', '1d']
+    })
+
+    upsertEphemeralVmRuntime(userDataPath, first)
+    upsertEphemeralVmRuntime(userDataPath, second)
+
+    expect(listEphemeralVmRuntimes(userDataPath)).toEqual([second, first])
+  })
+
   it('does not rewrite unchanged features when runtime order differs from feature order', () => {
     const userDataPath = makeUserDataPath()
     const older = {

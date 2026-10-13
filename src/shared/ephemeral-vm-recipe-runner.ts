@@ -17,6 +17,7 @@ import {
 export {
   buildEphemeralVmRecipeCleanupCommand,
   buildEphemeralVmRecipeCleanupPayload,
+  buildEphemeralVmRecipeExtendPayload,
   type EphemeralVmRecipeCleanupPayload
 } from './ephemeral-vm-recipe-lifecycle-payload'
 
@@ -315,7 +316,7 @@ function buildRecipeContext(
   }
 }
 
-function validateRepoPath(repoPath: string): void {
+export function validateRepoPath(repoPath: string): void {
   const stat = statSync(repoPath)
   if (!stat.isDirectory()) {
     throw new Error(`Recipe repo path is not a directory: ${repoPath}`)

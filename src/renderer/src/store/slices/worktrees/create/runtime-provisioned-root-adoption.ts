@@ -1,6 +1,7 @@
 import type { CreateWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import type { RuntimeClientTarget } from '../../../../runtime/runtime-client-target'
 import { callRuntimeRpc } from '../../../../runtime/runtime-rpc-client'
+import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
 import {
   buildRuntimeWorktreeCreateParams,
   type CreateWorktreeCallOptions,
@@ -32,5 +33,6 @@ export async function adoptRuntimeProvisionedRoot(
     runtimeId: provisionedRoot.runtimeId,
     workspaceId: result.worktree.id
   })
+  refreshEphemeralVmRuntimesAfterMutation()
   return result
 }

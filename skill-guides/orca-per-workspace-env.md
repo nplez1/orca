@@ -71,7 +71,8 @@ snapshot (step 5), and `create` boots from the authenticated snapshot they produ
    executable. The per-provider worked examples are in the conditional references below.
 5. **[CHECKPOINT] Build the base snapshot** (section 3). Paid and slow.
 6. **[CHECKPOINT] Authenticate the agent** (section 4). Interactive; the user follows a URL and code.
-7. **Wire the recipe** so `orca.yaml` points create, suspend, resume, and destroy at the scripts.
+7. **Wire the recipe** so `orca.yaml` points create, suspend, resume, extend, and destroy at the
+   scripts, with `extendDurations` listing every lifetime the provider will sell.
    Tell the user up front: the composer reads `environmentRecipes` from the primary checkout, so
    a recipe that lives only on a branch never appears as a "Run on" option. The doctor works on
    any branch; the picker needs `orca.yaml` on the primary branch.
@@ -92,6 +93,9 @@ say which items you verified and which the user asserted.
   state.
 - **Plan, timeout, and RAM caps.** Record them. Vercel's Hobby plan, for example, caps sandbox
   timeout at 45 minutes, which limits both the base build and the per-workspace runtime.
+- **Lease TTL, if the recipe will offer Extend.** Ask the provider for the longest extension it will
+  sell, and declare only spans inside that. `extendDurations` is the whole menu Orca offers, so a
+  value outside it is a lease the provider refuses in the middle of a paid interaction.
 - **Git token for private repos** (`GH_TOKEN`, `GITHUB_TOKEN`, or the provider's git auth, falling
   back to `gh auth token`).
 - **Coding-agent CLI choice** and an account for it.
@@ -254,7 +258,7 @@ set -euo pipefail
 # 4. print one recipe-result JSON object to stdout
 ```
 
-### 7d. Suspend, resume, destroy
+### 7d. Suspend, resume, extend, destroy
 
 ```bash
 #!/usr/bin/env bash
@@ -264,8 +268,14 @@ resource_id="$(node -e 'const d=JSON.parse(process.argv[1]); process.stdout.writ
 [ -n "$resource_id" ] || { echo "No resource id in lifecycle payload" >&2; exit 1; }
 # suspend: provider suspend "$resource_id"
 # resume:  provider resume "$resource_id"; then RE-EMIT fresh recipe JSON (pairing may change)
+# extend:  provider extend "$resource_id" "$lifetime"; then RE-READ the resource and re-emit the
+#          recipe result with the new userData.releaseAt — never a deadline computed locally
 # destroy: provider remove "$resource_id"   (or set destroy: none in orca.yaml)
 ```
+
+`extend` is the one hook whose job is to move a clock: it reads `lifetime` (the canonical spelling of
+one of the recipe's own `extendDurations`) out of that same payload, and must end with the provider's
+own new deadline, because that is the only deadline the provider enforces.
 
 ### 7e. State file
 
@@ -282,13 +292,17 @@ environmentRecipes:
     create: ./scripts/orca-vm/cloud-sandbox-create.sh
     suspend: ./scripts/orca-vm/cloud-sandbox-suspend.sh
     resume: ./scripts/orca-vm/cloud-sandbox-resume.sh
+    extend: ./scripts/orca-vm/cloud-sandbox-extend.sh
+    extendDurations: [1h, 4h, 24h]
     destroy: ./scripts/orca-vm/cloud-sandbox-destroy.sh
 ```
 
 `create` is required, runs locally from the repo root, and prints exactly one JSON object on stdout.
 `suspend` and `resume` are optional and read the lifecycle payload on stdin; `resume` must print
-fresh recipe JSON because the pairing may have changed. `destroy` may be omitted only with
-`destroy: none`. The legacy keys `command` and `cleanup` still map to `create` and `destroy`.
+fresh recipe JSON because the pairing may have changed. `extend` is optional too, and belongs with
+`extendDurations`: Orca offers only the lifetimes that list declares, and rejects the recipe outright
+when `extendDurations` appears without `extend`. `destroy` may be omitted only with `destroy: none`.
+The legacy keys `command` and `cleanup` still map to `create` and `destroy`.
 
 The base result, which is what Orca-server mode prints:
 
@@ -312,6 +326,81 @@ Three named deltas change that shape:
   `checkoutMode: provisioned-root` to the recipe, require `ORCA_RECIPE_RESULT_SCHEMA_VERSION=2`, and
   emit `"schemaVersion": 2` with `"checkoutMode": "provisioned-root"`. Fail if the requested schema
   is not `2` rather than falling back to the ordinary shape. Details are in `references/ssh-host.md`.
+
+### The lifetime metadata
+
+An ephemeral host can be put on a provider deadline. Four `userData` keys are well known to Orca:
+
+| Key               | Value                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `releaseAt`       | The provider's absolute deadline, RFC 3339 **with an offset**: `2026-10-13T03:26:41Z` or `2026-10-13T05:26:41+02:00`. |
+| `lifetimeSeconds` | Positive whole seconds. Context only.                                                                                 |
+| `provider`        | Opaque to Orca; a non-empty string or a finite number. Names the provider in the UI.                                  |
+| `resourceId`      | Opaque to Orca; a non-empty string or a finite number. The handle every lifecycle script reads back out of here.      |
+
+```json
+{
+  "schemaVersion": 1,
+  "pairingCode": "orca-pairing-code-or-url",
+  "projectRoot": "/absolute/path/to/repo/on/remote",
+  "userData": {
+    "provider": "example",
+    "resourceId": "vm-9f2c",
+    "releaseAt": "2026-10-13T03:26:41Z",
+    "lifetimeSeconds": 21600
+  }
+}
+```
+
+`releaseAt` is the **only** source of the countdown, and it is also the switch that opts a recipe in:
+
+- **No `releaseAt`, no lifetime.** A `userData` without it is not on a clock, so an existing recipe
+  keeps behaving exactly as it did even if it already sets `provider` for its own reasons.
+- **Once `releaseAt` is present, a malformed one is reported as a warning, not a failed result.** A
+  local time with no offset, or a non-numeric `lifetimeSeconds`, still produces a working host with
+  no countdown: `create` has already run by then, so failing the result would strand a machine the
+  provider is billing for. You see a `recipe.result.lifetime.unreadable` warning instead — in the
+  provisioning flow and in `orca vm recipe doctor --provision`. An unreadable deadline is treated as
+  *no* deadline everywhere, so the host is never reclaimed automatically. An `extend` or `resume`
+  that would lose an existing deadline **is** refused, because there the record survives and you can
+  retry. Emit an offset (`Z` for UTC) and a whole number of positive seconds.
+- **`lifetimeSeconds` never substitutes for the deadline.** A provider may report the original lease
+  or what is left of it, and the two disagree the moment a lease is extended, so Orca ignores it for
+  arithmetic. Report it when the provider gives you one; it is not required.
+
+### Expiry and reclamation
+
+Past `releaseAt` Orca treats the host as expired and presents it as expired rather than healthy.
+Orca's own SSH reconnect ladder is bounded — nine attempts, about a hundred seconds — so retrying
+stops on its own shortly after the deadline, and the "exhausted" verdict it reaches is one Orca
+earned rather than one Orca forced. It does **not** immediately forget the host, and this is the part
+worth getting right when you author a recipe:
+
+- Orca reclaims the host — releases its registrations and tells the renderer to forget the workspace
+  row — only once the deadline plus that same 15-minute grace has passed **and** it holds evidence the
+  host is not coming back. That evidence is transport-specific: for SSH it is the reconnect ladder
+  reaching `reconnection-failed`; for Orca-server hosts, whose reconnect scheduler caps nothing, it is
+  a probe that actually failed or the host's own verdict that the pairing is over. A probe that has
+  not settled yet is not a failure.
+- A host that is merely unreachable (laptop off-network, VPN dropped, machine asleep) is never
+  treated as gone on reachability alone: that is indistinguishable from a deallocated machine, and it
+  may still be running the user's work. The honest limit is that neither transport checks whether your
+  machine had a network, so a laptop offline past its deadline plus the grace does lose its rows even
+  though it may still be alive. Nothing on the machine is lost when that happens — a reclaim destroys
+  nothing — but recovering means re-creating the workspace and re-adding the target, so it is not a
+  free mistake.
+- The provider's own TTL is the backstop for the case Orca cannot observe at all. If Orca exits or
+  loses connectivity for good, the provider destroys the machine without Orca's help.
+- Reclaiming removes Orca's bookkeeping only, and never runs your `destroy`. Orca runs `destroy` only
+  when it is asked for — the Cleanup action in Settings, or the teardown that follows deleting the
+  workspace — so make the destroy verb idempotent, because a machine the provider already took away
+  is the common case by then.
+- These machines are **remote**: files, git state, and branches stay on the host, so nothing on that
+  disk is touched and the workspace's work is not deleted by Orca forgetting it.
+
+`extend` does not depend on the countdown: a recipe that declares it and `extendDurations` is offered
+the Extend lifetime action even when `create` publishes no `releaseAt` yet. Only the countdown chip
+needs a deadline to show.
 
 ### The `orca serve` invocation
 
@@ -340,8 +429,9 @@ parses as JSON; if the process dies first, dump its stderr log and fail.
 
 `ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json` validates static wiring only; it boots
 nothing. It checks local-host execution, the repo path, that the recipe id exists, that the create,
-destroy, suspend, and resume command paths resolve, that suspend and resume are paired, and that
-each script is executable (the POSIX exec bit, skipped on Windows).
+destroy, suspend, resume, and extend command paths resolve, that suspend and resume are paired, that
+an `extend` hook declares `extendDurations` to offer, and that each script is executable (the POSIX
+exec bit, skipped on Windows).
 
 **The free gate is clear only with no `fail` and no `warn`.** A `warn` keeps `ok: true`, so `ok`
 alone proves nothing. Resolve each `warn`, or say why you accept it, before spending money on
@@ -349,6 +439,17 @@ alone proves nothing. Resolve each `warn`, or say why you accept it, before spen
 
 `--provision` (or its synonym `--connect`) runs the recipe end to end: `create`, validation of the
 returned JSON, then `destroy`. Nothing is left running as long as `destroy` works.
+
+Once it passes, exercise `extend` while nothing is live: save the recipe result the self-test printed
+to a file and run the hook through the CLI.
+
+```text
+ORCA vm recipe extend <recipe-id> --recipe-result ./result.json --lifetime 4h --json
+```
+
+The lifetime must be one the recipe's own `extendDurations` declares. It prints the updated result,
+so confirm `releaseAt` actually moved; extending a live lease from the app is what persists the new
+deadline, and this command only reports what the hook produced.
 
 Run it as a loop: read the `provisionTranscript` in the failed result, fix the script, re-run, until
 `ok` is `true`. Do not wait for the user to paste errors. How to read the transcript is in

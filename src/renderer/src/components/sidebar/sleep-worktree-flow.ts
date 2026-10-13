@@ -6,6 +6,7 @@ import {
   withWorktreeSleepTeardown
 } from '@/lib/worktree-sleep-intent'
 import { VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT } from '@/hooks/useVirtualizedScrollAnchor'
+import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
 import { translate } from '@/i18n/i18n'
 
 /**
@@ -190,6 +191,8 @@ export async function runSleepWorktrees(worktreeIds: readonly string[]): Promise
           await shutdownWorktreeTerminals(worktreeId, { keepIdentifiers: true })
           if (typeof window !== 'undefined' && window.api?.ephemeralVm?.suspendWorkspace) {
             await window.api.ephemeralVm.suspendWorkspace({ workspaceId: worktreeId })
+            // Why: a sleep changes the lease surfaces (a suspended host is no longer running).
+            refreshEphemeralVmRuntimesAfterMutation()
           }
         })
         // Why: a workspace the user activated during the batch is awake by their choice.

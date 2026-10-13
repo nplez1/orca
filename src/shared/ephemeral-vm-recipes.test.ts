@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from './pairing'
 import {
   EPHEMERAL_VM_RECIPE_JSON_STRUCTURE_LIMITS,
+  getEphemeralVmRecipeResultLifetime,
   parseEphemeralVmRecipeResult
 } from './ephemeral-vm-recipes'
 import {
@@ -344,5 +345,100 @@ describe('parseEphemeralVmRecipeResult', () => {
         }
       }
     })
+  })
+
+  it('accepts a provider deadline and exposes it as the result lifetime', () => {
+    const parsed = parseEphemeralVmRecipeResult(
+      JSON.stringify({
+        schemaVersion: 1,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo',
+        userData: {
+          provider: 'aws',
+          resourceId: 'i-0123456789',
+          releaseAt: '2026-10-13T03:26:41Z',
+          lifetimeSeconds: 3_600
+        }
+      })
+    )
+
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) {
+      return
+    }
+    expect(parsed.result.userData).toMatchObject({ releaseAt: '2026-10-13T03:26:41Z' })
+    expect(getEphemeralVmRecipeResultLifetime(parsed.result)).toEqual({
+      ok: true,
+      lifetime: {
+        provider: 'aws',
+        resourceId: 'i-0123456789',
+        releaseAt: '2026-10-13T03:26:41Z',
+        releaseAtMs: Date.parse('2026-10-13T03:26:41Z'),
+        lifetimeSeconds: 3_600
+      }
+    })
+  })
+
+  it('accepts a result with a malformed userData.releaseAt and reports it as a warning', () => {
+    // Why not a parse failure: `create` has already run by the time the result is read, so refusing
+    // the whole result would strand a machine the provider is billing for. The host provisions
+    // without a countdown, and the warning is how its author finds the typo.
+    const parsed = parseEphemeralVmRecipeResult(
+      JSON.stringify({
+        schemaVersion: 1,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo',
+        userData: { provider: 'aws', releaseAt: '2026-10-13T03:26:41' }
+      })
+    )
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) {
+      return
+    }
+    expect(getEphemeralVmRecipeResultLifetime(parsed.result)).toEqual({
+      ok: false,
+      error:
+        'userData.releaseAt must be an RFC 3339 timestamp with an offset, such as 2026-10-13T03:26:41Z.'
+    })
+    expect(getEphemeralVmRecipeResultWarnings(parsed.result)).toEqual([
+      expect.objectContaining({ id: 'recipe.result.lifetime.unreadable' })
+    ])
+  })
+
+  it('still accepts a result with no lifetime keys at all', () => {
+    const parsed = parseEphemeralVmRecipeResult(
+      JSON.stringify({
+        schemaVersion: 1,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo',
+        userData: { provider: 'aws', resourceId: 'i-0123456789' }
+      })
+    )
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(getEphemeralVmRecipeResultLifetime(parsed.result)).toEqual({
+        ok: true,
+        lifetime: null
+      })
+    }
+  })
+
+  it('gives a result with no userData an empty lifetime', () => {
+    const parsed = parseEphemeralVmRecipeResult(
+      JSON.stringify({
+        schemaVersion: 1,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo'
+      })
+    )
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(getEphemeralVmRecipeResultLifetime(parsed.result)).toEqual({
+        ok: true,
+        lifetime: null
+      })
+    }
   })
 })

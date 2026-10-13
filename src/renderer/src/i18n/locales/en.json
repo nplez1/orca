@@ -6087,7 +6087,12 @@
           "automationCreated": "Created by automation",
           "branchIdentity": "Branch",
           "branchFolderPathIdentity": "Branch or folder path",
-          "ef18787206": "Queued for deletion"
+          "ef18787206": "Queued for deletion",
+          "ephemeralLeaseExpired": "Expired",
+          "ephemeralLeaseRemaining": "Exp {{value0}}",
+          "ephemeralLeaseEndsAt": "Lease ends {{value0}}",
+          "ephemeralLeaseEndedAt": "Lease ended {{value0}}",
+          "ephemeralLeaseProvider": "Provider: {{value0}}"
         },
         "WorktreeCardAgents": {
           "1b0a156717": "Agents"
@@ -6197,6 +6202,8 @@
           "7a8b9c0d1e": "Update required",
           "hostAuthNeeded": "Authentication needed",
           "hostDisconnected": "Disconnected",
+          "ephemeralLeaseRemaining": "Exp {{value0}}",
+          "ephemeralLeaseExpired": "Expired",
           "d880ea0744": "Create a group and move this project into it.",
           "bc1460beb3": "Update the group name shown in the sidebar.",
           "13757c053c": "New Project Group",
@@ -6301,6 +6308,13 @@
           "8db4e19a26": "This setting never hides worktrees created through Orca.",
           "ec1e6a10fb": "Other worktrees start hidden to avoid unexpected sidebar clutter.",
           "1c68c9cf77": "Enable a source for all current and future worktrees, or show individual worktrees below."
+        },
+        "EphemeralVmExtendLifetimeMenu": {
+          "extendLifetime": "Extend lifetime",
+          "extendTo": "Extend to {{value0}}",
+          "extending": "Extending…",
+          "extended": "Lease extended",
+          "extendedUntil": "Lease extended to {{value0}}"
         },
         "HiddenWorktreeRecoveryList": {
           "64e6f53f05": "Show one without enabling its source.",
@@ -12012,7 +12026,17 @@
           "stoppingCleanup": "Stopping…",
           "stopCleanup": "Stop cleanup",
           "cleanupStopped": "Cleanup stopped",
-          "stopCleanupFailed": "Couldn’t stop Cloud VM cleanup."
+          "stopCleanupFailed": "Couldn’t stop Cloud VM cleanup.",
+          "providerDeadline": "Provider deadline {{value0}}",
+          "leaseProvider": "Provider: {{value0}}",
+          "leaseRemaining": "{{value0}} left",
+          "leaseExpired": "Lease expired {{value0}}. The provider can remove this host at any time, including while Orca is offline.",
+          "reclaimedHost": "Released from Orca on {{value0}}: this host stopped answering after its provider deadline, so its workspace rows were removed. The provider still owns the resource — Cleanup releases it now.",
+          "extendLifetime": "Extend lifetime",
+          "extending": "Extending…",
+          "extendTo": "Extend to {{value0}}",
+          "leaseExtended": "Lease extended.",
+          "leaseExtendedUntil": "Lease extended to {{value0}}."
         },
         "ephemeralVms": {
           "search": {

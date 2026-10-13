@@ -122,4 +122,77 @@ describe('doctorEphemeralVmRecipe', () => {
     expect(checkById(result, 'recipe.destroy')?.status).toBe('fail')
     expect(result.ok).toBe(false)
   })
+
+  it('checks the extend command path like every other lifecycle command', () => {
+    const repo = makeRepo({
+      'create.sh': { mode: 0o755 },
+      'extend.sh': { mode: 0o755 }
+    })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      extend: './extend.sh',
+      extendDurations: ['1h', '4h']
+    })
+
+    expect(checkById(result, 'recipe.extend')?.status).toBe('pass')
+    expect(result.ok).toBe(true)
+  })
+
+  it('fails the extend check when the extend script is missing', () => {
+    const repo = makeRepo({ 'create.sh': { mode: 0o755 } })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      extend: './missing.sh',
+      extendDurations: ['1h']
+    })
+
+    expect(checkById(result, 'recipe.extend')?.status).toBe('fail')
+    expect(result.ok).toBe(false)
+  })
+
+  it('warns when extend is declared without extendDurations', () => {
+    const repo = makeRepo({
+      'create.sh': { mode: 0o755 },
+      'extend.sh': { mode: 0o755 }
+    })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      extend: './extend.sh'
+    })
+
+    expect(checkById(result, 'recipe.extend')?.status).toBe('pass')
+    expect(checkById(result, 'recipe.extend_durations')).toMatchObject({
+      status: 'warn',
+      message: 'Recipe declares extend but no extendDurations.'
+    })
+    // warn never flips ok, so a recipe with no lifetimes stays usable
+    expect(result.ok).toBe(true)
+  })
+
+  it('does not warn when extend is declared with extendDurations', () => {
+    const repo = makeRepo({
+      'create.sh': { mode: 0o755 },
+      'extend.sh': { mode: 0o755 }
+    })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      extend: './extend.sh',
+      extendDurations: ['1h', '4h', '1d']
+    })
+
+    expect(checkById(result, 'recipe.extend_durations')).toBeUndefined()
+    expect(result.ok).toBe(true)
+  })
 })

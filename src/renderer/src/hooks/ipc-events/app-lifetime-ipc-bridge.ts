@@ -13,6 +13,7 @@ import { registerBrowserStateIpcBridge } from './browser-state-ipc-bridge'
 import { registerContentCreationIpcBridge } from './content-creation-ipc-bridge'
 import { createDirectSshBridgeRuntime } from './direct-ssh-bridge-runtime'
 import { registerDirectSshStateIpcBridge } from './direct-ssh-state-ipc-bridge'
+import { registerEphemeralVmReclaimIpcBridge } from './ephemeral-vm-reclaim-ipc-bridge'
 import { registerMobileAndTerminalCloseIpcBridge } from './mobile-terminal-close-ipc-bridge'
 import { registerMobileDriverIpcBridge } from './mobile-driver-ipc-bridge'
 import { registerOrcaProfileAuthIpcBridge } from './orca-profile-auth-ipc-bridge'
@@ -95,6 +96,8 @@ export function installAppLifetimeIpcEvents(
     remountTerminalTabsAwaitingHostHydration
   )
   registerSettingsAndSidebarIpcBridge(unsubs)
+  // Why: main reclaims a dead host's registrations itself; forgetting its workspace rows is ours.
+  registerEphemeralVmReclaimIpcBridge(unsubs)
   registerOrcaProfileAuthIpcBridge(unsubs)
   registerWorkspaceShortcutIpcBridge(unsubs)
   registerOsMarkdownFileOpenBridge(unsubs)

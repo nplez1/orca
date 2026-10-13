@@ -1,5 +1,6 @@
 import { parsePairingCode } from './pairing'
 import { stripCredentialsFromMessage } from './git-remote-error'
+import { readEphemeralVmLifetime } from './ephemeral-vm-lifetime'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeConnection,
@@ -16,15 +17,29 @@ export type EphemeralVmRecipeResultWarning = {
 export function getEphemeralVmRecipeResultWarnings(
   result: EphemeralVmRecipeResult
 ): EphemeralVmRecipeResultWarning[] {
+  // Why this warning exists: a recipe that publishes a deadline it cannot be read from is a typo the
+  // author has to see, but refusing the whole result would strand a machine `create` already billed
+  // for. So the host provisions normally without a countdown, and this is how the author finds out.
+  const lifetime = readEphemeralVmLifetime(result.userData)
+  const warnings: EphemeralVmRecipeResultWarning[] = lifetime.ok
+    ? []
+    : [
+        {
+          id: 'recipe.result.lifetime.unreadable',
+          message: lifetime.error,
+          remediation:
+            'Fix the recipe result, or remove releaseAt if the host has no provider deadline. Until then this host shows no countdown and is never reclaimed automatically.'
+        }
+      ]
+
   const connection = getEphemeralVmRecipeResultConnection(result)
   if (connection.type !== 'orca-server') {
-    return []
+    return warnings
   }
   const pairing = parsePairingCode(connection.pairingCode)
   if (!pairing) {
-    return []
+    return warnings
   }
-  const warnings: EphemeralVmRecipeResultWarning[] = []
   if (isPublicInsecureWebSocketEndpoint(pairing.endpoint)) {
     warnings.push({
       id: 'recipe.result.endpoint.public_ws',

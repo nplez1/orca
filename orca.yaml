@@ -12,4 +12,10 @@ environmentRecipes:
     create: ./local/orca-vm/create.sh
     suspend: ./local/orca-vm/suspend.sh
     resume: ./local/orca-vm/resume.sh
+    # Orca offers only the lifetimes declared here, and counts down only to a `releaseAt` the recipe
+    # publishes. Declaring these is enough for the Extend lifetime action to be offered; the
+    # countdown chip waits for create.sh to report a deadline, and there is nothing to show until it
+    # does.
+    extend: ./local/orca-vm/extend.sh
+    extendDurations: [1h, 4h, 24h]
     destroy: ./local/orca-vm/destroy.sh

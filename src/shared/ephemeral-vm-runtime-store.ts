@@ -119,10 +119,13 @@ export function updateEphemeralVmRuntimeStatus(
     cleanupStatus?: EphemeralVmCleanupStatus
     cleanupLastAttemptAt?: number
     cleanupLastError?: string | null
+    reclaimedAt?: number
+    reclaimedHostIds?: string[]
     workspaceId?: string
     workspaceName?: string
     connectionMode?: EphemeralVmRuntimeRecord['connectionMode'] | null
-    runtimeEnvironmentId?: string
+    /** null clears it, for a host whose server registration has been released. */
+    runtimeEnvironmentId?: string | null
     sshTargetId?: string | null
     recipeResult?: EphemeralVmRuntimeRecord['recipeResult']
     updatedAt?: number
@@ -148,6 +151,8 @@ export function updateEphemeralVmRuntimeStatus(
       : args.cleanupLastError
         ? { cleanupLastError: args.cleanupLastError }
         : {}),
+    ...(args.reclaimedAt !== undefined ? { reclaimedAt: args.reclaimedAt } : {}),
+    ...(args.reclaimedHostIds ? { reclaimedHostIds: args.reclaimedHostIds } : {}),
     ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),
     ...(args.workspaceName ? { workspaceName: args.workspaceName } : {}),
     // null explicitly clears the field (e.g. terminal cleanup); undefined leaves it unchanged.
@@ -156,7 +161,11 @@ export function updateEphemeralVmRuntimeStatus(
       : args.connectionMode
         ? { connectionMode: args.connectionMode }
         : {}),
-    ...(args.runtimeEnvironmentId ? { runtimeEnvironmentId: args.runtimeEnvironmentId } : {}),
+    ...(args.runtimeEnvironmentId === null
+      ? { runtimeEnvironmentId: undefined }
+      : args.runtimeEnvironmentId !== undefined
+        ? { runtimeEnvironmentId: args.runtimeEnvironmentId }
+        : {}),
     ...(args.sshTargetId === null
       ? { sshTargetId: undefined }
       : args.sshTargetId

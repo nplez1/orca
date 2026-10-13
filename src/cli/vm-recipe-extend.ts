@@ -1,0 +1,173 @@
+import { existsSync, readFileSync } from 'node:fs'
+import {
+  getEphemeralVmLifetimeLossError,
+  getEphemeralVmRecipeResultLifetime,
+  parseEphemeralVmRecipeResult,
+  type EphemeralVmRecipeResult
+} from '../shared/ephemeral-vm-recipes'
+import { redactEphemeralVmRecipeDiagnosticText } from '../shared/ephemeral-vm-recipe-diagnostics'
+import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lifetime'
+import { runEphemeralVmRecipeExtend } from '../shared/ephemeral-vm-recipe-extend-runner'
+import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
+
+/**
+ * Provider-author path for the `extend` hook: run it against a saved recipe result without the
+ * desktop app, so a script can be exercised end to end before it is wired into a live lease.
+ *
+ * The desktop surface (workspace context menu, runtime settings) is what updates persisted
+ * metadata; this only reports what the hook produced.
+ */
+
+const MAX_TRANSCRIPT_BYTES = 16_000
+
+export type ExtendEphemeralVmRecipeTranscript = {
+  exitCode: number | null
+  signal: NodeJS.Signals | null
+  stdout: string
+  stderr: string
+}
+
+export type ExtendEphemeralVmRecipeResult = {
+  recipeId: string
+  repoPath: string
+  ok: boolean
+  requestedLifetime?: string
+  /** The deadline the hook reported, so a caller can confirm it moved. */
+  releaseAt?: string
+  recipeResult?: EphemeralVmRecipeResult
+  offeredLifetimes?: string[]
+  error?: string
+  transcript?: ExtendEphemeralVmRecipeTranscript
+}
+
+export async function extendEphemeralVmRecipeFromFile(args: {
+  repoPath: string
+  recipe: OrcaVmRecipe
+  recipeResultPath: string
+  requestedLifetime: string
+}): Promise<ExtendEphemeralVmRecipeResult> {
+  const base = { recipeId: args.recipe.id, repoPath: args.repoPath }
+  const lifetime = normalizeEphemeralVmLifetimeDuration(args.requestedLifetime)
+  if (!lifetime) {
+    return {
+      ...base,
+      ok: false,
+      error: `"${args.requestedLifetime}" is not a duration such as 4h or 1d.`
+    }
+  }
+  if (!args.recipe.extend) {
+    return { ...base, ok: false, error: `Recipe "${args.recipe.id}" does not declare extend.` }
+  }
+  const offered = args.recipe.extendDurations ?? []
+  if (!offered.includes(lifetime)) {
+    return {
+      ...base,
+      ok: false,
+      offeredLifetimes: offered,
+      error: `Recipe "${args.recipe.id}" does not offer the lifetime "${lifetime}".`
+    }
+  }
+  if (!existsSync(args.recipeResultPath)) {
+    return { ...base, ok: false, error: `No recipe result file at ${args.recipeResultPath}.` }
+  }
+  const parsed = parseEphemeralVmRecipeResult(readFileSync(args.recipeResultPath, 'utf8'))
+  if (!parsed.ok) {
+    return { ...base, ok: false, error: `Recipe result file is not valid. ${parsed.error}` }
+  }
+
+  const extend = await runEphemeralVmRecipeExtend({
+    repoPath: args.repoPath,
+    recipe: args.recipe,
+    context: { recipeId: args.recipe.id, repoPath: args.repoPath },
+    recipeResult: parsed.result,
+    lifetime
+  })
+  if (!extend.ok) {
+    return {
+      ...base,
+      ok: false,
+      requestedLifetime: lifetime,
+      error: extend.error,
+      transcript: {
+        exitCode: extend.exitCode,
+        signal: extend.signal,
+        stdout: redactAndCap(extend.stdout),
+        stderr: redactAndCap(extend.stderr)
+      }
+    }
+  }
+
+  // Same guard as the app, and for the same reason: an answer that loses the deadline would leave a
+  // lease with no countdown and no reconciliation. Refusing costs nothing here — the caller still
+  // holds the result it passed in.
+  const lostLifetimeError = getEphemeralVmLifetimeLossError(parsed.result, extend.result, 'Extend')
+  if (lostLifetimeError) {
+    // Why the transcript travels with this refusal too: the hook succeeded but its answer was
+    // unusable, so its stdout is the only thing that shows the typo.
+    return {
+      ...base,
+      ok: false,
+      requestedLifetime: lifetime,
+      error: lostLifetimeError,
+      transcript: {
+        // The run itself succeeded — it is the answer that was unusable — so exit 0 / no signal.
+        exitCode: 0,
+        signal: null,
+        stdout: redactAndCap(extend.stdout),
+        stderr: redactAndCap(extend.stderr)
+      }
+    }
+  }
+  const extended = getEphemeralVmRecipeResultLifetime(extend.result)
+  return {
+    ...base,
+    ok: true,
+    requestedLifetime: lifetime,
+    recipeResult: extend.result,
+    ...(extended.ok && extended.lifetime ? { releaseAt: extended.lifetime.releaseAt } : {})
+  }
+}
+
+export function formatExtendEphemeralVmRecipeResult(result: ExtendEphemeralVmRecipeResult): string {
+  const lines = [`recipe: ${result.recipeId}`, `repoPath: ${result.repoPath}`]
+  if (!result.ok) {
+    lines.push('ok: false', `error: ${result.error ?? 'Extend failed.'}`)
+    if (result.offeredLifetimes?.length) {
+      lines.push(`offered lifetimes: ${result.offeredLifetimes.join(', ')}`)
+    }
+    if (result.transcript) {
+      const exit = result.transcript.exitCode ?? result.transcript.signal ?? 'unknown'
+      lines.push(`--- extend (exit ${exit}) ---`)
+      if (result.transcript.stdout.trim()) {
+        lines.push(`stdout:\n${result.transcript.stdout}`)
+      }
+      if (result.transcript.stderr.trim()) {
+        lines.push(`stderr:\n${result.transcript.stderr}`)
+      }
+    }
+    return lines.join('\n')
+  }
+  lines.push('ok: true', `lifetime: ${result.requestedLifetime ?? 'unknown'}`)
+  if (result.releaseAt) {
+    lines.push(`releaseAt: ${result.releaseAt}`)
+  }
+  // Why the warning: this is what the recipe's own `destroy` hook consumes on stdin, and it carries
+  // the connection verbatim — a pairing code included. Printing it is the point; treating it as
+  // anything but sensitive is not.
+  lines.push(
+    '',
+    'updated recipe result (contains the connection, including any pairing code — handle as sensitive):',
+    JSON.stringify(result.recipeResult, null, 2)
+  )
+  return lines.join('\n')
+}
+
+function redactAndCap(value: string): string {
+  const redacted = redactEphemeralVmRecipeDiagnosticText(value)
+  if (redacted.length <= MAX_TRANSCRIPT_BYTES) {
+    return redacted
+  }
+  const half = Math.floor(MAX_TRANSCRIPT_BYTES / 2)
+  const omitted = redacted.length - half * 2
+  return `${redacted.slice(0, half)}\n…[${omitted} chars omitted]…\n${redacted.slice(-half)}`
+}

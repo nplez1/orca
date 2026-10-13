@@ -12,6 +12,10 @@ import {
   MAX_ORCA_YAML_ALIAS_COUNT,
   MAX_ORCA_YAML_COLLECTION_ENTRIES
 } from './orca-yaml-file-limit'
+import {
+  EPHEMERAL_VM_LIFETIME_DURATION_LIMITS,
+  normalizeEphemeralVmLifetimeDuration
+} from './ephemeral-vm-lifetime'
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -104,6 +108,28 @@ type VmRecipeParseResult = {
   diagnostics: OrcaVmRecipeDiagnostic[]
 }
 
+/** Canonicalized, deduped `extendDurations`; null when the value cannot be used as written. */
+function normalizeVmRecipeExtendDurations(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null
+  }
+  if (value.length > EPHEMERAL_VM_LIFETIME_DURATION_LIMITS.maxDurations) {
+    return null
+  }
+  const durations: string[] = []
+  for (const entry of value) {
+    const raw = asTrimmedString(entry)
+    const normalized = raw ? normalizeEphemeralVmLifetimeDuration(raw) : null
+    if (!normalized) {
+      return null
+    }
+    if (!durations.includes(normalized)) {
+      durations.push(normalized)
+    }
+  }
+  return durations
+}
+
 function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
   const diagnostics: OrcaVmRecipeDiagnostic[] = []
   if (!Array.isArray(value)) {
@@ -178,6 +204,29 @@ function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
       const resume = asTrimmedString(record.resume)
       const destroyValue = asTrimmedString(record.destroy) ?? asTrimmedString(record.cleanup)
       const destroyDisabled = destroyValue === 'none'
+      const extend = asTrimmedString(record.extend)
+      const extendDurations =
+        record.extendDurations === undefined
+          ? []
+          : normalizeVmRecipeExtendDurations(record.extendDurations)
+      if (extendDurations === null) {
+        diagnostics.push({
+          index,
+          field: 'extendDurations',
+          message: `Recipe "${id}" extendDurations must be 1-${EPHEMERAL_VM_LIFETIME_DURATION_LIMITS.maxDurations} durations of at least ${EPHEMERAL_VM_LIFETIME_DURATION_LIMITS.minSeconds}s, such as 4h or 1d.`
+        })
+        return null
+      }
+      // Why: choices Orca can never offer are a misconfiguration, and dropping the recipe
+      // keeps the module's invariant that every diagnostic names a rejected recipe.
+      if (extendDurations.length > 0 && !extend) {
+        diagnostics.push({
+          index,
+          field: 'extendDurations',
+          message: `Recipe "${id}" declares extendDurations without extend. Add extend, or remove extendDurations.`
+        })
+        return null
+      }
       return {
         id,
         name,
@@ -187,7 +236,9 @@ function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
         ...(suspend ? { suspend } : {}),
         ...(resume ? { resume } : {}),
         ...(destroyValue && !destroyDisabled ? { destroy: destroyValue } : {}),
-        ...(destroyDisabled ? { destroyDisabled: true } : {})
+        ...(destroyDisabled ? { destroyDisabled: true } : {}),
+        ...(extend ? { extend } : {}),
+        ...(extendDurations.length > 0 ? { extendDurations } : {})
       }
     })
     .filter((entry): entry is OrcaVmRecipe => entry !== null)

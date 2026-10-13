@@ -3,7 +3,7 @@ import type { EphemeralVmRecipeContext } from './ephemeral-vm-recipe-runner'
 import { quoteShellToken } from './ephemeral-vm-recipe-process'
 import type { OrcaVmRecipe } from './orca-yaml-hook-types'
 
-export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy'
+export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy' | 'extend'
 
 export type EphemeralVmRecipeCleanupPayload = {
   schemaVersion: 1
@@ -14,6 +14,9 @@ export type EphemeralVmRecipeCleanupPayload = {
   workspaceId?: string
   workspaceName?: string
   recipeResult: EphemeralVmRecipeResult
+  /** The lifetime the provider is being asked for, in the canonical `<count><unit>`
+   *  form. Present only for `extend`, where it is the whole point of the call. */
+  lifetime?: string
 }
 
 export function buildEphemeralVmRecipeCleanupPayload(args: {
@@ -39,6 +42,18 @@ export function buildEphemeralVmRecipeLifecyclePayload(args: {
     workspaceId: args.context.workspaceId,
     workspaceName: args.context.workspaceName,
     recipeResult: args.recipeResult
+  }
+}
+
+export function buildEphemeralVmRecipeExtendPayload(args: {
+  recipe: Pick<OrcaVmRecipe, 'id'>
+  context: EphemeralVmRecipeContext
+  recipeResult: EphemeralVmRecipeResult
+  lifetime: string
+}): EphemeralVmRecipeCleanupPayload {
+  return {
+    ...buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'extend' }),
+    lifetime: args.lifetime
   }
 }
 

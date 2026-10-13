@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { parsePairingCode } from './pairing'
 import { MAX_SSH_RELAY_GRACE_PERIOD_SECONDS, MIN_SSH_RELAY_GRACE_PERIOD_SECONDS } from './ssh-types'
 import { assertJsonTextStructureWithinLimits } from './json-text-structure-limit'
+import {
+  readEphemeralVmLifetime,
+  type EphemeralVmLifetimeReadResult
+} from './ephemeral-vm-lifetime'
 
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([
@@ -174,7 +178,46 @@ export function parseEphemeralVmRecipeResult(stdout: string): EphemeralVmRecipeR
   if (!isAbsoluteRuntimePath(connection.projectRoot)) {
     return { ok: false, error: 'Recipe result projectRoot must be an absolute runtime path.' }
   }
+  // Why a bad deadline is not a parse failure: `create` has already run, so refusing the whole
+  // result here would leave a machine the provider is billing for with no record and no cleanup. It
+  // is reported as a warning instead (see getEphemeralVmRecipeResultWarnings), so the recipe author
+  // still sees a typo while the host itself is tracked and usable.
   return { ok: true, result: result.data }
+}
+
+export function getEphemeralVmRecipeResultLifetime(
+  result: EphemeralVmRecipeResult
+): EphemeralVmLifetimeReadResult {
+  return readEphemeralVmLifetime(result.userData)
+}
+
+/**
+ * Whether replacing `previous` with `next` would lose a release deadline the host already had.
+ *
+ * Why this is one shared rule: `extend` and `resume` both swap the stored result, and both must
+ * refuse an answer whose deadline is missing or unreadable — otherwise a lease the user just paid for
+ * keeps no countdown and no reconciliation, and the host can never be reclaimed. `action` names the
+ * caller so the refusal reads as the thing the user asked for.
+ *
+ * Why creating a host is the deliberate exception: by then the provider is already billing, so
+ * refusing the result would strand the machine with no record at all.
+ */
+export function getEphemeralVmLifetimeLossError(
+  previous: EphemeralVmRecipeResult,
+  next: EphemeralVmRecipeResult,
+  action: string
+): string | null {
+  const previousLifetime = getEphemeralVmRecipeResultLifetime(previous)
+  if (!previousLifetime.ok || !previousLifetime.lifetime) {
+    return null
+  }
+  const nextLifetime = getEphemeralVmRecipeResultLifetime(next)
+  if (!nextLifetime.ok) {
+    return nextLifetime.error
+  }
+  return nextLifetime.lifetime
+    ? null
+    : `${action} returned no lifetime metadata, which would have discarded the release deadline.`
 }
 
 export function getEphemeralVmRecipeResultConnection(
