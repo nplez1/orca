@@ -1,10 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+type DeleteWorktreeStateEntry = {
+  isDeleting?: boolean
+  phase?: 'queued' | 'deleting'
+  error?: string | null
+  canForceDelete?: boolean
+}
+
 const mocks = vi.hoisted(() => {
+  const worktreeRows: unknown[] = []
+  const activeWorkspaceExecutionHostId: string | null = null
+  const deleteStateByWorktreeId: Record<string, DeleteWorktreeStateEntry> = {}
   const state = {
     worktreeMap: new Map<string, unknown>(),
-    worktreeRows: [] as unknown[],
-    activeWorkspaceExecutionHostId: null as string | null,
+    worktreeRows,
+    activeWorkspaceExecutionHostId,
     clearWorktreeDeleteState: vi.fn((worktreeId: string) => {
       delete state.deleteStateByWorktreeId[worktreeId]
     }),
@@ -12,16 +22,24 @@ const mocks = vi.hoisted(() => {
       for (const worktreeId of new Set(worktreeIds)) {
         state.deleteStateByWorktreeId[worktreeId] = {
           isDeleting: true,
+          phase: 'deleting',
+          error: null,
+          canForceDelete: false
+        }
+      }
+    }),
+    markWorktreesQueuedForDeletion: vi.fn((worktreeIds: readonly string[]) => {
+      for (const worktreeId of new Set(worktreeIds)) {
+        state.deleteStateByWorktreeId[worktreeId] = {
+          isDeleting: true,
+          phase: 'queued',
           error: null,
           canForceDelete: false
         }
       }
     }),
     removeWorktree: vi.fn().mockResolvedValue({ ok: true }),
-    deleteStateByWorktreeId: {} as Record<
-      string,
-      { isDeleting?: boolean; error?: string | null; canForceDelete?: boolean }
-    >
+    deleteStateByWorktreeId
   }
   return { state }
 })
@@ -89,6 +107,7 @@ describe('runWorktreeDeletesInParallel', () => {
     mocks.state.removeWorktree.mockReset().mockResolvedValue({ ok: true })
     mocks.state.clearWorktreeDeleteState.mockClear()
     mocks.state.markWorktreesDeleting.mockClear()
+    mocks.state.markWorktreesQueuedForDeletion.mockClear()
     mocks.state.worktreeMap = new Map()
     mocks.state.worktreeRows = []
     mocks.state.activeWorkspaceExecutionHostId = null
@@ -165,7 +184,9 @@ describe('runWorktreeDeletesInParallel', () => {
         suppressPreservedBranchToast: true
       }
     )
-    expect(mocks.state.markWorktreesDeleting).toHaveBeenCalledWith(['wt-1', 'wt-2'])
+    expect(mocks.state.markWorktreesQueuedForDeletion).toHaveBeenCalledWith(['wt-1', 'wt-2'])
+    expect(mocks.state.markWorktreesDeleting).toHaveBeenCalledWith(['wt-1'])
+    expect(mocks.state.markWorktreesDeleting).toHaveBeenCalledWith(['wt-2'])
 
     second.resolve({ ok: true })
     await Promise.resolve()
@@ -186,14 +207,17 @@ describe('runWorktreeDeletesInParallel', () => {
       { id: 'child', displayName: 'child', repoId: 'repo-a', path: '/workspaces/parent/child' }
     ])
 
-    expect(mocks.state.markWorktreesDeleting).toHaveBeenCalledWith(['parent', 'child'])
+    expect(mocks.state.markWorktreesQueuedForDeletion).toHaveBeenCalledWith(['parent', 'child'])
+    expect(mocks.state.markWorktreesDeleting).toHaveBeenCalledWith(['child'])
     expect(mocks.state.deleteStateByWorktreeId['parent']).toEqual({
       isDeleting: true,
+      phase: 'queued',
       error: null,
       canForceDelete: false
     })
     expect(mocks.state.deleteStateByWorktreeId['child']).toEqual({
       isDeleting: true,
+      phase: 'deleting',
       error: null,
       canForceDelete: false
     })

@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => {
         }
       }
     }),
+    markWorktreesQueuedForDeletion: vi.fn(),
     openModal: vi.fn(),
     setRightSidebarTab: vi.fn(),
     setRightSidebarOpen: vi.fn(),
@@ -130,6 +131,7 @@ describe('delete worktree flow', () => {
     mocks.state.settings = { skipDeleteWorktreeConfirm: false }
     mocks.state.clearWorktreeDeleteState.mockClear()
     mocks.state.markWorktreesDeleting.mockClear()
+    mocks.state.markWorktreesQueuedForDeletion.mockClear()
     mocks.state.openModal.mockClear()
     mocks.state.removeWorktree.mockClear().mockResolvedValue({ ok: true })
     mocks.state.deleteStateByWorktreeId = {}

@@ -232,6 +232,65 @@ describe('createWorktreeSymlinks', () => {
     expect(statSync(join(worktree, '.env')).isFile()).toBe(true)
   })
 
+  it('clones independent APFS paths concurrently on macOS', async () => {
+    const paths = ['artifacts', 'dist', '.habitat_cache', '.polyget']
+    for (const path of paths) {
+      mkdirSync(join(primary, path), { recursive: true })
+      writeFileSync(join(primary, path, 'marker'), `${path}\n`)
+    }
+
+    let activeClones = 0
+    let maxActiveClones = 0
+    const cloneWorktreePath = vi.fn(async (source: string, target: string) => {
+      activeClones += 1
+      maxActiveClones = Math.max(maxActiveClones, activeClones)
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 20))
+      mkdirSync(target)
+      writeFileSync(join(target, 'marker'), readFileSync(join(source, 'marker')))
+      activeClones -= 1
+    })
+
+    await createWorktreeLinkedPaths(primary, worktree, paths, {
+      platform: 'darwin',
+      cloneWorktreePath
+    })
+
+    expect(maxActiveClones).toBeGreaterThan(1)
+    for (const path of paths) {
+      expect(readFileSync(join(worktree, path, 'marker'), 'utf8')).toBe(`${path}\n`)
+    }
+  })
+
+  it('keeps overlapping APFS paths sequential on macOS', async () => {
+    mkdirSync(join(primary, 'dist', 'nested'), { recursive: true })
+    writeFileSync(join(primary, 'dist', 'nested', 'marker'), 'nested\n')
+
+    let activeClones = 0
+    let maxActiveClones = 0
+    const cloneWorktreePath = vi.fn(async (source: string, target: string) => {
+      activeClones += 1
+      maxActiveClones = Math.max(maxActiveClones, activeClones)
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 10))
+      mkdirSync(target)
+      if (source === join(primary, 'dist')) {
+        mkdirSync(join(target, 'nested'))
+        writeFileSync(join(target, 'nested', 'marker'), 'nested\n')
+      } else {
+        writeFileSync(join(target, 'marker'), 'nested\n')
+      }
+      activeClones -= 1
+    })
+
+    await createWorktreeLinkedPaths(primary, worktree, ['dist', 'dist/nested'], {
+      platform: 'darwin',
+      cloneWorktreePath
+    })
+
+    expect(cloneWorktreePath).toHaveBeenCalledOnce()
+    expect(maxActiveClones).toBe(1)
+    expect(readFileSync(join(worktree, 'dist', 'nested', 'marker'), 'utf8')).toBe('nested\n')
+  })
+
   it('preserves a file target that appears while an APFS clone is staged', async () => {
     writeFileSync(join(primary, '.env'), 'SECRET=1\n')
     const target = join(worktree, '.env')
