@@ -40,6 +40,12 @@ export type OrcaVmRecipe = {
   resume?: string
   destroy?: string
   destroyDisabled?: boolean
+  /** Requests a longer provider lease for a host created by `create`. Receives the
+   *  persisted recipe result plus the requested `lifetime`; returns an updated one. */
+  extend?: string
+  /** The lifetimes this recipe's provider is willing to sell, such as `4h` or `1d`.
+   *  Orca offers only these, so it can never ask for a lease the provider rejects. */
+  extendDurations?: string[]
 }
 
 export type OrcaVmRecipeDiagnostic = {

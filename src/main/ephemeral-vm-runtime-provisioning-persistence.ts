@@ -7,6 +7,10 @@ import {
   upsertEphemeralVmRuntime
 } from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+import {
+  toEphemeralVmRuntimeExtendFields,
+  toEphemeralVmRuntimeRecipeSnapshot
+} from '../shared/ephemeral-vm-runtimes'
 import type {
   ProvisionEphemeralVmRuntimeArgs,
   ProvisionEphemeralVmRuntimeResult
@@ -49,7 +53,10 @@ export async function persistProvisionedEphemeralVmRuntime(
     return upsertEphemeralVmRuntime(args.userDataPath, {
       id: start.context.instanceId ?? start.context.recipeId,
       recipeId: args.recipe.id,
-      recipe: args.recipe,
+      recipe: toEphemeralVmRuntimeRecipeSnapshot(args.recipe),
+      // Why snapshotted beside the recipe: the lease this host was created under must stay
+      // extendable by the recipe that bought it, even if orca.yaml changes or drops it later.
+      ...toEphemeralVmRuntimeExtendFields(args.recipe),
       ...(args.repoId ? { repoId: args.repoId } : {}),
       ...(args.projectId ? { projectId: args.projectId } : {}),
       ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),

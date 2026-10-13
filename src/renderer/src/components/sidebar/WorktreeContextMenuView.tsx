@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils'
 import { WorktreeRowOpenInSubMenu } from './WorktreeRowOpenInSubMenu'
 import { WorktreeDeveloperMenu } from './WorktreeDeveloperMenu'
 import { WorkspaceSleepMenuItems } from './WorkspaceSleepMenuItems'
+import { EphemeralVmExtendLifetimeMenu } from './EphemeralVmExtendLifetimeMenu'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import { translate } from '@/i18n/i18n'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
@@ -313,6 +314,9 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
             onSleep={handleCloseTerminals}
             onSleepSubtree={handleSleepSubtree}
           />
+          {!isMultiContext && (
+            <EphemeralVmExtendLifetimeMenu workspaceId={worktree.id} disabled={isDeleting} />
+          )}
           {/* Why: primary checkout rows can't be git-worktree-removed, so keep a
              disabled Delete Worktree for parity with non-primary cards and pair
              it with the enabled Remove Project action below. */}

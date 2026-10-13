@@ -106,6 +106,33 @@ describe('cleanupEphemeralVmRuntimesForDeleted', () => {
     expect(destroyed).toEqual({ destroyedSshTargetIds: [], retainedSshTargetIds: [] })
   })
 
+  it('never cleans a reclaimed runtime, whose destroy would reach a machine that may still be alive', async () => {
+    // Why this is the load-bearing case: a reclaim already released this host's registrations because
+    // its provider lease lapsed. The workspace row that follows is Orca forgetting it, and re-entering
+    // cleanup here would run the recipe's destroy on a machine the user may still be using.
+    listRuntimes.mockResolvedValue([
+      runtime({
+        id: 'rt-reclaimed',
+        workspaceId: 'wt-1',
+        cleanupStatus: 'not_started',
+        reclaimedAt: 1_700_000_000_000
+      }),
+      runtime({
+        id: 'rt-reclaimed-ssh',
+        sshTargetId: 'runtime-ssh-b',
+        reclaimedAt: 1_700_000_000_000
+      })
+    ])
+
+    const destroyed = await cleanupEphemeralVmRuntimesForDeleted({
+      workspaceIds: ['wt-1'],
+      runtimeOwnedSshTargetIds: ['runtime-ssh-b']
+    })
+
+    expect(cleanup).not.toHaveBeenCalled()
+    expect(destroyed).toEqual({ destroyedSshTargetIds: [], retainedSshTargetIds: [] })
+  })
+
   it('retries a completed provider cleanup while its SSH target remains', async () => {
     listRuntimes.mockResolvedValue([
       runtime({

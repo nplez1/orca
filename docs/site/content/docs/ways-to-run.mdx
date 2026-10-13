@@ -104,10 +104,19 @@ Providers people wire today include Vercel Sandbox, Fly, Modal, plain SSH hosts,
 
 Recipes only show up for workspace create once the `environmentRecipes` entry is on the project's **primary** checkout of `orca.yaml` (not only a feature branch). Doctor and live provision can still run from any branch while you iterate on scripts.
 
+### Leases, expiry, and extending
+
+A recipe can publish a provider deadline in its result (`userData.releaseAt`). When it does, Orca treats that absolute timestamp — never a duration — as the authority, and shows the host counting down to it:
+
+- **Extend lifetime** asks the provider for more time. A recipe declares the lifetimes it is willing to sell (`extendDurations`, for example `[1h, 4h, 24h]`), and Orca offers exactly those. It never asks for a lease the provider would refuse.
+- Past the deadline the host is **expired**. Orca's own SSH reconnect ladder is bounded — nine attempts, about a hundred seconds — so retrying stops on its own shortly after the deadline, and the verdict it reaches is one Orca actually earned rather than one Orca forced.
+- Orca drops its own records for an expired host only once the deadline — plus a 15-minute grace — has passed **and** it has evidence the host is not coming back: the SSH reconnect ladder reaching `reconnection-failed`, or, for an Orca-server host, a probe that actually failed or the host's own verdict that the pairing is over. A host that is merely unreachable, because this laptop is off-network or off-VPN, is not treated as gone on reachability alone: that is indistinguishable from a deallocated machine, and the work on it may still be alive. Be precise about the limit, though — nothing here checks whether this machine had a network, so a laptop offline for longer than that grace past a deadline is the one case where a live host loses its rows. Nothing on the machine is lost when that happens, but recovering means re-creating the workspace.
+- Reclaiming is Orca's bookkeeping, not the machine's teardown. Files, git state, and branches live on the remote host, and the provider's own TTL is the backstop for the case Orca cannot observe at all.
+
 <Callout title="BYO cloud — not an Orca VPS">
   Cloud VMs do not give you an Orca-hosted VPS. You bring the provider (and pay that provider). Orca
-  runs your create/suspend/resume/destroy scripts and connects over the pairing URL or SSH details
-  they print.
+  runs your create/suspend/resume/extend/destroy scripts and connects over the pairing URL or SSH
+  details they print.
 </Callout>
 
 ## How to choose

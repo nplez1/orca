@@ -36,6 +36,8 @@ import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handl
 import type { PluginService } from '../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../plugins/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../ephemeral-vm-provisioned-root-source'
+import { startEphemeralVmRuntimeReclaim } from '../ephemeral-vm-runtime-reclaim'
+import { getCurrentMainWindow } from './ssh-ipc-context'
 
 const activeProvisionControllers = new Map<string, AbortController>()
 
@@ -73,6 +75,10 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
   ipcMain.removeHandler('ephemeralVm:provision')
   ipcMain.removeHandler('ephemeralVm:cancelProvision')
   registerEphemeralVmRuntimeHandlers(store)
+  startEphemeralVmRuntimeReclaim({
+    userDataPath: app.getPath('userData'),
+    getMainWindow: getCurrentMainWindow
+  })
 
   ipcMain.handle('ephemeralVm:listRecipes', async (_event, args: { repoId: string }) => {
     return listRecipes(store, args.repoId, await getApprovedPluginVmRecipes(pluginService))

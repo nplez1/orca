@@ -6,6 +6,7 @@ import { getProjectIdentityKey } from '../../../shared/project-host-setup-projec
 import type { Repo } from '../../../shared/repo-types'
 import { translate } from '@/i18n/i18n'
 import { cleanupFailedEphemeralVmWorkspace } from '@/lib/ephemeral-vm-failed-create-cleanup'
+import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
 
 const MAX_PROVISIONING_LOG_CHARS = 12_000
 
@@ -179,6 +180,9 @@ export async function attachEphemeralVmRuntimeToWorkspace(
       runtimeId: request.ephemeralVmRuntimeId,
       workspaceId
     })
+    // Why here: the runtime only becomes this workspace's host at attach time, and the shared lease
+    // cache loads once — without this the new workspace would show no chip and no Extend action.
+    refreshEphemeralVmRuntimesAfterMutation()
     if (request.ephemeralVmRuntimeEnvironmentId) {
       void useAppStore
         .getState()

@@ -48,6 +48,7 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '',
   'Environment Recipes:',
   '  vm recipe doctor          Validate a per-workspace environment recipe',
+  '  vm recipe extend          Extend an environment recipe lease from a stored result',
   '',
   'Automations:',
   '  automations list          List scheduled Orca automations',

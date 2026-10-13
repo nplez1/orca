@@ -1,5 +1,6 @@
 import { ipcRenderer } from 'electron'
 import type { PreloadApi } from '../api-types'
+import type { EphemeralVmRuntimeReclaimed } from '../../shared/ephemeral-vm-runtime-reclaim'
 
 export const ephemeralVmApi = {
   listRecipes: (args) => ipcRenderer.invoke('ephemeralVm:listRecipes', args),
@@ -21,5 +22,14 @@ export const ephemeralVmApi = {
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
+  extendLifetime: (args) => ipcRenderer.invoke('ephemeralVm:extendLifetime', args),
+  onRuntimeReclaimed: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      event: EphemeralVmRuntimeReclaimed
+    ): void => callback(event)
+    ipcRenderer.on('ephemeralVm:runtimeReclaimed', listener)
+    return () => ipcRenderer.removeListener('ephemeralVm:runtimeReclaimed', listener)
+  },
   getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args)
 } satisfies PreloadApi['ephemeralVm']

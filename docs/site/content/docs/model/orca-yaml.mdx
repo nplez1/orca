@@ -45,6 +45,22 @@ All keys are optional. Script, title, command, and path values must be strings; 
 
 `scripts` and `worktree` must be mappings; `defaultTabs`, `environmentRecipes`, and `sharedDirectories` must be lists. `setupRunPolicy` and `commandSourcePolicy` are **Settings values**, not accepted `orca.yaml` keys.
 
+### Environment recipe lifecycle hooks
+
+Each `environmentRecipes` entry points at scripts in the repository. Orca runs them on the desktop from the primary checkout's repository root, and reads only the one JSON object `create` prints on stdout.
+
+| Key                      | Accepted value                                                                                                                                                                                                                                    | When omitted                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `create` (or `command`)  | Nonempty script. Required. Boots the environment and prints the recipe result.                                                                                                                                                                    | Recipe rejected.                                                     |
+| `suspend`, `resume`      | Nonempty scripts. Both receive the lifecycle payload on stdin; `resume` prints a fresh recipe result.                                                                                                                                             | No suspend action; defining only one of the two warns in the doctor. |
+| `extend`                 | Nonempty script. Asks the provider for a longer lease. Receives the lifecycle payload plus `lifetime`, and prints the recipe result again with the updated deadline.                                                                              | No Extend action is offered.                                         |
+| `extendDurations`        | List of durations Orca may ask for: `<count><unit>` with `s`, `m`, `h`, or `d`, case-insensitive, each at least 60 seconds and at most 30 days, at most 8 entries. Canonicalized to the largest exact unit (`24h` becomes `1d`) and deduplicated. | Nothing can be offered.                                              |
+| `destroy` (or `cleanup`) | Nonempty script, or the literal `none`.                                                                                                                                                                                                           | The doctor warns.                                                    |
+
+`extendDurations` without `extend` rejects the whole recipe with a diagnostic: a lifetime Orca can never offer is a misconfiguration, not a value to ignore. `extend` without `extendDurations` parses, but the doctor warns that the Extend action has no lifetime to offer.
+
+Orca only ever offers the lifetimes a recipe declares, and only counts down to a deadline the recipe publishes — the `userData.releaseAt` timestamp in the `create` result. [Cloud VMs](/docs/ways-to-run#4-cloud-vms-per-workspace-environments) covers the lease, expiry, and reclaim behavior a recipe opts into with it.
+
 ### Parse failures and limits
 
 **Invalid YAML or a duplicate mapping key anywhere rejects the whole file.** Orca does not keep the last duplicate value. A non-mapping root, excessive alias expansion, or an oversized file also produces no configuration. A YAML checker that accepts duplicate keys does not establish that Orca will accept the file.

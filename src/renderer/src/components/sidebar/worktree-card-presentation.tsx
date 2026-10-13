@@ -11,6 +11,8 @@ import {
   WorktreeCardMetaBadges
 } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails, WorktreeCardPortsTrigger } from './WorktreeCardPorts'
+import { EphemeralVmLeaseBadge } from './EphemeralVmLeaseBadge'
+import { resolveEphemeralVmLeaseIndicator } from './ephemeral-vm-lease-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function buildWorktreeCardPresentation(card: WorktreeCardController) {
@@ -74,7 +76,8 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     canUnlinkReview,
     handleUnlinkReview,
     detailsHoverControl,
-    showDeleteQuickAction
+    showDeleteQuickAction,
+    ephemeralLease
   } = card
 
   // Why: pinned trees mix repos, so the repo icon shows regardless of groupBy's hideRepoBadge.
@@ -101,7 +104,11 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
   const showCombinedStatusSlot = showStatus
   const showTitleRowPrimary = compactCards && worktree.isMainWorktree && !isFolder
   const showMetaRowDetails = !newCardStyle && !compactCards && (hasDetails || hasPorts)
-  const showTitleRowIndicators = (newCardStyle || compactCards) && (hasDetails || hasPorts)
+  // Why: the lease chip shares the trailing slot with details/ports, and can hold that slot on its own —
+  // a deadline is worth showing on the default card too, which never gets a title-row details slot.
+  const showTitleRowDetails = (newCardStyle || compactCards) && (hasDetails || hasPorts)
+  const ephemeralLeaseIndicator = resolveEphemeralVmLeaseIndicator(ephemeralLease)
+  const showTitleRowIndicators = showTitleRowDetails || ephemeralLeaseIndicator !== null
   // Why: grouped views can hide the repo badge; don't reserve a blank metadata lane unless there's real content.
   const hasDetailedMetaRowContent = Boolean(
     (showRepoBadgeInMetaRow && repo) ||
@@ -238,7 +245,10 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
       detailsAndPortsContent
     )
   const titleRowIndicators = showTitleRowIndicators ? (
-    <div className="ml-auto flex shrink-0 items-center gap-1 pr-1.5">{detailsAndPorts}</div>
+    <div className="ml-auto flex shrink-0 items-center gap-1 pr-1.5">
+      {ephemeralLeaseIndicator && <EphemeralVmLeaseBadge indicator={ephemeralLeaseIndicator} />}
+      {showTitleRowDetails && detailsAndPorts}
+    </div>
   ) : null
   const hasSecondaryCardContent =
     hasMetaRow || !!remoteBranchConflict || showInlineAgentList || showLineageChildChip

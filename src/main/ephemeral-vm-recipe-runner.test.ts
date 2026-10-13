@@ -3,11 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../shared/pairing'
-import { getEphemeralVmRecipeResultProjectRoot } from '../shared/ephemeral-vm-recipes'
+import {
+  getEphemeralVmRecipeResultLifetime,
+  getEphemeralVmRecipeResultProjectRoot
+} from '../shared/ephemeral-vm-recipes'
 import {
   buildEphemeralVmRecipeCleanupCommand,
   buildEphemeralVmRecipeCleanupPayload,
   runEphemeralVmRecipeCleanup,
+  runEphemeralVmRecipeExtend,
   runEphemeralVmRecipeResume,
   runEphemeralVmRecipeStart,
   runEphemeralVmRecipeSuspend
@@ -426,5 +430,131 @@ describe('runEphemeralVmRecipeSuspend and runEphemeralVmRecipeResume', () => {
         projectRoot: '/workspace/resumed'
       })
     }
+  })
+})
+
+describe('runEphemeralVmRecipeExtend', () => {
+  const RELEASE_AT = '2026-10-13T03:26:41Z'
+
+  function extendArgs(repoPath: string, scriptPath: string) {
+    return {
+      repoPath,
+      recipe: {
+        id: 'cloud-sandbox',
+        name: 'Cloud Sandbox',
+        create: 'unused',
+        extend: nodeCommand(scriptPath),
+        extendDurations: ['1h', '4h']
+      },
+      context: {
+        recipeId: 'cloud-sandbox',
+        repoPath,
+        instanceId: 'orca-test-instance'
+      },
+      recipeResult: {
+        schemaVersion: 1 as const,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo',
+        userData: { provider: 'aws', resourceId: 'i-1', releaseAt: RELEASE_AT }
+      },
+      lifetime: '4h'
+    }
+  }
+
+  it('runs the extend hook in extend mode and returns the updated recipe result', async () => {
+    const repoPath = makeRepo()
+    const extendPath = join(repoPath, 'extend.js')
+    writeFileSync(
+      extendPath,
+      [
+        "let input = ''",
+        "process.stdin.on('data', (chunk) => { input += chunk })",
+        "process.stdin.on('end', () => {",
+        '  const payload = JSON.parse(input)',
+        '  console.error("seen:" + JSON.stringify({',
+        '    mode: payload.mode,',
+        '    lifetime: payload.lifetime,',
+        '    envMode: process.env.ORCA_VM_MODE,',
+        '    instanceId: payload.instanceId,',
+        '    releaseAt: payload.recipeResult.userData.releaseAt',
+        '  }))',
+        '  console.log(JSON.stringify({',
+        '    schemaVersion: 1,',
+        `    pairingCode: ${JSON.stringify(makePairingCode())},`,
+        "    projectRoot: '/workspace/repo',",
+        '    userData: {',
+        "      provider: 'aws',",
+        "      resourceId: 'i-1',",
+        "      releaseAt: '2026-10-13T07:26:41Z'",
+        '    }',
+        '  }))',
+        '})'
+      ].join('\n')
+    )
+
+    const result = await runEphemeralVmRecipeExtend(extendArgs(repoPath, extendPath))
+
+    expect(result.ok).toBe(true)
+    expect(result.stderr.trim()).toBe(
+      `seen:${JSON.stringify({
+        mode: 'extend',
+        lifetime: '4h',
+        envMode: 'extend',
+        instanceId: 'orca-test-instance',
+        releaseAt: RELEASE_AT
+      })}`
+    )
+    if (result.ok) {
+      expect(getEphemeralVmRecipeResultLifetime(result.result)).toEqual({
+        ok: true,
+        lifetime: {
+          provider: 'aws',
+          resourceId: 'i-1',
+          releaseAt: '2026-10-13T07:26:41Z',
+          releaseAtMs: Date.parse('2026-10-13T07:26:41Z')
+        }
+      })
+    }
+  })
+
+  it('fails loudly when the recipe declares no extend hook', async () => {
+    const repoPath = makeRepo()
+    const args = extendArgs(repoPath, join(repoPath, 'extend.js'))
+    const result = await runEphemeralVmRecipeExtend({
+      ...args,
+      recipe: {
+        id: 'manual-sandbox',
+        name: 'Manual Sandbox',
+        create: 'unused',
+        destroyDisabled: true
+      }
+    })
+
+    // Why: a silent skip would report success while the deadline stayed exactly where it was.
+    expect(result).toEqual({
+      ok: false,
+      context: args.context,
+      error: 'Recipe "manual-sandbox" does not declare extend.',
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      signal: null
+    })
+  })
+
+  it('reports a nonzero extend exit as a failure instead of a granted lease', async () => {
+    const repoPath = makeRepo()
+    const extendPath = join(repoPath, 'extend.js')
+    writeFileSync(extendPath, "console.error('provider refused')\nprocess.exit(4)\n")
+
+    const result = await runEphemeralVmRecipeExtend(extendArgs(repoPath, extendPath))
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'Extend exited with code 4.',
+      stderr: 'provider refused\n',
+      exitCode: 4,
+      signal: null
+    })
   })
 })

@@ -95,3 +95,13 @@ export function usePromptCacheCountdownNow(active: boolean): number {
     active ? getPromptCacheCountdownNow : getInactivePromptCacheCountdownNow
   )
 }
+
+/**
+ * The same visible-only 1s tick, named for what it is rather than for its first consumer.
+ *
+ * Why an alias instead of a second clock: one shared interval serves every countdown on screen,
+ * and a second implementation would be a second subscription to keep in step with visibility.
+ */
+export function useSecondTickNow(active: boolean): number {
+  return usePromptCacheCountdownNow(active)
+}

@@ -70,6 +70,20 @@ export function doctorEphemeralVmRecipe(args: {
   if (recipe.resume) {
     checks.push(checkCommandPath(args.repoPath, recipe.resume, 'recipe.resume'))
   }
+  if (recipe.extend) {
+    checks.push(checkCommandPath(args.repoPath, recipe.extend, 'recipe.extend'))
+    // Why: Orca only ever offers the lifetimes a recipe declares, so an extend hook with no
+    // choices leaves the user with a lease that expires and no way to ask for more.
+    if (!recipe.extendDurations?.length) {
+      checks.push({
+        id: 'recipe.extend_durations',
+        status: 'warn',
+        message: 'Recipe declares extend but no extendDurations.',
+        remediation:
+          'Add extendDurations, for example [1h, 4h, 24h], so the Extend lifetime action has lifetimes to offer.'
+      })
+    }
+  }
   // Why: a workspace suspended by `suspend` can only be woken if `resume` exists;
   // defining one without the other strands the workspace asleep.
   if (Boolean(recipe.suspend) !== Boolean(recipe.resume)) {

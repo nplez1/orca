@@ -3,6 +3,24 @@ import { GLOBAL_FLAGS } from '../args'
 
 export const VM_COMMAND_SPECS: CommandSpec[] = [
   {
+    path: ['vm', 'recipe', 'extend'],
+    summary: 'Run a per-workspace environment recipe extend hook against a stored recipe result',
+    usage:
+      'orca vm recipe extend <recipe-id> --recipe-result <file> --lifetime <duration> [--repo-path <path>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'recipe-id', 'repo-path', 'recipe-result', 'lifetime'],
+    positionalArgs: ['recipe-id'],
+    notes: [
+      'Runs the recipe extend hook from the command line, without the desktop app, so a provider author can exercise it before relying on it.',
+      'The recipe result is the JSON object the create script printed, saved to a file.',
+      'The lifetime must be one the recipe declares in extendDurations; the updated result is printed on stdout for the destroy hook to consume.',
+      'Extending a live lease from the app also updates the persisted runtime; this command only reports what the hook produced.'
+    ],
+    examples: [
+      'orca vm recipe extend cloud-sandbox --recipe-result ./result.json --lifetime 4h',
+      'orca vm recipe extend cloud-sandbox --recipe-result ./result.json --lifetime 4h --json'
+    ]
+  },
+  {
     path: ['vm', 'recipe', 'doctor'],
     summary: 'Validate a per-workspace environment recipe without provisioning by default',
     usage:

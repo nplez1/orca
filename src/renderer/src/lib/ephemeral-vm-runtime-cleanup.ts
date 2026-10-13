@@ -49,6 +49,11 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
     const runtimes = await window.api.ephemeralVm.listRuntimes()
     const matchingRuntimes = runtimes.filter(
       (runtime) =>
+        // Why a reclaimed host is never matched: its records were already released because the
+        // provider's lease lapsed and the machine stopped answering. Removing its workspace row is
+        // Orca forgetting a host it cannot use — not a reason to run the recipe's `destroy`, which
+        // could delete a machine that is still alive with the user's work on it.
+        runtime.reclaimedAt === undefined &&
         (runtime.cleanupStatus !== 'succeeded' || runtime.sshTargetId !== undefined) &&
         ((runtime.workspaceId !== undefined && workspaceIdSet.has(runtime.workspaceId)) ||
           (runtime.workspaceId !== undefined &&

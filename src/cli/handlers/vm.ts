@@ -1,17 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import { parseOrcaYaml } from '../../shared/orca-yaml'
 import {
   getEphemeralVmRecipeResultProjectRoot,
-  type EphemeralVmRecipeDoctorCheck,
-  type EphemeralVmRecipeDoctorResult
+  type EphemeralVmRecipeDoctorCheck
 } from '../../shared/ephemeral-vm-recipes'
-import {
-  getEphemeralVmRecipeResultWarnings,
-  redactEphemeralVmRecipeDiagnosticText
-} from '../../shared/ephemeral-vm-recipe-diagnostics'
+import { getEphemeralVmRecipeResultWarnings } from '../../shared/ephemeral-vm-recipe-diagnostics'
 // Why: import directly from the doctor module (not the barrel) — it uses Node
 // fs/path and must stay out of the browser bundle that imports the barrel.
 import { doctorEphemeralVmRecipe } from '../../shared/ephemeral-vm-recipe-doctor'
@@ -20,8 +16,56 @@ import {
   runEphemeralVmRecipeStart
 } from '../../shared/ephemeral-vm-recipe-runner'
 import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
+import {
+  extendEphemeralVmRecipeFromFile,
+  formatExtendEphemeralVmRecipeResult
+} from '../vm-recipe-extend'
+import {
+  buildProvisionFailureRemediation,
+  capTranscriptStream,
+  formatDoctorResult,
+  type DoctorResult,
+  type ProvisionTranscript
+} from '../vm-recipe-doctor-format'
 
 export const VM_HANDLERS: Record<string, CommandHandler> = {
+  'vm recipe extend': async ({ flags, cwd, json }) => {
+    const recipeId = getStringFlag(flags, 'recipe-id')
+    if (!recipeId) {
+      throw new RuntimeClientError('invalid_argument', 'Missing recipe id.')
+    }
+    const recipeResultPath = getStringFlag(flags, 'recipe-result')
+    if (!recipeResultPath) {
+      throw new RuntimeClientError('invalid_argument', 'Missing --recipe-result.')
+    }
+    const requestedLifetime = getStringFlag(flags, 'lifetime')
+    if (!requestedLifetime) {
+      throw new RuntimeClientError('invalid_argument', 'Missing --lifetime.')
+    }
+    const repoPath = getStringFlag(flags, 'repo-path') ?? cwd
+    const recipe = loadRecipe(repoPath, recipeId)
+    const result = recipe
+      ? await extendEphemeralVmRecipeFromFile({
+          repoPath,
+          recipe,
+          recipeResultPath: resolve(cwd, recipeResultPath),
+          requestedLifetime
+        })
+      : {
+          recipeId,
+          repoPath,
+          ok: false as const,
+          error: `Recipe "${recipeId}" was not found in environmentRecipes.`
+        }
+    if (json) {
+      console.log(JSON.stringify(result, null, 2))
+    } else {
+      console.log(formatExtendEphemeralVmRecipeResult(result))
+    }
+    if (!result.ok) {
+      process.exitCode = 1
+    }
+  },
   'vm recipe doctor': async ({ flags, cwd, json }) => {
     const recipeId = getStringFlag(flags, 'recipe-id')
     if (!recipeId) {
@@ -88,37 +132,6 @@ function readTextFile(path: string): string {
 // Why: give the agent the full create/destroy output so it can self-diagnose a
 // failed provision instead of relaying logs through the user. Each stream is
 // redacted and capped (head+tail) so a huge log stays readable but complete enough.
-type ProvisionStageTranscript = {
-  exitCode: number | null
-  signal: NodeJS.Signals | null
-  stdout: string
-  stderr: string
-  parseError?: string
-}
-
-type ProvisionTranscript = {
-  provision: ProvisionStageTranscript
-  destroy?: ProvisionStageTranscript
-}
-
-type DoctorResult = EphemeralVmRecipeDoctorResult & {
-  provisionTranscript?: ProvisionTranscript
-}
-
-const MAX_TRANSCRIPT_STREAM_BYTES = 16_000
-
-// Why: keep both ends of a long log — the script's setup context (head) and the
-// failure itself (tail) — rather than only the last 500 chars.
-function capTranscriptStream(value: string): string {
-  const redacted = redactEphemeralVmRecipeDiagnosticText(value)
-  if (redacted.length <= MAX_TRANSCRIPT_STREAM_BYTES) {
-    return redacted
-  }
-  const half = Math.floor(MAX_TRANSCRIPT_STREAM_BYTES / 2)
-  const omitted = redacted.length - half * 2
-  return `${redacted.slice(0, half)}\n…[${omitted} chars omitted]…\n${redacted.slice(-half)}`
-}
-
 async function doctorRecipeWithProvision(
   repoPath: string,
   recipeId: string
@@ -251,51 +264,9 @@ async function doctorRecipeWithProvision(
   }
 }
 
-function buildProvisionFailureRemediation(stderr: string, stdout: string): string {
-  const redactedStderr = redactEphemeralVmRecipeDiagnosticText(stderr).trim()
-  const redactedStdout = redactEphemeralVmRecipeDiagnosticText(stdout).trim()
-  const detail = redactedStderr || redactedStdout
-  return detail
-    ? `Check recipe output. Last captured output: ${detail.slice(-500)}`
-    : 'Check recipe stderr and ensure stdout contains the VM recipe result JSON.'
-}
-
 function loadRecipe(repoPath: string, recipeId: string): OrcaVmRecipe | null {
   const hooks = parseOrcaYaml(readTextFile(join(repoPath, 'orca.yaml')))
   return hooks?.environmentRecipes?.find((entry) => entry.id === recipeId) ?? null
-}
-
-function formatDoctorResult(result: DoctorResult): string {
-  const lines = [
-    `recipe: ${result.recipeId}`,
-    `repoPath: ${result.repoPath}`,
-    `ok: ${result.ok}`,
-    ...result.checks.map((check) => {
-      const suffix = check.remediation ? `\n  next: ${check.remediation}` : ''
-      return `${check.status.toUpperCase()} ${check.id}: ${check.message}${suffix}`
-    })
-  ]
-  if (result.provisionTranscript) {
-    lines.push(...formatTranscriptStage('create', result.provisionTranscript.provision))
-    if (result.provisionTranscript.destroy) {
-      lines.push(...formatTranscriptStage('destroy', result.provisionTranscript.destroy))
-    }
-  }
-  return lines.join('\n')
-}
-
-function formatTranscriptStage(label: string, stage: ProvisionStageTranscript): string[] {
-  const out = [`--- ${label} (exit ${stage.exitCode ?? stage.signal ?? 'unknown'}) ---`]
-  if (stage.parseError) {
-    out.push(`parseError: ${stage.parseError}`)
-  }
-  if (stage.stdout.trim()) {
-    out.push(`stdout:\n${stage.stdout}`)
-  }
-  if (stage.stderr.trim()) {
-    out.push(`stderr:\n${stage.stderr}`)
-  }
-  return out
 }
 
 function getStringFlag(flags: Map<string, string | boolean>, name: string): string | null {

@@ -1,0 +1,162 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  getEphemeralVmRuntimeStorePath,
+  listEphemeralVmRuntimes
+} from '../shared/ephemeral-vm-runtime-store'
+import { parseOrcaYaml } from '../shared/orca-yaml'
+import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
+import { provisionEphemeralVmRuntime } from './ephemeral-vm-runtime-service'
+
+const RELEASE_AT = '2026-06-01T13:00:00.000Z'
+
+const SSH_CONNECTION = {
+  type: 'ssh',
+  projectRoot: '/workspace/repo',
+  target: { label: 'VM', host: 'host', port: 22, username: 'orca' }
+}
+
+/** The shape orca.yaml produces, so the snapshot is exercised against a real parsed recipe. */
+const RECIPE_YAML = [
+  'environmentRecipes:',
+  '  - id: cloud-sandbox',
+  '    name: Cloud Sandbox',
+  '    create: ./scripts/orca-vm/start.sh',
+  '    extend: ./scripts/orca-vm/extend.sh',
+  '    extendDurations: [1h, 4h]'
+].join('\n')
+
+const tempDirs: string[] = []
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+function makeDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  tempDirs.push(dir)
+  return dir
+}
+
+function nodeCommand(scriptPath: string): string {
+  return `"${process.execPath}" "${scriptPath}"`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasOwnKey(value: unknown, key: string): boolean {
+  return isRecord(value) && Object.hasOwn(value, key)
+}
+
+/** The record as it sits on disk, so the assertion is about what was written, not what was parsed. */
+function rawRuntimeRecord(userDataPath: string): Record<string, unknown> {
+  const store: unknown = JSON.parse(
+    readFileSync(getEphemeralVmRuntimeStorePath(userDataPath), 'utf8')
+  )
+  if (!isRecord(store) || !Array.isArray(store.runtimes) || !isRecord(store.runtimes[0])) {
+    throw new Error('Unexpected ephemeral VM runtime store shape.')
+  }
+  return store.runtimes[0]
+}
+
+function parsedRecipe(): OrcaVmRecipe {
+  const recipe = parseOrcaYaml(RECIPE_YAML)?.environmentRecipes?.[0]
+  if (!recipe) {
+    throw new Error('Fixture orca.yaml did not parse to a recipe.')
+  }
+  return recipe
+}
+
+/** Writes a create script that marks the machine as created before it reports its result. */
+function writeCreateScript(repoPath: string): { command: string; markerPath: string } {
+  const scriptPath = join(repoPath, 'create.js')
+  const markerPath = join(repoPath, 'created.txt')
+  writeFileSync(
+    scriptPath,
+    [
+      `require('node:fs').writeFileSync(${JSON.stringify(markerPath)}, 'created')`,
+      `console.log(${JSON.stringify(
+        JSON.stringify({
+          schemaVersion: 1,
+          connection: SSH_CONNECTION,
+          userData: { releaseAt: RELEASE_AT }
+        })
+      )})`
+    ].join('\n')
+  )
+  return { command: nodeCommand(scriptPath), markerPath }
+}
+
+describe('persisting a provisioned ephemeral VM runtime', () => {
+  it('keeps the recipe snapshot parsable when the recipe declares extend', async () => {
+    const userDataPath = makeDir('orca-vm-provisioning-user-data-')
+    const repoPath = makeDir('orca-vm-provisioning-repo-')
+    const create = writeCreateScript(repoPath)
+    const recipe: OrcaVmRecipe = {
+      ...parsedRecipe(),
+      create: create.command,
+      extend: nodeCommand(join(repoPath, 'extend.js'))
+    }
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe,
+      repoId: 'repo-1',
+      projectId: 'project-1',
+      workspaceName: 'Fix Login Race',
+      now: 1_000
+    })
+
+    // The provider has already created and billed for this machine by the time persistence runs, so
+    // a write that rejects leaves it untracked.
+    expect(existsSync(create.markerPath)).toBe(true)
+    expect(provisioned.ok).toBe(true)
+    if (!provisioned.ok) {
+      throw new Error(provisioned.start.error)
+    }
+
+    const persisted = listEphemeralVmRuntimes(userDataPath)[0]
+    expect(persisted.extend).toBe(recipe.extend)
+    expect(persisted.extendDurations).toEqual(['1h', '4h'])
+    expect(persisted.recipe?.id).toBe('cloud-sandbox')
+
+    const raw = rawRuntimeRecord(userDataPath)
+    expect(raw.extend).toBe(recipe.extend)
+    expect(raw.extendDurations).toEqual(['1h', '4h'])
+    // The extend fields live on the record, never inside the strict lifecycle snapshot: an older
+    // build has to keep reading that snapshot, and a strict parse rejection here costs a machine.
+    expect(hasOwnKey(raw.recipe, 'extend')).toBe(false)
+    expect(hasOwnKey(raw.recipe, 'extendDurations')).toBe(false)
+    expect(raw.recipe).toMatchObject({ id: 'cloud-sandbox', create: create.command })
+  })
+
+  it('persists no extend keys for a recipe that declares none', async () => {
+    const userDataPath = makeDir('orca-vm-provisioning-plain-user-data-')
+    const repoPath = makeDir('orca-vm-provisioning-plain-repo-')
+    const create = writeCreateScript(repoPath)
+    const recipe: OrcaVmRecipe = { ...parsedRecipe(), create: create.command }
+    delete recipe.extend
+    delete recipe.extendDurations
+
+    const provisioned = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      recipe,
+      repoId: 'repo-1',
+      now: 1_000
+    })
+
+    expect(provisioned.ok).toBe(true)
+    const raw = rawRuntimeRecord(userDataPath)
+    expect(hasOwnKey(raw, 'extend')).toBe(false)
+    expect(hasOwnKey(raw, 'extendDurations')).toBe(false)
+    expect(raw.recipe).toMatchObject({ id: 'cloud-sandbox' })
+  })
+})

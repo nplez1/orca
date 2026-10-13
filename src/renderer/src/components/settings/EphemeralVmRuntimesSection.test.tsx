@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
 import {
   EphemeralVmRuntimesSection,
+  getEphemeralVmExtendDurations,
   getEphemeralVmRuntimeStatusLabel,
   getVisibleEphemeralVmRuntimes
 } from './EphemeralVmRuntimesSection'
@@ -86,6 +87,24 @@ describe('EphemeralVmRuntimesSection helpers', () => {
 
     expect(getVisibleEphemeralVmRuntimes([runtime])).toEqual([runtime])
     expect(getEphemeralVmRuntimeStatusLabel(runtime)).toBe('Cleanup failed')
+  })
+
+  it('offers only the lifetimes the runtime snapshot declares, and none once released', () => {
+    const extendable = makeRuntime({ extend: 'node extend.js', extendDurations: ['1h', '4h'] })
+    expect(getEphemeralVmExtendDurations(extendable)).toEqual(['1h', '4h'])
+
+    // Main refuses to extend a reclaimed host, so offering a lifetime would only produce an
+    // action that always fails.
+    expect(getEphemeralVmExtendDurations({ ...extendable, reclaimedAt: 1 })).toEqual([])
+    expect(getEphemeralVmExtendDurations({ ...extendable, status: 'cleaned' })).toEqual([])
+    expect(getEphemeralVmExtendDurations({ ...extendable, cleanupStatus: 'succeeded' })).toEqual([])
+    // A recipe with no extend verb, and one whose declared durations are not all usable.
+    expect(getEphemeralVmExtendDurations(makeRuntime({ extendDurations: ['1h'] }))).toEqual([])
+    expect(
+      getEphemeralVmExtendDurations(
+        makeRuntime({ extend: 'node extend.js', extendDurations: ['1h', 'not-a-duration'] })
+      )
+    ).toEqual(['1h'])
   })
 
   it('prioritizes cleanup status in the visible label', () => {

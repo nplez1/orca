@@ -4,6 +4,10 @@ import {
 } from '../shared/ephemeral-vm-recipes'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import {
+  toEphemeralVmRuntimeExtendFields,
+  toEphemeralVmRuntimeRecipeSnapshot
+} from '../shared/ephemeral-vm-runtimes'
+import {
   upsertEphemeralVmRuntime,
   upsertEphemeralVmRuntimeRollbackRecovery
 } from '../shared/ephemeral-vm-runtime-store'
@@ -32,7 +36,8 @@ export async function cleanupFailedEphemeralVmStart(
   const recovery: EphemeralVmRuntimeRecord = {
     id: start.context.instanceId ?? start.context.recipeId,
     recipeId: args.recipe.id,
-    recipe: args.recipe,
+    recipe: toEphemeralVmRuntimeRecipeSnapshot(args.recipe),
+    ...toEphemeralVmRuntimeExtendFields(args.recipe),
     ...(args.repoId ? { repoId: args.repoId } : {}),
     ...(args.projectId ? { projectId: args.projectId } : {}),
     ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),

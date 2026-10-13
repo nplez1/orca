@@ -15,6 +15,9 @@ export type ProcessRunResult = {
   aborted?: true
 }
 
+/** The lifecycle mode a recipe command runs in; published to it as `ORCA_VM_MODE`. */
+export type EphemeralVmRecipeProcessMode = 'create' | 'suspend' | 'resume' | 'destroy' | 'extend'
+
 export function quoteShellToken(value: string): string {
   if (process.platform === 'win32') {
     // Inside cmd.exe double quotes, `^` is literal; an embedded `"` is escaped
@@ -29,7 +32,7 @@ export async function runRecipeCommand(args: {
   command: string
   repoPath: string
   context: EphemeralVmRecipeContext
-  mode: 'create' | 'suspend' | 'resume' | 'destroy'
+  mode: EphemeralVmRecipeProcessMode
   resultSchemaVersion: 1 | 2
   stdin?: string
   env?: NodeJS.ProcessEnv
@@ -229,7 +232,7 @@ export function killRecipeProcess(child: ChildProcessWithoutNullStreams, force =
 
 function buildRecipeEnv(
   env: NodeJS.ProcessEnv | undefined,
-  mode: 'create' | 'suspend' | 'resume' | 'destroy',
+  mode: EphemeralVmRecipeProcessMode,
   context: EphemeralVmRecipeContext,
   resultSchemaVersion: 1 | 2
 ): NodeJS.ProcessEnv {

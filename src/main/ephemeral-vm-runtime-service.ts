@@ -1,4 +1,5 @@
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
+import { getEphemeralVmLifetimeLossError } from '../shared/ephemeral-vm-recipes'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
@@ -274,6 +275,19 @@ export async function resumeEphemeralVmRuntime(
     return { ok: false, runtime: failed, error: resumeIntegrityError }
   }
 
+  // Why: an answer that loses the deadline would silently drop the countdown and the only
+  // reconciliation this host has. The runtime is parked on resume_failed so the user sees it.
+  const lostLifetimeError = resume.skipped
+    ? null
+    : getEphemeralVmLifetimeLossError(existing.recipeResult, resume.result, 'Resume')
+  if (lostLifetimeError) {
+    const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
+      status: 'resume_failed',
+      updatedAt: Date.now()
+    })
+    return { ok: false, runtime: failed, error: lostLifetimeError }
+  }
+
   const runtime = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
     status: 'running',
     ...(!resume.skipped ? { recipeResult: resume.result } : {}),
@@ -282,7 +296,7 @@ export async function resumeEphemeralVmRuntime(
   return { ok: true, runtime, skipped: resume.skipped }
 }
 
-function contextFromRuntime(
+export function contextFromRuntime(
   repoPath: string,
   runtime: EphemeralVmRuntimeRecord
 ): EphemeralVmRecipeContext {

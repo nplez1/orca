@@ -3,6 +3,7 @@ import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environ
 import type { EphemeralVmRecipeDoctorResult } from '../../shared/ephemeral-vm-recipes'
 import type { EphemeralVmRecipeResultWarning } from '../../shared/ephemeral-vm-recipe-diagnostics'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeReclaimed } from '../../shared/ephemeral-vm-runtime-reclaim'
 
 export type EphemeralVmApi = {
   listRecipes: (args: { repoId: string }) => Promise<{
@@ -66,6 +67,19 @@ export type EphemeralVmApi = {
   resumeWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmRuntimeRecord | null>
   cleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
   stopCleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
+  /**
+   * Ask the provider for a longer lease. Rejects with a retryable message when the recipe's own
+   * extend hook fails, so the caller can surface the provider's reason verbatim.
+   */
+  extendLifetime: (args: {
+    runtimeId: string
+    lifetime: string
+  }) => Promise<EphemeralVmRuntimeRecord>
+  /**
+   * Fires when main reclaims an expired host whose machine is gone. The workspace rows are the
+   * renderer's to remove, so this is how it learns to forget them.
+   */
+  onRuntimeReclaimed: (callback: (event: EphemeralVmRuntimeReclaimed) => void) => () => void
   getCleanupCommand: (args: { runtimeId: string }) => Promise<{
     runtimeId: string
     command: string | null

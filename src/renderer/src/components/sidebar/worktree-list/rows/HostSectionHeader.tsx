@@ -1,10 +1,108 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { AlertTriangle, ChevronDown, Loader2, Server, ServerOff } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import {
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { formatEphemeralVmRemaining } from '../../../../../../shared/ephemeral-vm-lifetime'
+import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/ephemeral-vm-runtimes'
+import {
+  isReleasedEphemeralVmRuntime,
+  resolveEphemeralVmRuntimeLease,
+  useEphemeralVmRuntimes
+} from '@/hooks/useEphemeralVmRuntimes'
+import { useSecondTickNow } from '../../prompt-cache-countdown-clock'
 import type { HostHeaderRow } from '../../host-section-rows'
 import { HostSectionHeaderMenu } from '../../HostSectionHeaderMenu'
+
+/** How long one ephemeral host has left, as its header shows it. */
+export type EphemeralHostLease = {
+  expired: boolean
+  /** Coarse `3h` / `11m`, floored so it never overstates what is left. */
+  remaining: string
+}
+
+/**
+ * The host a runtime's workspace runs on. Both spellings are real: `runtime:<env>` when the recipe
+ * connected through an Orca server, and `ssh:<target>` for a recipe that only gives an SSH host.
+ */
+function getEphemeralVmHostId(runtime: EphemeralVmRuntimeRecord): ExecutionHostId | null {
+  if (runtime.runtimeEnvironmentId) {
+    return toRuntimeExecutionHostId(runtime.runtimeEnvironmentId)
+  }
+  return runtime.sshTargetId ? toSshExecutionHostId(runtime.sshTargetId) : null
+}
+
+/**
+ * What one host header shows for its lease, or null when that host is not on a provider lease.
+ *
+ * Why the records are searched rather than the runtime read off the row: a host header is keyed by
+ * host id, and only the runtime's own connection fields say which host it is.
+ */
+export function resolveEphemeralHostLease(
+  records: readonly EphemeralVmRuntimeRecord[],
+  hostId: ExecutionHostId,
+  nowMs: number
+): EphemeralHostLease | null {
+  const runtime =
+    records.find(
+      (record) => getEphemeralVmHostId(record) === hostId && !isReleasedEphemeralVmRuntime(record)
+    ) ?? null
+  const lease = resolveEphemeralVmRuntimeLease(runtime, nowMs)
+  return lease?.lifetime
+    ? { expired: lease.expired, remaining: formatEphemeralVmRemaining(lease.remainingMs) }
+    : null
+}
+
+/**
+ * The lease behind one host header.
+ *
+ * Why the records are read before the clock: only a host with a deadline needs the 1s tick, and only
+ * this marker subscribes to it, so no other part of the header re-renders for it.
+ */
+function useHostEphemeralLease(hostId: ExecutionHostId): EphemeralHostLease | null {
+  const records = useEphemeralVmRuntimes()
+  const hasLease = useMemo(
+    () => resolveEphemeralHostLease(records, hostId, 0) !== null,
+    [hostId, records]
+  )
+  const nowMs = useSecondTickNow(hasLease)
+  return useMemo(() => resolveEphemeralHostLease(records, hostId, nowMs), [hostId, nowMs, records])
+}
+
+/** `Exp 3h` for a host on a provider lease, `Expired` once that deadline has passed. */
+function EphemeralHostLeaseMarker({
+  hostId
+}: {
+  hostId: ExecutionHostId
+}): React.JSX.Element | null {
+  const lease = useHostEphemeralLease(hostId)
+  if (!lease) {
+    return null
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex h-4 shrink-0 items-center rounded-full border px-1.5 text-[9px] font-medium leading-none',
+        lease.expired
+          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+          : 'border-worktree-sidebar-border bg-worktree-sidebar-accent text-muted-foreground/90'
+      )}
+    >
+      {lease.expired
+        ? translate('auto.components.sidebar.WorktreeList.ephemeralLeaseExpired', 'Expired')
+        : translate(
+            'auto.components.sidebar.WorktreeList.ephemeralLeaseRemaining',
+            'Exp {{value0}}',
+            { value0: lease.remaining }
+          )}
+    </span>
+  )
+}
 
 function formatSectionActivityLabel(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? '' : 's'}`
@@ -135,6 +233,7 @@ export function HostSectionHeader({
           >
             {row.label}
           </span>
+          <EphemeralHostLeaseMarker hostId={row.hostId} />
           {detail ? (
             <span
               className={cn(

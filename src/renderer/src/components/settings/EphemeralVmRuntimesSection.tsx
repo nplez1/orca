@@ -3,12 +3,18 @@ import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
+import { parseEphemeralVmLifetimeDuration } from '../../../../shared/ephemeral-vm-lifetime'
 import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../shared/ephemeral-vm-recipe-destroy-result'
+import {
+  isReleasedEphemeralVmRuntime,
+  refreshEphemeralVmRuntimes,
+  resolveEphemeralVmRuntimeLease
+} from '@/hooks/useEphemeralVmRuntimes'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
 import { EphemeralVmCleanupStopDialog } from './EphemeralVmCleanupStopDialog'
-import { EphemeralVmRuntimeRow } from './EphemeralVmRuntimeRow'
+import { EphemeralVmRuntimeRow, formatEphemeralVmLeaseDeadline } from './EphemeralVmRuntimeRow'
 
 function hasCleanupFailed(runtime: EphemeralVmRuntimeRecord): boolean {
   return (
@@ -35,6 +41,33 @@ export function getVisibleEphemeralVmRuntimes(
   return runtimes
     .filter((runtime) => runtime.status !== 'cleaned' || runtime.sshTargetId !== undefined)
     .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+}
+
+/**
+ * The lifetimes this runtime's provider sells, or none when it cannot be extended.
+ *
+ * Why the runtime's own snapshot: a later edit to the recipe pack must not offer a lifetime this
+ * runtime was never created with. Why nothing once the host is released or reclaimed: main refuses
+ * that extension, so offering it would only produce an action that always fails.
+ */
+export function getEphemeralVmExtendDurations(runtime: EphemeralVmRuntimeRecord): string[] {
+  // Why the shared predicate: "this host is only a record now" is the same question the lease chip
+  // and the context menu ask, and it already covers reclaimed, cleaned and released.
+  if (!runtime.extend || isReleasedEphemeralVmRuntime(runtime)) {
+    return []
+  }
+  return (runtime.extendDurations ?? []).filter(
+    (duration) => parseEphemeralVmLifetimeDuration(duration) !== null
+  )
+}
+
+/**
+ * The deadline a successful extension reported, or null when the provider reported none.
+ *
+ * Why module scope: the clock has to be read outside render, where an impure call is the caller's.
+ */
+function getExtendedEphemeralVmLeaseDeadline(runtime: EphemeralVmRuntimeRecord): number | null {
+  return resolveEphemeralVmRuntimeLease(runtime, Date.now())?.lifetime?.releaseAtMs ?? null
 }
 
 export function getEphemeralVmRuntimeStatusLabel(runtime: EphemeralVmRuntimeRecord): string {
@@ -80,6 +113,7 @@ export function EphemeralVmRuntimesSection({
   const [isLoading, setIsLoading] = useState(true)
   const [cleaningId, setCleaningId] = useState<string | null>(null)
   const [stoppingId, setStoppingId] = useState<string | null>(null)
+  const [extending, setExtending] = useState<{ runtimeId: string; lifetime: string } | null>(null)
   const [pendingStop, setPendingStop] = useState<EphemeralVmRuntimeRecord | null>(null)
   const mountedRef = useMountedRef()
 
@@ -188,6 +222,49 @@ export function EphemeralVmRuntimesSection({
       if (mountedRef.current) {
         setCleaningId(null)
       }
+      // Why: a released host must stop advertising a deadline on every surface that reads the cache.
+      void refreshEphemeralVmRuntimes()
+    }
+  }
+
+  const extendLifetime = async (
+    runtime: EphemeralVmRuntimeRecord,
+    lifetime: string
+  ): Promise<void> => {
+    setExtending({ runtimeId: runtime.id, lifetime })
+    try {
+      const extended = await window.api.ephemeralVm.extendLifetime({
+        runtimeId: runtime.id,
+        lifetime
+      })
+      if (mountedRef.current) {
+        const extendedDeadlineMs = getExtendedEphemeralVmLeaseDeadline(extended)
+        toast.success(
+          extendedDeadlineMs !== null
+            ? translate(
+                'auto.components.settings.EphemeralVmRuntimesSection.leaseExtendedUntil',
+                'Lease extended to {{value0}}.',
+                { value0: formatEphemeralVmLeaseDeadline(extendedDeadlineMs) }
+              )
+            : translate(
+                'auto.components.settings.EphemeralVmRuntimesSection.leaseExtended',
+                'Lease extended.'
+              )
+        )
+      }
+      await refresh(false)
+      // Why also the shared cache: the workspace card and the host list read the deadline there.
+      await refreshEphemeralVmRuntimes()
+    } catch (error) {
+      // Why no refresh on failure: main leaves the record untouched, so the deadline did not move.
+      // Why the provider's own words: only its message says whether a retry could succeed.
+      if (mountedRef.current) {
+        toast.error(error instanceof Error ? error.message : String(error))
+      }
+    } finally {
+      if (mountedRef.current) {
+        setExtending(null)
+      }
     }
   }
 
@@ -249,6 +326,7 @@ export function EphemeralVmRuntimesSection({
       if (mountedRef.current) {
         setStoppingId(null)
       }
+      void refreshEphemeralVmRuntimes()
     }
   }
 
@@ -315,11 +393,19 @@ export function EphemeralVmRuntimesSection({
                 disabled={
                   isLoading ||
                   (cleaningId !== null && cleaningId !== runtime.id) ||
-                  (stoppingId !== null && stoppingId !== runtime.id)
+                  (stoppingId !== null && stoppingId !== runtime.id) ||
+                  (extending !== null && extending.runtimeId !== runtime.id)
+                }
+                extendDurations={getEphemeralVmExtendDurations(runtime)}
+                extendingLifetime={
+                  extending !== null && extending.runtimeId === runtime.id
+                    ? extending.lifetime
+                    : null
                 }
                 onCleanup={() => void cleanupRuntime(runtime)}
                 onStopCleanup={() => setPendingStop(runtime)}
                 onCopyCleanupCommand={() => void copyCleanupCommand(runtime)}
+                onExtendLifetime={(lifetime) => void extendLifetime(runtime, lifetime)}
               />
             ))}
           </div>
