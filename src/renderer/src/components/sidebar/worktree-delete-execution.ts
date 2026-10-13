@@ -54,10 +54,12 @@ export async function runWorktreeDeletesInParallel(
   const commitBatchFocus = activeWorktreeIdBefore
     ? prepareActiveWorktreeFocusAfterDelete(activeWorktreeIdBefore)
     : null
-  // Mark all targets up front so the sidebar shows immediate progress.
+  // Mark all targets up front, but keep queued work distinct from an active delete.
   useAppStore
     .getState()
-    .markWorktreesDeleting(uniqueTargets.map((target) => (target.hostId ? target : target.id)))
+    .markWorktreesQueuedForDeletion(
+      uniqueTargets.map((target) => (target.hostId ? target : target.id))
+    )
   // Git worktree removal shares repo locks only within one execution host.
   const groups = new Map<string, (typeof uniqueTargets)[number][]>()
   for (const target of uniqueTargets) {
@@ -141,6 +143,7 @@ export async function runWorktreeDeletesInParallel(
               clearWorktreeDeleteTargetState(target)
               return
             }
+            useAppStore.getState().markWorktreesDeleting([target.hostId ? target : target.id])
             const deleted = await runWorktreeDeleteWithToast(
               toWorktreeRemovalTarget(target),
               target.displayName,

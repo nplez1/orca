@@ -1,0 +1,139 @@
+{
+  "id": "copilot",
+  "engineVersion": 1,
+  "anchors": [
+    {
+      "id": "blocked_approval_run_command",
+      "why": "A shell command's approval dialog, verbatim from CLI 1.0.97: `Do you want to run this command?` over a Yes / tell-Copilot-differently pair. Copilot's hooks never report the dialog - `permission_prompt` also fires for requests it approves itself - so the screen is the only witness. The footer guard tolerates a wrap: a narrow pane can break one phrase without breaking the other.",
+      "when": {
+        "region": "text",
+        "find": {
+          "lastOf": "do you want to run this command"
+        },
+        "withinLastLines": 8,
+        "after": {
+          "any": [
+            {
+              "contains": "enter to select"
+            },
+            {
+              "contains": "esc to cancel"
+            }
+          ]
+        }
+      },
+      "answer": {
+        "state": "blocked",
+        "reason": "agent-approval-prompt"
+      }
+    },
+    {
+      "id": "blocked_approval_access",
+      "why": "A URL access approval, the same dialog for a different subject: `Do you want to allow this access?`. Captured separately from the command wording, so neither is generalised from the other.",
+      "when": {
+        "region": "text",
+        "find": {
+          "lastOf": "do you want to allow this access"
+        },
+        "withinLastLines": 8,
+        "after": {
+          "any": [
+            {
+              "contains": "enter to select"
+            },
+            {
+              "contains": "esc to cancel"
+            }
+          ]
+        }
+      },
+      "answer": {
+        "state": "blocked",
+        "reason": "agent-approval-prompt"
+      }
+    },
+    {
+      "id": "blocked_approval_deny_option",
+      "why": "Both captured approval dialogs offer the identical denial option, `No, and tell Copilot what to do differently (Esc to stop)`. It is a UI label, not prose, so it catches an approval whose question is worded a third way.",
+      "when": {
+        "region": "text",
+        "find": {
+          "lastOf": "tell copilot what to do differently"
+        },
+        "withinLastLines": 8,
+        "after": {
+          "any": [
+            {
+              "contains": "enter to select"
+            },
+            {
+              "contains": "esc to cancel"
+            }
+          ]
+        }
+      },
+      "answer": {
+        "state": "blocked",
+        "reason": "agent-approval-prompt"
+      }
+    },
+    {
+      "id": "blocked_question",
+      "why": "Copilot's question dialog opens with `Copilot needs information.` and closes with the select/accept controls, while its status row reads `Asking user` (captured from CLI 1.0.97). `ask_user` reaches Orca only as a postToolUse, i.e. after the answer, so nothing but the screen reports the wait.",
+      "when": {
+        "region": "text",
+        "find": {
+          "lastOf": "copilot needs information"
+        },
+        "withinLastLines": 12,
+        "after": {
+          "any": [
+            {
+              "contains": "ctrl+d decline"
+            },
+            {
+              "contains": "esc cancel"
+            },
+            {
+              "contains": "enter accept"
+            }
+          ]
+        }
+      },
+      "answer": {
+        "state": "blocked",
+        "reason": "agent-interactive-prompt"
+      }
+    },
+    {
+      "id": "blocked_question_controls",
+      "why": "The select/accept controls are unique to Copilot's question dialog, so they catch it even if the header is reworded, and a long question is still caught once its header scrolls out of the window. What keeps ordinary output - `cat`, `rg` or a diff quoting these files - from reading as a prompt is this literal and the window, not the guard: the footer it tests is the same row the literal matches.",
+      "when": {
+        "region": "text",
+        "find": {
+          "lastOf": "enter accept"
+        },
+        "withinLastLines": 12,
+        "lines": {
+          "atLeast": 1,
+          "includingLast": false,
+          "test": {
+            "any": [
+              {
+                "contains": "ctrl+d decline"
+              },
+              {
+                "contains": "esc cancel"
+              }
+            ]
+          }
+        }
+      },
+      "answer": {
+        "state": "blocked",
+        "reason": "agent-interactive-prompt"
+      }
+    }
+  ],
+  "rules": []
+}
