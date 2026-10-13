@@ -1,7 +1,13 @@
 /**
- * Copilot CLI's blocking prompts, taken from captured PTY transcripts of CLI 1.0.97
- * (`__fixtures__/copilot-permission-prompt.txt`, `__fixtures__/copilot-question-prompt.txt`; the
- * raw recordings, escapes intact, are the source these visible lines were read from).
+ * Copilot CLI's blocking prompts, taken from captured PTY transcripts of CLI 1.0.97. The three
+ * fixtures are the visible lines of those captures: `copilot-permission-prompt.txt` (URL access),
+ * `copilot-command-prompt.txt` (shell command), `copilot-question-prompt.txt`.
+ *
+ * Known gap: AGENTS.md asks for raw recordings with escapes intact plus a `.meta.json`, and these
+ * are extracted text, so the redraw pipeline is not exercised here. What protects an ANSWERED dialog
+ * is the CLI erasing it, not `withinLastLines` - a dialog left in the tail still reads until about six
+ * (approval) to ten (question) lines follow it. The raw before/after pair is what would rule out a
+ * renderer that commits it to scrollback, or a dialog taller than the viewport.
  *
  * The screen is the only witness. Copilot's hooks carry no "a prompt is up" event: a
  * `permission_prompt` also fires for the requests the CLI approves itself (measured: 3,611
@@ -10,7 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { readRuntimeFixture } from './agent-transcript-replay-test-harness'
+import { readRuntimeFixture, replayTranscript } from './agent-transcript-replay-test-harness'
 import { detectTerminalWaitBlockedReason } from './terminal-wait-detection'
 
 describe("Copilot's blocking prompts, from captured transcripts", () => {
@@ -64,5 +70,28 @@ describe("Copilot's blocking prompts, from captured transcripts", () => {
     const trust =
       '│ Confirm folder trust\n│ │ /private/tmp/cc-approval\n│ Do you trust the files in this folder?'
     expect(detectTerminalWaitBlockedReason(trust)).toBe('agent-trust-workspace')
+  })
+
+  it('stops reading a question the pane has scrolled well past', () => {
+    const scrolled = `${readRuntimeFixture('copilot-question-prompt')}\n${'output line\n'.repeat(12)}`
+    expect(detectTerminalWaitBlockedReason(scrolled)).toBeNull()
+  })
+
+  it('still reads a question with rows painted under its status line', () => {
+    const longer = `${readRuntimeFixture('copilot-question-prompt')}\n model: gpt-6-luna\n cwd /tmp/cc-cap-q`
+    expect(detectTerminalWaitBlockedReason(longer)).toBe('agent-interactive-prompt')
+  })
+
+  it('stops reading a dialog the CLI has erased from the screen', async () => {
+    // Why the erase and not the tail window: this is what protects an answered dialog.
+    const erased = `${readRuntimeFixture('copilot-question-prompt')}${'\u001b[2K\u001b[1A'.repeat(12)}`
+    let ruledScreenLines: readonly string[] = []
+    let waitText = ''
+    for await (const frame of replayTranscript(erased, 120, 40)) {
+      ruledScreenLines = frame.ruledScreenLines
+      waitText = frame.waitText
+    }
+    expect(detectTerminalWaitBlockedReason(ruledScreenLines.join('\n'))).toBeNull()
+    expect(detectTerminalWaitBlockedReason(waitText)).toBeNull()
   })
 })
