@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
@@ -47,6 +47,102 @@ export type JiraUserPickerFixedOption = {
   onSelect: () => void
 }
 
+function matchesJiraUserQuery(user: JiraUser, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) {
+    return true
+  }
+  return (
+    user.displayName.toLowerCase().includes(needle) ||
+    (user.email?.toLowerCase().includes(needle) ?? false)
+  )
+}
+
+/**
+ * Splits picker candidates into the people pinned above the list — the current user
+ * and the project's roster, in the order the caller passed them — and the rest of the
+ * matches. The pinned side is narrowed by `query` and both sides are deduped by account,
+ * so a typed query trims the pinned group instead of pushing the whole list below it.
+ * Candidates are left as the caller sent them: a site that matches on username rather
+ * than display name would lose real hits to a second, local filter.
+ */
+export function splitJiraUserPickerOptions({
+  candidates,
+  pinned,
+  query
+}: {
+  candidates: JiraUser[]
+  pinned: JiraUser[]
+  query: string
+}): { pinned: JiraUser[]; rest: JiraUser[] } {
+  const claimed = new Set<string>()
+  const pinnedUsers: JiraUser[] = []
+  for (const user of pinned) {
+    if (claimed.has(user.accountId) || !matchesJiraUserQuery(user, query)) {
+      continue
+    }
+    claimed.add(user.accountId)
+    pinnedUsers.push(user)
+  }
+  const rest = candidates.filter((user) => {
+    if (claimed.has(user.accountId)) {
+      return false
+    }
+    claimed.add(user.accountId)
+    return true
+  })
+  return { pinned: pinnedUsers, rest }
+}
+
+/** Debounced candidate lookup shared by the Jira user pickers, run while `active`.
+ *  `searchUsers` must be referentially stable, or the search restarts on every render. */
+export function useJiraUserSearch({
+  active,
+  query,
+  searchUsers
+}: {
+  active: boolean
+  query: string
+  searchUsers: (query: string) => Promise<JiraUser[]>
+}): { users: JiraUser[]; loading: boolean } {
+  const [users, setUsers] = useState<JiraUser[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!active) {
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    // Why: the previous query's matches must not sit under the new query while it is in flight.
+    setUsers([])
+    const timer = setTimeout(() => {
+      void searchUsers(query)
+        .then((found) => {
+          if (!cancelled) {
+            setUsers(found)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setUsers([])
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoading(false)
+          }
+        })
+    }, USER_SEARCH_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [active, query, searchUsers])
+
+  return { users, loading }
+}
+
 export function JiraUserPicker({
   providerSettings,
   siteId,
@@ -72,38 +168,23 @@ export function JiraUserPicker({
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [users, setUsers] = useState<JiraUser[]>([])
-  const [loading, setLoading] = useState(false)
+  const defaultSearch = useCallback(
+    (value: string) => jiraSearchUsers(providerSettings, value, siteId),
+    [providerSettings, siteId]
+  )
+  const { users, loading } = useJiraUserSearch({
+    active: open,
+    query,
+    searchUsers: searchUsers ?? defaultSearch
+  })
 
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-    let cancelled = false
-    setLoading(true)
-    const timer = setTimeout(() => {
-      void (searchUsers ? searchUsers(query) : jiraSearchUsers(providerSettings, query, siteId))
-        .then((found) => {
-          if (!cancelled) {
-            setUsers(found)
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setUsers([])
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setLoading(false)
-          }
-        })
-    }, USER_SEARCH_DEBOUNCE_MS)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [open, providerSettings, query, searchUsers, siteId])
+  const selectUser = useCallback(
+    (user: JiraUser) => {
+      onSelect(user)
+      setOpen(false)
+    },
+    [onSelect]
+  )
 
   const triggerLabel = useMemo(() => {
     if (selectedUser?.displayName) {
@@ -158,13 +239,7 @@ export function JiraUserPicker({
             {translate('components.jiraUserPicker.empty', 'No users found')}
           </p>
         ) : (
-          <JiraUserOptionList
-            users={users}
-            onSelect={(user) => {
-              onSelect(user)
-              setOpen(false)
-            }}
-          />
+          <JiraUserOptionList users={users} onSelect={selectUser} />
         )}
       </PopoverContent>
     </Popover>
