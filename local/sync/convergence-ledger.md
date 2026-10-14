@@ -315,6 +315,14 @@ blank first shell activates a background workspace. **Do not** drop the `provisi
 when the guard is next touched, and keep the automation test's
 `expect(runtime.createTerminal).not.toHaveBeenCalled()`.
 
+**Open (found by the sync's review):** the same double-setup shape survives for an automation create
+that *does* carry a startup command — the spawner stages setup and
+`provisionManagedWorktreeTerminals` runs it again with `hasStartupTerminal: false`
+(`worktree-remote.ts`). Upstream at `8b0fa15e94` behaves the same, and no current caller reaches it
+(the in-app automation dispatch passes no startup, and the other automation creates go through
+`createManagedWorktree`), so it was not changed mid-sync. Fix it when an automation path grows a
+startup command.
+
 ---
 
 ## Identity: this fork ships as Orca NP
