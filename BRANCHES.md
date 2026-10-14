@@ -1,12 +1,14 @@
 # Branch tracker
 
-Last updated **2026-10-09** — `nplez1/main` merged upstream main @ `1cda323b6a` (199 commits) into
-the release line from `6a7b39c398` (merge `f94d10ff60`). 37 conflicted paths, dominated by one
-convergence decision: upstream rebuilt the worktree-meta dialog as a linked-items model in the same
-week this fork built its Jira link into the same files, so the fork takes upstream's model and
-deletes its own superseded dialog modules. Six further breaks that no conflict marker showed were
-found by `pnpm tc` and the tests. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how
-that is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
+Last updated **2026-10-13** — `nplez1/main` merged upstream main @ `8b0fa15e94` (389 commits) into
+the release line from `dcb5ddfbc1` (merge `2fc80b8baf`, rollback tag
+`archive/pre-sync-dcb5ddfbc1`). 68 conflicted paths, and the convergence was the **end** of the SSH
+relay story: upstream retired the last relay-era git and quick-open plumbing, so the fork's surviving
+SSH path-search stack was deleted rather than re-pointed, and an SSH target now answers locally (see
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § SSH relay removal).
+Thirty-three typecheck sites, three max-lines overflows and a 14-site identity sweep were the breaks
+no conflict marker showed. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how that is
+done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
@@ -67,17 +69,20 @@ dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
 
-After the 2026-10-01 sync, **every PR-bound branch still sits on a pre-sync base** — none of them
+After the 2026-10-13 sync, **every PR-bound branch still sits on a pre-sync base** — none of them
 was rebased this time either. `#20813` is open and was deliberately left where it is; the rest are
-unopened. Measured by merge-base against `upstream/main`:
+unopened. Measured by merge-base against `upstream/main` on 2026-10-13:
 
 - the **seven PR-bound branches** (`fix/cli-symlink-world-readable`, `fix/copilot-background-work`,
   `fix/repo-catalog-connection-fence`, `fix/claude-codex-enterprise-accounts`, `feat/copilot-usage`,
-  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **1141 commits behind**;
+  `feat/deepseek-usage`, `feat/fireworks-usage`) sit on `560c42e1d1`, **2818 commits behind**;
 - the **five deliberately-left ones** (`feat/worktree-scan-cache-persistence`,
   `fix/terminal-session-reconnect`, `feat/startup-worktree-hydration`,
   `feat/startup-service-ordering`, `fix/agent-status-routing-readiness`) sit on `615b1370fb`,
-  **1235 commits behind**.
+  **2912 commits behind**.
+
+The two merge-bases have not moved since 2026-10-01 — the branches really are untouched, only the
+behind count grows (1141→2818 and 1235→2912 across four upstream syncs).
 
 Re-measure rather than trusting those numbers (`node local/branch-status.mjs`, and merge-base against
 `upstream/main` for the behind count, which that script does not print). `origin/main` was

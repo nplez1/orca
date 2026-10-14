@@ -326,6 +326,116 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-13 — merge of upstream `8b0fa15e94` (389 commits) into the release line, from
+  `dcb5ddfbc1`** (merge base `cc5c85fb7a`, rollback tag `archive/pre-sync-dcb5ddfbc1`). The merge
+  produced **68 conflicted paths** — `both-rewrote 34, union 23, modify/delete 8, duplicate-tail 2,
+  duplicate-members 1` — as the dry run predicted. Pre-flight failed once, on the derived catalog:
+  the four `ExperimentalPane.agentDashboard` entries the 2026-10-11 repair of
+  `AgentDashboardExperimentalSetting.tsx` left behind have literal defaults identical to their call
+  sites, so the generator no longer requires them; regenerating and committing that
+  (`dcb5ddfbc1`) was the gate's required state.
+
+  - **The SSH convergence is now finished, not extended.** Upstream retired the last relay-era git
+    and quick-open plumbing: `SshGitWorktreeProvider`, `removeRegisteredRemoteWorktree`,
+    `runtime-registered-remote-worktree-removal`, the `getSshFilesystemProvider` branch of
+    `fs:listFiles`, and — with them — the fork's still-live SSH path-search stack
+    (`filesystem-remote-path-search.ts`, the `RuntimeFileCommandsWithWorkspacePathSearch` mixin,
+    `ssh-filesystem-provider-crud.ts`, the `remote-session-scanner-*` family's copilot source).
+    Those files had no surviving caller and no surviving implementation of the provider methods they
+    called, so the deletions are adopted rather than reverted: `fs:searchFilePaths` answers an SSH
+    target with an empty result the way `fs:listFiles` does, `files.searchPaths` follows upstream's
+    shape (a name-filter request is the mobile/file search), and the fork's two
+    `IFilesystemProvider` additions plus the `searchWorkspacePathNameFilter` surface are gone with
+    them. The **local** half of #34 — the worker-owned path index, `fs:searchFilePaths` over IPC,
+    the name filter in the explorer — is intact and unchanged.
+  - **`deleteRemoteBranch` survives, on the local path only.** Upstream now routes every removal
+    through `removeRegisteredLocalWorktree` and refuses `repo.connectionId` with
+    `SshHostNotServedError`, so the fork's relay-era remote variants of that path are gone; the
+    option keeps flowing from the RPC params to `git worktree remove` on the local path, which is
+    the ledger's existing "Worktree create and removal" decision unchanged.
+  - **The fork's reconnect direct-SSH scoping went with its type.** Upstream deleted
+    `ReconnectPersistedTerminalsOptions` and the `directSshAuthority` plumbing along with
+    `direct-ssh-retry-status.ts` and `hidden-restore-state-and-ssh-probe.ts`; the fork's extra
+    parameter was already dead at the call sites (all of them pass a signal only), so the removal is
+    adopted and `publishPersistedTerminalHints` — the fork's extraction, used by the slice type and
+    its suite — is kept.
+  - **`en.json` was hand-unioned, not resolved by picking a side.** Both sides had rewired large
+    parts of the source catalog, and this time the merge conflicted (12 hunks) instead of
+    auto-merging. The union was computed as a three-way JSON merge with the fork's key order as the
+    spine: **0 true conflicts**, 69 keys dropped because upstream deleted them and the fork never
+    changed them, 618 fork-only keys kept, and the derived `en-runtime-required.json` regenerated
+    (never hand-merged). The 69 drops were checked against the source tree — none of them is
+    referenced by code — and `verify:localization-extraction` agrees. The technique is now in the
+    ledger's localization entry so the next sync does not re-derive it.
+  - **The `check:owner-routing-ratchet` → `check:focus-read-ratchet` replacement is not a loss.**
+    Upstream split the ratchet into `check-focus-read-ratchet.mjs` and
+    `check-layout-writer-ratchets.mjs`, and the file the new script reads is the fork's own
+    `config/focus-setting-read-baseline.txt`, which still carries the thirteen Jira/Linear files the
+    2026-10-11 sync registered. The lint chain now names the new scripts; the old script and its
+    three helpers (`countFocusRoutingCalls`, `formatBaseline`, `parseBaselineNotes`) are gone with
+    nothing to re-home.
+  - **Three files upstream left at the `oxlint` max-lines budget needed room for the fork's
+    additions** — and one had none left to give. `handler-group-manifest.ts` (exactly 300 code
+    lines upstream, +1 from the fork's `repo relocate` key) now spreads `LINEAR_HANDLER_GROUPS` from
+    a new `linear-handler-groups.ts`, mirroring upstream's own `browser-handler-groups.ts`, which
+    also buys headroom for the next sync; `protocol-version.ts` reached 302 because the fork's
+    derived `WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY` alias was two lines, so the array
+    entry now uses the contract's name and the one test that imported the alias imports it from
+    `workspace-path-search-contract`; `service-full-cycle-preparation.ts` and `FileExplorer.tsx`
+    were brought back under budget by collapsing wrapped constructions and, in `FileExplorer.tsx`,
+    dropping the `translate` import upstream's deleted inline placeholder had left behind. **Do not
+    add a max-lines disable for any of these** (AGENTS.md) — split or compact.
+  - **A silent loss the conflict markers did not show, and the typecheck did.** The `translate`
+    import above is one of **33 typecheck sites in 12 files** the first `pnpm tc` after the merge
+    reported. All of them were the same two shapes: a caller whose module upstream retired in this
+    range (the SSH path-search stack, the `remote-session-scanner-*` family, `getSshFilesystemProvider`
+    mock factories, the `ssh-git-dispatch`/`./pty` mock shapes) or a fork literal that no longer
+    matched a type upstream widened (the new `PairedRuntimeConnection` fields, `WatchedRoot`'s five
+    path-index fields, the disposition table's two new settings, `EventEmitter`'s import dropped by
+    upstream's own test deletion). Every one is fixed in `c17416e75f`; `pnpm tc` is clean.
+  - **The unreferenced-export census was reviewed, not waved through.** 34 exported names in modules
+    deleted between the pre-sync tip and HEAD have no surviving reference. They fall into three
+    groups, each verified by finding the successor: **renamed** (`registerLegacyBinaryControlFrames`
+    → `registerTerminalSubscribeBinaryControlFrames`, `parseCopilotSessionContent` →
+    `parseCopilotSessionFile`, the signed-out-child retire logic →
+    `structured-agent-session-outgrown-child.ts`), **superseded** (`check-owner-routing-ratchet.mjs`
+    by the two ratchets above), and **dead with the relay/direct-SSH removal** (`ssh-relay-*`,
+    `relay-retry-after-header`, `docker-ssh-relay-*`,
+    `relay-windows-process-tree-prepared-addon`, `direct-ssh-retry-status`,
+    `hidden-restore-state-and-ssh-probe`, the remote-layout snapshot and terminal-legacy families).
+    Nothing had a live caller to re-home.
+  - **The identity sweep flagged 14 sites, all of them upstream's new hook tests** writing
+    `~/.orca`: `gemini`, `kimi`, `copilot`, `command-code`, `agent-hooks`. `identity-sweep.mjs
+    --fix` re-pointed them at `~/.orca-np` — for `gemini`/`command-code` those are assertions about
+    where the service really installs, so the sweep was load-bearing rather than cosmetic. It now
+    reports **0 fixable** (1130 report-only, 231 allowlisted).
+  - **Kept deliberately, against upstream's deletion:** the `runtime-file-client.ts` barrel (the
+    fork re-exports its split `searchRuntimeFilePaths` through it, and four fork renderer files
+    import it, so the renderer tests keep importing the split module rather than upstream's); the
+    `git blame`-visible question of the barrel is answered in the ledger. The zcode stores keep the
+    fork's `getSecretStore` port and never adopt upstream's `guardedSafeStorage` — the 2026-10-11
+    decision stands. The hidden-SSH-target status-bar filter stays while upstream's
+    `userManagedEnvironments`/`visibleHostLabels` wording replaces the old host list.
+  - **Re-seated rather than resolved by picking a side:** `editor-tab-view-types.ts` gained the
+    fork's `errorAction` field after upstream moved `OpenCheckRunDetailsState` there, with
+    `CheckDetailsErrorAction` lifted to shared and re-exported from the renderer lib; the AgentsPane
+    keeps upstream's `AgentLaunchSettingsSection` structure with the fork's `SessionSummaryAiSetting`
+    and `AgentSessionSearchSection` re-inserted; the jump palette keeps `applyWorkspaceKindFilters`
+    and gains upstream's folder exemption; `runtime-project-host-setup-controller` and
+    `main-process-runtime-service` keep the fork's own additions beside upstream's; `MAIN_BUILD_ENTRY_POINTS`
+    (upstream's new module) gained the fork's `workspace-path-index-worker-entry`, which the merged
+    guard would otherwise have failed at build start.
+  - **Test evidence:** `pnpm tc` clean after `c17416e75f`; repo-wide `oxlint` clean; identity sweep
+    0 fixable; the full `pnpm test` run and its classified failures are recorded in the release
+    entry below once the workflow has run.
+  - **Follow-ups, named rather than left as TODOs:** (1) the explorer name filter has no
+    runtime/SSH half any more — if a remote name filter is wanted, it needs a new transport, not a
+    resurrection of `searchWorkspacePathNameFilter`; (2) `protocol-version.ts` sits at exactly 300
+    code lines with no headroom, so the next capability upstream adds must be split out, and
+    `mobile-web-bundle-manifest.mjs` scrapes `runtime-protocol-versions.ts` — keep the constant's
+    line intact; (3) the fork's `files-path-search.test.ts` additions for the deleted name-filter
+    branch are gone with upstream's version of that file.
+
 - **2026-10-11 — merge of upstream `cc5c85fb7a` (386 commits) into the release line, from
   `cce80247fb`** (merge base `1cda323b6a`, rollback tag `archive/pre-sync-cce80247fb`). Pre-flight
   passed and recorded the conflict set; the merge produced **102 conflicted paths** — `both-rewrote

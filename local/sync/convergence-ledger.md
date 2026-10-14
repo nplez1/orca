@@ -17,21 +17,34 @@ Rules for using it:
 
 ## SSH relay removal: upstream's orcad model wins
 
-**Paths:** `src/relay/**`, `src/wsl-guest/**`, `src/shared/ssh-ai-vault-relay.ts`, `src/main/providers/ssh-filesystem-*.ts`, `src/main/runtime/runtime-file-commands-search-remote-quick-*`
+**Paths:** `src/relay/**`, `src/wsl-guest/**`, `src/shared/ssh-ai-vault-relay.ts`, `src/main/providers/ssh-filesystem-*.ts`, `src/main/runtime/runtime-file-commands-search-remote-quick-*`, `src/main/runtime/runtime-file-commands-workspace-path-search.ts`, `src/main/ipc/filesystem/filesystem-remote-path-search.ts`, `src/main/providers/ssh-filesystem-provider-crud.ts`, `src/main/ai-vault/remote-session-scanner-*.ts`
 
 **Decision:** Upstream's deletion of the SSH relay stands. The 2026-10-11 sync takes the whole
 `src/relay/` removal (`2b4b60a87e` the server, `ff27338299` the client path) instead of reverting
 it, and the fork's WSL guest sources follow upstream into `src/wsl-guest/` (`31b2b17d9b`). SSH hosts
 are served by orcad; there is no relay on this branch.
 
+The **2026-10-13 sync finishes that removal**: upstream retired the last relay-era callers
+(`SshGitWorktreeProvider`, `removeRegisteredRemoteWorktree`,
+`runtime-registered-remote-worktree-removal`, the `getSshFilesystemProvider` branch of `fs:listFiles`),
+and the fork's remaining SSH path-search stack goes with them rather than being re-pointed. An SSH
+target is answered locally now: `fs:listFiles` and `fs:searchFilePaths` return an empty list, and
+`files.searchPaths` takes upstream's mobile/file-search shape. The fork's `IFilesystemProvider`
+additions (`searchWorkspacePathNameFilter`, `workspacePathSearchCapability`) are deleted with their
+implementations.
+
 **Why:** the fork's own investment in the relay is three commits (explorer name filter #34,
 agent-status #26, the ai-vault session-history pair) against 467 files and ~158k lines upstream has
 abandoned. Reverting would make the fork the sole maintainer of the subsystem and re-open the same
-~100-file conflict set at every future sync.
+~100-file conflict set at every future sync. By 2026-10-13 the relay-era SSH path-search stack had
+no surviving provider implementation to call, so keeping it would mean re-implementing the relay,
+not preserving a feature.
 
 **Do not:** reintroduce `src/relay/` or a relay client path; leave fork-added relay files at the old
 flat `src/relay/` path instead of relocating them under `src/wsl-guest/`; or keep citing the
-fork's relay-era SSH docs as describing this branch.
+fork's relay-era SSH docs as describing this branch. **Do not resurrect
+`searchWorkspacePathNameFilter` or `ssh-filesystem-provider-crud.ts`** — a remote name filter needs
+a new transport, not the old provider hook.
 
 ---
 
@@ -132,7 +145,11 @@ applies only when `hostAppliedScope` is true.
 there), and upstream's identity tests pin that.
 
 **Do not:** pick a separator from the presence of a backslash, or reject absolute-looking paths on
-the non-host path.
+the non-host path; or delete the `src/renderer/src/runtime/runtime-file-client.ts` barrel while the
+fork's renderer files still import it — upstream deleted that barrel on 2026-10-13 and the fork
+keeps it, with `searchRuntimeFilePaths` living in `runtime-file-path-search-client.ts` and the
+barrel re-exporting it. The **runtime/SSH half of #34 is gone** (see "SSH relay removal"): the local
+handler, the worker-owned index and the projection are the surviving feature.
 
 ---
 
@@ -267,7 +284,11 @@ capture `.handle` from both `splitTerminal` and `createTerminal`.
 pin the two-argument blank-create call.
 
 **Do not:** drop `deleteRemoteBranch` between the IPC entry point and `git worktree remove`, or
-revert the blank-create branch to a single unconditional spawn.
+revert the blank-create branch to a single unconditional spawn. Since 2026-10-13 there is **no SSH
+variant of that path**: upstream refuses `repo.connectionId` with `SshHostNotServedError` and routes
+every removal through `removeRegisteredLocalWorktree`, so the option is threaded to the local path
+only — do not re-add `removeRegisteredRemoteWorktree` or thread the option through a revived SSH
+branch.
 
 ---
 
@@ -281,9 +302,15 @@ userData `appData/orca-np`, home directory `~/.orca-np`, NSIS ProgIDs `OrcaNP.Ma
 relay's fixed plain `orca` shim are deliberate exceptions.
 
 **Why:** coexistence with an official install is the whole point of the identity patch, and upstream
-keeps adding new `~/.orca` and `orca.exe` references that must be swept each sync.
+keeps adding new `~/.orca` and `orca.exe` references that must be swept each sync. Upstream's tests
+are the biggest source: the 2026-10-13 sync flagged 14 fresh `~/.orca` sites, all in upstream's new
+hook-service suites, and for `gemini`/`command-code` they are assertions about where the service
+really installs.
 
-**Do not:** rename the URL scheme, or sweep the relay shim to `orca-np`.
+**Do not:** rename the URL scheme, or sweep the relay shim to `orca-np`; **and never hand-edit the
+sweep's subjects** — run `node local/sync/identity-sweep.mjs --fix` on a clean tree and review the
+diff (it reports `N fixable`, which must be 0). A hook test that writes `~/.orca` fails against this
+build, it does not merely read oddly.
 
 **Tooling:** `node local/sync/identity-sweep.mjs` reports every remaining violation (allowlisted
 cases are in that script).
@@ -376,6 +403,13 @@ older fixture.
 
 **Do not:** hand-edit the derived catalog, or resolve a locale conflict by picking a side for the
 derived file.
+
+**Conflict technique (2026-10-13):** when `en.json` itself conflicts, compute a three-way JSON
+merge — base/ours/theirs — with the fork's key order as the spine, then review the two counts that
+fall out: keys dropped because upstream deleted them and the fork never changed them, and keys kept
+because the fork owns them. On 2026-10-13 that was 0 true conflicts, 69 dropped, 618 kept, and the
+dropped set was checked against the source tree before it was believed. Never textually union the
+1 MB file: a hand union reorders keys and hides a dropped entry in the churn.
 
 ---
 
@@ -614,3 +648,25 @@ regression of a merged PR, not a tidy-up.
 **Do not:** reintroduce `SshTargetCardActions.tsx` or a second list component —
 `SshTargetServerList.tsx` was a duplicate of `SshTargetList.tsx` and is deleted; or drop
 `onSetHidden`/the toggle when upstream rewrites the card again.
+
+---
+
+## Max-lines budget pressure
+
+**Paths:** `.oxlintrc.json`, `config/max-lines-baseline.txt`, `src/cli/handler-group-manifest.ts`, `src/shared/protocol-version.ts`, `src/main/rate-limits/service/service-full-cycle-preparation.ts`, `src/renderer/src/components/right-sidebar/FileExplorer.tsx`
+
+**Decision:** upstream keeps several files at exactly the `.ts` budget (300 non-blank, non-comment
+lines), so **any** fork addition to one of them overflows and fails `oxlint` — no conflict marker
+shows it, and `pnpm tc` does not either. The 2026-10-13 sync hit four: the Linear handler groups
+moved to `linear-handler-groups.ts` (mirroring upstream's own `browser-handler-groups.ts`, which also
+buys headroom); the fork's two-line `WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY` alias was
+replaced by the contract's own name; and two wrapped constructions were collapsed.
+
+**Why:** the file is upstream's, so the fork cannot shrink upstream's half; the fork's own addition is
+always the line that has to go or move.
+
+**Do not:** add a `max-lines` disable or a `config/max-lines-baseline.txt` entry (AGENTS.md forbids
+the first, and the ratchet exists to fail the second). **Do not move a declaration out of
+`src/shared/protocol-version.ts` without checking `config/scripts/mobile-web-bundle-manifest.mjs`** —
+it regex-scrapes `runtime-protocol-versions.ts` for `RUNTIME_PROTOCOL_VERSION`, and the 2026-10-11
+split broke `readProtocolWindow()` that way.
