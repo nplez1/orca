@@ -230,8 +230,9 @@ const macUsageDescriptions = {
 }
 // Developer ID team that signs every release-channel mac build. Why the env first: this fork signs
 // with its own Developer ID, so the team notarization uses (APPLE_TEAM_ID, present whenever
-// MAC_CERTS is) is the team the packaged helper must carry — upstream's constant is upstream's own
-// team, kept as the fallback for an unsigned build.
+// MAC_CERTS is) is the team the packaged helper must carry. Upstream's constant is its own team and
+// is only reached by a release-flagged build that sets neither — upstream's own workflows; an
+// unsigned build never compares teams (`expectedTeamId` is null without ORCA_MAC_RELEASE).
 const ORCA_MAC_TEAM_ID = process.env.APPLE_TEAM_ID ?? '6CX3WHS9HZ'
 
 /** @type {import('electron-builder').Configuration} */
