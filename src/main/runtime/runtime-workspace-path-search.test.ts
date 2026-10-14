@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { searchQuickOpenFilePathsMock } = vi.hoisted(() => ({
   searchQuickOpenFilePathsMock: vi.fn()
@@ -26,6 +26,10 @@ function scope(): WorkspacePathSearchScopeDescriptor {
 
 describe('runtime forwarding of negotiated workspace path search', () => {
   useRuntimeFileCommandsLifecycle()
+
+  // Why reset between cases: the suite asserts `not.toHaveBeenCalled()` on the local walk, and this
+  // config does not clear mocks, so a call carried over from an earlier case would hide a regression.
+  beforeEach(() => searchQuickOpenFilePathsMock.mockReset())
 
   it('answers an SSH route with an unsupported partial response, and installs nothing', async () => {
     // Why: the relay-era provider hook this branch used to call is gone (2026-10-13 sync); an SSH
@@ -84,7 +88,7 @@ describe('runtime forwarding of negotiated workspace path search', () => {
     const hiddenDotfileScope = {
       ...scope(),
       includeDotfiles: false,
-      excludePathSegments: []
+      excludePathSegments: [['nested']]
     }
     const { commands } = createRuntimeFileCommands({
       resolveRuntimeFileTarget: vi.fn(async () => ({
@@ -97,6 +101,7 @@ describe('runtime forwarding of negotiated workspace path search', () => {
       commands.searchWorkspacePathNameFilter('id:wt-1', {
         query: 'target',
         limit: 32,
+        excludePaths: ['/repo/nested'],
         scope: hiddenDotfileScope,
         maxPageSerializedBytes: 400_000,
         correlationId: 'hidden-dotfiles-query'
@@ -107,10 +112,19 @@ describe('runtime forwarding of negotiated workspace path search', () => {
       count: { value: 1, provenance: 'exact-snapshot' }
     })
 
+    // Every field the local branch forwards, so a dropped limit, mode, ignored-files or exclusion
+    // flag fails here rather than silently narrowing the search.
     expect(searchQuickOpenFilePathsMock).toHaveBeenCalledWith(
       '/repo',
       expect.anything(),
-      expect.objectContaining({ includeDotfiles: false })
+      expect.objectContaining({
+        query: 'target',
+        limit: 32,
+        mode: 'name-filter',
+        excludePaths: ['/repo/nested'],
+        includeIgnoredFiles: false,
+        includeDotfiles: false
+      })
     )
   })
 })
