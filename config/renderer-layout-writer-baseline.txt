@@ -122,4 +122,4 @@
 3 src/renderer/src/store/terminals/terminal-tab-presentation.ts
 5 src/renderer/src/store/terminals/workspace-terminal-hydration-patch.ts
 2 src/renderer/src/store/terminals/workspace-terminal-hydration.ts
-2 src/renderer/src/store/terminals/workspace-terminal-reconnect.ts
+4 src/renderer/src/store/terminals/workspace-terminal-reconnect.ts

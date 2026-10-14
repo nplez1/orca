@@ -425,16 +425,43 @@ pnpm run sync:localization-runtime-catalog
     `main-process-runtime-service` keep the fork's own additions beside upstream's; `MAIN_BUILD_ENTRY_POINTS`
     (upstream's new module) gained the fork's `workspace-path-index-worker-entry`, which the merged
     guard would otherwise have failed at build start.
+  - **Two upstream ratchets needed the fork's own counts.** `check:layout-writer-ratchets.mjs` and
+    `check:main-sync-spawn-ratchet.mjs` are both new in this range, baselined against upstream's
+    tree. `config/main-sync-spawn-baseline.txt` had one stale entry (a synchronous launch moved out
+    of `macos-tailscale-dns-diagnostic.ts`), pruned with the script's own `--prune`;
+    `config/renderer-layout-writer-baseline.txt` had `workspace-terminal-reconnect.ts` at upstream's
+    2 writes while the fork's `publishPersistedTerminalHints` adds two more, so that entry is 4 —
+    the fork's own code at its current count, the same shape the 2026-10-11 sync used for
+    `config/focus-setting-read-baseline.txt`. No other entry moved.
+  - **`pnpm lint` passes end to end in a CI-shaped tree** (no `mobile/` install). With
+    `mobile/node_modules` present in this checkout, `audit:code-quality:native`'s `--deny-warnings`
+    step reports five `import(no-cycle)` warnings in `mobile/` sources — verified to be identical at
+    `upstream/main` in the same environment, so they are a property of the installed mobile
+    workspace, not of this sync. Every step after it was run individually and passes.
   - **Test evidence:** `pnpm tc` clean after `c17416e75f`; repo-wide `oxlint` clean; identity sweep
-    0 fixable; the full `pnpm test` run and its classified failures are recorded in the release
-    entry below once the workflow has run.
+    0 fixable; `pnpm test` ran **120,557 tests with 159 failing across 36 files, none of them this
+    sync's**. Fifteen are the upstream-red/env classes that reproduce at the pre-merge tip
+    (`dcb5ddfbc1`, 57 failed tests there); two fail at `upstream/main` itself
+    (`tests/e2e/cross-version-wire/legacy-relay-bridge.unit.test.ts` and
+    `tests/e2e/agent-launch-setup-choice.unit.test.ts`); eighteen are the mobile-web-bundle and
+    macOS-host assembly script tests, which fail identically at the pre-merge tip in this
+    environment (they bundle the mobile app with esbuild and hit alias resolution — the `mobile`
+    workspace's install is partial here); one (`src/main/ssh/orcad-state-snapshot-shell.test.ts`)
+    fails only under full-suite load and passes in isolation. The ten files that *were* this sync's
+    are fixed in `d31978f8e3`: an upstream test whose expectation this fork deliberately changed (the
+    host stages setup for a blank create with default tabs; the Linux CLI is `orca-np`; the daemon
+    host root and launchd bundle-id list are the fork's), and a fork file the merge re-pointed off
+    the module its suite mocks (the `runtime-file-client` barrel).
   - **Follow-ups, named rather than left as TODOs:** (1) the explorer name filter has no
     runtime/SSH half any more — if a remote name filter is wanted, it needs a new transport, not a
     resurrection of `searchWorkspacePathNameFilter`; (2) `protocol-version.ts` sits at exactly 300
     code lines with no headroom, so the next capability upstream adds must be split out, and
     `mobile-web-bundle-manifest.mjs` scrapes `runtime-protocol-versions.ts` — keep the constant's
     line intact; (3) the fork's `files-path-search.test.ts` additions for the deleted name-filter
-    branch are gone with upstream's version of that file.
+    branch are gone with upstream's version of that file; (4) the launchd job label still names
+    `com.stablyai.orca` (`macDaemonJobLabel` in `macos-daemon-launchd.ts`, whose
+    `AssociatedBundleIdentifiers` already uses the fork's `appId`) — worth fixing for
+    coexistence, but it is persisted state, so it wants a migration rather than a sweep.
 
 - **2026-10-11 — merge of upstream `cc5c85fb7a` (386 commits) into the release line, from
   `cce80247fb`** (merge base `1cda323b6a`, rollback tag `archive/pre-sync-cce80247fb`). Pre-flight
