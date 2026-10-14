@@ -53,7 +53,7 @@ describe('CommandCodeHookService', () => {
     expect(config.hooks.PreToolUse[0].hooks[0].command).toMatch(
       process.platform === 'win32'
         ? wrapWindowsBatchHookCommand(
-            join(homeDir, '.orca', 'agent-hooks', 'command-code-hook.cmd')
+            join(homeDir, '.orca-np', 'agent-hooks', 'command-code-hook.cmd')
           )
         : /command-code-hook/
     )
@@ -71,7 +71,7 @@ describe('CommandCodeHookService', () => {
     try {
       expect(new CommandCodeHookService().install().state).toBe('installed')
       const command = wrapWindowsBatchHookCommand(
-        join(homeDir, '.orca', 'agent-hooks', 'command-code-hook.cmd')
+        join(homeDir, '.orca-np', 'agent-hooks', 'command-code-hook.cmd')
       )
       const config = JSON.parse(
         readFileSync(join(homeDir, '.commandcode', 'settings.json'), 'utf8')

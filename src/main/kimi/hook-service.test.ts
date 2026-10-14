@@ -75,10 +75,10 @@ describe('KimiHookService', () => {
     })
 
     it('registers the .cmd by bare forward-slash path, else the encoded launcher', () => {
-      expect(getManagedCommand('C:\\Users\\alice\\.orca\\agent-hooks\\kimi-hook.cmd')).toBe(
-        'C:/Users/alice/.orca/agent-hooks/kimi-hook.cmd'
+      expect(getManagedCommand('C:\\Users\\alice\\.orca-np\\agent-hooks\\kimi-hook.cmd')).toBe(
+        'C:/Users/alice/.orca-np/agent-hooks/kimi-hook.cmd'
       )
-      const spacedPath = 'C:\\Users\\Bob Smith\\.orca\\agent-hooks\\kimi-hook.cmd'
+      const spacedPath = 'C:\\Users\\Bob Smith\\.orca-np\\agent-hooks\\kimi-hook.cmd'
       expect(getManagedCommand(spacedPath)).toBe(wrapWindowsHookCommand(spacedPath))
     })
 

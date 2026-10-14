@@ -74,7 +74,12 @@ describe('drive checkout suspect paths with real Git', () => {
     root = {
       subscription: { unsubscribe: async () => {} },
       listeners: new Map(),
+      indexConsumers: new Set(),
       batch: createDebouncedBatch(),
+      eventSequence: 0,
+      indexReconciliationPromise: Promise.resolve(),
+      indexReconciliationController: new AbortController(),
+      indexCoverageTimer: null,
       rootPath: repo
     }
     rootKey = getLocalWatcherRoot(repo).key

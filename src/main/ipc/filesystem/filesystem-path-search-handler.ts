@@ -21,7 +21,6 @@ import { resolveQuickOpenResultLimit } from '../../../shared/quick-open-listing-
 import { searchQuickOpenFilePaths } from '../filesystem-search-file-paths'
 import { resolveAuthorizedPath } from '../filesystem-auth'
 import { recordQuickOpenPathSearchFallback } from '../quick-open-path-inventory'
-import { searchSshWorkspaceNameFilter } from './filesystem-remote-path-search'
 import { WORKSPACE_PATH_INDEX_LISTING_POLICY_VERSION } from '../../workspace-path-index/workspace-path-index-runtime'
 import type { WorkspacePathIndexService } from '../../workspace-path-index/workspace-path-index-service'
 import { runWorkspacePathIndexIfEnabled } from '../../workspace-path-index/workspace-path-index-feature-switch'
@@ -83,17 +82,8 @@ export function registerFilesystemPathSearchHandler(
           }
         }
         if (args.connectionId && args.mode === 'name-filter') {
-          return await searchSshWorkspaceNameFilter({
-            connectionId: args.connectionId,
-            rootPath: args.rootPath,
-            query: args.query,
-            limit,
-            excludePaths: args.excludePaths,
-            includeDotfiles: args.includeDotfiles,
-            includeIgnoredFiles: args.includeIgnoredFiles,
-            correlationId: args.correlationId,
-            signal: controller?.signal
-          })
+          // Why: an SSH target is not served here; quick-open shows "No matching files", as it did when disconnected.
+          return { files: [], totalCount: null, truncated: false }
         }
         const authorizedRootPath =
           args.mode === 'name-filter'

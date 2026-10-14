@@ -54,7 +54,12 @@ function watchRoot(rootPath: string): WatchedRoot {
   return {
     subscription: { unsubscribe: async () => {} },
     listeners: new Map(),
+    indexConsumers: new Set(),
     batch: createDebouncedBatch(),
+    eventSequence: 0,
+    indexReconciliationPromise: Promise.resolve(),
+    indexReconciliationController: new AbortController(),
+    indexCoverageTimer: null,
     rootPath
   }
 }

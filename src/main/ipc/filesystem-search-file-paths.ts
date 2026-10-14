@@ -188,8 +188,7 @@ export async function collectQuickOpenPaths(
   )
   const { wslDistro, wslDistroForOutput } = resolveBundledRipgrepWslRouting(
     authorizedRootPath,
-    localGitOptions.wslDistro,
-    { followSymlinks: args.followSymlinks }
+    localGitOptions.wslDistro
   )
   const excludePathPrefixes = buildExcludePathPrefixes(authorizedRootPath, args.excludePaths)
   const { primary, ignoredPass } = buildRgArgsForQuickOpen({

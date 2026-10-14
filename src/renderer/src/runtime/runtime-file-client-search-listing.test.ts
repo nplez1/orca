@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   cancelRuntimeFileList,
   listRuntimeFiles,
-  searchRuntimeFilePaths,
   searchRuntimeFiles
 } from './runtime-file-search-client'
+import { searchRuntimeFilePaths } from './runtime-file-path-search-client'
 import {
   listRuntimeMarkdownDocuments,
   runtimePathExists,

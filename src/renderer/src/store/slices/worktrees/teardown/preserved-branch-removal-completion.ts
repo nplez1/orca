@@ -2,7 +2,7 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import { showPreservedBranchToast } from '@/components/sidebar/preserved-branch-toast'
-import type { RuntimeClientTarget } from '../../../../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { buildPreservedBranchCleanup } from './worktree-removal-result'
 import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 

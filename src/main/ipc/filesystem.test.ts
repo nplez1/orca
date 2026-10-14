@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {

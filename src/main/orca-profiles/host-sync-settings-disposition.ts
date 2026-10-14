@@ -102,6 +102,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   mobilePairingCustomAddresses: 'hostLocal',
   machineName: 'hostLocal',
   experimentalEphemeralVms: 'hostLocal',
+  // Why hostLocal: whether this machine runs its Orca server inside a WSL distro is a fact about it.
+  experimentalWslHosts: 'hostLocal',
   activeRuntimeEnvironmentId: 'hostLocal',
   defaultRepoSelection: 'hostLocal',
 
@@ -225,6 +227,7 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   nativeChatQueueFollowUps: 'replicated',
   nativeChatInlineVisuals: 'replicated',
   nativeChatSessionOptions: 'replicated',
+  nativeChatPermissionMode: 'replicated',
   rightSidebarOpenByDefault: 'replicated',
   followSymlinkedDirectories: 'replicated',
   showGitIgnoredFiles: 'replicated',

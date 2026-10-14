@@ -118,16 +118,16 @@ describe('CopilotHookService', () => {
       vi.stubEnv('SystemRoot', 'C:\\Windows')
       for (const eventName of COPILOT_EVENTS) {
         expect(
-          getManagedCommand('C:\\Users\\alice\\.orca\\agent-hooks\\copilot-hook.cmd', eventName)
+          getManagedCommand('C:\\Users\\alice\\.orca-np\\agent-hooks\\copilot-hook.cmd', eventName)
         ).toBe(
-          `C:/Windows/System32/cmd.exe /d /c C:/Users/alice/.orca/agent-hooks/copilot-hook.cmd ${eventName}`
+          `C:/Windows/System32/cmd.exe /d /c C:/Users/alice/.orca-np/agent-hooks/copilot-hook.cmd ${eventName}`
         )
       }
       vi.unstubAllEnvs()
     })
 
     it('passes the event through the encoded launcher when the path is not cmd-safe', () => {
-      const scriptPath = 'C:\\Users\\Bob Smith\\.orca\\agent-hooks\\copilot-hook.cmd'
+      const scriptPath = 'C:\\Users\\Bob Smith\\.orca-np\\agent-hooks\\copilot-hook.cmd'
       for (const eventName of COPILOT_EVENTS) {
         expect(getManagedCommand(scriptPath, eventName)).toBe(
           wrapWindowsHookCommand(scriptPath, { ORCA_COPILOT_HOOK_EVENT: eventName })
@@ -199,9 +199,9 @@ describe('CopilotHookService', () => {
       const status = await new CopilotHookService().installRemote(remote.sftp, '/home/alice')
       expect(status.state).toBe('installed')
       const installed = remote.fs.files.get('/home/alice/.copilot/hooks/orca.json')
-      expect(installed).toContain('/home/alice/.orca/agent-hooks/copilot-hook.sh')
+      expect(installed).toContain('/home/alice/.orca-np/agent-hooks/copilot-hook.sh')
       expect(installed).not.toMatch(/powershell|EncodedCommand|copilot-hook\.cmd/)
-      expect(remote.fs.files.get('/home/alice/.orca/agent-hooks/copilot-hook.sh')).toContain(
+      expect(remote.fs.files.get('/home/alice/.orca-np/agent-hooks/copilot-hook.sh')).toContain(
         '#!/bin/sh'
       )
     })

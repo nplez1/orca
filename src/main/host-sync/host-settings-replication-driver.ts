@@ -4,6 +4,7 @@ import {
   type HostSettingsReplicationApplyResult
 } from '../../shared/host-settings-replication'
 import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import { resolveEnvironmentPairingOffer } from '../../shared/runtime-environment-store'
 import { HOST_SETTINGS_CREDENTIAL_PORTS } from './host-settings-credential-ports'
 import { setReplicatedCredentialChangeListener } from './host-settings-replication-service'
@@ -38,7 +39,7 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
       resolvePairing,
       sendRequest: (pairing, method, params, timeoutMs) =>
         sendRemoteRuntimeRequest<HostSettingsReplicationApplyResult>(
-          pairing,
+          pairedRuntimeConnectionFromOffer(pairing),
           method,
           params,
           timeoutMs
@@ -50,7 +51,7 @@ export function getHostSettingsReplicationSync(): HostSettingsReplicationSync {
       supportsReplication: async (environmentId) => {
         try {
           const response = await sendRemoteRuntimeRequest(
-            resolvePairing(environmentId),
+            pairedRuntimeConnectionFromOffer(resolvePairing(environmentId)),
             'status.get',
             undefined,
             CAPABILITY_PROBE_TIMEOUT_MS

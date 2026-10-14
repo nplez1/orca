@@ -117,7 +117,7 @@ describe('GeminiHookService', () => {
     try {
       expect(new GeminiHookService().install().state).toBe('installed')
       const command = wrapWindowsBatchHookCommand(
-        join(homeDir, '.orca', 'agent-hooks', 'gemini-hook.cmd')
+        join(homeDir, '.orca-np', 'agent-hooks', 'gemini-hook.cmd')
       )
       const config = JSON.parse(readFileSync(join(homeDir, '.gemini', 'settings.json'), 'utf8'))
       for (const eventName of ['BeforeAgent', 'AfterAgent', 'AfterTool', 'BeforeTool']) {
@@ -171,7 +171,7 @@ describe('GeminiHookService', () => {
     expect(preToolCommands).toEqual(['echo user-authored'])
     expect(config.hooks.BeforeTool[0].hooks[0].command).toMatch(
       process.platform === 'win32'
-        ? wrapWindowsBatchHookCommand(join(homeDir, '.orca', 'agent-hooks', managedHookFileName))
+        ? wrapWindowsBatchHookCommand(join(homeDir, '.orca-np', 'agent-hooks', managedHookFileName))
         : new RegExp(managedHookFileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     )
   })
