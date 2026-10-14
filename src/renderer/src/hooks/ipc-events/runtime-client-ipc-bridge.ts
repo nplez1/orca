@@ -232,7 +232,11 @@ export function registerRuntimeClientIpcBridge(
       )
       return subscription
     },
-    onEvent: handleRuntimeClientEvent
+    onEvent: handleRuntimeClientEvent,
+    // Why: the mount and replay refreshes race the stream itself, and a subscribe retried into
+    // backoff has no stream while its host stays connected, so a stream that just went live
+    // re-reads the host rather than assume those refreshes saw everything.
+    onSubscriptionLive: (environmentId) => requestProjectRefresh(environmentId)
   })
 
   // Why: no on-connect repo fetch (PR #2); seed discovery for connected runtimes or remote projects hide until Add-Project.

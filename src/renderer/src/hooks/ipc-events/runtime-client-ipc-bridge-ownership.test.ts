@@ -392,3 +392,30 @@ it('accepts a fresh bridge early frame while rejecting the previous bridge frame
   }
   expect(h.ipc.removeListener).toHaveBeenCalledOnce()
 })
+
+it('re-reads the host catalog when the client-event subscription goes live', async () => {
+  const h = createHarness()
+  try {
+    h.start()
+    // Mount already refreshes connected hosts, so only growth after the stream exists
+    // proves the liveness catch-up ran; a missed event has no other catch-up.
+    for (let index = 0; index < 20 && h.pending.length === 0; index += 1) {
+      await Promise.resolve()
+    }
+    // Held before the timer advance so an unrelated later subscribe cannot take its place.
+    const clientEventsSubscription = h.pending[0]
+    expect(clientEventsSubscription).toBeDefined()
+    await vi.advanceTimersByTimeAsync(300)
+    const before = h.fetchRuntimeEnvironmentRepos.mock.calls.length
+
+    clientEventsSubscription.resolve({ subscriptionId: 'sub-0', requestId: 'r' })
+    // Generous: the refresh scheduler throttles per environment, and a mount refresh still
+    // in flight defers the catch-up until it settles.
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(h.fetchRuntimeEnvironmentRepos.mock.calls.length).toBeGreaterThan(before)
+    expect(h.fetchRuntimeEnvironmentRepos).toHaveBeenLastCalledWith('host-a')
+  } finally {
+    await h.finish()
+  }
+})

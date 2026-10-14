@@ -18,6 +18,8 @@ export type RuntimeClientEventsSyncDeps = {
     isCurrent: () => boolean
   ) => Promise<RuntimeClientEventSubscriptionHandle>
   onEvent: (environmentId: string, event: RuntimeClientEvent) => void
+  /** A subscription for this environment just went live, so earlier events were dropped. */
+  onSubscriptionLive?: (environmentId: string) => void
   /** Base retry delay; doubles per consecutive failure up to retryMaxDelayMs. */
   retryDelayMs?: number
   retryMaxDelayMs?: number
@@ -221,6 +223,9 @@ export function createRuntimeClientEventsSync(
             token: pendingSubscriptionToken,
             unsubscribe: subscription.unsubscribe
           })
+          // Why: an event published before this stream went live is lost, not queued, so this
+          // (re)establishment is the one moment the environment's catalogs may be stale.
+          deps.onSubscriptionLive?.(environmentId)
         })
         .catch((error) => {
           const isCurrentPending = pending.get(environmentId) === pendingSubscriptionToken
