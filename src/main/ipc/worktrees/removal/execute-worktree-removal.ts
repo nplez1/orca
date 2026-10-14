@@ -18,10 +18,8 @@ import { getEffectiveHooks, runHook } from '../../../hooks'
 import type { ArchiveHookOverride } from '../../../../shared/worktree/archive-hook-removal-gate'
 import { gateWorktreeRemovalOnArchiveHook } from '../../../worktree-archive-hook-gate'
 import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentation'
-import {
-  cleanupUnusedWorktreePushTargetRemote,
-  notifyWorktreesChanged
-} from '../../worktree-remote'
+import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
+import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
 import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
 import { formatWorktreeRemovalError } from '../../worktree-logic'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
@@ -150,7 +148,7 @@ export async function executeWorktreeRemoval(
       args.snapshotPruneBatchId
     )
     invalidateAuthorizedRootsCache()
-    notifyWorktreesChanged(mainWindow, repoId)
+    notifyWorktreeCatalogChanged(mainWindow, repoId)
     // Why: this path prunes a registration and never deletes the local branch, so the paired
     // remote branch is deliberately left alone — say so rather than reporting nothing.
     const staleResult = removalResult ?? {}

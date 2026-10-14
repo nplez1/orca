@@ -7,6 +7,7 @@ vi.mock('./worktree-remote', () => ({
 import { notifyWorktreesChanged } from './worktree-remote'
 import {
   notifyWatchedWorktreeCatalogChanged,
+  notifyWorktreeCatalogChanged,
   setWorktreeCatalogRemoteClientNotifier
 } from './watched-worktree-catalog-notification'
 
@@ -31,6 +32,20 @@ describe('watched worktree catalog notifications', () => {
     expect(notifyRemote).toHaveBeenCalledWith('repo-1')
   })
 
+  it('refreshes this renderer and paired clients for a catalog change this window made', () => {
+    const notifyRemote = vi.fn()
+    setWorktreeCatalogRemoteClientNotifier({
+      notifyWorktreeCatalogChangedForRemoteClients: notifyRemote
+    })
+
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the notifier only reads isDestroyed() and webContents.send.
+    notifyWorktreeCatalogChanged(mainWindow as never, 'repo-1')
+
+    expect(notifyWorktreesChanged).toHaveBeenCalledWith(mainWindow, 'repo-1')
+    expect(notifyRemote).toHaveBeenCalledOnce()
+    expect(notifyRemote).toHaveBeenCalledWith('repo-1')
+  })
+
   it('keeps the host refresh when remote publication fails', () => {
     const error = new Error('stream unavailable')
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -43,7 +58,7 @@ describe('watched worktree catalog notifications', () => {
     expect(() => notifyWatchedWorktreeCatalogChanged(mainWindow as never, 'repo-1')).not.toThrow()
     expect(notifyWorktreesChanged).toHaveBeenCalledWith(mainWindow, 'repo-1')
     expect(consoleError).toHaveBeenCalledWith(
-      '[worktrees] failed to notify remote clients of watched catalog change',
+      '[worktrees] failed to notify remote clients of worktree catalog change',
       error
     )
   })

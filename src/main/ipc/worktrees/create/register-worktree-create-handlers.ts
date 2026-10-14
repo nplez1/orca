@@ -17,7 +17,11 @@ import {
   finishAutomationWorkspaceProvenanceRequest
 } from '../../../automations/workspace-provenance'
 import { isFolderRepo } from '../../../../shared/repo-kind'
-import { createLocalWorktree, notifyWorktreesChanged } from '../../worktree-remote'
+import { createLocalWorktree } from '../../worktree-remote'
+import {
+  notifyWorktreeCatalogChanged,
+  notifyWorktreeCatalogChangedForPairedClients
+} from '../../watched-worktree-catalog-notification'
 import { SshHostNotServedError } from '../../../providers/ssh-host-not-served-error'
 import { track } from '../../../telemetry/client'
 import { classifyWorkspaceCreateError } from '../../workspace-create-error-classifier'
@@ -103,7 +107,10 @@ export function registerWorktreeCreateHandlers(context: WorktreeIpcContext): voi
         telemetry.succeeded(result.timing)
 
         if (isFolderRepo(repo)) {
-          notifyWorktreesChanged(mainWindow, repo.id)
+          notifyWorktreeCatalogChanged(mainWindow, repo.id)
+        } else {
+          // Why: the local create refreshed this renderer; paired clients hold no copy of it.
+          notifyWorktreeCatalogChangedForPairedClients(repo.id)
         }
 
         options?.onWorktreeLifecycle?.({
@@ -161,7 +168,7 @@ export function registerWorktreeCreateHandlers(context: WorktreeIpcContext): voi
           from_existing_branch: false,
           ...getCohortAtEmit()
         })
-        notifyWorktreesChanged(mainWindow, repo.id)
+        notifyWorktreeCatalogChanged(mainWindow, repo.id)
         options?.onWorktreeLifecycle?.({
           kind: 'created',
           worktreeId: result.worktree.id,

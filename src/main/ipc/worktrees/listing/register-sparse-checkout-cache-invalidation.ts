@@ -7,7 +7,7 @@ import {
 } from '../../../git/worktree-sparse-checkout-cache'
 import { areWorktreePathsEqual } from '../../../git/worktree-path-comparison'
 import { registerWorktreeChangeInvalidator } from '../../worktree-change-invalidators'
-import { notifyWorktreesChanged } from '../../worktree-remote'
+import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
 
 /**
  * Scope worktree-change invalidation to the affected repo (falling back to a full clear when the
@@ -31,7 +31,7 @@ export function registerSparseCheckoutCacheInvalidation(
       .getRepos()
       .find((candidate) => areWorktreePathsEqual(candidate.path, repoPath))
     if (repo) {
-      notifyWorktreesChanged(mainWindow, repo.id)
+      notifyWorktreeCatalogChanged(mainWindow, repo.id)
     }
   })
   return () => {
