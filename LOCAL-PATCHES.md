@@ -454,7 +454,7 @@ pnpm run sync:localization-runtime-catalog
     `upstream/main` in the same environment, so they are a property of the installed mobile
     workspace, not of this sync. Every step after it was run individually and passes.
   - **Test evidence:** `pnpm tc` clean after `c17416e75f`; repo-wide `oxlint` clean; identity sweep
-    0 fixable; `pnpm test` ran **120,557 tests with 159 failing across 36 files, none of them this
+    0 fixable; `pnpm test` ran **120,560 tests with 158 failing across 35 files, none of them this
     sync's**. Fifteen are the upstream-red/env classes that reproduce at the pre-merge tip
     (`dcb5ddfbc1`, 57 failed tests there); two fail at `upstream/main` itself
     (`tests/e2e/cross-version-wire/legacy-relay-bridge.unit.test.ts` and
@@ -462,7 +462,8 @@ pnpm run sync:localization-runtime-catalog
     macOS-host assembly script tests, which fail identically at the pre-merge tip in this
     environment (they bundle the mobile app with esbuild and hit alias resolution — the `mobile`
     workspace's install is partial here); one (`src/main/ssh/orcad-state-snapshot-shell.test.ts`)
-    fails only under full-suite load and passes in isolation. The ten files that *were* this sync's
+    fails only under full-suite load and passes in isolation. The set was re-checked after the two
+    review fixes (`7b70893f71`): every one of the 35 is in the classes above. The ten files that *were* this sync's
     are fixed in `d31978f8e3`: an upstream test whose expectation this fork deliberately changed (the
     host stages setup for a blank create with default tabs; the Linux CLI is `orca-np`; the daemon
     host root and launchd bundle-id list are the fork's), and a fork file the merge re-pointed off
