@@ -85,6 +85,17 @@ disabled, which is the same thing upstream's dev channels do for the same reason
 
 Anchor: `config/electron-builder.config.cjs`, `win.signtoolOptions`.
 
+### `local(build)`: expect this fork's Developer ID team, not upstream's
+
+Upstream's new `verifyMacTerminalHost` (`config/scripts/macos-terminal-host-bundle.cjs`) compares the
+packaged `Orca Terminal Host.app`'s signed team against `ORCA_MAC_TEAM_ID`, which upstream hardcodes
+to its own team (`6CX3WHS9HZ`). This fork signs with the Developer ID in `MAC_CERTS`, whose team is
+the owner's, so the check failed on the first sync to carry it (np.29). The constant now prefers
+`APPLE_TEAM_ID` — the team notarization already has to match the certificate, and present exactly
+when `MAC_CERTS` is — and keeps upstream's value as the unsigned fallback.
+
+Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
+
 ### `local(dev)`: rebuild-and-relaunch helper
 
 `package.json`'s `rebuild:mac:relaunch-installed` script plus
@@ -325,6 +336,14 @@ pnpm run sync:localization-runtime-catalog
 ```
 
 ### Sync log
+
+- **2026-10-14 — released as `v1.4.214-np.30`** from `419cdb689e` (workflow run 38508995384, attempt 2,
+  signed and notarized, both macOS slices plus Windows), onto upstream `8b0fa15e94`, from the
+  released tip `v1.4.214-np.26`. The release needed two fork-local build fixes that the sync's own
+  upstream merge introduced, both found by the packaging gates that arrived with it (see
+  `local(ci)` and the new `local(build)` note below): a configurable terminal-host boot deadline, and
+  the fork's own signing team instead of upstream's. Three earlier attempts (runs 28 and 29) failed
+  inside those gates and left only drafts, which are deleted; nothing was published from them.
 
 - **2026-10-13 — merge of upstream `8b0fa15e94` (389 commits) into the release line, from
   `dcb5ddfbc1`** (merge base `cc5c85fb7a`, rollback tag `archive/pre-sync-dcb5ddfbc1`). The merge
