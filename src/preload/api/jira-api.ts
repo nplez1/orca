@@ -18,6 +18,7 @@ import type {
   JiraProject,
   JiraProjectStatusOrder,
   JiraSiteSelection,
+  JiraSprintAssignment,
   JiraTransition,
   JiraUser,
   JiraViewer
@@ -99,4 +100,9 @@ export type JiraApi = {
   listBoards: (args?: { siteId?: JiraSiteSelection; name?: string }) => Promise<JiraBoard[]>
   getBoardOverview: (args: { boardId: string; siteId: string }) => Promise<JiraBoardOverview>
   listBoardIssues: (args: JiraBoardIssuePageRequest) => Promise<JiraBoardIssuePage>
+  getIssueSprintAssignment: (args: {
+    key: string
+    siteId?: string
+    boardId?: string
+  }) => Promise<JiraSprintAssignment>
 }

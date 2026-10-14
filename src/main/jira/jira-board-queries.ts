@@ -8,21 +8,21 @@ import type {
 } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
 import { jiraRequest } from './authenticated-request'
-import { clearToken, getClients, isAuthError } from './client'
+import { clearToken, getClients, getSingleClient, isAuthError } from './client'
+import { JIRA_AGILE_API, JIRA_CLOUD_SOFTWARE_API } from './jira-agile-api'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
+import { fetchBoardSprints } from './jira-sprint-queries'
 import { withJiraQueuedDeadline } from './jira-read-failure'
 import {
   asFiniteNumber,
   asIdentifier,
   asRecord,
   asString,
-  fetchPagedRecords,
   getPageItems,
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
 
-const JIRA_AGILE_API = '/rest/agile/1.0'
 const BOARD_PAGE_SIZE = 50
 const BOARD_ISSUE_PAGE_SIZE = 100
 // Why: a stalled settings read left these selects disabled with no way to retry.
@@ -65,29 +65,6 @@ function mapBoardColumns(value: unknown): JiraBoardColumn[] {
         .filter((statusId) => statusId.length > 0)
     }
   })
-}
-
-function mapActiveSprint(value: unknown): JiraBoardOverview['activeSprints'][number] | null {
-  const sprint = asRecord(value)
-  const id = asIdentifier(sprint.id)
-  if (!id) {
-    return null
-  }
-  return {
-    id,
-    name: asString(sprint.name, `Sprint ${id}`),
-    state: asString(sprint.state, 'active'),
-    startDate: asString(sprint.startDate) || undefined,
-    endDate: asString(sprint.endDate) || undefined
-  }
-}
-
-function getSingleClient(siteId: string) {
-  const entries = getClients(siteId)
-  if (entries.length !== 1) {
-    throw new Error('A single Jira site is required for board data.')
-  }
-  return entries[0]
 }
 
 export async function listBoards(
@@ -150,30 +127,15 @@ export async function getBoardOverview(
       entry,
       `${JIRA_AGILE_API}/board/${encodedBoardId}/configuration`
     )
-    const activeSprints =
-      board.type === 'scrum'
-        ? (
-            await fetchPagedRecords(
-              entry,
-              'values',
-              (startAt, maxResults) => {
-                const params = new URLSearchParams({
-                  state: 'active',
-                  startAt: String(startAt),
-                  maxResults: String(maxResults)
-                })
-                return `${JIRA_AGILE_API}/board/${encodedBoardId}/sprint?${params.toString()}`
-              },
-              BOARD_PAGE_SIZE
-            )
-          )
-            .map(mapActiveSprint)
-            .filter((sprint): sprint is NonNullable<typeof sprint> => sprint !== null)
-        : []
+    // Why: one request serves both the sprint tab (active sprints) and the sprint
+    // picker (anything an issue can be moved into), so the future sprints a
+    // backlog item would go to cost no extra round trip.
+    const sprints = board.type === 'scrum' ? await fetchBoardSprints(entry, boardId) : []
     return {
       board,
       columns: mapBoardColumns(configuration),
-      activeSprints
+      activeSprints: sprints.filter((sprint) => sprint.state === 'active'),
+      sprints
     }
   } catch (error) {
     if (isAuthError(error)) {
@@ -207,7 +169,7 @@ export async function listBoardIssues(
     } else if (request.pageToken) {
       params.set('nextPageToken', request.pageToken)
     }
-    const basePath = entry.site.authType === 'server' ? JIRA_AGILE_API : '/rest/software/1.0'
+    const basePath = entry.site.authType === 'server' ? JIRA_AGILE_API : JIRA_CLOUD_SOFTWARE_API
     path = `${basePath}/board/${boardId}/backlog?${params.toString()}`
   } else {
     if (entry.site.authType === 'server') {
@@ -215,7 +177,7 @@ export async function listBoardIssues(
     } else if (request.pageToken) {
       params.set('nextPageToken', request.pageToken)
     }
-    const basePath = entry.site.authType === 'server' ? JIRA_AGILE_API : '/rest/software/1.0'
+    const basePath = entry.site.authType === 'server' ? JIRA_AGILE_API : JIRA_CLOUD_SOFTWARE_API
     path = `${basePath}/board/${boardId}/sprint/${encodeURIComponent(request.sprintId)}/issue?${params.toString()}`
   }
 

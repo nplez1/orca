@@ -12,6 +12,7 @@ import {
   CreateIssue,
   IssueComment,
   IssueKey,
+  IssueSprintAssignment,
   IssueUpdate,
   ListIssues,
   ProjectIssueTypeFields,
@@ -250,5 +251,16 @@ export const JIRA_METHODS = [
     permission: 'workspace',
     params: BoardIssuePage,
     handler: async (params, { runtime }) => runtime.jiraListBoardIssues(params)
+  }),
+  defineMethod({
+    name: 'jira.getIssueSprintAssignment',
+    permission: 'workspace',
+    params: IssueSprintAssignment,
+    handler: async (params, { runtime }) =>
+      runtime.jiraGetIssueSprintAssignment({
+        key: params.key.trim(),
+        siteId: params.siteId,
+        boardId: params.boardId
+      })
   })
 ]

@@ -1,3 +1,4 @@
+import { jiraBoardErrorText } from './jira-board-error-text'
 import { useState } from 'react'
 import type {
   JiraCreateField,
@@ -20,10 +21,6 @@ export type JiraPendingTransitionFields = {
   issue: JiraIssue
   transition: JiraTransition
   fields: JiraCreateField[]
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : 'Jira board update failed.'
 }
 
 /**
@@ -105,7 +102,7 @@ export function useJiraBoardTransitionMove({
       refreshBoard()
       return { ok: true }
     } catch (error) {
-      return { ok: false, error: errorText(error) }
+      return { ok: false, error: jiraBoardErrorText(error) }
     } finally {
       if (!succeeded) {
         applyIssuePatch(issue.key, { status: previousStatus }, issue.siteId)

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-control'
+import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
@@ -13,6 +14,7 @@ import type {
   JiraIssue,
   JiraIssueUpdate,
   JiraPriority,
+  JiraSprintAssignment,
   JiraTransition,
   JiraUser
 } from '../../../shared/jira-types'
@@ -110,7 +112,8 @@ export function JiraIssueMetadataBar({
   selfUser,
   providerSettings,
   mutateIssue,
-  submitIssueFields
+  submitIssueFields,
+  sprintAssignment
 }: {
   displayed: JiraIssue
   pendingField: string | null
@@ -121,6 +124,8 @@ export function JiraIssueMetadataBar({
   editFieldsLoading: boolean
   selfUser: JiraUser | null
   providerSettings: RuntimeJiraSettings
+  /** Null on a host that cannot answer, or when no board is in scope to move into. */
+  sprintAssignment: JiraSprintAssignment | null
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
@@ -215,6 +220,26 @@ export function JiraIssueMetadataBar({
           pending={pendingField === 'assignee'}
           mutateIssue={mutateIssue}
         />
+
+        {sprintAssignment ? (
+          <JiraSprintPicker
+            sprint={sprintAssignment.sprint}
+            sprints={sprintAssignment.sprints}
+            onSelect={(sprintId) => void mutateIssue('sprint', { sprintId })}
+          >
+            <button
+              type="button"
+              disabled={pendingField === 'sprint'}
+              title={sprintAssignment.sprint?.name ?? backlogLabel()}
+              className="flex max-w-[220px] items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
+            >
+              <span className="truncate">{sprintTriggerLabel(sprintAssignment.sprint)}</span>
+              {pendingField === 'sprint' ? (
+                <LoaderCircle className="size-3 shrink-0 animate-spin" />
+              ) : null}
+            </button>
+          </JiraSprintPicker>
+        ) : null}
 
         <Button
           type="button"

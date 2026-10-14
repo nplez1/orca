@@ -119,7 +119,11 @@ const boardOverview = {
     { name: 'Ready', statusIds: ['1'] },
     { name: 'Doing', statusIds: ['3'] }
   ],
-  activeSprints: [{ id: '87', name: 'September sprint', state: 'active' }]
+  activeSprints: [{ id: '87', name: 'September sprint', state: 'active' }],
+  sprints: [
+    { id: '87', name: 'September sprint', state: 'active' },
+    { id: '88', name: 'October sprint', state: 'future' }
+  ]
 }
 
 const model: TaskPageJiraBoardModel = {
@@ -433,6 +437,88 @@ describe('TaskPageJiraBoard', () => {
     renderBoard({ onUseIssueList })
 
     await waitFor(() => expect(onUseIssueList).toHaveBeenCalledOnce())
+  })
+
+  it('moves a backlog item into a sprint from its own row', async () => {
+    const user = userEvent.setup()
+    const onIssueMoved = vi.fn()
+    renderBoard({ onIssueMoved })
+
+    await user.click(screen.getByRole('button', { name: 'Backlog' }))
+    await screen.findByText('ABC-2 title')
+
+    await user.click(screen.getByRole('button', { name: '+ Sprint' }))
+    // The backlog row offers the open sprints and nothing else: it is already the backlog.
+    const options = document.querySelector('[data-slot="popover-content"]')
+    expect(options?.textContent).toContain('October sprint')
+    expect(options?.textContent).not.toContain('Backlog')
+    await user.click(await screen.findByRole('option', { name: /October sprint/ }))
+
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        { kind: 'default-scope', settings: model.settings },
+        backlogIssue.key,
+        { sprintId: '88' },
+        backlogIssue.siteId
+      )
+    )
+    expect(onIssueMoved).toHaveBeenCalledWith(backlogIssue)
+    // Why: the cell and its portalled popover live inside a clickable row, so neither the
+    // trigger nor an option may also open the issue.
+    expect(model.openJiraDetailPage).not.toHaveBeenCalled()
+  })
+
+  it('starts one backlog row move at a time', async () => {
+    const user = userEvent.setup()
+    const secondBacklogIssue = issue('ABC-3', '1')
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        Promise.resolve({
+          issues:
+            request.scope === 'backlog'
+              ? [backlogIssue, secondBacklogIssue]
+              : [sprintIssue, otherAssigneeIssue],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 2,
+          isLast: true
+        })
+    )
+    let finishMove: (result: unknown) => void = () => {}
+    mocks.jiraUpdateIssue.mockReturnValue(
+      new Promise((resolve) => {
+        finishMove = resolve
+      })
+    )
+
+    renderBoard()
+    await user.click(screen.getByRole('button', { name: 'Backlog' }))
+    await screen.findByText('ABC-3 title')
+
+    const sprintButtons = await screen.findAllByRole('button', { name: '+ Sprint' })
+    expect(sprintButtons).toHaveLength(2)
+    await user.click(sprintButtons[0])
+    await user.click(await screen.findByRole('option', { name: /October sprint/ }))
+
+    // The first move is still in flight, so a second row must not start its own —
+    // the shared row state is what disables the rows and gates drops.
+    await user.click(screen.getAllByRole('button', { name: '+ Sprint' })[1])
+    await user.click(await screen.findByRole('option', { name: /September sprint/ }))
+    expect(mocks.jiraUpdateIssue).toHaveBeenCalledTimes(1)
+
+    finishMove({ ok: true })
+    await screen.findByText('ABC-2 title')
+  })
+
+  it('offers no sprint control on a board whose backlog has no sprints', async () => {
+    const user = userEvent.setup()
+    mocks.jiraGetBoardOverview.mockResolvedValue({ ...boardOverview, sprints: [] })
+    renderBoard()
+
+    await user.click(screen.getByRole('button', { name: 'Backlog' }))
+    await screen.findByText('ABC-2 title')
+
+    expect(screen.queryByRole('button', { name: '+ Sprint' })).toBeNull()
   })
 
   it('opens issue details and applies only an available status transition after a drop', async () => {

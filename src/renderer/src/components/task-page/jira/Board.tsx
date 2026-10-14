@@ -15,6 +15,7 @@ import { TaskPageJiraBoardHeader } from './BoardHeader'
 import { TaskPageJiraTransitionPicker } from './TransitionPicker'
 import { TaskPageJiraTransitionFieldsDialog } from './TransitionFieldsDialog'
 import { useJiraBoardDrop } from './use-jira-board-drop'
+import { jiraBoardErrorText } from './jira-board-error-text'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
 import { defaultScopeSource } from '@/lib/default-creation-host'
+import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
 import {
@@ -56,6 +58,7 @@ export function TaskPageJiraBoard({
     updateJiraBoardViewPreferences({ activeView: view })
   }, [])
   const legacyRuntimeFallbackApplied = useRef(false)
+  const [assigningSprintIssueKey, setAssigningSprintIssueKey] = useState<string | null>(null)
   const providerSettings = useMemo(
     () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
     [model.jiraTaskSourceContext, model.settings]
@@ -77,6 +80,38 @@ export function TaskPageJiraBoard({
     refreshBoard: board.refresh,
     onIssueMoved
   })
+
+  const backlogSprints = board.overview?.sprints ?? []
+  const sprintName = (sprintId: string): string =>
+    backlogSprints.find((sprint) => sprint.id === sprintId)?.name ?? sprintId
+
+  // Moving an issue into a sprint takes it out of the backlog, so the reload — not a
+  // local removal — is what settles both views.
+  const assignSprint = async (issue: JiraIssue, sprintId: string): Promise<void> => {
+    // One row move at a time: the key disables every row's control while it runs.
+    if (assigningSprintIssueKey) {
+      return
+    }
+    setAssigningSprintIssueKey(issue.key)
+    try {
+      const result = await jiraUpdateIssue(providerSettings, issue.key, { sprintId }, issue.siteId)
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      toast.success(
+        translate('auto.components.TaskPage.jiraSprintAssigned', '{{value0}} moved to {{value1}}', {
+          value0: issue.key,
+          value1: sprintName(sprintId)
+        })
+      )
+      onIssueMoved(issue)
+      board.refresh()
+    } catch (error) {
+      toast.error(jiraBoardErrorText(error))
+    } finally {
+      setAssigningSprintIssueKey(null)
+    }
+  }
 
   useEffect(() => {
     if (!board.runtimeBoardUnavailable || legacyRuntimeFallbackApplied.current) {
@@ -133,6 +168,15 @@ export function TaskPageJiraBoard({
               issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
               onOpenIssue={model.openJiraDetailPage}
               onOpenOrStartWorkspace={model.handleOpenOrUseJiraItem}
+              sprintOptions={
+                backlogSprints.length > 0
+                  ? {
+                      sprints: backlogSprints,
+                      assigningIssueKey: assigningSprintIssueKey,
+                      onAssignSprint: (issue, sprintId) => void assignSprint(issue, sprintId)
+                    }
+                  : null
+              }
             />
           ) : (
             <section

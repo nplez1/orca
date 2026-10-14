@@ -4,60 +4,13 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { jiraGetIssue, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import type {
-  JiraComment,
-  JiraEditableField,
-  JiraFieldErrors,
-  JiraIssue,
-  JiraPriority,
-  JiraTransition,
-  JiraUser
-} from '../../../shared/jira-types'
+import type { JiraFieldErrors, JiraIssue } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { useJiraIssueComments } from './jira-issue-workspace-comments'
 import { useJiraIssueSideData } from './jira-issue-workspace-side-data'
+import type { JiraIssueWorkspaceDetailState } from './jira-issue-workspace-detail-contract'
 
-export type JiraIssueWorkspaceDetailState = {
-  displayed: JiraIssue | null
-  issueLoading: boolean
-  comments: JiraComment[]
-  commentsLoading: boolean
-  commentsError: string | null
-  transitions: JiraTransition[]
-  priorities: JiraPriority[]
-  users: JiraUser[]
-  /** Custom fields Jira allows editing on this issue, with their current values. */
-  editFields: JiraEditableField[]
-  editFieldsLoading: boolean
-  pendingField: string | null
-  titleDraft: string
-  setTitleDraft: (value: string) => void
-  labelsDraft: string
-  setLabelsDraft: (value: string) => void
-  commentDraft: string
-  setCommentDraft: (value: string) => void
-  commentSubmitting: boolean
-  canSubmitComment: boolean
-  handleSaveTitle: () => void
-  handleSaveLabels: () => void
-  handleSubmitComment: () => Promise<void>
-  retryComments: () => void
-  refreshing: boolean
-  refresh: () => Promise<void>
-  /** Re-runs the initial issue fetch; used before anything is displayed. */
-  reload: () => void
-  mutateIssue: (
-    field: string,
-    updates: Parameters<typeof jiraUpdateIssue>[2],
-    optimistic?: Partial<JiraIssue>
-  ) => Promise<void>
-  /** Applies a custom-field edit and reports Jira's own rejection reasons back
-   *  to the calling form instead of swallowing them into a toast. */
-  submitIssueFields: (
-    updates: Parameters<typeof jiraUpdateIssue>[2]
-  ) => Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: JiraFieldErrors }>
-}
 
 /** Hydrates the full detail set for one Jira issue and owns its mutations.
  *  Shared by the Task view's `JiraIssueWorkspace` and the right-sidebar Issue
@@ -70,6 +23,7 @@ export function useJiraIssueWorkspaceDetail({
   issue,
   fetchKey = null,
   fetchSiteId = null,
+  sprintBoard = null,
   providerSettings,
   sourceContext,
   refreshSignal = 0
@@ -80,6 +34,8 @@ export function useJiraIssueWorkspaceDetail({
    *  from its own selected/active site, which is a different site whenever the
    *  user has more than one — the read then returns nothing for a valid key. */
   fetchSiteId?: string | null
+  /** Board the issue's sprint can be changed on; omitted where no board is in scope. */
+  sprintBoard?: { boardId: string; siteId: string } | null
   providerSettings: RuntimeJiraSettings
   sourceContext?: TaskSourceContext | null
   refreshSignal?: number
@@ -98,6 +54,11 @@ export function useJiraIssueWorkspaceDetail({
   const displayed = fullIssue ?? issue
   const siteId = displayed?.siteId ?? undefined
   const issueKey = displayed?.key ?? null
+  // A board id only means something on its own site: an issue on another site would
+  // have its siteless read and that board's sprint list served by different Jira
+  // instances, so it gets no board until the two agree.
+  const sprintBoardId =
+    sprintBoard && displayed?.siteId === sprintBoard.siteId ? sprintBoard.boardId : null
 
   useEffect(() => {
     // Why: bump before the reset branch so an in-flight fetch cannot land on a cleared issue.
@@ -136,10 +97,18 @@ export function useJiraIssueWorkspaceDetail({
       })
   }, [issue, fetchKey, fetchSiteId, providerSettings, reloadSignal])
 
-  const sideData = useJiraIssueSideData({ providerSettings, issueKey, issueSiteId: siteId })
+  const sideData = useJiraIssueSideData({
+    providerSettings,
+    issueKey,
+    issueSiteId: siteId,
+    sprintBoardId
+  })
   const commentsState = useJiraIssueComments({ providerSettings, issueKey, issueSiteId: siteId })
   const reloadTransitions = sideData.reloadTransitions
   const reloadEditFields = sideData.reloadEditFields
+  const reloadSprintAssignment = sideData.reloadSprintAssignment
+  const restoreSprintAssignment = sideData.restoreSprintAssignment
+  const selectSprint = sideData.selectSprint
 
   const refreshIssue = useCallback(async (): Promise<void> => {
     if (!displayed) {
@@ -188,19 +157,34 @@ export function useJiraIssueWorkspaceDetail({
       }
       setPendingField(field)
       const previous = displayed
+      const sprintChanged = updates.sprintId !== undefined
+      const previousSprintAssignment = sideData.sprintAssignment
       try {
         if (optimistic) {
           setFullIssue({ ...displayed, ...optimistic })
           patchJiraIssue(displayed.key, optimistic, { sourceContext })
+        }
+        if (sprintChanged) {
+          selectSprint(updates.sprintId ?? null)
         }
         const result = await jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
         if (!result.ok) {
           throw new Error(result.error)
         }
         await refreshIssue()
+        if (sprintChanged) {
+          await reloadSprintAssignment()
+        }
       } catch (error) {
         setFullIssue(previous)
         patchJiraIssue(previous.key, previous, { sourceContext })
+        if (sprintChanged) {
+          // Why the local restore before the re-read: the fault that failed the move
+          // usually fails that read too, and the picker must not keep showing a sprint
+          // the issue never reached.
+          restoreSprintAssignment(previousSprintAssignment)
+          await reloadSprintAssignment()
+        }
         toast.error(
           error instanceof Error
             ? error.message
@@ -213,7 +197,19 @@ export function useJiraIssueWorkspaceDetail({
         setPendingField(null)
       }
     },
-    [displayed, patchJiraIssue, pendingField, refreshIssue, providerSettings, siteId, sourceContext]
+    [
+      displayed,
+      patchJiraIssue,
+      pendingField,
+      refreshIssue,
+      providerSettings,
+      reloadSprintAssignment,
+      restoreSprintAssignment,
+      selectSprint,
+      sideData.sprintAssignment,
+      siteId,
+      sourceContext
+    ]
   )
 
   const submitIssueFields = useCallback(
@@ -307,6 +303,7 @@ export function useJiraIssueWorkspaceDetail({
     users: sideData.users,
     editFields: sideData.editFields,
     editFieldsLoading: sideData.editFieldsLoading,
+    sprintAssignment: sideData.sprintAssignment,
     pendingField,
     titleDraft,
     setTitleDraft,

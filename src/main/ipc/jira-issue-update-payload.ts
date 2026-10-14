@@ -49,6 +49,15 @@ export function normalizeIssueUpdate(value: unknown): JiraIssueUpdate | null {
   if (input.transitionId !== undefined && typeof input.transitionId !== 'string') {
     return null
   }
+  // A blank id is malformed rather than a clear: an unset sprint is null, and reading
+  // "" as the backlog would silently move the issue out of its sprint.
+  if (
+    input.sprintId !== undefined &&
+    input.sprintId !== null &&
+    (typeof input.sprintId !== 'string' || !input.sprintId.trim())
+  ) {
+    return null
+  }
   if (
     input.customFields !== undefined &&
     (!isRecordPayload(input.customFields) || !isCustomFieldMap(input.customFields))

@@ -9,6 +9,7 @@ import type {
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest, JiraApiError } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
+import { JIRA_AGILE_API } from './jira-agile-api'
 import { issueUrl, toBodyText } from './jira-issue-mapping'
 import { markdownCommentBody } from './jira-comment-body'
 import type { JiraRecord } from './jira-record-pages'
@@ -136,7 +137,7 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
   }
 }
 
-/** Applies field, assignee, and transition updates to an existing issue. */
+/** Applies field, assignee, transition, and sprint updates to an existing issue. */
 export async function updateIssue(
   key: string,
   updates: JiraIssueUpdate,
@@ -197,6 +198,20 @@ export async function updateIssue(
           ...(Object.keys(transitionFields).length > 0 ? { fields: transitionFields } : {})
         })
       })
+    }
+    if (updates.sprintId !== undefined) {
+      // Why: sprint membership is board state, not an issue field — the Agile API
+      // owns it, and the field-based equivalent needs a per-site custom field id.
+      await jiraRequest(
+        entry,
+        updates.sprintId
+          ? `${JIRA_AGILE_API}/sprint/${encodeURIComponent(updates.sprintId)}/issue`
+          : `${JIRA_AGILE_API}/backlog/issue`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ issues: [key] })
+        }
+      )
     }
     return { ok: true }
   } catch (error) {

@@ -1,6 +1,11 @@
 import { ipcMain } from 'electron'
 import type { JiraBoardIssuePageRequest, JiraSiteSelection } from '../../shared/jira-types'
-import { getBoardOverview, listBoardIssues, listBoards } from '../jira/issues'
+import {
+  getBoardOverview,
+  getIssueSprintAssignment,
+  listBoardIssues,
+  listBoards
+} from '../jira/issues'
 
 function normalizeBoardSiteSelection(value: unknown): JiraSiteSelection | undefined {
   if (typeof value !== 'string') {
@@ -59,4 +64,18 @@ export function registerJiraBoardHandlers(): void {
       siteId: args.siteId.trim()
     })
   })
+
+  ipcMain.handle(
+    'jira:getIssueSprintAssignment',
+    async (_event, args: { key: string; siteId?: string; boardId?: string }) => {
+      if (typeof args?.key !== 'string' || !args.key.trim()) {
+        throw new Error('Issue key is required.')
+      }
+      return getIssueSprintAssignment({
+        key: args.key.trim(),
+        siteId: normalizeBoardSiteSelection(args.siteId),
+        boardId: normalizeBoardName(args.boardId)
+      })
+    }
+  )
 }

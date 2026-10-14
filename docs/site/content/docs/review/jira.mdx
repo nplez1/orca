@@ -41,7 +41,8 @@ If you don't use Jira at all, hide it from the source picker via [Settings → T
 ## Using Jira
 
 - The task drawer shows GitHub, Linear, and Jira issues in a unified list once each source is enabled.
-- Open an issue to see the full description, comments, and metadata in a side drawer. Edit status (via available transitions), priority, assignee, and custom fields inline.
+- Open an issue to see the full description, comments, and metadata in a side drawer. Edit status (via available transitions), priority, assignee, sprint, and custom fields inline.
+- A Scrum board's **Backlog** tab lists the items that are in no sprint. Each row has a **+ Sprint** control (and the open issue has the same one in its metadata bar), so a backlog item can be moved into any of the board's active or future sprints, or back to the backlog. Changing a sprint needs the issue to be on a board Orca has configured — without one, the control is not shown.
 - Add a comment from the drawer's comment composer.
 - **New Jira issue** keeps title and description if you dismiss the dialog by accident — Escape, Cancel, outside click, or close. Text restores when you reopen the dialog in the same app session; drafts clear after a successful create and do not survive an app restart. Issue type and other pickers still use their usual open-time defaults.
 - Creating a worktree from a Jira issue pre-fills the task name and links the worktree to the issue, so the review and the issue stay tied together.

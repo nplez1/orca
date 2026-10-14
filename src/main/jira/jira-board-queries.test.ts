@@ -26,6 +26,13 @@ vi.mock('./authenticated-request', () => ({
 vi.mock('./client', () => ({
   clearToken: (...args: unknown[]) => clearTokenMock(...args),
   getClients: (...args: unknown[]) => getClientsMock(...args),
+  getSingleClient: (selection?: unknown) => {
+    const entries = getClientsMock(selection)
+    if (entries.length !== 1) {
+      throw new Error('A single Jira site is required for board data.')
+    }
+    return entries[0]
+  },
   isAuthError: (...args: unknown[]) => isAuthErrorMock(...args)
 }))
 
@@ -176,7 +183,7 @@ describe('Jira board queries', () => {
     await expectSettingsReadTimeout(() => listBoards('site-1'))
   })
 
-  it('loads board columns and only requests active sprints for Scrum boards', async () => {
+  it('loads board columns, the sprint tab, and every assignable sprint for Scrum boards', async () => {
     jiraRequestMock
       .mockResolvedValueOnce({ id: 42, name: 'Payments', type: 'scrum' })
       .mockResolvedValueOnce({
@@ -193,7 +200,15 @@ describe('Jira board queries', () => {
             id: 87,
             name: 'September sprint',
             state: 'active',
-            startDate: '2026-09-01T00:00:00.000Z'
+            startDate: '2026-09-01T00:00:00.000Z',
+            originBoardId: 42
+          },
+          {
+            id: 88,
+            name: 'October sprint',
+            state: 'future',
+            startDate: '2026-10-01T00:00:00.000Z',
+            originBoardId: 42
           }
         ],
         isLast: true
@@ -218,14 +233,34 @@ describe('Jira board queries', () => {
           name: 'September sprint',
           state: 'active',
           startDate: '2026-09-01T00:00:00.000Z',
-          endDate: undefined
+          endDate: undefined,
+          boardId: '42'
+        }
+      ],
+      // The sprint picker offers the future sprint a backlog item would go to.
+      sprints: [
+        {
+          id: '87',
+          name: 'September sprint',
+          state: 'active',
+          startDate: '2026-09-01T00:00:00.000Z',
+          endDate: undefined,
+          boardId: '42'
+        },
+        {
+          id: '88',
+          name: 'October sprint',
+          state: 'future',
+          startDate: '2026-10-01T00:00:00.000Z',
+          endDate: undefined,
+          boardId: '42'
         }
       ]
     })
     expect(jiraRequestMock.mock.calls.map((call) => call[1])).toEqual([
       '/rest/agile/1.0/board/42',
       '/rest/agile/1.0/board/42/configuration',
-      '/rest/agile/1.0/board/42/sprint?state=active&startAt=0&maxResults=50'
+      '/rest/agile/1.0/board/42/sprint?state=active%2Cfuture&startAt=0&maxResults=50'
     ])
   })
 
@@ -237,7 +272,8 @@ describe('Jira board queries', () => {
 
     await expect(getBoardOverview('44', 'site-1')).resolves.toMatchObject({
       board: { type: 'kanban' },
-      activeSprints: []
+      activeSprints: [],
+      sprints: []
     })
     expect(jiraRequestMock).toHaveBeenCalledTimes(2)
   })

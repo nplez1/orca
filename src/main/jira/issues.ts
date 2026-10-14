@@ -15,3 +15,4 @@ export {
 } from './jira-issue-create-metadata'
 export { getProjectStatusOrder, listTransitions } from './jira-transition-queries'
 export { getBoardOverview, listBoardIssues, listBoards } from './jira-board-queries'
+export { getIssueSprintAssignment } from './jira-sprint-queries'

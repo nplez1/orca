@@ -7,6 +7,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import { groupJiraIssuesByStatus } from '@/components/task-page-jira-grouping'
+import {
+  JiraSprintCell,
+  type TaskPageJiraSprintOptions
+} from '@/components/task-page-jira-sprint-cell'
 import type { Worktree } from '../../../shared/worktree/types'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
@@ -16,12 +21,6 @@ import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { JiraAttachedWorkspaceChip } from '@/components/task-page/jira/JiraAttachedWorkspaceChip'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '@/components/task-page-jira-priority-tone'
-
-export type TaskPageJiraIssueSection = {
-  key: string
-  label: string
-  issues: JiraIssue[]
-}
 
 type TaskPageJiraIssueListProps = {
   formatUpdatedAt: (updatedAt: string) => string
@@ -35,58 +34,19 @@ type TaskPageJiraIssueListProps = {
   statusDirection?: 'asc' | 'desc'
   statusOrder: JiraProjectStatusOrder | null
   groupByStatus?: boolean
+  /** Renders a sprint cell. Only the board's backlog passes it: a backlog issue is
+   *  in no sprint by definition, so the cell offers the board's open sprints. */
+  sprintOptions?: TaskPageJiraSprintOptions
 }
 
-function statusColumnRanks(order: JiraProjectStatusOrder | null): Map<string, number> {
-  const ranks = new Map<string, number>()
-  for (const [columnIndex, statusIds] of (order?.statusIdsByColumn ?? []).entries()) {
-    for (const statusId of statusIds) {
-      if (!ranks.has(statusId)) {
-        ranks.set(statusId, columnIndex)
-      }
-    }
-  }
-  return ranks
-}
-
-function sectionColumnRank(
-  section: TaskPageJiraIssueSection,
-  ranks: ReadonlyMap<string, number>
-): number {
-  let rank = Number.POSITIVE_INFINITY
-  for (const issue of section.issues) {
-    rank = Math.min(rank, ranks.get(issue.status.id) ?? Number.POSITIVE_INFINITY)
-  }
-  return rank
-}
-
-export function groupJiraIssuesByStatus(
-  issues: readonly JiraIssue[],
-  statusOrder: JiraProjectStatusOrder | null,
-  statusDirection: 'asc' | 'desc' = 'asc'
-): TaskPageJiraIssueSection[] {
-  const sections = new Map<string, TaskPageJiraIssueSection>()
-  for (const issue of issues) {
-    const key = `status:${issue.status.name}`
-    const section = sections.get(key)
-    if (section) {
-      section.issues.push(issue)
-    } else {
-      sections.set(key, { key, label: issue.status.name, issues: [issue] })
-    }
-  }
-
-  const ranks = statusColumnRanks(statusOrder)
-  const sectionRanks = new Map(
-    [...sections.values()].map((section) => [section.key, sectionColumnRank(section, ranks)])
-  )
-  const sortedSections = [...sections.values()].sort((a, b) => {
-    const rankA = sectionRanks.get(a.key) ?? Number.POSITIVE_INFINITY
-    const rankB = sectionRanks.get(b.key) ?? Number.POSITIVE_INFINITY
-    return rankA === rankB ? a.label.localeCompare(b.label) : rankA - rankB
-  })
-  return statusDirection === 'desc' ? sortedSections.toReversed() : sortedSections
-}
+// A sprint cell needs one more track than the flat list, and the action cluster keeps
+// its own track at every breakpoint (grid-auto-flow is a row, so a missing track wraps
+// the row rather than widening it). Both strings are spelled out so the class strings
+// stay static.
+const ISSUE_ROW_GRID =
+  'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]'
+const SPRINT_ISSUE_ROW_GRID =
+  'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_96px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_112px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_120px_128px_72px]'
 
 function isSelectedIssue(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
   if (!selectedIssue || issue.key !== selectedIssue.key) {
@@ -103,7 +63,8 @@ function JiraIssueRow({
   onOpenIssue,
   onOpenOrStartWorkspace,
   selected,
-  showSiteContext
+  showSiteContext,
+  sprintOptions
 }: {
   attachedWorkspace: Worktree | null
   formatUpdatedAt: (updatedAt: string) => string
@@ -113,6 +74,7 @@ function JiraIssueRow({
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
   selected: boolean
   showSiteContext: boolean
+  sprintOptions?: TaskPageJiraSprintOptions
 }): React.JSX.Element {
   const labels = issue.labels.slice(0, 3)
   const attachedWorkspaceLabel = attachedWorkspace
@@ -143,7 +105,7 @@ function JiraIssueRow({
         }
       }}
       className={cn(
-        'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]',
+        sprintOptions ? SPRINT_ISSUE_ROW_GRID : ISSUE_ROW_GRID,
         prioritySurface.base,
         prioritySurface.hover,
         selected && prioritySurface.selected
@@ -237,6 +199,8 @@ function JiraIssueRow({
         </span>
       </div>
 
+      {sprintOptions ? <JiraSprintCell issue={issue} options={sprintOptions} /> : null}
+
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="block min-w-0 truncate text-[12px] text-muted-foreground max-md:!hidden">
@@ -323,6 +287,7 @@ export function TaskPageJiraIssueList({
   onOpenOrStartWorkspace,
   selectedIssue,
   showSiteContext,
+  sprintOptions,
   statusDirection = 'asc',
   statusOrder,
   groupByStatus = true
@@ -343,7 +308,8 @@ export function TaskPageJiraIssueList({
     onOpenIssue,
     onOpenOrStartWorkspace,
     selected: isSelectedIssue(issue, selectedIssue),
-    showSiteContext
+    showSiteContext,
+    sprintOptions
   })
   if (!groupByStatus) {
     return (

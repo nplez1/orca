@@ -3,6 +3,7 @@ import {
   OptionalFiniteNumber,
   OptionalPlainString,
   OptionalString,
+  TriStateSprintId,
   requiredString
 } from './rpc-param-primitives'
 
@@ -92,7 +93,11 @@ export const IssueUpdate = z.object({
     transitionTextFieldKeys: z.array(z.string()).optional(),
     customFields: CustomFieldUpdateMap.optional(),
     userFieldKeys: z.array(z.string()).optional(),
-    textFieldKeys: z.array(z.string()).optional()
+    textFieldKeys: z.array(z.string()).optional(),
+    // Null moves the issue back to the board's backlog. A host that predates
+    // sprint assignment strips it and reports success, so callers only send it
+    // once the sprint read has answered (see `jira.getIssueSprintAssignment`).
+    sprintId: TriStateSprintId
   })
 })
 
@@ -135,6 +140,12 @@ export const ProjectStatusOrder = z.object({
 export const BoardIdentifier = z.object({
   boardId: requiredString('Board ID is required'),
   siteId: requiredString('Site ID is required')
+})
+
+export const IssueSprintAssignment = z.object({
+  key: requiredString('Issue key is required'),
+  siteId: OptionalString,
+  boardId: OptionalString
 })
 
 const BoardIssuePageFields = {

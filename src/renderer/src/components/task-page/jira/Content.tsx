@@ -125,6 +125,7 @@ export function TaskPageJiraContent({
         onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailSourceContext}
+        sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
       />
     </>
@@ -226,6 +227,7 @@ export function TaskPageJiraContent({
         onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailSourceContext}
+        sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
       />
     </div>
