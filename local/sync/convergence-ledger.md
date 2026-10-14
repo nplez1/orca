@@ -42,9 +42,11 @@ not preserving a feature.
 
 **Do not:** reintroduce `src/relay/` or a relay client path; leave fork-added relay files at the old
 flat `src/relay/` path instead of relocating them under `src/wsl-guest/`; or keep citing the
-fork's relay-era SSH docs as describing this branch. **Do not resurrect
-`searchWorkspacePathNameFilter` or `ssh-filesystem-provider-crud.ts`** — a remote name filter needs
-a new transport, not the old provider hook.
+fork's relay-era SSH docs as describing this branch. **Do not resurrect the SSH half of the path
+search** — `filesystem-remote-path-search.ts`, `ssh-filesystem-provider-crud.ts` and the
+`IFilesystemProvider` hooks (`searchWorkspacePathNameFilter`, `workspacePathSearchCapability`) are
+gone with the provider dispatch; the **local** branch of `searchWorkspacePathNameFilter` is live and
+stays (see "Explorer name filter and the path index").
 
 ---
 
@@ -148,8 +150,23 @@ there), and upstream's identity tests pin that.
 the non-host path; or delete the `src/renderer/src/runtime/runtime-file-client.ts` barrel while the
 fork's renderer files still import it — upstream deleted that barrel on 2026-10-13 and the fork
 keeps it, with `searchRuntimeFilePaths` living in `runtime-file-path-search-client.ts` and the
-barrel re-exporting it. The **runtime/SSH half of #34 is gone** (see "SSH relay removal"): the local
-handler, the worker-owned index and the projection are the surviving feature.
+barrel re-exporting it.
+
+**The runtime-RPC name filter is live, and only its SSH half is gone (2026-10-13).**
+`src/main/runtime/runtime-file-commands-workspace-path-search.ts`'s
+`searchWorkspacePathNameFilter` has two branches: the **local** one runs `searchQuickOpenFilePaths`
+for a non-SSH runtime route and is what the **web client and paired desktop clients** reach through
+`files.searchPaths` with `mode: 'name-filter'`; the **SSH** one called
+`IFilesystemProvider.searchWorkspacePathNameFilter` and died with the relay-era dispatch. This sync
+first deleted the whole module and routed `files.searchPaths` through `searchMobileFilePaths`, which
+would have broken the web client's filename filter — the Opus review caught it, and the module, the
+command surface, the `files.ts` branch and the fork's `files-path-search.test.ts` are restored with
+only the SSH branch replaced by an `unsupported` partial response.
+
+**Do not:** delete `RuntimeFileCommandsWithWorkspacePathSearch`, remove the `mode: 'name-filter'`
+branch of `files.searchPaths`, or drop `searchWorkspacePathNameFilter` from
+`runtime-file-command-surface.ts` — that breaks the web client's and paired clients' explorer name
+filter. The **SSH** half needs a new transport if it is ever wanted back, not the old provider hook.
 
 ---
 
@@ -289,6 +306,14 @@ variant of that path**: upstream refuses `repo.connectionId` with `SshHostNotSer
 every removal through `removeRegisteredLocalWorktree`, so the option is threaded to the local path
 only — do not re-add `removeRegisteredRemoteWorktree` or thread the option through a revived SSH
 branch.
+
+**Automation creates are provisioned in main, and the fork's guard must know it.**
+`spawnLocalStartupAndSetupTerminals` takes `provisionedByHost` and returns early when it is set with
+no startup command, because `provisionManagedWorktreeTerminals` (upstream, 2026-10-13) runs the same
+setup script from `worktree-remote.ts`. Without that exclusion the setup script runs twice and the
+blank first shell activates a background workspace. **Do not** drop the `provisionedByHost` argument
+when the guard is next touched, and keep the automation test's
+`expect(runtime.createTerminal).not.toHaveBeenCalled()`.
 
 ---
 

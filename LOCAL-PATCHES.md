@@ -338,21 +338,36 @@ pnpm run sync:localization-runtime-catalog
   - **The SSH convergence is now finished, not extended.** Upstream retired the last relay-era git
     and quick-open plumbing: `SshGitWorktreeProvider`, `removeRegisteredRemoteWorktree`,
     `runtime-registered-remote-worktree-removal`, the `getSshFilesystemProvider` branch of
-    `fs:listFiles`, and — with them — the fork's still-live SSH path-search stack
-    (`filesystem-remote-path-search.ts`, the `RuntimeFileCommandsWithWorkspacePathSearch` mixin,
-    `ssh-filesystem-provider-crud.ts`, the `remote-session-scanner-*` family's copilot source).
-    Those files had no surviving caller and no surviving implementation of the provider methods they
-    called, so the deletions are adopted rather than reverted: `fs:searchFilePaths` answers an SSH
-    target with an empty result the way `fs:listFiles` does, `files.searchPaths` follows upstream's
-    shape (a name-filter request is the mobile/file search), and the fork's two
-    `IFilesystemProvider` additions plus the `searchWorkspacePathNameFilter` surface are gone with
-    them. The **local** half of #34 — the worker-owned path index, `fs:searchFilePaths` over IPC,
-    the name filter in the explorer — is intact and unchanged.
+    `fs:listFiles`, and — with them — the **SSH half** of the fork's path search
+    (`filesystem-remote-path-search.ts`, its test, `ssh-filesystem-provider-crud.ts`, the
+    `remote-session-scanner-*` family's copilot source, and the two `IFilesystemProvider` hooks
+    `searchWorkspacePathNameFilter`/`workspacePathSearchCapability`). Those had no surviving
+    implementation to call, so the deletions are adopted rather than reverted: `fs:searchFilePaths`
+    answers an SSH target with an empty result the way `fs:listFiles` does, and a `files.searchPaths`
+    name-filter request over an SSH route answers an `unsupported` partial response.
+  - **The local half of that module was live and is kept — do not delete it again.**
+    `RuntimeFileCommandsWithWorkspacePathSearch` has two branches, and only the SSH one was dead: the
+    `else` branch runs `searchQuickOpenFilePaths` for a non-SSH runtime route, which is exactly the
+    path the **web client and paired desktop clients** take through `files.searchPaths` with
+    `mode: 'name-filter'` (`web/preload-api/web-workspace-path-search.ts`,
+    `runtime-workspace-path-search-client.ts`). This sync first deleted the whole module and routed
+    `files.searchPaths` through `searchMobileFilePaths`; the Opus review of the sync caught it as
+    ship-blocking, and `runtime-file-commands-workspace-path-search.ts`, `runtime-file-command-access.ts`,
+    `runtime-file-command-surface.ts`, `files.ts` and the fork's `files-path-search.test.ts` were
+    restored with only the SSH branch replaced by the partial response above. The local IPC handler
+    (`fs:searchFilePaths`, the worker-owned path index) was never affected.
   - **`deleteRemoteBranch` survives, on the local path only.** Upstream now routes every removal
     through `removeRegisteredLocalWorktree` and refuses `repo.connectionId` with
     `SshHostNotServedError`, so the fork's relay-era remote variants of that path are gone; the
     option keeps flowing from the RPC params to `git worktree remove` on the local path, which is
     the ledger's existing "Worktree create and removal" decision unchanged.
+  - **An automation create must not stage setup twice.** Upstream's new
+    `provisionManagedWorktreeTerminals` provisions an automation's setup and default tabs in main,
+    and it arrived in the same sync as the fork's `setupScriptLaunchMode`-aware guard — so with no
+    startup command the fork spawned a Setup terminal *and* handed `setup` to the provisioner. The
+    guard now also returns early when the host provisions (`spawnLocalStartupAndSetupTerminals` takes
+    `provisionedByHost`), the automation test asserts `runtime.createTerminal` was never called, and
+    the app-window test asserts the Setup terminal *was* created. Also caught by the Opus review.
   - **The fork's reconnect direct-SSH scoping went with its type.** Upstream deleted
     `ReconnectPersistedTerminalsOptions` and the `directSshAuthority` plumbing along with
     `direct-ssh-retry-status.ts` and `hidden-restore-state-and-ssh-probe.ts`; the fork's extra

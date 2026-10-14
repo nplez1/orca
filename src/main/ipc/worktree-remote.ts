@@ -315,13 +315,23 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   defaultTabs: CreateWorktreeResult['defaultTabs']
   settings: GlobalSettings
   createdWithAgent: CreateWorktreeArgs['createdWithAgent']
+  /** True when an automation's terminals are provisioned in main (`provisionManagedWorktreeTerminals`). */
+  provisionedByHost: boolean
 }): Promise<StagedStartupResult> {
   const { runtime, worktree, startup, setup, defaultTabs, settings, createdWithAgent } = args
   const setupLaunchMode = settings.setupScriptLaunchMode ?? 'new-tab'
   const hasDefaultTabs = (defaultTabs?.tabs.length ?? 0) > 0
   const canSpawnSetupWithoutStartup =
     setup !== undefined && (!hasDefaultTabs || setupLaunchMode === 'new-tab')
-  if (!runtime || (startup && hasDefaultTabs) || (!startup && !canSpawnSetupWithoutStartup)) {
+  // Why `provisionedByHost && !startup`: with no startup command an automation's terminals (its
+  // setup and default tabs) are provisioned in main, so spawning the setup terminal here too would
+  // run the setup script twice — and the blank first shell below would activate a background
+  // workspace. A create from the app window still stages setup itself.
+  if (
+    !runtime ||
+    (startup && hasDefaultTabs) ||
+    (!startup && (args.provisionedByHost || !canSpawnSetupWithoutStartup))
+  ) {
     return { didSpawnSetup: false }
   }
 
@@ -1739,7 +1749,8 @@ async function performLocalWorktreeCreate(
       setup,
       defaultTabs,
       settings,
-      createdWithAgent: args.createdWithAgent
+      createdWithAgent: args.createdWithAgent,
+      provisionedByHost: Boolean(args.automationProvenance)
     })
   )
 

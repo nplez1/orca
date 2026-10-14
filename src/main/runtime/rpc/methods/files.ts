@@ -6,6 +6,7 @@ import {
   remoteFileContentBudget
 } from './files-remote-content-budget'
 import { limitQuickOpenSearchReplyBySerializedBytes } from '../../../../shared/quick-open-transport-budget'
+import { limitWorkspacePathSearchResponseBySerializedBytes } from '../../../../shared/workspace-path-search-transport-budget'
 import { FileOpen, WorktreeSelector } from '../../../../shared/rpc-contract/files-target-params'
 import { FILE_TERMINAL_ARTIFACT_METHODS } from './files-terminal-artifact-methods'
 import {
@@ -40,6 +41,26 @@ export const FILE_METHODS = [
     permission: 'workspace',
     params: FilePathSearch,
     handler: async (params, { runtime, signal, clientKind, requestId }) => {
+      if (params.mode === 'name-filter') {
+        const maxContentBytes = remoteFileContentBudget(clientKind, requestId)
+        const result = await runtime.searchWorkspacePathNameFilter(params.worktree, {
+          query: params.query,
+          limit: params.limit,
+          excludePaths: params.excludePaths,
+          scope: params.scope,
+          maxPageSerializedBytes: params.maxPageSerializedBytes,
+          correlationId: params.correlationId,
+          signal,
+          maxContentBytes
+        })
+        return maxContentBytes === undefined
+          ? result
+          : limitWorkspacePathSearchResponseBySerializedBytes(result, {
+              maxPageSerializedBytes: maxContentBytes,
+              transportByteCeilings: [maxContentBytes],
+              envelopeHeadroomBytes: 0
+            })
+      }
       if (params.mode !== 'quick-open') {
         return runtime.searchMobileFilePaths(params.worktree, params.query, params.limit)
       }

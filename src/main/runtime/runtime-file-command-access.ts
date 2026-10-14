@@ -1,4 +1,5 @@
 import { RuntimeFileSearch } from './runtime-file-search'
+import { RuntimeFileCommandsWithWorkspacePathSearch } from './runtime-file-commands-workspace-path-search'
 import { listFilesystemMarkdownDocuments } from '../providers/filesystem-markdown-listing'
 import type { MarkdownDocument } from '../../shared/filesystem-entry-types'
 import {
@@ -27,11 +28,12 @@ import {
 import { parseExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
 import type { FileStat } from '../providers/filesystem-provider-contract'
 
-export class RuntimeFileCommandAccess {
+export class RuntimeFileCommandAccess extends RuntimeFileCommandsWithWorkspacePathSearch {
   protected readonly terminalFileGrants = new Map<string, TerminalFileGrant>()
   private readonly search: RuntimeFileSearch
 
   constructor(protected readonly host: RuntimeFileCommandHost) {
+    super(host)
     this.search = new RuntimeFileSearch(host)
   }
 

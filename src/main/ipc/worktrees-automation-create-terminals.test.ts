@@ -7,6 +7,7 @@ import {
   shouldRunSetupForCreateMock
 } from './worktrees-test-module-mocks'
 import { handlers, setupWorktreeHandlers } from './worktrees-test-harness'
+import type { WorktreeRuntimeStub } from './worktrees-test-runtime-stub'
 import { createdWorktreeList } from './worktrees-test-fixtures'
 
 vi.mock('electron', async () =>
@@ -107,9 +108,10 @@ const defaultTabs = { tabs: [{ title: 'Dev', command: 'pnpm dev' }], runCommands
 
 describe('automation creates: main provisions setup and default tabs', () => {
   let provision: ReturnType<typeof vi.fn>
+  let runtime: WorktreeRuntimeStub
 
   beforeEach(() => {
-    const runtime = setupWorktreeHandlers()
+    runtime = setupWorktreeHandlers()
     provision = vi.fn().mockResolvedValue({ setupSpawned: true, setupTerminalHandle: 'term-setup' })
     Object.assign(runtime, { provisionManagedWorktreeTerminals: provision })
     listWorktreesMock.mockResolvedValue(createdWorktreeList)
@@ -129,6 +131,9 @@ describe('automation creates: main provisions setup and default tabs', () => {
     expect(result).not.toHaveProperty('setup')
     expect(result).not.toHaveProperty('defaultTabs')
     expect(provision).toHaveBeenCalledOnce()
+    // Why: the host's provisioning owns this create's terminals, so the startup/setup spawner must
+    // not open a second Setup terminal (which would run the setup script twice).
+    expect(runtime.createTerminal).not.toHaveBeenCalled()
     expect(provision).toHaveBeenCalledWith(
       expect.objectContaining({
         worktreePath: '/workspace/improve-dashboard',
@@ -180,6 +185,11 @@ describe('automation creates: main provisions setup and default tabs', () => {
     // already opened. Upstream hands `setup` back for the window to run.
     expect(result).not.toHaveProperty('setup')
     expect(result).toMatchObject({ defaultTabs })
+    expect(runtime.createTerminal).toHaveBeenCalledWith(
+      'id:repo-1::/workspace/improve-dashboard',
+      expect.objectContaining({ title: 'Setup' }),
+      expect.anything()
+    )
     expect(provision).not.toHaveBeenCalled()
   })
 })
