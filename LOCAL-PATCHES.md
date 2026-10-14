@@ -368,6 +368,18 @@ pnpm run sync:localization-runtime-catalog
     guard now also returns early when the host provisions (`spawnLocalStartupAndSetupTerminals` takes
     `provisionedByHost`), the automation test asserts `runtime.createTerminal` was never called, and
     the app-window test asserts the Setup terminal *was* created. Also caught by the Opus review.
+  - **The release needed a longer terminal-host boot deadline, and the cause was measured, not
+    guessed.** Upstream added `verifyPackagedMacTerminalHostBoots`, which requires the packaged
+    `Orca Terminal Host.app` for each slice to serve a PTY within 20s. On the fork's GitHub-hosted
+    arm64 runner the x64 slice is built cross-arch and booted under Rosetta, and three np.28
+    attempts stalled at three different stages (no daemon token, no handshake, no PTY output).
+    With Rosetta installed locally the whole chain proved sound — x64 `node-pty`
+    (`Mach-O 64-bit bundle x86_64`), the pinned x64 Node spawning a PTY, the daemon entry completing
+    the check's own `runTerminalHostRoundTrip` with an arm64 *and* an x64 client, and a
+    packaged-shaped helper passing the real `verifyPackagedMacTerminalHostBoots` — at **13.9s of the
+    20s budget** on an idle machine. So the workflow raises the budget
+    (`ORCA_TERMINAL_HOST_BOOT_TIMEOUT_MS=120000`) and the check keeps its default; see
+    `local(ci)` in this file for the one-line reader and the reasoning.
   - **The fork's reconnect direct-SSH scoping went with its type.** Upstream deleted
     `ReconnectPersistedTerminalsOptions` and the `directSshAuthority` plumbing along with
     `direct-ssh-retry-status.ts` and `hidden-restore-state-and-ssh-probe.ts`; the fork's extra
@@ -1737,6 +1749,19 @@ Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instea
 empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
 `CSC_LINK` as a certificate path, and `resolveCscLinkPath('', cwd)` resolves to the repository root —
 so packaging dies with `<repo> not a file`. An empty secret and an absent one are not the same thing.
+
+**The cross-arch terminal-host boot gets a longer deadline (2026-10-13).** Upstream's `afterPack`
+check `verifyPackagedMacTerminalHostBoots` boots the packaged `Orca Terminal Host.app` for the slice
+it just built and requires it to serve a PTY within `TERMINAL_HOST_BOOT_TIMEOUT_MS` (20s upstream).
+On this fork's GitHub-hosted arm64 runner the *x64* slice is built cross-arch and booted under
+Rosetta, where the whole boot costs several times its local cost — measured at **~14s of that 20s**
+with a warm Rosetta cache and an idle CPU, and three consecutive np.28 attempts stalled at three
+different stages (no daemon token / no handshake / no PTY output). The artifact itself is sound: with
+Rosetta installed locally, the x64 `node-pty`, the pinned x64 Node, the daemon entry and a
+packaged-shaped helper all complete the same check. So the check keeps its 20s default and the fork's
+workflow raises the budget with `ORCA_TERMINAL_HOST_BOOT_TIMEOUT_MS=120000` on the packaging step —
+the one-line reader for that variable sits in `config/scripts/verify-packaged-daemon-entry.cjs`, and
+it is the only fork-local line in an upstream script this sync introduced.
 
 Fork-only helper scripts live in `local/`:
 

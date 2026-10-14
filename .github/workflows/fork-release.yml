@@ -192,6 +192,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Why: the x64 terminal host is packaged on this arm64 runner and booted under Rosetta,
+          # where the check's whole round trip (token, handshakes, shell output) costs several times
+          # its ~14s local cost. The check stays required; only its deadline moves.
+          ORCA_TERMINAL_HOST_BOOT_TIMEOUT_MS: '120000'
         run: |
           # Why unset: an unset secret still defines these as empty strings, and electron-builder
           # reads a defined CSC_LINK as a certificate path — resolving '' against the cwd and

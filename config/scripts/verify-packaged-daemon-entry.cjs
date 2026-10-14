@@ -63,7 +63,15 @@ function verifyPackagedDaemonEntryBoots(resourcesDir, options = {}) {
   console.log('[verify-packaged-daemon-entry] OK — packaged daemon-entry loads under plain Node')
 }
 
-const TERMINAL_HOST_BOOT_TIMEOUT_MS = 20_000
+// Why the override: a cross-arch slice boots under Rosetta on a cold CI runner, where the whole
+// boot (daemon token, two handshakes, the shell's first output) costs several times its local cost —
+// measured ~14s of the 20s budget on an M-series Mac. The fork's release workflow raises this
+// instead of skipping the check; a local build keeps the default.
+const configuredTerminalHostBootTimeoutMs = Number(process.env.ORCA_TERMINAL_HOST_BOOT_TIMEOUT_MS)
+const TERMINAL_HOST_BOOT_TIMEOUT_MS =
+  Number.isFinite(configuredTerminalHostBootTimeoutMs) && configuredTerminalHostBootTimeoutMs > 0
+    ? configuredTerminalHostBootTimeoutMs
+    : 20_000
 // Arithmetic so the shell echoing the typed command cannot satisfy the check.
 const TERMINAL_HOST_BOOT_COMMAND = 'echo "OK $((6*7))" && exit'
 const TERMINAL_HOST_BOOT_OUTPUT = 'OK 42'
