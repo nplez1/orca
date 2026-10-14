@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Automation } from '../../shared/automations-types'
+import { AUTOMATION_PROJECT_CONTEXT_MARKER } from '../../shared/automation-project-context'
 import type { Repo } from '../../shared/repo-types'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
 
@@ -72,7 +73,14 @@ describe('headless automation workspace create args', () => {
       activate: false,
       createdWithAgent: 'codex',
       startupAgent: 'codex',
-      startupPrompt: 'Review changes',
+      startupPrompt: [
+        AUTOMATION_PROJECT_CONTEXT_MARKER,
+        'Project: orca (project-1)',
+        'Host: ssh:ssh-target-1',
+        `Project root: ${repoPath} (shared checkout, not necessarily this run's workspace)`,
+        '',
+        'Review changes'
+      ].join('\n'),
       telemetrySource: 'unknown',
       automationProvenance: {
         kind: 'created-by-automation',
@@ -103,6 +111,16 @@ describe('headless automation workspace create args', () => {
 
     expect(args.setupDecision).toBe('skip')
     expect(Object.hasOwn(args, 'startupExtraAgentArgs')).toBe(false)
+  })
+
+  it('leaves a record that names no project prompt untouched', () => {
+    const args = buildHeadlessAutomationWorktreeCreateArgs({
+      automation: { ...automation, runContext: null, projectId: '' },
+      run: { id: 'run-1', title: 'Nightly review run', scheduledFor: 0 },
+      repo
+    })
+
+    expect(args.startupPrompt).toBe('Review changes')
   })
 
   it('carries saved extras into the startup agent launch', () => {

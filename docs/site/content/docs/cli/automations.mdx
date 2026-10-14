@@ -73,6 +73,22 @@ orca automations create \
 
 Use `--project-host-setup <id>` when you already have a setup id. Optional `--source-context '<json>'` pins task/provider data to a host/account (pass `null` on edit to clear).
 
+## What an assigned project adds to a run
+
+Assigning an automation to a project does more than pick where it runs: every run hands that project's context to the agent, prefixed to the saved prompt it already delivers. The agent is told the project's name and id, the host, the project root, and the pinned task source when there is one:
+
+```text
+<!-- orca automation project context: supplied by the assigned project for every run -->
+Project: orca (github:stablyai/orca)
+Host: ssh:devbox
+Project root: /home/me/orca (shared checkout, not necessarily this run's workspace)
+Task source: github stablyai/orca (account gpu-bot)
+
+<your saved prompt>
+```
+
+Every automation has a project — it is a required part of the record — so every run carries this block; for records created before project host setups existed, the project is named by the legacy repo id. The block is built from the record when the run starts and is never written back into the saved prompt, so `orca automations show` still prints exactly what you saved. A blank prompt stays blank, so an automation with no instructions still launches its agent bare.
+
 ## Manage automations across hosts
 
 The desktop **Automations** page loads schedules from this computer and supported connected Orca hosts into one table. The **Host** column shows where each automation is stored and scheduled; use **Filters → Host** to show one or more hosts, or return to **All hosts**.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AUTOMATION_PROJECT_CONTEXT_MARKER } from '../../shared/automation-project-context'
 import { launchHeadlessAutomationAgent } from './headless-automation-agent-launch'
 
 const CHAT_DEFAULT_ON = { experimentalNativeChat: true }
@@ -65,6 +66,48 @@ function launch(runtime: ReturnType<typeof harness>, overrides: Record<string, u
 }
 
 describe('headless automation agent launch', () => {
+  const assignedRunContext = {
+    kind: 'workspace-run' as const,
+    projectId: 'project-1',
+    hostId: 'ssh:ssh-target-1' as const,
+    projectHostSetupId: 'setup-1',
+    repoId: 'repo-1',
+    path: '/repo'
+  }
+  const assignedPromptBlock = [
+    AUTOMATION_PROJECT_CONTEXT_MARKER,
+    'Project: repo (project-1)',
+    'Host: ssh:ssh-target-1',
+    "Project root: /repo (shared checkout, not necessarily this run's workspace)"
+  ].join('\n')
+
+  it('carries the assigned project context on the launched prompt', async () => {
+    const runtime = harness()
+
+    await launch(runtime, { runContext: assignedRunContext })
+
+    expect(runtime.launchAgentTerminal).toHaveBeenCalledWith(
+      'id:wt-1',
+      expect.objectContaining({
+        prompt: `${assignedPromptBlock}\n\nfix the flaky test`
+      })
+    )
+  })
+
+  it('carries the assigned project context into a new-per-run workspace create', async () => {
+    const runtime = harness()
+
+    await launch(runtime, {
+      runContext: assignedRunContext,
+      workspaceMode: 'new_per_run',
+      workspaceId: null
+    })
+
+    expect(runtime.createManagedWorktree.mock.calls[0]![0]).toMatchObject({
+      startupPrompt: `${assignedPromptBlock}\n\nfix the flaky test`
+    })
+  })
+
   it('starts an argv agent in an existing workspace with the prompt on its command', async () => {
     const runtime = harness()
 

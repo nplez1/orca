@@ -10,6 +10,7 @@ import type {
   AutomationDispatchRequest,
   AutomationDispatchResult
 } from '../../../shared/automations-types'
+import { composeAutomationRunPrompt } from '../../../shared/automation-project-context'
 import { createAutomationDispatchCompletion } from './automation-dispatch-completion'
 import {
   prepareAutomationDispatchWorkspace,
@@ -111,7 +112,7 @@ export async function handleAutomationDispatchRequest({
             const submitted = await submitPromptToAgentPty({
               tabId: reusableSession.tabId,
               ptyId: reusableSession.ptyId,
-              content: automation.prompt
+              content: composeAutomationRunPrompt(automation, resolved.repo)
             })
             if (!submitted) {
               completion.cleanupRunObservers()
@@ -167,7 +168,7 @@ export async function handleAutomationDispatchRequest({
     const result = await launchAgentBackgroundSession({
       agent: automation.agentId,
       worktreeId: worktree.id,
-      prompt: automation.prompt,
+      prompt: composeAutomationRunPrompt(automation, resolved.repo),
       ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
       launchSource: 'unknown',
       title: run.title,

@@ -1,4 +1,5 @@
 import type { Automation, AutomationRun } from '../../shared/automations-types'
+import { composeAutomationRunPrompt } from '../../shared/automation-project-context'
 import { buildAutomationWorkspaceProvenance } from '../../shared/automation-workspace-provenance'
 import type { Repo } from '../../shared/repo-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -40,7 +41,8 @@ export function buildHeadlessAutomationWorktreeCreateArgs({
     activate: false,
     createdWithAgent: automation.agentId,
     startupAgent: automation.agentId,
-    startupPrompt: automation.prompt,
+    // Composed for the same reason as the launch: the create contract must not ship a context-less prompt.
+    startupPrompt: composeAutomationRunPrompt(automation, repo),
     ...(automation.extraAgentArgs ? { startupExtraAgentArgs: automation.extraAgentArgs } : {}),
     telemetrySource: 'unknown',
     automationProvenance: buildAutomationWorkspaceProvenance(automation, run, repo, createdAt)

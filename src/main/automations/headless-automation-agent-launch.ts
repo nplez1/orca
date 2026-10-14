@@ -15,6 +15,7 @@ import type {
 } from '../agent-launch/agent-launch-execution'
 import { executeAgentLaunch } from '../agent-launch/agent-launch-executor'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
+import { composeAutomationRunPrompt } from '../../shared/automation-project-context'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HeadlessAutomationDispatchLaunch } from './headless-dispatch'
@@ -45,7 +46,7 @@ export async function launchHeadlessAutomationAgent(
   const { automation, run, target } = request
   const agent = automation.agentId
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
-  const text = automation.prompt?.trim()
+  const text = composeAutomationRunPrompt(automation, target.repo).trim()
   let workspace: { id: string; displayName: string | null } | undefined
   let terminal: LaunchedTerminal | undefined
   const execution: AgentLaunchSurfaceExecution = {

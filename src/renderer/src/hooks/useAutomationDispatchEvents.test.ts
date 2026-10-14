@@ -251,7 +251,7 @@ describe('useAutomationDispatchEvents setup launch', () => {
     expect(mockLaunchAgentBackgroundSession).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: 'claude',
-        prompt: 'run this',
+        prompt: expect.stringContaining('run this'),
         worktreeId: 'wt-created'
       })
     )
@@ -278,7 +278,7 @@ describe('useAutomationDispatchEvents setup launch', () => {
     expect(mockLaunchAgentBackgroundSession).toHaveBeenCalledWith(
       expect.objectContaining({
         worktreeId: 'wt-existing',
-        prompt: 'run this'
+        prompt: expect.stringContaining('run this')
       })
     )
   })
@@ -324,7 +324,7 @@ describe('useAutomationDispatchEvents setup launch', () => {
     expect(mockLaunchAgentBackgroundSession).toHaveBeenCalledWith(
       expect.objectContaining({
         worktreeId: folderWorkspace.id,
-        prompt: 'run this'
+        prompt: expect.stringContaining('run this')
       })
     )
     expect(mockMarkDispatchResult).toHaveBeenCalledWith(
