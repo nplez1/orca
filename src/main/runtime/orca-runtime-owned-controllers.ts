@@ -18,7 +18,6 @@ import { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-pres
 import { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
 import { RuntimeWorkspaceSessionController } from './runtime-workspace-session-controller'
 import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
-import { addRemoteRepoFromPath } from '../ipc/repos/remote-repo-registration'
 import { teardownFolderWorkspacePtys } from './folder-workspace-pty-teardown'
 import { countRepoTerminalsNotKnownExited } from './project-removal-impact'
 
@@ -35,17 +34,6 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     listRepos: () => runtime.listRepos(),
     addRepo: (path, kind, hostId) => runtime.addRepo(path, kind, hostId),
-    addRemoteRepo: async (remote) => {
-      // The same registration the desktop IPC handler uses, so both surfaces agree on SSH hosts.
-      const result = await addRemoteRepoFromPath(runtime.requireStore(), remote)
-      if ('error' in result) {
-        throw new Error(result.error)
-      }
-      runtime.invalidateResolvedWorktreeCache()
-      runtime.invalidateWorktreeScanCacheForRepo(result.repo.id)
-      runtime.notifyReposChanged()
-      return result.repo
-    },
     cloneRepo: (url, destination, hostId) => runtime.cloneRepo(url, destination, hostId),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),

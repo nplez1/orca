@@ -2,7 +2,12 @@ import { net, session } from 'electron'
 import type { ProviderAllowance } from '../../shared/provider-allowance'
 import type { ProviderRateLimits, RateLimitWindow } from '../../shared/rate-limit-types'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
-import { createOAuthUsageError } from './claude-oauth-usage-error'
+import { abortSignalWithTimeout } from '../lib/abort-signal-with-timeout'
+import {
+  ClaudeUsageRequestError,
+  createOAuthUsageError,
+  OAuthUsageError
+} from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { abortedClaudeRateLimitResult } from './claude-usage-result'
 import {
@@ -159,10 +164,9 @@ export async function fetchClaudeOAuthUsage(
     return abortedClaudeRateLimitResult()
   }
 
-  const requestSignal = signal
-    ? AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)])
-    : AbortSignal.timeout(API_TIMEOUT_MS)
+  const requestSignal = abortSignalWithTimeout(signal, API_TIMEOUT_MS)
 
+  let data: OAuthUsageResponse
   try {
     const response = await net.fetch(OAUTH_USAGE_URL, {
       headers: {
@@ -176,33 +180,33 @@ export async function fetchClaudeOAuthUsage(
       throw await createOAuthUsageError(response)
     }
 
-    const data = (await response.json()) as OAuthUsageResponse
-    if (signal?.aborted) {
-      return abortedClaudeRateLimitResult()
-    }
-    const session = mapClaudeUsageWindow(data.five_hour, 300)
-    const weekly = mapClaudeUsageWindow(data.seven_day, 10080)
-    // Why: only for plans reporting no subscription window at all — an enterprise or
-    // usage-billed account. A Pro account with extra usage credits switched on keeps
-    // its 5h/7d bars and must not grow a spurious monthly one beside them.
-    const monthly =
-      session || weekly ? { monthly: null, allowance: null } : mapClaudeMonthlyAllowance(data)
-    return {
-      provider: 'claude',
-      session,
-      weekly,
-      fableWeekly: mapFableWeeklyWindow(data),
-      extraUsage: mapClaudeExtraUsage(data),
-      ...(monthly.monthly ? { monthly: monthly.monthly } : {}),
-      ...(monthly.allowance ? { allowance: monthly.allowance } : {}),
-      updatedAt: Date.now(),
-      error: null,
-      status: 'ok'
-    }
+    data = await response.json()
   } catch (error) {
     if (signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
-    throw error
+    throw error instanceof OAuthUsageError ? error : new ClaudeUsageRequestError(error)
+  }
+  if (signal?.aborted) {
+    return abortedClaudeRateLimitResult()
+  }
+  const session = mapClaudeUsageWindow(data.five_hour, 300)
+  const weekly = mapClaudeUsageWindow(data.seven_day, 10080)
+  // Why: only for plans reporting no subscription window at all — an enterprise or
+  // usage-billed account. A Pro account with extra usage credits switched on keeps
+  // its 5h/7d bars and must not grow a spurious monthly one beside them.
+  const monthly =
+    session || weekly ? { monthly: null, allowance: null } : mapClaudeMonthlyAllowance(data)
+  return {
+    provider: 'claude',
+    session,
+    weekly,
+    fableWeekly: mapFableWeeklyWindow(data),
+    extraUsage: mapClaudeExtraUsage(data),
+    ...(monthly.monthly ? { monthly: monthly.monthly } : {}),
+    ...(monthly.allowance ? { allowance: monthly.allowance } : {}),
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok'
   }
 }

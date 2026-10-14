@@ -320,6 +320,7 @@ export function VaultSessionRow({
           resumeLabel={resumeLabel}
           onJumpToOriginalPane={onJumpToOriginalPane}
           showJumpToWorktree={showJumpToWorktree}
+          jumpWorkspaceId={worktreeInfo?.worktreeId}
           onJumpToWorktree={onJumpToWorktree}
           onResume={onResume}
           onContinueInNewSession={onContinueInNewSession}

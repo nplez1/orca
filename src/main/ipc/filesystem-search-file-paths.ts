@@ -15,7 +15,7 @@ import {
   RipgrepLaunchFailureError,
   RipgrepUnavailableError
 } from '../../shared/ripgrep-process-availability'
-import { parseWslPath } from '../wsl'
+import { resolveBundledRipgrepWslRouting } from '../ripgrep/bundled-ripgrep-wsl-routing'
 import { resolveAuthorizedPath } from './filesystem-auth'
 import { getLocalGitOptionsForRegisteredWorktree } from './local-worktree-runtime-options'
 import { scanRipgrepPaths } from './quick-open-rg-path-scan'
@@ -62,7 +62,11 @@ export async function searchQuickOpenFilePaths(
     rootPath,
     authorizedRootPath
   )
-  const wslDistroForOutput = parseWslPath(authorizedRootPath)?.distro ?? localGitOptions.wslDistro
+  const { wslDistro, wslDistroForOutput } = resolveBundledRipgrepWslRouting(
+    authorizedRootPath,
+    localGitOptions.wslDistro,
+    { followSymlinks: args.followSymlinks }
+  )
 
   // Upstream's union: the workspace spelling and the canonical root can differ on macOS symlinked roots.
   const excludePathPrefixes = [
@@ -94,7 +98,7 @@ export async function searchQuickOpenFilePaths(
       args: passArgs,
       authorizedRootPath,
       excludePathPrefixes,
-      localGitOptions,
+      localGitOptions: { wslDistro },
       onPath: (path) => {
         if (
           args.mode === 'name-filter' &&
@@ -182,7 +186,11 @@ export async function collectQuickOpenPaths(
     rootPath,
     authorizedRootPath
   )
-  const wslDistroForOutput = parseWslPath(authorizedRootPath)?.distro ?? localGitOptions.wslDistro
+  const { wslDistro, wslDistroForOutput } = resolveBundledRipgrepWslRouting(
+    authorizedRootPath,
+    localGitOptions.wslDistro,
+    { followSymlinks: args.followSymlinks }
+  )
   const excludePathPrefixes = buildExcludePathPrefixes(authorizedRootPath, args.excludePaths)
   const { primary, ignoredPass } = buildRgArgsForQuickOpen({
     searchRoot: '.',
@@ -196,7 +204,7 @@ export async function collectQuickOpenPaths(
     args: args.pass === 'included' ? primary : ignoredPass,
     authorizedRootPath,
     excludePathPrefixes,
-    localGitOptions,
+    localGitOptions: { wslDistro },
     onPath: (path) => {
       if (paths.length >= maxPaths) {
         budgetExceeded = true

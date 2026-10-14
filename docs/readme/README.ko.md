@@ -98,7 +98,7 @@ Orca NP는 [stablyai/orca](https://github.com/stablyai/orca)에 포크 전용 �
 
 휴대폰에서 에이전트를 모니터링하고 조종하세요 — 에이전트가 완료되면 알림을 받고 어디서든 후속 지시를 보낼 수 있습니다.
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [문서 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [문서 →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -287,7 +287,7 @@ Orca NP는 공식 Orca와 나란히 설치되며 이 저장소의 릴리스로 �
 Orca 모바일 앱을 Orca NP와 페어링해 휴대폰에서 에이전트를 모니터링하고 조종하세요. 앱은 업스트림 Orca가 배포하며 Orca NP와 함께 동작합니다.
 
 - **iOS:** [App Store에서 다운로드](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [APK 0.0.52 다운로드](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [설치 가이드](https://www.onorca.dev/docs/android-apk)
+- **Android:** [APK 다운로드](https://www.onorca.dev/download/android) · [설치 가이드](https://www.onorca.dev/docs/android-apk)
 
 ---
 

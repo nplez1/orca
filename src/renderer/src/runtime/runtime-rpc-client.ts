@@ -8,7 +8,7 @@ import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call
 import { callRuntimeEnvironmentWithRevision } from './runtime-rpc-environment-call'
 import { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
-import type { RuntimeClientTarget } from './runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   RUNTIME_CAPABILITY_STATUS_TTL_MS,
   getCachedRuntimeCompatibilityCheck,
@@ -26,7 +26,7 @@ export {
   markRuntimeEnvironmentCompatible,
   subscribeRuntimeWorkspacePathSearchCapabilityInvalidation
 } from './runtime-compatibility-cache'
-export { type RuntimeClientTarget } from './runtime-client-target'
+export { type RuntimeClientTarget } from '../../../shared/runtime-client-target'
 export {
   hasRuntimeRpcErrorCode,
   RuntimeRpcCallError,

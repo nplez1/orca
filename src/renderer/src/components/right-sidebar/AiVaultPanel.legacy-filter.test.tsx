@@ -11,14 +11,14 @@ const mockState: {
     disabledTuiAgents?: string[]
   }
   runtimeEnvironments: never[]
-  folderWorkspaces: Record<string, never>
+  folderWorkspaces: never[]
   projectGroups: never[]
   repos: never[]
   worktreesByRepo: Record<string, never>
 } = {
   settings: {},
   runtimeEnvironments: [],
-  folderWorkspaces: {},
+  folderWorkspaces: [],
   projectGroups: [],
   repos: [],
   worktreesByRepo: {}

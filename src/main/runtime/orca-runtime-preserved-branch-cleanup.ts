@@ -3,7 +3,7 @@ import { OrcaRuntimeWithTerminalDrivers } from './orca-runtime-terminal-drivers'
 import { confirmRunTerminalShellAlone, readRunTerminalClientUse } from './run-terminal-client-use'
 import type { ExecutionHostScope } from '../../shared/execution-host'
 import { RuntimePreservedBranchCleanup } from './runtime-preserved-branch-cleanup'
-import type { IPtyProvider } from '../providers/types'
+import type { IPtyProvider } from '../providers/pty-provider-contract'
 import type {
   AgentSessionCreateOperation,
   OrchestrationCompatibilitySshAttachmentAuthority,
@@ -52,8 +52,6 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
   )
 
   protected readonly getLocalProviderFn: (() => IPtyProvider) | null
-
-  protected readonly getSshProviderFn: ((connectionId: string) => IPtyProvider | undefined) | null
 
   protected readonly onPtyStopped: ((ptyId: string) => void) | null
 

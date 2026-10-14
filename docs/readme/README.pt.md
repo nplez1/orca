@@ -98,7 +98,7 @@ A lista de recursos abaixo é a do Orca upstream; seus links "Docs" levam à doc
 
 Monitore e conduza seus agentes pelo celular — receba uma notificação quando um agente terminar e envie instruções de acompanhamento de qualquer lugar.
 
-[App Store para iOS](https://apps.apple.com/us/app/orca-ide/id6766130217) · [APK Android 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [Docs →](https://www.onorca.dev/docs/mobile)
+[App Store para iOS](https://apps.apple.com/us/app/orca-ide/id6766130217) · [APK Android](https://www.onorca.dev/download/android) · [Docs →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -287,7 +287,7 @@ O Orca NP se instala ao lado de um Orca oficial e se atualiza a partir das vers�
 Pareie o app móvel do Orca com o Orca NP para monitorar e conduzir seus agentes pelo celular. Os apps são publicados pelo Orca upstream e funcionam com o Orca NP.
 
 - **iOS:** [Baixar na App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [Baixar APK 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk)
+- **Android:** [Baixar APK](https://www.onorca.dev/download/android)
 
 ---
 

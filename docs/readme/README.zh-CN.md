@@ -98,7 +98,7 @@ Orca NP 是 [stablyai/orca](https://github.com/stablyai/orca) 加上一系列 fo
 
 用手机监控并指挥你的智能体 — 智能体完成时收到通知，随时随地发送后续指令。
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [文档 →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [文档 →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -285,7 +285,7 @@ Orca NP 可与官方 Orca 并存安装，并通过本仓库的发布自动更新
 将 Orca 移动应用与 Orca NP 配对，即可用手机监控和操控你的智能体。这些应用由上游 Orca 发布，可与 Orca NP 配合使用。
 
 - **iOS:** [从 App Store 下载](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [下载 APK](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk)
+- **Android:** [下载 APK](https://www.onorca.dev/download/android)
 
 ---
 

@@ -28,6 +28,10 @@ import {
   reconcileLocalWorkspacePathIndexEvents
 } from './filesystem-watcher-path-index-reconciliation'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import {
+  notifyLocalWatcherEvents,
+  notifyLocalWatcherInterrupted
+} from './local-watcher-event-observers'
 
 // Why: matches the watcher subprocess budget in parcel-watcher-event-delivery.ts.
 const DIRECTORY_STAT_CONCURRENCY = 8
@@ -261,6 +265,7 @@ export async function createLocalWatcher(
         root.batch.events.length
       )
       root.batch.indexReconciliationMarked = false
+      notifyLocalWatcherInterrupted(root)
       root.batch.overflowed = true
       scheduleLocalBatchFlush(root)
     }
@@ -273,6 +278,7 @@ export async function createLocalWatcher(
           invalidateQuickOpenPathInventory(root.rootPath, 'watcher-error')
           // Why: treat watcher errors as overflow so the renderer conservatively refreshes rather than trusting possibly-invalid caches (§7.2, §7.3).
           console.error(`[filesystem-watcher] error for ${rootKey}:`, err)
+          notifyLocalWatcherInterrupted(root)
           emitOverflowPayload(root)
           // Why: after an error the native subscription may be invalid (deleted root); tear down the dead watcher so it doesn't dangle (§7.3).
           cancelLocalBatchFlush(root)
@@ -298,6 +304,7 @@ export async function createLocalWatcher(
           root.batch.indexReconciliationMarked = true
           beginLocalWorkspacePathIndexReconciliation(root.rootPath, relevantEvents?.length ?? 0)
         }
+        notifyLocalWatcherEvents(root, events)
         queueWatcherEvents(root.batch, events)
         scheduleLocalBatchFlush(root)
       },

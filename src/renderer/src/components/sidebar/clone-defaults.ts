@@ -45,7 +45,6 @@ export function getCloneDestinationAutoFill({
   step,
   cloneDestination,
   activeRuntimeEnvironmentId,
-  sshTargetId,
   workspaceDir,
   layoutMode,
   cloneStepAutoFilled
@@ -53,7 +52,6 @@ export function getCloneDestinationAutoFill({
   step: string
   cloneDestination: string
   activeRuntimeEnvironmentId: string | null | undefined
-  sshTargetId?: string | null | undefined
   workspaceDir: string | null | undefined
   layoutMode?: WorktreeLayoutMode
   cloneStepAutoFilled: boolean
@@ -61,7 +59,7 @@ export function getCloneDestinationAutoFill({
   if (step !== 'clone' || cloneStepAutoFilled || cloneDestination) {
     return null
   }
-  if (activeRuntimeEnvironmentId?.trim() || sshTargetId?.trim() || !workspaceDir) {
+  if (activeRuntimeEnvironmentId?.trim() || !workspaceDir) {
     return null
   }
   return { destination: getDefaultCloneParent(workspaceDir, layoutMode) }

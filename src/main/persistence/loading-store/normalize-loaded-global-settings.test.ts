@@ -6,6 +6,7 @@ import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-setting
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
+import { applyAgentPermissionMode } from '../../../shared/tui-agent-permissions'
 
 // Simulates a profile created before the fields under test were persisted. A profile written
 // before a field existed has no such key at all, which is the only shape that exercises the
@@ -178,5 +179,27 @@ describe('worktree layout mode for profiles written before it existed', () => {
     )
     // The untouched default object is what a genuinely new install starts from.
     expect(defaults.settings.worktreeLayoutMode).toBe('project-folder')
+  })
+})
+
+describe('the new-chat permission setting', () => {
+  it.each([
+    ['manual', 'ask'],
+    ['yolo', 'full-access']
+  ] as const)('seeds a profile without it from %s Agent Permissions', (mode, expected) => {
+    const normalized = normalizeLegacyProfile({
+      nativeChatPermissionMode: undefined,
+      ...applyAgentPermissionMode({ mode })
+    })
+    expect(normalized.nativeChatPermissionMode).toBe(expected)
+  })
+
+  // Seeded once: after the next save the setting is the user's, not a mirror of Agent Permissions.
+  it('keeps a saved value when Agent Permissions change afterwards', () => {
+    const normalized = normalizeLegacyProfile({
+      nativeChatPermissionMode: 'ask',
+      ...applyAgentPermissionMode({ mode: 'yolo' })
+    })
+    expect(normalized.nativeChatPermissionMode).toBe('ask')
   })
 })

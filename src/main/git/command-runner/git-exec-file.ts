@@ -5,10 +5,7 @@ import {
   resolveGitFetchHeadCommand,
   runWithGitFetchHeadLock
 } from '../../../shared/git-fetch-head-lock'
-import {
-  isWslLinkedWorktreeGitRoutingCandidate,
-  prepareWslLinkedWorktreeGitRouting
-} from '../wsl-linked-worktree-git-routing'
+import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
 import { resolveCommand, type ResolvedCommand } from './wsl-command-resolution'
 import { readCapturedGitBuffer, readCapturedGitString } from './captured-output'
 import { annotateWslHostFailure } from './wsl-host-failure'
@@ -46,10 +43,9 @@ async function gitExecFileAsyncUnlocked(
   return withGitSpan(
     { args, ...(options.cwd !== undefined ? { cwd: options.cwd } : {}) },
     async (span) => {
-      if (isWslLinkedWorktreeGitRoutingCandidate(options.cwd, options.wslDistro)) {
-        await prepareWslLinkedWorktreeGitRouting(options.cwd, options.wslDistro, {
-          signal: options.signal
-        })
+      const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
+      if (checkoutRoutingReady) {
+        await checkoutRoutingReady
       }
       const readEnvironmentReady = pendingWslDirectGitReadEnvironment(args, options)
       if (readEnvironmentReady) {
@@ -211,10 +207,9 @@ export async function gitExecFileAsyncBuffer(
   }
 ): Promise<{ stdout: Buffer }> {
   return withGitSpan({ args, cwd: options.cwd }, async (span) => {
-    if (isWslLinkedWorktreeGitRoutingCandidate(options.cwd, options.wslDistro)) {
-      await prepareWslLinkedWorktreeGitRouting(options.cwd, options.wslDistro, {
-        signal: options.signal
-      })
+    const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
+    if (checkoutRoutingReady) {
+      await checkoutRoutingReady
     }
     const readEnvironmentReady = pendingWslDirectGitReadEnvironment(args, options)
     if (readEnvironmentReady) {

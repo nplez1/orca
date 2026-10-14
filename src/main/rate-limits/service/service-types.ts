@@ -44,7 +44,7 @@ export type InactiveCodexAccountInfo = {
 
 export type CodexHomePathResolver = (
   target?: CodexAccountSelectionTarget
-) => CodexRateLimitHomeResolution
+) => CodexRateLimitHomeResolution | Promise<CodexRateLimitHomeResolution>
 export type KimiHomeResolver = () => Promise<KimiHomeResolution>
 export type ClaudeAuthPreparationResolver = (
   target?: ClaudeAccountSelectionTarget

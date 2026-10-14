@@ -1,5 +1,6 @@
 import type { CommandHandler } from './dispatch'
 import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
+import { LINEAR_HANDLER_GROUPS } from './linear-handler-groups'
 
 export type HandlerGroup = {
   name: string
@@ -21,6 +22,16 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'core',
     keys: ['claude-teams', 'open', 'serve', 'status'],
     load: async () => (await import('./handlers/core.js')).CORE_HANDLERS
+  },
+  {
+    name: 'serve-restore',
+    keys: ['serve restore resume'],
+    load: async () => (await import('./handlers/serve-restore.js')).SERVE_RESTORE_HANDLERS
+  },
+  {
+    name: 'serve-service',
+    keys: ['serve service install', 'serve service status', 'serve service uninstall'],
+    load: async () => (await import('./handlers/serve-service.js')).SERVE_SERVICE_HANDLERS
   },
   {
     name: 'account',
@@ -197,13 +208,18 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/agent-hooks.js')).AGENT_HOOK_HANDLERS
   },
   {
+    name: 'agent-launch',
+    keys: ['agent launch'],
+    load: async () => (await import('./handlers/agent-launch.js')).AGENT_LAUNCH_HANDLERS
+  },
+  {
     name: 'profile-state',
     keys: ['profile state exports', 'profile state rollback'],
     load: async () => (await import('./handlers/profile-state.js')).PROFILE_STATE_HANDLERS
   },
   {
     name: 'diagnostics',
-    keys: ['diagnostics memory'],
+    keys: ['diagnostics memory', 'terminal-daemon status', 'terminal-daemon restart'],
     load: async () => (await import('./handlers/diagnostics.js')).DIAGNOSTICS_HANDLERS
   },
   {
@@ -236,39 +252,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     ],
     load: async () => (await import('./handlers/managed-server.js')).MANAGED_SERVER_HANDLERS
   },
-  {
-    name: 'linear',
-    keys: [
-      'linear save-issue',
-      'linear list-issues',
-      'linear relation add',
-      'linear relation remove',
-      'linear issue',
-      'linear search',
-      'linear team list',
-      'linear team members',
-      'linear team states',
-      'linear team labels',
-      'linear project list',
-      'linear list',
-      'linear status set',
-      'linear assignee set',
-      'linear assignee clear',
-      'linear priority set',
-      'linear priority clear',
-      'linear estimate set',
-      'linear estimate clear',
-      'linear due-date set',
-      'linear due-date clear',
-      'linear label add',
-      'linear label remove',
-      'linear label set',
-      'linear comment add',
-      'linear attach',
-      'linear create'
-    ],
-    load: async () => (await import('./handlers/linear.js')).LINEAR_HANDLERS
-  },
+  ...LINEAR_HANDLER_GROUPS,
   {
     name: 'vm',
     keys: ['vm recipe doctor', 'vm recipe extend'],

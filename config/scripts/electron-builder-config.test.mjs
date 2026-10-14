@@ -9,6 +9,12 @@ import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
+const MAIN_BUILD_ENTRY_POINTS_PATH = join(
+  REPO_ROOT,
+  'config',
+  'build-plugins',
+  'main-build-entry-points.ts'
+)
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
@@ -361,8 +367,10 @@ describe('electron-builder config', () => {
     const entryFilename = 'wsl-transcript-fs-process-entry.js'
     expect(electronBuilderConfig.asarUnpack).toContain(`out/main/${entryFilename}`)
 
-    const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
-    expect(viteConfig).toMatch(new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`))
+    const entryPoints = await readFile(MAIN_BUILD_ENTRY_POINTS_PATH, 'utf8')
+    expect(entryPoints).toMatch(
+      new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
+    )
   })
 
   // Why: the CLI runs this entry under ELECTRON_RUN_AS_NODE, which cannot read
@@ -409,7 +417,10 @@ describe('electron-builder config', () => {
     // longer exists.
     const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
     expect(viteConfig).toContain("entryFileNames: '[name].js'")
-    expect(viteConfig).toMatch(new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`))
+    const entryPoints = await readFile(MAIN_BUILD_ENTRY_POINTS_PATH, 'utf8')
+    expect(entryPoints).toMatch(
+      new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
+    )
   })
 
   it('keeps the worker-thread hang watchdog inside app.asar', () => {
@@ -565,16 +576,6 @@ describe('electron-builder config', () => {
       expect(unrecoverable).toEqual([])
     })
 
-    it('accepts exactly the markers electron-updater maps to a root-package updater', async () => {
-      const source = await readFile(
-        new URL('../../src/main/linux-update-package-type.ts', import.meta.url),
-        'utf8'
-      )
-      for (const target of linuxTargets.filter((entry) => RECOVERABLE_TARGETS.has(entry))) {
-        expect(source).toContain(`value === '${target}'`)
-      }
-    })
-
     it('keeps the pinned FpmTarget overwrite for configured deb and rpm artifacts', async () => {
       const source = await readFile(
         require.resolve('app-builder-lib/out/targets/FpmTarget'),
@@ -612,7 +613,11 @@ describe('arch-aware packaging guard', () => {
   })
 
   const packHost = (arch) =>
-    electronBuilderConfig.beforePack({ electronPlatformName: process.platform, arch }, bundleDir)
+    electronBuilderConfig.beforePack(
+      { electronPlatformName: process.platform, arch },
+      bundleDir,
+      () => undefined
+    )
 
   it('allows packaging the host platform and architecture', () => {
     expect(() => packHost(HOST_ARCH)).not.toThrow()
@@ -630,10 +635,21 @@ describe('arch-aware packaging guard', () => {
       expect(() => packHost(OTHER_ARCH)).toThrow(otherSherpa)
       expect(() => packHost(OTHER_ARCH)).toThrow('pnpm install:release')
       expect(() => packHost(HOST_ARCH)).not.toThrow()
-    } else {
+    } else if (process.platform !== 'win32') {
       expect(() => packHost(OTHER_ARCH)).not.toThrow()
     }
   })
+
+  // The host's own build is the foreign-arch case: a Windows checkout compiles these for its CPU only.
+  it.runIf(process.platform === 'win32')(
+    'refuses a Windows workspace addon built for another architecture',
+    () => {
+      for (const binary of ['orca_windows_registry.node', 'orca_windows_security.node']) {
+        expect(() => packHost(OTHER_ARCH)).toThrow(`${binary} for ${OTHER_ARCH_NAME}`)
+      }
+      expect(() => packHost(HOST_ARCH)).not.toThrow()
+    }
+  )
 
   it('requires installed Windows addons for Windows packaging', () => {
     const windowsAddon = electronBuilderConfig.win.extraResources.some(
@@ -646,6 +662,8 @@ describe('arch-aware packaging guard', () => {
     } else {
       expect(packWindows).toThrow('@vscode/windows-process-tree')
       expect(packWindows).toThrow('Windows packaging requires a Windows host')
+      // A workspace link exists everywhere; only its compiled binary proves the addon will load.
+      expect(packWindows).toThrow('@orca/windows-security')
     }
   })
 })

@@ -8,7 +8,8 @@ import {
   getRuntimeFileSearchRejectedField
 } from './runtime-file-search-bounds'
 import { validateLegacyQuickOpenRecentCandidates } from './runtime-legacy-quick-open-inventory'
-import { callRuntimeRpc, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
 export async function searchRuntimeFiles(

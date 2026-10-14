@@ -1,9 +1,7 @@
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
-import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 import { buildByIdIndex, buildWorktreeByIdIndex } from '../slices/worktree-by-id-index'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
-import { isCurrentDirectSshAuthority } from './terminal-pty-identities'
 
 export type PersistedTerminalHints = {
   tabsByWorktree: Record<string, TerminalTab[]> | null
@@ -16,8 +14,7 @@ export function buildPersistedTerminalHints({
   pendingReconnectPtyIdByTabId,
   terminalLayoutsByTabId,
   tabsByWorktree,
-  ptyIdsByTabId,
-  directSshTargetId
+  ptyIdsByTabId
 }: {
   ids: readonly string[]
   pendingReconnectTabByWorktree: Record<string, string[]>
@@ -25,7 +22,6 @@ export function buildPersistedTerminalHints({
   terminalLayoutsByTabId: TerminalSlice['terminalLayoutsByTabId']
   tabsByWorktree: Record<string, TerminalTab[]>
   ptyIdsByTabId: Record<string, string[]>
-  directSshTargetId?: string
 }): PersistedTerminalHints {
   let nextTabsByWorktree: Record<string, TerminalTab[]> | null = null
   let nextPtyIdsByTabId: Record<string, string[]> | null = null
@@ -45,12 +41,7 @@ export function buildPersistedTerminalHints({
     for (const tab of tabsToReconnect) {
       const tabId = tab.id
       const leafPtyMap = terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId ?? {}
-      const pendingPtyId = pendingReconnectPtyIdByTabId[tabId]
-      const tabLevelPtyId =
-        directSshTargetId !== undefined &&
-        parseAppSshPtyId(pendingPtyId ?? '')?.connectionId !== directSshTargetId
-          ? undefined
-          : pendingPtyId
+      const tabLevelPtyId = pendingReconnectPtyIdByTabId[tabId]
       const allPtyIds =
         Object.keys(leafPtyMap).length > 0
           ? (Object.values(leafPtyMap).filter(Boolean) as string[])
@@ -99,11 +90,8 @@ export function createWorkspaceTerminalReconnectActions(
         ...(hints.ptyIdsByTabId ? { ptyIdsByTabId: hints.ptyIdsByTabId } : {})
       })
     },
-    reconnectPersistedTerminals: async (signal, options) => {
-      if (
-        signal?.aborted ||
-        (options && !isCurrentDirectSshAuthority(get(), options.directSshAuthority))
-      ) {
+    reconnectPersistedTerminals: async (signal) => {
+      if (signal?.aborted) {
         return
       }
       const {
@@ -114,14 +102,8 @@ export function createWorkspaceTerminalReconnectActions(
         tabsByWorktree,
         ptyIdsByTabId
       } = get()
-      const scopedWorkspaceKeys = options ? new Set(options.workspaceKeys) : null
-      const ids = (pendingReconnectWorktreeIds ?? []).filter(
-        (id) => !scopedWorkspaceKeys || scopedWorkspaceKeys.has(id)
-      )
+      const ids = pendingReconnectWorktreeIds ?? []
       if (ids.length === 0) {
-        if (options) {
-          return
-        }
         set({
           workspaceSessionReady: true,
           pendingReconnectWorktreeIds: [],
@@ -138,32 +120,20 @@ export function createWorkspaceTerminalReconnectActions(
           pendingReconnectPtyIdByTabId,
           terminalLayoutsByTabId,
           tabsByWorktree,
-          ptyIdsByTabId,
-          ...(options ? { directSshTargetId: options.directSshAuthority.targetId } : {})
+          ptyIdsByTabId
         })
       // Why indexed: the loop neither sets state nor awaits, so one index over the
       // whole store snapshot serves every iteration.
       const worktreeById = buildWorktreeByIdIndex(get().worktreesByRepo)
       const repoById = buildByIdIndex(get().repos)
       // Why: keep deferred SSH session IDs for post-cleanup reconnect.
-      const scopedTabIds = new Set(
-        [...(scopedWorkspaceKeys ?? ids)].flatMap((workspaceKey) =>
-          (tabsByWorktree[workspaceKey] ?? []).map((tab) => tab.id)
-        )
-      )
-      const deferredSshSessionIdsByTabId: Record<string, string> = options
-        ? Object.fromEntries(
-            Object.entries(get().deferredSshSessionIdsByTabId).filter(
-              ([tabId]) => !scopedTabIds.has(tabId)
-            )
-          )
-        : {}
+      const deferredSshSessionIdsByTabId: Record<string, string> = {}
       for (const worktreeId of ids) {
         const worktree = worktreeById.get(worktreeId)
         // Why: SSH worktrees aren't in worktreesByRepo at cold start; fall back to the repo id in the composite worktree id so sessions still reach the deferred map.
         const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)
         const repo = repoId ? (repoById.get(repoId) ?? null) : null
-        const connectionId = options?.directSshAuthority.targetId ?? repo?.connectionId
+        const connectionId = repo?.connectionId
         if (!connectionId) {
           continue
         }
@@ -183,44 +153,21 @@ export function createWorkspaceTerminalReconnectActions(
         const tabs = tabsByWorktree[worktreeId] ?? []
         for (const tab of tabs) {
           const sessionId = pendingReconnectPtyIdByTabId[tab.id]
-          if (
-            sessionId &&
-            (!options || parseAppSshPtyId(sessionId)?.connectionId === connectionId)
-          ) {
+          if (sessionId) {
             deferredSshSessionIdsByTabId[tab.id] = sessionId
           }
         }
       }
-      if (
-        signal?.aborted ||
-        (options && !isCurrentDirectSshAuthority(get(), options.directSshAuthority))
-      ) {
+      if (signal?.aborted) {
         return
       }
-      const remainingReconnectWorktreeIds = options
-        ? pendingReconnectWorktreeIds.filter((id) => !scopedWorkspaceKeys?.has(id))
-        : []
-      const remainingReconnectTabByWorktree = options
-        ? Object.fromEntries(
-            Object.entries(pendingReconnectTabByWorktree).filter(
-              ([workspaceKey]) => !scopedWorkspaceKeys?.has(workspaceKey)
-            )
-          )
-        : {}
-      const remainingReconnectPtyIdByTabId = options
-        ? Object.fromEntries(
-            Object.entries(pendingReconnectPtyIdByTabId).filter(
-              ([tabId]) => !scopedTabIds.has(tabId)
-            )
-          )
-        : {}
       set({
         ...(reconnectedTabsByWorktree ? { tabsByWorktree: reconnectedTabsByWorktree } : {}),
         ...(reconnectedPtyIdsByTabId ? { ptyIdsByTabId: reconnectedPtyIdsByTabId } : {}),
-        ...(options ? {} : { workspaceSessionReady: true }),
-        pendingReconnectWorktreeIds: remainingReconnectWorktreeIds,
-        pendingReconnectTabByWorktree: remainingReconnectTabByWorktree,
-        pendingReconnectPtyIdByTabId: remainingReconnectPtyIdByTabId,
+        workspaceSessionReady: true,
+        pendingReconnectWorktreeIds: [],
+        pendingReconnectTabByWorktree: {},
+        pendingReconnectPtyIdByTabId: {},
         deferredSshSessionIdsByTabId
       })
     }

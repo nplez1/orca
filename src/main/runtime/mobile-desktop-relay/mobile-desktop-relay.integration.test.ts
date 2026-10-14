@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../../shared/paired-runtime-connection'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -144,8 +145,19 @@ describe('mobile desktop relay: phone -> desktop -> server', () => {
     const registry = host.server.getDeviceRegistry()!
     const children = () => registry.listDelegatedMobileDevices(desktopOnHost.pairedDeviceId!)
     const syncedNames: string[][] = []
-    const state = { capable: true, retire: (_id: string) => {} }
+    const retirementListeners = new Set<(environmentId: string) => void>()
+    const state = {
+      capable: true,
+      retire: (environmentId: string) =>
+        retirementListeners.forEach((listener) => listener(environmentId))
+    }
     const hosts: MobileDesktopRelayHosts = {
+      list: () => ({
+        environments: [],
+        statusByEnvironmentId: new Map(),
+        sshTargetLabels: new Map(),
+        sshConnectionStates: new Map()
+      }),
       resolve: async (environmentId) =>
         environmentId === 'env-1'
           ? { environmentId, fence: 'pairing-1', pairing: desktopOnHost }
@@ -155,7 +167,12 @@ describe('mobile desktop relay: phone -> desktop -> server', () => {
           const { phones } = DelegatedMobileDeviceSyncParamsSchema.parse(params)
           syncedNames.push(phones.map((phone) => phone.name))
         }
-        const response = await sendRemoteRuntimeRequest(desktopOnHost, method, params, 5_000)
+        const response = await sendRemoteRuntimeRequest(
+          pairedRuntimeConnectionFromOffer(desktopOnHost),
+          method,
+          params,
+          5_000
+        )
         // An older server: the same status without the delegated-devices capability.
         return method === 'status.get' && !state.capable && response.ok
           ? {
@@ -165,8 +182,8 @@ describe('mobile desktop relay: phone -> desktop -> server', () => {
           : response
       },
       onEnvironmentRetired: (listener) => {
-        state.retire = listener
-        return () => {}
+        retirementListeners.add(listener)
+        return () => retirementListeners.delete(listener)
       }
     }
     desktop.server.setMobileDesktopRelayHosts(hosts)

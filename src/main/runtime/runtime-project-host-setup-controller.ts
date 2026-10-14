@@ -28,6 +28,11 @@ import {
 } from '../../shared/orca-workspace-layout'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktree-base-directory-watcher'
+import {
+  SshHostNotServedError,
+  sshTargetNotConnectedMessage
+} from '../providers/ssh-host-not-served-error'
+import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import type { RuntimeStore } from './runtime-store-contract'
 import { readAllWorktreeMetaForRepo } from '../persistence/host-qualified-worktree-meta'
@@ -40,13 +45,6 @@ type RuntimeProjectHostSetupDependencies = {
   getStore: () => RuntimeStore | null
   listRepos: () => Repo[]
   addRepo: (path: string, kind: 'folder' | 'git', hostId: ExecutionHostId) => Promise<Repo>
-  /** Register an existing path that lives on an SSH host; `addRepo` only reaches local/runtime hosts. */
-  addRemoteRepo: (args: {
-    connectionId: string
-    remotePath: string
-    displayName?: string
-    kind: 'folder' | 'git'
-  }) => Promise<Repo>
   cloneRepo: (url: string, destination: string, hostId: ExecutionHostId) => Promise<Repo>
   invalidateResolvedWorktrees: () => void
   invalidateWorktreeScan: (repoId: string) => void
@@ -54,10 +52,8 @@ type RuntimeProjectHostSetupDependencies = {
   countLiveTerminalsForRepo: (repo: Repo) => number
 }
 
-// Why clone alone still refuses: nothing in this process clones onto an SSH host. `cloneRepo` runs
-// `git clone` on the client, so accepting `ssh:*` here would register the client's copy as the
-// host's repo — a local answer to a remote question. Registering an existing remote path, by
-// contrast, has a correct implementation this process already uses over IPC.
+// Why clone refuses up front: `cloneRepo` runs `git clone` on the client, so accepting `ssh:*`
+// here would register the client's copy as the host's repo — a local answer to a remote question.
 function assertCloneHostIsSupported(hostId: ExecutionHostId | null | undefined): void {
   if (parseExecutionHostId(hostId)?.kind !== 'ssh') {
     return
@@ -65,6 +61,10 @@ function assertCloneHostIsSupported(hostId: ExecutionHostId | null | undefined):
   throw new Error(
     'Cloning onto an SSH host is not supported. Clone the repository on the host, then set the project up from that existing folder.'
   )
+}
+
+function sshTargetNotServedError(connectionId: string): SshHostNotServedError {
+  return new SshHostNotServedError(connectionId, sshTargetNotConnectedMessage(connectionId))
 }
 
 export class RuntimeProjectHostSetupController {
@@ -107,6 +107,7 @@ export class RuntimeProjectHostSetupController {
     if (!result) {
       throw new Error(`Project not found: ${args.projectId}`)
     }
+    this.deps.notifyReposChanged()
     return result
   }
 
@@ -118,32 +119,20 @@ export class RuntimeProjectHostSetupController {
     }
     const kind = args.kind === 'folder' ? 'folder' : 'git'
     const knownRepoIds = new Set(this.deps.listRepos().map((repo) => repo.id))
-    // Why route rather than refuse: this process owns the SSH connection, and its own IPC handler
-    // already registers `ssh:*` hosts correctly. Refusing here only made the CLI and runtime RPC
-    // disagree with the desktop app about what the same process can do.
     const sshTargetId = getSshTargetIdForExecutionHost(args.hostId)
-    const repo = sshTargetId
-      ? await this.deps.addRemoteRepo({
-          connectionId: sshTargetId,
-          remotePath: args.path,
-          ...(args.displayName ? { displayName: args.displayName } : {}),
-          kind
-        })
-      : await this.deps.addRepo(args.path, kind, args.hostId)
+    if (sshTargetId) {
+      throw sshTargetNotServedError(sshTargetId)
+    }
+    const repo = await this.deps.addRepo(args.path, kind, args.hostId)
     return this.completeSetup(args, repo, !knownRepoIds.has(repo.id))
   }
 
-  /** Registers an existing folder on one of this host's SSH targets as a new project. */
-  addSshRepo(args: {
-    connectionId: string
-    remotePath: string
-    displayName?: string
-    kind?: 'folder' | 'git'
-  }): Promise<Repo> {
+  /** `repo.addRemote` stays registered for older clients; this process serves no SSH target. */
+  addSshRepo(args: { connectionId: string }): Promise<Repo> {
     if (!this.deps.getStore()) {
       throw new Error('runtime_unavailable')
     }
-    return this.deps.addRemoteRepo({ ...args, kind: args.kind === 'folder' ? 'folder' : 'git' })
+    throw sshTargetNotServedError(args.connectionId)
   }
 
   async setupClone(args: ProjectHostSetupCloneArgs): Promise<ProjectHostSetupResult> {
@@ -173,6 +162,11 @@ export class RuntimeProjectHostSetupController {
       void prepareLocalWorktreeRootForRepo(store, result.repo)
       invalidateAuthorizedRootsCache()
     }
+    if (result.repo && ('path' in args.updates || 'kind' in args.updates)) {
+      this.retireRepoCatalog(result.repo.id)
+    }
+    this.deps.invalidateResolvedWorktrees()
+    this.deps.notifyReposChanged()
     return result
   }
 
@@ -222,7 +216,18 @@ export class RuntimeProjectHostSetupController {
     if (!result) {
       throw new Error(`Project host setup not found: ${args.setupId}`)
     }
+    if (result.repo) {
+      this.retireRepoCatalog(result.repo.id)
+    }
+    this.deps.invalidateResolvedWorktrees()
+    this.deps.notifyReposChanged()
     return result
+  }
+
+  // Why the shared invalidators: desktop and runtime scan caches key on repo id, not path or kind.
+  private retireRepoCatalog(repoId: string): void {
+    runWorktreeChangeInvalidators(repoId)
+    invalidateAuthorizedRootsCache()
   }
 
   // Why only for an explicit `force: false`: older clients omit it and must keep their delete.

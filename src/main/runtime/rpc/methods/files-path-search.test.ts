@@ -5,10 +5,7 @@ import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { FILE_METHODS } from './files'
 import { remoteRpcContentBudget } from '../../../../shared/remote-rpc-content-budget'
-import {
-  RUNTIME_PROTOCOL_VERSION,
-  WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY
-} from '../../../../shared/protocol-version'
+import { RUNTIME_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
 import { WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY } from '../../../../shared/workspace-path-search-contract'
 
 vi.mock('electron', () => ({
@@ -22,7 +19,7 @@ describe('file path search RPC method', () => {
   it('advertises the negotiated path-search descriptor without changing protocol version', () => {
     const status = new OrcaRuntimeService().getStatus()
     expect(status.runtimeProtocolVersion).toBe(RUNTIME_PROTOCOL_VERSION)
-    expect(status.capabilities).toContain(WORKSPACE_PATH_SEARCH_NAME_FILTER_RUNTIME_CAPABILITY)
+    expect(status.capabilities).toContain(WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY)
     expect(
       status.pathSearchCapabilities?.[WORKSPACE_PATH_SEARCH_NAME_FILTER_CAPABILITY]
     ).toMatchObject({

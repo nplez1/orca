@@ -60,12 +60,19 @@ export function revealWorktreeInSidebarForActivation(
 export function revealFolderWorkspaceInSidebar(
   state: SidebarRevealState,
   workspaceKey: string,
-  opts?: Pick<SidebarRevealActivationOptions, 'revealInSidebar' | 'sidebarRevealBehavior'>
+  opts?: Pick<
+    SidebarRevealActivationOptions,
+    'revealInSidebar' | 'sidebarRevealBehavior' | 'executionHostId'
+  >
 ): void {
   if (opts?.revealInSidebar !== false) {
-    state.revealWorktreeInSidebar(
-      workspaceKey,
-      opts?.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : undefined
-    )
+    if (opts?.sidebarRevealBehavior || opts?.executionHostId) {
+      state.revealWorktreeInSidebar(workspaceKey, {
+        ...(opts.sidebarRevealBehavior ? { behavior: opts.sidebarRevealBehavior } : {}),
+        ...(opts.executionHostId ? { executionHostId: opts.executionHostId } : {})
+      })
+    } else {
+      state.revealWorktreeInSidebar(workspaceKey)
+    }
   }
 }

@@ -41,6 +41,7 @@ import { useFileExplorerVisibleRowProjection } from './useFileExplorerVisibleRow
 import { useFileExplorerBackgroundMenu } from './use-file-explorer-background-menu'
 import { useFileExplorerNameFilter } from './use-file-explorer-name-filter'
 import { useFileExplorerTreePaneState } from './use-file-explorer-tree-pane-state'
+import { useWslHostUnavailableReason } from '../terminal-pane/use-wsl-host-unavailable-reason'
 import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
 
 /** Coordinates scoped navigation while retaining the actual worktree root for file operations and runtime routing. */
@@ -53,6 +54,7 @@ function FileExplorerFiles(): React.JSX.Element {
   const runtimeEnvironmentId = useAppStore((s) =>
     getRuntimeEnvironmentIdForWorktree(s, activeWorktreeId)
   )
+  const wslHostUnavailable = useWslHostUnavailableReason(activeWorktreeId)
   const activeWorktree = useActiveWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   // Why: a folder workspace has no repo row, so only the catalog owner names its SSH host.
@@ -116,6 +118,7 @@ function FileExplorerFiles(): React.JSX.Element {
     handleClearNameFilter,
     reduceNameFilterPageLimit
   } = useFileExplorerNameFilter({ isFilesViewActive, activeWorktreeId })
+  const { previousResults, searching, loading, files, loadError } = nameFilterFiles
 
   const handleSelectExplorerView = useCallback(
     (view: RightSidebarExplorerView) => {
@@ -331,8 +334,8 @@ function FileExplorerFiles(): React.JSX.Element {
                 truncated={!!nameFilterFiles.truncated}
                 workspacePathSearch={nameFilterFiles.workspacePathSearch}
                 isUpdating={
-                  !!nameFilterFiles.previousResults ||
-                  (nameFilterFiles.searching && nameFilterFiles.files.length > 0) ||
+                  !!previousResults ||
+                  (searching && files.length > 0) ||
                   projectionPending ||
                   nameFilterSource?.workspacePathSearch?.state.freshness === 'dirty' ||
                   nameFilterSource?.workspacePathSearch?.state.freshness === 'reconciling'
@@ -341,12 +344,8 @@ function FileExplorerFiles(): React.JSX.Element {
                   nameFilterSource?.workspacePathSearch?.degradationReason === 'missing' ||
                   nameFilterSource?.workspacePathSearch?.degradationReason === 'building'
                 }
-                isSearching={
-                  nameFilterFiles.searching &&
-                  nameFilterFiles.loading &&
-                  !nameFilterFiles.previousResults
-                }
-                hasError={!!nameFilterFiles.loadError || !!projectionError}
+                isSearching={searching && loading && !previousResults}
+                hasError={!!loadError || !!projectionError}
                 hasProjectionError={projectionError === 'budget'}
               />
             </div>
@@ -386,6 +385,7 @@ function FileExplorerFiles(): React.JSX.Element {
             visibleRowCount={visibleRowCount}
             handleExplorerBackgroundContextMenuCapture={handleExplorerBackgroundContextMenuCapture}
             handleExplorerBackgroundDoubleClick={handleExplorerBackgroundDoubleClick}
+            wslHostUnavailable={wslHostUnavailable}
           />
           <FileExplorerSearchOverlay explorerView={explorerView} searchPanel={searchPanel} />
         </div>

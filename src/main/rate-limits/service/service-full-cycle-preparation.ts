@@ -45,11 +45,13 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     this.rememberClaudeAuthSnapshot(claudeAuthPreparation, claudeGeneration, claudeTarget)
     const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const codexTarget = this.codexFetchTarget
+    // Why: capture before the resolver await; a reset during it bumps the generation and this cycle's result is stale.
+    const codexGeneration = this.codexFetchGeneration
     const previousState = this.state
     // Why: a skipped Codex poll must not stop the other providers' cycle, so gate
     // only the Codex slot instead of returning early (#STA-4422).
     // Why: resolveCodexHome probes credential homes, so a disabled Codex skips it entirely.
-    const codexHome = disabled.has('codex') ? null : this.resolveCodexHome(codexTarget)
+    const codexHome = disabled.has('codex') ? null : await this.resolveCodexHome(codexTarget)
     const codexFetchGated = disabled.has('codex') || codexHome?.skip === true
     const codexHomePath = codexHome?.homePath ?? null
     const codexStateBeforeFetch =
@@ -57,7 +59,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const codexProvenance = codexFetchGated
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
-    const codexGeneration = this.codexFetchGeneration
     const openCodeGoConfig = disabled.has('opencode-go') ? null : this.resolveOpenCodeGoConfig()
     const cookie = openCodeGoConfig?.sessionCookie ?? ''
     const workspaceIdOverride = openCodeGoConfig?.workspaceIdOverride ?? ''
@@ -70,9 +71,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
-    const deepSeekConfigResult = this.resolveDeepSeekConfig({
-      disabled: disabled.has('deepseek')
-    })
+    const deepSeekConfigResult = this.resolveDeepSeekConfig({ disabled: disabled.has('deepseek') })
     const deepSeekApiKey = deepSeekConfigResult.config.apiKey
     const fireworksConfigResult = this.resolveFireworksConfig({
       disabled: disabled.has('fireworks')
@@ -217,6 +216,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         : (missingWslCodexHome ??
           fetchCodexRateLimits({
             codexHomePath,
+            networkProxySettings: this.networkProxySettingsResolver?.(),
             signal
           })),
       this.fetchUnlessDisabled('gemini', () => fetchGeminiRateLimits(geminiCliOAuthEnabled)),

@@ -1,12 +1,7 @@
+import type { CheckDetailsErrorAction } from '../../../shared/editor-tab-view-types'
 import type { JenkinsBuildDetailsFailureReason } from '../../../shared/jenkins-check-details'
 
-/**
- * A check-details failure the user can fix elsewhere, carried alongside the message.
- *
- * Why a serializable descriptor rather than a callback: the pane and the full-details tab keep
- * this in their state (and the tab state is persisted), so it has to survive a round trip.
- */
-export type CheckDetailsErrorAction = { kind: 'open-jenkins-settings' }
+export type { CheckDetailsErrorAction }
 
 /** Failures that mean "Jenkins is not set up for this build", not "the build went wrong". */
 const JENKINS_SETTINGS_REASONS: ReadonlySet<JenkinsBuildDetailsFailureReason> = new Set([

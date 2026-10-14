@@ -80,7 +80,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     const claudeDisabled = this.isUsageProviderDisabled('claude')
     const latestCodexHome = codexDisabled
       ? { skip: true, homePath: null }
-      : this.resolveCodexHome(codexTarget)
+      : await this.resolveCodexHome(codexTarget)
     const latestClaudeAuthPreparation = claudeDisabled
       ? undefined
       : await this.claudeAuthPreparationResolver?.(claudeTarget)

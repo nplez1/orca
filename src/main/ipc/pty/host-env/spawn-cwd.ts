@@ -12,7 +12,6 @@ import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus
 } from '../../../project-groups/folder-workspace-path-status'
-import { getSshFilesystemProvider } from '../../../providers/ssh-filesystem-dispatch'
 
 export function assertFolderWorkspacePtyPathUsable(
   store: Store | undefined,
@@ -22,11 +21,10 @@ export function assertFolderWorkspacePtyPathUsable(
   if (!store || workspaceScope?.type !== 'folder') {
     return
   }
-  return getFolderWorkspacePathStatus(
-    store,
-    { scope: 'folder-workspace', folderWorkspaceId: workspaceScope.folderWorkspaceId },
-    { getSshFilesystemProvider }
-  ).then(assertFolderWorkspacePathUsable)
+  return getFolderWorkspacePathStatus(store, {
+    scope: 'folder-workspace',
+    folderWorkspaceId: workspaceScope.folderWorkspaceId
+  }).then(assertFolderWorkspacePathUsable)
 }
 
 export function resolvePtySpawnStartupCwd(

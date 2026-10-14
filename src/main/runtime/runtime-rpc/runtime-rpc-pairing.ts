@@ -1,5 +1,5 @@
 import type { RuntimeDeviceGrant } from '../rpc/rpc-caller-scope'
-import type { DeviceEntry, DeviceRegistry, DeviceScope } from '../device-registry'
+import type { DeviceRegistry, DeviceScope, TokenDeviceEntry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
 import type { MobileSocketWiring } from '../rpc/mobile-socket-wiring'
 import type { RelayDeviceBinding, RelayRevokeOutbox } from '../relay/relay-revoke-outbox'
@@ -10,6 +10,8 @@ import { resolveAdvertisedPairingEndpoint } from '../pairing-endpoint'
 import { RuntimeRpcNetworkExposure } from './runtime-rpc-network-exposure'
 import { MobileDesktopRelay } from '../mobile-desktop-relay/mobile-desktop-relay'
 import type { MobileDesktopRelayHosts } from '../mobile-desktop-relay/mobile-desktop-relay-hosts'
+import { MobileRelayHostCatalog } from '../mobile-desktop-relay/mobile-relay-host-catalog'
+import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
 import { DELEGATED_PHONE_NAME_MAX_CHARS } from '../../../shared/delegated-mobile-device-contract'
 import { allocateTerminalSubscriptionStreamId } from '../rpc/methods/terminal/terminal-subscription-stream-id'
 import {
@@ -98,6 +100,12 @@ export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
           allocateStreamId: allocateTerminalSubscriptionStreamId
         })
       : null
+    this.mobileRelayHostCatalog = hosts
+      ? new MobileRelayHostCatalog({
+          hosts,
+          hostLabelOverrides: () => getHostDisplayLabelOverrides(this.runtime.getClientSettings())
+        })
+      : null
   }
 
   private listRelayedPhones(): { phoneKey: string; name: string }[] {
@@ -163,7 +171,7 @@ export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
     const endpoint = advertised.endpoint
     const deviceName = args.name ?? `CLI ${new Date().toLocaleDateString()}`
     const scope = args.scope ?? 'runtime'
-    let device: DeviceEntry
+    let device: TokenDeviceEntry
     try {
       const reach = args.reach ?? 'network'
       const grants = args.grants ?? []

@@ -2,7 +2,7 @@ import { normalize } from 'node:path'
 import { realpath, stat } from 'node:fs/promises'
 import type { Stats } from 'node:fs'
 import type { Store } from '../persistence'
-import type { FileStat, IFilesystemProvider } from '../providers/types'
+import type { FileStat, IFilesystemProvider } from '../providers/filesystem-provider-contract'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import {
   isProjectFolderLayout,

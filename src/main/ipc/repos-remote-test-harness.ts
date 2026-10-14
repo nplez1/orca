@@ -29,16 +29,9 @@ export type ReposIpcMocks = {
     | 'getSshTarget'
     | 'getSshTargets',
     ReposIpcSpy
-  > & { updateRepo: Mock<(repoId: string, updates: Record<string, unknown>) => unknown> }
-  mockGitProvider: Record<
-    'isGitRepo' | 'isGitRepoAsync' | 'clone' | 'listWorktrees' | 'getHostPlatform',
-    ReposIpcSpy
-  > & { exec: ReposGitArgvSpy }
-  mockFilesystemProvider: Record<
-    'readDir' | 'readFile' | 'stat' | 'createDir' | 'createDirNoClobber' | 'deletePath',
-    ReposIpcSpy
-  >
-  mockMultiplexer: Record<'request' | 'notify', ReposIpcSpy>
+  > & {
+    updateRepo: Mock<(repoId: string, updates: Record<string, unknown>) => unknown>
+  }
   gitSpawnMock: ReposIpcSpy
   gitSpawnAfterWindowsEnvironmentReadyMock: ReposIpcSpy
   gitExecFileAsyncMock: ReposGitArgvSpy
@@ -70,34 +63,6 @@ export function createReposIpcMocks(): ReposIpcMocks {
       getSshTarget: vi.fn(),
       getSshTargets: vi.fn().mockReturnValue([])
     },
-    mockGitProvider: {
-      isGitRepo: vi.fn().mockReturnValue(true),
-      isGitRepoAsync: vi.fn().mockResolvedValue({ isRepo: true, rootPath: null }),
-      exec: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
-      clone: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
-      listWorktrees: vi.fn().mockResolvedValue([]),
-      getHostPlatform: vi.fn().mockReturnValue({
-        relayPlatform: 'linux-x64',
-        os: 'linux',
-        arch: 'x64',
-        pathFlavor: 'posix',
-        commandDialect: 'posix',
-        pathSeparator: '/',
-        pathDelimiter: ':'
-      })
-    },
-    mockFilesystemProvider: {
-      readDir: vi.fn().mockResolvedValue([]),
-      readFile: vi.fn().mockRejectedValue(new Error('not found')),
-      stat: vi.fn().mockRejectedValue(new Error('not found')),
-      createDir: vi.fn().mockResolvedValue(undefined),
-      createDirNoClobber: vi.fn().mockResolvedValue(undefined),
-      deletePath: vi.fn().mockResolvedValue(undefined)
-    },
-    mockMultiplexer: {
-      request: vi.fn(),
-      notify: vi.fn()
-    },
     gitSpawnMock: vi.fn(),
     gitSpawnAfterWindowsEnvironmentReadyMock: vi.fn(),
     gitExecFileAsyncMock: vi.fn(),
@@ -117,7 +82,7 @@ export function electronModuleMock(mocks: ReposIpcMocks): Record<string, unknown
   }
 }
 
-// Why: use real pure helpers so SSH parity tests catch drift in DEFAULT_BASE_REF_PROBES / normalizeRefSearchQuery.
+// Why: use real pure helpers; stub only what spawns git or touches the filesystem.
 export function gitRepoModuleMock(actual: typeof RepoModule): Record<string, unknown> {
   const isGitRepo = vi.fn().mockReturnValue(true)
   const getGitRepoRoot = vi.fn((path: string) => path)
@@ -167,40 +132,6 @@ export function registeredWorktreeRootsCacheModuleMock(
 
 export function worktreeRootPreparationModuleMock(mocks: ReposIpcMocks): Record<string, unknown> {
   return { prepareLocalWorktreeRootForRepo: mocks.prepareLocalWorktreeRootForRepoMock }
-}
-
-export function sshGitDispatchModuleMock(mocks: ReposIpcMocks): Record<string, unknown> {
-  return {
-    getSshGitProviderGeneration: () => 0,
-    getSshGitProvider: vi.fn().mockImplementation((id: string) => {
-      if (id === 'conn-1') {
-        return mocks.mockGitProvider
-      }
-      return undefined
-    })
-  }
-}
-
-export function sshFilesystemDispatchModuleMock(mocks: ReposIpcMocks): Record<string, unknown> {
-  return {
-    getSshFilesystemProvider: vi.fn().mockImplementation((id: string) => {
-      if (id === 'conn-1') {
-        return mocks.mockFilesystemProvider
-      }
-      return undefined
-    })
-  }
-}
-
-export function sshModuleMock(mocks: ReposIpcMocks): Record<string, unknown> {
-  return {
-    getActiveMultiplexer: vi.fn().mockImplementation((id: string) => {
-      if (id === 'conn-1') {
-        return mocks.mockMultiplexer
-      }
-      return undefined
-    })
-  }
 }
 
 export type RepoHandlerHarness = {
@@ -262,8 +193,6 @@ export function resetProjectGroupMocks(
   vi.mocked(gitRepo.isGitRepo).mockReturnValue(true)
   vi.mocked(gitRepo.getGitRepoRoot).mockReset()
   vi.mocked(gitRepo.getGitRepoRoot).mockImplementation((path: string) => path)
-  mocks.mockMultiplexer.notify.mockReset()
-  mocks.mockMultiplexer.request.mockReset()
   mocks.invalidateAuthorizedRootsCacheMock.mockReset()
   mocks.prepareLocalWorktreeRootForRepoMock.mockReset().mockResolvedValue(undefined)
 }

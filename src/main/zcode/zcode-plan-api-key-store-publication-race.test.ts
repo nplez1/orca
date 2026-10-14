@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { _resetSecretStoreForTests, setSecretStore } from '../../shared/secret-store'
+import type * as Fs from 'node:fs'
 import type * as SecureFile from '../../shared/secure-file'
 import type * as ZcodePlanApiKeyStore from './zcode-plan-api-key-store'
 
@@ -27,15 +28,24 @@ const secretStoreMock = {
   describeProtectionGap: () => null
 }
 
-vi.mock('../../shared/secure-path-windows-acl', () => ({
-  restrictWindowsPathSync: restriction,
-  bestEffortRestrictWindowsPath: (
-    _path: string,
-    _directory: boolean,
-    settled: (restricted: boolean) => void
-  ) => settled(false),
-  resetSecureFileWindowsUserSidForTests: vi.fn()
-}))
+// Stands in for the born-restricted create: a real staged write, then the injected outcome.
+vi.mock('../../shared/secure-path-windows-acl', async () => {
+  const { writeFileSync: stage } = await vi.importActual<typeof Fs>('node:fs')
+  return {
+    restrictWindowsPathSync: restriction,
+    bestEffortRestrictWindowsPath: (
+      _path: string,
+      _directory: boolean,
+      settled: (restricted: boolean) => void
+    ) => settled(false),
+    resetSecureFileWindowsUserSidForTests: vi.fn(),
+    writeRestrictedWindowsFile: (path: string, contents: string) => {
+      stage(path, contents, { encoding: 'utf-8', mode: 0o600 })
+      return restriction(path, false)
+    },
+    restrictWindowsDirectory: () => Promise.resolve(false)
+  }
+})
 
 const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!
 const envelope = (key: string): string =>

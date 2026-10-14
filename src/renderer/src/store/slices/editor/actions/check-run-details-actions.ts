@@ -7,9 +7,9 @@ import {
   getCheckRunDetailsTabLabel,
   isSameGitHubRepository,
   isSameGitLabProjectRef,
-  type CheckRunDetailsTabPatch,
-  type OpenCheckRunDetailsState
+  type CheckRunDetailsTabPatch
 } from '@/components/editor/check-run-details-tab'
+import type { OpenCheckRunDetailsState } from '../../../../../../shared/editor-tab-view-types'
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
 import { loadCheckDetailsWithProviderFallback } from '@/runtime/jenkins-check-details-client'
 import { checkDetailsErrorAction } from '@/lib/check-details-error-action'
