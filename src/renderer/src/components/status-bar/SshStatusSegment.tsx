@@ -37,6 +37,9 @@ import {
   runtimeStatusForOverall
 } from '@/runtime/runtime-host-connection-state'
 
+/** Stable empty set: a selector must not mint a new Set on every read. */
+const NO_HIDDEN_SSH_TARGETS: ReadonlySet<string> = new Set()
+
 export function SshStatusSegment({
   compact,
   iconOnly
@@ -46,7 +49,7 @@ export function SshStatusSegment({
 }): React.JSX.Element | null {
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
-  const hiddenSshTargetIds = useAppStore((s) => s.hiddenSshTargetIds)
+  const hiddenSshTargetIds = useAppStore((s) => s.hiddenSshTargetIds ?? NO_HIDDEN_SSH_TARGETS)
   const settings = useAppStore((s) => s.settings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)

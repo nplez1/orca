@@ -2,6 +2,7 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/pro
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
 import type { DaemonEndpointIdentity } from './daemon-hello-protocol'
 import type { ProcessResult, ProcessSpec } from '@orca/process-host/process-spec'
 
@@ -189,7 +190,7 @@ it('launches the copied helper on plain Node and leaves no inherited credentials
     Label: macDaemonJobLabel(state.root),
     KeepAlive: false,
     // Local Network access for a plist-launched job resolves through its associated app.
-    AssociatedBundleIdentifiers: ['com.stablyai.orca'],
+    AssociatedBundleIdentifiers: [LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId],
     EnvironmentVariables: { ORCA_TEST_SECRET: 'test-value' }
   })
   expect(JSON.stringify(job)).not.toContain('NODE_CHANNEL_FD')

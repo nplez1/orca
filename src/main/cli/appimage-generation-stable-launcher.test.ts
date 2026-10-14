@@ -12,6 +12,7 @@ vi.mock('electron', () => ({
 }))
 
 import { CliInstaller } from './cli-installer'
+import { CLI_COMMAND_NAME } from './cli-install-constants'
 import { installLinuxBareOrcaDispatcher } from './linux-bare-orca-dispatcher'
 
 const created: string[] = []
@@ -56,11 +57,13 @@ describe.skipIf(process.platform === 'win32')(
       expect(result).toMatchObject({ state: 'installed', target: fixture.stableLauncherPath })
     })
 
-    it('recognises the stable launcher it registered as its own `orca-ide`', async () => {
+    it('recognises the stable launcher it registered as its own CLI command', async () => {
       const fixture = await makeGeneration()
       const commandDirectory = join(fixture.homePath, '.local', 'bin')
       await mkdir(commandDirectory, { recursive: true })
-      await symlink(fixture.stableLauncherPath, join(commandDirectory, 'orca-ide'))
+      // Why `CLI_COMMAND_NAME` and not `orca-ide`: the fork installs the CLI under its own name on
+      // every platform (`local(identity)`), while the packaged launcher it points at stays `orca-ide`.
+      await symlink(fixture.stableLauncherPath, join(commandDirectory, CLI_COMMAND_NAME))
       const installer = new CliInstaller({
         platform: 'linux',
         isPackaged: true,
@@ -73,7 +76,7 @@ describe.skipIf(process.platform === 'win32')(
       })
       const status = await installer.install()
       expect(status.state).toBe('installed')
-      expect(status.commandPath).toBe(join(commandDirectory, 'orca-ide'))
+      expect(status.commandPath).toBe(join(commandDirectory, CLI_COMMAND_NAME))
     })
   }
 )

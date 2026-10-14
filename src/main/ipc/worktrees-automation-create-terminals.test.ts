@@ -167,14 +167,19 @@ describe('automation creates: main provisions setup and default tabs', () => {
     }
   )
 
-  it('leaves a create from the app window to the window', async () => {
+  it('stages setup in the host for a create from the app window', async () => {
     const result = await handlers['worktrees:create'](null, {
       repoId: 'repo-1',
       name: 'improve-dashboard',
       setupDecision: 'run'
     })
 
-    expect(result).toMatchObject({ setup: expect.anything(), defaultTabs })
+    // Why this fork differs from upstream: with `setupScriptLaunchMode` defaulting to `new-tab` the
+    // host spawns the Setup terminal itself (convergence-ledger § "Worktree create and removal"), so
+    // the window is handed no setup payload — it gets the default tabs and the setup tab the host
+    // already opened. Upstream hands `setup` back for the window to run.
+    expect(result).not.toHaveProperty('setup')
+    expect(result).toMatchObject({ defaultTabs })
     expect(provision).not.toHaveBeenCalled()
   })
 })

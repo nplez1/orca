@@ -3,6 +3,7 @@ import os from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAppEnvironment } from '../../shared/app-environment'
+import { APP_DATA_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import {
   DAEMON_HOST_NATIVE_PATH_BUDGET,
   deepestDaemonHostNativePathLength,
@@ -56,7 +57,7 @@ function materializedHostRoot(): string {
 }
 
 function publishedBuilds(): string[] {
-  const versionRoot = join(localAppDataDir, 'Orca', 'daemon-host-profiles')
+  const versionRoot = join(localAppDataDir, APP_DATA_DIRECTORY_NAME, 'daemon-host-profiles')
   return readdirSync(versionRoot).flatMap((profile) => {
     const dir = join(versionRoot, profile, version)
     return existsSync(dir) ? readdirSync(dir).filter((name) => name.startsWith('build-')) : []
@@ -113,7 +114,7 @@ describe('relocated daemon host path budget', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     useLocalAppData(join(tempDir, 'l'.repeat(DAEMON_HOST_NATIVE_PATH_BUDGET - tempDir.length)))
     expect(materializeRelocatedDaemonHost()).toBeNull()
-    expect(existsSync(join(localAppDataDir, 'Orca'))).toBe(false)
+    expect(existsSync(join(localAppDataDir, APP_DATA_DIRECTORY_NAME))).toBe(false)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('too deep for conpty.dll'))
   })
 

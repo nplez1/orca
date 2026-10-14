@@ -93,7 +93,7 @@ describe('CopilotHookService', () => {
     expect(firstPromptHook.type).toBe('command')
     expect(firstPromptHook.timeoutSec).toBe(5)
     if (process.platform === 'win32') {
-      const scriptPath = join(tmpDir, '.orca', 'agent-hooks', 'copilot-hook.cmd')
+      const scriptPath = join(tmpDir, '.orca-np', 'agent-hooks', 'copilot-hook.cmd')
       expect(firstPromptHook.powershell).toBe(getManagedCommand(scriptPath, 'UserPromptSubmit'))
     } else {
       expect(firstPromptHook.bash).toContain('if [ -f ')
@@ -104,7 +104,7 @@ describe('CopilotHookService', () => {
     expect(existsSync(join(tmpDir, '.orca-np', 'agent-hooks', 'copilot-hook.sh'))).toBe(
       process.platform !== 'win32'
     )
-    expect(existsSync(join(tmpDir, '.orca', 'agent-hooks', 'copilot-hook.cmd'))).toBe(
+    expect(existsSync(join(tmpDir, '.orca-np', 'agent-hooks', 'copilot-hook.cmd'))).toBe(
       process.platform === 'win32'
     )
   })
@@ -179,7 +179,7 @@ describe('CopilotHookService', () => {
 
       expect(service.install().state).toBe('installed')
       const hooks = readHooksJson(configPath)?.hooks ?? {}
-      const scriptPath = join(tmpDir, '.orca', 'agent-hooks', 'copilot-hook.cmd')
+      const scriptPath = join(tmpDir, '.orca-np', 'agent-hooks', 'copilot-hook.cmd')
       for (const eventName of COPILOT_EVENTS) {
         const managed = {
           type: 'command',

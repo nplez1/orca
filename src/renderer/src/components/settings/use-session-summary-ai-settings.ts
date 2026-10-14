@@ -139,9 +139,17 @@ export function useSessionSummaryAiSettings(): SessionSummaryAiSettingsViewModel
       return
     }
     let cancelled = false
+    // Why guarded: the paired web client renders this pane with no Git bridge, and a missing
+    // bridge is "cannot probe", not a crash.
+    const discovery = window.api?.git?.discoverCommitMessageModels?.({
+      agentId: selectedAgentId
+    })
+    if (!discovery) {
+      setDiscoveryStatus('unavailable')
+      return
+    }
     setDiscoveryStatus('discovering')
-    void window.api.git
-      .discoverCommitMessageModels({ agentId: selectedAgentId })
+    void discovery
       .then((result) => {
         if (cancelled) {
           return
