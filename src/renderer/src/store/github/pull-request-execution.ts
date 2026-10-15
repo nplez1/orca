@@ -69,7 +69,7 @@ export function startPullRequestLookup(args: {
   } = args
   const request = (async () => {
     try {
-      const runtimeRepo = getRuntimeRepoTarget(get(), repoPath, requestTarget)
+      const runtimeRepo = getRuntimeRepoTarget(get(), repoPath, requestTarget, repoId)
       const candidateWorktree = options?.worktreeId
         ? findWorktreeById(get(), options.worktreeId)
         : null

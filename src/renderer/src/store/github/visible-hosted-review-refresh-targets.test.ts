@@ -133,6 +133,41 @@ describe('visible hosted review refresh targets', () => {
     ).toBe('github')
   })
 
+  // Why: two machines can hold a checkout at the same path, so a first-wins path lookup hands
+  // the server a repo id it does not own and the PR never reaches the cache the panel reads.
+  it('resolves the repo on the runtime host when another host shares its path', async () => {
+    const localRow: Repo = { ...repo, id: 'repo-local' }
+    const runtimeRow: Repo = {
+      ...repo,
+      id: 'repo-runtime',
+      executionHostId: 'runtime:owner-server'
+    }
+    const runtimeWorktree = makePRRefreshWorktree({
+      id: 'wt-runtime',
+      repoId: runtimeRow.id,
+      linkedPR: 12
+    })
+    const store = createTestStore()
+    store.setState({
+      repos: [localRow, runtimeRow],
+      settings: null,
+      worktreesByRepo: { [runtimeRow.id]: [runtimeWorktree] },
+      activeWorktreeId: runtimeWorktree.id,
+      visibleReviewWorktreeIds: [runtimeWorktree.id],
+      sshConnectionStates: new Map()
+    })
+    runtimeEnvironmentCall.mockResolvedValue({ id: 'review', ok: true, result: makePR() })
+
+    expect(await targets(store)[0].refresh()).toBe(true)
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selector: 'owner-server',
+        method: 'github.prForBranch',
+        params: expect.objectContaining({ repo: runtimeRow.id, linkedPRNumber: 12 })
+      })
+    )
+  })
+
   it('routes non-GitHub runtime reviews and local reviews independently of server focus', async () => {
     const owner: Repo = { ...repo, executionHostId: 'runtime:owner-server' }
     const remote = setup(owner)

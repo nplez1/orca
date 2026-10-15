@@ -13,19 +13,36 @@ import {
   getRepoExecutionHostId,
   getSettingsFocusedExecutionHostId,
   normalizeExecutionHostId,
-  parseExecutionHostId
+  parseExecutionHostId,
+  toRuntimeExecutionHostId
 } from '../../../../shared/execution-host'
+
+/** The repo row at this path/id **on this server**. A path or an id can name another machine's
+ *  row — two checkouts can sit at the same path — and the bare first-wins lookups would then hand
+ *  the server a repo id it does not own, so every read routed through it fails there. */
+function findRepoOnRuntimeHost(
+  repos: readonly Repo[] | undefined,
+  repoPath: string,
+  environmentId: string,
+  repoId: string | null | undefined
+): Repo | undefined {
+  const index = getGitHubRepoLookupIndex(repos)
+  const hostId = toRuntimeExecutionHostId(environmentId)
+  const byId = repoId ? index.findByIdOnHost(repoId, hostId) : undefined
+  return byId ?? index.findByPathOnHost(repoPath, hostId)
+}
 
 /** The server-side repo for a request already routed to `target`; `null` when it runs here. */
 export function getRuntimeRepoTarget(
-  state: AppState,
+  state: Pick<AppState, 'repos'>,
   repoPath: string,
-  target: RuntimeClientTarget
+  target: RuntimeClientTarget,
+  repoId?: string | null
 ): { target: { kind: 'environment'; environmentId: string }; repo: Repo } | null {
   if (target.kind !== 'environment') {
     return null
   }
-  const repo = getGitHubRepoLookupIndex(state.repos).findByPath(repoPath)
+  const repo = findRepoOnRuntimeHost(state.repos, repoPath, target.environmentId, repoId)
   return repo ? { target, repo } : null
 }
 
@@ -53,7 +70,8 @@ export function getPRRefreshRuntimeRepoTarget(
   return getRuntimeRepoTarget(
     state,
     candidate.repoPath,
-    runtimeTargetForOwnerEnvironment(ownerRuntimeEnvironmentId)
+    runtimeTargetForOwnerEnvironment(ownerRuntimeEnvironmentId),
+    candidate.repoId
   )
 }
 

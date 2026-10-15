@@ -26,6 +26,21 @@ describe('getGitHubRepoLookupIndex', () => {
     expect(lookup.findByIdOrPath('target', '/target')).toBe(pathMatch)
   })
 
+  // Why: two machines can hold a checkout at the same path, and can publish the same repo id
+  // twice, so a caller that knows the host must be able to name the row on that host alone.
+  it('keeps host-scoped id and path lookups apart from another host\u2019s row', () => {
+    const local = makeRepo('repo', '/same')
+    const remote = { ...makeRepo('repo', '/same'), executionHostId: 'runtime:env-1' as const }
+    const lookup = getGitHubRepoLookupIndex([local, remote])
+
+    expect(lookup.findByPathOnHost('/same', 'runtime:env-1')).toBe(remote)
+    expect(lookup.findByPathOnHost('/same', 'local')).toBe(local)
+    expect(lookup.findByIdOnHost('repo', 'runtime:env-1')).toBe(remote)
+    expect(lookup.findByIdOnHost('repo', 'local')).toBe(local)
+    expect(lookup.findByIdOnHost('repo', 'ssh:other')).toBeUndefined()
+    expect(lookup.findByPathOnHost('/other', 'runtime:env-1')).toBeUndefined()
+  })
+
   it('scans each repo once across repeated misses', () => {
     let idReads = 0
     const repos = Array.from({ length: 32 }, (_, index) => {
