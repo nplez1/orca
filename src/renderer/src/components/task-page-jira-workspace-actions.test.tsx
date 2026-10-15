@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
@@ -33,6 +33,7 @@ const second = makeWorktree({ id: 'second', repoId: 'web', displayName: 'UI fix'
 const onOpenWorkspace = vi.fn()
 const onOpenIssue = vi.fn()
 const onStartWorkspace = vi.fn()
+const onOpenOrStartWorkspace = vi.fn()
 function renderList(workspaces = [first, second]) {
   const props = {
     columns: visibleJiraListColumns(defaultJiraListColumnIds()),
@@ -44,6 +45,7 @@ function renderList(workspaces = [first, second]) {
     getStatusTone: () => '',
     onOpenIssue,
     onStartWorkspace,
+    onOpenOrStartWorkspace,
     getIssueWorkspaces: () => workspaces,
     onOpenWorkspace
   }
@@ -57,69 +59,52 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
 })
-describe('Jira linked workspace actions', () => {
-  it('shows all linked workspaces and opens the selected one', async () => {
+describe('Jira linked workspace split action', () => {
+  it('opens the linked workspace on default click of the button body', async () => {
+    renderList([first])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Open workspace attached to APP-1' }))
+    expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(issue)
+    expect(onOpenWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('lists every linked workspace and opens the selected one from the caret', async () => {
     renderList()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: '2 workspaces linked to APP-1' }))
     await user.click(await screen.findByRole('menuitem', { name: /UI fix/ }))
     expect(onOpenWorkspace).toHaveBeenCalledWith(second)
   })
-  it('offers existing and new workspaces when exactly one is linked', async () => {
+
+  it('offers Start new workspace when exactly one workspace is linked', async () => {
     renderList([first])
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: '1 workspace linked to APP-1' }))
     expect(onOpenWorkspace).not.toHaveBeenCalled()
-    expect(screen.getByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
+    expect(await screen.findByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Start new workspace' }))
     expect(onStartWorkspace).toHaveBeenCalledWith(issue)
     expect(onOpenIssue).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: '1 workspace linked to APP-1' }))
-    await user.click(screen.getByRole('menuitem', { name: /API fix/ }))
-    expect(onOpenWorkspace).toHaveBeenCalledWith(first)
   })
-  it('keeps the new-workspace action for an unlinked issue', () => {
+
+  it('opens the same menu on press-and-hold of the body without firing the default click', async () => {
+    renderList([first])
+    const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
+    fireEvent.pointerDown(body)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 550))
+    })
+    expect(screen.getByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
+    fireEvent.pointerUp(body)
+    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('keeps a plain start button for an unlinked issue', async () => {
     renderList([])
-    expect(screen.getByRole('button', { name: 'Start workspace from APP-1' })).toBeInTheDocument()
-  })
-  it('keeps the fork open-or-start button and the linked-workspace picker for a two-workspace link', async () => {
-    const onOpenOrStartWorkspace = vi.fn()
-    render(
-      <TooltipProvider>
-        <TaskPageJiraIssueList
-          columns={visibleJiraListColumns(defaultJiraListColumnIds())}
-          issues={[issue]}
-          selectedIssue={null}
-          showSiteContext={false}
-          statusOrder={null}
-          formatUpdatedAt={() => 'Today'}
-          getStatusTone={() => ''}
-          onOpenIssue={onOpenIssue}
-          onStartWorkspace={onStartWorkspace}
-          onOpenOrStartWorkspace={onOpenOrStartWorkspace}
-          getIssueWorkspaces={() => [first, second]}
-          onOpenWorkspace={onOpenWorkspace}
-        />
-      </TooltipProvider>
-    )
     const user = userEvent.setup()
-
-    // The fork's open-or-start button survives the union.
-    expect(screen.getByRole('button', { name: 'Start workspace from APP-1' })).toBeInTheDocument()
-
-    // Upstream's picker is present too: count badge, one entry per workspace, Start new workspace.
-    await user.click(screen.getByRole('button', { name: '2 workspaces linked to APP-1' }))
-    expect(await screen.findByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /UI fix/ })).toBeInTheDocument()
-    await user.click(screen.getByRole('menuitem', { name: /UI fix/ }))
-    expect(onOpenWorkspace).toHaveBeenCalledWith(second)
-
-    await user.click(screen.getByRole('button', { name: '2 workspaces linked to APP-1' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Start new workspace' }))
-    expect(onStartWorkspace).toHaveBeenCalledWith(issue)
-
-    // The fork's button still routes through the open-or-start handler.
     await user.click(screen.getByRole('button', { name: 'Start workspace from APP-1' }))
     expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(issue)
+    // No linked workspace means no caret dropdown.
+    expect(screen.queryByRole('button', { name: /workspaces? linked/ })).not.toBeInTheDocument()
   })
 })

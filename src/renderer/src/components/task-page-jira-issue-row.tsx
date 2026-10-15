@@ -1,11 +1,11 @@
-import { ArrowRight, ExternalLink, FolderOpen } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { JiraIssueRowCopyMenu } from './JiraIssueRowCopyMenu'
-import { JiraLinkedWorkspaceAction } from './JiraLinkedWorkspaceAction'
+import { JiraIssueWorkspaceSplitAction } from './JiraIssueWorkspaceSplitAction'
 import type { Worktree } from '../../../shared/worktree/types'
 import { jiraListColumnVisibility, type JiraListColumn } from './jira-list-columns'
 import { JiraIssueCell, unassignedLabel } from './task-page-jira-issue-cells'
@@ -243,136 +243,35 @@ export function JiraIssueRow({
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-1">
-          {onOpenOrStartWorkspace ? (
-            <>
-              <JiraIssueRowCopyMenu issue={issue} />
-              {onOpenWorkspace && onStartWorkspace && workspaces.length > 1 ? (
-                <JiraLinkedWorkspaceAction
-                  issue={issue}
-                  workspaces={workspaces}
-                  onOpenWorkspace={onOpenWorkspace}
-                  onStartWorkspace={onStartWorkspace}
-                />
-              ) : null}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    // Why: solid primary when a workspace is already linked so Show reads stronger than Start.
-                    variant={attachedWorkspace ? 'default' : 'ghost'}
-                    size="icon-xs"
-                    data-contextual-tour-target="tasks-start-workspace"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onOpenOrStartWorkspace(issue)
-                    }}
-                    aria-label={
-                      attachedWorkspace
-                        ? translate(
-                            'auto.components.TaskPage.jiraOpenAttachedWorkspace',
-                            'Open workspace attached to {{value0}}',
-                            { value0: issue.key }
-                          )
-                        : translate(
-                            'auto.components.TaskPage.ff90d0abc7',
-                            'Start workspace from {{value0}}',
-                            { value0: issue.key }
-                          )
-                    }
-                  >
-                    {attachedWorkspace ? (
-                      <FolderOpen className="size-3.5" />
-                    ) : (
-                      <ArrowRight className="size-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {attachedWorkspace
-                    ? translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')
-                    : translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      window.api.shell.openUrl(issue.url)
-                    }}
-                    aria-label={translate(
-                      'auto.components.TaskPage.4ac8ff2275',
-                      'Open {{value0}} in Jira',
-                      { value0: issue.key }
-                    )}
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {translate('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
-                </TooltipContent>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <JiraIssueRowCopyMenu issue={issue} />
-              {onOpenWorkspace && onStartWorkspace && workspaces.length > 0 ? (
-                <JiraLinkedWorkspaceAction
-                  issue={issue}
-                  workspaces={workspaces}
-                  onOpenWorkspace={onOpenWorkspace}
-                  onStartWorkspace={onStartWorkspace}
-                />
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onStartWorkspace?.(issue)
-                      }}
-                      aria-label={translate(
-                        'auto.components.TaskPage.ff90d0abc7',
-                        'Start workspace from {{value0}}',
-                        { value0: issue.key }
-                      )}
-                    >
-                      <ArrowRight className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={6}>
-                    {translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      window.api.shell.openUrl(issue.url)
-                    }}
-                    aria-label={translate(
-                      'auto.components.TaskPage.4ac8ff2275',
-                      'Open {{value0}} in Jira',
-                      { value0: issue.key }
-                    )}
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {translate('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
-                </TooltipContent>
-              </Tooltip>
-            </>
-          )}
+          <JiraIssueWorkspaceSplitAction
+            issue={issue}
+            workspaces={workspaces}
+            onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+            onOpenWorkspace={onOpenWorkspace}
+            onStartWorkspace={onStartWorkspace}
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  window.api.shell.openUrl(issue.url)
+                }}
+                aria-label={translate(
+                  'auto.components.TaskPage.4ac8ff2275',
+                  'Open {{value0}} in Jira',
+                  { value0: issue.key }
+                )}
+              >
+                <ExternalLink className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              {translate('auto.components.TaskPage.eee68073b2', 'Open in Jira')}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </JiraIssueRowCopyMenu>

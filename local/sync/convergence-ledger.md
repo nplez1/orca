@@ -797,6 +797,21 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   choosing between them again** — an issue linked from two workspaces must reach both, and start a
   third. Both open paths share `openJiraIssueWorkspace`, which passes `executionHostId` (upstream's
   picker omitted the host, which is wrong when one worktree id exists on two hosts).
+- **The row's final shape is a split button, and the owner chose it (2026-10-15).**
+  `JiraIssueWorkspaceSplitAction.tsx` is one control: the body's default click is the fork's
+  open-or-start (open the linked workspace, or start one when none is linked — exactly the pre-sync
+  behaviour), and the caret **or a 500 ms press-and-hold on the body** opens one menu listing every
+  linked workspace plus "Start new workspace". Every workspace entry opens on its own host. Superseding
+  `JiraLinkedWorkspaceAction` (deleted) is what makes all of it fit: the split control is a **constant
+  36 px** (24 px body + 12 px caret, the count badge replaced by the caret's `aria-label`), so
+  `split + gap + open-in-Jira = 64 px` — an **exact fit** for the backlog's 64 px column, 8 px slack at
+  72 px and 40 px slack in the list's 104 px. No grid template or minimum width changed, which is what
+  the four prior rounds could not achieve by adding controls.
+- **The visible copy button is now contextual, and that is the owner-authorised trade-off.** Copy
+  moved to the row's right-click menu because a visible copy button needs 24 + 4 px more, i.e. a 92 px
+  split that cannot fit the 64 px backlog column the owner forbade widening. Copy stays discoverable
+  and no menu item was removed. **Do not** re-add it as a visible button without also revisiting the
+  column width — the arithmetic is the reason it is not one.
 - **The transition toast is a caller opt-out, not a field-name rule.** `mutateIssue` takes
   `options?: { reportsInline?: boolean }` and toasts unless the caller sets it; only the sheet's
   transition control does, because it renders the error itself. An earlier round keyed the skip on
