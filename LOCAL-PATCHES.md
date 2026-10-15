@@ -428,6 +428,13 @@ pnpm run sync:localization-runtime-catalog
     unchanged, passes 3/3 in isolation twice, and fails only under full-suite load — a `vi.waitFor`
     default timeout expiring while the bundled worker still reports `reason: 'building'`. Both are
     recorded rather than chased, which is the standing convention here.
+  - **The four red-flag files reviewed.** `post-sync.mjs` flags files modified here that upstream
+    never touched in the range; all four are deliberate and none is a lost feature:
+    `src/main/agent-hooks/first-work-folder-rename.test.ts` (nodefix: the `makeDeps` fixture now
+    resolves `worktreeLayoutMode`, which the merged `WorktreePathSettings` requires),
+    `src/renderer/src/components/quick-open-file-list.ts` (the Quick Open convergence above),
+    `src/shared/orca-workspace-layout.ts` (the new `OrcaWorkspaceLayoutSettings` slice) and
+    `src/shared/rpc-contract/client-ui-params.ts` (the restored `dashboardPopoutBounds` schema entry).
   - **Follow-ups opened by this sync, by name.** (1) `local/sync/post-sync.mjs` should gain the
     fork-only reference sweep that found the orphan above: take every `src/` path from the pre-sync
     fork-only inventory, resolve every relative and `@/` import specifier in the tree, and report each

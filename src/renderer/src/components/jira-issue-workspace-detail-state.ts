@@ -1,22 +1,21 @@
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: Jira issue hydration, comments, transitions, priorities, and user options are loaded from provider IPC for the selected issue. */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import { jiraGetIssue, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
+import { jiraGetIssue } from '@/runtime/runtime-jira-client'
+import type { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type { JiraIssue } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import { translate } from '@/i18n/i18n'
 import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
 import { useJiraIssueComments } from './jira-issue-workspace-comments'
 import { useJiraIssueSideData } from './jira-issue-workspace-side-data'
 import type { JiraIssueWorkspaceDetailState } from './jira-issue-workspace-detail-contract'
-import { enqueueJiraIssueMutation, jiraIssueRequestScope } from './jira-issue-mutation-queue'
+import { jiraIssueRequestScope } from './jira-issue-mutation-queue'
 import { useJiraIssueMutationState } from './use-jira-issue-mutation-state'
 import { useJiraIssueWorkspaceRefresh } from './use-jira-issue-workspace-refresh'
+import { useJiraIssueWorkspaceMutation } from './use-jira-issue-workspace-mutation'
 import { submitJiraIssueFields } from './jira-issue-workspace-field-submission'
 import {
-  editedJiraIssueFields,
   mergeJiraIssueHydration,
   type EditableJiraIssueField
 } from './jira-issue-workspace-hydration'
@@ -43,7 +42,6 @@ export function useJiraIssueWorkspaceDetail({
   refreshSignal?: number
 }): JiraIssueWorkspaceDetailState {
   const settings = useAppStore((s) => s.settings)
-  const patchJiraIssue = useAppStore((s) => s.patchJiraIssue)
   const [fullIssue, setFullIssue] = useState<JiraIssue | null>(null)
   const [issueLoading, setIssueLoading] = useState(false)
   const [pendingField, setPendingField] = useState<string | null>(null)
@@ -145,9 +143,6 @@ export function useJiraIssueWorkspaceDetail({
   const commentsState = useJiraIssueComments({ providerSettings, issueKey, issueSiteId: siteId })
   const reloadTransitions = sideData.reloadTransitions
   const reloadEditFields = sideData.reloadEditFields
-  const reloadSprintAssignment = sideData.reloadSprintAssignment
-  const restoreSprintAssignment = sideData.restoreSprintAssignment
-  const selectSprint = sideData.selectSprint
   const retryComments = commentsState.retryComments
 
   const onStatusSettled = useCallback(
@@ -181,84 +176,19 @@ export function useJiraIssueWorkspaceDetail({
     setFullIssue
   })
 
-  const mutateIssue = useCallback(
-    async (
-      field: string,
-      updates: Parameters<typeof jiraUpdateIssue>[2],
-      optimistic?: Partial<JiraIssue>
-    ): Promise<void> => {
-      if (!displayed || !requestKey || pendingField) {
-        return
-      }
-      const previous = displayed
-      const sprintChanged = updates.sprintId !== undefined
-      const previousSprintAssignment = sideData.sprintAssignment
-      const scopeGeneration = scopeGenerationRef.current
-      setPendingField(field)
-      for (const editable of optimistic ? editedJiraIssueFields(optimistic) : []) {
-        editedFieldsRef.current.add(editable)
-      }
-      try {
-        await enqueueJiraIssueMutation({
-          scope: requestKey,
-          previous,
-          optimistic: optimistic ?? {},
-          commentsChanged: Boolean(updates.transitionComment?.trim()),
-          update: async () => {
-            if (sprintChanged) {
-              selectSprint(updates.sprintId ?? null)
-            }
-            return jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
-          },
-          refresh: () => jiraGetIssue(providerSettings, displayed.key, displayed.siteId),
-          patchIssue: (patch) =>
-            patchJiraIssue(displayed.key, patch, {
-              sourceContext,
-              siteId: displayed.siteId,
-              contextKey: mutationContextKey
-            })
-        })
-        if (sprintChanged) {
-          await reloadSprintAssignment()
-        }
-      } catch (error) {
-        if (sprintChanged) {
-          // Why the local restore before the re-read: the fault that failed the move
-          // usually fails that read too, and the picker must not keep showing a sprint
-          // the issue never reached.
-          restoreSprintAssignment(previousSprintAssignment)
-          await reloadSprintAssignment()
-        }
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : translate(
-                'auto.components.JiraIssueWorkspace.ea21952aa3',
-                'Failed to update Jira issue.'
-              )
-        )
-        throw error
-      } finally {
-        if (scopeGeneration === scopeGenerationRef.current) {
-          setPendingField(null)
-        }
-      }
-    },
-    [
-      displayed,
-      mutationContextKey,
-      patchJiraIssue,
-      pendingField,
-      providerSettings,
-      reloadSprintAssignment,
-      requestKey,
-      restoreSprintAssignment,
-      selectSprint,
-      sideData.sprintAssignment,
-      siteId,
-      sourceContext
-    ]
-  )
+  const mutateIssue = useJiraIssueWorkspaceMutation({
+    displayed,
+    requestKey,
+    pendingField,
+    mutationContextKey,
+    providerSettings,
+    siteId,
+    sourceContext,
+    sideData,
+    scopeGenerationRef,
+    editedFieldsRef,
+    setPendingField
+  })
 
   const submitIssueFields = useCallback(
     (updates: Parameters<typeof jiraUpdateIssue>[2]) =>

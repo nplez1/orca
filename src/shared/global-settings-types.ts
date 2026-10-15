@@ -5,11 +5,11 @@ import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
 import type { GitLabProjectSettings } from './gitlab-types'
+import type { NpSettings } from './np-settings-types'
 import type { TaskViewSettings } from './task-view-settings-types'
 import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
-import type { SessionSummaryAiSettings } from './session-summary-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { UiLanguage } from './ui-language'
@@ -25,7 +25,6 @@ import type {
   CodexManagedAccount,
   CodexManagedAccountRuntimeSelection
 } from './managed-account-types'
-import type { DisableableUsageProviderId } from './usage-provider-enablement'
 import type { NotificationSettings } from './notification-settings-types'
 import type { CtrlTabOrderMode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
@@ -33,7 +32,6 @@ import type { TerminalQuickCommand } from './terminal-quick-command-types'
 import type { TuiAgent } from './tui-agent'
 import type { ZcodePlanSite } from './zcode-plan-sites'
 import type {
-  AgentDashboardCardClickAction,
   BranchPrefixStrategy,
   FloatingTerminalTriggerLocation,
   JiraIssueKeyCasing,
@@ -96,9 +94,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   richMarkdownSpellcheckEnabled?: boolean
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
-  /** Whether GitHub PR review threads are drawn inline on their commented lines in the code.
-   *  Hiding them keeps a small gutter marker per thread rather than removing the thread entirely. */
-  prCommentsInlineEnabled: boolean
   /** Why: mirrors terminal selection-paste muscle memory without mutating the
    *  normal system clipboard; Linux and macOS enable it by default, Windows
    *  leaves middle-click semantics unchanged unless the user opts in. */
@@ -213,8 +208,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   httpProxyBypassRules?: string
   /** Why: corporate TLS-intercepting proxies can break HTTP/2 downloads; opt-in Chromium process-wide HTTP/1.1 switch. */
   electronHttp1CompatibilityMode?: boolean
-  /** Opt-in stall logging for UI-hang diagnosis; off by default. Records renderer/main event-loop stalls and Electron unresponsive windows to logs/ui-hangs.ndjson. */
-  uiHangDiagnosticsEnabled?: boolean
   /** Opt-in in-app browsing (isolated guest surface); default keeps links opening in the system browser. */
   openLinksInApp: boolean
   /** Worktree-scoped localhost hostnames to distinguish tabs; opt-in since a non-localhost host can break apps binding cookies/sessions to localhost. */
@@ -376,9 +369,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   claudeAgentTeamsDefaultDisabledMigrated?: boolean
   /** Why: worktree deletion is destructive (rm -rf of the working dir), so confirm by default. */
   skipDeleteWorktreeConfirm: boolean
-  /** Why: `git push --delete` has no server-side refusal to fall back on, so the delete dialog's
-   *  remote-branch checkbox starts unchecked and only this setting can change that. */
-  deleteRemoteBranchOnWorkspaceDelete: boolean
   /** Opt-in: workspace deletion discards changes and may waive terminal-stop verification. */
   alwaysForceDeleteWorktrees?: boolean
   /** Why: closing a terminal with child processes kills foreground work; keep this skip separate from other confirmations. */
@@ -403,9 +393,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   zcodePlanSite?: ZcodePlanSite
   /** Extract OAuth credentials from the local Gemini CLI for rate-limit fetching. Off by default (explicit opt-in). */
   geminiCliOAuthEnabled: boolean
-  /** Usage providers the user switched off: Orca neither polls them nor reads their
-   *  local CLI/IDE credentials. Absent/empty means every provider is enabled. */
-  disabledUsageProviders?: DisableableUsageProviderId[]
   /** Per-agent CLI command overrides. A missing key means use the catalog default binary name. */
   agentCmdOverrides: Partial<Record<TuiAgent, string>>
   /** Custom CODEX_HOME for Codex session-history discovery (defaults to ~/.codex).
@@ -493,8 +480,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   agentsSidebarMigratedFromExperimental?: boolean
   /** Includes stale quiet agents as a fourth Agent Dashboard column. */
   experimentalAgentDashboardShowIdle?: boolean
-  /** What clicking an Agent Dashboard card does. Defaults to opening the agent's workspace. */
-  experimentalAgentDashboardCardClickAction?: AgentDashboardCardClickAction
   /** One-shot migration guard for defaulting the Agents view off; later explicit opt-ins persist normally. */
   experimentalActivityDefaultedOffForAllUsers?: boolean
   /** Experimental: persistent terminal-pane attention ring for bell + agent-completion events. Opt-in while tuning signal/noise. */
@@ -522,8 +507,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   commitMessageAi?: CommitMessageAiSettings
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
-  /** Which agent and model fold a session summary on view. Separate from source-control AI so summary cost is tunable on its own. */
-  sessionSummaryAi?: SessionSummaryAiSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
   /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.
@@ -544,7 +527,8 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   /** Transcript full-text search consent + retention. Absent means off; nothing indexes until the user opts in. */
   aiVaultSearch?: AiVaultSearchSettings
 } & TaskViewSettings &
-  OrcaWorkspaceLayoutSettings
+  OrcaWorkspaceLayoutSettings &
+  NpSettings
 
 // Re-exported so existing importers keep one entry point; the shape lives in its
 // own file because this one is at the max-lines ceiling.

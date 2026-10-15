@@ -66,6 +66,101 @@
       "supersededBy": "src/renderer/src/lib/structured-agent-session-launch-admission.ts (HostAdmittedStructuredLaunch, beginHostAdmittedStructuredLaunch)",
       "reason": "Upstream commit `c71601f51c` renamed the implementation `R061` and its test `R055` from paired admission to host admission. `HostAdmittedStructuredLaunch` and `beginHostAdmittedStructuredLaunch` retain the old paired admission path while also handling local-host admission, workspace-unresolved routing, and the launch hold; live callers in `structured-agent-session-provisional-tab.ts` and launch tests use the new exports.",
       "since": "f94d10ff601a59c3188a3f692299f0279e235f2c"
+    },
+    "src/main/agent-hooks/restored-subagent-liveness-sweep.ts": {
+      "supersededBy": "src/main/agent-hooks/restored-status-dead-terminal-sweep.ts (RestoredStatusDeadTerminalSweepDeps, retireRestoredStatusesWithDeadTerminals)",
+      "reason": "Upstream replaced the fork's restored-subagent PTY-liveness sweep with `retireRestoredStatusesWithDeadTerminals`, which lists unconfirmed restored statuses, probes the local PTY, and retires proven-absent rows; `resolveAgentWorkspaceExecutionHostId` and `isLocalExecutionHost` survive there, and `main-process-pty-startup.ts` now calls the new function.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-list-known-resolved-worktrees-for-explicit-target.ts": {
+      "supersededBy": "src/main/runtime/workspaces/workspace-catalog.ts (listKnownResolvedWorktreesForExplicitTarget)",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream replaced the inheritance chain with composition and `WorkspaceCatalog` now owns `listKnownResolvedWorktreesForExplicitTarget`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-move-headless-mobile-session-tab.ts": {
+      "supersededBy": "src/main/runtime/session-tabs/headless-tab-group-moves.ts",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream's composed `headless-tab-group-moves.ts` owns `moveHeadlessMobileSessionTab` and its split/reorder paths.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts": {
+      "supersededBy": "src/main/runtime/session-tabs/headless-tab-properties.ts",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream's composed `headless-tab-properties.ts` owns `persistHeadlessSessionTabProps`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-refresh-repo-worktree-scan.ts": {
+      "supersededBy": "src/main/runtime/workspaces/workspace-repo-scan-refresh.ts",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream's composed `workspace-repo-scan-refresh.ts` owns `refreshRepoWorktreeScan` including the Git-admin fingerprint skip.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-resolve-worktree-selector.ts": {
+      "supersededBy": "src/main/runtime/construction/runtime-construction-services.ts (abstract resolveWorktreeSelector)",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream's composed construction services declare `resolveWorktreeSelector` and the browser/file command surfaces call it.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/orca-runtime-wait-for-session-tabs-inventory-publication.ts": {
+      "supersededBy": "src/main/runtime/session-tabs/session-tabs-inventory-publication.ts",
+      "reason": "Fork's mechanically-split `OrcaRuntime` mixin; upstream's composed `session-tabs-inventory-publication.ts` owns `waitForSessionTabsInventoryPublication`/`markSessionTabsInventoryPublished`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-active-screencasts-by-page-id.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-screencasts.ts (activeScreencastsByPageId)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserScreencasts` owns `activeScreencastsByPageId`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-browser-screencast.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-screencasts.ts (browserScreencast)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserScreencasts` owns `browserScreencast`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-browser-tab-close.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-tab-close.ts (browserTabClose)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserTabClose` owns `browserTabClose`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-browser-tab-create.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-tab-creation.ts (browserTabCreate)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserTabCreation` owns `browserTabCreate`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-browser-tab-list.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-tab-queries.ts (browserTabList)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserTabQueries` owns `browserTabList`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-browser-tab-set-profile.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-profiles.ts (browserTabSetProfile)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserProfiles` owns `browserTabSetProfile`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-browser-commands-list-logical-browser-tabs.ts": {
+      "supersededBy": "src/main/runtime/browser/browser-tab-catalog.ts (listLogicalBrowserTabs)",
+      "reason": "Fork's mechanically-split browser-command mixin; upstream's composed `RuntimeBrowserTabCatalog` owns `listLogicalBrowserTabs`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-file-command-access.ts": {
+      "supersededBy": "src/main/runtime/orca-runtime-files.ts (RuntimeFileCommands)",
+      "reason": "The fork's file-command access base converged onto upstream's composed `RuntimeFileCommands`; `runtime-file-commands-workspace-path-search.ts` was re-homed onto that surface.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-file-commands-assert-remote-terminal-file-grant-path-still-canonical.ts": {
+      "supersededBy": "src/main/runtime/orca-runtime-files.ts (RuntimeFileCommands), src/main/runtime/files/file-reads.ts",
+      "reason": "Fork's mechanically-split file-command mixin (readFileExplorerDir/watchFileExplorer and friends); upstream's composed `RuntimeFileCommands` owns those methods.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-file-commands-read-file-explorer-preview.ts": {
+      "supersededBy": "src/main/runtime/orca-runtime-files.ts (RuntimeFileCommands), src/main/runtime/files/file-reads.ts (readFileExplorerPreview)",
+      "reason": "Fork's mechanically-split file-command mixin; upstream's composed `RuntimeFileCommands` owns `readFileExplorerPreview`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/main/runtime/runtime-file-commands-resolve-terminal-path.ts": {
+      "supersededBy": "src/main/runtime/orca-runtime-files.ts (RuntimeFileCommands.resolveTerminalPath)",
+      "reason": "Fork's mechanically-split file-command mixin; upstream's composed `RuntimeFileCommands` owns `resolveTerminalPath`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
+    },
+    "src/renderer/src/components/sidebar/workspace-creator-visibility.ts": {
+      "supersededBy": "src/shared/workspace-creator-visibility.ts (isWorkspaceOwnedBySomeoneElse)",
+      "reason": "The fork's `isWorkspaceFromOtherDevice` was renamed upstream to `isWorkspaceOwnedBySomeoneElse` with the same body; the rest of the module re-homed to `src/shared/workspace-creator-visibility.ts`.",
+      "since": "79d7351d64e8573b48497a0042ad3d872e8b6213"
     }
   }
 }

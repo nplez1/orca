@@ -1,14 +1,22 @@
 # Branch tracker
 
-Last updated **2026-10-13** — `nplez1/main` merged upstream main @ `8b0fa15e94` (389 commits) into
-the release line from `dcb5ddfbc1` (merge `2fc80b8baf`, rollback tag
-`archive/pre-sync-dcb5ddfbc1`). 68 conflicted paths, and the convergence was the **end** of the SSH
-relay story: upstream retired the last relay-era git and quick-open plumbing, so the fork's surviving
-SSH path-search stack was deleted rather than re-pointed, and an SSH target now answers locally (see
-[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § SSH relay removal).
-Thirty-three typecheck sites, three max-lines overflows and a 14-site identity sweep were the breaks
-no conflict marker showed. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how that is
-done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what it cost.
+Last updated **2026-10-15** — `nplez1/main` merged upstream main @ `e8c7b32a90` (311 commits) into
+the release line from `bb043b9724` (merge `79d7351d64`, backup `backup/nplez1-main-pre-sync`,
+rollback tag `archive/pre-sync-bb043b9724`). 88 conflicted paths, and the convergence was the fork's
+**Jira product line**: upstream spent the same window building the assignee search, board, sprint
+filter, planning columns and linked-workspace views this fork built, so the two lines converged per
+capability rather than per feature (see [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
+§ The Jira product line). The breaks no conflict marker showed, all repaired: two `JiraApiError`
+classes, an orphaned `searchWorkspacePathNameFilter`, a runtime mixin upstream made abstract, an
+upstream field dropped from `PersistedUIState` (plus the exhaustiveness maps upstream's sweeps
+require), and five `max-lines` overflows. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
+for how a sync is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what this one cost.
+
+**Branch measurements could not be re-taken in this worktree.** The PR-bound branches are not
+fetched here, so `node local/branch-status.mjs` reports every one as `MISSING locally` and the
+merge-base/behind figures below are still the 2026-10-13 measurements. Re-run the script from a
+worktree that has them before trusting the numbers; the merge moved the shared ancestor, so every
+branch's behind-count has grown by this sync's 311 commits plus the fork's own.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
 is generated, not kept by hand:
@@ -68,6 +76,12 @@ that `terminal-session-reconnect` adds. Splitting it further would mean duplicat
 dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
+
+**2026-10-15:** two fork PRs are open against `nplez1/main` and were cut before this sync, so they now
+sit on `bb043b9724` and need a catch-up merge before they can be updated — `#109`
+(`nplez1/automations-project-scope`) and `#110` (`nplez1/automations-create-by-desc`). `nplez1/main`
+itself moved to `79d7351d64`; a PR head that does not descend from it is refused by
+`local/open-pr.mjs` rather than reviewed.
 
 After the 2026-10-13 sync, **every PR-bound branch still sits on a pre-sync base** — none of them
 was rebased this time either. `#20813` is open and was deliberately left where it is; the rest are
