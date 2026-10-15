@@ -5,6 +5,7 @@ import {
   type AgentStatusEntry
 } from '../../../../shared/agent-status-types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { toWebTerminalSurfaceTabId } from '../../../../shared/terminal-surface-id'
 import { resolveWorktreeStatus } from '@/lib/worktree-status'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import {
@@ -639,5 +640,47 @@ describe('selectWorktreeAgentActivitySummary', () => {
     })
 
     expect(status).toBe('active')
+  })
+
+  // The remote shape the reported spinner had: a paired host's last working title
+  // (`⠋ π - session`) sits in the client's cached pane titles forever — a title has no age of its
+  // own, unlike a row — and the row for that pane has gone stale. Nothing quieted the frame, so
+  // the card spun until the app restarted.
+  it('does not keep spinning on a mirrored pane title after its row records a finish', () => {
+    const tabId = toWebTerminalSurfaceTabId('host-tab-1')
+    const paneKey = makePaneKey(tabId, LEAF_ID)
+    const entry = makeAgentStatusEntry({ paneKey, state: 'done', worktreeId: 'repo::/wt-1' })
+    vi.spyOn(Date, 'now').mockReturnValue(entry.updatedAt + AGENT_STATUS_STALE_AFTER_MS + 1)
+    const tab = { ...makeTab(tabId, 'repo::/wt-1'), title: 'π - widget' }
+    const state: AgentActivityInput = {
+      tabsByWorktree: { 'repo::/wt-1': [tab] },
+      agentStatusEpoch: 0,
+      agentStatusByPaneKey: { [paneKey]: entry },
+      migrationUnsupportedByPtyId: {},
+      runtimeAgentOrchestrationByPaneKey: {},
+      retainedAgentsByPaneKey: {}
+    }
+    const summary = selectWorktreeAgentActivitySummary(state, 'repo::/wt-1')
+    expect(summary.stalePaneIdsByTabId[tabId]).toEqual(new Set([LEAF_ID]))
+    expect(summary.terminalPaneIdsByTabId[tabId]).toEqual(new Set([LEAF_ID]))
+
+    const resolve = (withRow = true) =>
+      resolveWorktreeStatus({
+        tabs: [tab],
+        browserTabs: [],
+        ptyIdsByTabId: { [tabId]: ['pty-1'] },
+        runtimePaneTitlesByTabId: { [tabId]: { 1: '⠋ π - widget' } },
+        agentStatusPaneIdsByTabId: withRow ? summary.agentStatusPaneIdsByTabId : undefined,
+        stalePaneIdsByTabId: withRow ? summary.stalePaneIdsByTabId : undefined,
+        terminalPaneIdsByTabId: withRow ? summary.terminalPaneIdsByTabId : undefined,
+        hasPermission: false,
+        hasLiveWorking: false,
+        hasLiveDone: false,
+        hasRetainedDone: false
+      })
+
+    expect(resolve()).toBe('active')
+    // With no row behind it the frame is the only evidence there is, and it still spins.
+    expect(resolve(false)).toBe('working')
   })
 })

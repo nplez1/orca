@@ -2,15 +2,19 @@ import type { GitHubWorkItem, GitHubWorkItemDetails } from '../../../shared/gith
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { GitHubOwnerRepo } from '../../../shared/github/pull-request-types'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   getGitHubRuntimeRepoId,
-  getGitHubSourceRuntimeHost,
   getGitHubSourceRuntimeTarget
 } from './github-source-runtime-context'
 
 type GitHubWorkItemLookupArgs = {
   repoPath: string
   repoId: string
+  /** Transport for this read. A caller holding the repo row passes its owner host — a workspace
+   *  link can carry no task-source context at all, and the source-context fallback then sends a
+   *  runtime-owned repo's read to this app's IPC, which refuses a repo it does not own. */
+  target?: RuntimeClientTarget
   sourceContext?: TaskSourceContext | null
   number: number
   type?: 'issue' | 'pr'
@@ -26,6 +30,9 @@ type GitHubWorkItemByOwnerRepoLookupArgs = GitHubWorkItemLookupArgs & {
 type GitHubWorkItemDetailsLookupArgs = {
   repoPath: string
   repoId: string
+  /** Required here: both callers render a workspace's item, where the source context can be null
+   *  and the source-context fallback would read a runtime-owned repo on this app's IPC. */
+  target: RuntimeClientTarget
   sourceContext?: TaskSourceContext | null
   number: number
   type: 'issue' | 'pr'
@@ -36,10 +43,16 @@ function runtimeRepoId(args: Pick<GitHubWorkItemLookupArgs, 'repoId' | 'sourceCo
   return getGitHubRuntimeRepoId(args.sourceContext, args.repoId)
 }
 
+function workItemTarget(
+  args: Pick<GitHubWorkItemLookupArgs, 'target' | 'sourceContext'>
+): RuntimeClientTarget {
+  return args.target ?? getGitHubSourceRuntimeTarget(args.sourceContext)
+}
+
 export async function lookupGitHubWorkItemForSource(
   args: GitHubWorkItemLookupArgs
 ): Promise<GitHubWorkItem | null> {
-  const target = getGitHubSourceRuntimeTarget(args.sourceContext)
+  const target = workItemTarget(args)
   const item =
     target.kind === 'environment'
       ? await callRuntimeRpc<Omit<GitHubWorkItem, 'repoId'> | null>(
@@ -64,7 +77,7 @@ export async function lookupGitHubWorkItemForSource(
 export async function lookupGitHubWorkItemByOwnerRepoForSource(
   args: GitHubWorkItemByOwnerRepoLookupArgs
 ): Promise<GitHubWorkItem | null> {
-  const target = getGitHubSourceRuntimeTarget(args.sourceContext)
+  const target = workItemTarget(args)
   const item =
     target.kind === 'environment'
       ? await callRuntimeRpc<Omit<GitHubWorkItem, 'repoId'> | null>(
@@ -97,10 +110,10 @@ export function lookupGitHubWorkItemDetailsForSource(
   args: GitHubWorkItemDetailsLookupArgs
 ): Promise<GitHubWorkItemDetails | null> {
   const sourceContext = args.sourceContext
-  const runtimeHost = getGitHubSourceRuntimeHost(sourceContext)
-  if (runtimeHost) {
+  const target = args.target
+  if (target.kind === 'environment') {
     return callRuntimeRpc<GitHubWorkItemDetails | null>(
-      { kind: 'environment', environmentId: runtimeHost.environmentId },
+      target,
       'github.workItemDetails',
       {
         repo: getGitHubRuntimeRepoId(sourceContext, args.repoId),

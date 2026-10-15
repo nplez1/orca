@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useAppStore } from '@/store'
 import { lookupGitHubWorkItemDetailsForSource } from '@/lib/github-work-item-source-lookup'
+import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
 import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type {
@@ -142,6 +144,7 @@ export function usePullRequestDetails(args: {
       lookupGitHubWorkItemDetailsForSource({
         repoPath: repoPath ?? '',
         repoId: effectiveRepoId,
+        target: getGitHubRepoRoutingTarget(useAppStore.getState(), effectiveRepoId, sourceContext),
         sourceContext,
         number: workItem.number,
         type: workItem.type

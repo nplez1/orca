@@ -8,19 +8,25 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import { GithubLinkedIssuePane } from './GithubLinkedIssuePane'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
-const mocks = vi.hoisted(() => ({
-  lookup: vi.fn(),
+const mocks = vi.hoisted(() => {
+  type MockRepoState = {
+    repos: { id: string; path: string; executionHostId?: string | null }[]
+    settings: null
+  }
   // Why: the real store returns the stored repo object, so the selector result is
   // referentially stable. A fresh object per render would re-create `load` and
   // re-run the fetch effect forever.
-  repoState: { repos: [{ id: 'repo-1', path: '/tmp/repo' }] }
-}))
+  const repoState: MockRepoState = { repos: [{ id: 'repo-1', path: '/tmp/repo' }], settings: null }
+  return { lookup: vi.fn(), repoState }
+})
 
 vi.mock('@/lib/github-work-item-source-lookup', () => ({
   lookupGitHubWorkItemForSource: (...args: unknown[]) => mocks.lookup(...args)
 }))
 vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) => selector(mocks.repoState)
+  useAppStore: Object.assign((selector: (state: unknown) => unknown) => selector(mocks.repoState), {
+    getState: () => mocks.repoState
+  })
 }))
 vi.mock('@/components/github-item-dialog/load-item-details/use-github-item-dialog-details', () => ({
   useGitHubItemDialogDetails: () => ({
@@ -84,6 +90,7 @@ function item(title: string): GitHubWorkItem {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  mocks.repoState = { repos: [{ id: 'repo-1', path: '/tmp/repo' }], settings: null }
 })
 
 describe('GithubLinkedIssuePane', () => {
@@ -136,5 +143,30 @@ describe('GithubLinkedIssuePane', () => {
     resolveFirst?.(item('First'))
     await waitFor(() => expect(screen.getByText('Second')).toBeTruthy())
     expect(screen.queryByText('First')).toBeNull()
+  })
+
+  // Why: this workspace's link is a bare issue number with no task-source context, so the
+  // read must follow the repo row's owner host — the task source alone reads on this app's
+  // IPC, which refuses a repo a paired server owns.
+  it('reads the issue on the repo owner host, not this app', async () => {
+    mocks.repoState = {
+      repos: [{ id: 'repo-1', path: '/tmp/repo', executionHostId: 'runtime:env-1' }],
+      settings: null
+    }
+    mocks.lookup.mockResolvedValue(item('Fix checkout'))
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane worktree={worktree} linkedIssue={linkedIssue} sourceContext={null} />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(mocks.lookup).toHaveBeenCalled())
+    expect(mocks.lookup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoId: 'repo-1',
+        sourceContext: null,
+        target: { kind: 'environment', environmentId: 'env-1' }
+      })
+    )
   })
 })

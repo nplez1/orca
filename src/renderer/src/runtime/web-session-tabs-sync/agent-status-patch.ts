@@ -109,9 +109,14 @@ export function buildMirroredAgentStatusPatch(
     const existing =
       nextByPaneKey.get(hostEntry.paneKey) ?? state.agentStatusByPaneKey[hostEntry.paneKey]
     const entry = withMirroredEvidenceReceipt(
-      hostEntry.connectionId === undefined
-        ? { ...hostEntry, connectionId: environmentId }
-        : hostEntry,
+      {
+        ...hostEntry,
+        ...(hostEntry.connectionId === undefined ? { connectionId: environmentId } : {}),
+        // Why: the sweep keys on worktreeId, so a host projection that omits it (the synthetic
+        // done, an idle title) left a row no snapshot could retire — it outlived the agent until
+        // the store reset on restart. Stamp the mirror's own worktree, as connectionId is stamped.
+        ...(hostEntry.worktreeId === undefined ? { worktreeId } : {})
+      },
       existing,
       now
     )

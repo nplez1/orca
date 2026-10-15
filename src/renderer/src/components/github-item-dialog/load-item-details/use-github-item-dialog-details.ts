@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useAppStore } from '@/store'
 import { lookupGitHubWorkItemDetailsForSource } from '@/lib/github-work-item-source-lookup'
-import { canUseGitHubRepoContext } from '@/lib/github-source-runtime-context'
+import {
+  canUseGitHubRepoContext,
+  getGitHubRepoRoutingTarget
+} from '@/lib/github-source-runtime-context'
 import {
   normalizeItemDialogTab,
   parseOwnerRepoFromItemUrl,
@@ -187,6 +190,7 @@ export function useGitHubItemDialogDetails({
       lookupGitHubWorkItemDetailsForSource({
         repoPath: repoPath ?? '',
         repoId: effectiveRepoId,
+        target: getGitHubRepoRoutingTarget(useAppStore.getState(), effectiveRepoId, sourceContext),
         sourceContext,
         number: workItem.number,
         type: workItem.type,

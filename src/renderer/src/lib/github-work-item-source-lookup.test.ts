@@ -3,6 +3,7 @@ import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import type * as RuntimeRpcClient from '@/runtime/runtime-rpc-client'
 import {
   lookupGitHubWorkItemDetailsForSource,
+  lookupGitHubWorkItemForSource,
   lookupGitHubWorkItemByOwnerRepoForSource
 } from './github-work-item-source-lookup'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
@@ -23,19 +24,20 @@ const runtimeSourceContext: TaskSourceContext = {
   repoId: 'runtime-repo'
 }
 
-describe('GitHub source lookup routing', () => {
-  beforeEach(() => {
-    vi.mocked(callRuntimeRpc).mockReset()
-    vi.stubGlobal('window', {
-      api: {
-        gh: {
-          workItemDetails: vi.fn(),
-          workItemByOwnerRepo: vi.fn().mockResolvedValue(null)
-        }
+beforeEach(() => {
+  vi.mocked(callRuntimeRpc).mockReset()
+  vi.stubGlobal('window', {
+    api: {
+      gh: {
+        workItem: vi.fn().mockResolvedValue(null),
+        workItemDetails: vi.fn(),
+        workItemByOwnerRepo: vi.fn().mockResolvedValue(null)
       }
-    })
+    }
   })
+})
 
+describe('GitHub source lookup routing', () => {
   it.each(['local', 'ssh:build-box'] as const)(
     'forwards %s source identity to exact repository IPC',
     async (hostId) => {
@@ -99,6 +101,7 @@ describe('GitHub source lookup routing', () => {
       lookupGitHubWorkItemDetailsForSource({
         repoPath: '/home/runtime/app',
         repoId: 'renderer-repo',
+        target: { kind: 'environment', environmentId: 'env-1' },
         sourceContext: runtimeSourceContext,
         number: 42,
         type: 'issue',
@@ -121,6 +124,7 @@ describe('GitHub source lookup routing', () => {
     await lookupGitHubWorkItemDetailsForSource({
       repoPath: '/home/runtime/app',
       repoId: 'renderer-repo',
+      target: { kind: 'environment', environmentId: 'env-1' },
       sourceContext: { ...runtimeSourceContext, repoId: null },
       number: 42,
       type: 'pr'
@@ -146,6 +150,7 @@ describe('GitHub source lookup routing', () => {
       lookupGitHubWorkItemDetailsForSource({
         repoPath: 'C:\\workspace\\app',
         repoId: 'local-repo',
+        target: { kind: 'local' },
         sourceContext,
         number: 42,
         type: 'issue'
@@ -169,6 +174,7 @@ describe('GitHub source lookup routing', () => {
     await lookupGitHubWorkItemDetailsForSource({
       repoPath: '/home/fixture/widgets',
       repoId: 'local-repo',
+      target: { kind: 'local' },
       number: 12,
       type: 'issue',
       ownerRepo
@@ -177,6 +183,76 @@ describe('GitHub source lookup routing', () => {
     expect(window.api.gh.workItemDetails).toHaveBeenCalledWith(
       expect.objectContaining({ repoPath: '/home/fixture/widgets', ownerRepo })
     )
+    expect(callRuntimeRpc).not.toHaveBeenCalled()
+  })
+})
+
+// Why: a workspace link can be a bare numeric slot carrying no task-source context, so a
+// caller that knows the repo row must hand the read that row's owner host; the source-context
+// fallback alone sends a runtime-owned repo's read to this app's IPC, which refuses it.
+describe('GitHub work-item reads honour an explicit owner target', () => {
+  const ownerTarget = { kind: 'environment', environmentId: 'env-1' } as const
+
+  it('reads the work item on the given server, not on this app', async () => {
+    vi.mocked(callRuntimeRpc).mockResolvedValue(null)
+
+    await expect(
+      lookupGitHubWorkItemForSource({
+        repoPath: '/Users/mini/Code/orca/automations-project-scope',
+        repoId: 'remote-repo',
+        target: ownerTarget,
+        number: 106,
+        type: 'issue'
+      })
+    ).resolves.toBeNull()
+
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'github.workItem',
+      { repo: 'remote-repo', number: 106, type: 'issue' },
+      { timeoutMs: 30_000 }
+    )
+    expect(window.api.gh.workItem).not.toHaveBeenCalled()
+  })
+
+  it('reads issue details on the given server, not on this app', async () => {
+    vi.mocked(callRuntimeRpc).mockResolvedValue(null)
+
+    await expect(
+      lookupGitHubWorkItemDetailsForSource({
+        repoPath: '/Users/mini/Code/orca/automations-project-scope',
+        repoId: 'remote-repo',
+        target: ownerTarget,
+        number: 106,
+        type: 'issue'
+      })
+    ).resolves.toBeNull()
+
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'github.workItemDetails',
+      { repo: 'remote-repo', number: 106, type: 'issue' },
+      { timeoutMs: 30_000 }
+    )
+    expect(window.api.gh.workItemDetails).not.toHaveBeenCalled()
+  })
+
+  it('falls back to this app when no target is given', async () => {
+    vi.mocked(window.api.gh.workItem).mockResolvedValue(null)
+
+    await lookupGitHubWorkItemForSource({
+      repoPath: '/repo',
+      repoId: 'local-repo',
+      number: 12,
+      type: 'pr'
+    })
+
+    expect(window.api.gh.workItem).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      repoId: 'local-repo',
+      number: 12,
+      type: 'pr'
+    })
     expect(callRuntimeRpc).not.toHaveBeenCalled()
   })
 })
