@@ -304,9 +304,10 @@ export function buildPtyHostEnv(
   })
   // Why Pi's trigger is wider than the Codex one above: a server with its own window is not
   // headless, yet a paired client is still a viewer on another machine, and every paired client
-  // pushes its theme. Only Pi's own OSC 52 opt-in rides on this, never a faked SSH posture.
+  // pushes its theme. Every pane is stamped, not only an identified agent launch, because pi is
+  // often started by hand in a shell; only Pi-family CLIs read the key, so nothing else changes
+  // behaviour and no faked SSH posture is involved.
   applyPiRemoteViewerTerminalClipboardEnv(baseEnv, {
-    isPiLaunch: explicitPiAgentKind !== null,
     viewerIsRemote: opts.routeBrowserOpensToClient === true || hasPairedViewerTerminalColors()
   })
 

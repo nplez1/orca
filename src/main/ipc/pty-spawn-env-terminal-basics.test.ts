@@ -295,11 +295,12 @@ describe('registerPtyHandlers', () => {
     })
 
     describe('Pi terminal clipboard on a host viewed from elsewhere', () => {
-      const buildPiEnv = (args: {
+      type PiPaneLaunch = {
         launchAgent?: 'pi' | 'omp' | 'prime-agent' | 'claude'
         launchCommand?: string
-        routeBrowserOpensToClient?: boolean
-      }) =>
+      }
+
+      const buildPiEnv = (args: PiPaneLaunch & { routeBrowserOpensToClient?: boolean }) =>
         buildPtyHostEnv(
           'pty-pi-clipboard',
           {},
@@ -314,52 +315,62 @@ describe('registerPtyHandlers', () => {
           }
         )
 
+      const runWithCleanStamp = <T>(run: () => T): T => {
+        vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
+        try {
+          return run()
+        } finally {
+          _resetTerminalViewAttributesForTest()
+          vi.unstubAllEnvs()
+        }
+      }
+
       it.each([
-        ['pi', true, undefined, '1'],
-        ['omp', true, undefined, '1'],
-        ['pi', false, undefined, undefined],
-        ['claude', true, undefined, undefined],
-        // Why: an Orca-launched Pi is not always stamped with an agent identity.
-        [undefined, true, 'pi --resume session-1', '1']
-      ] as const)(
-        'launching %s with a remote viewer=%s and command %s sets PI_CLIPBOARD_OSC52=%s',
-        (launchAgent, remoteViewer, launchCommand, expected) => {
-          vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
-          try {
-            const env = buildPiEnv({
-              ...(launchAgent ? { launchAgent } : {}),
-              ...(launchCommand ? { launchCommand } : {}),
-              routeBrowserOpensToClient: remoteViewer
-            })
-            expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe(expected)
-          } finally {
-            vi.unstubAllEnvs()
-          }
+        ['a pi agent', { launchAgent: 'pi' }],
+        ['an omp agent', { launchAgent: 'omp' }],
+        // Why: not a Pi-family agent, so the key is inert — stamped anyway for one rule per host.
+        ['a claude agent', { launchAgent: 'claude' }],
+        ['a pi launch command', { launchCommand: 'pi --resume session-1' }],
+        // Why: pi is routinely started by hand inside a shell pane.
+        ['a bare shell', {}]
+      ] as const satisfies readonly (readonly [string, PiPaneLaunch])[])(
+        'stamps %s on a headless host with a remote viewer',
+        (_label, launch) => {
+          const env = runWithCleanStamp(() =>
+            buildPiEnv({ ...launch, routeBrowserOpensToClient: true })
+          )
+          expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe('1')
+        }
+      )
+
+      it.each([
+        ['a pi agent', { launchAgent: 'pi' }],
+        ['a claude agent', { launchAgent: 'claude' }],
+        ['a bare shell', {}]
+      ] as const satisfies readonly (readonly [string, PiPaneLaunch])[])(
+        'leaves %s alone when this host has no viewer elsewhere',
+        (_label, launch) => {
+          const env = runWithCleanStamp(() => buildPiEnv(launch))
+          expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBeUndefined()
         }
       )
 
       it('stamps a windowed host that a paired client is viewing', () => {
-        vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
-        setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
-        try {
+        const env = runWithCleanStamp(() => {
+          setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
           // Why: a server with its own window is not headless, but its paired client is still a
           // viewer on another machine — the copy has to reach that clipboard too.
-          expect(buildPiEnv({ launchAgent: 'pi' })[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe('1')
-        } finally {
-          _resetTerminalViewAttributesForTest()
-          vi.unstubAllEnvs()
-        }
+          return buildPiEnv({ launchAgent: 'pi' })
+        })
+        expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe('1')
       })
 
-      it('leaves a bare shell alone on a host a paired client is viewing', () => {
-        vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
-        setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
-        try {
-          expect(buildPiEnv({})[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBeUndefined()
-        } finally {
-          _resetTerminalViewAttributesForTest()
-          vi.unstubAllEnvs()
-        }
+      it('stamps a bare shell on a windowed host a paired client is viewing', () => {
+        const env = runWithCleanStamp(() => {
+          setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
+          return buildPiEnv({})
+        })
+        expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe('1')
       })
     })
 

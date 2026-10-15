@@ -6,22 +6,23 @@
  * sitting at: they paste whatever they had copied before. Pi documents the var for exactly this
  * shape — "a remote client reaches Pi without SSH variables ... or a remote IDE daemon".
  *
+ * Every pane of such a host is stamped, not only an identified agent launch: the CLI is often
+ * started by hand inside a shell, and only Pi-family CLIs read this key, so nothing else changes
+ * behaviour. An inherited value still wins, so `PI_CLIPBOARD_OSC52=0` stays a global opt-out.
+ *
  * Sibling of `codex-terminal-clipboard.ts`, which fakes `SSH_CONNECTION` for the same reason
- * (#23530). A separate file because this knob belongs to the CLI and not to a faked SSH session:
- * only a launch identified as Pi-family is stamped, so no other program changes its behaviour.
+ * (#23530) but is scoped to Codex launches: a faked SSH session changes more than the clipboard.
  */
 export const PI_REMOTE_VIEWER_CLIPBOARD_ENV = 'PI_CLIPBOARD_OSC52'
 
 export function applyPiRemoteViewerTerminalClipboardEnv(
   env: Record<string, string>,
   options: {
-    /** True only for a positively identified Pi-family launch (typed agent, or its own command). */
-    isPiLaunch: boolean
     viewerIsRemote: boolean
     inheritedEnv?: NodeJS.ProcessEnv
   }
 ): void {
-  if (!options.isPiLaunch || !options.viewerIsRemote) {
+  if (!options.viewerIsRemote) {
     return
   }
   const inherited = options.inheritedEnv ?? process.env
