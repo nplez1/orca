@@ -9,7 +9,8 @@ import userEvent from '@testing-library/user-event'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { sortJiraIssues } from './jira-issue-sorter'
-import { groupJiraIssuesByStatus, TaskPageJiraIssueList } from './task-page-jira-issue-list'
+import { groupJiraIssuesByStatus } from './task-page-jira-grouping'
+import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import {
   getSingleJiraProjectScope,

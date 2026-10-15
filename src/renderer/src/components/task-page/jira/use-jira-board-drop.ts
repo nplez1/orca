@@ -8,10 +8,7 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { useJiraBoardTransitionMove } from './use-jira-board-transition-move'
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : 'Jira board update failed.'
-}
+import { jiraBoardErrorText } from './jira-board-error-text'
 
 function columnKey(column: JiraBoardColumn, index: number): string {
   return `${column.name}:${index}:${column.statusIds.join(',')}`
@@ -78,7 +75,7 @@ export function useJiraBoardDrop({
     try {
       return await jiraListTransitions(providerSettings, issue.key, issue.siteId)
     } catch (error) {
-      toast.error(errorText(error))
+      toast.error(jiraBoardErrorText(error))
       return null
     }
   }

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
+import { matchesCommandTerms } from '@/lib/command-choice-filter'
 import type { SessionOptionSelectChoice } from '../../../../shared/native-chat-session-options'
 import { useNativeChatPickerFocusReturn } from './native-chat-picker-focus-return'
 import { nativeChatSessionChoiceLabel } from './native-chat-session-option-labels'
@@ -30,9 +31,7 @@ type NativeChatModelComboboxProps = {
 
 // Why not cmdk's scorer: it matches scattered letters and reorders the host's list.
 function modelChoiceFilter(value: string, search: string, keywords?: string[]): number {
-  const haystack = [value, ...(keywords ?? [])].join(' ').toLowerCase()
-  const terms = search.toLowerCase().split(/\s+/).filter(Boolean)
-  return terms.every((term) => haystack.includes(term)) ? 1 : 0
+  return matchesCommandTerms(search, [value, ...(keywords ?? [])]) ? 1 : 0
 }
 
 export function NativeChatModelCombobox({

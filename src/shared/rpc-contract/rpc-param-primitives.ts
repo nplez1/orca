@@ -54,6 +54,21 @@ export const TriStateLinkedIssue = z
   .pipe(z.union([z.number(), z.null(), z.undefined()]))
   .optional()
 
+// Why: the same tri-state read as TriStateLinkedIssue — undefined means "no
+// update", null means "back to the backlog", a non-empty id means "set". A blank
+// id is malformed rather than a clear, so it decodes to "no update" instead of
+// silently moving the issue out of its sprint.
+export const TriStateSprintId = z
+  .unknown()
+  .transform((value) => {
+    if (value === null) {
+      return null
+    }
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+  })
+  .pipe(z.union([z.string(), z.null(), z.undefined()]))
+  .optional()
+
 // Why: the legacy extractBrowserTarget treated worktree as a plain-string
 // passthrough (empty string preserved) but `page` as non-empty-string. The
 // browser bridge uses worktree-as-empty-string to mean "any worktree", so

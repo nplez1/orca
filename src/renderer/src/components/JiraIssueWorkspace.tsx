@@ -25,6 +25,10 @@ type JiraIssueWorkspaceProps = {
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
+  /** Board the issue's sprint is changed on. Sprint membership is board state, so
+   *  without one there is nothing to move the issue into; the caller omits it
+   *  where the surface has no board. */
+  sprintBoard?: { boardId: string; siteId: string } | null
   refreshSignal?: number
 }
 
@@ -34,6 +38,7 @@ export default function JiraIssueWorkspace({
   onOpenOrStartWorkspace,
   onClose,
   sourceContext,
+  sprintBoard = null,
   refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
@@ -46,6 +51,7 @@ export default function JiraIssueWorkspace({
     issue,
     providerSettings,
     sourceContext,
+    sprintBoard,
     refreshSignal
   })
   const { displayed } = detail
@@ -112,6 +118,7 @@ export default function JiraIssueWorkspace({
               editFieldsLoading={detail.editFieldsLoading}
               selfUser={selfUser}
               providerSettings={providerSettings}
+              sprintAssignment={detail.sprintAssignment}
               mutateIssue={detail.mutateIssue}
               submitIssueFields={detail.submitIssueFields}
             />

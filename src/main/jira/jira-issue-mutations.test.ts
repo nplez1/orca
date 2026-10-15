@@ -372,4 +372,58 @@ describe('Jira issue mutations', () => {
       fields: { customfield_7: expect.objectContaining({ type: 'doc' }) }
     })
   })
+
+  it('moves an issue into a sprint through the Agile API', async () => {
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await expect(updateIssue('ALP-1', { sprintId: '87' }, 'site-1')).resolves.toEqual({ ok: true })
+
+    // No issue-field PUT: sprint membership is board state, not an editable field.
+    expect(jiraRequestMock).toHaveBeenCalledTimes(1)
+    expect(jiraRequestMock).toHaveBeenCalledWith(
+      expect.anything(),
+      '/rest/agile/1.0/sprint/87/issue',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ issues: ['ALP-1'] }) })
+    )
+  })
+
+  it('moves an issue back to the backlog when the sprint is cleared', async () => {
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await expect(updateIssue('ALP-1', { sprintId: null }, 'site-1')).resolves.toEqual({ ok: true })
+
+    expect(jiraRequestMock).toHaveBeenCalledWith(
+      expect.anything(),
+      '/rest/agile/1.0/backlog/issue',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ issues: ['ALP-1'] }) })
+    )
+  })
+
+  it('keeps the same Agile path on self-hosted sites', async () => {
+    getClientsMock.mockReturnValue([makeServerEntry()])
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue('ALP-1', { sprintId: '87' }, 'server-1')
+
+    expect(jiraRequestMock).toHaveBeenCalledWith(
+      expect.anything(),
+      '/rest/agile/1.0/sprint/87/issue',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('applies issue fields and the sprint move in one update', async () => {
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue('ALP-1', { title: 'Renamed', sprintId: '87' }, 'site-1')
+
+    expect(jiraRequestMock.mock.calls.map((call) => call[1])).toEqual([
+      '/rest/api/3/issue/ALP-1',
+      '/rest/agile/1.0/sprint/87/issue'
+    ])
+  })
 })

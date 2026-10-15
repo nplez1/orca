@@ -65,6 +65,7 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     getProjectStatusOrder: (args) => jiraCall('getProjectStatusOrder', args),
     listBoards: (args) => jiraCall('listBoards', args),
     getBoardOverview: (args) => jiraCall('getBoardOverview', args),
-    listBoardIssues: (args) => jiraCall('listBoardIssues', args)
+    listBoardIssues: (args) => jiraCall('listBoardIssues', args),
+    getIssueSprintAssignment: (args) => jiraCall('getIssueSprintAssignment', args)
   }
 }

@@ -36,6 +36,7 @@ export {
 export type { RuntimeJiraSettings } from './runtime-jira-target'
 export {
   jiraGetBoardOverview,
+  jiraGetIssueSprintAssignment,
   jiraListBoardIssues,
   jiraListBoards
 } from './runtime-jira-board-client'

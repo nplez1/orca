@@ -57,6 +57,15 @@ export function getClients(selection?: JiraSiteSelection | null): JiraClientForS
   })
 }
 
+/** Resolves the one site a board- or sprint-scoped Jira read needs. */
+export function getSingleClient(selection?: JiraSiteSelection | null): JiraClientForSite {
+  const entries = getClients(selection)
+  if (entries.length !== 1) {
+    throw new Error('A single Jira site is required for board data.')
+  }
+  return entries[0]
+}
+
 export function getStatus(): JiraConnectionStatus {
   const file = getSiteFile()
   const sites = file.sites.filter((site) => hasStoredToken(site.id))

@@ -130,12 +130,25 @@ export type JiraSprint = {
   state: string
   startDate?: string
   endDate?: string
+  /** The sprint's own board (Jira's `originBoardId`); `undefined` on a response that omits it. */
+  boardId?: string
+}
+
+/** Which sprint an issue sits in, and the sprints it can be moved into.
+ *  `sprint: null` means the item is in the board's backlog. */
+export type JiraSprintAssignment = {
+  sprint: JiraSprint | null
+  sprints: JiraSprint[]
 }
 
 export type JiraBoardOverview = {
   board: JiraBoard
   columns: JiraBoardColumn[]
   activeSprints: JiraSprint[]
+  /** Sprints an issue can be moved into (active + future). Optional because a
+   *  host that predates sprint assignment omits it; absence must hide the control
+   *  rather than offer an empty picker. */
+  sprints?: JiraSprint[]
 }
 
 export type JiraBoardIssuePage = {
@@ -212,6 +225,8 @@ export type JiraIssueUpdate = {
   userFieldKeys?: string[]
   /** Keys in customFields holding plain text the host converts for the site. */
   textFieldKeys?: string[]
+  /** Target sprint, or null to move the issue back to the board's backlog. */
+  sprintId?: string | null
 }
 
 /** Jira's per-field rejection reasons, keyed by the field's Jira key. */

@@ -5,7 +5,8 @@ import type {
   JiraCreateIssueArgs,
   JiraIssueFilter,
   JiraIssueUpdate,
-  JiraSiteSelection
+  JiraSiteSelection,
+  JiraSprintAssignment
 } from '../../shared/jira-types'
 import { connect, disconnect, getStatus, selectSite, testConnection } from '../jira/client'
 import {
@@ -14,6 +15,7 @@ import {
   getBoardOverview,
   getIssue,
   getIssueComments,
+  getIssueSprintAssignment,
   getIssueSummary,
   getProjectStatusOrder,
   listAssignableUsers,
@@ -170,5 +172,13 @@ export class RuntimeJiraCommands {
 
   jiraListBoardIssues(request: JiraBoardIssuePageRequest): ReturnType<typeof listBoardIssues> {
     return listBoardIssues(request)
+  }
+
+  jiraGetIssueSprintAssignment(request: {
+    key: string
+    siteId?: string | null
+    boardId?: string | null
+  }): Promise<JiraSprintAssignment> {
+    return getIssueSprintAssignment(request)
   }
 }

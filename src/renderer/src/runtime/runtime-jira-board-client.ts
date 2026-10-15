@@ -3,8 +3,10 @@ import type {
   JiraBoardIssuePage,
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
-  JiraSiteSelection
+  JiraSiteSelection,
+  JiraSprintAssignment
 } from '../../../shared/jira-types'
+import { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 import { callRuntimeRpc } from './runtime-rpc-client'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
 
@@ -48,4 +50,35 @@ export async function jiraListBoardIssues(
         timeoutMs: 30_000
       })
     : window.api.jira.listBoardIssues(request)
+}
+
+/** Where one issue sits, and the sprints it can be moved into.
+ *
+ *  Resolves to null on a host that predates sprint assignment: a client and its
+ *  remote host update independently, and hiding the control is the only honest
+ *  answer when the host cannot move the issue. */
+export async function jiraGetIssueSprintAssignment(
+  settings: RuntimeJiraSettings,
+  key: string,
+  siteId?: string | null,
+  boardId?: string | null
+): Promise<JiraSprintAssignment | null> {
+  const target = getJiraRuntimeTarget(settings)
+  const args = { key, ...(siteId ? { siteId } : {}), ...(boardId ? { boardId } : {}) }
+  if (target.kind !== 'environment') {
+    return window.api.jira.getIssueSprintAssignment(args)
+  }
+  try {
+    return await callRuntimeRpc<JiraSprintAssignment>(
+      target,
+      'jira.getIssueSprintAssignment',
+      args,
+      { timeoutMs: 30_000 }
+    )
+  } catch (error) {
+    if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
+      return null
+    }
+    throw error
+  }
 }

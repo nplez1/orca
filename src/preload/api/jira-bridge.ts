@@ -7,7 +7,8 @@ import type {
   JiraCommentBodyFormat,
   JiraEditableField,
   JiraProjectStatusOrder,
-  JiraSiteSelection
+  JiraSiteSelection,
+  JiraSprintAssignment
 } from '../../shared/jira-types'
 import type { PreloadApi } from '../api-types'
 
@@ -111,5 +112,10 @@ export const jiraApi = {
   getBoardOverview: (args: { boardId: string; siteId: string }): Promise<JiraBoardOverview> =>
     ipcRenderer.invoke('jira:getBoardOverview', args),
   listBoardIssues: (args: JiraBoardIssuePageRequest): Promise<JiraBoardIssuePage> =>
-    ipcRenderer.invoke('jira:listBoardIssues', args)
+    ipcRenderer.invoke('jira:listBoardIssues', args),
+  getIssueSprintAssignment: (args: {
+    key: string
+    siteId?: string
+    boardId?: string
+  }): Promise<JiraSprintAssignment> => ipcRenderer.invoke('jira:getIssueSprintAssignment', args)
 } satisfies PreloadApi['jira']

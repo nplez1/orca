@@ -1,6 +1,7 @@
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/jira-types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
 import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import type { TaskPageJiraSprintOptions } from '@/components/task-page-jira-sprint-cell'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -17,6 +18,8 @@ type TaskPageJiraBacklogViewProps = {
   issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   onOpenIssue: (issue: JiraIssue) => void
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
+  /** Board sprints a backlog item can be moved into; null while none are known. */
+  sprintOptions: TaskPageJiraSprintOptions | null
 }
 
 export function TaskPageJiraBacklogView({
@@ -25,7 +28,8 @@ export function TaskPageJiraBacklogView({
   selectedIssue,
   issueWorkspaceAttachmentIndex,
   onOpenIssue,
-  onOpenOrStartWorkspace
+  onOpenOrStartWorkspace,
+  sprintOptions
 }: TaskPageJiraBacklogViewProps): React.JSX.Element {
   const backlogTitle =
     board.backlogTotal === null
@@ -96,6 +100,7 @@ export function TaskPageJiraBacklogView({
           onOpenOrStartWorkspace={onOpenOrStartWorkspace}
           selectedIssue={selectedIssue}
           showSiteContext={false}
+          sprintOptions={sprintOptions ?? undefined}
           statusOrder={statusOrder}
           groupByStatus={false}
         />

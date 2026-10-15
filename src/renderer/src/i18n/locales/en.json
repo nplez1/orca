@@ -2670,7 +2670,8 @@
         "jiraNoAvailableTransitions": "Jira lists no available transitions for {{value0}}; the issue may be closed or you may lack permission.",
         "jiraNoStatusTransitionAvailable": "Jira cannot move {{value0}} to {{value1}}. Available moves: {{value2}}.",
         "jiraNoOtherStatusTransition": "Jira has no move from {{value0}} to a status outside the board columns.",
-        "jiraNoPendingTransition": "No transition is pending."
+        "jiraNoPendingTransition": "No transition is pending.",
+        "jiraSprintAssigned": "{{value0}} moved to {{value1}}"
       },
       "Terminal": {
         "73768427cf": "Close",
@@ -18763,6 +18764,15 @@
         "resuming": "Resuming automatically after the restart.",
         "resumed": "Resumed automatically after the restart.",
         "changeInSettings": "Change in Settings"
+      },
+      "JiraSprintPicker": {
+        "backlog": "Backlog",
+        "active": "Active",
+        "future": "Future",
+        "addToSprint": "+ Sprint",
+        "sprint": "Sprint",
+        "findSprint": "Find a sprint…",
+        "noSprintMatch": "No sprint matches."
       }
     },
     "i18n": {
