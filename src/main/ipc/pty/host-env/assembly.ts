@@ -33,6 +33,8 @@ import { AGENT_HOOK_RUNTIME_ENV_KEYS } from './spawn-env-keys'
 import { applyManagedDataAccountEnvironment } from '../../../managed-data-accounts/launch-environment'
 import { applyOpenCodeStatusPluginEnv, captureOpenCodeSourceConfig } from './opencode-config'
 import { applyCodexRemoteViewerClipboardEnv } from './codex-terminal-clipboard'
+import { applyPiRemoteViewerTerminalClipboardEnv } from './pi-terminal-clipboard'
+import { hasPairedViewerTerminalColors } from '../../../runtime/terminal-view-attribute-store'
 
 /**
  * Mutates `baseEnv` in place with all host-local PTY env vars and returns it.
@@ -299,6 +301,13 @@ export function buildPtyHostEnv(
   applyCodexRemoteViewerClipboardEnv(baseEnv, {
     launchAgent: opts.launchAgent,
     viewerIsRemote: opts.routeBrowserOpensToClient === true
+  })
+  // Why Pi's trigger is wider than the Codex one above: a server with its own window is not
+  // headless, yet a paired client is still a viewer on another machine, and every paired client
+  // pushes its theme. Only Pi's own OSC 52 opt-in rides on this, never a faked SSH posture.
+  applyPiRemoteViewerTerminalClipboardEnv(baseEnv, {
+    isPiLaunch: explicitPiAgentKind !== null,
+    viewerIsRemote: opts.routeBrowserOpensToClient === true || hasPairedViewerTerminalColors()
   })
 
   // Why: must run after the prepends above — they re-read PATH from the unscrubbed

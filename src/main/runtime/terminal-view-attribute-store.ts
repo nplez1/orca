@@ -72,6 +72,12 @@ export function getTerminalViewerColors(): TerminalOscColorQueryReplyColors | nu
   return getTerminalViewColorQueryReplyColors() ?? pairedViewerColors ?? seedColors
 }
 
+/** True once a paired client has reported its theme: someone is viewing this host's terminals
+ *  from another machine, so an agent's copy has to reach that viewer's clipboard as well. */
+export function hasPairedViewerTerminalColors(): boolean {
+  return pairedViewerColors !== null
+}
+
 /** A paired client's theme, from terminal.setViewerColors or the colours on terminal.create. */
 export function setPairedViewerColors(colors: TerminalOscColorQueryReplyColors): void {
   const before = getTerminalViewerColors()

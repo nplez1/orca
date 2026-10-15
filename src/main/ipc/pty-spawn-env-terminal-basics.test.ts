@@ -17,6 +17,11 @@ import { buildJcodeRuntimeDir, shouldInjectJcodeRuntimeDir } from '../../shared/
 import { makePaneKey } from '../../shared/stable-pane-id'
 import { selectShellStartupFeatures } from '../shell-startup-features'
 import { CODEX_REMOTE_VIEWER_SSH_CONNECTION } from './pty/host-env/codex-terminal-clipboard'
+import { PI_REMOTE_VIEWER_CLIPBOARD_ENV } from './pty/host-env/pi-terminal-clipboard'
+import {
+  _resetTerminalViewAttributesForTest,
+  setPairedViewerColors
+} from '../runtime/terminal-view-attribute-store'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))
@@ -287,6 +292,75 @@ describe('registerPtyHandlers', () => {
           }
         }
       )
+    })
+
+    describe('Pi terminal clipboard on a host viewed from elsewhere', () => {
+      const buildPiEnv = (args: {
+        launchAgent?: 'pi' | 'omp' | 'prime-agent' | 'claude'
+        launchCommand?: string
+        routeBrowserOpensToClient?: boolean
+      }) =>
+        buildPtyHostEnv(
+          'pty-pi-clipboard',
+          {},
+          {
+            isPackaged: true,
+            userDataPath: '/tmp/orca-user-data',
+            selectedCodexHomePath: null,
+            agentStatusHooksEnabled: false,
+            routeBrowserOpensToClient: args.routeBrowserOpensToClient === true,
+            ...(args.launchCommand ? { launchCommand: args.launchCommand } : {}),
+            ...(args.launchAgent ? { launchAgent: args.launchAgent } : {})
+          }
+        )
+
+      it.each([
+        ['pi', true, undefined, '1'],
+        ['omp', true, undefined, '1'],
+        ['pi', false, undefined, undefined],
+        ['claude', true, undefined, undefined],
+        // Why: an Orca-launched Pi is not always stamped with an agent identity.
+        [undefined, true, 'pi --resume session-1', '1']
+      ] as const)(
+        'launching %s with a remote viewer=%s and command %s sets PI_CLIPBOARD_OSC52=%s',
+        (launchAgent, remoteViewer, launchCommand, expected) => {
+          vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
+          try {
+            const env = buildPiEnv({
+              ...(launchAgent ? { launchAgent } : {}),
+              ...(launchCommand ? { launchCommand } : {}),
+              routeBrowserOpensToClient: remoteViewer
+            })
+            expect(env[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe(expected)
+          } finally {
+            vi.unstubAllEnvs()
+          }
+        }
+      )
+
+      it('stamps a windowed host that a paired client is viewing', () => {
+        vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
+        setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
+        try {
+          // Why: a server with its own window is not headless, but its paired client is still a
+          // viewer on another machine — the copy has to reach that clipboard too.
+          expect(buildPiEnv({ launchAgent: 'pi' })[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBe('1')
+        } finally {
+          _resetTerminalViewAttributesForTest()
+          vi.unstubAllEnvs()
+        }
+      })
+
+      it('leaves a bare shell alone on a host a paired client is viewing', () => {
+        vi.stubEnv(PI_REMOTE_VIEWER_CLIPBOARD_ENV, undefined)
+        setPairedViewerColors({ foreground: '#ffffff', background: '#000000' })
+        try {
+          expect(buildPiEnv({})[PI_REMOTE_VIEWER_CLIPBOARD_ENV]).toBeUndefined()
+        } finally {
+          _resetTerminalViewAttributesForTest()
+          vi.unstubAllEnvs()
+        }
+      })
     })
 
     it('passes the PTY-resolved Codex home to the WSL relay lane', () => {
