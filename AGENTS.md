@@ -157,10 +157,14 @@ one was already opened, say so before anything else and offer to close it.
 ## Opening a PR — use the script, never hand-rolled `gh`
 
 ```bash
-node local/open-pr.mjs --title "<conventional title>" --body-file /tmp/body.md
-node local/open-pr.mjs --title "..." --body-file /tmp/body.md --dry-run    # inspect first
-node local/open-pr.mjs --title "..." --body-file /tmp/body.md --upstream   # only when asked
+body=$(mktemp "${TMPDIR:-/tmp}/orca-pr-body.XXXXXX")   # unique per agent — /tmp is shared
+node local/open-pr.mjs --title "<conventional title>" --body-file "$body"
+node local/open-pr.mjs --title "..." --body-file "$body" --dry-run         # inspect first
+node local/open-pr.mjs --title "..." --body-file "$body" --upstream        # only when asked
 ```
+
+The body path is `mktemp`-derived on purpose: several agents run at once on one machine and share
+`/tmp`, and a fixed `/tmp/body.md` has already collided between two of them.
 
 It defaults to fork `nplez1/orca` / base `nplez1/main`, requires `--upstream` to leave the fork, and
 refuses a head that does not descend from its base.
@@ -185,8 +189,10 @@ patch as a reversion — that is where the ~300k-line PRs came from.
 - Typecheck `pnpm tc` (`tc:node` / `tc:cli` / `tc:web`) · tests `pnpm test <path>`
 - Changed-lines gate CI enforces: `pnpm run check:code-quality:changed`
 - Lint `pnpm exec oxlint` · format `pnpm format`
-- **Always pass an explicit `timeout` of at least 600000 ms** for typecheck, test, or lint. The 120 s
-  default is below their real cost and causes repeated timeouts and restarts.
+- **Always pass an explicit `timeout`** for typecheck, test, or lint: the harness default is below
+  their real cost and causes repeated timeouts and restarts. The unit is per-harness — pi's Bash tool
+  takes **seconds** (`timeout: 600`), Claude Code's takes **milliseconds** (`600000`). An ms-scale
+  number handed to pi is not rejected, it just means ~7 days: no deadline at all.
 - Electron and tests: `ORCA_BACKGROUND_LAUNCH=1`, hidden renderers, CDP screenshots. Never steal focus.
 
 ## CI-fix cycle — standing preference

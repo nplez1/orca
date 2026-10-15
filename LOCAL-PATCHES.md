@@ -282,6 +282,12 @@ Why it is appended rather than woven in: it keeps the fork-only block contiguous
 `git rebase origin/main` is one hunk at the end of the file instead of several scattered through
 upstream's prose.
 
+Two lines in that section are corrections rather than new rules, and a re-append should carry them:
+`## Verify` gives the timeout per harness (pi's Bash tool is seconds, Claude Code's is milliseconds —
+the original "600000 ms" was only right for one of them, and pi accepts an ms-scale number silently,
+producing a command with no deadline), and the `## Opening a PR` example derives its body path with
+`mktemp` instead of the fixed `/tmp/body.md` that two concurrent agents collided on.
+
 Scope: same as `local(skills)` — a fresh worktree cut from `nplez1/main` carries it; a worktree
 branched before this commit does not.
 
