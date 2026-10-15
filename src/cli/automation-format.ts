@@ -14,6 +14,11 @@ import type { AutomationOwnerPrecondition } from '../shared/automation-owner-pre
 import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { formatAutomationPrecheckTimeout } from '../shared/automation-precheck'
 import { formatAutomationSchedule } from '../shared/automation-schedules'
+import {
+  formatAutomationStepsSummary,
+  resolveAutomationAgentStep,
+  resolveAutomationSteps
+} from '../shared/automation-steps'
 
 export type AutomationListPayload = {
   automations: Automation[]
@@ -72,10 +77,15 @@ export function formatAutomationShow(result: AutomationShowPayload): string {
         `legacyRepoId: ${getAutomationLegacyRepoId(automation)}`
       ]
     : [`legacyRepoId: ${getAutomationLegacyRepoId(automation)}`]
+  const agentStep = resolveAutomationAgentStep(automation)
   return [
     `id: ${automation.id}`,
     `name: ${automation.name}`,
-    `provider: ${automation.agentId}`,
+    // The plan replaces the flat prompt/provider pair as the record's source of truth,
+    // so it is what a reader (or an agent about to edit it) has to see.
+    `steps: ${formatAutomationStepsSummary(automation)}`,
+    ...automationStepLines(automation),
+    ...(agentStep ? [`provider: ${agentStep.agentId}`] : []),
     ...(automation.extraAgentArgs ? [`extraAgentArgs: ${automation.extraAgentArgs}`] : []),
     `enabled: ${automation.enabled}`,
     `schedule: ${formatAutomationSchedule(automation.rrule)}`,
@@ -96,8 +106,17 @@ export function formatAutomationShow(result: AutomationShowPayload): string {
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
     // Omitted rather than guessed: a host that reports no owner has none to report.
     ...(result.owner ? [`host: ${formatOwnerSelector(result.owner.selector)}`] : []),
-    `prompt: ${automation.prompt}`
+    ...(agentStep ? [`prompt: ${agentStep.prompt}`] : [])
   ].join('\n')
+}
+
+/** One line per step, numbered, with the flags that decide how it runs. */
+function automationStepLines(automation: Automation): string[] {
+  return resolveAutomationSteps(automation).map((step, index) =>
+    step.kind === 'script'
+      ? `step ${index + 1}: script (timeout ${formatAutomationPrecheckTimeout(step.timeoutSeconds)}, onFailure ${step.onFailure})\n  ${step.command}`
+      : `step ${index + 1}: agent ${step.agentId}\n  ${step.prompt}`
+  )
 }
 
 export function formatAutomationRemoved(result: { removed: boolean; id: string }): string {
@@ -116,8 +135,27 @@ export function formatAutomationRun(result: { run: AutomationRun }): string {
     `scheduledFor: ${new Date(result.run.scheduledFor).toISOString()}`,
     `workspaceId: ${result.run.workspaceId ?? 'null'}`,
     `precheck: ${formatAutomationRunPrecheck(result.run)}`,
+    ...formatAutomationRunSteps(result.run),
     `error: ${result.run.error ?? 'null'}`
   ].join('\n')
+}
+
+/** What each script step did, so a finished run explains itself without the log. */
+function formatAutomationRunSteps(run: AutomationRun): string[] {
+  if (!run.stepResults || run.stepResults.length === 0) {
+    return []
+  }
+  return [
+    `steps: ${run.stepResults.map((result) => `${result.index + 1}:${result.status}`).join(', ')}`,
+    ...run.stepResults.map((result) => {
+      const outcome = result.timedOut
+        ? 'timed out'
+        : result.error
+          ? `error: ${result.error}`
+          : `exit ${result.exitCode ?? 'unknown'}`
+      return `  step ${result.index + 1} (${result.label}): ${outcome}`
+    })
+  ]
 }
 
 function formatAutomationRunPrecheck(run: AutomationRun): string {
@@ -141,7 +179,7 @@ export function formatAutomationRuns(result: { runs: AutomationRun[] }): string 
   return result.runs
     .map(
       (run) =>
-        `${run.id}  ${run.automationId}  ${run.status}  ${run.trigger}  ${new Date(run.scheduledFor).toISOString()}\n${run.title}${run.precheckResult ? `\nprecheck: ${formatAutomationRunPrecheck(run)}` : ''}${run.error ? `\nerror: ${run.error}` : ''}`
+        `${run.id}  ${run.automationId}  ${run.status}  ${run.trigger}  ${new Date(run.scheduledFor).toISOString()}\n${run.title}${run.precheckResult ? `\nprecheck: ${formatAutomationRunPrecheck(run)}` : ''}${run.stepResults?.length ? `\nsteps: ${run.stepResults.map((result) => `${result.index + 1}:${result.status}`).join(', ')}` : ''}${run.error ? `\nerror: ${run.error}` : ''}`
     )
     .join('\n\n')
 }

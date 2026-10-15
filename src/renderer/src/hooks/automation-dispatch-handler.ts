@@ -10,6 +10,7 @@ import type {
   AutomationDispatchRequest,
   AutomationDispatchResult
 } from '../../../shared/automations-types'
+import { resolveAutomationAgentStep } from '../../../shared/automation-steps'
 import { createAutomationDispatchCompletion } from './automation-dispatch-completion'
 import {
   prepareAutomationDispatchWorkspace,
@@ -31,6 +32,21 @@ export async function handleAutomationDispatchRequest({
   run,
   dispatchToken
 }: AutomationDispatchRequest): Promise<void> {
+  // Only a plan with an agent step is dispatched to a terminal; a script-only plan is
+  // executed by the owning service and never reaches the renderer.
+  const agentStep = resolveAutomationAgentStep(automation)
+  if (!agentStep) {
+    await window.api.automations.markDispatchResult({
+      runId: run.id,
+      status: 'dispatch_failed',
+      workspaceId: run.workspaceId,
+      error: translate(
+        'auto.hooks.useAutomationDispatchEvents.noAgentStep',
+        'This automation has no agent step to launch.'
+      )
+    })
+    return
+  }
   const markDispatchResult = async (result: AutomationDispatchResult): Promise<void> => {
     // Deliberately no local emit: the write publishes its own host-scoped event
     // (automation-run-writer.ts) before this reply returns, and an unscoped one
@@ -95,7 +111,7 @@ export async function handleAutomationDispatchRequest({
     if (automation.reuseSession) {
       const reusableSession = findReusableAutomationSession({
         automationId: automation.id,
-        agentId: automation.agentId,
+        agentId: agentStep.agentId,
         worktreeId: worktree.id,
         currentRunId: run.id,
         // Why: the dispatch loop only ever executes for the desktop authority,
@@ -111,7 +127,7 @@ export async function handleAutomationDispatchRequest({
             const submitted = await submitPromptToAgentPty({
               tabId: reusableSession.tabId,
               ptyId: reusableSession.ptyId,
-              content: automation.prompt
+              content: agentStep.prompt
             })
             if (!submitted) {
               completion.cleanupRunObservers()
@@ -165,9 +181,9 @@ export async function handleAutomationDispatchRequest({
       }
     }
     const result = await launchAgentBackgroundSession({
-      agent: automation.agentId,
+      agent: agentStep.agentId,
       worktreeId: worktree.id,
-      prompt: automation.prompt,
+      prompt: agentStep.prompt,
       ...(automation.extraAgentArgs ? { extraAgentArgs: automation.extraAgentArgs } : {}),
       launchSource: 'unknown',
       title: run.title,

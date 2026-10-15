@@ -15,6 +15,7 @@ import {
 import type { ClaudeUsageStore } from '../claude-usage/store'
 import type { CodexUsageStore } from '../codex-usage/store'
 import { runAutomationPrecheck } from './precheck-runner'
+import { automationStepsHaveAgent } from '../../shared/automation-steps'
 import { resolveAutomationRunTarget, type AutomationRunTargetResult } from './run-target-resolution'
 import { writeAutomationRunUsage } from './run-usage-collection'
 import type { HeadlessAutomationDispatcher } from './headless-dispatch'
@@ -281,7 +282,13 @@ export class AutomationService {
     // */5 automation would otherwise write ~288 identical rows a day — past
     // retention, which would evict the automation's real history.
     const target = this.resolveTarget(automation)
-    const canDispatch = this.canDispatchToRenderer() || Boolean(this.headlessDispatcher)
+    // A plan of script steps needs no launch host, so the absence of a window is not
+    // a reason to skip it; `requestAutomationDispatch` still refuses a plan that does
+    // end in an agent step when there is nowhere to launch it.
+    const canDispatch =
+      !automationStepsHaveAgent(automation) ||
+      this.canDispatchToRenderer() ||
+      Boolean(this.headlessDispatcher)
     const refusal = describeScheduledRefusal({ target, canDispatch })
     if (refusal && (await this.runs.repeatSkip(automation.id, refusal, scheduledFor))) {
       await this.runs.advanceNextRun(automation.id, now)

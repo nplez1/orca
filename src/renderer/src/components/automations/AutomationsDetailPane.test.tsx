@@ -66,6 +66,7 @@ function renderDetailPane(options: {
           openExternalRunPage={() => undefined}
           openEditExternalDialog={() => undefined}
           runNow={() => undefined}
+          editWithAgent={() => undefined}
           openEditDialog={() => undefined}
           toggleAutomation={() => undefined}
           requestDeleteAutomation={() => undefined}
@@ -172,6 +173,7 @@ describe('AutomationsDetailPane tab keyboard navigation', () => {
             selectedExternalRunPage={null}
             selectedRuns={[]}
             selectedRunsNotice={null}
+            editWithAgent={() => undefined}
             activePaneTab="overview"
             relativeNow={1000}
             externalActionKey={null}

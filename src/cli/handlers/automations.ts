@@ -32,6 +32,10 @@ import { resolveAutomationDestination } from '../automation-destination'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
+  AUTOMATION_STEPS_HOST_UPDATE_REQUIRED,
+  AUTOMATION_STEPS_RUNTIME_CAPABILITY
+} from '../../shared/automation-runtime-capabilities'
+import {
   EXTRA_AGENT_ARGS_HOST_UPDATE_REQUIRED,
   hasExtraAgentArgs
 } from '../../shared/automation-extra-agent-args'
@@ -53,6 +57,7 @@ import {
   getWorkspaceModeFlag
 } from './automation-handler-flags'
 import { getExtraAgentArgsFlag } from './automation-extra-agent-args-flag'
+import { assertSinglePlanSource, getStepsFlag } from './automation-steps-flag'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   destination?: AutomationDestination
@@ -165,6 +170,20 @@ function buildAutomationRunContextFromSetup(setup: ProjectHostSetup): WorkspaceR
   return runContext
 }
 
+/** Same refusal for a plan: a runtime that cannot store steps would drop them. */
+async function assertAutomationStepsSupported(
+  client: RuntimeClient,
+  steps: readonly unknown[] | undefined
+): Promise<void> {
+  if (!steps || steps.length === 0) {
+    return
+  }
+  const status = await client.call<RuntimeStatus>('status.get')
+  if (!status.result.capabilities?.includes(AUTOMATION_STEPS_RUNTIME_CAPABILITY)) {
+    throw new RuntimeClientError('incompatible_runtime', AUTOMATION_STEPS_HOST_UPDATE_REQUIRED)
+  }
+}
+
 // Why: an older runtime strips the field and would run the automation without it.
 async function assertExtraAgentArgsSupported(
   client: RuntimeClient,
@@ -200,11 +219,17 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const workspaceMode =
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
     // Built before the destination read so a contradictory flag still fails without a runtime call.
+    const steps = getStepsFlag(flags)
+    assertSinglePlanSource(flags, steps)
+    // A plan that has no agent step has no prompt to require, which is the whole
+    // point of a deterministic automation.
+    const agentOnly = steps
+      ? null
+      : { prompt: getRequiredStringFlag(flags, 'prompt'), agentId: getProviderFlag(flags) }
     const create = {
       name: getRequiredStringFlag(flags, 'name'),
-      prompt: getRequiredStringFlag(flags, 'prompt'),
+      ...(steps ? { steps } : agentOnly!),
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
@@ -219,6 +244,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       ...schedule
     } satisfies AutomationCreateParams
     await assertExtraAgentArgsSupported(client, create.extraAgentArgs)
+    await assertAutomationStepsSupported(client, steps)
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.create', {
       ...create,
@@ -232,11 +258,14 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const sourceContext = getSourceContextFlag(flags)
     const id = getRequiredStringFlag(flags, 'id')
     // Built before the owner read so a contradictory flag still fails without a runtime call.
+    const steps = getStepsFlag(flags)
+    assertSinglePlanSource(flags, steps)
     const updates = {
       name: getOptionalStringFlag(flags, 'name'),
-      prompt: getOptionalStringFlag(flags, 'prompt'),
+      ...(steps ? { steps } : {}),
+      prompt: steps ? undefined : getOptionalStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getOptionalProviderFlag(flags),
+      agentId: steps ? undefined : getOptionalProviderFlag(flags),
       extraAgentArgs: getExtraAgentArgsFlag(flags),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
@@ -251,6 +280,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       ...schedule
     } satisfies AutomationUpdateParams
     await assertExtraAgentArgsSupported(client, updates.extraAgentArgs)
+    await assertAutomationStepsSupported(client, steps)
     const expectedOwner = await resolveExpectedOwner(client, id)
     // Why: expectedOwner only fences the host the record is leaving; an edit that moves it needs the arrival fenced too.
     const destination = await resolveAutomationDestination(client, target)

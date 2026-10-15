@@ -14,7 +14,8 @@ import {
   dispatchAutomationReread,
   type AutomationDispatchResult
 } from './automation-row-action-dispatch'
-import { buildDraftPrecheck } from './automation-draft-model'
+import { buildDraftPrecheck, getAutomationTimezone } from './automation-draft-model'
+import { resolveAutomationAgentStep } from '../../../../shared/automation-steps'
 import { hasExtraAgentArgs } from '../../../../shared/automation-extra-agent-args'
 import { buildAutomationRunContextForRepo } from './automation-run-context'
 import { resolveAutomationSetupDecisionForSave } from './automation-setup-decision'
@@ -68,7 +69,7 @@ export async function saveOrcaAutomation(
     return
   }
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = getAutomationTimezone()
   const rrule =
     draft.preset === 'custom'
       ? draft.customSchedule.trim()
@@ -155,11 +156,18 @@ export async function saveOrcaAutomation(
     currentAutomation = (reread.ok ? reread.value : null) ?? currentAutomation
   }
 
+  // Why the plan decides: a saved plan that has no agent step must not be handed flat
+  // agent fields, which the store would read as a request to add one. Conversely a plan
+  // that does have an agent step is patched through those same fields, so the plan's
+  // script steps survive an edit made in a form that cannot show them.
+  const planHasAgentStep = resolveAutomationAgentStep({ steps: draft.steps }) !== null
+  const agentFields: Pick<AutomationUpdateInput, 'prompt' | 'agentId'> = planHasAgentStep
+    ? { prompt: draft.prompt, agentId: draft.agentId }
+    : {}
   const updates: AutomationUpdateInput = {
     name: draft.name,
-    prompt: draft.prompt,
+    ...agentFields,
     precheck,
-    agentId: draft.agentId,
     // Sent only when it carries or clears extras, so other edits stay legacy-shaped.
     ...(hasExtraAgentArgs(draft.extraAgentArgs) || currentAutomation?.extraAgentArgs
       ? { extraAgentArgs: draft.extraAgentArgs }
@@ -180,9 +188,8 @@ export async function saveOrcaAutomation(
   }
   const createInput: AutomationCreateInput = {
     name: draft.name,
-    prompt: draft.prompt,
+    ...(planHasAgentStep ? { prompt: draft.prompt, agentId: draft.agentId } : {}),
     precheck,
-    agentId: draft.agentId,
     ...(hasExtraAgentArgs(draft.extraAgentArgs) ? { extraAgentArgs: draft.extraAgentArgs } : {}),
     runContext,
     projectId: draft.projectId,

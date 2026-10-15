@@ -14,6 +14,7 @@ import {
   MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS,
   normalizeAutomationPrecheckTimeoutSeconds
 } from '../automation-precheck'
+import { parseAutomationSteps, type AutomationStep } from '../automation-steps'
 
 export const TuiAgent = requiredString('Missing provider').refine(isTuiAgent, {
   message: 'Unknown provider'
@@ -186,31 +187,58 @@ export const AutomationRuns = z.object({
 // Why strict: null or a non-string must fail rather than fall back to "omitted", which preserves.
 const ExtraAgentArgs = z.string({ message: 'Extra agent arguments must be text.' }).optional()
 
-export const AutomationCreate = z.object({
-  creationKey: OptionalString,
-  name: requiredString('Missing automation name'),
-  prompt: requiredString('Missing automation prompt'),
-  precheck: AutomationPrecheck,
-  agentId: TuiAgent,
-  extraAgentArgs: ExtraAgentArgs,
-  runContext: WorkspaceRunContext,
-  sourceContext: TaskSourceContext,
-  repo: OptionalString,
-  workspace: OptionalString,
-  workspaceMode: AutomationWorkspaceMode,
-  baseBranch: OptionalPlainString,
-  setupDecision: SetupDecision,
-  reuseSession: OptionalBoolean,
-  timezone: OptionalString,
-  rrule: AutomationSchedule,
-  dtstart: requiredNumber('Missing trigger start time'),
-  enabled: OptionalBoolean,
-  missedRunGraceMinutes: OptionalPositiveInt,
-  destination: Destination
+/**
+ * The plan, validated by the same shared rule the store and the CLI apply, so an
+ * ordering or timeout the wire accepts can never be one the executor refuses.
+ */
+const AutomationSteps = z.unknown().transform((value, ctx): AutomationStep[] => {
+  const parsed = parseAutomationSteps(value)
+  if (!parsed.ok) {
+    ctx.addIssue({ code: 'custom', message: parsed.error })
+    return z.NEVER
+  }
+  return parsed.steps
 })
+
+export const AutomationCreate = z
+  .object({
+    creationKey: OptionalString,
+    name: requiredString('Missing automation name'),
+    // A plan, or one agent step spelled flat. A script-only automation has no prompt.
+    steps: AutomationSteps.optional(),
+    prompt: OptionalString,
+    precheck: AutomationPrecheck,
+    agentId: TuiAgent.optional(),
+    extraAgentArgs: ExtraAgentArgs,
+    runContext: WorkspaceRunContext,
+    sourceContext: TaskSourceContext,
+    repo: OptionalString,
+    workspace: OptionalString,
+    workspaceMode: AutomationWorkspaceMode,
+    baseBranch: OptionalPlainString,
+    setupDecision: SetupDecision,
+    reuseSession: OptionalBoolean,
+    timezone: OptionalString,
+    rrule: AutomationSchedule,
+    dtstart: requiredNumber('Missing trigger start time'),
+    enabled: OptionalBoolean,
+    missedRunGraceMinutes: OptionalPositiveInt,
+    destination: Destination
+  })
+  .superRefine((value, ctx) => {
+    if (!value.steps && !(value.prompt && value.agentId)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message:
+          'An automation needs at least one step: send steps, or a prompt together with an agentId.'
+      })
+    }
+  })
 
 export const AutomationUpdateFields = z.object({
   name: OptionalString,
+  steps: AutomationSteps.optional(),
   prompt: OptionalString,
   precheck: AutomationPrecheck,
   agentId: TuiAgent.optional(),

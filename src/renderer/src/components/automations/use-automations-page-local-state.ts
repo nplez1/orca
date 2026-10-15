@@ -132,6 +132,7 @@ export function useAutomationsPageLocalState(store: AutomationsPageStoreState) {
   >({})
   const [draft, setDraft] = useState<AutomationDraft>({
     name: '',
+    steps: [],
     prompt: '',
     agentId: defaultAgent,
     extraAgentArgs: '',

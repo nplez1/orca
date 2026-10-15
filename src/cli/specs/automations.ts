@@ -41,10 +41,11 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['automations', 'create'],
     summary: 'Create a scheduled Orca automation',
     usage:
-      'orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
+      'orca automations create --name <name> --trigger <preset|cron|rrule> (--steps-json <json> | --prompt <text> --provider <agent>) [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'name',
+      'steps-json',
       'prompt',
       'provider',
       'extra-agent-args',
@@ -60,7 +61,9 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       '--host runtime:<environment-id> targets that paired Orca server; use the id from `orca environment list`, not the environment name.',
       'Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.',
       'Use --workspace to run in an existing worktree; otherwise the automation creates a new worktree per run.',
-      'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run.',
+      'Use --steps-json to declare the work as an ordered plan: script steps run first, in the workspace, and an agent step (at most one, last) is what needs judgement. A plan of script steps only runs with no agent at all.',
+      'Step shapes: {"kind":"script","command":"pnpm build","timeoutSeconds":900,"onFailure":"stop"|"continue"} and {"kind":"agent","prompt":"...","agentId":"claude"}. Script steps need an existing workspace (--workspace), because a workspace created per run is created by the agent step.',
+      'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run. A precheck gates the whole run; a script step is the run.',
       'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.',
       'Use --extra-agent-args="--model opus --effort high" to add arguments after the host\'s default agent Arguments on each fresh run. Only model, effort, and a few safe options are accepted (Claude, Codex, CodeBuddy, Cursor, Grok, OMP); extras cannot be combined with --reuse-session. On edit, --extra-agent-args= clears them.'
     ],
@@ -68,17 +71,20 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'orca automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
       'orca automations create --name "Weekday triage" --trigger "0 9 * * 1-5" --prompt "Triage issues" --provider claude --repo my-repo',
       'orca automations create --name "PR review" --trigger hourly --precheck "gh pr list --json number -q .[0].number" --prompt "Review requested PRs" --provider codex',
-      'orca automations create --name "Docs pass" --trigger daily --prompt "Tidy the docs" --provider claude --extra-agent-args="--model opus --effort high --add-dir docs"'
+      'orca automations create --name "Docs pass" --trigger daily --prompt "Tidy the docs" --provider claude --extra-agent-args="--model opus --effort high --add-dir docs"',
+      'orca automations create --name "Daily latest build" --trigger "0 7 * * *" --workspace main --steps-json \'[{"kind":"script","command":"git fetch origin && git merge --ff-only origin/main && pnpm build","timeoutSeconds":1800}]\''
     ]
   },
   {
     path: ['automations', 'edit'],
     summary: 'Edit an Orca automation',
-    usage: 'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--json]',
+    usage:
+      'orca automations edit <id> [--name <name>] [--trigger <preset|cron|rrule>] [--steps-json <json>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'id',
       'name',
+      'steps-json',
       'prompt',
       'provider',
       'extra-agent-args',
@@ -91,7 +97,8 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'orca automations edit 2f9e... --disabled',
       'orca automations edit --id 2f9e... --trigger "30 * * * *" --json',
-      'orca automations edit 2f9e... --extra-agent-args='
+      'orca automations edit 2f9e... --extra-agent-args=',
+      'orca automations edit 2f9e... --steps-json \'[{"kind":"script","command":"pnpm build"}]\''
     ]
   },
   {

@@ -31,10 +31,14 @@ export function createAutomationSaveAction(context: AutomationSaveContext) {
     const isHermesSave =
       editingAutomationId === null && (createTarget === 'hermes' || editingExternalTarget !== null)
     const { hour, minute } = parseDraftTime(draft.time)
+    // Why: a plan of script steps only needs no prompt. The step list is not editable
+    // here, so this gate must not demand a field the record does not have.
+    const planNeedsPrompt =
+      draft.steps.length === 0 || draft.steps.some((step) => step.kind === 'agent')
     if (
       !draft.projectId ||
       ((draft.workspaceMode === 'existing' || isHermesSave) && !draft.workspaceId) ||
-      !draft.prompt.trim()
+      (planNeedsPrompt && !draft.prompt.trim())
     ) {
       toast.error(
         translate(

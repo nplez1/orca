@@ -12,12 +12,18 @@ export const AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY =
 // Older hosts strip extraAgentArgs and would run without the user's arguments.
 export const AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY =
   'automations.extra-agent-args.v1' as const
+// Older hosts strip `steps` and would store a record with nothing to run, so the
+// plan has to be refused rather than silently dropped.
+export const AUTOMATION_STEPS_RUNTIME_CAPABILITY = 'automations.steps.v1' as const
+export const AUTOMATION_STEPS_HOST_UPDATE_REQUIRED =
+  'Update Orca on this host to run automations with steps.'
 
 export const AUTOMATION_RUNTIME_CAPABILITIES = [
   AUTOMATION_LIST_HOST_SCOPE_RUNTIME_CAPABILITY,
   AUTOMATION_OWNER_FENCING_RUNTIME_CAPABILITY,
   AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
-  AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY
+  AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY,
+  AUTOMATION_STEPS_RUNTIME_CAPABILITY
 ] as const
 
 export const AUTOMATION_RUNTIME_CLIENT_CAPABILITIES = [

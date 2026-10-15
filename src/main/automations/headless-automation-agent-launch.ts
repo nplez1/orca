@@ -15,7 +15,9 @@ import type {
 } from '../agent-launch/agent-launch-execution'
 import { executeAgentLaunch } from '../agent-launch/agent-launch-executor'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
+import { resolveAutomationAgentStep } from '../../shared/automation-steps'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import type { TuiAgent } from '../../shared/tui-agent'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HeadlessAutomationDispatchLaunch } from './headless-dispatch'
 import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
@@ -43,9 +45,10 @@ export async function launchHeadlessAutomationAgent(
   }
 ): Promise<HeadlessAutomationAgentLaunch> {
   const { automation, run, target } = request
-  const agent = automation.agentId
+  const agentStep = requireAgentStep(automation)
+  const agent = agentStep.agentId
   // The startup plan trims the prompt for every agent; a blank one launches the agent bare.
-  const text = automation.prompt?.trim()
+  const text = agentStep.prompt.trim()
   let workspace: { id: string; displayName: string | null } | undefined
   let terminal: LaunchedTerminal | undefined
   const execution: AgentLaunchSurfaceExecution = {
@@ -161,6 +164,18 @@ function launchUntilPublished(
       console.warn('[automations] the agent launch failed after its terminal was published', error)
     })
   })
+}
+
+/**
+ * The step an agent launch exists for. Reaching a launch without one is a
+ * dispatch bug, not a user error: a script-only plan completes in the service.
+ */
+function requireAgentStep(automation: Automation): { prompt: string; agentId: TuiAgent } {
+  const step = resolveAutomationAgentStep(automation)
+  if (!step) {
+    throw new Error('This automation has no agent step to launch.')
+  }
+  return step
 }
 
 function requireWorkspaceId(automation: Automation): string {

@@ -61,6 +61,7 @@ export function useAutomationEditorActions({
     setCreateTarget('orca')
     const baseDraft: AutomationDraft = {
       name: '',
+      steps: [],
       prompt: '',
       agentId: defaultAgent,
       extraAgentArgs: '',
@@ -126,7 +127,7 @@ export function useAutomationEditorActions({
       initialDestination ? { projectId: latest.projectId, destination: initialDestination } : null
     )
     setEditingHostStableKey(initialDestination?.entry.stableKey ?? null)
-    const nextDraft = buildAutomationEditDraft(latest)
+    const nextDraft = buildAutomationEditDraft(latest, defaultAgent)
     setDraft(nextDraft)
     setDraftAtOpen(nextDraft)
     setCreateOpen(true)

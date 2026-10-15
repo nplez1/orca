@@ -6,6 +6,7 @@ import type {
   AutomationSchedulePreset,
   AutomationWorkspaceMode
 } from '../../../../shared/automations-types'
+import type { AutomationStep } from '../../../../shared/automation-steps'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrcaHooks } from '../../../../shared/orca-yaml-hook-types'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
@@ -15,6 +16,15 @@ import type { SetupDecision } from '../../../../shared/worktree/create-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { closeUnfocusedMonacoFindOrPreventDialogDismiss } from '@/components/editor/monaco-find-widget'
 import { AutomationOwnerConflictNotice } from './AutomationOwnerConflictNotice'
+import { AutomationAuthoringDialog } from './AutomationAuthoringDialog'
+import { buildAutomationAuthoringBrief } from '../../../../shared/automation-authoring-brief'
+import {
+  getAutomationAuthoringPlatform,
+  getAutomationTimezone,
+  getDefaultWorktree
+} from './automation-draft-model'
+import { translate } from '@/i18n/i18n'
+import { launchAutomationAuthoringSession } from '@/lib/launch-automation-authoring-session'
 import type { AutomationActionNotice } from './automation-row-action-dispatch'
 import type { AutomationHostRecoveryAction } from './automation-host-status-descriptors'
 import type { AutomationCreateDestinationControl } from './use-automation-create-destination'
@@ -36,6 +46,12 @@ export const AUTOMATION_EDITOR_SEGMENTED_ITEM_CLASS =
 
 export type AutomationDraft = {
   name: string
+  /**
+   * The plan this record already has, carried so a save cannot lose or invent steps.
+   * Empty for an automation being created by hand, which is the one-agent-step form.
+   * There is no step editor by design — a plan is authored by describing it.
+   */
+  steps: AutomationStep[]
   prompt: string
   agentId: TuiAgent
   /** Saved as-is; empty means none. */
@@ -126,11 +142,58 @@ export function AutomationEditorDialog({
   onSave
 }: AutomationEditorDialogProps): React.JSX.Element {
   const [templateOpen, setTemplateOpen] = React.useState(false)
+  const [describeOpen, setDescribeOpen] = React.useState(false)
+  const [describeError, setDescribeError] = React.useState<string | null>(null)
   const dialogContentRef = React.useRef<HTMLDivElement>(null)
   const isHermesTarget = createTarget === 'hermes'
   const isCreateMode = !isEditing && !isEditingExternal
   const isHermesCreate = isCreateMode && isHermesTarget
   const destination = isCreateMode ? createDestination : editDestination
+  const describeWorkspace = React.useMemo(
+    () =>
+      worktrees.find((candidate) => candidate.id === draft.workspaceId) ??
+      getDefaultWorktree(worktrees),
+    [draft.workspaceId, worktrees]
+  )
+  // The session needs a workspace to open in, which is the only reason this is not
+  // offered before the form names one.
+  const canDescribe = describeWorkspace !== null
+  const startAuthoring = (description: string): void => {
+    if (!describeWorkspace) {
+      return
+    }
+    const resolution = createDestination?.resolution
+    const entry = resolution?.status === 'ready' ? resolution.entry : null
+    const brief = buildAutomationAuthoringBrief({
+      mode: 'create',
+      description,
+      projectName: repos.find((repo) => repo.id === draft.projectId)?.displayName ?? null,
+      workspaceLabel: describeWorkspace.displayName,
+      hostLabel: entry?.label ?? null,
+      hostKind: entry?.kind === 'ssh' ? 'remote' : 'local',
+      platform: getAutomationAuthoringPlatform(),
+      timezone: getAutomationTimezone()
+    })
+    const opened = launchAutomationAuthoringSession({
+      agent: draft.agentId,
+      worktreeId: describeWorkspace.id,
+      brief
+    })
+    if (!opened) {
+      setDescribeError(
+        translate(
+          'auto.components.automations.AutomationAuthoringDialog.sessionFailed',
+          'That workspace or agent is no longer available. Pick another and try again.'
+        )
+      )
+      return
+    }
+    // The conversation is now the authoring surface, so the form closes rather than
+    // sitting behind it implying a second, competing way to build the plan.
+    setDescribeError(null)
+    setDescribeOpen(false)
+    onOpenChange(false)
+  }
   const visibleAgents = React.useMemo(() => {
     const enabledIds = new Set(
       filterEnabledTuiAgents(
@@ -182,11 +245,28 @@ export function AutomationEditorDialog({
           segmentedItemClassName={AUTOMATION_EDITOR_SEGMENTED_ITEM_CLASS}
           onCreateTargetChange={onCreateTargetChange}
           onTemplateOpenChange={setTemplateOpen}
+          onDescribeAutomation={canDescribe ? () => setDescribeOpen(true) : undefined}
           onApplyTemplate={(template) => {
             onApplyTemplate(template)
             setTemplateOpen(false)
           }}
         />
+
+        {canDescribe ? (
+          <AutomationAuthoringDialog
+            // Why: closing the editor programmatically must not leave this one open.
+            open={describeOpen && open}
+            workspaceLabel={describeWorkspace?.displayName ?? null}
+            error={describeError}
+            onOpenChange={(next) => {
+              setDescribeOpen(next)
+              if (!next) {
+                setDescribeError(null)
+              }
+            }}
+            onSubmit={startAuthoring}
+          />
+        ) : null}
 
         <div className="flex min-h-0 flex-1 flex-row">
           <AutomationEditorPromptSection

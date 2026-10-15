@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import type { AutomationDraft } from './AutomationEditorDialog'
 import { AutomationEditorPromptEditor } from './AutomationEditorPromptEditor'
+import { AutomationStepsSummary } from './AutomationStepsSummary'
 
 type AutomationEditorPromptSectionProps = {
   draft: AutomationDraft
@@ -18,6 +19,8 @@ export function AutomationEditorPromptSection({
   onDraftChange,
   onDismiss
 }: AutomationEditorPromptSectionProps): React.JSX.Element {
+  const planHasAgentStep =
+    draft.steps.length === 0 || draft.steps.some((step) => step.kind === 'agent')
   const titleRef = React.useRef<HTMLTextAreaElement>(null)
   const namePlaceholder = translate(
     'auto.components.automations.AutomationEditorDialogHeader.1d9826933e',
@@ -74,22 +77,33 @@ export function AutomationEditorPromptSection({
           </TooltipContent>
         </Tooltip>
       </div>
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-        {translate('auto.components.automations.AutomationEditorDialog.058c23cb3f', 'Prompt')}
-      </div>
-      <AutomationEditorPromptEditor
-        value={draft.prompt}
-        placeholder={translate(
-          'auto.components.automations.AutomationEditorDialog.6d778190b7',
-          'Run the weekly dependency audit and summarize risky changes.'
-        )}
-        ariaLabel={translate(
-          'auto.components.automations.AutomationEditorDialog.058c23cb3f',
-          'Prompt'
-        )}
-        onChange={(prompt) => onDraftChange((current) => ({ ...current, prompt }))}
-        onDismiss={onDismiss}
-      />
+      {planHasAgentStep ? (
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+          {translate('auto.components.automations.AutomationEditorDialog.058c23cb3f', 'Prompt')}
+        </div>
+      ) : null}
+      {planHasAgentStep ? (
+        <AutomationEditorPromptEditor
+          value={draft.prompt}
+          placeholder={translate(
+            'auto.components.automations.AutomationEditorDialog.6d778190b7',
+            'Run the weekly dependency audit and summarize risky changes.'
+          )}
+          ariaLabel={translate(
+            'auto.components.automations.AutomationEditorDialog.058c23cb3f',
+            'Prompt'
+          )}
+          onChange={(prompt) => onDraftChange((current) => ({ ...current, prompt }))}
+          onDismiss={onDismiss}
+        />
+      ) : (
+        // A plan of script steps has no prompt to edit, and its steps are not editable
+        // here at all: changing them means describing the change to an agent.
+        <AutomationStepsSummary
+          automation={{ steps: draft.steps, prompt: draft.prompt, agentId: draft.agentId }}
+          className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto"
+        />
+      )}
       <p className="mt-2 text-xs text-muted-foreground">
         {translate(
           'auto.components.automations.AutomationEditorDialog.827b25a81e',

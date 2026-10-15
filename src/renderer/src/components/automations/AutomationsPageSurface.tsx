@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react'
 import { translate } from '@/i18n/i18n'
 import { AutomationEditorDialog } from './AutomationEditorDialog'
+import { toast } from 'sonner'
 import { AutomationsDetailPane } from './AutomationsDetailPane'
+import { startAutomationEditWithAgent } from './automation-edit-with-agent'
+import { getAutomationAuthoringPlatform, getAutomationTimezone } from './automation-draft-model'
 import { AutomationsPageSkeleton } from './AutomationsPageSkeleton'
 import { getAutomationAuthorityTarget } from './automation-host-client'
 import type { AutomationListRow } from './automation-list-row-identity'
@@ -303,6 +306,29 @@ export function AutomationsPageSurface({
           openEditExternalDialog={editorActions.openEditExternalDialog}
           runNow={() => runSelectedRowAction(runActions.runNow)}
           openEditDialog={() => runSelectedRowAction(editorActions.openEditDialog)}
+          editWithAgent={(automation) => {
+            const started = startAutomationEditWithAgent({
+              automation,
+              repo: presentation.selectedRepo ?? null,
+              workspace: presentation.selectedWorktree ?? null,
+              fallbackAgentId: store.defaultAgent,
+              hostLabel: selectedRow?.hostLabel || null,
+              hostKind: automation.executionTargetType === 'ssh' ? 'remote' : 'local',
+              platform:
+                automation.executionTargetType === 'ssh'
+                  ? 'unknown'
+                  : getAutomationAuthoringPlatform(),
+              timezone: getAutomationTimezone()
+            })
+            if (!started) {
+              toast.error(
+                translate(
+                  'auto.components.automations.AutomationDetail.agentEditUnavailable',
+                  'Open this automation’s workspace and pick an enabled agent to change it with an agent.'
+                )
+              )
+            }
+          }}
           toggleAutomation={() => runSelectedRowAction(managementActions.toggleAutomation)}
           requestDeleteAutomation={() =>
             runSelectedRowAction(managementActions.requestDeleteAutomation)

@@ -45,7 +45,7 @@ describe('editing an automation whose saved schedule predates the input gate', (
   })
 
   it('opens the editor with the saved schedule intact and no warning', () => {
-    const draft = buildAutomationEditDraft(makeAutomation())
+    const draft = buildAutomationEditDraft(makeAutomation(), 'claude')
     expect(draft.preset).toBe('custom')
     expect(draft.customSchedule).toBe(LEGACY_OVERSIZED_STEP)
     expect(draft.scheduleWarning).toBeNull()
@@ -55,7 +55,7 @@ describe('editing an automation whose saved schedule predates the input gate', (
   // user never touched and that is still firing.
   it('lets a rename through without re-authoring the schedule', () => {
     const automation = makeAutomation()
-    const renamed = { ...buildAutomationEditDraft(automation), name: 'Renamed sweep' }
+    const renamed = { ...buildAutomationEditDraft(automation, 'claude'), name: 'Renamed sweep' }
     expect(renamed.scheduleWarning).toBeNull()
     expect(
       acceptsAutomationDraftSchedule({
@@ -92,7 +92,7 @@ describe('editing an automation whose saved schedule predates the input gate', (
   // The editor's live cron status runs the same gate, so an untouched legacy cadence is not
   // painted red with "fix this before saving" for a rule it only owes as new input.
   it('reports the saved schedule as valid in the editor cron status', () => {
-    const draft = buildAutomationEditDraft(makeAutomation())
+    const draft = buildAutomationEditDraft(makeAutomation(), 'claude')
     const accepts = (schedule: string): boolean =>
       acceptsAutomationDraftSchedule({
         customSchedule: schedule,
@@ -105,13 +105,15 @@ describe('editing an automation whose saved schedule predates the input gate', (
   })
 
   it('carries the saved schedule on the draft so the gate can see it', () => {
-    expect(buildAutomationEditDraft(makeAutomation()).savedSchedule).toBe(LEGACY_OVERSIZED_STEP)
+    expect(buildAutomationEditDraft(makeAutomation(), 'claude').savedSchedule).toBe(
+      LEGACY_OVERSIZED_STEP
+    )
   })
 
   // Leniency is scoped to the oversized-step gate; a schedule that cannot parse at all is
   // still unrepresentable and must keep warning rather than silently round-trip.
   it('keeps warning about a saved schedule that cannot be parsed', () => {
-    const draft = buildAutomationEditDraft(makeAutomation({ rrule: '0 9 32 * *' }))
+    const draft = buildAutomationEditDraft(makeAutomation({ rrule: '0 9 32 * *' }), 'claude')
     expect(draft.customSchedule).toBe('')
     expect(draft.scheduleWarning).toBeTruthy()
   })

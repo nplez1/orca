@@ -1,4 +1,5 @@
 import type { TuiAgent } from './tui-agent'
+import type { AutomationStep, AutomationStepResult } from './automation-steps'
 import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
 
@@ -93,9 +94,25 @@ export type Automation = {
   /** Optional client request key used to make cross-authority creates retry-safe. */
   creationKey?: string
   name: string
-  prompt: string
+  /**
+   * The plan this automation runs: script steps first, at most one agent step, last.
+   * Absent on records written before steps existed, which are read back as the single
+   * agent step their flat `prompt`/`agentId` describe (see `resolveAutomationSteps`).
+   */
+  steps?: AutomationStep[]
+  /**
+   * The plan's agent step, mirrored onto the record for readers that predate steps.
+   * Nothing new should read it: an automation whose plan has no agent step leaves this
+   * empty.
+   * @deprecated Read the plan with `resolveAutomationSteps`/`resolveAutomationAgentStep`.
+   */
+  prompt?: string
   precheck: AutomationPrecheck | null
-  agentId: TuiAgent
+  /**
+   * The plan's agent step, mirrored onto the record for readers that predate steps.
+   * @deprecated Read the plan with `resolveAutomationAgentStep`.
+   */
+  agentId?: TuiAgent
   /** Saved text appended to the host's default agent Arguments on each fresh run; absent means none. */
   extraAgentArgs?: string
   /** Why: runContext carries the logical project + host setup identity for
@@ -156,6 +173,8 @@ export type AutomationRun = {
   terminalPtyId: string | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
+  /** What each script step did, in plan order; absent for a plan with no script steps. */
+  stepResults?: AutomationStepResult[] | null
   usage: AutomationRunUsage | null
   error: string | null
   startedAt: number | null
@@ -182,9 +201,13 @@ export type AutomationCreateInput = {
   /** Optional idempotency key; repeated creates return the original record. */
   creationKey?: string
   name: string
-  prompt: string
+  /** The plan to run. When absent, `prompt` and `agentId` describe one agent step. */
+  steps?: AutomationStep[]
+  /** @deprecated Send `steps`; this is one agent step spelled flat. */
+  prompt?: string
   precheck?: AutomationPrecheck | null
-  agentId: TuiAgent
+  /** @deprecated Send `steps`; this is one agent step spelled flat. */
+  agentId?: TuiAgent
   /** Empty or whitespace means no extras. */
   extraAgentArgs?: string
   runContext?: WorkspaceRunContext | null
@@ -208,6 +231,7 @@ export type AutomationUpdateInput = Partial<
   Pick<
     Automation,
     | 'name'
+    | 'steps'
     | 'prompt'
     | 'precheck'
     | 'agentId'
@@ -244,109 +268,14 @@ export type AutomationDispatchResult = {
   terminalPtyId?: string | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
+  stepResults?: AutomationStepResult[] | null
   usage?: AutomationRunUsage | null
   error?: string | null
 }
 
-export type ExternalAutomationProvider = 'hermes' | 'openclaw'
-export type ExternalAutomationManagerStatus = 'available' | 'unavailable'
-export type ExternalAutomationAction = 'pause' | 'resume' | 'run' | 'delete'
-export type ExternalAutomationRunStatus = 'completed' | 'failed' | 'unknown'
-
-export type ExternalAutomationTarget =
-  | {
-      type: 'local'
-    }
-  | {
-      type: 'ssh'
-      connectionId: string
-    }
-
-export type ExternalAutomationJob = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  name: string
-  schedule: string
-  rawSchedule: string | null
-  enabled: boolean
-  state: string
-  prompt: string | null
-  promptPreview: string
-  nextRunAt: string | null
-  lastRunAt: string | null
-  lastStatus: string | null
-  lastError: string | null
-  workdir: string | null
-  runCount: number
-  runCountSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRun = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  jobId: string
-  runAt: string | null
-  status: ExternalAutomationRunStatus
-  outputPreview: string | null
-  outputContent: string | null
-  error: string | null
-  outputPath: string | null
-}
-
-export type ExternalAutomationRunsPage = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-  total: number
-  totalSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRunsInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-}
-
-export type ExternalAutomationCreateInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  name: string
-  prompt: string
-  schedule: string
-  workdir: string | null
-}
-
-export type ExternalAutomationUpdateInput = ExternalAutomationCreateInput & {
-  jobId: string
-}
-
-export type ExternalAutomationManager = {
-  id: string
-  provider: ExternalAutomationProvider
-  label: string
-  targetLabel: string
-  target: ExternalAutomationTarget
-  status: ExternalAutomationManagerStatus
-  error: string | null
-  canManage: boolean
-  jobs: ExternalAutomationJob[]
-}
-
-export type ExternalAutomationActionInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  action: ExternalAutomationAction
-}
+/**
+ * The Hermes and OpenClaw jobs Orca reads from other managers' own files. They are
+ * a separate record shape from an Orca automation, so they live in their own module;
+ * this re-export keeps the historical import path working.
+ */
+export * from './external-automation-types'

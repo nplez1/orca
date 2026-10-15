@@ -1,5 +1,9 @@
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import type { Automation } from '../../../../shared/automations-types'
+import {
+  resolveAutomationAgentStep,
+  resolveAutomationSteps
+} from '../../../../shared/automation-steps'
 import type { Repo } from '../../../../shared/repo-types'
 import type { AutomationListRow } from './automation-list-row-identity'
 import { getAgentLabel } from './automation-draft-model'
@@ -60,12 +64,25 @@ export function buildAutomationSearchFields(
       path: repo?.path
     }),
     workspace: buildAutomationWorkspaceSearchText(automation, context.worktreeMap),
-    agent: getAgentLabel(automation.agentId),
+    agent: automationAgentSearchText(automation),
     // The row's own host: a lookup by automation id would give two hosts' rows
     // one label, so a search for host B could only ever match host A's row.
     host: row.hostLabel,
-    prompt: automation.prompt
+    prompt: automationPlanSearchText(automation)
   }
+}
+
+/** Nothing to match when the plan has no agent step; an agent search must not hit it. */
+function automationAgentSearchText(automation: Automation): string {
+  const agentStep = resolveAutomationAgentStep(automation)
+  return agentStep ? getAgentLabel(agentStep.agentId) : ''
+}
+
+/** Every script command in full, plus the agent prompt: "build" has to find the build step. */
+function automationPlanSearchText(automation: Automation): string {
+  return resolveAutomationSteps(automation)
+    .map((step) => (step.kind === 'script' ? step.command : step.prompt))
+    .join('\n')
 }
 
 export function buildExternalAutomationSearchFields(

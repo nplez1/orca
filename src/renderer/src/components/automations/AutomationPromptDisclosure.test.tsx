@@ -61,6 +61,7 @@ function makeAutomation(
 
 const detailCallbacks = {
   onRunNow: vi.fn(),
+  onEditWithAgent: () => undefined,
   onEdit: vi.fn(),
   onToggle: vi.fn(),
   onDelete: vi.fn()

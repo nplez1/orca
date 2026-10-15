@@ -9,6 +9,13 @@ import type { PersistedState } from '../../../shared/persisted-state-types'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
+import {
+  AUTOMATION_STEP_LABEL_MAX_CHARS,
+  AUTOMATION_STEP_STATUSES,
+  MAX_AUTOMATION_STEP_STORED_OUTPUT_CHARS,
+  MAX_AUTOMATION_STEPS,
+  type AutomationStepResult
+} from '../../../shared/automation-steps'
 import { hasExtraAgentArgs } from '../../../shared/automation-extra-agent-args'
 import { getAutomationLegacyRepoId } from '../../../shared/automation-run-identity'
 import { projectHostSetupProjectionFromRepos } from '../../../shared/project-host-setup-projection'
@@ -90,6 +97,63 @@ export function normalizeAutomationPrecheckResult(
     startedAt,
     completedAt
   }
+}
+
+/**
+ * What a run's step results are allowed to say once they are stored.
+ *
+ * Bounded on the way in because this is the one field on a run whose size a user
+ * (or an agent) can choose: the executor caps its own output, and a patch that
+ * bypassed it must not be able to grow the run record without limit.
+ */
+export function normalizeAutomationStepResults(
+  value: AutomationStepResult[] | null | undefined
+): AutomationStepResult[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) {
+    return undefined
+  }
+  return value.slice(0, MAX_AUTOMATION_STEPS).map((entry, position) => {
+    const startedAt =
+      typeof entry?.startedAt === 'number' && Number.isFinite(entry.startedAt)
+        ? entry.startedAt
+        : Date.now()
+    const completedAt =
+      typeof entry?.completedAt === 'number' && Number.isFinite(entry.completedAt)
+        ? entry.completedAt
+        : startedAt
+    return {
+      index:
+        typeof entry?.index === 'number' && Number.isFinite(entry.index) ? entry.index : position,
+      kind: 'script',
+      label:
+        typeof entry?.label === 'string'
+          ? entry.label.slice(0, AUTOMATION_STEP_LABEL_MAX_CHARS)
+          : '',
+      status: AUTOMATION_STEP_STATUSES.includes(entry?.status) ? entry.status : 'failed',
+      exitCode:
+        typeof entry?.exitCode === 'number' && Number.isFinite(entry.exitCode)
+          ? entry.exitCode
+          : null,
+      timedOut: entry?.timedOut === true,
+      durationMs:
+        typeof entry?.durationMs === 'number' && Number.isFinite(entry.durationMs)
+          ? Math.max(0, entry.durationMs)
+          : Math.max(0, completedAt - startedAt),
+      stdout:
+        typeof entry?.stdout === 'string'
+          ? entry.stdout.slice(-MAX_AUTOMATION_STEP_STORED_OUTPUT_CHARS)
+          : '',
+      stderr:
+        typeof entry?.stderr === 'string'
+          ? entry.stderr.slice(-MAX_AUTOMATION_STEP_STORED_OUTPUT_CHARS)
+          : '',
+      stdoutTruncated: entry?.stdoutTruncated === true,
+      stderrTruncated: entry?.stderrTruncated === true,
+      error: typeof entry?.error === 'string' && entry.error.trim() ? entry.error : null,
+      startedAt,
+      completedAt
+    }
+  })
 }
 
 export function normalizeAutomationSessionReuse(automation: Automation): Automation {

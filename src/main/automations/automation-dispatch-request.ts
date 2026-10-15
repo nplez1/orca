@@ -10,6 +10,12 @@ import { runHeadlessAutomationDispatch } from './headless-dispatch-runner'
 import type { AutomationRunTargetResult } from './run-target-resolution'
 import { createAutomationDispatchToken } from './dispatch-tokens'
 import { NO_DISPATCH_HOST, sendRendererDispatch } from './dispatch-refusal'
+import { automationStepsHaveAgent } from '../../shared/automation-steps'
+import {
+  automationStepResultsOutputSnapshot,
+  runAutomationStepPlan
+} from './automation-step-plan-runner'
+import type { AutomationShellCommandTarget } from './automation-shell-command-runner'
 
 export type AutomationRendererChannel = Pick<WebContents, 'isDestroyed' | 'send'>
 
@@ -30,6 +36,16 @@ type DispatchContext = Pick<
 function definition(automation: Automation) {
   const { lastRunAt: _last, updatedAt: _updated, nextRunAt: _next, ...configured } = automation
   return configured
+}
+
+/** Where a plan's script steps run: the workspace, on the host that owns the automation. */
+function scriptTarget(
+  automation: Automation,
+  target: Extract<AutomationRunTargetResult, { ok: true }>
+): AutomationShellCommandTarget {
+  return automation.executionTargetType === 'ssh'
+    ? { type: 'ssh', cwd: target.cwd, connectionId: automation.executionTargetId }
+    : { type: 'local', cwd: target.cwd }
 }
 
 function destination(target: Extract<AutomationRunTargetResult, { ok: true }>) {
@@ -100,8 +116,15 @@ export async function requestAutomationDispatch(
     return returnDurable(run)
   }
   let target = resolveCurrentTarget()
-  if (!target.ok || (!ctx.getRenderer() && !ctx.headlessDispatcher)) {
-    return refuse(target.ok ? NO_DISPATCH_HOST : target.error)
+  if (!target.ok) {
+    return refuse(target.error)
+  }
+  // Only a plan that ends in an agent step needs somewhere to launch it. A plan of
+  // script steps runs in this process, so it must not be refused for having no
+  // window open — that is exactly when a scheduled build is most useful.
+  const launchesAgent = automationStepsHaveAgent(automation)
+  if (launchesAgent && !ctx.getRenderer() && !ctx.headlessDispatcher) {
+    return refuse(NO_DISPATCH_HOST)
   }
   await ctx.runs.updateRun({
     runId: run.id,
@@ -110,6 +133,60 @@ export async function requestAutomationDispatch(
     error: null
   })
 
+  run = readRun()
+  if (run.status !== 'dispatching') {
+    return returnDurable(run)
+  }
+  target = resolveCurrentTarget()
+  if (!target.ok) {
+    return refuse(target.error)
+  }
+  const plan = await runAutomationStepPlan({
+    automation,
+    target: scriptTarget(automation, target),
+    // Written as each step finishes: a build that takes minutes has to be visible
+    // while it runs, and a run cut off mid-plan still shows where it stopped.
+    onStepResults: async (stepResults) => {
+      await ctx.runs.updateRun({
+        runId: run.id,
+        status: 'dispatching',
+        workspaceId: automation.workspaceId,
+        stepResults,
+        error: null
+      })
+    }
+  })
+  if (plan.kind === 'refused') {
+    return ctx.runs.updateRun({
+      runId: run.id,
+      status: 'skipped_unavailable',
+      workspaceId: automation.workspaceId,
+      stepResults: plan.stepResults,
+      error: plan.error
+    })
+  }
+  if (plan.kind === 'failed') {
+    return ctx.runs.updateRun({
+      runId: run.id,
+      status: 'dispatch_failed',
+      workspaceId: automation.workspaceId,
+      stepResults: plan.stepResults,
+      outputSnapshot: automationStepResultsOutputSnapshot(plan.stepResults),
+      error: plan.error
+    })
+  }
+  if (plan.kind === 'completed') {
+    // The whole run was the scripts: nothing to launch, nothing to watch, and the
+    // run is final the moment the last command exits.
+    return ctx.runs.updateRun({
+      runId: run.id,
+      status: 'completed',
+      workspaceId: automation.workspaceId,
+      stepResults: plan.stepResults,
+      outputSnapshot: automationStepResultsOutputSnapshot(plan.stepResults),
+      error: null
+    })
+  }
   run = readRun()
   if (run.status !== 'dispatching') {
     return returnDurable(run)

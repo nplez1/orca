@@ -95,8 +95,11 @@ export function runLocalSourceControlPlan(input: {
   wslDistro?: string
   holdHomeLockUntilExit: boolean
   spawnAgent: SpawnSourceControlAgent
+  /** Omitted operations get the commit-message budget; a request that reads a repo needs longer. */
+  timeoutMs?: number
 }): LocalProcessExecution<InternalTextGenerationResult> {
   const { plan, cwd, operation, holdHomeLockUntilExit } = input
+  const timeoutMs = input.timeoutMs ?? SOURCE_CONTROL_GENERATION_TIMEOUT_MS
   let markProcessClosed!: () => void
   const processClosed = new Promise<void>((resolve) => {
     markProcessClosed = resolve
@@ -177,9 +180,9 @@ export function runLocalSourceControlPlan(input: {
       startTermination()
       finalize({
         success: false,
-        error: `Generation timed out after ${SOURCE_CONTROL_GENERATION_TIMEOUT_MS / 1000}s.`
+        error: `Generation timed out after ${timeoutMs / 1000}s.`
       })
-    }, SOURCE_CONTROL_GENERATION_TIMEOUT_MS)
+    }, timeoutMs)
 
     const onStdoutData = (chunk: Buffer): void => {
       stdoutBytes += chunk.byteLength

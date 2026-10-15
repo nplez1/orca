@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pencil, Pause, Play, Trash2 } from 'lucide-react'
+import { Pencil, Pause, Play, Trash2, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,6 +19,11 @@ import { getAutomationHostDetailDisplay } from './automation-host-detail-display
 import { getAutomationSourceDisplay } from './automation-source-display'
 import { translate } from '@/i18n/i18n'
 import { AutomationPromptDisclosure } from './AutomationPromptDisclosure'
+import { AutomationStepsSummary } from './AutomationStepsSummary'
+import {
+  resolveAutomationAgentStep,
+  resolveAutomationSteps
+} from '../../../../shared/automation-steps'
 
 type AutomationDetailProps = {
   automation: Automation | null
@@ -33,6 +38,8 @@ type AutomationDetailProps = {
   now: number
   onRunNow: (automation: Automation) => void
   onEdit: (automation: Automation) => void
+  /** Describes the change to an agent instead of editing fields in a form. */
+  onEditWithAgent: (automation: Automation) => void
   onToggle: (automation: Automation) => void
   onDelete: (automation: Automation) => void
 }
@@ -111,6 +118,7 @@ export function AutomationDetail({
   now,
   onRunNow,
   onEdit,
+  onEditWithAgent,
   onToggle,
   onDelete
 }: AutomationDetailProps): React.JSX.Element {
@@ -131,8 +139,14 @@ export function AutomationDetail({
       : usageSummary.unavailableRuns > 0
         ? 'Unavailable'
         : 'No runs'
-  const agentLabel =
-    getAgentCatalog().find((agent) => agent.id === automation.agentId)?.label ?? automation.agentId
+  const agentStep = resolveAutomationAgentStep(automation)
+  // Why: a plan with no script steps is the old one-agent automation, whose full prompt
+  // the disclosure below already shows; the summary is for plans a reader cannot infer.
+  const hasScriptSteps = resolveAutomationSteps(automation).length !== (agentStep ? 1 : 0)
+  const agentLabel = agentStep
+    ? (getAgentCatalog().find((agent) => agent.id === agentStep.agentId)?.label ??
+      agentStep.agentId)
+    : translate('auto.components.automations.AutomationDetail.scriptOnly', 'No agent step')
   const runLocationLabel =
     automation.workspaceMode === 'new_per_run'
       ? (automation.baseBranch ?? projectDefaultBaseRef ?? 'Project default')
@@ -190,6 +204,15 @@ export function AutomationDetail({
             onClick={() => onEdit(automation)}
           >
             <Pencil className="size-4" />
+          </ToolbarIconButton>
+          <ToolbarIconButton
+            label={translate(
+              'auto.components.automations.AutomationDetail.editWithAgent',
+              'Change it with an agent'
+            )}
+            onClick={() => onEditWithAgent(automation)}
+          >
+            <Wand2 className="size-4" />
           </ToolbarIconButton>
           <ToolbarIconButton
             label={
@@ -327,10 +350,13 @@ export function AutomationDetail({
         />
       </div>
 
-      <AutomationPromptDisclosure
-        key={`${automation.id}:${automation.prompt}`}
-        prompt={automation.prompt}
-      />
+      {hasScriptSteps ? <AutomationStepsSummary automation={automation} /> : null}
+      {agentStep ? (
+        <AutomationPromptDisclosure
+          key={`${automation.id}:${agentStep.prompt}`}
+          prompt={agentStep.prompt}
+        />
+      ) : null}
     </div>
   )
 }

@@ -233,6 +233,10 @@
         }
       },
       "automations": {
+        "AutomationAuthoringDialog": {
+          "description": "Say what you want automated. An agent drafts the name, the prompt, and — wherever a command can decide instead — the check that decides whether an agent runs at all.",
+          "placeholder": "Every weekday, triage new issues that need a first response."
+        },
         "AutomationCustomCronPanel": {
           "cadb7b0bc9": "invalid"
         },

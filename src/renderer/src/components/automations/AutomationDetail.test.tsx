@@ -34,6 +34,7 @@ async function render(overrides: Partial<Automation>): Promise<HTMLDivElement> {
           runNowAvailability={null}
           now={0}
           onRunNow={vi.fn()}
+          onEditWithAgent={() => undefined}
           onEdit={vi.fn()}
           onToggle={vi.fn()}
           onDelete={vi.fn()}

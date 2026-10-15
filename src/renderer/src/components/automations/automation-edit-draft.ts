@@ -7,7 +7,12 @@
  */
 
 import type { Automation, ExternalAutomationJob } from '../../../../shared/automations-types'
+import {
+  resolveAutomationAgentStep,
+  resolveAutomationSteps
+} from '../../../../shared/automation-steps'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   isRunnableAutomationCronSchedule,
   isRunnableAutomationSchedule,
@@ -17,13 +22,22 @@ import type { AutomationDraft } from './AutomationEditorDialog'
 import { AUTOMATION_DEFAULT_TIME, formatTimeInput } from './automation-draft-model'
 import { getAutomationSetupDecisionDraftValue } from './automation-setup-decision'
 
-export function buildAutomationEditDraft(automation: Automation): AutomationDraft {
+/**
+ * A record whose plan has no agent step still has to open in a form that owns an agent
+ * picker, so the picker shows the caller's default and the plan keeps its own steps.
+ */
+export function buildAutomationEditDraft(
+  automation: Automation,
+  fallbackAgentId: TuiAgent
+): AutomationDraft {
   const schedule = tryParseAutomationRrule(automation.rrule)
   const hasCustomSchedule = !schedule && isRunnableAutomationSchedule(automation.rrule)
+  const agentStep = resolveAutomationAgentStep(automation)
   return {
     name: automation.name,
-    prompt: automation.prompt,
-    agentId: automation.agentId,
+    steps: resolveAutomationSteps(automation),
+    prompt: agentStep?.prompt ?? '',
+    agentId: agentStep?.agentId ?? fallbackAgentId,
     extraAgentArgs: automation.extraAgentArgs ?? '',
     projectId: getAutomationRunRepoId(automation),
     workspaceMode: automation.workspaceMode,
@@ -57,6 +71,7 @@ export function buildExternalAutomationEditDraft(
   const hasCustomSchedule = isRunnableAutomationCronSchedule(rawSchedule)
   return {
     name: job.name,
+    steps: [],
     prompt: job.prompt ?? job.promptPreview,
     agentId: 'hermes',
     extraAgentArgs: '',

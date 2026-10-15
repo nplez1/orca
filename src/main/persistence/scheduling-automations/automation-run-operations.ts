@@ -19,6 +19,7 @@ import {
 } from '../../../shared/automation-run-cursor'
 import {
   normalizeAutomationPrecheckResult,
+  normalizeAutomationStepResults,
   normalizeAutomationRunOutputSnapshot,
   normalizeAutomationRunTerminalPaneKey,
   normalizeAutomationRunTerminalPtyId,
@@ -196,6 +197,9 @@ export function updateAutomationRun(
     precheckResult: Object.hasOwn(result, 'precheckResult')
       ? normalizeAutomationPrecheckResult(result.precheckResult)
       : normalizeAutomationPrecheckResult(current.precheckResult),
+    stepResults: Object.hasOwn(result, 'stepResults')
+      ? normalizeAutomationStepResults(result.stepResults)
+      : current.stepResults,
     usage: Object.hasOwn(result, 'usage') ? (result.usage ?? null) : (current.usage ?? null),
     error: result.error ?? null,
     startedAt: current.startedAt ?? now,

@@ -77,6 +77,7 @@ type AutomationsDetailPaneProps = {
   ) => void
   runNow: (automation: Automation) => void
   openEditDialog: (automation: Automation) => void
+  editWithAgent: (automation: Automation) => void
   toggleAutomation: (automation: Automation) => void
   requestDeleteAutomation: (automation: Automation) => void
   openAutomationRunPage: (run: AutomationRun) => void
@@ -108,6 +109,7 @@ export function AutomationsDetailPane({
   openEditExternalDialog,
   runNow,
   openEditDialog,
+  editWithAgent,
   toggleAutomation,
   requestDeleteAutomation,
   openAutomationRunPage,
@@ -253,6 +255,7 @@ export function AutomationsDetailPane({
               now={relativeNow}
               onRunNow={(automation) => void runNow(automation)}
               onEdit={(automation) => void openEditDialog(automation)}
+              onEditWithAgent={editWithAgent}
               onToggle={(automation) => void toggleAutomation(automation)}
               onDelete={requestDeleteAutomation}
             />

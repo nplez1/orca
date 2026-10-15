@@ -25,6 +25,8 @@ export function runLocalPlanForAgent(input: {
   emptyResultName: string
   operation: TextGenerationOperation
   spawnAgent: SpawnSourceControlAgent
+  /** Omitted operations get the commit-message budget. */
+  timeoutMs?: number
 }): Promise<InternalTextGenerationResult> {
   const target = {
     ...input.target,
@@ -45,6 +47,7 @@ export function runLocalPlanForAgent(input: {
       operation: input.operation,
       wslDistro: input.target.wslDistro,
       holdHomeLockUntilExit,
+      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
       spawnAgent: input.spawnAgent
     })
   if (input.agentId !== 'codex') {

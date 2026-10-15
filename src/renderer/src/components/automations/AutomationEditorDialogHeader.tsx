@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -21,6 +21,8 @@ type AutomationEditorDialogHeaderProps = {
   onCreateTargetChange: (target: AutomationCreateTarget) => void
   onTemplateOpenChange: (open: boolean) => void
   onApplyTemplate: (template: AutomationTemplate) => void
+  /** Absent when this computer cannot run the authoring agent. */
+  onDescribeAutomation?: (() => void) | undefined
 }
 
 function AutomationTemplateCard({
@@ -86,7 +88,8 @@ export function AutomationEditorDialogHeader({
   segmentedItemClassName,
   onCreateTargetChange,
   onTemplateOpenChange,
-  onApplyTemplate
+  onApplyTemplate,
+  onDescribeAutomation
 }: AutomationEditorDialogHeaderProps): React.JSX.Element {
   const title = getEditorTitle({ isEditing, isEditingExternal, isHermesCreate })
 
@@ -137,6 +140,15 @@ export function AutomationEditorDialogHeader({
               </div>
             </PopoverContent>
           </Popover>
+          {onDescribeAutomation && createTarget === 'orca' ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onDescribeAutomation}>
+              <Wand2 className="size-4" />
+              {translate(
+                'auto.components.automations.AutomationEditorDialogHeader.describeIt',
+                'Describe it'
+              )}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </DialogHeader>

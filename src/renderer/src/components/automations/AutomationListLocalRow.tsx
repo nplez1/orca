@@ -42,6 +42,7 @@ import { AutomationListLastRunCell } from './AutomationListLastRunCell'
 import { formatAutomationDateTimeWithRelative } from './automation-page-parts'
 import { getAutomationTargetAvailability } from './automation-target-availability'
 import { getAgentLabel } from './automation-draft-model'
+import { resolveAutomationAgentStep } from '../../../../shared/automation-steps'
 import type { AutomationListRow } from './automation-list-row-identity'
 import {
   formatAutomationCost,
@@ -157,7 +158,10 @@ export function AutomationListLocalRow({
     ? formatAutomationDateTimeWithRelative(automation.nextRunAt, relativeNow)
     : translate('auto.components.automations.enablement.paused', 'Paused')
   const isSelected = isSelectedLocal && selectedRowKey === row.key
-  const agentLabel = getAgentLabel(automation.agentId)
+  const agentStep = resolveAutomationAgentStep(automation)
+  const agentLabel = agentStep
+    ? getAgentLabel(agentStep.agentId)
+    : translate('auto.components.automations.AutomationListLocalRow.scriptOnly', 'Script')
   const hostId =
     automation.runContext?.hostId ??
     (automationRepo ? getRepoExecutionHostId(automationRepo) : null)

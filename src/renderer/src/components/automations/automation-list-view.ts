@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import { resolveAutomationAgentStep } from '../../../../shared/automation-steps'
 import { hostStableKey } from '../../../../shared/automation-owner-key'
 import type { AutomationListRow } from './automation-list-row-identity'
 import type { ExternalAutomationListEntry } from './external-automation-list-entries'
@@ -33,7 +34,8 @@ export type AutomationListViewItem =
       enabled: boolean
       lastRunAt: number | null
       lastRun: AutomationLastRunSnapshot
-      agentId: TuiAgent
+      /** Null when the plan has no agent step, so there is nothing to badge or filter by. */
+      agentId: TuiAgent | null
       row: AutomationListRow
     }
   | {
@@ -120,6 +122,14 @@ function matchesLastRunFilter(
   return snapshot.tone === filter
 }
 
+/**
+ * The row's agent, or null when the plan has no agent step. A script-only automation
+ * has no agent to badge, and an agent filter excludes it rather than matching nothing.
+ */
+export function rowAgentId(row: AutomationListRow): TuiAgent | null {
+  return resolveAutomationAgentStep(row.automation)?.agentId ?? null
+}
+
 /** Flattens the two rendered collections into one sortable list, preserving row identity. */
 export function buildAutomationListViewItems({
   rows,
@@ -138,7 +148,7 @@ export function buildAutomationListViewItems({
       enabled: row.automation.enabled,
       lastRunAt: lastRun.at,
       lastRun,
-      agentId: row.automation.agentId,
+      agentId: rowAgentId(row),
       row
     }
   })
@@ -187,13 +197,22 @@ export function filterAutomationListRows(
     return rows
   }
   const hostKeys = selectedHostKeys(filter)
-  return rows.filter(
-    (row) =>
-      matchesHostFilter(row.catalogRef ? hostStableKey(row.catalogRef) : null, hostKeys) &&
-      matchesStatusFilter(row.automation.enabled, filter.status) &&
-      matchesLastRunFilter(getAutomationRowLastRunSnapshot(row), filter.lastRun) &&
-      (filter.agentIds.length === 0 || filter.agentIds.includes(row.automation.agentId))
-  )
+  return rows.filter((row) => {
+    if (!matchesHostFilter(row.catalogRef ? hostStableKey(row.catalogRef) : null, hostKeys)) {
+      return false
+    }
+    if (!matchesStatusFilter(row.automation.enabled, filter.status)) {
+      return false
+    }
+    if (!matchesLastRunFilter(getAutomationRowLastRunSnapshot(row), filter.lastRun)) {
+      return false
+    }
+    if (filter.agentIds.length === 0) {
+      return true
+    }
+    const agentId = rowAgentId(row)
+    return agentId !== null && filter.agentIds.includes(agentId)
+  })
 }
 
 /** External jobs have no Orca agent, so any agent filter excludes them — matching the old view. */

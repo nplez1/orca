@@ -19,6 +19,7 @@ vi.mock('./AutomationExtraAgentArgsField', () => ({ AutomationExtraAgentArgsFiel
 
 const DRAFT: AutomationDraft = {
   name: '',
+  steps: [],
   prompt: '',
   agentId: 'codex',
   extraAgentArgs: '',

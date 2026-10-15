@@ -35,6 +35,7 @@ vi.mock('@/components/ui/select', () => ({
 
 const BASE_DRAFT: AutomationDraft = {
   name: '',
+  steps: [],
   prompt: '',
   agentId: 'codex',
   extraAgentArgs: '',

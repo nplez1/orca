@@ -1277,7 +1277,8 @@
         "16a21d6413": "SSH reconnect requires interactive credentials.",
         "386db94f3e": "The target project is no longer available.",
         "3ad7d77f57": "The target workspace is on a different host than this automation run target.",
-        "workspaceHostUnresolved": "The target workspace spans more than one host, so this run has no single host to use."
+        "workspaceHostUnresolved": "The target workspace spans more than one host, so this run has no single host to use.",
+        "noAgentStep": "This automation has no agent step to launch."
       },
       "useComposerState": {
         "7eb3f44ff7": "Selected agent is disabled. Choose an enabled agent before creating.",
@@ -17375,7 +17376,10 @@
           "51a470b966": "ssh",
           "b09b2384fd": "Paused",
           "eaa02014f8": "Enabled",
-          "29baf8f4c2": "Source"
+          "29baf8f4c2": "Source",
+          "scriptOnly": "No agent step",
+          "editWithAgent": "Change it with an agent",
+          "agentEditUnavailable": "Open this automation’s workspace and pick an enabled agent to change it with an agent."
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "Cancel",
@@ -17408,7 +17412,8 @@
           "0a75e5e2fa": "Create Hermes automation",
           "03142e7721": "Edit Hermes automation",
           "17086b48ee": "Edit automation",
-          "4c8e1a72b9": "A recurring agent task"
+          "4c8e1a72b9": "A recurring agent task",
+          "describeIt": "Describe it"
         },
         "AutomationMissedRunGraceField": {
           "0f4459e91d": "48 hours",
@@ -17891,6 +17896,28 @@
           "useFreshSessions": "Use fresh sessions",
           "helper": "Added to this host's default arguments for each fresh session.",
           "detailLabel": "Extra arguments"
+        },
+        "AutomationAuthoringDialog": {
+          "placeholder": "Every weekday, triage new issues that need a first response.",
+          "title": "Describe an automation",
+          "description": "Say what you want automated. An agent drafts the name, the prompt, and — wherever a command can decide instead — the check that decides whether an agent runs at all.",
+          "descriptionLabel": "What should this automation do?",
+          "close": "Cancel",
+          "workspace": "The session opens in",
+          "noWorkspace": "the workspace selected above",
+          "start": "Start authoring",
+          "sessionFailed": "That workspace or agent is no longer available. Pick another and try again."
+        },
+        "AutomationListLocalRow": {
+          "scriptOnly": "Script"
+        },
+        "AutomationStepsSummary": {
+          "heading": "Steps",
+          "stepNumber": "Step",
+          "kindAgent": "agent",
+          "kindScript": "script",
+          "onFailureContinue": "continues on failure",
+          "onFailureStop": "stops on failure"
         }
       },
       "agent": {

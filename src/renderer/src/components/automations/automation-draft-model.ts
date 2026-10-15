@@ -10,6 +10,29 @@ import type { AutomationDraft } from './AutomationEditorDialog'
 
 export const AUTOMATION_DEFAULT_TIME = '09:00'
 
+/**
+ * The shell a script step will be handed to on this host, as far as a window can tell.
+ * A paired host's platform is not knowable from here, which the brief says out loud.
+ */
+export function getAutomationAuthoringPlatform(): 'darwin' | 'linux' | 'win32' | 'unknown' {
+  const platform = navigator.platform.toLowerCase()
+  if (platform.includes('mac')) {
+    return 'darwin'
+  }
+  if (platform.includes('win')) {
+    return 'win32'
+  }
+  if (platform.includes('linux')) {
+    return 'linux'
+  }
+  return 'unknown'
+}
+
+/** The zone an automation created from this form reads its cadence in. */
+export function getAutomationTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
 export function getDefaultWorktree(worktrees: readonly Worktree[]): Worktree | null {
   return worktrees.find((worktree) => worktree.isMainWorktree) ?? worktrees[0] ?? null
 }

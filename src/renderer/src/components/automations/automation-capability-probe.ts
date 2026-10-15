@@ -10,6 +10,10 @@ import {
   type RuntimeCapability
 } from '../../../../shared/protocol-version'
 import {
+  AUTOMATION_STEPS_HOST_UPDATE_REQUIRED,
+  AUTOMATION_STEPS_RUNTIME_CAPABILITY
+} from '../../../../shared/automation-runtime-capabilities'
+import {
   EXTRA_AGENT_ARGS_HOST_UPDATE_REQUIRED,
   hasExtraAgentArgs
 } from '../../../../shared/automation-extra-agent-args'
@@ -160,6 +164,21 @@ export async function assertExtraAgentArgsSupported(
   )
 }
 
+/** Same gate for the unfenced path: a plan is lost by a host that cannot store one. */
+export async function assertAutomationStepsSupported(
+  authority: AutomationAuthorityRef,
+  steps: readonly unknown[] | undefined
+): Promise<void> {
+  if (!steps || steps.length === 0) {
+    return
+  }
+  await assertAuthorityCapability(
+    authority,
+    AUTOMATION_STEPS_RUNTIME_CAPABILITY,
+    AUTOMATION_STEPS_HOST_UPDATE_REQUIRED
+  )
+}
+
 /** Same gate for the legacy unfenced path, which knows only the environment id. */
 export async function assertEnvironmentSupportsExtraAgentArgs(
   environmentId: string,
@@ -177,5 +196,6 @@ export async function assertEnvironmentSupportsExtraAgentArgs(
 export {
   AUTOMATION_LIST_HOST_SCOPE_RUNTIME_CAPABILITY,
   AUTOMATION_LIST_HOST_SCOPE_UPDATE_REQUIRED_MESSAGE,
-  AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY
+  AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
+  AUTOMATION_STEPS_HOST_UPDATE_REQUIRED
 }

@@ -7,7 +7,11 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
+import { automationLegacyAgentFields } from '../../../shared/automation-steps'
+import {
+  applyAutomationPlanRecordMirror,
+  resolveAutomationPlanWrite
+} from '../../../shared/automation-plan-record'
 import {
   assertAutomationExtraAgentArgs,
   storedExtraAgentArgs
@@ -86,13 +90,29 @@ export function createAutomation(
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
   const extraAgentArgs = storedExtraAgentArgs(input.extraAgentArgs)
+  const plan = resolveAutomationPlanWrite({
+    current: {},
+    currentPrecheck: null,
+    patch: input,
+    patchedPrecheck: input.precheck,
+    hasPrecheckPatch: true,
+    currentHasPlan: false,
+    hasStepsPatch: input.steps !== undefined,
+    requirePlan: true
+  })
+  // Derived from the write, not from the record being built: a flat create has no
+  // stored steps, so the flat fields are the only place its agent step can come from.
+  const agentMirror = automationLegacyAgentFields({ steps: plan.steps })
   const automation: Automation = {
     id: randomUUID(),
     ...(input.creationKey ? { creationKey: input.creationKey } : {}),
     name: input.name.trim() || 'Untitled automation',
-    prompt: input.prompt,
-    precheck: normalizeAutomationPrecheck(input.precheck),
-    agentId: input.agentId,
+    // Only a write that named a plan stores one: a flat create keeps the legacy
+    // prompt/agentId shape, which is also what tells a precheck apart from steps.
+    ...(input.steps ? { steps: plan.steps ?? [] } : {}),
+    prompt: agentMirror.prompt,
+    ...(agentMirror.agentId ? { agentId: agentMirror.agentId } : {}),
+    precheck: plan.precheck,
     ...(extraAgentArgs !== undefined ? { extraAgentArgs } : {}),
     // Why own contexts win: a wire context speaks the client's perspective —
     // 'runtime:<id>' is a client-assigned name this store cannot interpret, and
@@ -172,13 +192,22 @@ export function updateAutomation(
   const extraAgentArgs = Object.hasOwn(definedUpdates, 'extraAgentArgs')
     ? storedExtraAgentArgs(definedUpdates.extraAgentArgs)
     : storedExtraAgentArgs(current.extraAgentArgs)
+  const plan = resolveAutomationPlanWrite({
+    current,
+    currentPrecheck: current.precheck,
+    patch: definedUpdates,
+    patchedPrecheck: definedUpdates.precheck,
+    hasPrecheckPatch: Object.hasOwn(definedUpdates, 'precheck'),
+    currentHasPlan: current.steps !== undefined,
+    hasStepsPatch: definedUpdates.steps !== undefined,
+    requirePlan: false
+  })
   const merged: Automation = {
     ...current,
     ...definedUpdates,
+    ...(plan.steps === null ? {} : { steps: plan.steps }),
     name: updates.name !== undefined ? updates.name.trim() || 'Untitled automation' : current.name,
-    precheck: Object.hasOwn(definedUpdates, 'precheck')
-      ? normalizeAutomationPrecheck(definedUpdates.precheck)
-      : normalizeAutomationPrecheck(current.precheck),
+    precheck: plan.precheck,
     projectId: repoId,
     // Why the wire object is ignored: contexts are the storing authority's own
     // registry speaking. A move restates them from that registry, anything else
@@ -234,6 +263,10 @@ export function updateAutomation(
   } else {
     merged.extraAgentArgs = extraAgentArgs
   }
+  // Why re-derive rather than trust the patch: an older client edits the flat agent
+  // fields, and a plan patched that way must not leave the mirror describing a step
+  // the plan no longer has.
+  applyAutomationPlanRecordMirror(merged)
   assertAutomationExtraAgentArgs(merged)
   const previousPin = automationWorkspaceSshPin(operations.state, current.workspaceId)
   const workspaceSshPin = automationWorkspaceSshPin(operations.state, merged.workspaceId)

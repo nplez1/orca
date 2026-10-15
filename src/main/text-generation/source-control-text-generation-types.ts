@@ -44,6 +44,7 @@ export type TextGenerationOperation =
   | 'pull-request-fields'
   | 'branch-name'
   | 'conversation-name'
+  | 'automation-authoring'
 
 export type CommitMessageGenerationTarget =
   | { kind: 'local'; cwd: string; env?: NodeJS.ProcessEnv; wslDistro?: string }
