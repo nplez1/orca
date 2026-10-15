@@ -115,17 +115,19 @@ export function useJiraIssueSideData({
     setEditFields([])
     setEditFieldsLoading(true)
     void Promise.all([
-      jiraListTransitions(providerSettings, issueKey, issueSiteId).catch((error) => {
-        if (
-          requestId === requestIdRef.current &&
-          transitionsReadId === transitionsReadIdRef.current
-        ) {
-          setTransitionsError(
-            error instanceof Error ? error.message : 'Failed to load status changes.'
-          )
+      jiraListTransitions(providerSettings, issueKey, issueSiteId).catch(
+        (error): JiraTransition[] => {
+          if (
+            requestId === requestIdRef.current &&
+            transitionsReadId === transitionsReadIdRef.current
+          ) {
+            setTransitionsError(
+              error instanceof Error ? error.message : 'Failed to load status changes.'
+            )
+          }
+          return []
         }
-        return [] as JiraTransition[]
-      }),
+      ),
       // Why the local catches: a priorities or assignable-users failure must not
       // reject the whole Promise.all and silently blank the transitions list.
       jiraListPriorities(providerSettings, issueSiteId).catch(() => []),

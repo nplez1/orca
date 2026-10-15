@@ -128,6 +128,7 @@ export function useJiraIssueWorkspaceMutation({
     },
     [
       displayed,
+      editedFieldsRef,
       mutationContextKey,
       patchJiraIssue,
       pendingField,
@@ -135,10 +136,12 @@ export function useJiraIssueWorkspaceMutation({
       reloadSprintAssignment,
       requestKey,
       restoreSprintAssignment,
+      scopeGenerationRef,
       selectSprint,
-      sprintAssignment,
+      setPendingField,
       siteId,
-      sourceContext
+      sourceContext,
+      sprintAssignment
     ]
   )
 }

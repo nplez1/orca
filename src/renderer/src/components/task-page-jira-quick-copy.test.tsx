@@ -38,6 +38,13 @@ function renderList() {
     </TooltipProvider>
   )
 }
+async function openCopyContextMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Fix login') })
+}
+async function openTemplatePicker(user: ReturnType<typeof userEvent.setup>) {
+  await openCopyContextMenu(user)
+  await user.click(screen.getByRole('menuitem', { name: 'Copy prompt from template' }))
+}
 beforeEach(() => {
   Object.assign(window, { api: { ui: { writeClipboardText } } })
   vi.clearAllMocks()
@@ -48,7 +55,7 @@ describe('Jira row quick copy', () => {
   it('offers the same copy actions in the row context menu', async () => {
     renderList()
     const user = userEvent.setup()
-    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Fix login') })
+    await openCopyContextMenu(user)
     await user.click(screen.getByRole('menuitem', { name: 'Copy URL' }))
     expect(writeClipboardText).toHaveBeenCalledWith(issue.url)
     expect(onOpenIssue).not.toHaveBeenCalled()
@@ -57,8 +64,7 @@ describe('Jira row quick copy', () => {
   it('renders a template preview with additional instructions and copies it', async () => {
     renderList()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Copy context for APP-1' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Copy prompt from template' }))
+    await openTemplatePicker(user)
     await user.type(
       screen.getByLabelText('Additional instructions (optional)'),
       'Cover SSH behavior.'
@@ -75,17 +81,14 @@ describe('Jira row quick copy', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Copy prompt from template' })
     ).not.toBeInTheDocument()
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Copy context for APP-1' })).toHaveFocus()
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: /Fix login/ })).toHaveFocus())
   })
 
   it('reuses a custom template after closing and reopening the picker', async () => {
     renderList()
     const user = userEvent.setup()
     async function openCustomTemplate() {
-      await user.click(screen.getByRole('button', { name: 'Copy context for APP-1' }))
-      await user.click(screen.getByRole('menuitem', { name: 'Copy prompt from template' }))
+      await openTemplatePicker(user)
       await user.click(screen.getByRole('combobox', { name: 'Template' }))
       await user.click(screen.getByRole('option', { name: 'Custom template' }))
     }
@@ -105,8 +108,7 @@ describe('Jira row quick copy', () => {
     writeClipboardText.mockRejectedValueOnce(new Error('Clipboard unavailable'))
     renderList()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Copy context for APP-1' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Copy prompt from template' }))
+    await openTemplatePicker(user)
     await user.click(screen.getByRole('button', { name: 'Copy prompt' }))
     expect(screen.getByRole('dialog', { name: 'Copy prompt from template' })).toBeInTheDocument()
   })
@@ -114,7 +116,7 @@ describe('Jira row quick copy', () => {
   it('copies the key from the row without opening the issue', async () => {
     renderList()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Copy context for APP-1' }))
+    await openCopyContextMenu(user)
     await user.click(screen.getByRole('menuitem', { name: 'Copy key' }))
     expect(writeClipboardText).toHaveBeenCalledWith('APP-1')
     expect(onOpenIssue).not.toHaveBeenCalled()

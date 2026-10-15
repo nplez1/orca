@@ -89,6 +89,7 @@ describe('Jira linked workspace split action', () => {
 
   it('opens the same menu on press-and-hold of the body without firing the default click', async () => {
     renderList([first])
+    const user = userEvent.setup()
     const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
     fireEvent.pointerDown(body)
     await act(async () => {
@@ -97,6 +98,11 @@ describe('Jira linked workspace split action', () => {
     expect(screen.getByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
     fireEvent.pointerUp(body)
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+    // The open menu swallows the release click, so the onClick guard never clears
+    // heldRef here; the next activation after dismissal must still fire.
+    await user.keyboard('{Escape}')
+    fireEvent.click(body)
+    expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(issue)
   })
 
   it('keeps a plain start button for an unlinked issue', async () => {

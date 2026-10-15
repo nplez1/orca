@@ -55,8 +55,10 @@ export function JiraIssueWorkspaceSplitAction({
     }
   }
 
-  const startHold = (): void => {
-    if (!linked) {
+  const startHold = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    // Primary mouse press only: right-click or a touch long-press (the row's
+    // context menu) would otherwise open both menus at once.
+    if (!linked || event.button !== 0 || event.pointerType === 'touch') {
       return
     }
     heldRef.current = false
@@ -124,6 +126,9 @@ export function JiraIssueWorkspaceSplitAction({
       open={menuOpen}
       onOpenChange={(next) => {
         clearHold()
+        // The open menu blocks the release click, so the body onClick never runs
+        // to clear heldRef; reset it here so the next activation is not swallowed.
+        heldRef.current = false
         setMenuOpen(next)
       }}
     >

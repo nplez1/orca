@@ -171,9 +171,9 @@ describe('JiraLinkedIssuePane', () => {
       </TooltipProvider>
     )
 
-    const statusRow = (await screen.findByRole('button', {
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
       name: /In Progress/
-    })) as HTMLButtonElement
+    })
     // Wait for the transitions to load, which is what un-disables the row.
     await waitFor(() => expect(statusRow.disabled).toBe(false))
     fireEvent.click(statusRow)

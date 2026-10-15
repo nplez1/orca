@@ -1,6 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Clipboard, FileText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -8,14 +7,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import type { JiraIssue } from '../../../shared/jira-types'
 import { copyJiraTextToClipboard } from './jira-issue-workspace-actions'
@@ -28,7 +19,7 @@ export function JiraIssueRowCopyMenu({
   children
 }: {
   issue: JiraIssue
-  children?: ReactNode
+  children: ReactNode
 }): React.JSX.Element {
   const [templateOpen, setTemplateOpen] = useState(false)
   const anchorRef = useRef<HTMLElement | null>(null)
@@ -52,80 +43,38 @@ export function JiraIssueRowCopyMenu({
       copiedLabel: 'Prompt'
     }
   ]
-  const Item = children ? ContextMenuItem : DropdownMenuItem
-  const Separator = children ? ContextMenuSeparator : DropdownMenuSeparator
-  const items = (
-    <>
-      {actions.map((action) => (
-        <Item
-          key={action.copiedLabel}
-          onSelect={() => void copyJiraTextToClipboard(action.text, action.copiedLabel)}
-        >
-          <Clipboard className="size-3.5" />
-          {action.label}
-        </Item>
-      ))}
-      <Separator />
-      <Item onSelect={() => setTemplateOpen(true)}>
-        <FileText className="size-3.5" />
-        {translate('jira.prompt.dialogTitle', 'Copy prompt from template')}
-      </Item>
-    </>
-  )
   return (
     <Popover open={templateOpen} onOpenChange={setTemplateOpen}>
-      {children ? (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <PopoverAnchor asChild ref={setAnchor}>
-              {children}
-            </PopoverAnchor>
-          </ContextMenuTrigger>
-          <ContextMenuContent
-            onClick={(event) => event.stopPropagation()}
-            onCloseAutoFocus={(event) => {
-              if (templateOpen) {
-                event.preventDefault()
-              }
-            }}
-          >
-            {items}
-          </ContextMenuContent>
-        </ContextMenu>
-      ) : (
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <PopoverAnchor asChild ref={setAnchor}>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={translate('jira.copy.context', 'Copy context for {{key}}', {
-                      key: issue.key
-                    })}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Clipboard className="size-3.5" />
-                  </Button>
-                </PopoverAnchor>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>{translate('jira.copy.actions', 'Copy issue context')}</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent
-            align="end"
-            onClick={(event) => event.stopPropagation()}
-            onCloseAutoFocus={(event) => {
-              if (templateOpen) {
-                event.preventDefault()
-              }
-            }}
-          >
-            {items}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <PopoverAnchor asChild ref={setAnchor}>
+            {children}
+          </PopoverAnchor>
+        </ContextMenuTrigger>
+        <ContextMenuContent
+          onClick={(event) => event.stopPropagation()}
+          onCloseAutoFocus={(event) => {
+            if (templateOpen) {
+              event.preventDefault()
+            }
+          }}
+        >
+          {actions.map((action) => (
+            <ContextMenuItem
+              key={action.copiedLabel}
+              onSelect={() => void copyJiraTextToClipboard(action.text, action.copiedLabel)}
+            >
+              <Clipboard className="size-3.5" />
+              {action.label}
+            </ContextMenuItem>
+          ))}
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => setTemplateOpen(true)}>
+            <FileText className="size-3.5" />
+            {translate('jira.prompt.dialogTitle', 'Copy prompt from template')}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       {templateOpen ? (
         <JiraPromptTemplatePopover
           issue={issue}

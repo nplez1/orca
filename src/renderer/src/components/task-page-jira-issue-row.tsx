@@ -58,7 +58,11 @@ export function JiraIssueRow({
   selected,
   showSiteContext
 }: TaskPageJiraIssueRowProps): React.JSX.Element {
-  const workspaces = getIssueWorkspaces?.(issue) ?? []
+  const linkedWorkspaces = getIssueWorkspaces?.(issue) ?? []
+  // The chip and the button must read one rule: fall back to the index-derived
+  // attachment so an index-only caller still flips the action.
+  const workspaces =
+    linkedWorkspaces.length > 0 ? linkedWorkspaces : attachedWorkspace ? [attachedWorkspace] : []
   const labels = issue.labels.slice(0, 3)
   const attachedWorkspaceLabel = attachedWorkspace
     ? getWorktreeAttachmentLabel(attachedWorkspace)
