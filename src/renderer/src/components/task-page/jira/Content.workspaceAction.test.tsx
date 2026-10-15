@@ -20,8 +20,18 @@ const spies = vi.hoisted(() => ({
 }))
 
 vi.mock('@/components/task-page-jira-issue-list', () => ({
-  TaskPageJiraIssueList: (props: { onStartWorkspace: unknown; columns: unknown }) => {
-    spies.list(props.onStartWorkspace, props.columns)
+  TaskPageJiraIssueList: (props: {
+    onOpenOrStartWorkspace: unknown
+    issueWorkspaceAttachmentIndex: unknown
+    sourceContext: unknown
+    columns: unknown
+  }) => {
+    spies.list(
+      props.onOpenOrStartWorkspace,
+      props.issueWorkspaceAttachmentIndex,
+      props.sourceContext,
+      props.columns
+    )
     return null
   }
 }))
@@ -128,6 +138,7 @@ function model(
     closeTaskDetailPage: vi.fn(),
     selectedJiraIssue: selectedIssue,
     jiraDetailSourceContext: null,
+    jiraTaskSourceContext: null,
     openJiraDetailPage: vi.fn(),
     jiraIssues: [selectedIssue],
     jiraLoading: false,
@@ -162,7 +173,7 @@ afterEach(() => {
 })
 
 describe('TaskPageJiraContent workspace action wiring', () => {
-  it('routes the list to the start handler and the sheet to open-or-start, never the composer', () => {
+  it('wires the list chip and the sheet to open-or-start, never the composer', () => {
     const { handleUseJiraItem, handleOpenOrUseJiraItem, composerHandler, rendered } = model([
       attachedWorkspace('alp-1-fix-payments')
     ])
@@ -173,13 +184,25 @@ describe('TaskPageJiraContent workspace action wiring', () => {
       </TooltipProvider>
     )
 
-    expect(spies.list).toHaveBeenCalledWith(handleUseJiraItem, rendered.jiraColumns)
+    expect(spies.list).toHaveBeenCalledWith(
+      handleOpenOrUseJiraItem,
+      rendered.jiraIssueAttachmentIndex,
+      rendered.jiraTaskSourceContext,
+      rendered.jiraColumns
+    )
     expect(spies.sheet).toHaveBeenCalledWith(
       handleOpenOrUseJiraItem,
       rendered.jiraIssueAttachmentIndex
     )
-    expect(spies.list).not.toHaveBeenCalledWith(composerHandler, expect.anything())
+    expect(spies.list).not.toHaveBeenCalledWith(
+      composerHandler,
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    )
     expect(spies.sheet).not.toHaveBeenCalledWith(composerHandler, expect.anything())
+    // The chip and open/start must not be wired to the start-only (composer) handler.
+    expect(handleUseJiraItem).not.toHaveBeenCalled()
   })
 
   it('routes the sheet the same way in board mode', () => {

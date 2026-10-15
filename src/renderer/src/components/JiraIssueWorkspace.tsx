@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import * as VisuallyHidden from 'radix-ui/visually-hidden'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { useAppStore } from '@/store'
@@ -25,7 +25,7 @@ import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state
 
 const EMPTY_ATTACHMENT_INDEX: JiraIssueWorkspaceAttachmentIndex = new Map()
 
-type JiraIssueWorkspaceOpenHandler = (issue: JiraIssue) => void
+type JiraIssueWorkspaceOpenHandler = (issue: JiraIssue, source?: TaskSourceContext | null) => void
 
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
@@ -73,6 +73,13 @@ export default function JiraIssueWorkspace({
   refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const openOrStartWorkspace = resolveOpenOrStartWorkspace(onOpenOrStartWorkspace, onUse)
+  // Why the bound source: the label resolves `sourceContext` (the detail source, which
+  // Cmd-J can set to another host than the task source), so the click must hand the
+  // handler the same source or the two can name different workspaces for one link.
+  const handleOpenOrStart = useCallback(
+    (target: JiraIssue) => openOrStartWorkspace(target, sourceContext),
+    [openOrStartWorkspace, sourceContext]
+  )
   const settings = useAppStore((s) => s.settings)
   const jiraStatus = useAppStore((s) => s.jiraStatus)
   const providerSettings = useMemo(
@@ -154,7 +161,7 @@ export default function JiraIssueWorkspace({
               attachedWorkspaceLabel={attachedWorkspaceLabel}
               displayed={displayed}
               issueLoading={detail.issueLoading}
-              onOpenOrStartWorkspace={openOrStartWorkspace}
+              onOpenOrStartWorkspace={handleOpenOrStart}
               onClose={onClose}
             />
 
@@ -195,7 +202,7 @@ export default function JiraIssueWorkspace({
               commentsLoading={detail.commentsLoading}
               retryComments={detail.retryComments}
               attachedWorkspaceLabel={attachedWorkspaceLabel}
-              onOpenOrStartWorkspace={openOrStartWorkspace}
+              onOpenOrStartWorkspace={handleOpenOrStart}
               actionItems={actionItems}
             />
 

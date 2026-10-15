@@ -10,7 +10,7 @@ import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
 import {
   buildJiraIssueWorkspaceAttachmentIndex,
   collectLinkedJiraIssueRefs,
-  findJiraIssueWorkspaceAttachmentsInIndex
+  findJiraIssueWorkspaceAttachmentsForIssue
 } from '@/lib/jira-issue-workspace-attachment'
 import { filterLinkedJiraIssues } from './task-page-jira-linked-issues'
 import { sortJiraIssues } from './jira-issue-sorter'
@@ -36,9 +36,9 @@ export function useTaskPageJiraListProjection(model: TaskPageLinearBoardModel) {
     [linearAttachmentWorkspaces]
   )
   const getJiraIssueWorkspaces = useCallback(
-    (issue: Parameters<typeof findJiraIssueWorkspaceAttachmentsInIndex>[1]) =>
-      findJiraIssueWorkspaceAttachmentsInIndex(
-        jiraIssueAttachmentIndex,
+    (issue: Parameters<typeof findJiraIssueWorkspaceAttachmentsForIssue>[1]) =>
+      findJiraIssueWorkspaceAttachmentsForIssue(
+        jiraIssueAttachmentIndex.get(issue.key.toUpperCase()) ?? [],
         issue,
         jiraTaskSourceContext
       ),

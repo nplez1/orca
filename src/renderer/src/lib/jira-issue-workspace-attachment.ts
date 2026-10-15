@@ -108,18 +108,33 @@ export function buildJiraIssueWorkspaceAttachmentIndex(
   return index
 }
 
-export function findJiraIssueWorkspaceAttachmentsInIndex(
-  index: JiraIssueWorkspaceAttachmentIndex,
+/** The strict identity match over a live list: host, account, project and site
+ *  scoped, most-recent ordering. Shared by the index lookup and the
+ *  strict-then-fallback resolver so the two cannot drift. */
+function findStrictJiraIssueWorkspaceAttachments(
+  workspaces: readonly Worktree[],
   issue: JiraIssue,
   source?: TaskSourceContext | null
-): readonly Worktree[] {
-  return (index.get(issue.key.toUpperCase()) ?? [])
+): Worktree[] {
+  return workspaces
     .filter((workspace) =>
       getWorkspaceAttachments(workspace).some((item) =>
         jiraAttachmentMatchesIssue(item, issue, source)
       )
     )
     .toSorted((a, b) => b.lastActivityAt - a.lastActivityAt)
+}
+
+export function findJiraIssueWorkspaceAttachmentsInIndex(
+  index: JiraIssueWorkspaceAttachmentIndex,
+  issue: JiraIssue,
+  source?: TaskSourceContext | null
+): readonly Worktree[] {
+  return findStrictJiraIssueWorkspaceAttachments(
+    index.get(issue.key.toUpperCase()) ?? [],
+    issue,
+    source
+  )
 }
 
 export function collectLinkedJiraIssueRefs(
@@ -225,20 +240,26 @@ export function findJiraIssueWorkspaceAttachment(
  *  site still resolves. The sheet's label, list rows, board chip, and the
  *  open/start action all route through here, so they cannot disagree about which
  *  workspace a link names. */
+export function findJiraIssueWorkspaceAttachmentsForIssue(
+  workspaces: readonly Worktree[],
+  issue: JiraIssue,
+  source?: TaskSourceContext | null
+): readonly Worktree[] {
+  const live = workspaces.filter(isCandidate)
+  const strict = findStrictJiraIssueWorkspaceAttachments(live, issue, source)
+  if (strict.length > 0) {
+    return strict
+  }
+  const fallback = findJiraIssueWorkspaceAttachment(live, issue)
+  return fallback ? [fallback] : []
+}
+
 export function findJiraIssueWorkspaceAttachmentForIssue(
   workspaces: readonly Worktree[],
   issue: JiraIssue,
   source?: TaskSourceContext | null
 ): Worktree | null {
-  const live = workspaces.filter(isCandidate)
-  const strict = live
-    .filter((workspace) =>
-      getWorkspaceAttachments(workspace).some((item) =>
-        jiraAttachmentMatchesIssue(item, issue, source)
-      )
-    )
-    .toSorted((a, b) => b.lastActivityAt - a.lastActivityAt)
-  return strict[0] ?? findJiraIssueWorkspaceAttachment(live, issue)
+  return findJiraIssueWorkspaceAttachmentsForIssue(workspaces, issue, source)[0] ?? null
 }
 
 /** Why: board and list rows would otherwise rescan every workspace per row; one

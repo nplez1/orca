@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../../shared/linear/workspace-types'
 import type { JiraIssue } from '../../../shared/jira-types'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import { useAppStore } from '@/store'
@@ -241,11 +242,12 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     [openComposerForJiraItem]
   )
   const handleOpenOrUseJiraItem = useCallback(
-    (issue: JiraIssue): void => {
+    (
+      issue: JiraIssue,
+      source: TaskSourceContext | null | undefined = jiraTaskSourceContext
+    ): void => {
       if (
-        openJiraIssueWorkspaceOrStart(issue, jiraTaskSourceContext, () =>
-          handleUseJiraItem(issue)
-        ) === 'opened'
+        openJiraIssueWorkspaceOrStart(issue, source, () => handleUseJiraItem(issue)) === 'opened'
       ) {
         useAppStore.getState().recordFeatureInteraction('jira-tasks')
       }

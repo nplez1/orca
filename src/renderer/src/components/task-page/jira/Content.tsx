@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
-import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 import { LoaderCircle } from 'lucide-react'
@@ -34,7 +32,6 @@ export function TaskPageJiraContent({
   const {
     jiraStatus,
     jiraHasWorkspace,
-    getJiraIssueWorkspaces,
     jiraStatusReady,
     jiraConnected,
     selectedJiraSiteId,
@@ -293,27 +290,16 @@ export function TaskPageJiraContent({
           />
         ) : (
           <TaskPageJiraIssueList
-            getIssueWorkspaces={getJiraIssueWorkspaces}
-            onOpenWorkspace={(workspace) => {
-              if (
-                activateAndRevealWorktree(workspace.id, { navigationIntent: 'user-open' }) === false
-              ) {
-                toast.error(
-                  translate(
-                    'jira.workspace.openFailed',
-                    'Unable to open the workspace linked to this Jira issue.'
-                  )
-                )
-              }
-            }}
             columns={jiraColumns}
             formatUpdatedAt={formatRelativeTime}
             getStatusTone={getJiraStatusTone}
+            issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
             issues={sortedJiraIssues}
             onOpenIssue={openJiraDetailPage}
-            onStartWorkspace={handleUseJiraItem}
+            onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
             selectedIssue={selectedJiraIssue}
             showSiteContext={selectedJiraSiteId === 'all'}
+            sourceContext={jiraTaskSourceContext}
             statusDirection={jiraOrderBy === 'status' ? jiraOrderDirection : 'asc'}
             statusOrder={displayedJiraStatusOrder}
           />
