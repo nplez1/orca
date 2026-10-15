@@ -98,9 +98,11 @@ export function JiraIssueRow({
             onOpenIssue(issue)
             return
           }
-          // Why: macOS has no Menu key / Shift+F10 convention and the row is a div, not a
-          // native context target, so the browser never emits `contextmenu`; synthesize one
-          // so Radix opens the copy menu from the keyboard (idempotent on Windows/Linux).
+          // Why: macOS has no Menu key and no Shift+F10 convention, so the browser emits
+          // nothing and the keyboard route has to be synthesized. Windows and Linux do get a
+          // native `contextmenu` for a focused element, and this is still safe there:
+          // cancelling the key press suppresses Chromium's key-down event, and the Menu key's
+          // key-up one lands on the already-open menu rather than on the row.
           if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
             event.preventDefault()
             const rect = event.currentTarget.getBoundingClientRect()
