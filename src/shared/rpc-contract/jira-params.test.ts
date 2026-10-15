@@ -32,4 +32,13 @@ describe('Jira RPC params', () => {
 
     expect(parsed.textFieldKeys).toEqual(['customfield_2'])
   })
+
+  it('refuses a system-field key in the field-edit map, as the local path does', () => {
+    const result = IssueUpdate.safeParse({
+      key: 'A-1',
+      updates: { customFields: { reporter: 'acc-1' } }
+    })
+
+    expect(result.success).toBe(false)
+  })
 })

@@ -66,6 +66,15 @@ export const CreateIssue = z.object({
   textFieldKeys: z.array(z.string()).optional()
 })
 
+// Why: the field-edit path targets custom fields; system fields have dedicated
+// update fields, and the transition screen is the one place a workflow names
+// them. Matches the local IPC narrowing so both hosts refuse the same payloads.
+const CustomFieldUpdateMap = z
+  .record(z.string(), z.unknown())
+  .refine((value) => Object.keys(value).every((key) => key.startsWith('customfield_')), {
+    message: 'Custom-field updates may only name custom fields'
+  })
+
 export const IssueUpdate = z.object({
   key: requiredString('Issue key is required'),
   siteId: OptionalString,
@@ -81,7 +90,7 @@ export const IssueUpdate = z.object({
     transitionFields: z.record(z.string(), z.unknown()).optional(),
     transitionUserFieldKeys: z.array(z.string()).optional(),
     transitionTextFieldKeys: z.array(z.string()).optional(),
-    customFields: z.record(z.string(), z.unknown()).optional(),
+    customFields: CustomFieldUpdateMap.optional(),
     userFieldKeys: z.array(z.string()).optional(),
     textFieldKeys: z.array(z.string()).optional()
   })
