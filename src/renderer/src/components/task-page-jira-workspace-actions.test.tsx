@@ -82,4 +82,44 @@ describe('Jira linked workspace actions', () => {
     renderList([])
     expect(screen.getByRole('button', { name: 'Start workspace from APP-1' })).toBeInTheDocument()
   })
+  it('keeps the fork open-or-start button and the linked-workspace picker for a two-workspace link', async () => {
+    const onOpenOrStartWorkspace = vi.fn()
+    render(
+      <TooltipProvider>
+        <TaskPageJiraIssueList
+          columns={visibleJiraListColumns(defaultJiraListColumnIds())}
+          issues={[issue]}
+          selectedIssue={null}
+          showSiteContext={false}
+          statusOrder={null}
+          formatUpdatedAt={() => 'Today'}
+          getStatusTone={() => ''}
+          onOpenIssue={onOpenIssue}
+          onStartWorkspace={onStartWorkspace}
+          onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+          getIssueWorkspaces={() => [first, second]}
+          onOpenWorkspace={onOpenWorkspace}
+        />
+      </TooltipProvider>
+    )
+    const user = userEvent.setup()
+
+    // The fork's open-or-start button survives the union.
+    expect(screen.getByRole('button', { name: 'Start workspace from APP-1' })).toBeInTheDocument()
+
+    // Upstream's picker is present too: count badge, one entry per workspace, Start new workspace.
+    await user.click(screen.getByRole('button', { name: '2 workspaces linked to APP-1' }))
+    expect(await screen.findByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /UI fix/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: /UI fix/ }))
+    expect(onOpenWorkspace).toHaveBeenCalledWith(second)
+
+    await user.click(screen.getByRole('button', { name: '2 workspaces linked to APP-1' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Start new workspace' }))
+    expect(onStartWorkspace).toHaveBeenCalledWith(issue)
+
+    // The fork's button still routes through the open-or-start handler.
+    await user.click(screen.getByRole('button', { name: 'Start workspace from APP-1' }))
+    expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(issue)
+  })
 })

@@ -139,7 +139,9 @@ const model: TaskPageJiraBoardModel = {
   selectedJiraIssue: null,
   jiraIssueAttachmentIndex: buildJiraIssueWorkspaceAttachmentIndex([]),
   openJiraDetailPage: vi.fn(),
-  handleOpenOrUseJiraItem: vi.fn()
+  handleOpenOrUseJiraItem: vi.fn(),
+  getJiraIssueWorkspaces: () => [],
+  handleUseJiraItem: vi.fn()
 }
 
 function boardTree(

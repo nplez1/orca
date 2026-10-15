@@ -29,7 +29,7 @@ vi.mock('@/lib/worktree-activation', () => ({
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
-import { openJiraIssueWorkspaceOrStart } from './jira-issue-workspace-open'
+import { openJiraIssueWorkspace, openJiraIssueWorkspaceOrStart } from './jira-issue-workspace-open'
 
 function worktree(overrides: Partial<Worktree> = {}): Worktree {
   return {
@@ -156,5 +156,25 @@ describe('openJiraIssueWorkspaceOrStart', () => {
 
     expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('failed')
     expect(startWorkspace).not.toHaveBeenCalled()
+  })
+})
+
+describe('openJiraIssueWorkspace', () => {
+  beforeEach(() => {
+    mocks.activateAndRevealFolderWorkspace.mockReset().mockReturnValue({ primaryTabId: null })
+    mocks.activateAndRevealWorktree.mockReset().mockReturnValue({ primaryTabId: null })
+  })
+
+  it('qualifies a remote worktree with its execution host', () => {
+    expect(openJiraIssueWorkspace(worktree({ hostId: 'ssh:builder' }))).toBe('opened')
+    expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith('worktree-1', {
+      navigationIntent: 'user-open',
+      executionHostId: 'ssh:builder'
+    })
+  })
+
+  it('reports failure when activation is refused', () => {
+    mocks.activateAndRevealWorktree.mockReturnValue(false)
+    expect(openJiraIssueWorkspace(worktree())).toBe('failed')
   })
 })

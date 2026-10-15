@@ -1,5 +1,6 @@
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
 import type { JiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import type { TaskPageJiraSprintOptions } from '@/components/task-page-jira-sprint-cell'
@@ -19,6 +20,9 @@ type TaskPageJiraBacklogViewProps = {
   issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   onOpenIssue: (issue: JiraIssue) => void
   onOpenOrStartWorkspace: (issue: JiraIssue) => void
+  getIssueWorkspaces: (issue: JiraIssue) => readonly Worktree[]
+  onOpenWorkspace: (workspace: Worktree) => void
+  onStartWorkspace: (issue: JiraIssue) => void
   /** Jira source the attached-workspace chip is scoped to; see TaskPageJiraIssueList. */
   sourceContext: TaskSourceContext | null
   /** Board sprints a backlog item can be moved into; null while none are known. */
@@ -32,6 +36,9 @@ export function TaskPageJiraBacklogView({
   issueWorkspaceAttachmentIndex,
   onOpenIssue,
   onOpenOrStartWorkspace,
+  getIssueWorkspaces,
+  onOpenWorkspace,
+  onStartWorkspace,
   sourceContext,
   sprintOptions
 }: TaskPageJiraBacklogViewProps): React.JSX.Element {
@@ -102,6 +109,9 @@ export function TaskPageJiraBacklogView({
           issueWorkspaceAttachmentIndex={issueWorkspaceAttachmentIndex}
           onOpenIssue={onOpenIssue}
           onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+          getIssueWorkspaces={getIssueWorkspaces}
+          onOpenWorkspace={onOpenWorkspace}
+          onStartWorkspace={onStartWorkspace}
           sourceContext={sourceContext}
           selectedIssue={selectedIssue}
           showSiteContext={false}

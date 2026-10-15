@@ -23,6 +23,7 @@ import {
   runtimeTargetEnvironmentId
 } from '@/runtime/runtime-client-target'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
+import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 
 export function TaskPageJiraContent({
   model
@@ -70,7 +71,8 @@ export function TaskPageJiraContent({
     jiraBoardViewMode,
     setJiraBoardViewMode,
     jiraIssueAttachmentIndex,
-    handleOpenOrUseJiraItem
+    handleOpenOrUseJiraItem,
+    getJiraIssueWorkspaces
   } = model
   const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
@@ -292,11 +294,14 @@ export function TaskPageJiraContent({
           <TaskPageJiraIssueList
             columns={jiraColumns}
             formatUpdatedAt={formatRelativeTime}
+            getIssueWorkspaces={getJiraIssueWorkspaces}
             getStatusTone={getJiraStatusTone}
             issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
             issues={sortedJiraIssues}
             onOpenIssue={openJiraDetailPage}
+            onOpenWorkspace={openJiraIssueWorkspace}
             onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
+            onStartWorkspace={handleUseJiraItem}
             selectedIssue={selectedJiraIssue}
             showSiteContext={selectedJiraSiteId === 'all'}
             sourceContext={jiraTaskSourceContext}

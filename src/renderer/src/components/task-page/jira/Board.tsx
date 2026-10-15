@@ -29,6 +29,7 @@ import { defaultScopeSource } from '@/lib/default-creation-host'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
+import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import {
   loadJiraBoardViewPreferences,
   updateJiraBoardViewPreferences
@@ -168,6 +169,9 @@ export function TaskPageJiraBoard({
               issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
               onOpenIssue={model.openJiraDetailPage}
               onOpenOrStartWorkspace={model.handleOpenOrUseJiraItem}
+              getIssueWorkspaces={model.getJiraIssueWorkspaces}
+              onOpenWorkspace={openJiraIssueWorkspace}
+              onStartWorkspace={model.handleUseJiraItem}
               sourceContext={model.jiraTaskSourceContext}
               sprintOptions={
                 backlogSprints.length > 0

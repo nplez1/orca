@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 
@@ -25,12 +26,18 @@ vi.mock('@/components/task-page-jira-issue-list', () => ({
     issueWorkspaceAttachmentIndex: unknown
     sourceContext: unknown
     columns: unknown
+    getIssueWorkspaces: unknown
+    onOpenWorkspace: unknown
+    onStartWorkspace: unknown
   }) => {
     spies.list(
       props.onOpenOrStartWorkspace,
       props.issueWorkspaceAttachmentIndex,
       props.sourceContext,
-      props.columns
+      props.columns,
+      props.getIssueWorkspaces,
+      props.onOpenWorkspace,
+      props.onStartWorkspace
     )
     return null
   }
@@ -111,11 +118,13 @@ function model(
 ): {
   handleUseJiraItem: (issue: JiraIssue) => void
   handleOpenOrUseJiraItem: (issue: JiraIssue) => void
+  getJiraIssueWorkspaces: (issue: JiraIssue) => readonly Worktree[]
   composerHandler: (issue: JiraIssue) => void
   rendered: TaskPageComposerActionsModel
 } {
   const handleUseJiraItem = vi.fn()
   const handleOpenOrUseJiraItem = vi.fn()
+  const getJiraIssueWorkspaces = vi.fn(() => [])
   const composerHandler = vi.fn()
   const selectedIssue = issue()
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: TaskPage accumulates one model object across hooks; the test supplies only the members this component reads.
@@ -130,7 +139,7 @@ function model(
     jiraCurrentSprint: false,
     setJiraCurrentSprint: vi.fn(),
     jiraHasWorkspace: false,
-    getJiraIssueWorkspaces: () => [],
+    getJiraIssueWorkspaces,
     jiraConnected: true,
     selectedJiraSiteId: 'site-1',
     hideTaskSource: vi.fn(),
@@ -163,7 +172,13 @@ function model(
     // Why supplied at all: it must not be the handler either surface is wired to.
     composerHandler
   } as unknown as TaskPageComposerActionsModel
-  return { handleUseJiraItem, handleOpenOrUseJiraItem, composerHandler, rendered }
+  return {
+    handleUseJiraItem,
+    handleOpenOrUseJiraItem,
+    getJiraIssueWorkspaces,
+    composerHandler,
+    rendered
+  }
 }
 
 afterEach(() => {
@@ -174,9 +189,13 @@ afterEach(() => {
 
 describe('TaskPageJiraContent workspace action wiring', () => {
   it('wires the list chip and the sheet to open-or-start, never the composer', () => {
-    const { handleUseJiraItem, handleOpenOrUseJiraItem, composerHandler, rendered } = model([
-      attachedWorkspace('alp-1-fix-payments')
-    ])
+    const {
+      handleUseJiraItem,
+      handleOpenOrUseJiraItem,
+      getJiraIssueWorkspaces,
+      composerHandler,
+      rendered
+    } = model([attachedWorkspace('alp-1-fix-payments')])
 
     render(
       <TooltipProvider>
@@ -188,7 +207,10 @@ describe('TaskPageJiraContent workspace action wiring', () => {
       handleOpenOrUseJiraItem,
       rendered.jiraIssueAttachmentIndex,
       rendered.jiraTaskSourceContext,
-      rendered.jiraColumns
+      rendered.jiraColumns,
+      getJiraIssueWorkspaces,
+      openJiraIssueWorkspace,
+      handleUseJiraItem
     )
     expect(spies.sheet).toHaveBeenCalledWith(
       handleOpenOrUseJiraItem,

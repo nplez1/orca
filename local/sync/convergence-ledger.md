@@ -781,7 +781,22 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   the fork's permissive matcher is deliberate leniency for links recorded before sites were stored,
   pinned by `jira-issue-workspace-attachment.test.ts` ("still matches when one side names no site"),
   which upstream's strict predicate would refuse. **Do not** collapse this to one matcher without
-  settling that case.
+  settling that case. Two call sites are settled by name: the **default Jira list** must consume the
+  same resolver **and** `issueWorkspaceAttachmentIndex` — the merge had dropped the fork's title-line
+  chip from it while the backlog list kept it, so a no-site link offered a plain "Start workspace"
+  (opening a duplicate) on the row and "Open <workspace>" in the sheet; and
+  `collectLinkedJiraIssueRefs` deliberately keeps **strict site resolution**, because it maps an
+  attachment to a site+key for the Linked view to fetch under, and the permissive fallback is a
+  workspace-identity heuristic that cannot supply a site to fetch with. **The row keeps BOTH
+  affordances, and that is the settled shape:** the fork's title-line chip, its open-or-start button
+  and a visible copy-menu button, **plus** upstream's `JiraLinkedWorkspaceAction` picker whenever the
+  resolver returns **more than one** linked workspace — count badge, one entry per workspace, and
+  "Start new workspace". Both surfaces that render the chip (the default list and the configured
+  board's backlog) must pass the same three props. Four consecutive review rounds each fixed one side
+  of this row by displacing the other (the chip, then the picker); **do not resolve this row by
+  choosing between them again** — an issue linked from two workspaces must reach both, and start a
+  third. Both open paths share `openJiraIssueWorkspace`, which passes `executionHostId` (upstream's
+  picker omitted the host, which is wrong when one worktree id exists on two hosts).
 - **The transition toast is a caller opt-out, not a field-name rule.** `mutateIssue` takes
   `options?: { reportsInline?: boolean }` and toasts unless the caller sets it; only the sheet's
   transition control does, because it renders the error itself. An earlier round keyed the skip on

@@ -245,6 +245,15 @@ export function JiraIssueRow({
         <div className="flex shrink-0 items-center justify-end gap-1">
           {onOpenOrStartWorkspace ? (
             <>
+              <JiraIssueRowCopyMenu issue={issue} />
+              {onOpenWorkspace && onStartWorkspace && workspaces.length > 1 ? (
+                <JiraLinkedWorkspaceAction
+                  issue={issue}
+                  workspaces={workspaces}
+                  onOpenWorkspace={onOpenWorkspace}
+                  onStartWorkspace={onStartWorkspace}
+                />
+              ) : null}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

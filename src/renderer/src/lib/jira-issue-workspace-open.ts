@@ -11,6 +11,37 @@ import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { findJiraIssueWorkspaceAttachmentForIssue } from '@/lib/jira-issue-workspace-attachment'
 import type { JiraIssue } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { Worktree } from '../../../shared/worktree/types'
+
+/**
+ * Activates one workspace already linked to a Jira issue, qualified with its
+ * execution host so a remote worktree opens on the host that owns it. Shared by
+ * the open-or-start action and the linked-workspace picker so neither can drop
+ * the host (upstream's picker did).
+ */
+export function openJiraIssueWorkspace(workspace: Worktree): 'opened' | 'failed' {
+  const workspaceScope = parseWorkspaceKey(workspace.id)
+  const activation =
+    workspaceScope?.type === 'folder'
+      ? activateAndRevealFolderWorkspace(workspaceScope.folderWorkspaceId, {
+          navigationIntent: 'user-open',
+          ...(workspace.hostId ? { executionHostId: workspace.hostId } : {})
+        })
+      : activateAndRevealWorktree(workspace.id, {
+          navigationIntent: 'user-open',
+          ...(workspace.hostId ? { executionHostId: workspace.hostId } : {})
+        })
+  if (activation === false) {
+    toast.error(
+      translate(
+        'auto.lib.jira.issue.workspace.open.failed',
+        'Unable to open the workspace attached to this issue.'
+      )
+    )
+    return 'failed'
+  }
+  return 'opened'
+}
 
 /**
  * Opens the workspace already attached to a Jira issue, or starts a new one.
@@ -35,26 +66,5 @@ export function openJiraIssueWorkspaceOrStart(
     startWorkspace()
     return 'started'
   }
-
-  const workspaceScope = parseWorkspaceKey(attached.id)
-  const activation =
-    workspaceScope?.type === 'folder'
-      ? activateAndRevealFolderWorkspace(workspaceScope.folderWorkspaceId, {
-          navigationIntent: 'user-open',
-          ...(attached.hostId ? { executionHostId: attached.hostId } : {})
-        })
-      : activateAndRevealWorktree(attached.id, {
-          navigationIntent: 'user-open',
-          ...(attached.hostId ? { executionHostId: attached.hostId } : {})
-        })
-  if (activation === false) {
-    toast.error(
-      translate(
-        'auto.lib.jira.issue.workspace.open.failed',
-        'Unable to open the workspace attached to this issue.'
-      )
-    )
-    return 'failed'
-  }
-  return 'opened'
+  return openJiraIssueWorkspace(attached)
 }
