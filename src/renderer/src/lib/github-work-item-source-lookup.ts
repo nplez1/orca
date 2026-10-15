@@ -30,7 +30,9 @@ type GitHubWorkItemByOwnerRepoLookupArgs = GitHubWorkItemLookupArgs & {
 type GitHubWorkItemDetailsLookupArgs = {
   repoPath: string
   repoId: string
-  target?: RuntimeClientTarget
+  /** Required here: both callers render a workspace's item, where the source context can be null
+   *  and the source-context fallback would read a runtime-owned repo on this app's IPC. */
+  target: RuntimeClientTarget
   sourceContext?: TaskSourceContext | null
   number: number
   type: 'issue' | 'pr'
@@ -108,7 +110,7 @@ export function lookupGitHubWorkItemDetailsForSource(
   args: GitHubWorkItemDetailsLookupArgs
 ): Promise<GitHubWorkItemDetails | null> {
   const sourceContext = args.sourceContext
-  const target = workItemTarget(args)
+  const target = args.target
   if (target.kind === 'environment') {
     return callRuntimeRpc<GitHubWorkItemDetails | null>(
       target,

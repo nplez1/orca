@@ -28,17 +28,33 @@ describe('getGitHubRepoLookupIndex', () => {
 
   // Why: two machines can hold a checkout at the same path, and can publish the same repo id
   // twice, so a caller that knows the host must be able to name the row on that host alone.
-  it('keeps host-scoped id and path lookups apart from another host\u2019s row', () => {
+  it('keeps a host-scoped lookup on its own host whichever order the rows arrive in', () => {
     const local = makeRepo('repo', '/same')
     const remote = { ...makeRepo('repo', '/same'), executionHostId: 'runtime:env-1' as const }
-    const lookup = getGitHubRepoLookupIndex([local, remote])
 
-    expect(lookup.findByPathOnHost('/same', 'runtime:env-1')).toBe(remote)
-    expect(lookup.findByPathOnHost('/same', 'local')).toBe(local)
-    expect(lookup.findByIdOnHost('repo', 'runtime:env-1')).toBe(remote)
-    expect(lookup.findByIdOnHost('repo', 'local')).toBe(local)
-    expect(lookup.findByIdOnHost('repo', 'ssh:other')).toBeUndefined()
-    expect(lookup.findByPathOnHost('/other', 'runtime:env-1')).toBeUndefined()
+    for (const rows of [
+      [local, remote],
+      [remote, local]
+    ]) {
+      const lookup = getGitHubRepoLookupIndex(rows)
+      expect(lookup.findByPathOnHost('/same', 'runtime:env-1')).toBe(remote)
+      expect(lookup.findByPathOnHost('/same', 'local')).toBe(local)
+      expect(lookup.findByIdOnHost('repo', 'runtime:env-1')).toBe(remote)
+      expect(lookup.findByIdOnHost('repo', 'local')).toBe(local)
+      expect(lookup.findByIdOnHost('repo', 'ssh:other')).toBeUndefined()
+      expect(lookup.findByPathOnHost('/other', 'runtime:env-1')).toBeUndefined()
+    }
+  })
+
+  it('keeps the id and path lookups independent on the same host', () => {
+    const byId = { ...makeRepo('repo', '/elsewhere'), executionHostId: 'runtime:env-1' as const }
+    const byPath = { ...makeRepo('other', '/same'), executionHostId: 'runtime:env-1' as const }
+    const lookup = getGitHubRepoLookupIndex([byId, byPath])
+
+    expect(lookup.findByIdOnHost('repo', 'runtime:env-1')).toBe(byId)
+    expect(lookup.findByIdOnHost('other', 'runtime:env-1')).toBe(byPath)
+    expect(lookup.findByPathOnHost('/same', 'runtime:env-1')).toBe(byPath)
+    expect(lookup.findByPathOnHost('/elsewhere', 'runtime:env-1')).toBe(byId)
   })
 
   it('scans each repo once across repeated misses', () => {

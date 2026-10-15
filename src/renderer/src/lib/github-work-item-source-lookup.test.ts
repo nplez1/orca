@@ -101,6 +101,7 @@ describe('GitHub source lookup routing', () => {
       lookupGitHubWorkItemDetailsForSource({
         repoPath: '/home/runtime/app',
         repoId: 'renderer-repo',
+        target: { kind: 'environment', environmentId: 'env-1' },
         sourceContext: runtimeSourceContext,
         number: 42,
         type: 'issue',
@@ -123,6 +124,7 @@ describe('GitHub source lookup routing', () => {
     await lookupGitHubWorkItemDetailsForSource({
       repoPath: '/home/runtime/app',
       repoId: 'renderer-repo',
+      target: { kind: 'environment', environmentId: 'env-1' },
       sourceContext: { ...runtimeSourceContext, repoId: null },
       number: 42,
       type: 'pr'
@@ -148,6 +150,7 @@ describe('GitHub source lookup routing', () => {
       lookupGitHubWorkItemDetailsForSource({
         repoPath: 'C:\\workspace\\app',
         repoId: 'local-repo',
+        target: { kind: 'local' },
         sourceContext,
         number: 42,
         type: 'issue'
@@ -171,6 +174,7 @@ describe('GitHub source lookup routing', () => {
     await lookupGitHubWorkItemDetailsForSource({
       repoPath: '/home/fixture/widgets',
       repoId: 'local-repo',
+      target: { kind: 'local' },
       number: 12,
       type: 'issue',
       ownerRepo

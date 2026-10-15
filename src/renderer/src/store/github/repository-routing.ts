@@ -17,7 +17,7 @@ import {
   toRuntimeExecutionHostId
 } from '../../../../shared/execution-host'
 
-/** The repo row at this path/id **on this server**. A path or an id can name another machine's
+/** The repo row at this path/id on this server. A path or an id can name another machine's
  *  row — two checkouts can sit at the same path — and the bare first-wins lookups would then hand
  *  the server a repo id it does not own, so every read routed through it fails there. */
 function findRepoOnRuntimeHost(

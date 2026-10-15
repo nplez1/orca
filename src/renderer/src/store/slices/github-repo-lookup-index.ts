@@ -43,18 +43,15 @@ export function getGitHubRepoLookupIndex(
       indexedCount += 1
       const repoId = repo.id
       const repoPath = repo.path
-      const hostScopedKey = (value: string): string =>
-        `${getRepoExecutionHostId(repo)}\u0000${value}`
-      const hostIdKey = hostScopedKey(repoId)
-      const hostPathKey = hostScopedKey(repoPath)
+      const hostId = getRepoExecutionHostId(repo)
+      if (!byHostId.has(`${hostId}\u0000${repoId}`)) {
+        byHostId.set(`${hostId}\u0000${repoId}`, { index, repo })
+      }
+      if (!byHostPath.has(`${hostId}\u0000${repoPath}`)) {
+        byHostPath.set(`${hostId}\u0000${repoPath}`, { index, repo })
+      }
       if (!byId.has(repoId)) {
         byId.set(repoId, { index, repo })
-      }
-      if (!byHostId.has(hostIdKey)) {
-        byHostId.set(hostIdKey, { index, repo })
-      }
-      if (!byHostPath.has(hostPathKey)) {
-        byHostPath.set(hostPathKey, { index, repo })
       }
       if (!byPath.has(repoPath)) {
         byPath.set(repoPath, { index, repo })
