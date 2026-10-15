@@ -435,6 +435,21 @@ pnpm run sync:localization-runtime-catalog
     `src/renderer/src/components/quick-open-file-list.ts` (the Quick Open convergence above),
     `src/shared/orca-workspace-layout.ts` (the new `OrcaWorkspaceLayoutSettings` slice) and
     `src/shared/rpc-contract/client-ui-params.ts` (the restored `dashboardPopoutBounds` schema entry).
+  - **The full `pnpm test` run does not complete in this environment, and the release says so.** The
+    runner stalls at 0% CPU with no summary — reproduced with the default and TAP reporters and under
+    four-way sharding — and it is **pre-existing**: the file that holds the worker open
+    (`persistence-loading-store-extraction.test.ts`) passes its 10 assertions but never releases the
+    runner, is byte-identical at the fork tip, and excluding it does not clear the stall, so at least
+    one more file waits on something that never arrives. It is being tracked as its own work.
+    What the run did produce: two of four shards completed, **~62,000 tests passing**, and every
+    failing file was triaged — the merge-introduced ones fixed (the Jira renderer and detail surface,
+    two identity tests pointing at a literal `~/.orca` where production writes `~/.orca-np`, an
+    incomplete `Orca NP` tray re-point, a capability list short of `armWorktreeSetupRunner`), and the
+    rest proven pre-existing (the darwin launcher's `cd -P` resolving macOS's `/var` → `/private/var`),
+    environment-bound (the relay region test needing the uninstalled `cloud/` workspace) or a
+    load-dependent flake (`workspace-path-index-publication-admission` passes 3/3 in isolation).
+    Three PTY files that get no child output under the `bun` project were re-seated into
+    `NODE_RUNTIME_INCLUDE`, which is the documented fix for that gap.
   - **Follow-ups opened by this sync, by name.** (1) `local/sync/post-sync.mjs` should gain the
     fork-only reference sweep that found the orphan above: take every `src/` path from the pre-sync
     fork-only inventory, resolve every relative and `@/` import specifier in the tree, and report each
