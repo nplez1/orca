@@ -8,6 +8,23 @@ name: Mirror upstream release tags
 # Only `v*` desktop tags are mirrored. The mobile release workflows trigger on
 # `mobile-ios-v*` / `mobile-android-v*`, so fetching those would start App Store and Play
 # builds; no desktop workflow triggers on a tag push, so `v*` is inert.
+#
+# Why a token other than `GITHUB_TOKEN`: a tag brings the commits behind it, and pushing
+# workflow-file changes needs the `workflows` permission, which the Actions `GITHUB_TOKEN` can
+# never hold — `permissions:` has no `workflows` scope to grant. Upstream's release cuts routinely
+# touch `.github/workflows/**`, so `git push origin --tags` is rejected server-side: "Unable to
+# determine if workflow can be created or updated due to timeout; `workflows` scope may be
+# required". Those tags are release-line commits that are not ancestors of `upstream/main`, so no
+# later sync makes them already present and the rejection repeats on every run.
+#
+# So the checkout authenticates with `FORK_TAG_MIRROR_TOKEN`: a fine-grained PAT scoped to
+# `nplez1/orca` with Contents: read and write, plus Workflows: read and write. `actions/checkout`
+# persists it in the checkout's git config, which is the credential the `git push` below uses.
+#
+# Two consequences of the PAT: unlike a `GITHUB_TOKEN` push, it starts workflows, so the
+# `v*`-is-inert note above is now the only guard; and it expires, so rotate it before the job
+# starts failing at checkout. Until the secret exists at all, `token` is empty and checkout stops
+# at "Input required and not supplied: token" rather than falling back to the built-in token.
 on:
   schedule:
     # Off the hour, to stay off the release-train cron pile-up.
@@ -15,7 +32,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  # The PAT does both the checkout and the push; nothing uses the built-in token, so keep it
+  # read-only.
+  contents: read
 
 concurrency:
   group: mirror-upstream-release-tags
@@ -28,6 +47,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.FORK_TAG_MIRROR_TOKEN }}
 
       - name: Mirror upstream's desktop release tags
         run: |
