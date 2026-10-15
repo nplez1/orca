@@ -769,16 +769,25 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   drag-drop transitions (`task-page/jira/Board.tsx`), sprint assignment, board settings, and the
   priority tone.
 
-- **The Task view uses one linked-workspace rule, upstream's.** Both matchers still exist, so the split
-  is easy to reintroduce: `findJiraIssueWorkspaceAttachmentsInIndex` (upstream's, strict — rejects
-  another host, account, project or site) is what the list rows use, and the fork's
-  `findJiraIssueWorkspaceAttachmentInIndex` now **delegates to it** (`jira-issue-workspace-attachment.ts`),
-  with `source` threaded through the sheet, the backlog list and the board chip. The fork's permissive
-  URL-identity finder survives only where it is pinned by its own test — the *open/start action*
-  (`jira-issue-workspace-open.ts`). Before this, one issue could read "Start workspace" on its row and
-  "Show workspace X" in its sheet, because the fork scored site by URL identity and ignored host and
-  account. Upstream's predicate is the stricter superset, and its "most recent" ordering subsumes the
-  fork's "most specific site, then most recent" tie-break once site identity is verified.
+- **The Task view uses one shared linked-workspace resolver — strict first, permissive fallback.**
+  `findJiraIssueWorkspaceAttachmentForIssue(workspaces, issue, source)`
+  (`jira-issue-workspace-attachment.ts`) tries upstream's strict
+  `findJiraIssueWorkspaceAttachmentsInIndex` (host, account, project and site scoped, most-recent
+  ordering) and only then the fork's `findJiraIssueWorkspaceAttachment` URL-identity finder.
+  `findJiraIssueWorkspaceAttachmentInIndex` and `openJiraIssueWorkspaceOrStart` both call it, so the
+  label, the row chip, the board chip and the button's **action** cannot disagree — an earlier round
+  had the label strict and the action permissive, so a link from another host or one naming no site
+  read "Start workspace" while clicking it opened an existing workspace. **Why the fallback is kept:**
+  the fork's permissive matcher is deliberate leniency for links recorded before sites were stored,
+  pinned by `jira-issue-workspace-attachment.test.ts` ("still matches when one side names no site"),
+  which upstream's strict predicate would refuse. **Do not** collapse this to one matcher without
+  settling that case.
+- **The transition toast is a caller opt-out, not a field-name rule.** `mutateIssue` takes
+  `options?: { reportsInline?: boolean }` and toasts unless the caller sets it; only the sheet's
+  transition control does, because it renders the error itself. An earlier round keyed the skip on
+  `field === 'transition'` and made the right-sidebar pane's status row fail **silently** — it has no
+  inline error display, so it must keep the toast. **Rule:** whether a failure is reported inline is a
+  property of the *surface*, never of the field name.
 - **Upstream's orphaned Jira detail hooks are deleted, and their transitions state is folded in —
   and this deletion is invisible to `post-sync.mjs`.** `use-jira-issue-workspace-data.ts`,
   `use-jira-issue-remote-details.ts` and `use-jira-issue-comment-submission.ts` (plus the orphaned
