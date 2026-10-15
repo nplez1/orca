@@ -86,6 +86,7 @@ export function JiraIssueRow({
         role="button"
         tabIndex={0}
         aria-current={selected ? 'true' : undefined}
+        aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
         data-current={selected ? 'true' : undefined}
         onClick={() => onOpenIssue(issue)}
         onKeyDown={(event) => {
@@ -95,6 +96,23 @@ export function JiraIssueRow({
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             onOpenIssue(issue)
+            return
+          }
+          // Why: macOS has no Menu key / Shift+F10 convention and the row is a div, not a
+          // native context target, so the browser never emits `contextmenu`; synthesize one
+          // so Radix opens the copy menu from the keyboard (idempotent on Windows/Linux).
+          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+            event.preventDefault()
+            const rect = event.currentTarget.getBoundingClientRect()
+            event.currentTarget.dispatchEvent(
+              new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: rect.left,
+                clientY: rect.top + rect.height / 2
+              })
+            )
           }
         }}
         className={cn(
