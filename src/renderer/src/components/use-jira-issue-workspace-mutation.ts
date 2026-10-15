@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { jiraGetIssue, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue, JiraMutationResult } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { enqueueJiraIssueMutation } from './jira-issue-mutation-queue'
@@ -44,7 +44,7 @@ export function useJiraIssueWorkspaceMutation({
   field: string,
   updates: Parameters<typeof jiraUpdateIssue>[2],
   optimistic?: Partial<JiraIssue>
-) => Promise<void> {
+) => Promise<JiraMutationResult> {
   const patchJiraIssue = useAppStore((s) => s.patchJiraIssue)
   const { selectSprint, reloadSprintAssignment, restoreSprintAssignment, sprintAssignment } =
     sideData
@@ -54,9 +54,15 @@ export function useJiraIssueWorkspaceMutation({
       field: string,
       updates: Parameters<typeof jiraUpdateIssue>[2],
       optimistic?: Partial<JiraIssue>
-    ): Promise<void> => {
+    ): Promise<JiraMutationResult> => {
       if (!displayed || !requestKey || pendingField) {
-        return
+        return {
+          ok: false,
+          error: translate(
+            'auto.components.JiraIssueWorkspace.anotherUpdatePending',
+            'Another Jira update is still in progress.'
+          )
+        }
       }
       const previous = displayed
       const sprintChanged = updates.sprintId !== undefined
@@ -89,6 +95,7 @@ export function useJiraIssueWorkspaceMutation({
         if (sprintChanged) {
           await reloadSprintAssignment()
         }
+        return { ok: true }
       } catch (error) {
         if (sprintChanged) {
           // Why the local restore before the re-read: the fault that failed the move
@@ -97,15 +104,18 @@ export function useJiraIssueWorkspaceMutation({
           restoreSprintAssignment(previousSprintAssignment)
           await reloadSprintAssignment()
         }
-        toast.error(
+        const message =
           error instanceof Error
             ? error.message
             : translate(
                 'auto.components.JiraIssueWorkspace.ea21952aa3',
                 'Failed to update Jira issue.'
               )
-        )
-        throw error
+        // Why skip the toast: the transition control already shows the error inline.
+        if (field !== 'transition') {
+          toast.error(message)
+        }
+        return { ok: false, error: message }
       } finally {
         if (scopeGeneration === scopeGenerationRef.current) {
           setPendingField(null)

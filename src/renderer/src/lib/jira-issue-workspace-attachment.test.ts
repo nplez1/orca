@@ -55,8 +55,20 @@ function attached(
   })
 }
 
-function issue(key: string, site = 'https://acme.atlassian.net'): Pick<JiraIssue, 'key' | 'url'> {
-  return { key, url: `${site}/browse/${key}` }
+function issue(key: string, site = 'https://acme.atlassian.net'): JiraIssue {
+  return {
+    id: key,
+    key,
+    siteId: 'site-acme',
+    title: key,
+    url: `${site}/browse/${key}`,
+    project: { id: 'project-acme', key: 'ACME', name: 'Acme' },
+    issueType: { id: 'task', name: 'Task' },
+    status: { id: '1', name: 'Open', categoryKey: 'new', categoryName: 'To Do' },
+    labels: [],
+    createdAt: '',
+    updatedAt: ''
+  }
 }
 
 /** A link written the way the composer writes it: issue key and site identity both stored. */
@@ -203,7 +215,7 @@ describe('Jira issue workspace attachment', () => {
     expect(findJiraIssueWorkspaceAttachmentInIndex(index, issue('ALP-1'))).toBe(first)
     expect(findJiraIssueWorkspaceAttachmentInIndex(index, issue('BRV-2'))).toBe(second)
     expect(findJiraIssueWorkspaceAttachmentInIndex(index, issue('ALP-9'))).toBeNull()
-    expect(findJiraIssueWorkspaceAttachmentInIndex(index, { key: '' })).toBeNull()
+    expect(findJiraIssueWorkspaceAttachmentInIndex(index, issue(''))).toBeNull()
   })
 
   it('applies the same site rule through the index', () => {

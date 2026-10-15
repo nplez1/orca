@@ -8,6 +8,7 @@ import type { JiraListColumn } from './jira-list-columns'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
 import { groupJiraIssuesByStatus, type TaskPageJiraIssueSection } from './task-page-jira-grouping'
 import type { TaskPageJiraSprintOptions } from './task-page-jira-sprint-cell'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
@@ -35,6 +36,9 @@ type TaskPageJiraIssueListProps = {
    *  cell instead of the column-driven main list. */
   issueWorkspaceAttachmentIndex?: JiraIssueWorkspaceAttachmentIndex
   onOpenOrStartWorkspace?: (issue: JiraIssue) => void
+  /** The Jira source the attached-workspace lookup is scoped to, so the chip and
+   *  the list projection agree on host, account, project and site identity. */
+  sourceContext?: TaskSourceContext | null
   sprintOptions?: TaskPageJiraSprintOptions
   groupByStatus?: boolean
 }
@@ -57,6 +61,7 @@ export function TaskPageJiraIssueList({
   onOpenIssue,
   onStartWorkspace,
   onOpenOrStartWorkspace,
+  sourceContext,
   selectedIssue,
   showSiteContext,
   sprintOptions,
@@ -80,7 +85,7 @@ export function TaskPageJiraIssueList({
     onStartWorkspace,
     onOpenOrStartWorkspace,
     attachedWorkspace: issueWorkspaceAttachmentIndex
-      ? findJiraIssueWorkspaceAttachmentInIndex(issueWorkspaceAttachmentIndex, issue)
+      ? findJiraIssueWorkspaceAttachmentInIndex(issueWorkspaceAttachmentIndex, issue, sourceContext)
       : null,
     sprintOptions,
     selected: isSelectedIssue(issue, selectedIssue),

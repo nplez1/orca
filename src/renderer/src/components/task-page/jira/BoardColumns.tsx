@@ -1,5 +1,6 @@
 import type { DragEvent, JSX } from 'react'
 import type { JiraIssue } from '../../../../../shared/jira-types'
+import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
@@ -18,6 +19,8 @@ type TaskPageJiraBoardColumnsProps = {
   otherIssues: JiraIssue[]
   selectedIssue: JiraIssue | null
   issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
+  /** Jira source the attached-workspace chip is scoped to; see TaskPageJiraIssueList. */
+  sourceContext: TaskSourceContext | null
   draggingIssueKey: string | null
   updatingIssueKeys: readonly string[]
   onOpenIssue: (issue: JiraIssue) => void
@@ -135,6 +138,7 @@ export function TaskPageJiraBoardColumns({
   otherIssues,
   selectedIssue,
   issueWorkspaceAttachmentIndex,
+  sourceContext,
   draggingIssueKey,
   updatingIssueKeys,
   onOpenIssue,
@@ -179,7 +183,8 @@ export function TaskPageJiraBoardColumns({
         {issues.map((issue) => {
           const attached = findJiraIssueWorkspaceAttachmentInIndex(
             issueWorkspaceAttachmentIndex,
-            issue
+            issue,
+            sourceContext
           )
           return (
             <JiraBoardCard

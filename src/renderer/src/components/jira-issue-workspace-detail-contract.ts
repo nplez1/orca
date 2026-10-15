@@ -4,6 +4,7 @@ import type {
   JiraFieldErrors,
   JiraIssue,
   JiraIssueUpdate,
+  JiraMutationResult,
   JiraPriority,
   JiraSprintAssignment,
   JiraTransition,
@@ -17,6 +18,8 @@ export type JiraIssueWorkspaceDetailState = {
   commentsLoading: boolean
   commentsError: string | null
   transitions: JiraTransition[]
+  transitionsLoading: boolean
+  transitionsError: string | null
   priorities: JiraPriority[]
   users: JiraUser[]
   /** Custom fields Jira allows editing on this issue, with their current values. */
@@ -40,11 +43,13 @@ export type JiraIssueWorkspaceDetailState = {
   refresh: () => Promise<void>
   /** Re-runs the initial issue fetch; used before anything is displayed. */
   reload: () => void
+  /** Re-lists the issue's available transitions; the transition control's Retry. */
+  reloadTransitions: () => Promise<void>
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
     optimistic?: Partial<JiraIssue>
-  ) => Promise<void>
+  ) => Promise<JiraMutationResult>
   /** Applies a custom-field edit and reports Jira's own rejection reasons back
    *  to the calling form instead of swallowing them into a toast. */
   submitIssueFields: (

@@ -214,9 +214,9 @@ export function useJiraIssueWorkspaceDetail({
       setTitleDraft(displayed.title)
       return
     }
-    // Why the catch: a failed save is already surfaced by the toast; the draft
-    // mutation promise must not reject unhandled.
-    void mutateIssue('title', { title }, { title }).catch(() => {})
+    // Why: a failed save is already surfaced by the toast; `mutateIssue` resolves
+    // a result rather than rejecting, so no unhandled rejection can escape here.
+    void mutateIssue('title', { title }, { title })
   }, [displayed, mutateIssue, titleDraft])
 
   const handleSaveLabels = useCallback(() => {
@@ -227,7 +227,7 @@ export function useJiraIssueWorkspaceDetail({
       .split(',')
       .map((label) => label.trim())
       .filter(Boolean)
-    void mutateIssue('labels', { labels }, { labels }).catch(() => {})
+    void mutateIssue('labels', { labels }, { labels })
   }, [displayed, labelsDraft, mutateIssue])
 
   const reload = useCallback((): void => {
@@ -241,6 +241,8 @@ export function useJiraIssueWorkspaceDetail({
     commentsLoading: commentsState.commentsLoading,
     commentsError: commentsState.commentsError,
     transitions: sideData.transitions,
+    transitionsLoading: sideData.transitionsLoading,
+    transitionsError: sideData.transitionsError,
     priorities: sideData.priorities,
     users: sideData.users,
     editFields: sideData.editFields,
@@ -262,6 +264,7 @@ export function useJiraIssueWorkspaceDetail({
     refreshing,
     refresh,
     reload,
+    reloadTransitions,
     mutateIssue,
     submitIssueFields
   }

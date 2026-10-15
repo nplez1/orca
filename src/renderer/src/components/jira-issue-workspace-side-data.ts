@@ -17,6 +17,8 @@ import type {
 
 export type JiraIssueSideDataState = {
   transitions: JiraTransition[]
+  transitionsLoading: boolean
+  transitionsError: string | null
   priorities: JiraPriority[]
   users: JiraUser[]
   /** Custom fields Jira allows this user to edit on the issue, with values. */
@@ -64,6 +66,8 @@ export function useJiraIssueSideData({
   sprintBoardId?: string | null
 }): JiraIssueSideDataState {
   const [transitions, setTransitions] = useState<JiraTransition[]>([])
+  const [transitionsLoading, setTransitionsLoading] = useState(false)
+  const [transitionsError, setTransitionsError] = useState<string | null>(null)
   const [priorities, setPriorities] = useState<JiraPriority[]>([])
   const [users, setUsers] = useState<JiraUser[]>([])
   const [editFields, setEditFields] = useState<JiraEditableField[]>([])
@@ -88,6 +92,8 @@ export function useJiraIssueSideData({
   useEffect(() => {
     if (!issueKey) {
       setTransitions([])
+      setTransitionsLoading(false)
+      setTransitionsError(null)
       setPriorities([])
       setUsers([])
       setEditFields([])
@@ -99,12 +105,24 @@ export function useJiraIssueSideData({
     const transitionsReadId = transitionsReadIdRef.current
     // Clear the previous issue's data so it cannot linger while the new read runs.
     setTransitions([])
+    setTransitionsLoading(true)
+    setTransitionsError(null)
     setPriorities([])
     setUsers([])
     setEditFields([])
     setEditFieldsLoading(true)
     void Promise.all([
-      jiraListTransitions(providerSettings, issueKey, issueSiteId),
+      jiraListTransitions(providerSettings, issueKey, issueSiteId).catch((error) => {
+        if (
+          requestId === requestIdRef.current &&
+          transitionsReadId === transitionsReadIdRef.current
+        ) {
+          setTransitionsError(
+            error instanceof Error ? error.message : 'Failed to load status changes.'
+          )
+        }
+        return [] as JiraTransition[]
+      }),
       jiraListPriorities(providerSettings, issueSiteId),
       jiraListAssignableUsers(providerSettings, issueKey, undefined, issueSiteId),
       jiraListEditFields(providerSettings, issueKey, issueSiteId).catch(() => []),
@@ -126,6 +144,7 @@ export function useJiraIssueSideData({
           }
           if (transitionsReadId === transitionsReadIdRef.current) {
             setTransitions(nextTransitions)
+            setTransitionsLoading(false)
           }
           setPriorities(nextPriorities)
           setUsers(nextUsers)
@@ -137,6 +156,9 @@ export function useJiraIssueSideData({
       .finally(() => {
         if (requestId === requestIdRef.current) {
           setEditFieldsLoading(false)
+          if (transitionsReadId === transitionsReadIdRef.current) {
+            setTransitionsLoading(false)
+          }
         }
       })
   }, [issueKey, issueSiteId, providerSettings, sprintBoardId])
@@ -146,11 +168,23 @@ export function useJiraIssueSideData({
       return
     }
     const readId = ++transitionsReadIdRef.current
-    const next = await jiraListTransitions(providerSettings, issueKey, issueSiteId).catch(
-      () => null
-    )
-    if (next && readId === transitionsReadIdRef.current) {
-      setTransitions(next)
+    setTransitionsLoading(true)
+    setTransitionsError(null)
+    try {
+      const next = await jiraListTransitions(providerSettings, issueKey, issueSiteId)
+      if (readId === transitionsReadIdRef.current) {
+        setTransitions(next)
+      }
+    } catch (error) {
+      if (readId === transitionsReadIdRef.current) {
+        setTransitionsError(
+          error instanceof Error ? error.message : 'Failed to load status changes.'
+        )
+      }
+    } finally {
+      if (readId === transitionsReadIdRef.current) {
+        setTransitionsLoading(false)
+      }
     }
   }, [issueKey, issueSiteId, providerSettings])
 
@@ -221,6 +255,8 @@ export function useJiraIssueSideData({
 
   return {
     transitions,
+    transitionsLoading,
+    transitionsError,
     priorities,
     users,
     editFields,

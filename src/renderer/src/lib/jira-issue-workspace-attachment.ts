@@ -223,12 +223,11 @@ export function findJiraIssueWorkspaceAttachment(
  *  pass per workspace list turns each row lookup into a map hit. */
 export function findJiraIssueWorkspaceAttachmentInIndex(
   index: JiraIssueWorkspaceAttachmentIndex,
-  issue: JiraIssueAttachmentRef
+  issue: JiraIssue,
+  source?: TaskSourceContext | null
 ): Worktree | null {
-  const key = normalizeJiraIssueKey(issue.key)
-  if (!key) {
-    return null
-  }
-  const candidates = index.get(key)
-  return candidates ? findBestAttachment(candidates, issue) : null
+  // Why delegate: the single-result label lookup must use the same strict identity
+  // rule as the list projection, so a row, the sheet, and the board chip never
+  // disagree about which workspace is linked to this issue.
+  return findJiraIssueWorkspaceAttachmentsInIndex(index, issue, source)[0] ?? null
 }

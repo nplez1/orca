@@ -168,6 +168,7 @@ export function TaskPageJiraBoard({
               issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
               onOpenIssue={model.openJiraDetailPage}
               onOpenOrStartWorkspace={model.handleOpenOrUseJiraItem}
+              sourceContext={model.jiraTaskSourceContext}
               sprintOptions={
                 backlogSprints.length > 0
                   ? {
@@ -222,6 +223,7 @@ export function TaskPageJiraBoard({
                   otherIssues={filteredColumns.otherIssues}
                   selectedIssue={model.selectedJiraIssue}
                   issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
+                  sourceContext={model.jiraTaskSourceContext}
                   draggingIssueKey={drop.draggingIssueKey}
                   updatingIssueKeys={drop.movingIssueKeys}
                   dragOverColumnKey={drop.dragOverColumnKey}

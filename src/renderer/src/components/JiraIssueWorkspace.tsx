@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import * as VisuallyHidden from 'radix-ui/visually-hidden'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { useAppStore } from '@/store'
-import type { JiraIssue, JiraIssueUpdate, JiraMutationResult } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira-types'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
@@ -25,14 +25,13 @@ import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state
 
 const EMPTY_ATTACHMENT_INDEX: JiraIssueWorkspaceAttachmentIndex = new Map()
 
+type JiraIssueWorkspaceOpenHandler = (issue: JiraIssue) => void
+
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   /** Workspaces already attached to Jira issues, so the primary action can show the
    *  one belonging to this issue instead of offering to start a duplicate. */
   issueWorkspaceAttachmentIndex?: JiraIssueWorkspaceAttachmentIndex
-  onOpenOrStartWorkspace?: (issue: JiraIssue) => void
-  // Why both names: the fork's callers pass `onOpenOrStartWorkspace`, upstream's tests use `onUse`.
-  onUse?: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
   /** Board the issue's sprint is changed on. Sprint membership is board state, so
@@ -40,6 +39,27 @@ type JiraIssueWorkspaceProps = {
    *  where the surface has no board. */
   sprintBoard?: { boardId: string; siteId: string } | null
   refreshSignal?: number
+} &
+  // Why the union: the fork's callers pass `onOpenOrStartWorkspace`, upstream's tests
+  // and fixtures pass `onUse`; requiring exactly one keeps the primary button from
+  // ever rendering with a silently inert handler.
+  (
+    | { onOpenOrStartWorkspace: JiraIssueWorkspaceOpenHandler; onUse?: never }
+    | { onOpenOrStartWorkspace?: never; onUse: JiraIssueWorkspaceOpenHandler }
+  )
+
+// Why a helper: the prop union above guarantees one handler, but destructuring a
+// union cannot narrow the two optionals, so the coalescing lives here with a
+// non-silent failure for anything that slips past the type.
+function resolveOpenOrStartWorkspace(
+  onOpenOrStartWorkspace: JiraIssueWorkspaceOpenHandler | undefined,
+  onUse: JiraIssueWorkspaceOpenHandler | undefined
+): JiraIssueWorkspaceOpenHandler {
+  const handler = onOpenOrStartWorkspace ?? onUse
+  if (!handler) {
+    throw new Error('JiraIssueWorkspace requires onOpenOrStartWorkspace or onUse')
+  }
+  return handler
 }
 
 export default function JiraIssueWorkspace({
@@ -52,7 +72,7 @@ export default function JiraIssueWorkspace({
   sprintBoard = null,
   refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
-  const openOrStartWorkspace = onOpenOrStartWorkspace ?? onUse ?? (() => {})
+  const openOrStartWorkspace = resolveOpenOrStartWorkspace(onOpenOrStartWorkspace, onUse)
   const settings = useAppStore((s) => s.settings)
   const jiraStatus = useAppStore((s) => s.jiraStatus)
   const providerSettings = useMemo(
@@ -76,7 +96,11 @@ export default function JiraIssueWorkspace({
   // `displayed`, and the detail hook keeps the previous issue for a render after the
   // selection changes — so anything else could label one issue and open another's.
   const attachedWorkspace = displayed
-    ? findJiraIssueWorkspaceAttachmentInIndex(issueWorkspaceAttachmentIndex, displayed)
+    ? findJiraIssueWorkspaceAttachmentInIndex(
+        issueWorkspaceAttachmentIndex,
+        displayed,
+        sourceContext
+      )
     : null
   const attachedWorkspaceLabel = attachedWorkspace
     ? getWorktreeAttachmentLabel(attachedWorkspace)
@@ -94,33 +118,6 @@ export default function JiraIssueWorkspace({
     siteId,
     displayed?.key
   ])
-
-  // Why wrapped: the transition control expects a JiraMutationResult; the detail
-  // hook's mutation queue re-reads comments and transitions after the write settles.
-  const mutateIssue = useCallback(
-    async (
-      field: string,
-      updates: JiraIssueUpdate,
-      optimistic?: Partial<JiraIssue>
-    ): Promise<JiraMutationResult> => {
-      try {
-        await detail.mutateIssue(field, updates, optimistic)
-        return { ok: true }
-      } catch (error) {
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.components.JiraIssueWorkspace.ea21952aa3',
-                  'Failed to update Jira issue.'
-                )
-        }
-      }
-    },
-    [detail]
-  )
   // Why the issue's own site: the viewer identity is per site, and the picker pins
   // "me" for the issue being edited, not for the host's currently selected site.
   const selfUser = useMemo(
@@ -166,9 +163,9 @@ export default function JiraIssueWorkspace({
               displayed={displayed}
               pendingField={detail.pendingField}
               transitions={detail.transitions}
-              transitionsLoading={false}
-              transitionsError={null}
-              reloadTransitions={() => void detail.refresh()}
+              transitionsLoading={detail.transitionsLoading}
+              transitionsError={detail.transitionsError}
+              reloadTransitions={() => void detail.reloadTransitions()}
               priorities={detail.priorities}
               users={detail.users}
               editFields={detail.editFields}
@@ -179,7 +176,7 @@ export default function JiraIssueWorkspace({
               owner={owner}
               runtimeContextKey={runtimeContextKey}
               sprintAssignment={detail.sprintAssignment}
-              mutateIssue={mutateIssue}
+              mutateIssue={detail.mutateIssue}
               submitIssueFields={detail.submitIssueFields}
             />
 

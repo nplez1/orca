@@ -769,6 +769,28 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   drag-drop transitions (`task-page/jira/Board.tsx`), sprint assignment, board settings, and the
   priority tone.
 
+- **The Task view uses one linked-workspace rule, upstream's.** Both matchers still exist, so the split
+  is easy to reintroduce: `findJiraIssueWorkspaceAttachmentsInIndex` (upstream's, strict — rejects
+  another host, account, project or site) is what the list rows use, and the fork's
+  `findJiraIssueWorkspaceAttachmentInIndex` now **delegates to it** (`jira-issue-workspace-attachment.ts`),
+  with `source` threaded through the sheet, the backlog list and the board chip. The fork's permissive
+  URL-identity finder survives only where it is pinned by its own test — the *open/start action*
+  (`jira-issue-workspace-open.ts`). Before this, one issue could read "Start workspace" on its row and
+  "Show workspace X" in its sheet, because the fork scored site by URL identity and ignored host and
+  account. Upstream's predicate is the stricter superset, and its "most recent" ordering subsumes the
+  fork's "most specific site, then most recent" tie-break once site identity is verified.
+- **Upstream's orphaned Jira detail hooks are deleted, and their transitions state is folded in —
+  and this deletion is invisible to `post-sync.mjs`.** `use-jira-issue-workspace-data.ts`,
+  `use-jira-issue-remote-details.ts` and `use-jira-issue-comment-submission.ts` (plus the orphaned
+  `useJiraIssueWorkspaceActions` export) had no importers after the merge; the comments behaviour was
+  already covered by the fork's `jira-issue-workspace-comments.ts`, and the one behaviour that lived
+  **only** in the dead data hook — real `transitionsLoading` / `transitionsError` for the transition
+  control's spinner, error and Retry — is re-implemented in `jira-issue-workspace-side-data.ts`.
+  The reason this is recorded rather than just done: `post-sync-checks.mjs`'s orphan scan
+  (`deletedForkModules`) only looks at *fork* files, so it cannot see an orphaned **upstream** module,
+  and the next sync would re-import these three while silently dropping the transitions state again.
+  **Follow-up:** extend that scan to upstream files, which is the general form of this gap.
+
 **Named follow-up:** `task-page/jira/Content.tsx` now has **two** board surfaces — the configured
 agile board (`jiraBoardViewMode` + `board.viewMode`-style preference, drag-drop transitions) and
 upstream's ad-hoc status board over the current result set (`jiraViewMode`, current-sprint filter,
