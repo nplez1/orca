@@ -102,7 +102,10 @@ export function useJiraIssueSideData({
       return
     }
     const requestId = ++requestIdRef.current
-    const transitionsReadId = transitionsReadIdRef.current
+    // Why increment: a reload or post-transition re-read for the previous issue must
+    // not land its transitions, loading flag or error on the issue now selected, so
+    // each effect run claims its own read id rather than sharing the last one.
+    const transitionsReadId = ++transitionsReadIdRef.current
     // Clear the previous issue's data so it cannot linger while the new read runs.
     setTransitions([])
     setTransitionsLoading(true)
@@ -123,8 +126,10 @@ export function useJiraIssueSideData({
         }
         return [] as JiraTransition[]
       }),
-      jiraListPriorities(providerSettings, issueSiteId),
-      jiraListAssignableUsers(providerSettings, issueKey, undefined, issueSiteId),
+      // Why the local catches: a priorities or assignable-users failure must not
+      // reject the whole Promise.all and silently blank the transitions list.
+      jiraListPriorities(providerSettings, issueSiteId).catch(() => []),
+      jiraListAssignableUsers(providerSettings, issueKey, undefined, issueSiteId).catch(() => []),
       jiraListEditFields(providerSettings, issueKey, issueSiteId).catch(() => []),
       // Why the local catch: sprint assignment is optional next to the fields above,
       // so a read that fails must not blank them all.

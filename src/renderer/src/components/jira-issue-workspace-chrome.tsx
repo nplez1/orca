@@ -134,7 +134,8 @@ export function JiraIssueMetadataBar({
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
-    optimistic?: Partial<JiraIssue>
+    optimistic?: Partial<JiraIssue>,
+    options?: { reportsInline?: boolean }
   ) => Promise<JiraMutationResult>
   submitIssueFields: (updates: JiraIssueUpdate) => Promise<JiraIssueFieldOutcome>
 }): React.JSX.Element {
@@ -151,7 +152,7 @@ export function JiraIssueMetadataBar({
           pending={pendingField !== null}
           onRetry={reloadTransitions}
           onTransition={(updates, transition) =>
-            mutateIssue('transition', updates, { status: transition.to })
+            mutateIssue('transition', updates, { status: transition.to }, { reportsInline: true })
           }
         />
 

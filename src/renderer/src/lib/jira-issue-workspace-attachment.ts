@@ -219,6 +219,28 @@ export function findJiraIssueWorkspaceAttachment(
   return findBestAttachment(worktrees.filter(isCandidate), issue)
 }
 
+/** One resolution rule for "which workspace is this issue linked to": the strict
+ *  identity match first (host, account, project and site scoped), then the fork's
+ *  permissive URL-identity finder as a fallback so a legacy link that records no
+ *  site still resolves. The sheet's label, list rows, board chip, and the
+ *  open/start action all route through here, so they cannot disagree about which
+ *  workspace a link names. */
+export function findJiraIssueWorkspaceAttachmentForIssue(
+  workspaces: readonly Worktree[],
+  issue: JiraIssue,
+  source?: TaskSourceContext | null
+): Worktree | null {
+  const live = workspaces.filter(isCandidate)
+  const strict = live
+    .filter((workspace) =>
+      getWorkspaceAttachments(workspace).some((item) =>
+        jiraAttachmentMatchesIssue(item, issue, source)
+      )
+    )
+    .toSorted((a, b) => b.lastActivityAt - a.lastActivityAt)
+  return strict[0] ?? findJiraIssueWorkspaceAttachment(live, issue)
+}
+
 /** Why: board and list rows would otherwise rescan every workspace per row; one
  *  pass per workspace list turns each row lookup into a map hit. */
 export function findJiraIssueWorkspaceAttachmentInIndex(
@@ -226,8 +248,9 @@ export function findJiraIssueWorkspaceAttachmentInIndex(
   issue: JiraIssue,
   source?: TaskSourceContext | null
 ): Worktree | null {
-  // Why delegate: the single-result label lookup must use the same strict identity
-  // rule as the list projection, so a row, the sheet, and the board chip never
-  // disagree about which workspace is linked to this issue.
-  return findJiraIssueWorkspaceAttachmentsInIndex(index, issue, source)[0] ?? null
+  return findJiraIssueWorkspaceAttachmentForIssue(
+    index.get(issue.key.toUpperCase()) ?? [],
+    issue,
+    source
+  )
 }

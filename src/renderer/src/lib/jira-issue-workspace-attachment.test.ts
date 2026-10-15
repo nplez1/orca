@@ -9,6 +9,7 @@ import {
   buildJiraIssueWorkspaceAttachmentIndex,
   collectLinkedJiraIssueRefs,
   findJiraIssueWorkspaceAttachment,
+  findJiraIssueWorkspaceAttachmentForIssue,
   findJiraIssueWorkspaceAttachmentInIndex,
   findJiraIssueWorkspaceAttachmentsInIndex,
   normalizeJiraIssueKey
@@ -283,6 +284,24 @@ describe('Jira issue workspace attachment', () => {
 
     expect(index.size).toBe(0)
     expect(findJiraIssueWorkspaceAttachmentInIndex(index, issue('ALP-1'))).toBeNull()
+  })
+
+  it('resolves strict-first, then falls back to the permissive URL-identity finder', () => {
+    // A link that records no site has no strict identity, so only the fork's
+    // permissive finder can resolve it — and the shared rule must still reach it.
+    const silent = worktree({
+      linkedItems: [
+        { provider: 'jira', type: 'issue', number: 0, title: 'ALP-1', jiraIdentifier: 'ALP-1' }
+      ]
+    })
+    expect(findJiraIssueWorkspaceAttachmentForIssue([silent], issue('ALP-1'))).toBe(silent)
+
+    // A same-site link wins over a no-site link when both are present, because the
+    // strict match is tried first.
+    const sameSite = attached('ALP-1', { id: 'same-site' })
+    expect(findJiraIssueWorkspaceAttachmentForIssue([silent, sameSite], issue('ALP-1'))).toBe(
+      sameSite
+    )
   })
 })
 

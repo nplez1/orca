@@ -43,7 +43,8 @@ export function useJiraIssueWorkspaceMutation({
 }): (
   field: string,
   updates: Parameters<typeof jiraUpdateIssue>[2],
-  optimistic?: Partial<JiraIssue>
+  optimistic?: Partial<JiraIssue>,
+  options?: { reportsInline?: boolean }
 ) => Promise<JiraMutationResult> {
   const patchJiraIssue = useAppStore((s) => s.patchJiraIssue)
   const { selectSprint, reloadSprintAssignment, restoreSprintAssignment, sprintAssignment } =
@@ -53,7 +54,8 @@ export function useJiraIssueWorkspaceMutation({
     async (
       field: string,
       updates: Parameters<typeof jiraUpdateIssue>[2],
-      optimistic?: Partial<JiraIssue>
+      optimistic?: Partial<JiraIssue>,
+      options?: { reportsInline?: boolean }
     ): Promise<JiraMutationResult> => {
       if (!displayed || !requestKey || pendingField) {
         return {
@@ -111,8 +113,10 @@ export function useJiraIssueWorkspaceMutation({
                 'auto.components.JiraIssueWorkspace.ea21952aa3',
                 'Failed to update Jira issue.'
               )
-        // Why skip the toast: the transition control already shows the error inline.
-        if (field !== 'transition') {
+        // Why a flag rather than the field name: more than one surface mutates a
+        // transition — the sheet's control reports the error inline, but the pane's
+        // status row does not — so only the caller with an inline display opts out.
+        if (!options?.reportsInline) {
           toast.error(message)
         }
         return { ok: false, error: message }

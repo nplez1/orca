@@ -242,11 +242,15 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
   )
   const handleOpenOrUseJiraItem = useCallback(
     (issue: JiraIssue): void => {
-      if (openJiraIssueWorkspaceOrStart(issue, () => handleUseJiraItem(issue)) === 'opened') {
+      if (
+        openJiraIssueWorkspaceOrStart(issue, jiraTaskSourceContext, () =>
+          handleUseJiraItem(issue)
+        ) === 'opened'
+      ) {
         useAppStore.getState().recordFeatureInteraction('jira-tasks')
       }
     },
-    [handleUseJiraItem]
+    [handleUseJiraItem, jiraTaskSourceContext]
   )
   // Why: one pass over workspaces per list render; per-row scans re-read every attachment list.
   const jiraIssueAttachmentIndex = useMemo(

@@ -48,7 +48,8 @@ export type JiraIssueWorkspaceDetailState = {
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
-    optimistic?: Partial<JiraIssue>
+    optimistic?: Partial<JiraIssue>,
+    options?: { reportsInline?: boolean }
   ) => Promise<JiraMutationResult>
   /** Applies a custom-field edit and reports Jira's own rejection reasons back
    *  to the calling form instead of swallowing them into a toast. */

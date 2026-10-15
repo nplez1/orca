@@ -23,7 +23,8 @@ const mocks = vi.hoisted(() => ({
   jiraListPriorities: vi.fn(),
   jiraListTransitions: vi.fn(),
   jiraUpdateIssue: vi.fn(),
-  patchJiraIssue: vi.fn()
+  patchJiraIssue: vi.fn(),
+  toastError: vi.fn()
 }))
 
 vi.mock('@/store', () => ({
@@ -46,7 +47,9 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback?: string) => fallback ?? _key
 }))
 
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }))
+vi.mock('sonner', () => ({
+  toast: { error: mocks.toastError, success: vi.fn(), message: vi.fn() }
+}))
 
 function issue(key = 'ABC-1'): JiraIssue {
   return {
@@ -106,6 +109,33 @@ const sprintAssignment: JiraSprintAssignment = {
     { id: '87', name: 'September sprint', state: 'active' },
     { id: '88', name: 'October sprint', state: 'future' }
   ]
+}
+
+/** Drives a transition mutation with or without the inline-report flag, so the
+ *  toast decision is observable without the chrome in between. */
+function TransitionProbe({ reportsInline }: { reportsInline: boolean }): React.JSX.Element {
+  const detail = useJiraIssueWorkspaceDetail({
+    issue: issueFor('ABC-1'),
+    providerSettings: DEFAULT_SCOPE_SOURCE
+  })
+  return (
+    <div>
+      <div data-testid="key">{detail.displayed?.key ?? 'loading'}</div>
+      <button
+        type="button"
+        onClick={() =>
+          void detail.mutateIssue(
+            'transition',
+            { transitionId: '31' },
+            { status: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' } },
+            { reportsInline }
+          )
+        }
+      >
+        transition
+      </button>
+    </div>
+  )
 }
 
 /** Renders the sprint assignment and drives one move, so the hook's read, its
@@ -257,5 +287,32 @@ describe('useJiraIssueWorkspaceDetail sprint assignment', () => {
 
     await waitFor(() => expect(mocks.jiraGetIssue).toHaveBeenCalled())
     expect(mocks.jiraGetIssueSprintAssignment).not.toHaveBeenCalled()
+  })
+})
+
+describe('useJiraIssueWorkspaceDetail transition failure toast', () => {
+  it.each([
+    { reportsInline: false, expectToast: true },
+    { reportsInline: true, expectToast: false }
+  ] as const)('reportsInline=%s toasts=%s', async ({ reportsInline, expectToast }) => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([] satisfies JiraComment[])
+    mocks.jiraListAssignableUsers.mockResolvedValue([] satisfies JiraUser[])
+    mocks.jiraListPriorities.mockResolvedValue([] satisfies JiraPriority[])
+    mocks.jiraListTransitions.mockResolvedValue([] satisfies JiraTransition[])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: false, error: 'Transition rejected' })
+    const user = userEvent.setup()
+
+    render(<TransitionProbe reportsInline={reportsInline} />)
+    await waitFor(() => expect(screen.getByTestId('key').textContent).toBe('ABC-1'))
+    await user.click(screen.getByRole('button', { name: 'transition' }))
+    // The failed mutation publishes its optimistic patch, then its rollback.
+    await waitFor(() => expect(mocks.patchJiraIssue).toHaveBeenCalledTimes(2))
+
+    if (expectToast) {
+      expect(mocks.toastError).toHaveBeenCalledWith('Transition rejected')
+    } else {
+      expect(mocks.toastError).not.toHaveBeenCalled()
+    }
   })
 })

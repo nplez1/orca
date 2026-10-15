@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import type { JiraIssue } from '../../../shared/jira-types'
 
 const mocks = vi.hoisted(() => {
   const folderWorkspaces: FolderWorkspace[] = []
@@ -86,7 +87,19 @@ function folderWorkspace(): FolderWorkspace {
   }
 }
 
-const ALP_1 = { key: 'ALP-1', url: 'https://acme.atlassian.net/browse/ALP-1' }
+const ALP_1: JiraIssue = {
+  id: 'ALP-1',
+  key: 'ALP-1',
+  siteId: 'site-acme',
+  title: 'ALP-1',
+  url: 'https://acme.atlassian.net/browse/ALP-1',
+  project: { id: 'project-acme', key: 'ACME', name: 'Acme' },
+  issueType: { id: 'task', name: 'Task' },
+  status: { id: '1', name: 'Open', categoryKey: 'new', categoryName: 'To Do' },
+  labels: [],
+  createdAt: '',
+  updatedAt: ''
+}
 
 describe('openJiraIssueWorkspaceOrStart', () => {
   beforeEach(() => {
@@ -99,7 +112,7 @@ describe('openJiraIssueWorkspaceOrStart', () => {
   it('qualifies remote worktree activation with its execution host', () => {
     mocks.worktrees = [worktree({ hostId: 'ssh:builder' })]
 
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, vi.fn())).toBe('opened')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, vi.fn())).toBe('opened')
     expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith('worktree-1', {
       navigationIntent: 'user-open',
       executionHostId: 'ssh:builder'
@@ -110,7 +123,7 @@ describe('openJiraIssueWorkspaceOrStart', () => {
     mocks.folderWorkspaces = [folderWorkspace()]
     const startWorkspace = vi.fn()
 
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, startWorkspace)).toBe('opened')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('opened')
     expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenCalledWith('folder-1', {
       navigationIntent: 'user-open',
       executionHostId: 'local'
@@ -121,18 +134,18 @@ describe('openJiraIssueWorkspaceOrStart', () => {
   it('starts a workspace when the issue has none attached', () => {
     const startWorkspace = vi.fn()
 
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, startWorkspace)).toBe('started')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('started')
     expect(startWorkspace).toHaveBeenCalledTimes(1)
     expect(mocks.activateAndRevealWorktree).not.toHaveBeenCalled()
   })
 
   it('re-reads the live workspace list rather than a value captured earlier', () => {
     const startWorkspace = vi.fn()
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, startWorkspace)).toBe('started')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('started')
 
     // The workspace appears after the row that offered "Start workspace" rendered.
     mocks.worktrees = [worktree()]
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, startWorkspace)).toBe('opened')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('opened')
     expect(startWorkspace).toHaveBeenCalledTimes(1)
   })
 
@@ -141,7 +154,7 @@ describe('openJiraIssueWorkspaceOrStart', () => {
     mocks.activateAndRevealWorktree.mockReturnValue(false)
     const startWorkspace = vi.fn()
 
-    expect(openJiraIssueWorkspaceOrStart(ALP_1, startWorkspace)).toBe('failed')
+    expect(openJiraIssueWorkspaceOrStart(ALP_1, undefined, startWorkspace)).toBe('failed')
     expect(startWorkspace).not.toHaveBeenCalled()
   })
 })

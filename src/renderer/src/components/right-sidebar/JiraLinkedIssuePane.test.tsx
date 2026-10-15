@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   jiraSearchUsers: vi.fn(),
   jiraAddIssueComment: vi.fn(),
   patchJiraIssue: vi.fn(),
+  toastError: vi.fn(),
   viewerAccountId: 'u-bob'
 }))
 
@@ -49,6 +50,7 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('@/i18n/relative-time-format', () => ({
   formatUiRelativeTimeFromDate: () => 'now'
 }))
+vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
 
 const linkedIssue = {
   provider: 'jira' as const,
@@ -147,5 +149,36 @@ describe('JiraLinkedIssuePane', () => {
       )
     )
     expect(await screen.findByText('Looks good to me')).toBeTruthy()
+  })
+
+  it('toasts when a status change fails from the pane', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' }
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: false, error: 'Transition rejected' })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+      </TooltipProvider>
+    )
+
+    const statusRow = (await screen.findByRole('button', {
+      name: /In Progress/
+    })) as HTMLButtonElement
+    // Wait for the transitions to load, which is what un-disables the row.
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Transition rejected'))
   })
 })

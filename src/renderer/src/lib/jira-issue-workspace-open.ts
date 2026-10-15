@@ -8,10 +8,9 @@ import {
 } from '@/lib/worktree-activation'
 import { folderWorkspaceToWorktree } from '../../../shared/folder-workspace-worktree'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
-import {
-  findJiraIssueWorkspaceAttachment,
-  type JiraIssueAttachmentRef
-} from '@/lib/jira-issue-workspace-attachment'
+import { findJiraIssueWorkspaceAttachmentForIssue } from '@/lib/jira-issue-workspace-attachment'
+import type { JiraIssue } from '../../../shared/jira-types'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 
 /**
  * Opens the workspace already attached to a Jira issue, or starts a new one.
@@ -19,13 +18,18 @@ import {
  * is still honoured instead of starting a duplicate.
  */
 export function openJiraIssueWorkspaceOrStart(
-  issue: JiraIssueAttachmentRef,
+  issue: JiraIssue,
+  source: TaskSourceContext | null | undefined,
   startWorkspace: () => void
 ): 'opened' | 'started' | 'failed' {
   const state = useAppStore.getState()
-  const attached = findJiraIssueWorkspaceAttachment(
+  // Why the shared finder: the sheet's label and this action must resolve the same
+  // workspace — strict identity first, then the fork's permissive URL-identity finder
+  // — so the label and the click can never disagree about what they point at.
+  const attached = findJiraIssueWorkspaceAttachmentForIssue(
     [...state.allWorktrees(), ...state.folderWorkspaces.map(folderWorkspaceToWorktree)],
-    issue
+    issue,
+    source
   )
   if (!attached) {
     startWorkspace()
