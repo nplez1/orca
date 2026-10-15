@@ -5,6 +5,7 @@ import type {
   JiraBoardIssuePageRequest,
   JiraBoardOverview,
   JiraCommentBodyFormat,
+  JiraEditableField,
   JiraProjectStatusOrder,
   JiraSiteSelection
 } from '../../shared/jira-types'
@@ -83,6 +84,9 @@ export const jiraApi = {
 
   listCreateFields: (args: { projectIdOrKey: string; issueTypeId: string; siteId?: string }) =>
     ipcRenderer.invoke('jira:listCreateFields', args),
+
+  listEditFields: (args: { key: string; siteId?: string }): Promise<JiraEditableField[]> =>
+    ipcRenderer.invoke('jira:listEditFields', args),
 
   listPriorities: (args?: { siteId?: string }) => ipcRenderer.invoke('jira:listPriorities', args),
 

@@ -20,6 +20,7 @@ import {
   listBoardIssues,
   listBoards,
   listCreateFields,
+  listEditFields,
   listIssueTypes,
   listIssues,
   listPriorities,
@@ -87,6 +88,11 @@ export class RuntimeJiraCommands {
     signal?: AbortSignal
   ): ReturnType<typeof getIssueSummary> {
     return getIssueSummary(key, siteId, signal)
+  }
+
+  /** Fields this user can edit on an existing issue, with the current values. */
+  jiraListEditFields(key: string, siteId?: string): ReturnType<typeof listEditFields> {
+    return listEditFields(key, siteId)
   }
 
   jiraUpdateIssue(

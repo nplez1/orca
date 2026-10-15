@@ -17,7 +17,7 @@ import { createCompatibleRuntimeStatusResponse } from './runtime-compatibility-t
 import {
   JIRA_USER_FIELDS_RUNTIME_CAPABILITY,
   JIRA_USER_FIELDS_UPDATE_REQUIRED_MESSAGE
-} from '../../../shared/protocol-version'
+} from '../../../shared/jira-runtime-capabilities'
 
 type RuntimeSubscribeArgs = Parameters<typeof window.api.runtimeEnvironments.subscribe>[0]
 type RuntimeSubscribeCallbacks = Parameters<typeof window.api.runtimeEnvironments.subscribe>[1]

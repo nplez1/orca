@@ -1,8 +1,12 @@
-import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira-types'
+import type {
+  JiraCreateField,
+  JiraProjectStatusOrder,
+  JiraTransition
+} from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
-import { mapStatus } from './jira-issue-mapping'
+import { mapCreateField, mapStatus } from './jira-issue-mapping'
 import {
   asFiniteNumber,
   asIdentifier,
@@ -11,6 +15,24 @@ import {
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
+
+/**
+ * The fields the transition's screen requires, in the create-field shape the
+ * renderer already draws. Blank when the screen asks for none — which is also
+ * what an older host that never requested the expand produces.
+ */
+function requiredTransitionFields(rawFields: unknown): { requiredFields?: JiraCreateField[] } {
+  const fields = asRecord(rawFields)
+  const requiredFields = Object.entries(fields)
+    .map(([fieldKey, raw]) => mapCreateField(raw, fieldKey))
+    // Why: a field Jira will default itself is not input the user owes us; prompting
+    // for it turns a valid move into a blocked one.
+    .filter(
+      (field): field is JiraCreateField =>
+        field !== null && field.required && field.hasDefaultValue !== true
+    )
+  return requiredFields.length > 0 ? { requiredFields } : {}
+}
 
 export async function listTransitions(
   key: string,
@@ -22,14 +44,18 @@ export async function listTransitions(
   }
   await acquire()
   try {
+    // Why the expand: without it Jira reports no fields, so a transition whose
+    // workflow requires input can only be attempted and refused. With it the
+    // client can prompt for exactly what is missing before submitting.
     const response = await jiraRequest<{ transitions?: JiraRecord[] }>(
       entry,
-      `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/transitions`
+      `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/transitions?expand=transitions.fields`
     )
     return (response.transitions ?? []).map((transition) => ({
       id: asString(transition.id),
       name: asString(transition.name),
-      to: mapStatus(transition.to)
+      to: mapStatus(transition.to),
+      ...requiredTransitionFields(transition.fields)
     }))
   } catch (error) {
     if (isAuthError(error)) {

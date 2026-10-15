@@ -6,6 +6,8 @@ import { jiraGetIssue, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type {
   JiraComment,
+  JiraEditableField,
+  JiraFieldErrors,
   JiraIssue,
   JiraPriority,
   JiraTransition,
@@ -25,6 +27,9 @@ export type JiraIssueWorkspaceDetailState = {
   transitions: JiraTransition[]
   priorities: JiraPriority[]
   users: JiraUser[]
+  /** Custom fields Jira allows editing on this issue, with their current values. */
+  editFields: JiraEditableField[]
+  editFieldsLoading: boolean
   pendingField: string | null
   titleDraft: string
   setTitleDraft: (value: string) => void
@@ -47,6 +52,11 @@ export type JiraIssueWorkspaceDetailState = {
     updates: Parameters<typeof jiraUpdateIssue>[2],
     optimistic?: Partial<JiraIssue>
   ) => Promise<void>
+  /** Applies a custom-field edit and reports Jira's own rejection reasons back
+   *  to the calling form instead of swallowing them into a toast. */
+  submitIssueFields: (
+    updates: Parameters<typeof jiraUpdateIssue>[2]
+  ) => Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: JiraFieldErrors }>
 }
 
 /** Hydrates the full detail set for one Jira issue and owns its mutations.
@@ -129,6 +139,7 @@ export function useJiraIssueWorkspaceDetail({
   const sideData = useJiraIssueSideData({ providerSettings, issueKey, issueSiteId: siteId })
   const commentsState = useJiraIssueComments({ providerSettings, issueKey, issueSiteId: siteId })
   const reloadTransitions = sideData.reloadTransitions
+  const reloadEditFields = sideData.reloadEditFields
 
   const refreshIssue = useCallback(async (): Promise<void> => {
     if (!displayed) {
@@ -205,6 +216,59 @@ export function useJiraIssueWorkspaceDetail({
     [displayed, patchJiraIssue, pendingField, refreshIssue, providerSettings, siteId, sourceContext]
   )
 
+  const submitIssueFields = useCallback(
+    async (
+      updates: Parameters<typeof jiraUpdateIssue>[2]
+    ): Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: JiraFieldErrors }> => {
+      if (!displayed) {
+        return {
+          ok: false,
+          error: translate(
+            'auto.components.JiraIssueWorkspace.noIssueSelected',
+            'No Jira issue is selected.'
+          )
+        }
+      }
+      if (pendingField) {
+        return {
+          ok: false,
+          error: translate(
+            'auto.components.JiraIssueWorkspace.anotherUpdatePending',
+            'Another Jira update is still in progress.'
+          )
+        }
+      }
+      setPendingField('fields')
+      try {
+        const result = await jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
+        if (!result.ok) {
+          return {
+            ok: false,
+            error: result.error,
+            ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {})
+          }
+        }
+        await refreshIssue()
+        await reloadEditFields()
+        return { ok: true }
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : translate(
+                  'auto.components.JiraIssueWorkspace.ea21952aa3',
+                  'Failed to update Jira issue.'
+                )
+        }
+      } finally {
+        setPendingField(null)
+      }
+    },
+    [displayed, pendingField, providerSettings, refreshIssue, reloadEditFields, siteId]
+  )
+
   const handleSaveTitle = useCallback(() => {
     if (!displayed) {
       return
@@ -241,6 +305,8 @@ export function useJiraIssueWorkspaceDetail({
     transitions: sideData.transitions,
     priorities: sideData.priorities,
     users: sideData.users,
+    editFields: sideData.editFields,
+    editFieldsLoading: sideData.editFieldsLoading,
     pendingField,
     titleDraft,
     setTitleDraft,
@@ -257,6 +323,7 @@ export function useJiraIssueWorkspaceDetail({
     refreshing,
     refresh,
     reload,
-    mutateIssue
+    mutateIssue,
+    submitIssueFields
   }
 }

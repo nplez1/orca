@@ -54,6 +54,7 @@ export function createWebJiraApi(): PreloadApi['jira'] {
     listProjects: (args) => jiraCall('listProjects', args),
     listIssueTypes: (args) => jiraCall('listIssueTypes', args),
     listCreateFields: (args) => jiraCall('listCreateFields', args),
+    listEditFields: (args) => jiraCall('listEditFields', args),
     listPriorities: (args) => jiraCall('listPriorities', args),
     listAssignableUsers: (args) => jiraCall('listAssignableUsers', args),
     // Why: servers expose no project-scoped user search; match the remote-environment fallback.

@@ -41,6 +41,9 @@ export function filterTaskPageJiraBoardIssues(
   if (filter === 'all') {
     return [...issues]
   }
+  if (filter === 'unassigned') {
+    return issues.filter((issue) => !issue.assignee)
+  }
   return viewerAccountId
     ? issues.filter((issue) => issue.assignee?.accountId === viewerAccountId)
     : []

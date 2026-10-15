@@ -1,4 +1,5 @@
 import { ArrowRight, FolderOpen, LoaderCircle, X } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -7,12 +8,18 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type {
+  JiraEditableField,
   JiraIssue,
   JiraIssueUpdate,
   JiraPriority,
   JiraTransition,
   JiraUser
 } from '../../../shared/jira-types'
+import {
+  JiraIssueEditFieldsDialog,
+  type JiraIssueFieldOutcome
+} from './jira-issue-edit-fields-dialog'
+import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 
 function jiraStatusClass(categoryKey: string): string {
   if (categoryKey === 'done') {
@@ -98,130 +105,164 @@ export function JiraIssueMetadataBar({
   transitions,
   priorities,
   users,
-  mutateIssue
+  editFields,
+  editFieldsLoading,
+  providerSettings,
+  mutateIssue,
+  submitIssueFields
 }: {
   displayed: JiraIssue
   pendingField: string | null
   transitions: JiraTransition[]
   priorities: JiraPriority[]
   users: JiraUser[]
+  editFields: JiraEditableField[]
+  editFieldsLoading: boolean
+  providerSettings: RuntimeJiraSettings
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
     optimistic?: Partial<JiraIssue>
   ) => Promise<void>
+  submitIssueFields: (updates: JiraIssueUpdate) => Promise<JiraIssueFieldOutcome>
 }): React.JSX.Element {
+  const [editFieldsOpen, setEditFieldsOpen] = useState(false)
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={pendingField === 'transition' || transitions.length === 0}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80 disabled:opacity-50',
-              jiraStatusClass(displayed.status.categoryKey)
-            )}
-          >
-            {displayed.status.name}
-            {pendingField === 'transition' ? (
-              <LoaderCircle className="size-3 animate-spin" />
-            ) : null}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="popover-scroll-content scrollbar-sleek w-52 p-1" align="start">
-          {transitions.map((transition) => (
+    <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
+        <Popover>
+          <PopoverTrigger asChild>
             <button
-              key={transition.id}
+              type="button"
+              disabled={pendingField === 'transition' || transitions.length === 0}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80 disabled:opacity-50',
+                jiraStatusClass(displayed.status.categoryKey)
+              )}
+            >
+              {displayed.status.name}
+              {pendingField === 'transition' ? (
+                <LoaderCircle className="size-3 animate-spin" />
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="popover-scroll-content scrollbar-sleek w-52 p-1" align="start">
+            {transitions.map((transition) => (
+              <button
+                key={transition.id}
+                type="button"
+                onClick={() =>
+                  void mutateIssue(
+                    'transition',
+                    { transitionId: transition.id },
+                    { status: transition.to }
+                  )
+                }
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+              >
+                {transition.name}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={pendingField === 'priority'}
+              className="rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
+            >
+              {displayed.priority?.name ??
+                translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+              {pendingField === 'priority' ? (
+                <LoaderCircle className="ml-1 inline size-3 animate-spin" />
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="popover-scroll-content scrollbar-sleek w-48 p-1" align="start">
+            <button
               type="button"
               onClick={() =>
+                void mutateIssue('priority', { priorityId: null }, { priority: undefined })
+              }
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+            >
+              {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
+            </button>
+            {priorities.map((priority) => (
+              <button
+                key={priority.id}
+                type="button"
+                onClick={() =>
+                  void mutateIssue('priority', { priorityId: priority.id }, { priority })
+                }
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+              >
+                {priority.name}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={pendingField === 'assignee'}
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
+            >
+              {displayed.assignee?.displayName ??
+                translate('auto.components.JiraIssueWorkspace.54649eaeab', '+ Assignee')}
+              {pendingField === 'assignee' ? (
+                <LoaderCircle className="size-3 animate-spin" />
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="popover-scroll-content scrollbar-sleek w-56 p-1" align="start">
+            <button
+              type="button"
+              onClick={() =>
+                void mutateIssue('assignee', { assigneeAccountId: null }, { assignee: undefined })
+              }
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+            >
+              {translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
+            </button>
+            <JiraUserOptionList
+              users={users}
+              onSelect={(user) =>
                 void mutateIssue(
-                  'transition',
-                  { transitionId: transition.id },
-                  { status: transition.to }
+                  'assignee',
+                  { assigneeAccountId: user.accountId },
+                  { assignee: user }
                 )
               }
-              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-            >
-              {transition.name}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
+            />
+          </PopoverContent>
+        </Popover>
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={pendingField === 'priority'}
-            className="rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
-          >
-            {displayed.priority?.name ??
-              translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
-            {pendingField === 'priority' ? (
-              <LoaderCircle className="ml-1 inline size-3 animate-spin" />
-            ) : null}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="popover-scroll-content scrollbar-sleek w-48 p-1" align="start">
-          <button
-            type="button"
-            onClick={() =>
-              void mutateIssue('priority', { priorityId: null }, { priority: undefined })
-            }
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-          >
-            {translate('auto.components.JiraIssueWorkspace.51bed73f88', 'No priority')}
-          </button>
-          {priorities.map((priority) => (
-            <button
-              key={priority.id}
-              type="button"
-              onClick={() =>
-                void mutateIssue('priority', { priorityId: priority.id }, { priority })
-              }
-              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-            >
-              {priority.name}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={pendingField === 'assignee'}
-            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
-          >
-            {displayed.assignee?.displayName ??
-              translate('auto.components.JiraIssueWorkspace.54649eaeab', '+ Assignee')}
-            {pendingField === 'assignee' ? <LoaderCircle className="size-3 animate-spin" /> : null}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="popover-scroll-content scrollbar-sleek w-56 p-1" align="start">
-          <button
-            type="button"
-            onClick={() =>
-              void mutateIssue('assignee', { assigneeAccountId: null }, { assignee: undefined })
-            }
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-          >
-            {translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
-          </button>
-          <JiraUserOptionList
-            users={users}
-            onSelect={(user) =>
-              void mutateIssue(
-                'assignee',
-                { assigneeAccountId: user.accountId },
-                { assignee: user }
-              )
-            }
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="ml-auto"
+          disabled={pendingField === 'fields' || editFieldsLoading || editFields.length === 0}
+          onClick={() => setEditFieldsOpen(true)}
+        >
+          {editFieldsLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+          {translate('auto.components.JiraIssueWorkspace.editFields', 'Edit fields')}
+        </Button>
+      </div>
+      <JiraIssueEditFieldsDialog
+        open={editFieldsOpen}
+        onOpenChange={setEditFieldsOpen}
+        issue={displayed}
+        fields={editFields}
+        providerSettings={providerSettings}
+        submitting={pendingField === 'fields'}
+        onSubmit={submitIssueFields}
+      />
+    </>
   )
 }

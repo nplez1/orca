@@ -7,7 +7,7 @@
 
 export const JIRA_BOARD_VIEW_MODES = ['board', 'list'] as const
 export const JIRA_BOARD_ACTIVE_VIEWS = ['sprint', 'backlog'] as const
-export const JIRA_BOARD_FILTERS = ['me', 'all'] as const
+export const JIRA_BOARD_FILTERS = ['me', 'all', 'unassigned'] as const
 
 export type JiraBoardViewMode = (typeof JIRA_BOARD_VIEW_MODES)[number]
 export type JiraBoardActiveView = (typeof JIRA_BOARD_ACTIVE_VIEWS)[number]
@@ -18,7 +18,8 @@ export type JiraBoardViewPreferences = {
   viewMode: JiraBoardViewMode
   /** Sprint vs backlog tab inside the board. */
   activeView: JiraBoardActiveView
-  /** Me = assigned to the viewer, All = every issue in the board filter. */
+  /** Me = assigned to the viewer, All = every issue in the board filter,
+   *  Unassigned = issues with no assignee yet. */
   filter: JiraBoardFilter
   /** Free-text filter applied to already-loaded board issues. */
   query: string

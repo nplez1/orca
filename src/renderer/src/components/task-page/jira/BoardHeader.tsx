@@ -143,6 +143,15 @@ export function TaskPageJiraBoardHeader({
             >
               {translate('auto.components.TaskPage.jiraAllFilter', 'All')}
             </Button>
+            <Button
+              type="button"
+              variant={filter === 'unassigned' ? 'secondary' : 'ghost'}
+              size="xs"
+              aria-pressed={filter === 'unassigned'}
+              onClick={() => onFilterChange('unassigned')}
+            >
+              {translate('auto.components.TaskPage.jiraUnassignedFilter', 'Unassigned')}
+            </Button>
           </div>
         </div>
       </div>

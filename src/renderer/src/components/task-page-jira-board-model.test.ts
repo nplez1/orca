@@ -84,6 +84,9 @@ describe('Jira board projection', () => {
       'ABC-2',
       'ABC-3'
     ])
+    expect(
+      filterTaskPageJiraBoardIssues(issues, 'unassigned', null).map((item) => item.key)
+    ).toEqual(['ABC-3'])
   })
 
   it('matches the board filter query against key, summary, assignee, status, type, and labels', () => {

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
@@ -162,6 +162,22 @@ function renderBoard(
   } = {}
 ) {
   return render(boardTree(props.model ?? model, props))
+}
+
+/** Starts a drag of `key` and drops it on `target`, the way the board's handlers see it. */
+function dragCardOnto(card: HTMLElement, target: HTMLElement, key: string): void {
+  const dataTransfer = {
+    effectAllowed: 'move',
+    dropEffect: 'none',
+    setData: vi.fn(),
+    getData: vi.fn().mockReturnValue(key)
+  }
+  const dragStart = new Event('dragstart', { bubbles: true, cancelable: true })
+  Object.defineProperty(dragStart, 'dataTransfer', { value: dataTransfer })
+  fireEvent(card, dragStart)
+  const drop = new Event('drop', { bubbles: true, cancelable: true })
+  Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer })
+  fireEvent(target, drop)
 }
 
 afterEach(() => {
@@ -455,5 +471,124 @@ describe('TaskPageJiraBoard', () => {
       )
     )
     expect(onIssueMoved).toHaveBeenCalledWith(sprintIssue)
+  })
+
+  it('moves the card into the new lane before Jira confirms the transition', async () => {
+    const onIssueMoved = vi.fn()
+    let resolveUpdate: (value: { ok: true }) => void = () => {}
+    mocks.jiraUpdateIssue.mockImplementation(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          resolveUpdate = resolve
+        })
+    )
+    renderBoard({ onIssueMoved })
+
+    const card = await screen.findByRole('button', { name: /ABC-1 title/ })
+    const doingColumn = screen.getByText('Doing').closest('section')
+    if (!doingColumn) {
+      throw new Error('Doing column was not rendered')
+    }
+    dragCardOnto(card, doingColumn, sprintIssue.key)
+
+    // The point of the optimistic move: the card is already where it was dropped
+    // while the transition request is still outstanding.
+    await waitFor(() => {
+      expect(screen.getByText('ABC-1').closest('section')?.textContent).toContain('Doing')
+    })
+
+    await act(async () => {
+      resolveUpdate({ ok: true })
+    })
+    await waitFor(() => expect(onIssueMoved).toHaveBeenCalledWith(sprintIssue))
+  })
+
+  it('prompts for a transition screen field and submits it with the move', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        ...startTransition,
+        requiredFields: [
+          { key: 'customfield_10001', name: 'Dev', required: true, schema: { type: 'string' } }
+        ]
+      }
+    ])
+    renderBoard()
+
+    const card = await screen.findByRole('button', { name: /ABC-1 title/ })
+    const doingColumn = screen.getByText('Doing').closest('section')
+    if (!doingColumn) {
+      throw new Error('Doing column was not rendered')
+    }
+    dragCardOnto(card, doingColumn, sprintIssue.key)
+
+    await user.type(await screen.findByPlaceholderText('Enter Dev'), 'platform')
+    await user.click(screen.getByRole('button', { name: 'Apply and move' }))
+
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        { kind: 'default-scope', settings: model.settings },
+        sprintIssue.key,
+        expect.objectContaining({
+          transitionId: 'start-work',
+          transitionFields: { customfield_10001: 'platform' }
+        }),
+        sprintIssue.siteId
+      )
+    )
+  })
+
+  it('moves a card dropped on the Other statuses bucket to a status no column owns', async () => {
+    const otherStatusIssue = issue('ABC-4', '9')
+    mocks.jiraListBoardIssues.mockResolvedValue({
+      issues: [sprintIssue, otherStatusIssue],
+      startAt: 0,
+      nextPageToken: null,
+      total: 2,
+      isLast: true
+    })
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        ...startTransition,
+        id: 'ship',
+        name: 'Ship',
+        to: { ...startTransition.to, id: '9', name: 'Shipped' }
+      }
+    ])
+    renderBoard()
+
+    const card = await screen.findByRole('button', { name: /ABC-1 title/ })
+    const otherBucket = (await screen.findByText('Other statuses')).closest('section')
+    if (!otherBucket) {
+      throw new Error('Other statuses bucket was not rendered')
+    }
+    dragCardOnto(card, otherBucket, sprintIssue.key)
+
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        expect.anything(),
+        sprintIssue.key,
+        { transitionId: 'ship' },
+        sprintIssue.siteId
+      )
+    )
+  })
+
+  it('shows only unassigned issues behind the Unassigned filter', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListBoardIssues.mockResolvedValue({
+      issues: [sprintIssue, otherAssigneeIssue, issue('ABC-5', '1', { assignee: undefined })],
+      startAt: 0,
+      nextPageToken: null,
+      total: 3,
+      isLast: true
+    })
+    renderBoard()
+
+    await screen.findByText('ABC-1')
+    await user.click(screen.getByRole('button', { name: 'Unassigned' }))
+
+    await waitFor(() => expect(screen.queryByText('ABC-1')).toBeNull())
+    expect(screen.getByText('ABC-5')).toBeTruthy()
   })
 })

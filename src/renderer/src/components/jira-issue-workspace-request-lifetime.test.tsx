@@ -49,6 +49,7 @@ vi.mock('@/runtime/runtime-jira-client', () => {
     jiraGetIssue: (_settings: unknown, key: string) => request(boundary.issues, key),
     jiraIssueComments: (_settings: unknown, key: string) => request(boundary.comments, key),
     jiraListTransitions: async () => [],
+    jiraListEditFields: async () => [],
     jiraListPriorities: async () => [],
     jiraListAssignableUsers: async () => [],
     jiraUpdateIssue: async () => ({ ok: true }),

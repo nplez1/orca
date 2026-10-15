@@ -67,6 +67,9 @@ export type JiraCreateField = {
   key: string
   name: string
   required: boolean
+  /** True when Jira will supply the value itself, so a required transition
+   *  field marked this way needs no prompt. */
+  hasDefaultValue?: boolean
   schema?: {
     type?: string
     items?: string
@@ -157,6 +160,10 @@ export type JiraTransition = {
   id: string
   name: string
   to: JiraStatus
+  /** Fields the transition's own screen requires. Present only when the host
+   *  asked Jira for `expand=transitions.fields`; an older host omits it, and the
+   *  client then submits the transition without fields exactly as it used to. */
+  requiredFields?: JiraCreateField[]
 }
 
 export type JiraIssue = {
@@ -192,6 +199,35 @@ export type JiraIssueUpdate = {
   assigneeAccountId?: string | null
   priorityId?: string | null
   transitionId?: string
+  /** Fields the transition's screen requires, submitted beside the transition.
+   *  Separate from `customFields` because Jira applies them in the transition
+   *  call, not the field-edit PUT. */
+  transitionFields?: Record<string, unknown>
+  transitionUserFieldKeys?: string[]
+  /** Keys in transitionFields holding plain text the host converts for the site. */
+  transitionTextFieldKeys?: string[]
+  /** Fields applied through the field-edit PUT, custom fields included. A null
+   *  value clears the field. */
+  customFields?: Record<string, unknown>
+  userFieldKeys?: string[]
+  /** Keys in customFields holding plain text the host converts for the site. */
+  textFieldKeys?: string[]
+}
+
+/** Jira's per-field rejection reasons, keyed by the field's Jira key. */
+export type JiraFieldErrors = Record<string, string>
+
+/** One editable field on an existing issue, as `/issue/{key}/editmeta` reports
+ *  it, paired with the value the issue currently holds. */
+export type JiraEditableField = {
+  /** Edit-side metadata, in the same shape the create dialog consumes. */
+  field: JiraCreateField
+  /** The current value as a control draft, '' when the field is unset. For a user
+   *  field this is the accountId (Cloud) or username (Server/DC) the ref needs. */
+  value: string
+  /** The current user's display name, so a picker shows a name rather than an id
+   *  before any search runs. Absent for non-user fields. */
+  displayName?: string
 }
 
 export type JiraIssueFilter = 'assigned' | 'reported' | 'all' | 'done'
@@ -215,10 +251,22 @@ export type JiraCreateIssueArgs = {
   // Keys in customFields holding user ids; the host shapes them into the
   // {accountId} / {name} object Jira requires. Omitted by older clients.
   userFieldKeys?: string[]
+  // Keys in customFields holding plain text; the host converts them to the
+  // site's own body format. Omitted by older clients.
+  textFieldKeys?: string[]
 }
 
 export type JiraCreateIssueResult =
   | { ok: true; id: string; key: string; url: string }
   | { ok: false; error: string }
 
-export type JiraMutationResult = { ok: true } | { ok: false; error: string }
+export type JiraMutationResult =
+  | { ok: true }
+  | {
+      ok: false
+      error: string
+      // Jira's own field-level rejections, so the UI can name the offending field
+      // instead of showing one flattened string. Absent on transport failures.
+      fieldErrors?: JiraFieldErrors
+      errorMessages?: string[]
+    }

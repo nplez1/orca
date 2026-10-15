@@ -30,7 +30,7 @@ import {
   SelectItem
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { getJiraCreateAllowedValueLabel } from '@/components/task-page-jira-create-fields'
+import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { TaskPageJiraIssueAssigneeField } from './IssueAssigneeField'
 export function TaskPageJiraIssueDialog({
   model
@@ -282,62 +282,18 @@ export function TaskPageJiraIssueDialog({
                     <label className="text-[11px] font-medium text-muted-foreground">
                       {field.name}
                     </label>
-                    {field.allowedValues?.length && field.schema?.type !== 'array' ? (
-                      <Select
-                        value={fieldValue}
-                        onValueChange={(value) =>
-                          setNewJiraIssueCustomFieldValues((prev) => ({
-                            ...prev,
-                            [field.key]: value
-                          }))
-                        }
-                        disabled={newJiraIssueSubmitting}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={translate(
-                              'auto.components.TaskPage.1f0fce91e3',
-                              'Select {{value0}}',
-                              {
-                                value0: field.name
-                              }
-                            )}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {field.allowedValues.map((value) => {
-                            const optionValue = value.id ?? value.value ?? value.name ?? ''
-                            return optionValue ? (
-                              <SelectItem key={optionValue} value={optionValue}>
-                                {getJiraCreateAllowedValueLabel(value)}
-                              </SelectItem>
-                            ) : null
-                          })}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        value={fieldValue}
-                        onChange={(event) =>
-                          setNewJiraIssueCustomFieldValues((prev) => ({
-                            ...prev,
-                            [field.key]: event.target.value
-                          }))
-                        }
-                        type={field.schema?.type === 'number' ? 'number' : 'text'}
-                        placeholder={
-                          field.schema?.type === 'array'
-                            ? translate(
-                                'auto.components.TaskPage.56cdb413a2',
-                                'Comma-separated values'
-                              )
-                            : translate('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
-                                value0: field.name
-                              })
-                        }
-                        disabled={newJiraIssueSubmitting}
-                      />
-                    )}
+                    <JiraSchemaFieldControl
+                      field={field}
+                      value={fieldValue}
+                      fallbackToText
+                      onValueChange={(value) =>
+                        setNewJiraIssueCustomFieldValues((prev) => ({
+                          ...prev,
+                          [field.key]: value
+                        }))
+                      }
+                      disabled={newJiraIssueSubmitting}
+                    />
                   </div>
                 )
               })}

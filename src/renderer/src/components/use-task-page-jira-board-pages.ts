@@ -15,6 +15,7 @@ import {
   JIRA_BOARD_ISSUE_PAGE_SIZE,
   readJiraBoardScopePages
 } from './task-page-jira-board-page-fetch'
+import { useJiraBoardIssuePatch } from './use-jira-board-issue-patch'
 
 export function useTaskPageJiraBoardPages(args: {
   providerSettings: RuntimeJiraSettings
@@ -82,6 +83,14 @@ export function useTaskPageJiraBoardPages(args: {
     },
     [cacheKey, setBacklogPageLocal]
   )
+
+  // Local-only pending patch; the hook documents why it is never cached.
+  const patchBoardIssue = useJiraBoardIssuePatch({
+    sprintPageRef,
+    backlogPageRef,
+    setSprintPageLocal,
+    setBacklogPageLocal
+  })
 
   useEffect(() => {
     const generation = ++sprintGeneration.current
@@ -300,6 +309,7 @@ export function useTaskPageJiraBoardPages(args: {
     backlogLoading,
     backlogLoadingMore,
     backlogError,
-    loadMoreBacklog
+    loadMoreBacklog,
+    patchBoardIssue
   }
 }

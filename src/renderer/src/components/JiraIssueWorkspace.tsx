@@ -100,7 +100,11 @@ export default function JiraIssueWorkspace({
               transitions={detail.transitions}
               priorities={detail.priorities}
               users={detail.users}
+              editFields={detail.editFields}
+              editFieldsLoading={detail.editFieldsLoading}
+              providerSettings={providerSettings}
               mutateIssue={detail.mutateIssue}
+              submitIssueFields={detail.submitIssueFields}
             />
 
             <JiraIssueWorkspaceContent

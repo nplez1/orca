@@ -4,6 +4,7 @@ import type {
   JiraCommentBodyFormat,
   JiraConnectionStatus,
   JiraCreateField,
+  JiraEditableField,
   JiraIssue,
   JiraIssueFilter,
   JiraIssueType,
@@ -22,6 +23,7 @@ import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { isRuntimeProviderSearchQueryWithinLimit } from './runtime-provider-search-bounds'
 import { readRuntimeJiraPayload } from './runtime-jira-payload-stream'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
+import { foldIssueUpdateForTarget } from './runtime-jira-text-fields'
 import { parseJiraConnectionStatus } from './runtime-jira-connection-status'
 
 export { jiraLookupIssueSummary, jiraReadStatus } from './runtime-jira-summary-client'
@@ -172,7 +174,11 @@ export async function jiraUpdateIssue(
   siteId?: string | null
 ): Promise<JiraMutationResult> {
   const target = getJiraRuntimeTarget(settings)
-  const args = { key, updates, siteId: siteId ?? undefined }
+  const args = {
+    key,
+    updates: await foldIssueUpdateForTarget(target, updates),
+    siteId: siteId ?? undefined
+  }
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, { timeoutMs: 30_000 })
     : window.api.jira.updateIssue(args)
@@ -263,6 +269,34 @@ export async function jiraListPriorities(
         { timeoutMs: 30_000 }
       )
     : window.api.jira.listPriorities(siteId ? { siteId } : undefined)
+}
+
+/**
+ * Fields the user can edit on an existing issue, with the values it holds. A
+ * remote runtime that predates the method cannot answer; editing is then simply
+ * unavailable, so the miss degrades to an empty list instead of failing the
+ * detail view.
+ */
+export async function jiraListEditFields(
+  settings: RuntimeJiraSettings,
+  key: string,
+  siteId?: string | null
+): Promise<JiraEditableField[]> {
+  const target = getJiraRuntimeTarget(settings)
+  const args = { key, siteId: siteId ?? undefined }
+  if (target.kind !== 'environment') {
+    return window.api.jira.listEditFields(args)
+  }
+  try {
+    return await callRuntimeRpc<JiraEditableField[]>(target, 'jira.listEditFields', args, {
+      timeoutMs: 30_000
+    })
+  } catch (error) {
+    if (error instanceof RuntimeRpcCallError && error.code === 'method_not_found') {
+      return []
+    }
+    throw error
+  }
 }
 
 /** Lists users assignable to an existing issue, via the active runtime. */

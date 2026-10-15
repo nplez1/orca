@@ -34,6 +34,7 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListAssignableUsers: (...args: unknown[]) => mocks.jiraListAssignableUsers(...args),
   jiraListPriorities: (...args: unknown[]) => mocks.jiraListPriorities(...args),
   jiraListTransitions: (...args: unknown[]) => mocks.jiraListTransitions(...args),
+  jiraListEditFields: async () => [],
   jiraUpdateIssue: (...args: unknown[]) => mocks.jiraUpdateIssue(...args)
 }))
 

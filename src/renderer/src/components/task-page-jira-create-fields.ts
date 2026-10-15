@@ -1,5 +1,5 @@
-import { buildJiraCreateTextAdf } from '@/components/jira-create-adf'
 import type { JiraCreateField } from '../../../shared/jira-types'
+import { isJiraTextAreaField } from '../../../shared/jira-field-rendering'
 
 // 'assignee' is system here because the dialog renders a dedicated picker for it.
 const JIRA_CREATE_SYSTEM_FIELD_KEYS = new Set([
@@ -105,9 +105,8 @@ export function buildJiraCreateFieldValue(field: JiraCreateField, draftValue: st
     const numberValue = Number(trimmed)
     return Number.isFinite(numberValue) ? numberValue : trimmed
   }
-  if (field.schema?.custom?.includes(':textarea') || field.schema?.type === 'textarea') {
-    return buildJiraCreateTextAdf(trimmed)
-  }
+  // The host converts textarea values to the site's own body format; a
+  // renderer-built ADF document is rejected by Server/DC and flattens Markdown on Cloud.
   return trimmed
 }
 
@@ -126,11 +125,17 @@ export function buildJiraCreateCustomFields(
 }
 
 // Only populated user fields require the remote user-field capability.
+export type JiraCreateFieldSubmission = {
+  customFields?: Record<string, unknown>
+  userFieldKeys?: string[]
+  textFieldKeys?: string[]
+}
+
 export function buildJiraCreateSubmission(
   fields: readonly JiraCreateField[],
   values: Record<string, string>,
   assigneeAccountId?: string | null
-): { customFields?: Record<string, unknown>; userFieldKeys?: string[] } {
+): JiraCreateFieldSubmission {
   const customFields = { ...buildJiraCreateCustomFields(fields, values) }
   if (assigneeAccountId) {
     customFields[JIRA_ASSIGNEE_FIELD_KEY] = assigneeAccountId
@@ -141,8 +146,12 @@ export function buildJiraCreateSubmission(
   if (assigneeAccountId) {
     userFieldKeys.push(JIRA_ASSIGNEE_FIELD_KEY)
   }
+  const textFieldKeys = fields
+    .filter((field) => isJiraTextAreaField(field) && customFields[field.key] !== undefined)
+    .map((field) => field.key)
   return {
     customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
-    userFieldKeys: userFieldKeys.length > 0 ? userFieldKeys : undefined
+    userFieldKeys: userFieldKeys.length > 0 ? userFieldKeys : undefined,
+    textFieldKeys: textFieldKeys.length > 0 ? textFieldKeys : undefined
   }
 }
