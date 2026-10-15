@@ -20,10 +20,8 @@ import {
   removeLocalWorktreePath,
   toLocalWorktreeRuntimePath
 } from '../../../local-worktree-filesystem'
-import {
-  cleanupUnusedWorktreePushTargetRemote,
-  notifyWorktreesChanged
-} from '../../worktree-remote'
+import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
+import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
 import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
@@ -102,7 +100,7 @@ export async function removeUnregisteredWorktree(
         hostId: removalHostId
       })
     )
-    notifyWorktreesChanged(mainWindow, repoId)
+    notifyWorktreeCatalogChanged(mainWindow, repoId)
     return {}
   }
   const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
@@ -155,7 +153,7 @@ export async function removeUnregisteredWorktree(
       })
     )
     invalidateAuthorizedRootsCache()
-    notifyWorktreesChanged(mainWindow, repoId)
+    notifyWorktreeCatalogChanged(mainWindow, repoId)
     return {}
   }
   if (await isAlreadyRemovedWorktreePath(worktreePath, localWorktreeGitOptions)) {
@@ -185,7 +183,7 @@ export async function removeUnregisteredWorktree(
         hostId: removalHostId
       })
     )
-    notifyWorktreesChanged(mainWindow, repoId)
+    notifyWorktreeCatalogChanged(mainWindow, repoId)
     return {}
   }
   throw new Error(`Refusing to delete unregistered worktree path: ${worktreePath}`)

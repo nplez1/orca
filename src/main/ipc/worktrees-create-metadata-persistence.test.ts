@@ -16,6 +16,7 @@ import {
   makeWorktreeMeta
 } from './worktrees-test-fixtures'
 import type { WorktreeRuntimeStub } from './worktrees-test-runtime-stub'
+import { setWorktreeCatalogRemoteClientNotifier } from './watched-worktree-catalog-notification'
 
 const WORKTREE_HANDLER_CHANNELS = [
   'worktrees:listAll',
@@ -407,6 +408,35 @@ describe('registerWorktreeHandlers', () => {
         displayName: 'Fix: dashboards for PRs'
       })
     })
+  })
+
+  it('pushes a paired-client catalog invalidation after a create in this window', async () => {
+    listWorktreesMock.mockResolvedValue([
+      {
+        path: '/workspace/improve-dashboard',
+        head: 'abc123',
+        branch: 'improve-dashboard',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
+    const notifyPairedClients = vi.fn()
+    // Why: the local create only refreshed this renderer, so a paired client learns of the new
+    // workspace from this event alone (#11994 is the same gap on the repo side).
+    setWorktreeCatalogRemoteClientNotifier({
+      notifyWorktreeCatalogChangedForRemoteClients: notifyPairedClients
+    })
+    try {
+      await handlers['worktrees:create'](null, {
+        repoId: 'repo-1',
+        name: 'improve-dashboard'
+      })
+
+      expect(notifyPairedClients).toHaveBeenCalledWith('repo-1')
+    } finally {
+      setWorktreeCatalogRemoteClientNotifier(null)
+    }
   })
 
   it('pins a legacy name-only user create when the branch matches', async () => {

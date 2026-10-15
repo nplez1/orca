@@ -4,7 +4,7 @@ import type { RemoveWorktreeResult } from '../../../../shared/worktree/create-ty
 import { killAllProcessesForWorktree } from '../../../runtime/worktree-teardown'
 import { withWorktreeRemoveStageSpan } from '../../../observability/instrumentation'
 import { preservedBranchCleanupScopeKey } from '../../../../shared/preserved-branch-cleanup'
-import { notifyWorktreesChanged } from '../../worktree-remote'
+import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
 import { clearProviderPtyState } from '../../pty/provider/state-cleanup'
 import { getLocalPtyProvider } from '../../pty/provider/registry'
 import type { RemoveWorktreeArgs } from '../ipc-context-schemas'
@@ -60,6 +60,6 @@ export async function removeFolderWorkspace(
   preservedBranchCleanupByScope.delete(
     preservedBranchCleanupScopeKey({ worktreeId: args.worktreeId, hostId: removalHostId })
   )
-  notifyWorktreesChanged(mainWindow, repoId)
+  notifyWorktreeCatalogChanged(mainWindow, repoId)
   return {}
 }

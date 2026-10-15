@@ -14,10 +14,8 @@ import { clearProviderPtyState } from '../../pty/provider/state-cleanup'
 import { killAllProcessesForWorktree } from '../../../runtime/worktree-teardown'
 import { invalidateAuthorizedRootsCache } from '../../registered-worktree-roots-cache'
 import { preservedBranchCleanupScopeKey } from '../../../../shared/preserved-branch-cleanup'
-import {
-  notifyWorktreesChanged,
-  cleanupUnusedWorktreePushTargetRemote
-} from '../../worktree-remote'
+import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
+import { notifyWorktreeCatalogChanged } from '../../watched-worktree-catalog-notification'
 import { SshHostNotServedError } from '../../../providers/ssh-host-not-served-error'
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { forceDeleteLocalBranch } from '../../../git/worktree'
@@ -130,7 +128,7 @@ export function registerWorktreeForgetHandlers(context: WorktreeIpcContext): voi
             }
           }
         }
-        notifyWorktreesChanged(mainWindow, repoId)
+        notifyWorktreeCatalogChanged(mainWindow, repoId)
         return {}
       })()
       worktreeRemovalsInFlight.set(inFlightKey, { optionsKey, promise: forget })

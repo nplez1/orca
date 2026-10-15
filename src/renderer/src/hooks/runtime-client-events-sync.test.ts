@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   createRuntimeClientEventsSync,
-  type RuntimeClientEventSubscriptionHandle
+  type RuntimeClientEventSubscriptionHandle,
+  type RuntimeClientEventsSyncDeps
 } from './runtime-client-events-sync'
 
 type SubscribeRecord = {
@@ -10,7 +11,10 @@ type SubscribeRecord = {
   unsubscribe: ReturnType<typeof vi.fn>
 }
 
-function makeHarness(initialDesired: string[]) {
+function makeHarness(
+  initialDesired: string[],
+  extraDeps: Partial<Pick<RuntimeClientEventsSyncDeps, 'onSubscriptionLive'>> = {}
+) {
   let desired = initialDesired
   const records: SubscribeRecord[] = []
   const subscribe = vi.fn(
@@ -27,7 +31,8 @@ function makeHarness(initialDesired: string[]) {
   const sync = createRuntimeClientEventsSync({
     getDesiredEnvironmentIds: () => desired,
     subscribe,
-    onEvent: vi.fn()
+    onEvent: vi.fn(),
+    ...extraDeps
   })
   return {
     sync,
@@ -460,5 +465,110 @@ describe('createRuntimeClientEventsSync', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('createRuntimeClientEventsSync subscription liveness', () => {
+  // Why: an event published before the stream existed is dropped, not queued, so each
+  // environment has to be revalidated at the one moment its subscription becomes live.
+  it('revalidates an environment when its subscription first goes live', async () => {
+    const onSubscriptionLive = vi.fn()
+    const h = makeHarness(['A'], { onSubscriptionLive })
+
+    h.sync.sync()
+    expect(onSubscriptionLive).not.toHaveBeenCalled()
+
+    h.recordsFor('A')[0].resolveWith()
+    await flush()
+
+    expect(onSubscriptionLive).toHaveBeenCalledTimes(1)
+    expect(onSubscriptionLive).toHaveBeenCalledWith('A')
+  })
+
+  it('revalidates after a failed subscribe finally succeeds', async () => {
+    vi.useFakeTimers()
+    try {
+      let attempt = 0
+      const onSubscriptionLive = vi.fn()
+      const unsubscribe = vi.fn()
+      const subscribe = vi.fn((): Promise<RuntimeClientEventSubscriptionHandle> => {
+        attempt += 1
+        return attempt === 1
+          ? Promise.reject(new Error('temporary subscribe failure'))
+          : Promise.resolve({ unsubscribe })
+      })
+      const sync = createRuntimeClientEventsSync({
+        getDesiredEnvironmentIds: () => ['A'],
+        subscribe,
+        onEvent: vi.fn(),
+        onSubscriptionLive,
+        retryDelayMs: 10,
+        random: () => 1
+      })
+
+      sync.sync()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(onSubscriptionLive).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(10)
+      // Extra ticks: the retry's subscribe promise resolves into a .then chain.
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(onSubscriptionLive).toHaveBeenCalledTimes(1)
+      expect(onSubscriptionLive).toHaveBeenCalledWith('A')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not revalidate when the env left the desired set first', async () => {
+    const onSubscriptionLive = vi.fn()
+    const h = makeHarness(['A'], { onSubscriptionLive })
+
+    h.sync.sync()
+    h.setDesired([])
+    h.sync.sync()
+    h.recordsFor('A')[0].resolveWith()
+    await flush()
+
+    expect(onSubscriptionLive).not.toHaveBeenCalled()
+  })
+
+  it('does not revalidate a subscription that settles after stop()', async () => {
+    const onSubscriptionLive = vi.fn()
+    const h = makeHarness(['A'], { onSubscriptionLive })
+
+    h.sync.sync()
+    h.sync.stop()
+    h.recordsFor('A')[0].resolveWith()
+    await flush()
+
+    expect(onSubscriptionLive).not.toHaveBeenCalled()
+  })
+
+  it('revalidates once when duplicate subscribes race for one environment', async () => {
+    // 'B' keeps the subscription set non-empty, which is what lets the two A
+    // subscribes overlap; only the retained winner is a live stream.
+    const onSubscriptionLive = vi.fn()
+    const h = makeHarness(['B'], { onSubscriptionLive })
+    h.sync.sync()
+    h.recordsFor('B')[0].resolveWith()
+    await flush()
+
+    h.setDesired(['A', 'B'])
+    h.sync.sync()
+    h.setDesired(['B'])
+    h.sync.sync()
+    h.setDesired(['A', 'B'])
+    h.sync.sync()
+
+    const aRecords = h.recordsFor('A')
+    expect(aRecords).toHaveLength(2)
+    aRecords[0].resolveWith()
+    await flush()
+    aRecords[1].resolveWith()
+    await flush()
+
+    expect(onSubscriptionLive.mock.calls.filter(([id]) => id === 'A')).toHaveLength(1)
   })
 })
