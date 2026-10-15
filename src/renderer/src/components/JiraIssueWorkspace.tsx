@@ -11,6 +11,7 @@ import {
 import { getWorktreeAttachmentLabel } from '@/lib/worktree-attachment-label'
 import { translate } from '@/i18n/i18n'
 import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
+import { getJiraSelfUser } from './jira-self-user'
 import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
 import { defaultScopeSource } from '@/lib/default-creation-host'
@@ -36,6 +37,7 @@ export default function JiraIssueWorkspace({
   refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  const jiraStatus = useAppStore((s) => s.jiraStatus)
   const providerSettings = useMemo(
     () => sourceContext ?? defaultScopeSource(settings),
     [sourceContext, settings]
@@ -59,6 +61,12 @@ export default function JiraIssueWorkspace({
   const actionItems = useMemo(
     () => (displayed ? getJiraIssueWorkspaceActions(displayed) : []),
     [displayed]
+  )
+  // Why the issue's own site: the viewer identity is per site, and the picker pins
+  // "me" for the issue being edited, not for the host's currently selected site.
+  const selfUser = useMemo(
+    () => (displayed ? getJiraSelfUser(jiraStatus, displayed.siteId ?? null) : null),
+    [displayed, jiraStatus]
   )
 
   return (
@@ -102,6 +110,7 @@ export default function JiraIssueWorkspace({
               users={detail.users}
               editFields={detail.editFields}
               editFieldsLoading={detail.editFieldsLoading}
+              selfUser={selfUser}
               providerSettings={providerSettings}
               mutateIssue={detail.mutateIssue}
               submitIssueFields={detail.submitIssueFields}

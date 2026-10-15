@@ -3,24 +3,32 @@
 import type { ReactNode } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
-const mocks = vi.hoisted(() => ({
-  jiraGetIssue: vi.fn(),
-  jiraIssueComments: vi.fn(),
-  jiraListAssignableUsers: vi.fn(),
-  jiraListPriorities: vi.fn(),
-  jiraListTransitions: vi.fn(),
-  jiraUpdateIssue: vi.fn(),
-  jiraAddIssueComment: vi.fn(),
-  patchJiraIssue: vi.fn()
-}))
+const mocks = vi.hoisted(() => {
+  const storeState: { jiraStatus: JiraConnectionStatus | undefined } = { jiraStatus: undefined }
+  return {
+    jiraGetIssue: vi.fn(),
+    jiraIssueComments: vi.fn(),
+    jiraListAssignableUsers: vi.fn(),
+    jiraListPriorities: vi.fn(),
+    jiraListTransitions: vi.fn(),
+    jiraUpdateIssue: vi.fn(),
+    jiraAddIssueComment: vi.fn(),
+    patchJiraIssue: vi.fn(),
+    storeState
+  }
+})
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({ settings: null, patchJiraIssue: mocks.patchJiraIssue })
+    selector({
+      settings: null,
+      patchJiraIssue: mocks.patchJiraIssue,
+      jiraStatus: mocks.storeState.jiraStatus
+    })
 }))
 
 vi.mock('@/runtime/runtime-jira-client', () => ({
@@ -43,8 +51,17 @@ vi.mock('@/components/ui/sheet', () => ({
 }))
 
 vi.mock('./jira-issue-workspace-chrome', () => ({
-  JiraIssueMetadataBar: ({ displayed }: { displayed: JiraIssue }) => (
-    <div data-testid="issue-status">{displayed.status.name}</div>
+  JiraIssueMetadataBar: ({
+    displayed,
+    selfUser
+  }: {
+    displayed: JiraIssue
+    selfUser: JiraUser | null
+  }) => (
+    <div>
+      <div data-testid="issue-status">{displayed.status.name}</div>
+      <div data-testid="assignee-self">{selfUser?.accountId ?? ''}</div>
+    </div>
   ),
   JiraIssueWorkspaceHeader: () => null
 }))
@@ -77,6 +94,7 @@ function issue(statusId: string, statusName: string): JiraIssue {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  mocks.storeState.jiraStatus = undefined
 })
 
 const EMPTY_ATTACHMENT_INDEX = buildJiraIssueWorkspaceAttachmentIndex([])
@@ -120,5 +138,31 @@ describe('JiraIssueWorkspace refresh signal', () => {
     expect(mocks.patchJiraIssue).toHaveBeenCalledWith('ABC-1', movedIssue, {
       sourceContext: undefined
     })
+  })
+
+  it("pins the signed-in user for the issue's site into the assignee picker", async () => {
+    mocks.storeState.jiraStatus = {
+      connected: true,
+      activeSiteId: 'site-1',
+      viewer: { accountId: 'viewer-1', displayName: 'Viewer One', email: null }
+    }
+    const selectedIssue = issue('1', 'Ready')
+    mocks.jiraGetIssue.mockResolvedValue(selectedIssue)
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([])
+
+    render(
+      <JiraIssueWorkspace
+        issue={selectedIssue}
+        issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
+        onOpenOrStartWorkspace={vi.fn()}
+        onClose={vi.fn()}
+        refreshSignal={0}
+      />
+    )
+
+    await waitFor(() => expect(screen.getByTestId('assignee-self').textContent).toBe('viewer-1'))
   })
 })
