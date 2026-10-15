@@ -6,6 +6,7 @@ import type { PRComment } from '../../../../shared/github/comment-types'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { useGitHubItemDialogDetails } from '@/components/github-item-dialog/load-item-details/use-github-item-dialog-details'
 import { lookupGitHubWorkItemForSource } from '@/lib/github-work-item-source-lookup'
+import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
 import { useAppStore } from '@/store'
 import { projectGroupIdFromRepoId } from '../../../../shared/folder-workspace-worktree'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -74,6 +75,9 @@ export function GithubLinkedIssuePane({
     void lookupGitHubWorkItemForSource({
       repoPath: repo.path,
       repoId: repo.id,
+      // Why the repo's owner: the link this pane renders can carry no task-source context, and
+      // the source-context fallback would read a runtime-owned repo on this app's IPC instead.
+      target: getGitHubRepoRoutingTarget(useAppStore.getState(), repo.id, sourceContext),
       sourceContext,
       number: linkedIssue.number,
       type: 'issue'
