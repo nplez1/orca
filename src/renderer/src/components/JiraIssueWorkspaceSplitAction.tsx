@@ -56,9 +56,10 @@ export function JiraIssueWorkspaceSplitAction({
   }
 
   const startHold = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    // Primary mouse press only: right-click or a touch long-press (the row's
-    // context menu) would otherwise open both menus at once.
-    if (!linked || event.button !== 0 || event.pointerType === 'touch') {
+    // Primary mouse press only: right-click, ctrl+click on macOS (a primary-button
+    // press but still the row's context menu), or a touch long-press would otherwise
+    // open both menus at once.
+    if (!linked || event.button !== 0 || event.pointerType === 'touch' || event.ctrlKey) {
       return
     }
     heldRef.current = false

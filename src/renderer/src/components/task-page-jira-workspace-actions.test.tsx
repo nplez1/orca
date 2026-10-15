@@ -105,6 +105,42 @@ describe('Jira linked workspace split action', () => {
     expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(issue)
   })
 
+  it('does not open the menu on a secondary-button press held past the hold window', async () => {
+    renderList([first])
+    const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
+    fireEvent.pointerDown(body, { button: 2 })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 550))
+    })
+    fireEvent.pointerUp(body, { button: 2 })
+    expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
+    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('does not open the menu on a ctrl+click press held past the hold window (macOS right-click)', async () => {
+    renderList([first])
+    const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
+    fireEvent.pointerDown(body, { button: 0, ctrlKey: true })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 550))
+    })
+    fireEvent.pointerUp(body, { button: 0, ctrlKey: true })
+    expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
+    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('does not open the menu on a touch long-press of the body', async () => {
+    renderList([first])
+    const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
+    fireEvent.pointerDown(body, { button: 0, pointerType: 'touch' })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 550))
+    })
+    fireEvent.pointerUp(body, { button: 0, pointerType: 'touch' })
+    expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
+    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+  })
+
   it('keeps a plain start button for an unlinked issue', async () => {
     renderList([])
     const user = userEvent.setup()
