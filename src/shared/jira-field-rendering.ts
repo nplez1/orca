@@ -43,13 +43,23 @@ export function resolveJiraFieldControlKind(field: JiraCreateField): JiraFieldCo
   if (custom.includes(':textarea') || type === 'textarea') {
     return 'textarea'
   }
-  if (type === 'date' || type === 'datetime') {
+  if (type === 'date') {
     return 'date'
+  }
+  // Why not a date control: Jira's datetime fields take an offset-carrying value
+  // that an <input type="date"> cannot show or submit, so they stay free text.
+  if (type === 'datetime') {
+    return 'text'
   }
   if (type === 'number') {
     return 'number'
   }
   return type === 'string' ? 'text' : null
+}
+
+/** True for fields whose value Jira expects as a body document, not a bare string. */
+export function isJiraTextAreaField(field: JiraCreateField): boolean {
+  return field.schema?.custom?.includes(':textarea') === true || field.schema?.type === 'textarea'
 }
 
 /** True for single- and multi-user fields, which need an accountId/id, not a name. */

@@ -62,7 +62,8 @@ export const CreateIssue = z.object({
   title: requiredString('Title is required'),
   description: OptionalPlainString,
   customFields: z.record(z.string(), z.unknown()).optional(),
-  userFieldKeys: z.array(z.string()).optional()
+  userFieldKeys: z.array(z.string()).optional(),
+  textFieldKeys: z.array(z.string()).optional()
 })
 
 export const IssueUpdate = z.object({
@@ -73,7 +74,16 @@ export const IssueUpdate = z.object({
     labels: z.array(z.string()).optional(),
     assigneeAccountId: z.union([z.string(), z.null()]).optional(),
     priorityId: z.union([z.string(), z.null()]).optional(),
-    transitionId: OptionalString
+    transitionId: OptionalString,
+    // Why these stay declared: the zod object strips keys it does not name, and
+    // the dispatcher hands the stripped object to the handler, so an undeclared
+    // field would reach the host as a silent no-op on every remote runtime.
+    transitionFields: z.record(z.string(), z.unknown()).optional(),
+    transitionUserFieldKeys: z.array(z.string()).optional(),
+    transitionTextFieldKeys: z.array(z.string()).optional(),
+    customFields: z.record(z.string(), z.unknown()).optional(),
+    userFieldKeys: z.array(z.string()).optional(),
+    textFieldKeys: z.array(z.string()).optional()
   })
 })
 

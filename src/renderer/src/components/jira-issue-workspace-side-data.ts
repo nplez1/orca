@@ -92,8 +92,11 @@ export function useJiraIssueSideData({
     if (!issueKey) {
       return
     }
+    // Why the shared request id: a save that lands after the user switched issue
+    // must not repopulate the new issue's form with the old issue's fields.
+    const requestId = ++requestIdRef.current
     const next = await jiraListEditFields(providerSettings, issueKey, issueSiteId).catch(() => null)
-    if (next) {
+    if (next && requestId === requestIdRef.current) {
       setEditFields(next)
     }
   }, [issueKey, issueSiteId, providerSettings])

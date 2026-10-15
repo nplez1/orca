@@ -124,6 +124,7 @@ export function mapCreateField(value: unknown, fallbackKey = ''): JiraCreateFiel
     key,
     name: asString(field.name, key),
     required: field.required === true,
+    ...(field.hasDefaultValue === true ? { hasDefaultValue: true } : {}),
     schema: {
       type: asString(schema.type) || undefined,
       items: asString(schema.items) || undefined,

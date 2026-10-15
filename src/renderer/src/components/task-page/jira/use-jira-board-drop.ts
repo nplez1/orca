@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
@@ -50,6 +50,9 @@ export function useJiraBoardDrop({
   const [pendingTransitionMode, setPendingTransitionMode] = useState<'column' | 'otherStatuses'>(
     'column'
   )
+  // Why a ref, not the moving list: a second drop can fire before the first
+  // transition lookup has resolved, and state updates are not synchronous there.
+  const dropsInFlightRef = useRef(new Set<string>())
 
   const clearPicker = (): void => {
     setPendingIssue(null)
@@ -95,7 +98,7 @@ export function useJiraBoardDrop({
     if (!issue) {
       return null
     }
-    if (move.movingIssueKeys.includes(issue.key)) {
+    if (move.movingIssueKeys.includes(issue.key) || dropsInFlightRef.current.has(issue.key)) {
       toast.message(
         translate('auto.components.TaskPage.jiraBoardIssueMoving', '{{value0}} is still moving.', {
           value0: issue.key
@@ -103,17 +106,11 @@ export function useJiraBoardDrop({
       )
       return null
     }
+    dropsInFlightRef.current.add(issue.key)
     return issue
   }
 
-  const handleDrop = async (
-    column: JiraBoardColumn,
-    event: DragEvent<HTMLElement>
-  ): Promise<void> => {
-    const issue = takeDroppedIssue(event)
-    if (!issue) {
-      return
-    }
+  const runColumnDrop = async (column: JiraBoardColumn, issue: JiraIssue): Promise<void> => {
     if (column.statusIds.includes(issue.status.id)) {
       toast.message(
         translate(
@@ -162,15 +159,26 @@ export function useJiraBoardDrop({
     setPendingTransitions(matchingTransitions)
   }
 
-  /**
-   * "Other statuses" spans several statuses, so it is not a lane: the only
-   * truthful move is to a status no column owns, chosen explicitly.
-   */
-  const handleOtherDrop = async (event: DragEvent<HTMLElement>): Promise<void> => {
+  const handleDrop = async (
+    column: JiraBoardColumn,
+    event: DragEvent<HTMLElement>
+  ): Promise<void> => {
     const issue = takeDroppedIssue(event)
     if (!issue) {
       return
     }
+    try {
+      await runColumnDrop(column, issue)
+    } finally {
+      dropsInFlightRef.current.delete(issue.key)
+    }
+  }
+
+  /**
+   * "Other statuses" spans several statuses, so it is not a lane: the only
+   * truthful move is to a status no column owns, chosen explicitly.
+   */
+  const runOtherDrop = async (issue: JiraIssue): Promise<void> => {
     const transitions = await loadTransitions(issue)
     if (!transitions) {
       return
@@ -196,6 +204,18 @@ export function useJiraBoardDrop({
     setPendingTransitionMode('otherStatuses')
     setPendingIssue(issue)
     setPendingTransitions(otherTransitions)
+  }
+
+  const handleOtherDrop = async (event: DragEvent<HTMLElement>): Promise<void> => {
+    const issue = takeDroppedIssue(event)
+    if (!issue) {
+      return
+    }
+    try {
+      await runOtherDrop(issue)
+    } finally {
+      dropsInFlightRef.current.delete(issue.key)
+    }
   }
 
   return {

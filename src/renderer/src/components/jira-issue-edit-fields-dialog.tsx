@@ -136,6 +136,9 @@ function EditFieldsForm({
             <JiraSchemaFieldControl
               field={entry.field}
               value={drafts[entry.field.key] ?? ''}
+              // Only while untouched: once edited, the hint would describe a value
+              // the draft no longer holds.
+              displayValue={drafts[entry.field.key] === entry.value ? entry.displayName : undefined}
               disabled={submitting}
               userField={{
                 selectedUser: selectedUsers[entry.field.key] ?? null,

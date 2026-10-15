@@ -108,4 +108,29 @@ describe('Jira transition queries', () => {
 
     expect(transition.requiredFields).toBeUndefined()
   })
+
+  it('does not prompt for a required field Jira will default itself', async () => {
+    jiraRequestMock.mockResolvedValue({
+      transitions: [
+        {
+          id: '31',
+          name: 'Done',
+          to: { id: '3', name: 'Done', statusCategory: { key: 'done', name: 'Done' } },
+          fields: {
+            fixVersions: {
+              required: true,
+              hasDefaultValue: true,
+              name: 'Fix Version/s',
+              schema: { type: 'array', items: 'version' }
+            }
+          }
+        }
+      ]
+    })
+    const { listTransitions } = await import('./issues')
+
+    const [transition] = await listTransitions('ALP-1', 'site-1')
+
+    expect(transition.requiredFields).toBeUndefined()
+  })
 })

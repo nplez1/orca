@@ -43,7 +43,9 @@ export function useJiraBoardTransitionMove({
   onIssueMoved: (issue: JiraIssue) => void
 }) {
   const [movingIssueKeys, setMovingIssueKeys] = useState<string[]>([])
-  const [transitionSaving, setTransitionSaving] = useState(false)
+  // Why a count, not a flag: two moves can overlap, and the first to finish must
+  // not re-enable the other move's dialog mid-request.
+  const [inFlightCount, setInFlightCount] = useState(0)
   const [pendingTransitionFields, setPendingTransitionFields] =
     useState<JiraPendingTransitionFields | null>(null)
 
@@ -64,7 +66,7 @@ export function useJiraBoardTransitionMove({
     const previousStatus = issue.status
     applyIssuePatch(issue.key, { status: transition.to }, issue.siteId)
     markMoving(issue.key, true)
-    setTransitionSaving(true)
+    setInFlightCount((current) => current + 1)
     let succeeded = false
     try {
       const hasFields = Boolean(
@@ -78,7 +80,8 @@ export function useJiraBoardTransitionMove({
           ...(hasFields
             ? {
                 transitionFields: submission?.customFields,
-                transitionUserFieldKeys: submission?.userFieldKeys
+                transitionUserFieldKeys: submission?.userFieldKeys,
+                transitionTextFieldKeys: submission?.textFieldKeys
               }
             : {})
         },
@@ -108,13 +111,13 @@ export function useJiraBoardTransitionMove({
         applyIssuePatch(issue.key, { status: previousStatus }, issue.siteId)
       }
       markMoving(issue.key, false)
-      setTransitionSaving(false)
+      setInFlightCount((current) => Math.max(0, current - 1))
     }
   }
 
   return {
     movingIssueKeys,
-    transitionSaving,
+    transitionSaving: inFlightCount > 0,
     pendingTransitionFields,
     applyTransition,
     openTransitionFields: (
@@ -123,7 +126,7 @@ export function useJiraBoardTransitionMove({
       fields: JiraCreateField[]
     ) => setPendingTransitionFields({ issue, transition, fields }),
     closeTransitionFields: () => {
-      if (!transitionSaving) {
+      if (inFlightCount === 0) {
         setPendingTransitionFields(null)
       }
     },

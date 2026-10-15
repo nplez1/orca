@@ -46,15 +46,24 @@ function applyCustomFieldValues(
   target: JiraRecord,
   values: Record<string, unknown> | undefined,
   userFieldKeys: readonly string[] | undefined,
+  textFieldKeys: readonly string[] | undefined,
   mode: 'create' | 'update'
 ): void {
   const userKeys = new Set(userFieldKeys ?? [])
+  const textKeys = new Set(textFieldKeys ?? [])
   for (const [fieldKey, value] of Object.entries(values ?? {})) {
     if (!fieldKey || value === undefined) {
       continue
     }
     if (userKeys.has(fieldKey)) {
       target[fieldKey] = value === null || value === '' ? null : toUserFieldValue(site, value)
+      continue
+    }
+    if (typeof value === 'string' && value.trim() && textKeys.has(fieldKey)) {
+      // Why: REST v2 takes wiki/plain text and v3 takes ADF, and the renderer cannot
+      // know the site; converting here also lets Markdown parse instead of arriving
+      // as literal paragraphs.
+      target[fieldKey] = markdownCommentBody(site, value)
       continue
     }
     if (value !== null && value !== '') {
@@ -99,7 +108,14 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
     if (args.description?.trim()) {
       fields.description = toBodyText(entry.site, args.description.trim())
     }
-    applyCustomFieldValues(entry.site, fields, args.customFields, args.userFieldKeys, 'create')
+    applyCustomFieldValues(
+      entry.site,
+      fields,
+      args.customFields,
+      args.userFieldKeys,
+      args.textFieldKeys,
+      'create'
+    )
     const created = await jiraRequest<{ id: string; key: string; self: string }>(
       entry,
       `${apiBasePath(entry.site)}/issue`,
@@ -148,6 +164,7 @@ export async function updateIssue(
       fields,
       updates.customFields,
       updates.userFieldKeys,
+      updates.textFieldKeys,
       'update'
     )
     if (Object.keys(fields).length > 0) {
@@ -170,6 +187,7 @@ export async function updateIssue(
         transitionFields,
         updates.transitionFields,
         updates.transitionUserFieldKeys,
+        updates.transitionTextFieldKeys,
         'update'
       )
       await jiraRequest(entry, `${issueBase}/transitions`, {

@@ -42,6 +42,13 @@ function optionDraft(field: JiraCreateField, value: unknown): string {
   return optionValue || name || id
 }
 
+/** The human-readable label for an option value, for a name-bearing hint beside
+ *  a control that has to hold the id the submission needs. */
+function optionLabel(value: unknown): string {
+  const record = asRecord(value)
+  return asString(record.name) || asString(record.value) || asString(record.id)
+}
+
 function userDraft(value: unknown): { id: string; displayName?: string } {
   const user = asRecord(value)
   const id = asString(user.accountId) || asString(user.name) || asString(user.key)
@@ -70,11 +77,13 @@ function describeEditableValue(
     }
   }
   if (Array.isArray(raw)) {
+    const labels = raw.map(optionLabel).filter(Boolean)
     return {
       value: raw
         .map((entry) => optionDraft(field, entry))
         .filter(Boolean)
-        .join(', ')
+        .join(', '),
+      ...(labels.length > 0 ? { displayName: labels.join(', ') } : {})
     }
   }
   if (raw === null || raw === undefined) {

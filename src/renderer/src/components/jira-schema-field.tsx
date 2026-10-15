@@ -26,12 +26,16 @@ export function JiraSchemaFieldControl({
   onValueChange,
   disabled,
   userField,
-  fallbackToText
+  fallbackToText,
+  displayValue
 }: {
   field: JiraCreateField
   value: string
   onValueChange: (value: string) => void
   disabled?: boolean
+  /** Names for a value the control holds in a submission-shaped token (a joined
+   *  id list), so the current selection is readable beside it. */
+  displayValue?: string
   userField?: {
     selectedUser: JiraUser | null
     onSelectUser: (user: JiraUser | null) => void
@@ -116,18 +120,27 @@ export function JiraSchemaFieldControl({
     )
   }
   return (
-    <Input
-      value={value}
-      onChange={(event) => onValueChange(event.target.value)}
-      type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
-      placeholder={
-        kind === 'textList' || kind === 'userList'
-          ? translate('auto.components.TaskPage.56cdb413a2', 'Comma-separated values')
-          : translate('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
-              value0: field.name
-            })
-      }
-      disabled={disabled}
-    />
+    <div className="flex min-w-0 flex-col gap-1">
+      <Input
+        value={value}
+        onChange={(event) => onValueChange(event.target.value)}
+        type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
+        placeholder={
+          kind === 'textList' || kind === 'userList'
+            ? translate('auto.components.TaskPage.56cdb413a2', 'Comma-separated values')
+            : translate('auto.components.TaskPage.919a20dd5b', 'Enter {{value0}}', {
+                value0: field.name
+              })
+        }
+        disabled={disabled}
+      />
+      {displayValue && displayValue !== value ? (
+        <p className="text-[11px] text-muted-foreground">
+          {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
+            value0: displayValue
+          })}
+        </p>
+      ) : null}
+    </div>
   )
 }

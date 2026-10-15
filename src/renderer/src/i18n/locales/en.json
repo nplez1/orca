@@ -1797,7 +1797,8 @@
         "editFieldsEmpty": "Jira reports no editable custom fields on this issue.",
         "editFieldsSaving": "Saving…",
         "editFields": "Edit fields",
-        "noIssueSelected": "No Jira issue is selected."
+        "noIssueSelected": "No Jira issue is selected.",
+        "anotherUpdatePending": "Another Jira update is still in progress."
       },
       "Landing": {
         "76a95f7f47": "Create",
@@ -20023,7 +20024,8 @@
       "runTerminalUnavailable": "Run terminal is unavailable."
     },
     "jiraSchemaField": {
-      "noUser": "None"
+      "noUser": "None",
+      "currentValue": "Current: {{value0}}"
     }
   },
   "dashboardPopout": {

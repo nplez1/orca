@@ -338,4 +338,38 @@ describe('Jira issue mutations', () => {
       fieldErrors: { customfield_10001: 'Dev is required' }
     })
   })
+
+  it('converts a textarea field to the site body format instead of sending ADF', async () => {
+    getClientsMock.mockReturnValue([makeServerEntry()])
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue(
+      'ALP-1',
+      { customFields: { customfield_7: '**bold**' }, textFieldKeys: ['customfield_7'] },
+      'server-1'
+    )
+
+    // REST v2 rejects an ADF document; the wiki markup is what it accepts.
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      fields: { customfield_7: '{*}bold{*}' }
+    })
+  })
+
+  it('converts a textarea field to ADF on Cloud', async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue(
+      'ALP-1',
+      { customFields: { customfield_7: 'plain' }, textFieldKeys: ['customfield_7'] },
+      'site-1'
+    )
+
+    // Cloud takes ADF; the renderer no longer builds one itself.
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      fields: { customfield_7: expect.objectContaining({ type: 'doc' }) }
+    })
+  })
 })

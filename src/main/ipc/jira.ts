@@ -176,6 +176,9 @@ export function registerJiraHandlers(): void {
         args.customFields && typeof args.customFields === 'object' ? args.customFields : undefined,
       userFieldKeys: Array.isArray(args.userFieldKeys)
         ? args.userFieldKeys.filter((key): key is string => typeof key === 'string')
+        : undefined,
+      textFieldKeys: Array.isArray(args.textFieldKeys)
+        ? args.textFieldKeys.filter((key): key is string => typeof key === 'string')
         : undefined
     })
   })

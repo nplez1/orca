@@ -12,11 +12,19 @@ function isRecordPayload(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
+/** Custom-field edits may only name custom fields; the system fields the row edits
+ *  have dedicated update fields, and the transition screen is the one place a
+ *  workflow publicly names system fields. */
+function isCustomFieldMap(value: Record<string, unknown>): boolean {
+  return Object.keys(value).every((key) => key.startsWith('customfield_'))
+}
+
 /** Narrows an untrusted IPC payload to the issue-update fields the host accepts. */
 export function normalizeIssueUpdate(value: unknown): JiraIssueUpdate | null {
   if (!value || typeof value !== 'object') {
     return null
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every field is re-checked below before the narrowed object is returned.
   const input = value as JiraIssueUpdate
   if (input.title !== undefined && typeof input.title !== 'string') {
     return null
@@ -41,7 +49,10 @@ export function normalizeIssueUpdate(value: unknown): JiraIssueUpdate | null {
   if (input.transitionId !== undefined && typeof input.transitionId !== 'string') {
     return null
   }
-  if (input.customFields !== undefined && !isRecordPayload(input.customFields)) {
+  if (
+    input.customFields !== undefined &&
+    (!isRecordPayload(input.customFields) || !isCustomFieldMap(input.customFields))
+  ) {
     return null
   }
   if (input.transitionFields !== undefined && !isRecordPayload(input.transitionFields)) {
@@ -56,6 +67,18 @@ export function normalizeIssueUpdate(value: unknown): JiraIssueUpdate | null {
   if (
     input.transitionUserFieldKeys !== undefined &&
     normalizeStringArray(input.transitionUserFieldKeys) === undefined
+  ) {
+    return null
+  }
+  if (
+    input.textFieldKeys !== undefined &&
+    normalizeStringArray(input.textFieldKeys) === undefined
+  ) {
+    return null
+  }
+  if (
+    input.transitionTextFieldKeys !== undefined &&
+    normalizeStringArray(input.transitionTextFieldKeys) === undefined
   ) {
     return null
   }

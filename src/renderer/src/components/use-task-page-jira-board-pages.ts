@@ -84,11 +84,7 @@ export function useTaskPageJiraBoardPages(args: {
     [cacheKey, setBacklogPageLocal]
   )
 
-  /**
-   * Applies a local-only patch to one issue in both loaded scopes, so an
-   * optimistic move renders before Jira confirms it. Deliberately not cached: a
-   * status Jira has not accepted must not become the value a reload trusts.
-   */
+  // Local-only pending patch; the hook documents why it is never cached.
   const patchBoardIssue = useJiraBoardIssuePatch({
     sprintPageRef,
     backlogPageRef,

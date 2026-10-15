@@ -220,12 +220,21 @@ export function useJiraIssueWorkspaceDetail({
     async (
       updates: Parameters<typeof jiraUpdateIssue>[2]
     ): Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: JiraFieldErrors }> => {
-      if (!displayed || pendingField) {
+      if (!displayed) {
         return {
           ok: false,
           error: translate(
             'auto.components.JiraIssueWorkspace.noIssueSelected',
             'No Jira issue is selected.'
+          )
+        }
+      }
+      if (pendingField) {
+        return {
+          ok: false,
+          error: translate(
+            'auto.components.JiraIssueWorkspace.anotherUpdatePending',
+            'Another Jira update is still in progress.'
           )
         }
       }

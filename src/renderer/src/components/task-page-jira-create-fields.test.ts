@@ -183,21 +183,12 @@ describe('buildJiraCreateFieldValue', () => {
     expect(buildJiraCreateFieldValue(numberField, 'Infinity')).toBe('Infinity')
   })
 
-  it('builds an ADF document for textarea fields', () => {
+  it('leaves textarea fields as plain text for the host to convert', () => {
     const custom = field({ schema: { custom: 'com.atlassian.jira:textarea' } })
-    expect(buildJiraCreateFieldValue(custom, 'line one\nline two')).toEqual({
-      type: 'doc',
-      version: 1,
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'line one' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: 'line two' }] }
-      ]
-    })
-    expect(buildJiraCreateFieldValue(field({ schema: { type: 'textarea' } }), 'x')).toEqual({
-      type: 'doc',
-      version: 1,
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }]
-    })
+    // The site's body format is the host's call: v2 wants wiki/plain text and v3
+    // wants ADF, and a renderer-built ADF document is rejected by Server/DC.
+    expect(buildJiraCreateFieldValue(custom, 'line one\nline two')).toBe('line one\nline two')
+    expect(buildJiraCreateFieldValue(field({ schema: { type: 'textarea' } }), 'x')).toBe('x')
   })
 
   it('prefers allowed values over the number branch', () => {
@@ -275,6 +266,19 @@ describe('buildJiraCreateSubmission', () => {
     expect(buildJiraCreateSubmission([userField], {}, null)).toEqual({
       customFields: undefined,
       userFieldKeys: undefined
+    })
+  })
+
+  it('names textarea fields so the host can convert them for the site', () => {
+    const textareaField = field({
+      key: 'customfield_7',
+      schema: { custom: 'com.atlassian.jira:textarea' }
+    })
+
+    expect(buildJiraCreateSubmission([textareaField], { customfield_7: 'hello' }, null)).toEqual({
+      customFields: { customfield_7: 'hello' },
+      userFieldKeys: undefined,
+      textFieldKeys: ['customfield_7']
     })
   })
 })

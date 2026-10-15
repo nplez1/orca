@@ -67,6 +67,9 @@ export type JiraCreateField = {
   key: string
   name: string
   required: boolean
+  /** True when Jira will supply the value itself, so a required transition
+   *  field marked this way needs no prompt. */
+  hasDefaultValue?: boolean
   schema?: {
     type?: string
     items?: string
@@ -201,10 +204,14 @@ export type JiraIssueUpdate = {
    *  call, not the field-edit PUT. */
   transitionFields?: Record<string, unknown>
   transitionUserFieldKeys?: string[]
+  /** Keys in transitionFields holding plain text the host converts for the site. */
+  transitionTextFieldKeys?: string[]
   /** Fields applied through the field-edit PUT, custom fields included. A null
    *  value clears the field. */
   customFields?: Record<string, unknown>
   userFieldKeys?: string[]
+  /** Keys in customFields holding plain text the host converts for the site. */
+  textFieldKeys?: string[]
 }
 
 /** Jira's per-field rejection reasons, keyed by the field's Jira key. */
@@ -244,6 +251,9 @@ export type JiraCreateIssueArgs = {
   // Keys in customFields holding user ids; the host shapes them into the
   // {accountId} / {name} object Jira requires. Omitted by older clients.
   userFieldKeys?: string[]
+  // Keys in customFields holding plain text; the host converts them to the
+  // site's own body format. Omitted by older clients.
+  textFieldKeys?: string[]
 }
 
 export type JiraCreateIssueResult =

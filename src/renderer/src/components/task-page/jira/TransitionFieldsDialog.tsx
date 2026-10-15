@@ -57,8 +57,7 @@ function TransitionFieldsForm({
 
   const renderable = request.fields.filter((field) => resolveJiraFieldControlKind(field) !== null)
   const unrenderable = request.fields.filter((field) => resolveJiraFieldControlKind(field) === null)
-  const missing = renderable.filter((field) => !(drafts[field.key] ?? '').trim())
-  const blocked = unrenderable.length > 0 || missing.length > 0
+  const missing = renderable.filter((field) => !(drafts[field.key] ?? '').trim()).length
 
   const handleSubmit = async (): Promise<void> => {
     setError(null)
@@ -97,7 +96,7 @@ function TransitionFieldsForm({
           >
             {translate(
               'auto.components.TaskPage.jiraTransitionFieldsUnsupported',
-              'Orca cannot set {{value0}}, so Jira will refuse this move. Complete the transition in Jira.',
+              'Orca cannot set {{value0}}. If Jira requires it and the issue has no value, the move will be refused and Jira will name the field.',
               { value0: unrenderable.map((field) => field.name).join(', ') }
             )}
           </p>
@@ -141,7 +140,7 @@ function TransitionFieldsForm({
         <Button variant="outline" onClick={onClose} disabled={submitting}>
           {translate('auto.components.TaskPage.ff69a30681', 'Cancel')}
         </Button>
-        <Button onClick={() => void handleSubmit()} disabled={submitting || blocked}>
+        <Button onClick={() => void handleSubmit()} disabled={submitting || missing > 0}>
           {submitting ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />

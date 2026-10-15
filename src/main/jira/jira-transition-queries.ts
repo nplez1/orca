@@ -25,7 +25,12 @@ function requiredTransitionFields(rawFields: unknown): { requiredFields?: JiraCr
   const fields = asRecord(rawFields)
   const requiredFields = Object.entries(fields)
     .map(([fieldKey, raw]) => mapCreateField(raw, fieldKey))
-    .filter((field): field is JiraCreateField => field !== null && field.required)
+    // Why: a field Jira will default itself is not input the user owes us; prompting
+    // for it turns a valid move into a blocked one.
+    .filter(
+      (field): field is JiraCreateField =>
+        field !== null && field.required && field.hasDefaultValue !== true
+    )
   return requiredFields.length > 0 ? { requiredFields } : {}
 }
 

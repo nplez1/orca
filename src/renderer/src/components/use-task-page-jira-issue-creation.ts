@@ -44,7 +44,7 @@ export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationM
     if (!title || newJiraIssueSubmitting || hasMissingJiraCreateField || jiraCreateFieldsLoading) {
       return
     }
-    const { customFields, userFieldKeys } = buildJiraCreateSubmission(
+    const { customFields, userFieldKeys, textFieldKeys } = buildJiraCreateSubmission(
       visibleJiraCreateFields,
       newJiraIssueCustomFieldValues,
       // Why: Jira rejects creates that set a field absent from the create
@@ -61,7 +61,8 @@ export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationM
         title,
         description: newJiraIssueBody || undefined,
         customFields,
-        userFieldKeys
+        userFieldKeys,
+        textFieldKeys
       })
       if (submitProviderRuntimeContextKey !== providerRuntimeContextKeyRef.current) {
         return
