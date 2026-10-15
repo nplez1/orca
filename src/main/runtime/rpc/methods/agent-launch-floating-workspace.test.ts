@@ -36,9 +36,7 @@ afterEach(() => {
 })
 
 describe('floating workspace resolved-worktree minting', () => {
-  // Regression: this mixin file is @ts-nocheck, so a missing module import there is invisible to
-  // `pnpm tc` and only fails at call time (shipped once as a ReferenceError from the structured
-  // createSupport path). Calling the real method pins the import wiring.
+  // A missing resolver import previously broke structured-session creation at call time.
   it('mints the synthetic floating row through the shared module', () => {
     class FloatingResolverProbe extends OrcaRuntimeService {
       mintFloatingResolvedWorktree(path: string): ResolvedWorktree {

@@ -1,5 +1,6 @@
 import { sep } from 'node:path'
 import type { Store } from '../persistence'
+import type { RuntimeStore } from '../runtime/runtime-store-contract'
 import type { WorkspacePathSearchQueryMetrics } from '../../shared/workspace-path-search-instrumentation'
 import { hasDotfileAncestry } from '../../shared/workspace-path-catalog'
 import { fileListingCancellationError } from '../../shared/file-listing-cancellation'
@@ -29,7 +30,7 @@ export type QuickOpenFilePathSearchResult = {
 
 export async function searchQuickOpenFilePaths(
   rootPath: string,
-  store: Store,
+  store: RuntimeStore,
   args: {
     includeIgnored?: boolean
     followSymlinks?: boolean

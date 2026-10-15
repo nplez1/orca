@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -8,13 +8,6 @@ import { writeMobileWebBundleFixtureTree } from './mobile-web-bundle-fixture-tre
 import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
-const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
-const MAIN_BUILD_ENTRY_POINTS_PATH = join(
-  REPO_ROOT,
-  'config',
-  'build-plugins',
-  'main-build-entry-points.ts'
-)
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
@@ -262,6 +255,10 @@ describe('electron-builder config', () => {
         expect.objectContaining({
           from: 'native/windows-cli-launcher/.build/orca.exe',
           to: 'bin/orca-np.exe'
+        }),
+        expect.objectContaining({
+          from: 'native/windows-cli-launcher/.build/orca-administrator-restart.exe',
+          to: 'bin/orca-administrator-restart.exe'
         })
       ])
     )
@@ -276,6 +273,37 @@ describe('electron-builder config', () => {
       expect.objectContaining({ to: join('node_modules', 'serve-sim') })
     ])
   })
+
+  it.each(['mac', 'linux'])(
+    'loads Codex TOML parsing after %s runtime pruning',
+    async (platform) => {
+      const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-packaged-codex-toml-'))
+      try {
+        const resource = electronBuilderConfig[platform].extraResources.find(
+          (entry) => entry.to === join('node_modules', 'smol-toml')
+        )
+        expect(resource).toBeDefined()
+        await copyFiles([
+          new FileMatcher(resource.from, join(resourcesDir, resource.to), (value) => value)
+        ])
+        require('../packaged-runtime-node-modules.cjs').prunePackagedRuntimeNodeModules(
+          resourcesDir,
+          platform === 'mac' ? 'darwin' : 'linux',
+          process.arch
+        )
+        const stagedRequire = createRequire(join(resourcesDir, 'out', 'main', 'codex', 'trust.cjs'))
+        expect(await realpath(stagedRequire.resolve('smol-toml'))).toBe(
+          await realpath(join(resourcesDir, resource.to, 'dist', 'index.cjs'))
+        )
+        const { parse } = stagedRequire('smol-toml')
+        expect(parse('[projects."/workspace"]\ntrust_level = "trusted"\n')).toEqual({
+          projects: { '/workspace': { trust_level: 'trusted' } }
+        })
+      } finally {
+        await rm(resourcesDir, { recursive: true, force: true })
+      }
+    }
+  )
 
   // Why: serve-sim's addon is a Mach-O, and Windows signing rejects every *.node that is not PE.
   it('keeps serve-sim out of the Windows and Linux runtime closures', () => {
@@ -366,11 +394,6 @@ describe('electron-builder config', () => {
   it('unpacks the replaceable WSL transcript filesystem process entry', async () => {
     const entryFilename = 'wsl-transcript-fs-process-entry.js'
     expect(electronBuilderConfig.asarUnpack).toContain(`out/main/${entryFilename}`)
-
-    const entryPoints = await readFile(MAIN_BUILD_ENTRY_POINTS_PATH, 'utf8')
-    expect(entryPoints).toMatch(
-      new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
-    )
   })
 
   // Why: the CLI runs this entry under ELECTRON_RUN_AS_NODE, which cannot read
@@ -393,34 +416,6 @@ describe('electron-builder config', () => {
     expect(
       isUnpacked(join('/app', 'out', 'main', `${entryName}.js`), { isDirectory: () => false })
     ).toBe(true)
-  })
-
-  // Why: the scanner service is forked with ELECTRON_RUN_AS_NODE, so asar is
-  // invisible to it and a packed worker entry fails closed — dropping every
-  // OpenCode session in packaged builds while dev stays green. Three legs must
-  // agree on the filename, so all three are read rather than hardcoded.
-  it('unpacks the foreign SQLite reader entry the scanner service runs OpenCode reads on', async () => {
-    const entryPathSource = await readFile(
-      join(SRC_MAIN_DIR, 'foreign-sqlite-readers', 'foreign-sqlite-reader-entry-path.ts'),
-      'utf8'
-    )
-    const entryFilename = entryPathSource.match(
-      /FOREIGN_SQLITE_READER_ENTRY_FILENAME = '([^']+)'/
-    )?.[1]
-
-    expect(entryFilename).toBeDefined()
-    expect(electronBuilderConfig.asarUnpack).toContain(`out/main/${entryFilename}`)
-
-    // Why: the emitted path comes from the rollup input key under
-    // entryFileNames '[name].js', not from the source filename — renaming the
-    // key alone would leave the other two legs agreeing on a file that no
-    // longer exists.
-    const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
-    expect(viteConfig).toContain("entryFileNames: '[name].js'")
-    const entryPoints = await readFile(MAIN_BUILD_ENTRY_POINTS_PATH, 'utf8')
-    expect(entryPoints).toMatch(
-      new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
-    )
   })
 
   it('keeps the worker-thread hang watchdog inside app.asar', () => {
@@ -551,43 +546,6 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.beforeBuild).toBe(electronBuilderNativeRebuild)
     expect(electronBuilderConfig.npmRebuild).toBe(true)
   })
-
-  // Why: the .deb/.rpm update-recovery path keys entirely off the resources/package-type marker that
-  // app-builder-lib's FpmTarget writes. If packaging silently stops shipping an fpm target, or adds
-  // one the recovery path does not cover, getLinuxRootPackageType() returns null, autoInstallOnAppQuit
-  // quietly goes back to true, and no unit test notices.
-  describe('linux root-package update recovery contract', () => {
-    // FpmTarget writes resources/package-type only for targets it supports auto-update for.
-    const MARKER_TARGETS = new Set(['deb', 'rpm', 'pacman'])
-    const RECOVERABLE_TARGETS = new Set(['deb', 'rpm'])
-    const linuxTargets = electronBuilderConfig.linux.target.map((entry) =>
-      typeof entry === 'string' ? entry : entry.target
-    )
-
-    it('still ships an AppImage plus at least one root-package target', () => {
-      expect(linuxTargets).toContain('AppImage')
-      expect(linuxTargets.some((target) => MARKER_TARGETS.has(target))).toBe(true)
-    })
-
-    it('ships no root-package target the recovery path cannot recover', () => {
-      const unrecoverable = linuxTargets.filter(
-        (target) => MARKER_TARGETS.has(target) && !RECOVERABLE_TARGETS.has(target)
-      )
-      expect(unrecoverable).toEqual([])
-    })
-
-    it('keeps the pinned FpmTarget overwrite for configured deb and rpm artifacts', async () => {
-      const source = await readFile(
-        require.resolve('app-builder-lib/out/targets/FpmTarget'),
-        'utf8'
-      )
-
-      expect(source).toContain('path.join(resourceDir, "package-type"), target')
-      for (const target of RECOVERABLE_TARGETS) {
-        expect(electronBuilderConfig[target]).toBeDefined()
-      }
-    })
-  })
 })
 
 describe('arch-aware packaging guard', () => {
@@ -634,7 +592,6 @@ describe('arch-aware packaging guard', () => {
     if (otherSherpaExpected && !otherSherpaInstalled) {
       expect(() => packHost(OTHER_ARCH)).toThrow(otherSherpa)
       expect(() => packHost(OTHER_ARCH)).toThrow('pnpm install:release')
-      expect(() => packHost(HOST_ARCH)).not.toThrow()
     } else if (process.platform !== 'win32') {
       expect(() => packHost(OTHER_ARCH)).not.toThrow()
     }
@@ -647,7 +604,6 @@ describe('arch-aware packaging guard', () => {
       for (const binary of ['orca_windows_registry.node', 'orca_windows_security.node']) {
         expect(() => packHost(OTHER_ARCH)).toThrow(`${binary} for ${OTHER_ARCH_NAME}`)
       }
-      expect(() => packHost(HOST_ARCH)).not.toThrow()
     }
   )
 

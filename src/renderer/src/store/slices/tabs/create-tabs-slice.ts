@@ -9,7 +9,9 @@ import { createTabsLabelActions } from './tabs-label-actions'
 import { createTabsGroupActions } from './tabs-group-actions'
 import { createTabsMoveActions } from './tabs-move-actions'
 import { createTabsDropActions } from './tabs-drop-actions'
-import { createTabsSecondaryActions } from './tabs-secondary-actions'
+import { createTabsSplitRatioActions } from './tabs-split-ratio-actions'
+import { createTabsBranchGroupHostActions } from './tabs-branch-group-host-actions'
+import { createTabsDragPreviewActions } from './tabs-drag-preview-actions'
 import { createTabsSessionActions } from './tabs-session-actions'
 
 export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, get) => ({
@@ -26,6 +28,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   ...createTabsGroupActions(set, get),
   ...createTabsMoveActions(set, get),
   ...createTabsDropActions(set, get),
-  ...createTabsSecondaryActions(set, get),
+  ...createTabsSplitRatioActions(set),
+  ...createTabsBranchGroupHostActions(set),
+  ...createTabsDragPreviewActions(set),
   ...createTabsSessionActions(set, get)
 })

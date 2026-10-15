@@ -16,6 +16,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/ai-vault-search/session-search-instance.test.ts',
   'src/main/ai-vault-search/session-search-list-latency.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
+  // Disk checkpoints require Node's iterable writeFile semantics.
+  'src/main/ai-vault/session-parse-cache-checkpoint.test.ts',
+  'src/main/ai-vault/session-parse-cache-save-lane.test.ts',
+  'src/main/ai-vault/session-parse-cache-metadata-checkpoint.test.ts',
   // Electron main bridges streams with Node's implementation.
   'src/main/host/electron-http-client.test.ts',
   'src/main/daemon/daemon-init-provider-installation.test.ts',
@@ -55,6 +59,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/ai-vault-search/session-search-fts5-contract.test.ts',
   'src/main/foreign-sqlite-readers/**/*.test.ts',
   'src/main/browser/*cookie*.test.ts',
+  // Playwright's CDP transport needs Node's WebSocket implementation.
+  'src/main/browser/browser-popup-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-native-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-background-compatibility.electron.test.ts',
   'src/main/ai-vault/session-scanner-devin-db.test.ts',
   'src/shared/workspace-session-salvage.test.ts',
   'src/main/git/repo-detection.test.ts',
@@ -64,6 +72,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/providers/local-pty-child-process-verdict.test.ts',
   'src/main/providers/working-directory-validation.test.ts',
   'src/main/pty/posix-pty-process-groups.integration.test.ts',
+  // Real PTYs get no child output under bun; these spawn node-pty and must run on Node.
+  'src/main/daemon/shell-ready.test.ts',
+  'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
+  'src/main/shell-startup-feature-channel.test.ts',
   'src/shared/ephemeral-vm-recipe-output-capture.test.ts',
   'src/main/gitlab/gitlab-known-host-retirement.test.ts',
   'src/main/window/main-window-updater-deferred-setup.test.ts',
@@ -84,6 +96,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/runtime/structured-session-mail-redrive-wiring.test.ts',
   'src/main/runtime/rpc/ws-transport.test.ts',
   'src/main/runtime/rpc/dispatcher-transport-parity.test.ts',
+  'src/main/runtime/rpc/methods/structured-agent-session-visual.test.ts',
   // Bun resolves 'ws' to its built-in client, which bypasses the patched package.
   'src/main/runtime/rpc/ws-empty-payload-frame-write.test.ts',
   'src/shared/remote-runtime-client.test.ts',
@@ -94,10 +107,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/codex/codex-shared-server-probe.test.ts',
   'src/main/opencode/opencode-launch-model-context-supervision.test.ts',
   'src/main/hermes/hermes-config-remote-adapter.test.ts',
-  'src/renderer/src/lib/monaco-languages/monarch-upstream-mdx-recursion.test.ts',
   'src/main/ipc/orca-profiles-switch-persistence.test.ts',
   'src/main/ipc/settings-delayed-response.test.ts',
   'src/main/runtime/structured-agent-session-startup-tab-restore.test.ts',
+  'src/main/runtime/structured-agent-session-windowless-layout-host.test.ts',
   'src/shared/remote-runtime-shared-control-connection.test.ts',
   'src/main/runtime/relay/relay-control-client.test.ts',
   'src/main/ipc/filesystem-watcher-ignore-real.test.ts',

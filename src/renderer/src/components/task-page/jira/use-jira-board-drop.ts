@@ -3,6 +3,7 @@ import type { DragEvent } from 'react'
 import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import { getTaskPageJiraBoardTransitionTargets } from '../../task-page-jira-board-model'
+import { requiredTransitionFields } from '../../../../../shared/jira-transition-fields'
 import { jiraListTransitions } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
@@ -58,9 +59,10 @@ export function useJiraBoardDrop({
 
   /** A transition that needs its screen fields asks for them before submitting. */
   const resolveTransition = async (issue: JiraIssue, transition: JiraTransition): Promise<void> => {
-    if (transition.requiredFields?.length) {
+    const required = requiredTransitionFields(transition)
+    if (required.length > 0) {
       clearPicker()
-      move.openTransitionFields(issue, transition, transition.requiredFields)
+      move.openTransitionFields(issue, transition, required)
       return
     }
     const outcome = await move.applyTransition(issue, transition)

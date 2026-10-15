@@ -17,6 +17,14 @@ export type OrcaWorkspaceLayout = {
   worktreeLayoutMode?: WorktreeLayoutMode
 }
 
+/** The settings slice carrying the placement rule for new workspaces. Declared here so
+ *  `GlobalSettings` can intersect it instead of growing its own line budget. */
+export type OrcaWorkspaceLayoutSettings = {
+  /** Placement rule for new workspaces. Kept optional so a settings file written before
+   *  the mode existed stays readable — resolve it with `resolveWorktreeLayoutMode`. */
+  worktreeLayoutMode?: WorktreeLayoutMode
+}
+
 export const DEFAULT_WORKTREE_LAYOUT_MODE: WorktreeLayoutMode = 'project-folder'
 
 /**

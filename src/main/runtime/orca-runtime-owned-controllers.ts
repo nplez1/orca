@@ -1,6 +1,8 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import { ALL_EXECUTION_HOSTS_SCOPE } from '../../shared/execution-host'
-import type { OrcaRuntimeWithPreservedBranchCleanup } from './orca-runtime-preserved-branch-cleanup'
+// Why this path: upstream moved the mixin into the construction module, and this is a
+// type-only import, so the cycle with host-services' value import of this file is erased.
+import type { OrcaRuntimeWithPreservedBranchCleanup } from './construction/runtime-host-services'
 import { RuntimeAccountController } from './runtime-account-controller'
 import { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
 import { RuntimeMobileDictationController } from './runtime-mobile-dictation-controller'

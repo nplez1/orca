@@ -5,14 +5,17 @@ import {
   getWorktreeExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { isDetachedHeadWorkspace } from '../../visible-worktree-kinds'
+import { isDetachedHeadWorkspace } from '../../../../../../shared/worktree/workspace-kinds'
 import { branchName } from '../../../../lib/git-utils'
 import {
   composeWorktreeHostIdentity,
   getWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
 import { PINNED_GROUP_KEY } from './group-keys'
-import { getProjectGroupingForRepo, type ProjectGroupingIndex } from './project-grouping'
+import {
+  getProjectGroupingForRepo,
+  type ProjectGroupingIndex
+} from '../../../../../../shared/project-section-grouping'
 import type { BranchGroupMember, Row, WorktreeRow } from './row-types'
 
 // `|` is legal inside a branch, so the section and branch need a separator that

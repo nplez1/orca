@@ -11,7 +11,16 @@ import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../../shared/quick-open-listi
 import type { FilePathSearchResult } from '../../../shared/file-path-search-result'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import { useRuntimeFileListForWorktree, type RuntimeFileListState } from './quick-open-file-list'
+import {
+  getRuntimeFileListTarget,
+  getNestedWorktreeExcludeRequest,
+  getNestedWorktreeExcludePaths,
+  isNestedWorktreePath,
+  useRuntimeFileListForWorktree,
+  type RuntimeFileListState
+} from './quick-open-file-list'
+import * as fileListTarget from './quick-open-file-list-target'
+import * as nestedWorktrees from './quick-open-nested-worktrees'
 import { QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS } from './quick-open-search'
 
 const listRuntimeFilesMock = vi.hoisted(() => vi.fn())
@@ -219,6 +228,13 @@ afterEach(async () => {
   roots.length = 0
   Reflect.deleteProperty(window, 'api')
   useAppStore.setState(initialAppState, true)
+})
+
+it('keeps the pure file list functions available through the hook module', () => {
+  expect(getRuntimeFileListTarget).toBe(fileListTarget.getRuntimeFileListTarget)
+  expect(getNestedWorktreeExcludeRequest).toBe(fileListTarget.getNestedWorktreeExcludeRequest)
+  expect(getNestedWorktreeExcludePaths).toBe(nestedWorktrees.getNestedWorktreeExcludePaths)
+  expect(isNestedWorktreePath).toBe(nestedWorktrees.isNestedWorktreePath)
 })
 
 describe('useRuntimeFileListForWorktree', () => {

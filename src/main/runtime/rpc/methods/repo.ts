@@ -39,7 +39,7 @@ export const REPO_METHODS = [
       context.runtime.enrichMissingRepoGitRemoteIdentities?.()
       return {
         repos: context.runtime
-          .listRepos()
+          .listVisibleRepos()
           .map((repo) => projectRepoVisibilityForClient(repo, context)),
         // Why on a listing: a checkout sitting outside its project folder is something the host can
         // see for free, and a client only ever learns about it if the listing says so.
@@ -52,7 +52,7 @@ export const REPO_METHODS = [
     name: 'projectGroup.list',
     permission: 'workspace',
     params: null,
-    handler: (_params, { runtime }) => ({ groups: runtime.listProjectGroups() })
+    handler: (_params, { runtime }) => ({ groups: runtime.listVisibleProjectGroups() })
   }),
   defineMethod({
     name: 'projectGroup.create',

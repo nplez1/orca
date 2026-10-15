@@ -2,6 +2,11 @@ import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import { getMainHttpClient } from '../network/http-client'
 import { withSpan } from '../observability/tracer'
 import type { JiraAuthType, JiraSite } from '../../shared/jira-types'
+import { isJiraGatewayBaseUrl } from './gateway-base-url'
+import {
+  readFetchResponseBytesWithinLimit,
+  readFetchResponseJsonWithinLimit
+} from '../../shared/fetch-response-body'
 
 // Why: Atlassian's XSRF filter rejects POST/PUT REST calls that carry a browser
 // User-Agent, failing them with "XSRF check failed" even under API-token auth.
@@ -30,25 +35,48 @@ export class JiraApiError extends Error {
   fieldErrors?: Record<string, string>
   /** Jira's non-field error strings, e.g. a workflow rule that failed outright. */
   errorMessages?: string[]
+  /** True when the token's scopes do not cover this request, so the credential
+   *  is valid but under-scoped and must not be cleared. */
+  scopeMismatch = false
 
   constructor(
     message: string,
     status: number | null = null,
-    detail?: { fieldErrors?: Record<string, string>; errorMessages?: string[] }
+    detail?:
+      | {
+          fieldErrors?: Record<string, string>
+          errorMessages?: string[]
+          scopeMismatch?: boolean
+        }
+      // Upstream's call sites pass the scope flag positionally rather than as detail.
+      | boolean
   ) {
     super(message)
     this.status = status
-    this.fieldErrors = detail?.fieldErrors
-    this.errorMessages = detail?.errorMessages
+    const fields = typeof detail === 'boolean' ? undefined : detail
+    this.fieldErrors = fields?.fieldErrors
+    this.errorMessages = fields?.errorMessages
+    this.scopeMismatch = typeof detail === 'boolean' ? detail : fields?.scopeMismatch === true
   }
 }
 
-export function authHeader(email: string, apiToken: string, authType?: JiraAuthType): string {
+/** REST base URL: the scoped-token gateway for Cloud sites that declare one. */
+export function apiBaseUrl(site: JiraSite): string {
+  if (site.authType !== 'server' && site.apiBaseUrl !== undefined) {
+    if (!isJiraGatewayBaseUrl(site.apiBaseUrl)) {
+      throw new JiraApiError('Invalid Jira gateway URL. Reconnect this Jira site.')
+    }
+    return site.apiBaseUrl
+  }
+  return site.siteUrl
+}
+
+export function authHeader(email: string, apiToken: string, _authType?: JiraAuthType): string {
   // Self-hosted with no username = a personal access token (Bearer); Basic auth
   // with a PAT in the password slot is what produces the 401s users report.
   // Self-hosted WITH a username is classic username+password Basic auth, which
-  // older Server/DC instances (predating PATs) require. Cloud is always Basic.
-  if (authType === 'server' && !email) {
+  // older Server/DC instances require. Email-free Cloud tokens use the gateway.
+  if (!email) {
     return `Bearer ${apiToken}`
   }
   return `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`
@@ -65,7 +93,7 @@ function describeErrorCause(error: unknown): string | undefined {
   return cause === undefined ? undefined : String(cause)
 }
 
-async function jiraFetch(url: string, init: RequestInit): Promise<Response> {
+export async function jiraFetch(url: string, init: RequestInit): Promise<Response> {
   return withSpan(
     'jira.request',
     async (span) => {
@@ -121,11 +149,11 @@ export async function requestWithCredentials(
   headers.set('Authorization', authHeader(email, apiToken, authType))
   const response = await jiraFetch(`${siteUrl}${path}`, {
     ...init,
-    headers
+    headers,
+    ...(isJiraGatewayBaseUrl(siteUrl) ? { redirect: 'error' as const } : {})
   })
   if (!response.ok) {
-    const detail = await readJiraErrorDetail(response)
-    throw new JiraApiError(detail.message, response.status, detail)
+    throw await toJiraError(response, `${siteUrl}${path}`)
   }
   if (response.status === 204) {
     return null
@@ -137,24 +165,54 @@ type JiraErrorDetail = {
   message: string
   fieldErrors?: Record<string, string>
   errorMessages?: string[]
+  scopeMismatch?: boolean
 }
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-async function readJiraErrorDetail(response: Response): Promise<JiraErrorDetail> {
+function isScopeMismatch(response: Response, message: string, url: string): boolean {
+  const target = new URL(url)
+  return (
+    target.origin === 'https://api.atlassian.com' &&
+    (response.status === 401 || response.status === 403) &&
+    /scope does not match|insufficient_scope|scope mismatch/i.test(
+      `${message} ${response.headers.get('www-authenticate') ?? ''}`
+    )
+  )
+}
+
+function scopeMismatchMessage(response: Response, url: string): string {
+  const target = new URL(url)
+  const scope = /\/(myself|user|users)(\/|$)/.test(target.pathname)
+    ? 'read:jira-user'
+    : 'read:jira-work for reads or write:jira-work for edits'
+  return `Jira rejected this request's API token scopes at ${target.host}${target.pathname} (HTTP ${response.status}). Add ${scope}; board ordering also needs the Jira Software board scopes listed in the connection guide.`
+}
+
+async function readJiraErrorDetail(
+  response: Response,
+  url: string,
+  maxResponseBytes?: number
+): Promise<JiraErrorDetail> {
+  let message = response.statusText || `Jira request failed (${response.status})`
+  let fieldErrors: Record<string, string> | undefined
+  let errorMessages: string[] | undefined
   try {
-    const raw: unknown = await response.json()
+    const raw: unknown =
+      maxResponseBytes === undefined
+        ? await response.json()
+        : await readFetchResponseJsonWithinLimit(response, maxResponseBytes)
     const data = isUnknownRecord(raw) ? raw : {}
     const errors = isUnknownRecord(data.errors) ? data.errors : {}
-    const fieldErrors = Object.fromEntries(
+    fieldErrors = Object.fromEntries(
       Object.entries(errors).filter(
         (entry): entry is [string, string] => typeof entry[1] === 'string'
       )
     )
-    const errorMessages = Array.isArray(data.errorMessages)
-      ? data.errorMessages.filter((message): message is string => typeof message === 'string')
+    errorMessages = Array.isArray(data.errorMessages)
+      ? data.errorMessages.filter((item): item is string => typeof item === 'string')
       : undefined
     const messages = [
       ...(errorMessages ?? []),
@@ -162,69 +220,109 @@ async function readJiraErrorDetail(response: Response): Promise<JiraErrorDetail>
       ...(typeof data.message === 'string' ? [data.message] : [])
     ].filter(Boolean)
     if (messages.length > 0) {
-      return {
-        message: messages.join('; '),
-        ...(Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}),
-        ...(errorMessages && errorMessages.length > 0 ? { errorMessages } : {})
-      }
+      message = messages.join('; ')
     }
   } catch {
-    // Fall through to status text.
+    // Fall through to status text for non-JSON responses.
   }
-  return { message: response.statusText || `Jira request failed (${response.status})` }
+  const scopeMismatch = isScopeMismatch(response, message, url)
+  return {
+    message: scopeMismatch ? scopeMismatchMessage(response, url) : message,
+    ...(fieldErrors && Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}),
+    ...(errorMessages && errorMessages.length > 0 ? { errorMessages } : {}),
+    ...(scopeMismatch ? { scopeMismatch } : {})
+  }
+}
+
+async function toJiraError(
+  response: Response,
+  url: string,
+  maxResponseBytes?: number
+): Promise<JiraApiError> {
+  const detail = await readJiraErrorDetail(response, url, maxResponseBytes)
+  return new JiraApiError(detail.message, response.status, detail)
 }
 
 export async function jiraRequest<T>(
   client: JiraClientForSite,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  maxResponseBytes?: number
 ): Promise<T> {
   const headers = new Headers(init?.headers)
   headers.set('Accept', 'application/json')
   headers.set('Content-Type', 'application/json')
   headers.set('User-Agent', JIRA_API_USER_AGENT)
   headers.set('Authorization', client.authorization)
-  const response = await jiraFetch(`${client.site.siteUrl}${path}`, {
+  const url = `${apiBaseUrl(client.site)}${path}`
+  const response = await jiraFetch(url, {
     ...init,
-    headers
+    headers,
+    ...(isJiraGatewayBaseUrl(apiBaseUrl(client.site)) ? { redirect: 'error' as const } : {})
   })
   if (!response.ok) {
-    const detail = await readJiraErrorDetail(response)
-    throw new JiraApiError(detail.message, response.status, detail)
+    throw await toJiraError(response, url, maxResponseBytes)
   }
   if (response.status === 204) {
     return null as T
   }
+  if (maxResponseBytes !== undefined) {
+    return readFetchResponseJsonWithinLimit<T>(response, maxResponseBytes)
+  }
   return (await response.json()) as T
+}
+
+function resolveBinaryRequestUrl(site: JiraSite, pathOrUrl: string): URL {
+  const siteUrl = new URL(site.siteUrl)
+  const baseUrl = apiBaseUrl(site)
+  const requestUrl = /^https?:\/\//i.test(pathOrUrl)
+    ? new URL(pathOrUrl)
+    : new URL(`${site.siteUrl}${pathOrUrl}`)
+  if (!requestUrl.username && !requestUrl.password) {
+    if (baseUrl !== site.siteUrl && requestUrl.href.startsWith(`${baseUrl}/`)) {
+      return requestUrl
+    }
+    if (requestUrl.origin === siteUrl.origin) {
+      if (baseUrl === site.siteUrl) {
+        return requestUrl
+      }
+      if (requestUrl.pathname.startsWith('/rest/')) {
+        return new URL(`${baseUrl}${requestUrl.pathname}${requestUrl.search}`)
+      }
+      throw new JiraApiError('Scoped Jira attachments require a REST content URL.', null)
+    }
+  }
+  // The gateway origin is shared by every tenant, so its full cloud-ID prefix must match.
+  throw new JiraApiError('Jira attachment URL must use the configured site origin.', null)
 }
 
 export async function jiraRequestBinary(
   client: JiraClientForSite,
-  pathOrUrl: string
+  pathOrUrl: string,
+  options: { maxBytes?: number; signal?: AbortSignal } = {}
 ): Promise<{ data: ArrayBuffer; contentType: string }> {
-  const siteUrl = new URL(client.site.siteUrl)
-  const requestUrl = /^https?:\/\//i.test(pathOrUrl)
-    ? new URL(pathOrUrl)
-    : new URL(`${client.site.siteUrl}${pathOrUrl}`)
-  if (requestUrl.origin !== siteUrl.origin) {
-    // Why: attachment metadata is provider-controlled; never forward Jira
-    // credentials if a malformed response points at another origin.
-    throw new JiraApiError('Jira attachment URL must use the configured site origin.', null)
-  }
+  const requestUrl = resolveBinaryRequestUrl(client.site, pathOrUrl)
   const headers = new Headers()
   // Why: attachment content is binary; forcing JSON Accept/Content-Type can
   // break downloads and confuses some Atlassian edge responses.
   headers.set('Accept', '*/*')
   headers.set('User-Agent', JIRA_API_USER_AGENT)
   headers.set('Authorization', client.authorization)
-  const response = await jiraFetch(requestUrl.toString(), { headers })
+  const response = await jiraFetch(requestUrl.toString(), {
+    headers,
+    signal: options.signal,
+    ...(isJiraGatewayBaseUrl(apiBaseUrl(client.site)) ? { redirect: 'error' as const } : {})
+  })
   if (!response.ok) {
-    const detail = await readJiraErrorDetail(response)
-    throw new JiraApiError(detail.message, response.status, detail)
+    throw await toJiraError(response, requestUrl.toString())
   }
   const contentType = response.headers.get('content-type') || 'application/octet-stream'
+  const bytes = await readFetchResponseBytesWithinLimit(
+    response,
+    options.maxBytes ?? 2 * 1024 * 1024
+  )
   return {
-    data: await response.arrayBuffer(),
+    data: Uint8Array.from(bytes).buffer,
     contentType
   }
 }

@@ -5,7 +5,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-control'
 import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
-import { cn } from '@/lib/utils'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
+import { JiraIssueTransitionControl } from './jira-issue-transition-control'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
@@ -13,6 +15,7 @@ import type {
   JiraEditableField,
   JiraIssue,
   JiraIssueUpdate,
+  JiraMutationResult,
   JiraPriority,
   JiraSprintAssignment,
   JiraTransition,
@@ -22,16 +25,6 @@ import {
   JiraIssueEditFieldsDialog,
   type JiraIssueFieldOutcome
 } from './jira-issue-edit-fields-dialog'
-
-function jiraStatusClass(categoryKey: string): string {
-  if (categoryKey === 'done') {
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-  }
-  if (categoryKey === 'indeterminate') {
-    return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
-  }
-  return 'border-border/50 bg-muted/40 text-muted-foreground'
-}
 
 /** Header row for an open Jira issue: key, summary, and workspace actions. */
 export function JiraIssueWorkspaceHeader({
@@ -105,73 +98,62 @@ export function JiraIssueMetadataBar({
   displayed,
   pendingField,
   transitions,
+  transitionsLoading,
+  transitionsError,
+  reloadTransitions,
   priorities,
-  users,
   editFields,
   editFieldsLoading,
-  selfUser,
   providerSettings,
+  sourceContext,
+  owner,
+  runtimeContextKey,
+  sprintAssignment,
   mutateIssue,
-  submitIssueFields,
-  sprintAssignment
+  submitIssueFields
 }: {
   displayed: JiraIssue
   pendingField: string | null
   transitions: JiraTransition[]
+  transitionsLoading: boolean
+  transitionsError: string | null
+  reloadTransitions: () => void
   priorities: JiraPriority[]
-  users: JiraUser[]
   editFields: JiraEditableField[]
   editFieldsLoading: boolean
+  /** Kept in the contract for the sheet's self-user pass-through; the assignee
+   *  control now resolves the signed-in user itself from the source context. */
   selfUser: JiraUser | null
+  users: JiraUser[]
   providerSettings: RuntimeJiraSettings
+  sourceContext?: TaskSourceContext | null
+  owner: RuntimeClientTarget
+  runtimeContextKey: string
   /** Null on a host that cannot answer, or when no board is in scope to move into. */
   sprintAssignment: JiraSprintAssignment | null
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
     optimistic?: Partial<JiraIssue>
-  ) => Promise<void>
+  ) => Promise<JiraMutationResult>
   submitIssueFields: (updates: JiraIssueUpdate) => Promise<JiraIssueFieldOutcome>
 }): React.JSX.Element {
   const [editFieldsOpen, setEditFieldsOpen] = useState(false)
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-4 py-2.5">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              disabled={pendingField === 'transition' || transitions.length === 0}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80 disabled:opacity-50',
-                jiraStatusClass(displayed.status.categoryKey)
-              )}
-            >
-              {displayed.status.name}
-              {pendingField === 'transition' ? (
-                <LoaderCircle className="size-3 animate-spin" />
-              ) : null}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="popover-scroll-content scrollbar-sleek w-52 p-1" align="start">
-            {transitions.map((transition) => (
-              <button
-                key={transition.id}
-                type="button"
-                onClick={() =>
-                  void mutateIssue(
-                    'transition',
-                    { transitionId: transition.id },
-                    { status: transition.to }
-                  )
-                }
-                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-              >
-                {transition.name}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <JiraIssueTransitionControl
+          key={`${displayed.siteId ?? ''}:${displayed.key}`}
+          issue={displayed}
+          transitions={transitions}
+          loading={transitionsLoading}
+          error={transitionsError}
+          pending={pendingField !== null}
+          onRetry={reloadTransitions}
+          onTransition={(updates, transition) =>
+            mutateIssue('transition', updates, { status: transition.to })
+          }
+        />
 
         <Popover>
           <PopoverTrigger asChild>
@@ -213,11 +195,11 @@ export function JiraIssueMetadataBar({
         </Popover>
 
         <JiraIssueAssigneeControl
-          displayed={displayed}
-          users={users}
-          selfUser={selfUser}
-          providerSettings={providerSettings}
-          pending={pendingField === 'assignee'}
+          issue={displayed}
+          disabled={pendingField !== null}
+          sourceContext={sourceContext}
+          owner={owner}
+          runtimeContextKey={runtimeContextKey}
           mutateIssue={mutateIssue}
         />
 

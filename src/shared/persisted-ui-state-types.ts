@@ -1,3 +1,5 @@
+import type { JiraQuickFilterState } from './jira-quick-filters'
+import type { JiraSavedFilterState } from './jira-saved-filters'
 import type { ReleaseChannel } from './release-channel'
 import type { WorkspaceCleanupUIState } from './workspace-cleanup'
 import type { FeatureTipId } from './feature-tips'
@@ -27,6 +29,8 @@ import type { WorkspaceStatusDefinition } from './worktree/types'
 import type { PersistedAutomationHostFilter } from './automation-host-filter'
 
 export type PersistedUIState = {
+  jiraSavedFilterState?: JiraSavedFilterState
+  jiraQuickFilterState?: JiraQuickFilterState
   lastActiveRepoId: string | null
   lastActiveWorktreeId: string | null
   /** Active top-level view at save time, restored on relaunch; sanitized to 'terminal' if unknown or now-gated. */
@@ -202,6 +206,9 @@ export type PersistedUIState = {
   browserKagiSessionLink?: string | null
   /** Saved window bounds so the app restores last position/size instead of maximizing each launch. */
   windowBounds?: { x: number; y: number; width: number; height: number } | null
+  /** Saved bounds for the pop-out dashboard window so it restores to its last
+   *  position/size. Independent of the main window's bounds. */
+  dashboardPopoutBounds?: { x: number; y: number; width: number; height: number } | null
   /** Whether the window was maximized when it was last closed. */
   windowMaximized?: boolean
   /** One-shot flag: 'recent' once meant the smart sort (v1→v2 rename), migrated to 'smart' once so the new last-activity 'recent' isn't re-clobbered. */

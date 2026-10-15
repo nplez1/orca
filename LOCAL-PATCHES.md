@@ -343,6 +343,100 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-15 — merge of upstream `e8c7b32a90` (311 commits) into the release line, from
+  `bb043b9724`** (merge base `8b0fa15e943b`, backup `backup/nplez1-main-pre-sync`, rollback tag
+  `archive/pre-sync-bb043b9724`). The upstream-branch workflow still leaves `origin/main` where it
+  was; nothing here touched it. The pre-flight gate passed on the fork tip before any resolution.
+
+  The merge produced **88 conflicted paths** — `both-rewrote 51, union 20, rename-replay 6,
+  modify/delete 5, add/add 4, duplicate-members 2`. Upstream spent the same window building the same
+  Jira features this fork built, so roughly a third of the conflict set was one idea implemented twice
+  on both lines (assignee search and *Assign to me* #28612, a board and current-sprint filter #28633,
+  required transition fields #28588, planning columns #28615, linked-workspace views #28590). The
+  convergence is recorded in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
+  under five new sections; the short version is **per capability, not per feature**: upstream's shape
+  wins wherever it is a superset, and every fork addition is re-expressed on top of it.
+
+  - **The Jira line, converged without losing the fork's half.** `JiraTransition.requiredFields`
+    became upstream's canonical `fields`, with the fork's one rule inside it (a required field Jira
+    will default itself is not the user's to fill) re-homed into
+    `src/shared/jira-transition-fields.ts` so upstream's `classifyTransitionRequirements` inherits it.
+    `jira-transition-queries.ts` takes upstream's version wholesale. `JiraIssueUpdate` carries both
+    upstream's `transitionComment` and the fork's shaping keys. `jiraAddIssueComment` gained an
+    **optional** `bodyFormat` — required would have broken upstream's four-argument call site. The
+    fork keeps what upstream has no counterpart for: self-hosted Server/DC *body* rendering,
+    editmeta custom-field editing, sprint assignment, the configured agile board with drag-drop
+    transitions, board settings, priority tone, and the generic transition-fields dialog (upstream
+    handles only resolution + comment and calls anything else `unsupported`).
+  - **Two `JiraApiError` classes became one.** Upstream split a second class into `jira-api-error.ts`
+    whose `toJiraApiError` nothing in the merged tree calls, while every real `instanceof
+    JiraApiError` site tests the fork's class — so auth classification would have depended on which
+    module threw. That file now re-exports the single class, and the constructor accepts upstream's
+    positional boolean as well as the fork's detail object, so upstream's own call site is unchanged.
+  - **Upstream retired its own Orca/Hermes automation target; no fork work went with it.** The merge
+    stages ~2,455 deletions across 77 `components/automations` files, which looks exactly like a merge
+    eating fork work. The test that separates the two: the deleted files (`automation-hermes-save.ts`,
+    `hermes-cron-output-parse.ts`, `ExternalAutomationRunTable.tsx`, …) exist at the merge base **and**
+    at the fork tip but not upstream, and the fork's only contribution anywhere in that feature was
+    `cd3e64b6cf` substituting `APP_DISPLAY_NAME` for the app name in a toggle upstream removed. The
+    orphaned import was deleted; the feature is not re-added.
+  - **Silent losses found by machinery, not by conflict markers.** Three more of the class this
+    section has recorded before, each fixed rather than tolerated:
+    - *Upstream replaced an inheritance chain with composition.* `RuntimeFileCommands` now holds
+      `search`/`access`/`reads`/`mutations`/`watches` sub-objects, and the merge deleted
+      `runtime-file-command-access.ts`, `runtime-file-search.ts`, `runtime-file-command-host.ts` and
+      `runtime-file-command-target.ts` with it. The fork's `searchWorkspacePathNameFilter` lived only
+      in a module inheriting from the deleted one, so the merge left it with three dangling imports
+      **and no caller**, while `runtime-file-command-surface.ts` still required the method and
+      `rpc/methods/files.ts` still called it. Re-homed onto upstream's composition — and note the
+      2026-10-13 entry below already says of this same module "do not delete it again"; the local half
+      is what the web client and paired desktops use.
+    - *Upstream made a runtime mixin `abstract`.* `OrcaRuntimeWithStartTuiIdleVisibleReadProbe` moved
+      under `terminal/wait/` and became abstract, so the fork's two concrete mid-chain classes were
+      suddenly required to implement 119 inherited members. Both are `abstract` now, matching
+      upstream's chain, and the requirement propagates to the same concrete endpoint as upstream's.
+    - *An upstream field was dropped from a persisted type.* The auto-merge took the fork's shape of
+      `PersistedUIState` and lost upstream's `dashboardPopoutBounds`, which upstream's own
+      schema-parity check then caught. Restoring it exposed a second gap: upstream's new
+      `wsl-move-ui-dispositions.ts` asserts every `PersistedUIState` field is classified, and the
+      merged type now carries five fork-only fields. All six entries were added, and the same class of
+      gap was fixed in the storage dispositions too (the fork's `jira-board-view-storage.ts` in the
+      localStorage map, upstream's `ai-vault-search.sessions_fts` in the SQLite map). **The sweep test
+      that caught these is the general form of the trap** — after a sync, every exhaustiveness map
+      upstream adds has to learn the merged content.
+  - **Five `max-lines` overflows, all fixed by splitting, none by a cap bump.** Upstream keeps
+    several files at exactly the budget, so a union overflows with no marker and no type error:
+    `rpc/methods/jira.ts` 324→292 (the four board methods moved to `jira-board-methods.ts`),
+    `task-page-jira-issue-list.tsx` 488→144 (`JiraIssueRow` → `task-page-jira-issue-row.tsx`),
+    `worktree.ts` 301→258, `runtime-project-host-setup-controller.ts` 301→274,
+    `use-task-page-jira-list-effects.ts` 312→279. One `max-lines` overflow came from the coordinator's
+    own repair (`global-settings-types.ts`, 301), fixed by moving the worktree-layout settings field
+    into `orca-workspace-layout.ts` and intersecting it — the pattern that file already used.
+  - **The focus-read ratchet was raised deliberately, with its cause named.** Four Jira surfaces
+    gained owner-aware reads from the merged upstream work (`JiraIssueWorkspace.tsx` 1→2,
+    `jira-issue-workspace-side-data.ts` 6→8, `task-page/jira/Board.tsx` 3→4,
+    `runtime-jira-board-client.ts` 3→4). The fork's owner-routing migration is the standing follow-up
+    from 2026-10-11 and this sync did not take it on, so the counts are recorded in
+    `config/focus-setting-read-baseline.txt` with a dated annotation — the same action the 2026-10-11
+    entry above took for the same reason.
+  - **Two failures proved not ours, the way this section asks for it.**
+    `src/main/cli/packaged-cli-assets.test.ts` reproduces **identically** on the pre-sync tip
+    `bb043b9724` in a fresh worktree (the darwin launcher's `app_realpath` uses `cd -P`, which resolves
+    macOS's `/var` → `/private/var` symlink while the test builds its path from the unresolved
+    `os.tmpdir()`), and the test file plus both launcher assets are byte-identical at `HEAD`.
+    `src/main/workspace-path-index/workspace-path-index-publication-admission.test.ts` is fork-only and
+    unchanged, passes 3/3 in isolation twice, and fails only under full-suite load — a `vi.waitFor`
+    default timeout expiring while the bundled worker still reports `reason: 'building'`. Both are
+    recorded rather than chased, which is the standing convention here.
+  - **Follow-ups opened by this sync, by name.** (1) `local/sync/post-sync.mjs` should gain the
+    fork-only reference sweep that found the orphan above: take every `src/` path from the pre-sync
+    fork-only inventory, resolve every relative and `@/` import specifier in the tree, and report each
+    fork-only file nothing references. Run by hand it found that module plus four pre-existing dead
+    files. (2) `Content.tsx` currently exposes two board surfaces — the configured agile board and
+    upstream's status board over the current result set — deliberately kept apart because unifying
+    them is a UI decision, not a sync decision. (3) The Quick Open list-target helpers are a known
+    duplicate that this sync converged onto upstream's pair.
+
 - **2026-10-14 — released as `v1.4.214-np.30`** from `419cdb689e` (workflow run 38508995384, attempt 2,
   signed and notarized, both macOS slices plus Windows), onto upstream `8b0fa15e94`, from the
   released tip `v1.4.214-np.26`. The release needed two fork-local build fixes that the sync's own

@@ -1,7 +1,7 @@
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { Worktree } from '../../../shared/worktree/types'
 import { revealRepoInProjectFilter } from '@/components/sidebar/project-filter-reveal'
-import { isDetachedHeadWorkspace } from '@/components/sidebar/visible-worktrees'
+import { isDetachedHeadWorkspace } from '../../../shared/worktree/workspace-kinds'
 import type { useAppStore } from '@/store'
 import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
 

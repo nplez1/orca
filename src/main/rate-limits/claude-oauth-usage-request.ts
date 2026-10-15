@@ -1,7 +1,7 @@
-import { net, session } from 'electron'
 import type { ProviderAllowance } from '../../shared/provider-allowance'
 import type { ProviderRateLimits, RateLimitWindow } from '../../shared/rate-limit-types'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
+import { getMainHttpClient } from '../network/http-client'
 import { abortSignalWithTimeout } from '../lib/abort-signal-with-timeout'
 import {
   ClaudeUsageRequestError,
@@ -127,7 +127,6 @@ function mapClaudeMonthlyAllowance(data: OAuthUsageResponse): {
 
 async function ensureProxyFromEnvironment(): Promise<void> {
   await ensureElectronProxyFromEnvironment({
-    proxySession: session.defaultSession,
     probeUrl: OAUTH_USAGE_URL
   }).catch(() => {})
 }
@@ -168,7 +167,7 @@ export async function fetchClaudeOAuthUsage(
 
   let data: OAuthUsageResponse
   try {
-    const response = await net.fetch(OAUTH_USAGE_URL, {
+    const response = await getMainHttpClient().fetch(OAUTH_USAGE_URL, {
       headers: {
         Authorization: `Bearer ${token}`,
         'anthropic-beta': 'oauth-2025-04-20',

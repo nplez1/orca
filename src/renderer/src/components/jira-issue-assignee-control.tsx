@@ -1,16 +1,29 @@
-import { useCallback, useMemo, useState } from 'react'
-import { LoaderCircle } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  JiraUserOptionList,
-  splitJiraUserPickerOptions,
-  useJiraUserSearch
-} from '@/components/jira-user-picker'
-import { jiraListAssignableUsers } from '@/runtime/runtime-jira-client'
+import { useCallback, useRef } from 'react'
+import { Button } from '@/components/ui/button'
+import { JiraUserPicker, splitJiraUserPickerOptions } from '@/components/jira-user-picker'
+import { getJiraSelfUser } from '@/components/jira-self-user'
+import { useJiraSourceConnection } from '@/components/new-workspace/use-jira-source-connection'
+import { useAppStore } from '@/store'
+import { compareBaseSensitivityLocaleText } from '@/lib/locale-text-collators'
+import { jiraListAssignableUsersForTarget } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
-import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import {
+  getTaskSourceCacheScope,
+  type TaskSourceContext
+} from '../../../shared/task-source-context'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { JiraIssue, JiraIssueUpdate, JiraUser } from '../../../shared/jira-types'
+
+/**
+ * Why one order for both groups: upstream sorts candidate rows by name, and the fork's pinned
+ * group is a prefix of that same list rather than a separately-ordered one.
+ */
+function byJiraDisplayName(a: JiraUser, b: JiraUser): number {
+  return (
+    compareBaseSensitivityLocaleText(a.displayName, b.displayName) ||
+    a.accountId.localeCompare(b.accountId)
+  )
+}
 
 /**
  * Assignee control for an open Jira issue. Typing narrows the list to the people
@@ -18,122 +31,105 @@ import type { JiraIssue, JiraIssueUpdate, JiraUser } from '../../../shared/jira-
  * pinned above the results.
  */
 export function JiraIssueAssigneeControl({
-  displayed,
-  users,
-  selfUser,
-  providerSettings,
-  pending,
+  issue,
+  disabled,
+  sourceContext,
+  owner,
+  runtimeContextKey,
   mutateIssue
 }: {
-  displayed: JiraIssue
-  /** The issue's assignable users — the project roster, which is the pinned group. */
-  users: JiraUser[]
-  selfUser: JiraUser | null
-  providerSettings: RuntimeJiraSettings
-  pending: boolean
+  issue: JiraIssue
+  disabled: boolean
+  sourceContext?: TaskSourceContext | null
+  owner: RuntimeClientTarget
+  runtimeContextKey: string
   mutateIssue: (
     field: string,
     updates: JiraIssueUpdate,
     optimistic?: Partial<JiraIssue>
-  ) => Promise<void>
+  ) => Promise<unknown>
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  // Why strings and not `displayed`: a refresh swaps the issue object, and an unstable
-  // search callback would restart the search under the user's cursor.
-  const issueKey = displayed.key
-  const siteId = displayed.siteId
-  const searchUsers = useCallback(
-    (value: string) => jiraListAssignableUsers(providerSettings, issueKey, value, siteId),
-    [issueKey, providerSettings, siteId]
-  )
-  const hasQuery = query.trim().length > 0
-  const { users: found, loading } = useJiraUserSearch({
-    // Why: the roster is already loaded as `users`, so only a typed query needs a request.
-    active: open && hasQuery,
-    query,
-    searchUsers
+  const defaultStatus = useAppStore((state) => state.jiraStatus)
+  const defaultStatusKey = useAppStore((state) => state.jiraStatusContextKey)
+  const connection = useJiraSourceConnection({
+    enabled: true,
+    sourceContext: sourceContext ?? null
   })
-  // Why gated on the query: clearing it abandons its lookup mid-flight, leaving `loading` set.
-  const searching = hasQuery && loading
-  const options = useMemo(
-    () =>
-      splitJiraUserPickerOptions({
-        candidates: hasQuery ? found : [],
-        pinned: selfUser ? [selfUser, ...users] : users,
+  const status = sourceContext
+    ? connection.status
+    : defaultStatusKey === runtimeContextKey
+      ? defaultStatus
+      : null
+  const self = getJiraSelfUser(status, issue.siteId)
+  // Why refs: `searchUsers` must be referentially stable or the picker restarts its
+  // debounced lookup on every render, and the viewer object is rebuilt each render.
+  const selfRef = useRef<JiraUser | null>(null)
+  selfRef.current = self
+  const selfAccountId = self?.accountId
+  // Why the roster is remembered: the picker's first lookup runs with an empty query and
+  // its result IS the project roster, so later queries can keep me and my team pinned
+  // above the matches without a second request.
+  const rosterRef = useRef<JiraUser[]>([])
+  const searchUsers = useCallback(
+    async (query: string): Promise<JiraUser[]> => {
+      const found = await jiraListAssignableUsersForTarget(owner, issue.key, query, issue.siteId)
+      if (query.trim().length === 0) {
+        rosterRef.current = found
+      }
+      const me = selfRef.current
+      const roster = [...rosterRef.current].sort(byJiraDisplayName)
+      const { pinned, rest } = splitJiraUserPickerOptions({
+        candidates: found,
+        pinned: me ? [me, ...roster] : roster,
         query
-      }),
-    [found, hasQuery, query, selfUser, users]
-  )
-
-  const selectAssignee = useCallback(
-    (user: JiraUser) => {
-      void mutateIssue('assignee', { assigneeAccountId: user.accountId }, { assignee: user })
-      setOpen(false)
+      })
+      return [...pinned, ...[...rest].sort(byJiraDisplayName)]
     },
-    [mutateIssue]
+    [issue.key, issue.siteId, owner]
   )
-
+  const assign = (user: JiraUser | null): void => {
+    if (disabled) {
+      return
+    }
+    void mutateIssue(
+      'assignee',
+      { assigneeAccountId: user?.accountId ?? null },
+      { assignee: user ?? undefined }
+    )
+  }
+  const sourceKey = sourceContext ? getTaskSourceCacheScope(sourceContext) : runtimeContextKey
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (!next) {
-          setQuery('')
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={pending}
-          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50"
-        >
-          {displayed.assignee?.displayName ??
-            translate('auto.components.JiraIssueWorkspace.54649eaeab', '+ Assignee')}
-          {pending ? <LoaderCircle className="size-3 animate-spin" /> : null}
-        </button>
-      </PopoverTrigger>
-      {/* Why the wrapper: `popover-scroll-content` carries the height and scroll styling, and
-          `wheelScroll` keeps the Radix scroll-lock from swallowing the wheel inside it. */}
-      <PopoverContent className="w-56" align="start" wheelScroll>
-        <div className="popover-scroll-content scrollbar-sleek p-1">
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={translate('components.jiraUserPicker.search', 'Search users')}
-            className="mb-1 h-7"
-            autoFocus
-          />
-          <button
-            type="button"
-            onClick={() => {
-              void mutateIssue('assignee', { assigneeAccountId: null }, { assignee: undefined })
-              setOpen(false)
-            }}
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-          >
-            {translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')}
-          </button>
-          {searching ? (
-            <div className="flex items-center gap-2 px-2 py-3 text-[12px] text-muted-foreground">
-              <LoaderCircle className="size-3 animate-spin" />
-              {translate('auto.components.right.sidebar.IssueAssignee.searching', 'Searching…')}
-            </div>
-          ) : null}
-          <JiraUserOptionList users={options.pinned} onSelect={selectAssignee} />
-          {options.pinned.length > 0 && options.rest.length > 0 ? (
-            <div className="my-1 h-px bg-border/60" aria-hidden />
-          ) : null}
-          <JiraUserOptionList users={options.rest} onSelect={selectAssignee} />
-          {!searching && options.pinned.length === 0 && options.rest.length === 0 ? (
-            <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
-              {translate('components.jiraUserPicker.empty', 'No users found')}
-            </p>
-          ) : null}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="w-40">
+        <JiraUserPicker
+          key={JSON.stringify([sourceKey, issue.siteId, issue.key])}
+          providerSettings={owner}
+          siteId={issue.siteId}
+          value={
+            issue.assignee?.accountId ??
+            translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')
+          }
+          selectedUser={issue.assignee ?? null}
+          onSelect={assign}
+          disabled={disabled}
+          label={translate('components.jiraIssueAssigneeField.label', 'Assignee')}
+          fixedOptions={[
+            {
+              key: 'unassigned',
+              label: translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned'),
+              onSelect: () => assign(null)
+            }
+          ]}
+          searchUsers={searchUsers}
+        />
+      </div>
+      {self && issue.assignee?.accountId !== selfAccountId ? (
+        <Button variant="ghost" size="xs" disabled={disabled} onClick={() => assign(self)}>
+          {translate('components.jiraIssueAssigneeField.assignToMe', 'Assign to me ({{name}})', {
+            name: self.displayName
+          })}
+        </Button>
+      ) : null}
+    </div>
   )
 }

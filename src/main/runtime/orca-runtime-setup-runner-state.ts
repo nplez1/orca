@@ -1,5 +1,5 @@
 import { createOsc133CommandFinishedScanner } from '../../shared/terminal-osc133-command-finished'
-import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './orca-runtime-start-tui-idle-visible-read-probe'
+import { OrcaRuntimeWithStartTuiIdleVisibleReadProbe } from './terminal/wait/terminal-wait-visible-probe'
 import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 
 /**
@@ -39,7 +39,7 @@ type SetupRunnerObservation = {
  *  - the watchdog above, for a runner that never starts at all.
  * The state is in-memory only, so a main-process restart cannot carry it over.
  */
-export class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithStartTuiIdleVisibleReadProbe {
+export abstract class OrcaRuntimeWithSetupRunnerState extends OrcaRuntimeWithStartTuiIdleVisibleReadProbe {
   private setupRunnerObservationByPtyId = new Map<string, SetupRunnerObservation>()
   private setupRunnerPtyCountByWorktreeId = new Map<string, number>()
   private setupRunnerRunningWorktreeIds = new Set<string>()

@@ -9,6 +9,7 @@ import { formatBrowserClientHostIdArgument } from '../../shared/browser-client-h
 import { markSystemSessionEnding } from '../crash-reporting/expected-teardown-state'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
 import { clearTrustedUIRendererWebContentsId, setTrustedUIRendererWebContentsId } from '../ipc/ui'
+import { flushUnsavedCloudSessions } from '../orca-profiles/profile-cloud-session-owner'
 import type { Store } from '../persistence'
 import {
   installMainWindowCloseLifecycle,
@@ -158,6 +159,7 @@ export function createMainWindow(
           ? event.reasons.filter((reason) => typeof reason === 'string').join(',')
           : ''
       })
+      flushUnsavedCloudSessions()
       // Windows emits no will-quit for an OS shutdown or logoff, so its teardown never records it.
       recordAgentSessionRuntimeEnd('quit')
     })

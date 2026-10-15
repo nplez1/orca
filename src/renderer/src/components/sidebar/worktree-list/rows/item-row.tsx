@@ -15,10 +15,10 @@ import {
   getFolderBackedRepoWorktreeCardContentIndent,
   getFolderBackedRepoWorktreeCardSurfaceInset,
   getLineageChildrenInlineStyle,
-  getLineageNestedRowGeometry,
   getWorktreeCardContentIndent,
   getWorktreeCardSurfaceInset,
-  LINEAGE_CHILDREN_INLINE_OFFSET
+  LINEAGE_CHILDREN_INLINE_OFFSET,
+  LINEAGE_NESTED_ROW_SURFACE_INSET
 } from './indentation'
 import type { LineageToggleHandler } from '../../worktree-lineage-toggle-handler-cache'
 import { stopNestedWorktreeCardBubble } from './header-event-guards'
@@ -73,13 +73,16 @@ function getWorktreeItemRowGeometry(
   ctx: WorktreeItemRowContext,
   itemRow: WorktreeItemRow,
   nested: boolean
-): { surfaceInset: number; cardContentIndent: number; lineageChildrenInlineOffset?: number } {
+): { surfaceInset: number; cardContentIndent: number } {
+  // Why: the shared child wrapper already inherits the parent's group and content offsets.
+  if (nested) {
+    return { surfaceInset: LINEAGE_NESTED_ROW_SURFACE_INSET, cardContentIndent: 0 }
+  }
+
   const projectGroupId = itemRow.repo?.projectGroupId
   const isFolderBackedRepoChild =
     ctx.groupBy === 'repo' &&
     Boolean(projectGroupId && ctx.folderBackedProjectGroupIds.has(projectGroupId))
-  // Why: experimental in-card lineage inherits the parent surface; legacy cards keep depth-based nested geometry.
-  const paddingDepth = nested ? Math.max(0, itemRow.depth - 1) : itemRow.depth
   const getCardContentIndent = (lineageDepth: number): number =>
     isFolderBackedRepoChild
       ? getFolderBackedRepoWorktreeCardContentIndent({
@@ -91,39 +94,19 @@ function getWorktreeItemRowGeometry(
           groupDepth: itemRow.groupDepth,
           lineageDepth
         })
-  const nestedLineageGeometry = nested
-    ? getLineageNestedRowGeometry({
-        experimentalNewWorktreeCardStyle: ctx.settings?.experimentalNewWorktreeCardStyle === true,
-        inheritedCardContentIndent: getCardContentIndent(0),
+  const paddingLeft = getCardContentIndent(itemRow.depth)
+  const surfaceInset = isFolderBackedRepoChild
+    ? getFolderBackedRepoWorktreeCardSurfaceInset({
+        groupDepth: itemRow.groupDepth,
         lineageDepth: itemRow.depth
       })
-    : null
-  // Why: grouped rows inherit their header depth, but the card surface still spans the full row.
-  const paddingLeft =
-    nested && ctx.groupBy !== 'none'
-      ? getWorktreeCardContentIndent({
-          isGrouped: false,
-          groupDepth: itemRow.groupDepth,
-          lineageDepth: paddingDepth
-        })
-      : getCardContentIndent(paddingDepth)
-  const surfaceInset = nestedLineageGeometry
-    ? nestedLineageGeometry.surfaceInset
-    : isFolderBackedRepoChild
-      ? getFolderBackedRepoWorktreeCardSurfaceInset({
-          groupDepth: itemRow.groupDepth,
-          lineageDepth: paddingDepth
-        })
-      : getWorktreeCardSurfaceInset({
-          isGrouped: ctx.groupBy !== 'none',
-          groupDepth: itemRow.groupDepth
-        })
+    : getWorktreeCardSurfaceInset({
+        isGrouped: ctx.groupBy !== 'none',
+        groupDepth: itemRow.groupDepth
+      })
   return {
     surfaceInset,
-    cardContentIndent: nestedLineageGeometry
-      ? nestedLineageGeometry.cardContentIndent
-      : Math.max(0, paddingLeft - surfaceInset),
-    lineageChildrenInlineOffset: nestedLineageGeometry?.lineageChildrenInlineOffset
+    cardContentIndent: Math.max(0, paddingLeft - surfaceInset)
   }
 }
 
@@ -134,10 +117,9 @@ export function renderWorktreeItemRow(
   lineageChildren?: React.ReactNode,
   forceActiveSurface = false
 ): React.JSX.Element {
-  const { surfaceInset, cardContentIndent, lineageChildrenInlineOffset } =
-    getWorktreeItemRowGeometry(ctx, itemRow, nested)
+  const { surfaceInset, cardContentIndent } = getWorktreeItemRowGeometry(ctx, itemRow, nested)
   const lineageChildrenStyle = lineageChildren
-    ? getLineageChildrenInlineStyle(lineageChildrenInlineOffset ?? LINEAGE_CHILDREN_INLINE_OFFSET)
+    ? getLineageChildrenInlineStyle(LINEAGE_CHILDREN_INLINE_OFFSET)
     : undefined
   // Why: a Group by branch card stands in for every host it merged. Until the
   // user picks a host, it follows the active workspace, then falls back local-first.

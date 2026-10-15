@@ -70,6 +70,9 @@ export function useJiraIssueSideData({
   const [editFieldsLoading, setEditFieldsLoading] = useState(false)
   const [sprintState, setSprintState] = useState<SprintAssignmentState | null>(null)
   const requestIdRef = useRef(0)
+  // Fences a reload against an in-flight initial read so a stale list cannot
+  // overwrite the freshly reloaded one.
+  const transitionsReadIdRef = useRef(0)
   // Why a key ref rather than the request counter: a reload for the old issue
   // must be dropped without also discarding the new issue's in-flight load.
   const editFieldsIssueKeyRef = useRef<string | null>(issueKey)
@@ -93,6 +96,12 @@ export function useJiraIssueSideData({
       return
     }
     const requestId = ++requestIdRef.current
+    const transitionsReadId = transitionsReadIdRef.current
+    // Clear the previous issue's data so it cannot linger while the new read runs.
+    setTransitions([])
+    setPriorities([])
+    setUsers([])
+    setEditFields([])
     setEditFieldsLoading(true)
     void Promise.all([
       jiraListTransitions(providerSettings, issueKey, issueSiteId),
@@ -115,7 +124,9 @@ export function useJiraIssueSideData({
           if (requestId !== requestIdRef.current) {
             return
           }
-          setTransitions(nextTransitions)
+          if (transitionsReadId === transitionsReadIdRef.current) {
+            setTransitions(nextTransitions)
+          }
           setPriorities(nextPriorities)
           setUsers(nextUsers)
           setEditFields(nextEditFields)
@@ -134,10 +145,11 @@ export function useJiraIssueSideData({
     if (!issueKey) {
       return
     }
+    const readId = ++transitionsReadIdRef.current
     const next = await jiraListTransitions(providerSettings, issueKey, issueSiteId).catch(
       () => null
     )
-    if (next) {
+    if (next && readId === transitionsReadIdRef.current) {
       setTransitions(next)
     }
   }, [issueKey, issueSiteId, providerSettings])

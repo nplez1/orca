@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraIssue } from '../../../../../shared/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 
 // Why: this pins the seam the helper tests cannot see — which handler Content wires
@@ -19,11 +20,8 @@ const spies = vi.hoisted(() => ({
 }))
 
 vi.mock('@/components/task-page-jira-issue-list', () => ({
-  TaskPageJiraIssueList: (props: {
-    issueWorkspaceAttachmentIndex: unknown
-    onOpenOrStartWorkspace: unknown
-  }) => {
-    spies.list(props.onOpenOrStartWorkspace, props.issueWorkspaceAttachmentIndex)
+  TaskPageJiraIssueList: (props: { onStartWorkspace: unknown; columns: unknown }) => {
+    spies.list(props.onStartWorkspace, props.columns)
     return null
   }
 }))
@@ -37,6 +35,14 @@ vi.mock('@/components/JiraIssueWorkspace', () => ({
 
 vi.mock('./Board', () => ({ TaskPageJiraBoard: () => null }))
 vi.mock('../linear/Content', () => ({ TaskPageLinearContent: () => null }))
+// Presentation chrome the list branch renders; the test only pins the handler wiring.
+vi.mock('@/components/jira-list-columns-menu', () => ({ JiraListColumnsMenu: () => null }))
+vi.mock('@/components/task-page-jira-view-controls', () => ({
+  TaskPageJiraViewControls: () => null
+}))
+vi.mock('@/components/task-page-jira-sort-controls', () => ({
+  TaskPageJiraSortControls: () => null
+}))
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -93,10 +99,12 @@ function model(
   workspaces: Worktree[],
   view: 'list' | 'board' = 'list'
 ): {
+  handleUseJiraItem: (issue: JiraIssue) => void
   handleOpenOrUseJiraItem: (issue: JiraIssue) => void
   composerHandler: (issue: JiraIssue) => void
   rendered: TaskPageComposerActionsModel
 } {
+  const handleUseJiraItem = vi.fn()
   const handleOpenOrUseJiraItem = vi.fn()
   const composerHandler = vi.fn()
   const selectedIssue = issue()
@@ -107,6 +115,12 @@ function model(
     jiraStatusReady: true,
     jiraBoardViewMode: view,
     setJiraBoardViewMode: vi.fn(),
+    jiraViewMode: 'list',
+    setJiraViewMode: vi.fn(),
+    jiraCurrentSprint: false,
+    setJiraCurrentSprint: vi.fn(),
+    jiraHasWorkspace: false,
+    getJiraIssueWorkspaces: () => [],
     jiraConnected: true,
     selectedJiraSiteId: 'site-1',
     hideTaskSource: vi.fn(),
@@ -125,16 +139,20 @@ function model(
     jiraOrderBy: 'status',
     jiraOrderDirection: 'asc',
     handleJiraSort: vi.fn(),
+    jiraColumnIds: defaultJiraListColumnIds(),
+    jiraColumns: visibleJiraListColumns(defaultJiraListColumnIds()),
+    toggleJiraColumn: vi.fn(),
     displayedJiraIssues: [selectedIssue],
     displayedJiraStatusOrder: null,
     sortedJiraIssues: [selectedIssue],
     setJiraConnectOpen: vi.fn(),
     jiraIssueAttachmentIndex: buildJiraIssueWorkspaceAttachmentIndex(workspaces),
+    handleUseJiraItem,
     handleOpenOrUseJiraItem,
     // Why supplied at all: it must not be the handler either surface is wired to.
     composerHandler
   } as unknown as TaskPageComposerActionsModel
-  return { handleOpenOrUseJiraItem, composerHandler, rendered }
+  return { handleUseJiraItem, handleOpenOrUseJiraItem, composerHandler, rendered }
 }
 
 afterEach(() => {
@@ -144,8 +162,8 @@ afterEach(() => {
 })
 
 describe('TaskPageJiraContent workspace action wiring', () => {
-  it('routes the list and the sheet to the open-or-start handler, never the composer', () => {
-    const { handleOpenOrUseJiraItem, composerHandler, rendered } = model([
+  it('routes the list to the start handler and the sheet to open-or-start, never the composer', () => {
+    const { handleUseJiraItem, handleOpenOrUseJiraItem, composerHandler, rendered } = model([
       attachedWorkspace('alp-1-fix-payments')
     ])
 
@@ -155,10 +173,7 @@ describe('TaskPageJiraContent workspace action wiring', () => {
       </TooltipProvider>
     )
 
-    expect(spies.list).toHaveBeenCalledWith(
-      handleOpenOrUseJiraItem,
-      rendered.jiraIssueAttachmentIndex
-    )
+    expect(spies.list).toHaveBeenCalledWith(handleUseJiraItem, rendered.jiraColumns)
     expect(spies.sheet).toHaveBeenCalledWith(
       handleOpenOrUseJiraItem,
       rendered.jiraIssueAttachmentIndex

@@ -1,19 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setMainHttpClient } from '../network/http-client'
 
-const { netFetchMock, resolveProxyMock, setProxyMock, appGetPathMock } = vi.hoisted(() => ({
-  netFetchMock: vi.fn(),
-  resolveProxyMock: vi.fn(),
-  setProxyMock: vi.fn(),
-  appGetPathMock: vi.fn()
-}))
-
-vi.mock('electron', () => ({
-  app: { getPath: appGetPathMock },
-  net: { fetch: netFetchMock },
-  session: { defaultSession: { resolveProxy: resolveProxyMock, setProxy: setProxyMock } }
-}))
+const fetchMock = vi.fn()
 
 import { fetchClaudeOAuthUsage } from './claude-oauth-usage-request'
+
+setMainHttpClient({ fetch: fetchMock, proxySession: () => null })
 
 /** Integer count of 10^-exponent units, e.g. 640000 at exponent 2 is 6400.00. */
 function money(amountMinor: number, exponent: number | undefined, currency?: string) {
@@ -54,16 +46,13 @@ function enterpriseUsagePayload(overrides: Record<string, unknown> = {}) {
 }
 
 function fetchUsage(payload: unknown) {
-  netFetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }))
+  fetchMock.mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }))
   return fetchClaudeOAuthUsage('oauth-token')
 }
 
 describe('Claude monthly allowance for windowless plans', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    appGetPathMock.mockReturnValue('/tmp/orca-claude-monthly-test')
-    resolveProxyMock.mockResolvedValue('DIRECT')
-    setProxyMock.mockResolvedValue(undefined)
   })
 
   afterEach(() => {

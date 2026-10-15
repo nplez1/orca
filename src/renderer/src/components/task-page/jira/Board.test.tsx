@@ -594,7 +594,7 @@ describe('TaskPageJiraBoard', () => {
     mocks.jiraListTransitions.mockResolvedValue([
       {
         ...startTransition,
-        requiredFields: [
+        fields: [
           { key: 'customfield_10001', name: 'Dev', required: true, schema: { type: 'string' } }
         ]
       }

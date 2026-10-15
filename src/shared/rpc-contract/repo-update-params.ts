@@ -3,6 +3,7 @@ import { normalizeRepoSourceControlAiOverrides } from '../source-control-ai'
 import { normalizeRepoBadgeColor } from '../repo-badge-color'
 import { sanitizeRepoIcon } from '../repo-icon'
 import { normalizeGhAccountBinding } from '../github/account-binding'
+import { normalizeJiraProjectReference } from '../jira-project-reference'
 import {
   normalizeCustomWorktreeVisibilitySources,
   normalizeWorktreeVisibilitySourcePreferences
@@ -59,6 +60,7 @@ export function createRepoUpdateSchema<T extends Readonly<Record<string, z.ZodTy
       symlinkPaths: z.array(z.string()).optional(),
       sharedDirectoriesMode: z.enum(WORKTREE_SHARED_DIRECTORIES_MODES).optional(),
       issueSourcePreference: z.enum(['auto', 'upstream', 'origin']).optional(),
+      defaultJiraProject: z.unknown().optional().transform(normalizeJiraProjectReference),
       ghAccount: z
         .unknown()
         .optional()

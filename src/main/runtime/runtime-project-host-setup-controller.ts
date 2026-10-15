@@ -21,25 +21,25 @@ import {
 } from '../../shared/execution-host'
 import { getProjectIdForProviderIdentity } from '../../shared/project-host-setup-projection'
 import { getProjectHostSetupForRepo } from '../../shared/project-host-setup-lookup'
-import {
-  layoutModeNestsWorkspaces,
-  resolveWorktreeLayoutMode,
-  type WorktreeLayoutMode
-} from '../../shared/orca-workspace-layout'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
-import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktree-base-directory-watcher'
 import {
   SshHostNotServedError,
   sshTargetNotConnectedMessage
 } from '../providers/ssh-host-not-served-error'
 import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
+import { applyProjectSetupWorktreeLayoutMode } from './runtime-project-setup-layout-mode'
 import type { RuntimeStore } from './runtime-store-contract'
 import { readAllWorktreeMetaForRepo } from '../persistence/host-qualified-worktree-meta'
 import {
   countRepoWorkspacesWithMetadata,
   describeProjectRemovalRefusal
 } from './project-removal-impact'
+import {
+  assertWslMoveHostSetupIdWritable,
+  assertWslMoveHostSetupWritable,
+  assertWslMoveReposWritable
+} from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 type RuntimeProjectHostSetupDependencies = {
   getStore: () => RuntimeStore | null
@@ -79,6 +79,8 @@ export class RuntimeProjectHostSetupController {
     if (!store?.updateProject) {
       throw new Error('runtime_unavailable')
     }
+    const existing = store.getProjects?.().find((entry) => entry.id === projectId)
+    assertWslMoveReposWritable(store, existing?.sourceRepoIds ?? [])
     const project = store.updateProject(projectId, updates)
     if (!project) {
       throw new Error(`Project not found: ${projectId}`)
@@ -97,10 +99,11 @@ export class RuntimeProjectHostSetupController {
     if (!store?.createProjectHostSetup) {
       throw new Error('runtime_unavailable')
     }
+    assertWslMoveHostSetupWritable(store, args)
     // Why before the setup write: the mode is a host setting rather than a setup field, so a
     // rejected settings write should fail the command instead of leaving a created setup whose
     // requested layout silently did not apply.
-    this.applyWorktreeLayoutMode(args.worktreeLayoutMode)
+    applyProjectSetupWorktreeLayoutMode(this.deps, args.worktreeLayoutMode)
     const { worktreeLayoutMode: _mode, ...setupArgs } = args
     void _mode
     const result = store.createProjectHostSetup(setupArgs)
@@ -151,7 +154,8 @@ export class RuntimeProjectHostSetupController {
     if (!store?.updateProjectHostSetup) {
       throw new Error('runtime_unavailable')
     }
-    this.applyWorktreeLayoutMode(args.updates.worktreeLayoutMode)
+    assertWslMoveHostSetupIdWritable(store, args.setupId)
+    applyProjectSetupWorktreeLayoutMode(this.deps, args.updates.worktreeLayoutMode)
     const { worktreeLayoutMode: _mode, ...updates } = args.updates
     void _mode
     const result = store.updateProjectHostSetup({ ...args, updates })
@@ -170,45 +174,12 @@ export class RuntimeProjectHostSetupController {
     return result
   }
 
-  /**
-   * Write the host-level layout mode these setup calls can carry. Returns whether it changed.
-   *
-   * Why here: the CLI has no settings command, so `orca project setup-create|setup-update` is the
-   * only placement surface it exposes. The value is global — it applies to every project on this
-   * host, not to the setup record being written.
-   */
-  private applyWorktreeLayoutMode(mode: WorktreeLayoutMode | undefined): boolean {
-    if (!mode) {
-      return false
-    }
-    const store = this.deps.getStore()
-    if (!store?.updateSettings || !store.getSettings) {
-      throw new Error('runtime_unavailable')
-    }
-    if (resolveWorktreeLayoutMode(store.getSettings()) === mode) {
-      return false
-    }
-    // Why the boolean too: an older reader of these settings only understands it, so leaving it
-    // stale would make the same host place worktrees two different ways.
-    store.updateSettings(
-      { worktreeLayoutMode: mode, nestWorkspaces: layoutModeNestsWorkspaces(mode) },
-      { notifyListeners: true }
-    )
-    // Why: placement is derived from the mode, so every root and watch target derived from the
-    // previous one is now stale. Mirrors what the Settings pane does for the same change.
-    for (const repo of this.deps.listRepos()) {
-      void prepareLocalWorktreeRootForRepo(store, repo)
-    }
-    scheduleCurrentWorktreeBaseDirectoryWatcherSync()
-    invalidateAuthorizedRootsCache()
-    return true
-  }
-
   deleteSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {
     const store = this.deps.getStore()
     if (!store?.deleteProjectHostSetup) {
       throw new Error('runtime_unavailable')
     }
+    assertWslMoveHostSetupIdWritable(store, args.setupId)
     if (args.force === false) {
       this.assertSetupRemovalIsUnused(store, args.setupId)
     }
@@ -287,6 +258,11 @@ export class RuntimeProjectHostSetupController {
     if (!store) {
       throw new Error('runtime_unavailable')
     }
+    assertWslMoveHostSetupWritable(store, {
+      projectId: args.projectId,
+      hostId: getRepoExecutionHostId(initialRepo),
+      repoId: initialRepo.id
+    })
     let repo = initialRepo
     let setup = getProjectHostSetupForRepo(this.listSetups(), repo)
     if (setup.projectId !== args.projectId) {

@@ -16,6 +16,8 @@ import { bindTaskPageJiraItemSourceContext } from './task-page-jira-item-source-
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldHideTaskPageListChrome } from '@/components/task-page-list-chrome-visibility'
 import { getJiraIssueWorkspaceSeed } from './task-page-source-context'
+import { findJiraIssueDefaultRepo } from '../../../shared/jira-project-reference'
+import { getRepoWorkspaceCreationTargetHint } from '@/lib/project-host-workspace-target'
 export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) {
   const {
     setTaskResumeState,
@@ -217,14 +219,19 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
         url: issue.url,
         jiraIdentifier: issue.key
       }
+      const mappedRepo = findJiraIssueDefaultRepo(model.repos, issue, taskSourceContext.hostId)
       openModal('new-workspace-composer', {
         linkedWorkItem,
         taskSourceContext,
+        initialRepoId: mappedRepo?.id,
+        initialWorkspaceTarget: mappedRepo
+          ? getRepoWorkspaceCreationTargetHint(mappedRepo, useAppStore.getState().projectHostSetups)
+          : undefined,
         prefilledName: getJiraIssueWorkspaceSeed(issue),
         telemetrySource: 'sidebar'
       })
     },
-    [jiraSites, jiraTaskSourceContext, openModal]
+    [jiraSites, jiraTaskSourceContext, model.repos, openModal]
   )
   const handleUseJiraItem = useCallback(
     (issue: JiraIssue): void => {
@@ -269,6 +276,7 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     handleLinearScopeOpen: typeof handleLinearScopeOpen
     handleLinearAccessConnected: typeof handleLinearAccessConnected
     openComposerForJiraItem: typeof openComposerForJiraItem
+    handleUseJiraItem: typeof handleUseJiraItem
     handleOpenOrUseJiraItem: typeof handleOpenOrUseJiraItem
     jiraIssueAttachmentIndex: typeof jiraIssueAttachmentIndex
     taskPageListChromeHidden: typeof taskPageListChromeHidden
@@ -281,6 +289,7 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
   nextModel.handleLinearScopeOpen = handleLinearScopeOpen
   nextModel.handleLinearAccessConnected = handleLinearAccessConnected
   nextModel.openComposerForJiraItem = openComposerForJiraItem
+  nextModel.handleUseJiraItem = handleUseJiraItem
   nextModel.handleOpenOrUseJiraItem = handleOpenOrUseJiraItem
   nextModel.jiraIssueAttachmentIndex = jiraIssueAttachmentIndex
   nextModel.taskPageListChromeHidden = taskPageListChromeHidden

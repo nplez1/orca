@@ -8,6 +8,8 @@ import type { Store } from '../persistence'
 import { ensureFloatingWorkspaceLaunchDirectory } from '../floating-workspace-launch-directory'
 import { authorizeExternalPath } from './filesystem-auth'
 
+type FloatingTerminalSettings = Pick<GlobalSettings, 'floatingTerminalTrustedCwds'>
+
 /** Pre-folder builds kept floating markdown notes beside the rest of the app data. */
 const LEGACY_FLOATING_NOTES_DIRNAME = 'floating-workspace'
 
@@ -44,7 +46,7 @@ async function canonicalizeAccessibleDirectory(dirPath: string): Promise<string 
   }
 }
 
-function getTrustedFloatingWorkspaceDirectories(settings: GlobalSettings): Set<string> {
+function getTrustedFloatingWorkspaceDirectories(settings: FloatingTerminalSettings): Set<string> {
   return new Set(
     (settings.floatingTerminalTrustedCwds ?? [])
       .map((trustedPath) => trustedPath.trim())
@@ -66,7 +68,7 @@ async function getPreservedTrustedFloatingWorkspaceDirectories(
 
 function isTrustedFloatingWorkspaceDirectory(
   canonicalDirPath: string,
-  settings: GlobalSettings
+  settings: FloatingTerminalSettings
 ): boolean {
   return getTrustedFloatingWorkspaceDirectories(settings).has(path.resolve(canonicalDirPath))
 }
@@ -161,7 +163,7 @@ async function pathExists(target: string): Promise<boolean> {
 }
 
 export async function resolveFloatingTerminalCwd(
-  store: Pick<Store, 'getSettings'>,
+  store: { getSettings: () => FloatingTerminalSettings },
   args?: FloatingTerminalCwdRequest
 ): Promise<string> {
   const configuredPath = typeof args?.path === 'string' ? args.path.trim() : ''

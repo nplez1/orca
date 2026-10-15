@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import * as VisuallyHidden from 'radix-ui/visually-hidden'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { useAppStore } from '@/store'
-import type { JiraIssue } from '../../../shared/jira-types'
-import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { JiraIssue, JiraIssueUpdate, JiraMutationResult } from '../../../shared/jira-types'
+import {
+  getTaskSourceCacheScope,
+  type TaskSourceContext
+} from '../../../shared/task-source-context'
 import {
   findJiraIssueWorkspaceAttachmentInIndex,
   type JiraIssueWorkspaceAttachmentIndex
@@ -14,15 +17,22 @@ import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-wor
 import { getJiraSelfUser } from './jira-self-user'
 import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeSource, defaultScopeHost } from '@/lib/default-creation-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
+import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
+import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
+
+const EMPTY_ATTACHMENT_INDEX: JiraIssueWorkspaceAttachmentIndex = new Map()
 
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   /** Workspaces already attached to Jira issues, so the primary action can show the
    *  one belonging to this issue instead of offering to start a duplicate. */
-  issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
-  onOpenOrStartWorkspace: (issue: JiraIssue) => void
+  issueWorkspaceAttachmentIndex?: JiraIssueWorkspaceAttachmentIndex
+  onOpenOrStartWorkspace?: (issue: JiraIssue) => void
+  // Why both names: the fork's callers pass `onOpenOrStartWorkspace`, upstream's tests use `onUse`.
+  onUse?: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
   /** Board the issue's sprint is changed on. Sprint membership is board state, so
@@ -34,19 +44,26 @@ type JiraIssueWorkspaceProps = {
 
 export default function JiraIssueWorkspace({
   issue,
-  issueWorkspaceAttachmentIndex,
+  issueWorkspaceAttachmentIndex = EMPTY_ATTACHMENT_INDEX,
   onOpenOrStartWorkspace,
+  onUse,
   onClose,
   sourceContext,
   sprintBoard = null,
   refreshSignal = 0
 }: JiraIssueWorkspaceProps): React.JSX.Element {
+  const openOrStartWorkspace = onOpenOrStartWorkspace ?? onUse ?? (() => {})
   const settings = useAppStore((s) => s.settings)
   const jiraStatus = useAppStore((s) => s.jiraStatus)
   const providerSettings = useMemo(
     () => sourceContext ?? defaultScopeSource(settings),
     [sourceContext, settings]
   )
+  const owner = useMemo(
+    () => (sourceContext ? taskSourceRuntimeTarget(sourceContext) : defaultScopeHost(settings)),
+    [settings, sourceContext]
+  )
+  const runtimeContextKey = getEnvironmentRuntimeContextKey(runtimeTargetEnvironmentId(owner))
   const detail = useJiraIssueWorkspaceDetail({
     issue,
     providerSettings,
@@ -67,6 +84,42 @@ export default function JiraIssueWorkspace({
   const actionItems = useMemo(
     () => (displayed ? getJiraIssueWorkspaceActions(displayed) : []),
     [displayed]
+  )
+  const siteId = displayed?.siteId ?? undefined
+  // Why the owner (not just the source) in the key: a row-less source remounts the
+  // metadata bar when the execution host changes, so a half-typed transition form
+  // cannot be submitted against the wrong host.
+  const metadataKey = JSON.stringify([
+    sourceContext ? getTaskSourceCacheScope(sourceContext) : owner,
+    siteId,
+    displayed?.key
+  ])
+
+  // Why wrapped: the transition control expects a JiraMutationResult; the detail
+  // hook's mutation queue re-reads comments and transitions after the write settles.
+  const mutateIssue = useCallback(
+    async (
+      field: string,
+      updates: JiraIssueUpdate,
+      optimistic?: Partial<JiraIssue>
+    ): Promise<JiraMutationResult> => {
+      try {
+        await detail.mutateIssue(field, updates, optimistic)
+        return { ok: true }
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : translate(
+                  'auto.components.JiraIssueWorkspace.ea21952aa3',
+                  'Failed to update Jira issue.'
+                )
+        }
+      }
+    },
+    [detail]
   )
   // Why the issue's own site: the viewer identity is per site, and the picker pins
   // "me" for the issue being edited, not for the host's currently selected site.
@@ -104,27 +157,35 @@ export default function JiraIssueWorkspace({
               attachedWorkspaceLabel={attachedWorkspaceLabel}
               displayed={displayed}
               issueLoading={detail.issueLoading}
-              onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+              onOpenOrStartWorkspace={openOrStartWorkspace}
               onClose={onClose}
             />
 
             <JiraIssueMetadataBar
+              key={metadataKey}
               displayed={displayed}
               pendingField={detail.pendingField}
               transitions={detail.transitions}
+              transitionsLoading={false}
+              transitionsError={null}
+              reloadTransitions={() => void detail.refresh()}
               priorities={detail.priorities}
               users={detail.users}
               editFields={detail.editFields}
               editFieldsLoading={detail.editFieldsLoading}
               selfUser={selfUser}
               providerSettings={providerSettings}
+              sourceContext={sourceContext}
+              owner={owner}
+              runtimeContextKey={runtimeContextKey}
               sprintAssignment={detail.sprintAssignment}
-              mutateIssue={detail.mutateIssue}
+              mutateIssue={mutateIssue}
               submitIssueFields={detail.submitIssueFields}
             />
 
             <JiraIssueWorkspaceContent
               displayed={displayed}
+              imageTarget={owner}
               titleDraft={detail.titleDraft}
               setTitleDraft={detail.setTitleDraft}
               labelsDraft={detail.labelsDraft}
@@ -137,7 +198,7 @@ export default function JiraIssueWorkspace({
               commentsLoading={detail.commentsLoading}
               retryComments={detail.retryComments}
               attachedWorkspaceLabel={attachedWorkspaceLabel}
-              onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+              onOpenOrStartWorkspace={openOrStartWorkspace}
               actionItems={actionItems}
             />
 

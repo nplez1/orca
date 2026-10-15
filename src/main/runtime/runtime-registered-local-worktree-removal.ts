@@ -191,7 +191,8 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
       args.onRemoved()
       return result
     },
-    publish: () => args.publish()
+    publish: () => args.publish(),
+    cleanupPushTargetRemote: () => cleanupRemovedWorktreePushTarget(args)
   })
   return { removing: true, ...acceptedFields }
 }

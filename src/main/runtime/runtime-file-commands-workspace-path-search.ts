@@ -15,9 +15,9 @@ import {
 import { limitWorkspacePathSearchResponseBySerializedBytes } from '../../shared/workspace-path-search-transport-budget'
 import { searchQuickOpenFilePaths } from '../ipc/filesystem-search-file-paths'
 import { parseWslPath } from '../wsl'
-import { runtimeFileRouteForTarget } from './runtime-file-command-target'
-import { RuntimeFileSearch } from './runtime-file-search'
-import type { RuntimeFileCommandHost } from './runtime-file-command-host'
+import { runtimeFileRouteForTarget } from './files/file-target'
+import { RuntimeFileSearch } from './files/search/file-search'
+import type { RuntimeFileCommandHost } from './files/file-command-host'
 
 type WorkspacePathSearchOptions = {
   query: string

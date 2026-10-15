@@ -287,6 +287,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   terminalMainSideEffectAuthority: 'hostLocal',
   terminalHiddenDeliveryGate: 'hostLocal',
   terminalModelQueryAuthority: 'hostLocal',
+  // Why replicated, like `defaultTuiAgent`: a new-workspace launch preference, not a machine fact.
+  newWorkspaceSetupOnly: 'replicated',
   defaultTuiAgent: 'replicated',
   disabledTuiAgents: 'replicated',
   pluginSystemEnabled: 'replicated',
@@ -340,6 +342,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   visibleTaskProviders: 'replicated',
   defaultLinearTeamSelection: 'replicated',
   defaultJiraBoard: 'replicated',
+  // Why replicated, like `defaultJiraBoard`: a naming preference for suggested workspace/branch names.
+  jiraIssueKeyCasing: 'replicated',
   claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>
 

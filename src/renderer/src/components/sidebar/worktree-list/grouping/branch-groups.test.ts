@@ -4,7 +4,7 @@ import type { Worktree } from '../../../../../../shared/worktree/types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { mergeSameBranchRows, resolveBranchGroupSelection } from './branch-groups'
-import { buildProjectGroupingIndex } from './project-grouping'
+import { buildProjectGroupingIndex } from '../../../../../../shared/project-section-grouping'
 import { PINNED_GROUP_KEY } from './group-keys'
 import type { BranchGroupMember, Row, WorktreeRow } from './row-types'
 import {

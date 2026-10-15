@@ -13,18 +13,17 @@ import { resolveRuntimeFileListDerivedState } from './runtime-file-list-derived-
 import { useRuntimePathSearchSchedulerLifecycle } from './use-runtime-path-search-scheduler-lifecycle'
 import { NO_LISTING, scheduleRuntimeFilePathSearch } from './runtime-path-search-request'
 import { useQuickOpenRecentListing } from './quick-open-recent-file-merge'
-import { getRuntimeFileListTarget } from './runtime-file-list-scan-target'
+import { getRuntimeFileListTarget } from './quick-open-file-list-target'
 
 export {
-  getNestedWorktreeExcludePaths,
   getNestedWorktreeExcludeRequest,
-  getRuntimeFileListTarget,
-  isNestedWorktreePath
-} from './runtime-file-list-scan-target'
+  getRuntimeFileListTarget
+} from './quick-open-file-list-target'
+export { getNestedWorktreeExcludePaths, isNestedWorktreePath } from './quick-open-nested-worktrees'
 export type {
   NestedWorktreeExcludeRequest,
   RuntimeFileListTarget
-} from './runtime-file-list-scan-target'
+} from './quick-open-file-list-target'
 import { useAppStore } from '@/store'
 import { useKnownWorktreeById, useWorktreesForRepo } from '@/store/selectors'
 import type { FileExplorerOperationOwner } from '@/components/right-sidebar/file-explorer-types'

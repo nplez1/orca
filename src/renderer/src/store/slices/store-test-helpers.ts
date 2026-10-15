@@ -51,6 +51,7 @@ import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
 import { createStructuredSessionLaunchDirectorySlice } from './structured-session-launch-directories'
 import { createWorktreeSetupRunnerSlice } from './worktree-setup-runner'
+import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-attention-slice'
 import '@/i18n/i18n'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 export { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
@@ -111,7 +112,8 @@ export function createTestStore() {
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
     ...createStructuredSessionLaunchDirectorySlice(...a),
-    ...createWorktreeSetupRunnerSlice(...a)
+    ...createWorktreeSetupRunnerSlice(...a),
+    ...createWorkspaceAttentionSlice(...a)
   }))
 }
 

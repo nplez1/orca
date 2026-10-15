@@ -13,6 +13,7 @@ type NewWorkspaceComposerNameSectionProps = Pick<
   NewWorkspaceComposerCardProps,
   | 'nameInputRef'
   | 'eligibleRepos'
+  | 'selectedRepo'
   | 'repoId'
   | 'onRepoChange'
   | 'name'
@@ -51,6 +52,7 @@ type NewWorkspaceComposerNameSectionProps = Pick<
 export function NewWorkspaceComposerNameSection({
   nameInputRef,
   eligibleRepos,
+  selectedRepo,
   repoId,
   onRepoChange,
   name,
@@ -138,6 +140,7 @@ export function NewWorkspaceComposerNameSection({
         <SmartWorkspaceNameField
           inputRef={nameInputRef}
           repos={eligibleRepos}
+          selectedRepo={selectedRepo}
           repoId={repoId}
           onRepoChange={onRepoChange}
           value={name}

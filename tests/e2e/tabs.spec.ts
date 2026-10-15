@@ -516,7 +516,7 @@ test.describe('Tabs', () => {
    * so the test fails if the store cleared the tab but the DOM didn't
    * re-render.
    */
-  test('closing a tab removes it from the tab bar', async ({ orcaPage }) => {
+  test('closing the active tab removes it and activates a neighbor', async ({ orcaPage }) => {
     const worktreeId = (await getActiveWorktreeId(orcaPage))!
 
     // Need a second tab so we can close one without deactivating the worktree.
@@ -545,45 +545,7 @@ test.describe('Tabs', () => {
         message: 'Clicking close did not remove the tab element from the DOM'
       })
       .toBe(tabsBefore - 1)
-  })
-
-  /**
-   * User Prompt:
-   * - closing tabs works
-   *
-   * The DOM check (`data-active="true"` lands on a different element) proves
-   * the tab bar re-paints the active indicator after a close — a store-only
-   * check would pass even if the indicator failed to shift.
-   */
-  test('closing the active tab activates a neighbor tab', async ({ orcaPage }) => {
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
-
-    await orcaPage.evaluate((targetWorktreeId) => {
-      const store = window.__store
-      if (!store) {
-        return
-      }
-      const state = store.getState()
-      if ((state.tabsByWorktree[targetWorktreeId] ?? []).length < 2) {
-        state.createTab(targetWorktreeId)
-      }
-    }, worktreeId)
-    await expect
-      .poll(() => countRenderedTabs(orcaPage), { timeout: 5_000 })
-      .toBeGreaterThanOrEqual(2)
-
-    const activeTabBefore = await getActiveTabId(orcaPage)
-    expect(activeTabBefore).not.toBeNull()
-
-    await closeTabFromTabBar(orcaPage, activeTabBefore!)
-
-    // Final DOM assertion: some *other* tab element now carries data-active.
-    await expect
-      .poll(() => getDomActiveTabId(orcaPage), {
-        timeout: 5_000,
-        message: 'After closing the active tab, no neighbor tab took over the active indicator'
-      })
-      .not.toBe(activeTabBefore)
+    await expect.poll(() => getDomActiveTabId(orcaPage), { timeout: 5_000 }).not.toBe(activeId)
     await expect.poll(() => getDomActiveTabId(orcaPage), { timeout: 5_000 }).not.toBeNull()
   })
 })

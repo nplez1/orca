@@ -4,21 +4,25 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { jiraGetIssue, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import type { JiraFieldErrors, JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
 import { useJiraIssueComments } from './jira-issue-workspace-comments'
 import { useJiraIssueSideData } from './jira-issue-workspace-side-data'
 import type { JiraIssueWorkspaceDetailState } from './jira-issue-workspace-detail-contract'
+import { enqueueJiraIssueMutation, jiraIssueRequestScope } from './jira-issue-mutation-queue'
+import { useJiraIssueMutationState } from './use-jira-issue-mutation-state'
+import { useJiraIssueWorkspaceRefresh } from './use-jira-issue-workspace-refresh'
+import { submitJiraIssueFields } from './jira-issue-workspace-field-submission'
+import {
+  editedJiraIssueFields,
+  mergeJiraIssueHydration,
+  type EditableJiraIssueField
+} from './jira-issue-workspace-hydration'
 
-
-/** Hydrates the full detail set for one Jira issue and owns its mutations.
- *  Shared by the Task view's `JiraIssueWorkspace` and the right-sidebar Issue
- *  pane so both read and write through the same contract.
- *
- *  `fetchKey` lets a caller that only knows the issue key (the pane, reading a
- *  workspace's persisted link) hydrate from that key instead of handing over a
- *  full issue. Passing neither `issue` nor `fetchKey` resets the state. */
+/** Hydrates one Jira issue and owns its mutations, shared by the Task view and
+ *  the Issue pane. `fetchKey` hydrates from a bare key; neither input resets state. */
 export function useJiraIssueWorkspaceDetail({
   issue,
   fetchKey = null,
@@ -30,9 +34,7 @@ export function useJiraIssueWorkspaceDetail({
 }: {
   issue: JiraIssue | null
   fetchKey?: string | null
-  /** The site the linked workspace already records. The host would otherwise pick
-   *  from its own selected/active site, which is a different site whenever the
-   *  user has more than one — the read then returns nothing for a valid key. */
+  /** The linked workspace's own site, so a valid key reads back from the right one. */
   fetchSiteId?: string | null
   /** Board the issue's sprint can be changed on; omitted where no board is in scope. */
   sprintBoard?: { boardId: string; siteId: string } | null
@@ -40,6 +42,7 @@ export function useJiraIssueWorkspaceDetail({
   sourceContext?: TaskSourceContext | null
   refreshSignal?: number
 }): JiraIssueWorkspaceDetailState {
+  const settings = useAppStore((s) => s.settings)
   const patchJiraIssue = useAppStore((s) => s.patchJiraIssue)
   const [fullIssue, setFullIssue] = useState<JiraIssue | null>(null)
   const [issueLoading, setIssueLoading] = useState(false)
@@ -47,20 +50,34 @@ export function useJiraIssueWorkspaceDetail({
   const [titleDraft, setTitleDraft] = useState('')
   const [labelsDraft, setLabelsDraft] = useState('')
   const [reloadSignal, setReloadSignal] = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
   const issueRequestIdRef = useRef(0)
-  const lastRefreshSignalRef = useRef(refreshSignal)
+  const lastReloadSignalRef = useRef(reloadSignal)
+  const loadedRequestKeyRef = useRef<string | null>(null)
+  const editedFieldsRef = useRef(new Set<EditableJiraIssueField>())
+  // Bumped whenever the mutation scope changes, so a save that settles after a
+  // selection moved to another issue does not clear the new issue's pending field.
+  const scopeGenerationRef = useRef(0)
 
   const displayed = fullIssue ?? issue
   const siteId = displayed?.siteId ?? undefined
   const issueKey = displayed?.key ?? null
-  // A board id only means something on its own site: an issue on another site would
-  // have its siteless read and that board's sprint list served by different Jira
-  // instances, so it gets no board until the two agree.
+  // A board only means something on its own site, so the two must agree first.
   const sprintBoardId =
     sprintBoard && displayed?.siteId === sprintBoard.siteId ? sprintBoard.boardId : null
 
+  const requestKey = jiraIssueRequestScope(displayed, sourceContext, settings)
+  // Key on the raw prop: the displayed issue stays the previous one for a render after a switch.
+  const hydrationScopeKey = jiraIssueRequestScope(issue, sourceContext, settings)
+  const mutationContextKey = getJiraReadIdentity(settings, sourceContext).contextKey
+
   useEffect(() => {
+    const reloadRequested = lastReloadSignalRef.current !== reloadSignal
+    lastReloadSignalRef.current = reloadSignal
+    // Why skip: an optimistic patch hands a new object for the same key/site and must not re-hydrate.
+    if (issue && !reloadRequested && loadedRequestKeyRef.current === hydrationScopeKey) {
+      return
+    }
+    loadedRequestKeyRef.current = hydrationScopeKey
     // Why: bump before the reset branch so an in-flight fetch cannot land on a cleared issue.
     const fetchRequestId = ++issueRequestIdRef.current
     if (!issue && !fetchKey) {
@@ -85,9 +102,14 @@ export function useJiraIssueWorkspaceDetail({
         if (fetchRequestId !== issueRequestIdRef.current || !result) {
           return
         }
-        setFullIssue(result)
-        setTitleDraft(result.title)
-        setLabelsDraft(result.labels.join(', '))
+        const edited = new Set(editedFieldsRef.current)
+        setFullIssue((current) => mergeJiraIssueHydration(result, current, edited))
+        if (!edited.has('title')) {
+          setTitleDraft(result.title)
+        }
+        if (!edited.has('labels')) {
+          setLabelsDraft(result.labels.join(', '))
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -95,7 +117,24 @@ export function useJiraIssueWorkspaceDetail({
           setIssueLoading(false)
         }
       })
-  }, [issue, fetchKey, fetchSiteId, providerSettings, reloadSignal])
+  }, [issue, fetchKey, fetchSiteId, providerSettings, reloadSignal, hydrationScopeKey])
+
+  // Reset per-scope mutation state when the scope moves to another issue/account/host/site.
+  useEffect(() => {
+    scopeGenerationRef.current += 1
+    setPendingField(null)
+    editedFieldsRef.current = new Set()
+  }, [requestKey])
+
+  // Why the cleanup: StrictMode double-mounts and a remount must re-run hydration,
+  // not be mistaken for the same scope and skipped.
+  useEffect(
+    () => () => {
+      issueRequestIdRef.current += 1
+      loadedRequestKeyRef.current = null
+    },
+    []
+  )
 
   const sideData = useJiraIssueSideData({
     providerSettings,
@@ -109,42 +148,38 @@ export function useJiraIssueWorkspaceDetail({
   const reloadSprintAssignment = sideData.reloadSprintAssignment
   const restoreSprintAssignment = sideData.restoreSprintAssignment
   const selectSprint = sideData.selectSprint
+  const retryComments = commentsState.retryComments
 
-  const refreshIssue = useCallback(async (): Promise<void> => {
-    if (!displayed) {
-      return
-    }
-    try {
-      const latest = await jiraGetIssue(providerSettings, displayed.key, displayed.siteId)
-      if (latest) {
-        setFullIssue(latest)
-        patchJiraIssue(latest.key, latest, { sourceContext })
-      }
-    } catch {
-      // Keep the visible issue snapshot if refresh fails.
-    }
-  }, [displayed, patchJiraIssue, providerSettings, sourceContext])
+  const onStatusSettled = useCallback(
+    () => displayed && void reloadTransitions(),
+    [displayed, reloadTransitions]
+  )
 
-  const refresh = useCallback(async (): Promise<void> => {
-    if (!displayed) {
-      return
-    }
-    setRefreshing(true)
-    try {
-      await refreshIssue()
-      await reloadTransitions()
-    } finally {
-      setRefreshing(false)
-    }
-  }, [displayed, refreshIssue, reloadTransitions])
+  const onCommentsChanged = useCallback(
+    () => displayed && void retryComments(),
+    [displayed, retryComments]
+  )
 
-  useEffect(() => {
-    if (lastRefreshSignalRef.current === refreshSignal) {
-      return
-    }
-    lastRefreshSignalRef.current = refreshSignal
-    void refresh()
-  }, [refresh, refreshSignal])
+  useJiraIssueMutationState({
+    scope: requestKey,
+    issue,
+    displayed,
+    editedFieldsRef,
+    setFullIssue,
+    setTitleDraft,
+    setLabelsDraft,
+    onStatusSettled,
+    onCommentsChanged
+  })
+
+  const { refreshIssue, refresh, refreshing } = useJiraIssueWorkspaceRefresh({
+    displayed,
+    providerSettings,
+    sourceContext,
+    reloadTransitions,
+    refreshSignal,
+    setFullIssue
+  })
 
   const mutateIssue = useCallback(
     async (
@@ -152,32 +187,41 @@ export function useJiraIssueWorkspaceDetail({
       updates: Parameters<typeof jiraUpdateIssue>[2],
       optimistic?: Partial<JiraIssue>
     ): Promise<void> => {
-      if (!displayed || pendingField) {
+      if (!displayed || !requestKey || pendingField) {
         return
       }
-      setPendingField(field)
       const previous = displayed
       const sprintChanged = updates.sprintId !== undefined
       const previousSprintAssignment = sideData.sprintAssignment
+      const scopeGeneration = scopeGenerationRef.current
+      setPendingField(field)
+      for (const editable of optimistic ? editedJiraIssueFields(optimistic) : []) {
+        editedFieldsRef.current.add(editable)
+      }
       try {
-        if (optimistic) {
-          setFullIssue({ ...displayed, ...optimistic })
-          patchJiraIssue(displayed.key, optimistic, { sourceContext })
-        }
-        if (sprintChanged) {
-          selectSprint(updates.sprintId ?? null)
-        }
-        const result = await jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
-        await refreshIssue()
+        await enqueueJiraIssueMutation({
+          scope: requestKey,
+          previous,
+          optimistic: optimistic ?? {},
+          commentsChanged: Boolean(updates.transitionComment?.trim()),
+          update: async () => {
+            if (sprintChanged) {
+              selectSprint(updates.sprintId ?? null)
+            }
+            return jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
+          },
+          refresh: () => jiraGetIssue(providerSettings, displayed.key, displayed.siteId),
+          patchIssue: (patch) =>
+            patchJiraIssue(displayed.key, patch, {
+              sourceContext,
+              siteId: displayed.siteId,
+              contextKey: mutationContextKey
+            })
+        })
         if (sprintChanged) {
           await reloadSprintAssignment()
         }
       } catch (error) {
-        setFullIssue(previous)
-        patchJiraIssue(previous.key, previous, { sourceContext })
         if (sprintChanged) {
           // Why the local restore before the re-read: the fault that failed the move
           // usually fails that read too, and the picker must not keep showing a sprint
@@ -193,17 +237,21 @@ export function useJiraIssueWorkspaceDetail({
                 'Failed to update Jira issue.'
               )
         )
+        throw error
       } finally {
-        setPendingField(null)
+        if (scopeGeneration === scopeGenerationRef.current) {
+          setPendingField(null)
+        }
       }
     },
     [
       displayed,
+      mutationContextKey,
       patchJiraIssue,
       pendingField,
-      refreshIssue,
       providerSettings,
       reloadSprintAssignment,
+      requestKey,
       restoreSprintAssignment,
       selectSprint,
       sideData.sprintAssignment,
@@ -213,56 +261,18 @@ export function useJiraIssueWorkspaceDetail({
   )
 
   const submitIssueFields = useCallback(
-    async (
-      updates: Parameters<typeof jiraUpdateIssue>[2]
-    ): Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: JiraFieldErrors }> => {
-      if (!displayed) {
-        return {
-          ok: false,
-          error: translate(
-            'auto.components.JiraIssueWorkspace.noIssueSelected',
-            'No Jira issue is selected.'
-          )
-        }
-      }
-      if (pendingField) {
-        return {
-          ok: false,
-          error: translate(
-            'auto.components.JiraIssueWorkspace.anotherUpdatePending',
-            'Another Jira update is still in progress.'
-          )
-        }
-      }
-      setPendingField('fields')
-      try {
-        const result = await jiraUpdateIssue(providerSettings, displayed.key, updates, siteId)
-        if (!result.ok) {
-          return {
-            ok: false,
-            error: result.error,
-            ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {})
-          }
-        }
-        await refreshIssue()
-        await reloadEditFields()
-        return { ok: true }
-      } catch (error) {
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.components.JiraIssueWorkspace.ea21952aa3',
-                  'Failed to update Jira issue.'
-                )
-        }
-      } finally {
-        setPendingField(null)
-      }
-    },
-    [displayed, pendingField, providerSettings, refreshIssue, reloadEditFields, siteId]
+    (updates: Parameters<typeof jiraUpdateIssue>[2]) =>
+      submitJiraIssueFields({
+        displayed,
+        pendingField,
+        providerSettings,
+        siteId,
+        refreshIssue,
+        reloadEditFields,
+        setPendingField,
+        updates
+      }),
+    [displayed, pendingField, providerSettings, siteId, refreshIssue, reloadEditFields]
   )
 
   const handleSaveTitle = useCallback(() => {
@@ -274,7 +284,9 @@ export function useJiraIssueWorkspaceDetail({
       setTitleDraft(displayed.title)
       return
     }
-    void mutateIssue('title', { title }, { title })
+    // Why the catch: a failed save is already surfaced by the toast; the draft
+    // mutation promise must not reject unhandled.
+    void mutateIssue('title', { title }, { title }).catch(() => {})
   }, [displayed, mutateIssue, titleDraft])
 
   const handleSaveLabels = useCallback(() => {
@@ -285,7 +297,7 @@ export function useJiraIssueWorkspaceDetail({
       .split(',')
       .map((label) => label.trim())
       .filter(Boolean)
-    void mutateIssue('labels', { labels }, { labels })
+    void mutateIssue('labels', { labels }, { labels }).catch(() => {})
   }, [displayed, labelsDraft, mutateIssue])
 
   const reload = useCallback((): void => {

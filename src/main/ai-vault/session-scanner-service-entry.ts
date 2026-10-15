@@ -1,7 +1,8 @@
 import { requestSessionSearchRoots } from './session-scanner-service-root-request'
+import { trackAiVaultScanProgress } from './ai-vault-scan-progress'
+import type { AiVaultSessionTitle } from '../../shared/ai-vault-session-title'
 import type { AiVaultListResult } from '../../shared/ai-vault-types'
 import { aiVaultSessionsMatchingQuery } from '../../shared/ai-vault-session-filters'
-import type { AiVaultSessionTitle } from '../../shared/ai-vault-session-title'
 import { readAiVaultFirstUserPrompt } from './session-first-user-prompt-read'
 import {
   flushSessionParseCachePersist,
@@ -45,6 +46,20 @@ function send(message: AiVaultServiceChildMessage): void {
 
 function titleKey(request: { agent: string; sessionId: string }): string {
   return `${request.agent}\0${request.sessionId}`
+}
+
+async function scanReportingProgress(
+  request: Extract<AiVaultServiceRequest, { operation: 'scan' }>,
+  signal: AbortSignal
+): Promise<AiVaultListResult> {
+  const stopProgress = trackAiVaultScanProgress(signal, (units) =>
+    send({ type: 'progress', id: request.id, units })
+  )
+  try {
+    return await scanAiVaultSessions({ ...request.options, signal })
+  } finally {
+    stopProgress()
+  }
 }
 
 /** A scanner result narrowed by the plain-text query, which the scanner cannot apply. */
@@ -117,10 +132,7 @@ async function executeRequest(request: AiVaultServiceRequest): Promise<AiVaultSe
     // unfiltered answer would read as "everything matches".
     const result =
       indexed ??
-      filteredScanResult(
-        await scanAiVaultSessions({ ...request.options, signal: controller.signal }),
-        request.query
-      )
+      filteredScanResult(await scanReportingProgress(request, controller.signal), request.query)
     for (const session of result.sessions) {
       if ((session.agent === 'claude' || session.agent === 'codex') && session.title.trim()) {
         cacheServiceTitle(titleIndex, {

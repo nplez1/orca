@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GlobalSettings } from '../../shared/global-settings-types'
+import { resolveWorktreeLayoutMode } from '../../shared/orca-workspace-layout'
 import type { Repo } from '../../shared/repo-types'
 import {
   renameWorktreeFolderOnFirstWork,
@@ -7,14 +7,17 @@ import {
 } from './first-work-folder-rename'
 
 const REPO = { id: 'repo1', path: '/repos/orca', connectionId: null } as unknown as Repo
-const SETTINGS = { nestWorkspaces: false, workspaceDir: '/ws' } as unknown as GlobalSettings
+const SETTINGS = { nestWorkspaces: false, workspaceDir: '/ws' }
 const OLD_ID = 'repo1::/ws/cunner'
 const FOLDER_WORKSPACE_ID = 'repo1::/ws/cunner::workspace:12345678-1234-1234-1234-123456789abc'
 
 function makeDeps(overrides: Partial<FirstWorkFolderRenameDeps> = {}): FirstWorkFolderRenameDeps {
   return {
     getRepo: vi.fn(() => REPO),
-    getSettings: vi.fn(() => SETTINGS),
+    getSettings: vi.fn(() => ({
+      ...SETTINGS,
+      worktreeLayoutMode: resolveWorktreeLayoutMode(SETTINGS)
+    })),
     migrateWorktreeIdentity: vi.fn(),
     notifyWorktreeRenamed: vi.fn(),
     pathExists: vi.fn(async () => false),

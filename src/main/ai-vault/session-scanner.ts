@@ -15,10 +15,7 @@ import {
   type AntigravityWorkspaceResolver
 } from './session-scanner-antigravity-history'
 import { sessionCandidatesFromDiscoveries } from './session-scanner-candidates'
-import {
-  ensureSessionParseCacheLoaded,
-  scheduleSessionParseCachePersist
-} from './session-parse-cache-persistence'
+import { ensureSessionParseCacheLoaded } from './session-parse-cache-persistence'
 import {
   createSessionParseStats,
   parseAgentSessionFileCached,
@@ -143,8 +140,6 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
         span.setAttribute('bytesRead', parseStats.bytesRead)
         span.setAttribute('issues', issues.length)
 
-        scheduleSessionParseCachePersist(parseStats)
-
         return {
           sessions: unionScopedSessions(cappedSessions, scopeSessions),
           issues: issues.map((issue) => ({ executionHostId, ...issue })),
@@ -216,9 +211,8 @@ async function parseSessionCandidates(args: {
   antigravityWorkspaceResolver?: AntigravityWorkspaceResolver
 }): Promise<AiVaultSession[]> {
   const sessions = new ScannedSessionCollection()
-  let index = 0
 
-  while (index < args.candidates.length) {
+  for (let index = 0; index < args.candidates.length;) {
     throwIfAiVaultScanCancelled(args.signal)
     if (
       canStopParsingSessions(sessions, args.limit, candidateFileTime(args.candidates[index]?.file))

@@ -703,3 +703,181 @@ the first, and the ratchet exists to fail the second). **Do not move a declarati
 `src/shared/protocol-version.ts` without checking `config/scripts/mobile-web-bundle-manifest.mjs`** —
 it regex-scrapes `runtime-protocol-versions.ts` for `RUNTIME_PROTOCOL_VERSION`, and the 2026-10-11
 split broke `readProtocolWindow()` that way.
+
+**2026-10-15 addendum.** upstream moved the whole inline capability list out of
+`src/shared/protocol-version.ts` into `runtime-capability-constants.ts` and the five `ACCOUNT_*`
+names into `account-runtime-capabilities.ts`, while the fork's own split of the version numbers into
+`runtime-protocol-versions.ts` stays load-bearing. The merged file is upstream's shape plus three
+fork lines (`export * from './runtime-protocol-versions'`, the `HOST_SETTINGS_REPLICATION` and
+`WORKSPACE_PATH_SEARCH_NAME_FILTER` capabilities), which lands at 256 lines instead of 435. The same
+sync overflowed `src/renderer/src/runtime/runtime-jira-client.ts` by 8 lines, so `jiraListEditFields`
+now lives in `runtime-jira-detail-client.ts` as `jiraListEditFieldsForTarget` and is re-exported —
+mirroring upstream's own split of that file.
+
+---
+
+## The Jira product line: upstream's shape, the fork's extra capabilities
+
+**Paths:** `src/main/jira/*`, `src/main/ipc/jira.ts`, `src/renderer/src/runtime/runtime-jira{,-client,-detail-client,-board-client,-text-fields}.ts`,
+`src/renderer/src/components/{JiraIssueWorkspace,jira-issue-assignee-control,jira-issue-workspace-*}.tsx`,
+`src/renderer/src/components/task-page/jira/*`, `src/shared/{jira-types,jira-transition-fields,jira-runtime-capabilities}.ts`
+
+**Decision (2026-10-15, fork owner):** upstream spent the same window building the same Jira features
+the fork built — assignee search and "Assign to me" (`#28612`), a board and current-sprint filter
+(`#28633`), required transition fields (`#28588`), planning columns (`#28615`), linked-workspace views
+(`#28590`) — so this sync converged **per capability, not per feature**: take upstream's shape
+whenever it is a superset, and re-express every fork addition on top of it rather than dropping it.
+
+**Settled here:**
+
+- `JiraTransition.requiredFields` is **gone**; the canonical field is upstream's `fields`. The fork's
+  one rule inside it — a required field Jira will default itself is not the user's to fill — is
+  re-homed into `src/shared/jira-transition-fields.ts` as the `hasDefaultValue !== true` exclusion in
+  `requiredTransitionFields`, so upstream's `classifyTransitionRequirements` inherits it.
+- `jira-transition-queries.ts` takes upstream's version wholesale (its `strict` mode, the
+  400/403/404 fallback off the `expand=transitions.fields` call, and `columns` on the status order).
+- **`JiraApiError` has one declaration, in `authenticated-request.ts`.** Upstream split a second
+  class into `jira-api-error.ts`, whose `toJiraApiError` is called by nothing in the merged tree while
+  every real `instanceof JiraApiError` site (`client.ts`, `credential-verification.ts`,
+  `attachment-images.ts`, `jira-issue-mutations.ts`, `jira-transition-queries.ts`) tests the fork's
+  class — so two classes would have made auth classification depend on which module threw. That file
+  now re-exports the single class, and the constructor accepts upstream's positional boolean for
+  `scopeMismatch` as well as the fork's detail object, so upstream's own test call site is unchanged.
+- `JiraIssueUpdate` carries both `transitionComment` (upstream) and the fork's
+  `transitionUserFieldKeys` / `transitionTextFieldKeys` / `customFields` / `userFieldKeys` /
+  `textFieldKeys` / `sprintId`.
+- `jiraAddIssueComment` gained an **optional** `bodyFormat` — required would have broken upstream's
+  four-argument call site, and omitting it is the pre-composer "store verbatim" behaviour.
+- `src/shared/jira-runtime-capabilities.ts` now **re-exports** upstream's Jira capability names from
+  `jira-detail-capabilities.ts` instead of re-declaring `JIRA_USER_FIELDS_*`, so each name has one
+  declaration; its `JIRA_RUNTIME_CAPABILITIES` array holds only the fork-only text-fields capability.
+- `JiraIssueAssigneeControl` keeps **upstream's prop contract** (`issue`, `disabled`, `sourceContext`,
+  `owner`, `runtimeContextKey`, `mutateIssue`) because that is what carries host/source awareness, and
+  preserves the fork's pin-me-and-my-team ordering inside it: the picker's empty-query lookup result
+  is remembered as the project roster and pinned above every later search's matches. The fork's
+  "roster arrives in a prop, so opening the picker costs no request" optimisation is **not** kept —
+  upstream's control fetches on open, and one request per open is its accepted cost. The pinned
+  roster is also **sorted by display name**, not left in Jira's returned order as the fork had it:
+  upstream sorts candidate rows by name, and the pinned group is a prefix of that same list rather
+  than a separately-ordered one. Both suites' ordering assertions hold only with the sort, and the
+  feature the fork's tests lock — *me and my team above the matches* — is unaffected by it.
+- Fork-only capability with no upstream counterpart is kept: self-hosted Jira Server/DC **body
+  rendering** (`jira-rendered-html.ts`, the `renderedHtmlOnly`/`htmlOptions` path, the wiki comment
+  write), editmeta-driven custom-field editing (`jira-issue-edit-metadata.ts`), the generic
+  schema-driven transition-fields dialog (`TransitionFieldsDialog.tsx` — upstream handles only
+  resolution + comment and calls anything else `unsupported`), the configured agile board with
+  drag-drop transitions (`task-page/jira/Board.tsx`), sprint assignment, board settings, and the
+  priority tone.
+
+**Named follow-up:** `task-page/jira/Content.tsx` now has **two** board surfaces — the configured
+agile board (`jiraBoardViewMode` + `board.viewMode`-style preference, drag-drop transitions) and
+upstream's ad-hoc status board over the current result set (`jiraViewMode`, current-sprint filter,
+host-targeted). Both are deliberate for now; unifying them into one control is a UI decision that
+should not be made inside a sync.
+
+**Do not:** re-litigate the Jira overlap per sync. The fork's implementations of the assignee,
+board, sprint-filter and required-fields ideas are the ones upstream superseded; re-adding them means
+re-resolving these same 30 paths next time.
+
+---
+
+## Tabs slice: upstream's module split keeps the fork's one action
+
+**Paths:** `src/renderer/src/store/slices/tabs/{create-tabs-slice,tabs-slice-contract,tabs-split-ratio-actions,tabs-branch-group-host-actions}.ts`
+
+**Decision:** upstream deleted `tabs-secondary-actions.ts`, splitting `setTabGroupSplitRatio` into
+`tabs-split-ratio-actions.ts` and dropping `copyUnifiedTabToGroup`/`mergeGroupIntoSibling` outright.
+The fork's addition to that file was a single action, `setBranchGroupHost`, which the merged contract
+still declares and which the fork-only `WorktreeBranchHostSelect.tsx` /
+`use-branch-group-host-selection.ts` still call — so it survives as
+`tabs-branch-group-host-actions.ts` (`createTabsBranchGroupHostActions`), wired into
+`create-tabs-slice.ts`. The old file name would have described one action among its removed
+neighbours, hence the rename.
+
+**Why:** a `modify/delete` conflict whose only fork content is one action is not a reason to keep the
+whole module; accepting upstream's deletion silently would have left `setBranchGroupHost` declared
+and uninitialised, which no conflict marker showed.
+
+**Do not:** re-add `copyUnifiedTabToGroup`/`mergeGroupIntoSibling` from the fork's copy of the deleted
+file — upstream removed them, and nothing in the merged tree calls them.
+
+---
+
+## Automations: upstream retired its own Orca/Hermes target, and the fork's label went with it
+
+**Paths:** `src/renderer/src/components/automations/**`
+
+**Decision:** upstream deleted the whole external-automation / Hermes-target subsystem in this
+delta — `automation-hermes-save.ts`, `hermes-cron-output-parse.ts`, `ExternalAutomationRunTable.tsx`,
+`automation-external-target-match.ts`, `HermesCronOutputView.tsx` and their tests all exist at the base
+and at the fork tip but not upstream, and upstream rewrote the ~77 surrounding files (≈2,455 deleted
+lines). The fork's **only** contribution anywhere in that feature was `cd3e64b6cf`
+(`local(identity)`) substituting `APP_DISPLAY_NAME` for the app name in the create-target toggle, so
+nothing fork-owned is lost: the retired `AutomationCreateTarget` / `isHermesCreate` / `isEditingExternal`
+identifiers had zero remaining referents in the merged tree, and the orphaned `APP_DISPLAY_NAME`
+import in `AutomationEditorDialogHeader.tsx` was removed.
+
+**Why this is checked rather than assumed:** a whole subsystem vanishing as staged deletions in a
+merge looks identical to the merge silently discarding fork work. The test that separates them is
+`git cat-file -e <base>:<path>` / `HEAD:<path>` / `upstream/main:<path>` — a file present on both
+local sides and absent upstream was upstream's to retire.
+
+**Do not:** resurrect the Hermes automation target, and do not re-add `APP_DISPLAY_NAME` to the
+automations UI — upstream's replacement, whatever it becomes, owns that surface now.
+
+---
+
+## Runtime file commands: upstream's composition, with the fork's path search re-homed
+
+**Paths:** `src/main/runtime/orca-runtime-files.ts`, `src/main/runtime/runtime-file-commands-workspace-path-search.ts`,
+`src/main/runtime/runtime-file-command-surface.ts`
+
+**Decision:** upstream replaced the fork's file-command **inheritance chain** with **composition** —
+`RuntimeFileCommands` in `orca-runtime-files.ts` now holds `search`/`access`/`reads`/`mutations`/
+`watches` sub-objects built from `files/*`, and deleted `runtime-file-command-access.ts`,
+`runtime-file-search.ts`, `runtime-file-command-host.ts` and `runtime-file-command-target.ts`. The
+fork's `searchWorkspacePathNameFilter` (the negotiated `files.searchPaths` name filter the web and
+paired clients use) lived only in `runtime-file-commands-workspace-path-search.ts`, which inherited
+from the deleted `runtime-file-search.ts` — so the merge left it with three dangling imports **and**
+no caller, while `runtime-file-command-surface.ts` still required the method and
+`rpc/methods/files.ts` still called it. It is now a composed unit on `RuntimeFileCommands`
+(`this.workspacePathSearch`), delegating through the same `Parameters<...>` style the other search
+methods use, with its imports re-pointed at `files/search/file-search`, `files/file-command-host` and
+`files/file-target`.
+
+**Why this was easy to miss:** no conflict marker pointed at it. The orphan only shows up as a
+fork-only module that no longer has an importer. **Follow-up:** add the sweep to
+`local/sync/post-sync.mjs` — take every path in the pre-sync fork-only inventory under `src/`
+(no tests/fixtures), resolve every `from './x'`, `import './x'` and `from '@/x'` specifier in the
+tree, and report each fork-only file nothing references. Run on 2026-10-15 it found exactly this
+module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
+`quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already
+unreferenced at the fork tip), so the check needs an allowlist for known-dead paths and for worker
+entries loaded by path (`workspace-path-index-benchmark-worker-entry.ts`).
+
+**Do not:** rebuild the old inheritance chain; add new file-command units as composed fields here.
+
+---
+
+## Quick Open list-target helpers: upstream's pair, the fork's duplicate deleted
+
+**Paths:** `src/renderer/src/components/quick-open-file-list.ts`,
+`src/renderer/src/components/quick-open-file-list-target.ts` + `quick-open-nested-worktrees.ts`
+(upstream), `src/renderer/src/components/runtime-file-list-scan-target.ts` (fork, **deleted**)
+
+**Decision:** converge on upstream's pair. The two spell the same six helpers —
+`NestedWorktreeExcludeRequest`, `RuntimeFileListTarget`, `getRuntimeFileListTarget`,
+`getNestedWorktreeExcludeRequest`, `isNestedWorktreePath`, `getNestedWorktreeExcludePaths` — with no
+capability difference; upstream split them across two modules, the fork kept one. `quick-open-file-list.ts`
+now imports upstream's `quick-open-file-list-target` and `quick-open-nested-worktrees`, and the fork's
+`runtime-file-list-scan-target.ts` is deleted.
+
+**Why it moved from "deferred" to "done" in the same sync:** the first pass left both because
+re-pointing a fork-critical component late in a sync buys nothing for no behaviour change — but the
+suite then showed a test asserting **function identity** across the two modules
+(`expect(getRuntimeFileListTarget).toBe(fileListTarget.getRuntimeFileListTarget)`), which two distinct
+exports can never satisfy. Equivalence was checked by diff against `upstream/main` before re-pointing:
+the other four helpers are byte-identical and `isNestedWorktreePath` / `getNestedWorktreeExcludePaths`
+are the two upstream moved into the nested-worktrees module.
+
+**Do not:** re-add a fork-local copy of those helpers; import upstream's.

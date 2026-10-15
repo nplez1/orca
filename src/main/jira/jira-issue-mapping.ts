@@ -15,6 +15,7 @@ import {
   asRecord,
   asString,
   asStringArray,
+  asFiniteNumber,
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
@@ -30,7 +31,10 @@ export const ISSUE_FIELDS = [
   'priority',
   'labels',
   'created',
-  'updated'
+  'updated',
+  'parent',
+  'timeoriginalestimate',
+  'timeestimate'
 ]
 
 // Why: list/typeahead only need identity + metadata; description ADF parse is the hot-path cost.
@@ -128,6 +132,7 @@ export function mapCreateField(value: unknown, fallbackKey = ''): JiraCreateFiel
     schema: {
       type: asString(schema.type) || undefined,
       items: asString(schema.items) || undefined,
+      system: asString(schema.system) || undefined,
       custom: asString(schema.custom) || undefined
     },
     allowedValues
@@ -205,10 +210,53 @@ export function mapJiraBody(
   return adfToMarkdownText(rawBody, adfOptions)
 }
 
+/** Site-specific custom field ids for agile data; discovered per site, see jira-agile-fields.ts. */
+export type JiraAgileFieldIds = {
+  sprint?: string
+  storyPoints?: string[]
+}
+
+function mapParent(value: unknown): JiraIssue['parent'] {
+  const parent = asRecord(value)
+  const key = asString(parent.key)
+  if (!key) {
+    return undefined
+  }
+  const fields = asRecord(parent.fields)
+  return {
+    key,
+    title: asString(fields.summary, key),
+    issueTypeName: asString(asRecord(fields.issuetype).name) || undefined
+  }
+}
+
+// Cloud returns sprint objects; Server/DC returns "…Sprint@…[id=1,…,name=Sprint 3,…]" strings.
+function sprintName(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return /name=(.*?)(?:,(?:startDate|endDate|completeDate|sequence|goal)=|\]$)/.exec(value)?.[1]
+  }
+  return asString(asRecord(value).name) || undefined
+}
+
+function sprintState(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return /state=([^,\]]+)/.exec(value)?.[1]
+  }
+  return asString(asRecord(value).state) || undefined
+}
+
+// Why: Jira orders an issue's sprints by id, not state, so the last one may be closed.
+export function mapSprint(value: unknown): string | undefined {
+  const sprints = Array.isArray(value) ? value : value ? [value] : []
+  const active = sprints.find((sprint) => sprintState(sprint)?.toLowerCase() === 'active')
+  return sprintName(active ?? sprints.at(-1))
+}
+
 export function mapJiraIssue(
   site: JiraSite,
   raw: JiraRecord,
   adfOptions?: AdfToMarkdownOptions,
+  agileFields: JiraAgileFieldIds = {},
   renderedOptions?: RenderedJiraHtmlOptions
 ): JiraIssue {
   const fields = asRecord(raw.fields)
@@ -234,6 +282,14 @@ export function mapJiraIssue(
     assignee: mapUser(fields.assignee),
     reporter: mapUser(fields.reporter),
     priority: mapPriority(fields.priority),
+    parent: mapParent(fields.parent),
+    sprint: agileFields.sprint ? mapSprint(fields[agileFields.sprint]) : undefined,
+    storyPoints:
+      agileFields.storyPoints
+        ?.map((id) => asFiniteNumber(fields[id]))
+        .find((value) => value !== null) ?? undefined,
+    originalEstimateSeconds: asFiniteNumber(fields.timeoriginalestimate) ?? undefined,
+    remainingEstimateSeconds: asFiniteNumber(fields.timeestimate) ?? undefined,
     createdAt: asString(fields.created, new Date().toISOString()),
     updatedAt: asString(fields.updated, new Date().toISOString())
   }

@@ -234,6 +234,15 @@ export const UiUpdateFields = z
       })
       .nullable()
       .optional(),
+    dashboardPopoutBounds: z
+      .object({
+        x: z.number().finite(),
+        y: z.number().finite(),
+        width: z.number().finite(),
+        height: z.number().finite()
+      })
+      .nullable()
+      .optional(),
     windowMaximized: z.boolean().optional(),
     _sortBySmartMigrated: z.boolean().optional(),
     _inlineAgentsDefaultedForExperiment: z.boolean().optional(),

@@ -15,7 +15,6 @@ import type {
 import type { GitLabProjectRef } from './gitlab-types'
 import type { PRCheckDetail, PRCheckRunDetails } from './github/check-types'
 import type { GitHubRepositoryIdentity } from './github/pull-request-types'
-import type { RuntimeClientTarget } from './runtime-client-target'
 
 /**
  * A check-details failure the user can fix elsewhere, carried alongside the message.
@@ -96,14 +95,6 @@ export type OpenCheckRunDetailsState = {
   gitlabProjectRef?: GitLabProjectRef | null
 }
 
-/** A chat visual opened as its own workspace tab. Identity only, never the HTML. */
-export type OpenChatVisualTabState = {
-  target: RuntimeClientTarget
-  sessionId: string
-  file: string
-  title: string | null
-}
-
 /** An editor tab's view, keyed by its mode, with exactly the open-file fields that mode uses today. The view is not saved. */
 export type EditorTabView =
   /** An edit tab opened on a conflicted file. */
@@ -128,4 +119,3 @@ export type EditorTabView =
     }
   | { mode: 'conflict-review'; conflictReview?: ConflictReviewState }
   | { mode: 'check-details'; checkRunDetails?: OpenCheckRunDetailsState }
-  | { mode: 'chat-visual'; chatVisual?: OpenChatVisualTabState }

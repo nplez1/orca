@@ -43,6 +43,8 @@ export function selectPreferredAttachmentIds(args: {
    *  attachments are the only images there are — gating them on ADF media nodes
    *  would download nothing for the one body that needs them. */
   useRenderedHtmlIdsOnly?: boolean
+  maxBytes?: number
+  maxImages?: number
 }): { preferredIds: string[]; fallbackRan: boolean; needCount: number } {
   if (args.useRenderedHtmlIdsOnly) {
     const preferredIds = args.renderedHtmlIds.slice(0, MAX_IMAGES)
@@ -61,10 +63,10 @@ export function selectPreferredAttachmentIds(args: {
   let fallbackRan = false
 
   if (needCount > preferredIds.length) {
-    const metas = parseImageAttachmentMetas(args.attachmentField)
+    const metas = parseImageAttachmentMetas(args.attachmentField, args.maxBytes)
     // Why: multiple Jira screenshots often share image.png — assign next unused meta per node.
     for (const node of needing) {
-      if (preferredIds.length >= MAX_IMAGES) {
+      if (preferredIds.length >= (args.maxImages ?? MAX_IMAGES)) {
         break
       }
       const alt = (node.alt ?? '').trim()
@@ -85,7 +87,7 @@ export function selectPreferredAttachmentIds(args: {
   }
 
   return {
-    preferredIds: preferredIds.slice(0, MAX_IMAGES),
+    preferredIds: preferredIds.slice(0, args.maxImages ?? MAX_IMAGES),
     fallbackRan,
     needCount
   }

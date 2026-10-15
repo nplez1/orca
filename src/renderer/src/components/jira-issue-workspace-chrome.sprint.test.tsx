@@ -3,6 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
 import type { JiraIssue, JiraSprintAssignment } from '../../../shared/jira-types'
 import { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -39,25 +40,32 @@ const sprintAssignment: JiraSprintAssignment = {
   ]
 }
 
+type MutateIssue = ComponentProps<typeof JiraIssueMetadataBar>['mutateIssue']
+
 function renderBar({
   assignment = sprintAssignment,
-  mutateIssue = vi.fn()
+  mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: true }))
 }: {
   assignment?: JiraSprintAssignment | null
-  mutateIssue?: (field: string, updates: { sprintId?: string | null }) => Promise<void>
-} = {}): (field: string, updates: { sprintId?: string | null }) => Promise<void> {
+  mutateIssue?: MutateIssue
+} = {}): MutateIssue {
   render(
     <TooltipProvider>
       <JiraIssueMetadataBar
         displayed={issue()}
         pendingField={null}
         transitions={[]}
+        transitionsLoading={false}
+        transitionsError={null}
+        reloadTransitions={vi.fn()}
         priorities={[]}
         users={[]}
         editFields={[]}
         editFieldsLoading={false}
         selfUser={null}
         providerSettings={defaultScopeSource(null)}
+        owner={{ kind: 'local' }}
+        runtimeContextKey="local#0"
         sprintAssignment={assignment}
         mutateIssue={mutateIssue}
         submitIssueFields={async () => ({ ok: true })}

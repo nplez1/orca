@@ -1,6 +1,6 @@
 import type { NativeChatGlobalSettings } from './native-chat-appearance-settings'
 import type { ExecutionHostId } from './execution-host'
-import type { OrcaWorkspaceLayout, WorktreeLayoutMode } from './orca-workspace-layout'
+import type { OrcaWorkspaceLayout, OrcaWorkspaceLayoutSettings } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
@@ -36,6 +36,7 @@ import type {
   AgentDashboardCardClickAction,
   BranchPrefixStrategy,
   FloatingTerminalTriggerLocation,
+  JiraIssueKeyCasing,
   LeftSidebarAppearanceMode,
   OpenInApplication,
   SourceControlGroupOrder,
@@ -59,9 +60,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   /** Legacy placement switch, still written alongside `worktreeLayoutMode` so an older
    *  reader (or a paired host on an older build) still computes the same root. */
   nestWorkspaces: boolean
-  /** Placement rule for new workspaces. Kept optional so a settings file written before
-   *  the mode existed stays readable — resolve it with `resolveWorktreeLayoutMode`. */
-  worktreeLayoutMode?: WorktreeLayoutMode
   workspaceDirHistory?: OrcaWorkspaceLayout[]
   refreshLocalBaseRefOnWorktreeCreate: boolean
   /** Set once the user dismisses the "local main is behind" suggestion toast, so
@@ -76,6 +74,9 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   autoRenameBranchFromWorkDefaultedOn?: boolean
   branchPrefix: BranchPrefixStrategy
   branchPrefixCustom: string
+  /** Jira key casing for newly generated Jira-linked workspace and branch names.
+   *  Existing workspaces and user-typed names are never rewritten. */
+  jiraIssueKeyCasing?: JiraIssueKeyCasing
   theme: 'system' | 'dark' | 'light'
   /** Controls the left sidebar surface without changing terminal brightness. */
   leftSidebarAppearanceMode: LeftSidebarAppearanceMode
@@ -354,6 +355,8 @@ export type GlobalSettings = NativeChatGlobalSettings & {
    *  - 'blank': blank terminal (no agent launched)
    *  - TuiAgent: a specific agent id */
   defaultTuiAgent: TuiAgent | 'blank' | null
+  /** @deprecated Retained for older peers; setup-only is now a per-create choice. */
+  newWorkspaceSetupOnly?: boolean
   /** Agents hidden from picker/auto-launch; detection stays a raw PATH snapshot. */
   disabledTuiAgents: TuiAgent[]
   /** Master switch for the experimental plugin system. Off by default: no
@@ -540,7 +543,8 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   voice?: VoiceSettings
   /** Transcript full-text search consent + retention. Absent means off; nothing indexes until the user opts in. */
   aiVaultSearch?: AiVaultSearchSettings
-} & TaskViewSettings
+} & TaskViewSettings &
+  OrcaWorkspaceLayoutSettings
 
 // Re-exported so existing importers keep one entry point; the shape lives in its
 // own file because this one is at the max-lines ceiling.

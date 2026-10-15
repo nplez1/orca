@@ -1,3 +1,4 @@
+import { JiraIssueListFiltersParam } from './jira-quick-filter-params'
 import { z } from 'zod'
 import {
   OptionalFiniteNumber,
@@ -11,7 +12,8 @@ export const VALID_FILTERS = ['assigned', 'reported', 'all', 'done'] as const
 
 export const SiteSelection = z
   .object({
-    siteId: OptionalString
+    siteId: OptionalString,
+    strict: z.boolean().optional()
   })
   .optional()
 
@@ -40,20 +42,30 @@ export const SelectSite = z.object({
 export const SearchIssues = z.object({
   jql: requiredString('Missing JQL'),
   limit: OptionalFiniteNumber,
-  siteId: OptionalString
+  siteId: OptionalString,
+  strict: z.boolean().optional()
 })
 
 export const ListIssues = z
   .object({
     filter: z.enum(VALID_FILTERS).optional(),
     limit: OptionalFiniteNumber,
-    siteId: OptionalString
+    siteId: OptionalString,
+    strict: z.boolean().optional(),
+    filters: JiraIssueListFiltersParam.optional()
   })
   .optional()
 
 export const IssueKey = z.object({
   key: requiredString('Issue key is required'),
-  siteId: OptionalString
+  siteId: OptionalString,
+  strict: z.boolean().optional(),
+  mediaFormat: z.literal('reference').optional()
+})
+
+export const AttachmentImage = z.object({
+  reference: z.string().uuid(),
+  transferId: z.string().uuid()
 })
 
 export const CreateIssue = z.object({
@@ -79,26 +91,38 @@ const CustomFieldUpdateMap = z
 export const IssueUpdate = z.object({
   key: requiredString('Issue key is required'),
   siteId: OptionalString,
-  updates: z.object({
-    title: OptionalString,
-    labels: z.array(z.string()).optional(),
-    assigneeAccountId: z.union([z.string(), z.null()]).optional(),
-    priorityId: z.union([z.string(), z.null()]).optional(),
-    transitionId: OptionalString,
-    // Why these stay declared: the zod object strips keys it does not name, and
-    // the dispatcher hands the stripped object to the handler, so an undeclared
-    // field would reach the host as a silent no-op on every remote runtime.
-    transitionFields: z.record(z.string(), z.unknown()).optional(),
-    transitionUserFieldKeys: z.array(z.string()).optional(),
-    transitionTextFieldKeys: z.array(z.string()).optional(),
-    customFields: CustomFieldUpdateMap.optional(),
-    userFieldKeys: z.array(z.string()).optional(),
-    textFieldKeys: z.array(z.string()).optional(),
-    // Null moves the issue back to the board's backlog. A host that predates
-    // sprint assignment strips it and reports success, so callers only send it
-    // once the sprint read has answered (see `jira.getIssueSprintAssignment`).
-    sprintId: TriStateSprintId
-  })
+  updates: z
+    .object({
+      title: OptionalString,
+      labels: z.array(z.string()).optional(),
+      labelOperations: z
+        .object({
+          add: z.array(requiredString('Label cannot be empty')).optional(),
+          remove: z.array(requiredString('Label cannot be empty')).optional()
+        })
+        .strict()
+        .optional(),
+      assigneeAccountId: z.union([z.string(), z.null()]).optional(),
+      priorityId: z.union([z.string(), z.null()]).optional(),
+      transitionId: OptionalString,
+      // Why these stay declared: the zod object strips keys it does not name, and
+      // the dispatcher hands the stripped object to the handler, so an undeclared
+      // field would reach the host as a silent no-op on every remote runtime.
+      transitionFields: z.record(z.string(), z.unknown()).optional(),
+      transitionComment: z.string().optional(),
+      transitionUserFieldKeys: z.array(z.string()).optional(),
+      transitionTextFieldKeys: z.array(z.string()).optional(),
+      customFields: CustomFieldUpdateMap.optional(),
+      userFieldKeys: z.array(z.string()).optional(),
+      textFieldKeys: z.array(z.string()).optional(),
+      // Null moves the issue back to the board's backlog. A host that predates
+      // sprint assignment strips it and reports success, so callers only send it
+      // once the sprint read has answered (see `jira.getIssueSprintAssignment`).
+      sprintId: TriStateSprintId
+    })
+    .refine((updates) => !(updates.labels && updates.labelOperations), {
+      message: 'Pass labels or labelOperations, not both'
+    })
 })
 
 export const IssueComment = z.object({
@@ -112,19 +136,22 @@ export const IssueComment = z.object({
 
 export const ProjectIssueTypes = z.object({
   projectIdOrKey: requiredString('Project is required'),
-  siteId: OptionalString
+  siteId: OptionalString,
+  strict: z.boolean().optional()
 })
 
 export const ProjectIssueTypeFields = z.object({
   projectIdOrKey: requiredString('Project is required'),
   issueTypeId: requiredString('Issue type is required'),
-  siteId: OptionalString
+  siteId: OptionalString,
+  strict: z.boolean().optional()
 })
 
 export const AssignableUsers = z.object({
   key: requiredString('Issue key is required'),
   query: OptionalPlainString,
-  siteId: OptionalString
+  siteId: OptionalString,
+  strict: z.boolean().optional()
 })
 
 export const UserSearch = z.object({
@@ -164,3 +191,15 @@ export const BoardIssuePage = z.discriminatedUnion('scope', [
     sprintId: requiredString('Sprint ID is required')
   })
 ])
+
+export const CancelGenerateIssueSummary = z.object({
+  siteId: requiredString('Site ID is required'),
+  requestId: z.string().trim().min(1).max(128),
+  draftId: z.string().trim().min(1).max(128)
+})
+
+export const GenerateIssueSummary = CancelGenerateIssueSummary.extend({
+  description: z.string().trim().min(1).max(32_000),
+  projectName: z.string().max(255).optional(),
+  issueTypeName: z.string().max(255).optional()
+})

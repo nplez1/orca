@@ -1,10 +1,7 @@
-import type {
-  JiraCreateField,
-  JiraProjectStatusOrder,
-  JiraTransition
-} from '../../shared/jira-types'
+import { requireStrictJiraSite } from './jira-read-failure'
+import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
-import { apiBasePath, jiraRequest } from './authenticated-request'
+import { apiBasePath, JiraApiError, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { mapCreateField, mapStatus } from './jira-issue-mapping'
 import {
@@ -16,46 +13,38 @@ import {
   type JiraRecord
 } from './jira-record-pages'
 
-/**
- * The fields the transition's screen requires, in the create-field shape the
- * renderer already draws. Blank when the screen asks for none — which is also
- * what an older host that never requested the expand produces.
- */
-function requiredTransitionFields(rawFields: unknown): { requiredFields?: JiraCreateField[] } {
-  const fields = asRecord(rawFields)
-  const requiredFields = Object.entries(fields)
-    .map(([fieldKey, raw]) => mapCreateField(raw, fieldKey))
-    // Why: a field Jira will default itself is not input the user owes us; prompting
-    // for it turns a valid move into a blocked one.
-    .filter(
-      (field): field is JiraCreateField =>
-        field !== null && field.required && field.hasDefaultValue !== true
-    )
-  return requiredFields.length > 0 ? { requiredFields } : {}
-}
-
 export async function listTransitions(
   key: string,
-  siteId?: string | null
+  siteId?: string | null,
+  strict = false
 ): Promise<JiraTransition[]> {
-  const entry = getClients(siteId)[0]
+  const entries = getClients(siteId)
+  requireStrictJiraSite(entries, siteId, strict)
+  const entry = entries[0]
   if (!entry) {
     return []
   }
   await acquire()
   try {
-    // Why the expand: without it Jira reports no fields, so a transition whose
-    // workflow requires input can only be attempted and refused. With it the
-    // client can prompt for exactly what is missing before submitting.
-    const response = await jiraRequest<{ transitions?: JiraRecord[] }>(
-      entry,
-      `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/transitions?expand=transitions.fields`
-    )
+    const issuePath = `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/transitions`
+    let response: { transitions?: JiraRecord[] }
+    try {
+      response = await jiraRequest(entry, `${issuePath}?expand=transitions.fields`)
+    } catch (error) {
+      if (!(error instanceof JiraApiError) || ![400, 403, 404].includes(error.status ?? 0)) {
+        throw error
+      }
+      response = await jiraRequest(entry, issuePath)
+    }
     return (response.transitions ?? []).map((transition) => ({
       id: asString(transition.id),
       name: asString(transition.name),
       to: mapStatus(transition.to),
-      ...requiredTransitionFields(transition.fields)
+      fields: transition.fields
+        ? Object.entries(asRecord(transition.fields))
+            .map(([fieldKey, field]) => mapCreateField(field, fieldKey))
+            .filter((field) => field !== null)
+        : undefined
     }))
   } catch (error) {
     if (isAuthError(error)) {
@@ -63,6 +52,9 @@ export async function listTransitions(
       throw error
     }
     console.warn('[jira] listTransitions failed:', error)
+    if (strict) {
+      throw error
+    }
     return []
   } finally {
     release()
@@ -113,6 +105,7 @@ export async function getProjectStatusOrder(
     // avoids a second metadata request and keeps duplicate names unambiguous.
     const seenStatusIds = new Set<string>()
     const statusIdsByColumn: string[][] = []
+    const boardColumns: NonNullable<JiraProjectStatusOrder['columns']> = []
     for (const column of columns) {
       const statuses = asRecord(column).statuses
       if (!Array.isArray(statuses)) {
@@ -129,8 +122,12 @@ export async function getProjectStatusOrder(
       if (columnStatusIds.length > 0) {
         statusIdsByColumn.push(columnStatusIds)
       }
+      const name = asString(asRecord(column).name).trim()
+      if (name) {
+        boardColumns.push({ name, statusIds: columnStatusIds })
+      }
     }
-    return { statusIdsByColumn }
+    return { statusIdsByColumn, ...(boardColumns.length ? { columns: boardColumns } : {}) }
   } catch (error) {
     if (isAuthError(error)) {
       clearToken(entry.site.id)
