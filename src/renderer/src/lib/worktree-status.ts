@@ -3,6 +3,7 @@ import { classifyTitleActivity } from '@/lib/pane-agent-evidence'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import { resolveRuntimePaneTitleLeafIdFromRoot } from '@/lib/runtime-pane-title-leaf-id'
 import { containsAgentSpinnerGlyph } from '../../../shared/agent-title-core'
+import { isWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 import { isSyntheticAgentPermissionTitle } from '../../../shared/synthetic-agent-title'
 import type {
   TerminalLayoutSnapshot,
@@ -29,6 +30,8 @@ type WorktreeStatusHeuristicOptions = {
   agentStatusPaneIdsByTabId?: Record<string, ReadonlySet<string>>
   /** Stale rows suppress Orca's generated permission labels; native title fallback stays live. */
   stalePaneIdsByTabId?: Record<string, ReadonlySet<string>>
+  /** Panes whose row records a finish: their cached title must not outlive it. */
+  terminalPaneIdsByTabId?: Record<string, ReadonlySet<string>>
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot | undefined>
   terminalLayoutRootsByTabId?: Record<string, TerminalPaneLayoutNode | null | undefined>
 }
@@ -82,8 +85,8 @@ function tabHasStatus(
   status: 'permission' | 'working',
   options: WorktreeStatusHeuristicOptions
 ): boolean {
-  const freshPaneIds = options.agentStatusPaneIdsByTabId?.[tab.id]
-  const permissionPaneIds = suppressingPaneIds(tab.id, status, options)
+  const suppressionPaneIds = titleSuppressionPaneIds(tab, status, options)
+  const permissionPaneIds = status === 'permission' ? recordedPaneIds(tab.id, options) : undefined
   const paneTitles = runtimePaneTitlesByTabId[tab.id]
   if (paneTitles && Object.keys(paneTitles).length > 0) {
     const tabLayoutRoot =
@@ -93,7 +96,7 @@ function tabHasStatus(
       const agentStatusPaneIds =
         status === 'permission' && isSyntheticAgentPermissionTitle(title)
           ? permissionPaneIds
-          : freshPaneIds
+          : suppressionPaneIds
       const leafId = resolveRuntimePaneTitleLeafIdFromRoot(tabLayoutRoot, runtimePaneId)
       // Why: runtime titles can precede layout hydration (SSH/replay); with one title and one agent row, prefer that row over a stale spinner.
       const hasSingleUnmappedAgentStatusPane =
@@ -118,7 +121,7 @@ function tabHasStatus(
   const agentStatusPaneIds =
     status === 'permission' && isSyntheticAgentPermissionTitle(tab.title)
       ? permissionPaneIds
-      : freshPaneIds
+      : suppressionPaneIds
   if (agentStatusPaneIds && agentStatusPaneIds.size > 0) {
     return false
   }
@@ -129,27 +132,50 @@ function tabHasStatus(
 }
 
 /**
- * Pane ids whose title must not drive `status` for this tab. Fresh rows suppress every heuristic;
- * stale rows suppress synthetic permission labels only. Returns the fresh set itself
- * when there is nothing to add, so the common path allocates nothing.
+ * Pane ids whose title must not drive `status` for this tab. A mirrored tab's title is the host's
+ * last report, cached with no age of its own — unlike a row, which decays — so a row that records
+ * a finish quiets it at any age. A local tab's title is live renderer state, where a live working
+ * title still outranks a stale row, and stale rows suppress synthetic permission labels only.
+ * Returns an existing set unchanged when nothing has to be added, so the common path allocates
+ * nothing.
  */
-function suppressingPaneIds(
-  tabId: string,
+function titleSuppressionPaneIds(
+  tab: Pick<TerminalTab, 'id' | 'title' | 'launchAgent'>,
   status: 'permission' | 'working',
   options: WorktreeStatusHeuristicOptions
 ): ReadonlySet<string> | undefined {
-  const fresh = options.agentStatusPaneIdsByTabId?.[tabId]
-  if (status !== 'permission') {
-    return fresh
+  if (status === 'working' && isWebTerminalSurfaceTabId(tab.id)) {
+    return unionPaneIds(
+      options.agentStatusPaneIdsByTabId?.[tab.id],
+      options.terminalPaneIdsByTabId?.[tab.id]
+    )
   }
-  const stale = options.stalePaneIdsByTabId?.[tabId]
-  if (!stale || stale.size === 0) {
-    return fresh
+  return options.agentStatusPaneIdsByTabId?.[tab.id]
+}
+
+/** Every pane with a recorded row, fresh or stale. */
+function recordedPaneIds(
+  tabId: string,
+  options: WorktreeStatusHeuristicOptions
+): ReadonlySet<string> | undefined {
+  return unionPaneIds(
+    options.agentStatusPaneIdsByTabId?.[tabId],
+    options.stalePaneIdsByTabId?.[tabId]
+  )
+}
+
+/** Returns `first` itself when there is nothing to add, so the common path allocates nothing. */
+function unionPaneIds(
+  first: ReadonlySet<string> | undefined,
+  second: ReadonlySet<string> | undefined
+): ReadonlySet<string> | undefined {
+  if (!second || second.size === 0) {
+    return first
   }
-  if (!fresh || fresh.size === 0) {
-    return stale
+  if (!first || first.size === 0) {
+    return second
   }
-  return new Set([...fresh, ...stale])
+  return new Set([...first, ...second])
 }
 
 // Why: require agent attribution so a bare never-cleared spinner title can't spin the dot "0 agents" forever with no matching sidebar row.
@@ -182,6 +208,7 @@ export function resolveWorktreeStatus(args: {
   runtimePaneTitlesByTabId?: Record<string, Record<number, string>>
   agentStatusPaneIdsByTabId?: Record<string, ReadonlySet<string>>
   stalePaneIdsByTabId?: Record<string, ReadonlySet<string>>
+  terminalPaneIdsByTabId?: Record<string, ReadonlySet<string>>
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot | undefined>
   terminalLayoutRootsByTabId?: Record<string, TerminalPaneLayoutNode | null | undefined>
   hasPermission: boolean
@@ -205,6 +232,7 @@ export function resolveWorktreeStatus(args: {
     {
       agentStatusPaneIdsByTabId: args.agentStatusPaneIdsByTabId,
       stalePaneIdsByTabId: args.stalePaneIdsByTabId,
+      terminalPaneIdsByTabId: args.terminalPaneIdsByTabId,
       terminalLayoutsByTabId: args.terminalLayoutsByTabId,
       terminalLayoutRootsByTabId: args.terminalLayoutRootsByTabId
     }

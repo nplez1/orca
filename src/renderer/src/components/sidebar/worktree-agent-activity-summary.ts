@@ -30,6 +30,8 @@ export type WorktreeAgentActivitySummary = {
   agentStatusPaneIdsByTabId: Record<string, ReadonlySet<string>>
   /** Stale rows suppress generated permission labels while preserving native title fallback. */
   stalePaneIdsByTabId: Record<string, ReadonlySet<string>>
+  /** Panes whose row records a finish, however old: a cached title must not outlive it. */
+  terminalPaneIdsByTabId: Record<string, ReadonlySet<string>>
 }
 
 const EMPTY_AGENT_STATUS_PANE_IDS_BY_TAB_ID: Record<string, ReadonlySet<string>> = {}
@@ -45,7 +47,8 @@ const EMPTY_SUMMARY: WorktreeAgentActivitySummary = {
   hasRetainedDone: false,
   hasRetainedFailed: false,
   agentStatusPaneIdsByTabId: EMPTY_AGENT_STATUS_PANE_IDS_BY_TAB_ID,
-  stalePaneIdsByTabId: EMPTY_AGENT_STATUS_PANE_IDS_BY_TAB_ID
+  stalePaneIdsByTabId: EMPTY_AGENT_STATUS_PANE_IDS_BY_TAB_ID,
+  terminalPaneIdsByTabId: EMPTY_AGENT_STATUS_PANE_IDS_BY_TAB_ID
 }
 
 type AgentActivityTabsByWorktree = Record<string, readonly { id: string }[]>
@@ -138,6 +141,12 @@ function getWorktreeAgentActivitySummaries(
       // `stalePaneIdsByTabId`. Dropping both let Orca's self-authored permission title outlive
       // the row it came from and pin the card to a question nobody was asking.
       addStalePaneId(summary, paneIdentity.tabId, paneIdentity.paneId)
+      if (entry.state === 'done') {
+        // Why: the finish outlives the row's freshness. A pane's cached title — a paired host's
+        // last report — has no age of its own, so without this the host's last working frame kept
+        // the card spinning long after the host reported the agent done.
+        addTerminalPaneId(summary, paneIdentity.tabId, paneIdentity.paneId)
+      }
       continue
     }
     addAgentStatusPaneId(summary, paneIdentity.tabId, paneIdentity.paneId)
@@ -215,7 +224,8 @@ function summariesEqual(
       previous.agentStatusPaneIdsByTabId,
       next.agentStatusPaneIdsByTabId
     ) &&
-    agentStatusPaneIdsByTabIdEqual(previous.stalePaneIdsByTabId, next.stalePaneIdsByTabId)
+    agentStatusPaneIdsByTabIdEqual(previous.stalePaneIdsByTabId, next.stalePaneIdsByTabId) &&
+    agentStatusPaneIdsByTabIdEqual(previous.terminalPaneIdsByTabId, next.terminalPaneIdsByTabId)
   )
 }
 
@@ -259,6 +269,14 @@ function addStalePaneId(
   paneId: string
 ): void {
   summary.stalePaneIdsByTabId = withPaneId(summary.stalePaneIdsByTabId, tabId, paneId)
+}
+
+function addTerminalPaneId(
+  summary: WorktreeAgentActivitySummary,
+  tabId: string,
+  paneId: string
+): void {
+  summary.terminalPaneIdsByTabId = withPaneId(summary.terminalPaneIdsByTabId, tabId, paneId)
 }
 
 function withPaneId(

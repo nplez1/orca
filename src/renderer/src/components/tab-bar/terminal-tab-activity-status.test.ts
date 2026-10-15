@@ -4,6 +4,7 @@ import {
   type AgentStatusEntry
 } from '../../../../shared/agent-status-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import { toWebTerminalSurfaceTabId } from '../../../../shared/terminal-surface-id'
 import {
   hasUnreadAgentCompletionForTerminalTab,
   resetUnreadAgentCompletionTabIdsCacheForTest,
@@ -243,6 +244,41 @@ describe('resolveTerminalTabActivityStatus', () => {
         ptyIdsByTabId: LIVE_PTY
       })
     ).toBe('working')
+  })
+
+  // A local pane always has per-pane titles, so this is the path a live title actually takes: an
+  // old `done` row must not quiet it.
+  it('keeps a live working title on a local pane whose only row is an old finish', () => {
+    const stale = entry(FIRST_LEAF_ID, 'done', { updatedAt: 0 })
+    vi.setSystemTime(31 * 60 * 1000)
+    expect(
+      resolveTerminalTabActivityStatus({
+        tab: { id: TAB_ID, title: 'Codex working' },
+        agentStatusByPaneKey: { [stale.paneKey]: stale },
+        runtimePaneTitlesByTabId: { [TAB_ID]: { 1: 'Codex working' } },
+        ptyIdsByTabId: LIVE_PTY
+      })
+    ).toBe('working')
+  })
+
+  // The reported remote shape: a paired host's last working title sits cached in
+  // runtimePaneTitlesByTabId with no age of its own, so a row that recorded a finish has to quiet
+  // it — otherwise the tab spun until the app restarted.
+  it('quietens the cached working title of a mirrored pane whose row records a finish', () => {
+    const mirroredTabId = toWebTerminalSurfaceTabId('host-tab-1')
+    const stale = entry(FIRST_LEAF_ID, 'done', {
+      updatedAt: 0,
+      paneKey: `${mirroredTabId}:${FIRST_LEAF_ID}`
+    })
+    vi.setSystemTime(31 * 60 * 1000)
+    expect(
+      resolveTerminalTabActivityStatus({
+        tab: { id: mirroredTabId, title: 'π - widget' },
+        agentStatusByPaneKey: { [stale.paneKey]: stale },
+        runtimePaneTitlesByTabId: { [mirroredTabId]: { 1: '⠋ π - widget' } },
+        ptyIdsByTabId: { [mirroredTabId]: ['pty-1'] }
+      })
+    ).toBe('active')
   })
 
   it('does not revive an unconfirmed restored row from its preserved title', () => {

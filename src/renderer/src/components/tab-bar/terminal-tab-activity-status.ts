@@ -26,6 +26,8 @@ type TerminalTabActivityFlags = AgentPaneActivityFlags & {
   paneIds: Set<string>
   /** Panes whose row went stale; suppress generated permission labels only. */
   stalePaneIds: Set<string>
+  /** Panes whose row records a finish; suppress their cached working title. */
+  terminalPaneIds: Set<string>
 }
 
 type FlagsCache = {
@@ -73,9 +75,12 @@ function getTerminalTabActivityFlags(
     // must not keep a tab spinning. Same freshness gate as the sidebar.
     if (!isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)) {
       // Stale identity suppresses Orca's one-shot permission label without suppressing native titles.
-      getOrCreateTerminalTabActivityFlags(flagsByTabId, identity.tabId).stalePaneIds.add(
-        identity.paneId
-      )
+      const staleFlags = getOrCreateTerminalTabActivityFlags(flagsByTabId, identity.tabId)
+      staleFlags.stalePaneIds.add(identity.paneId)
+      if (entry.state === 'done') {
+        // The finish outlives the row's freshness, and a cached title never ages on its own.
+        staleFlags.terminalPaneIds.add(identity.paneId)
+      }
       continue
     }
 
@@ -103,7 +108,8 @@ function getOrCreateTerminalTabActivityFlags(
       hasUnconfirmed: false,
       hasLiveDone: false,
       paneIds: new Set(),
-      stalePaneIds: new Set()
+      stalePaneIds: new Set(),
+      terminalPaneIds: new Set()
     }
     flagsByTabId.set(tabId, flags)
   }
@@ -160,6 +166,7 @@ export function resolveTerminalTabActivityStatus({
     runtimePaneTitlesByTabId: runtimePaneTitlesByTabId ?? {},
     agentStatusPaneIdsByTabId: { [tab.id]: flags?.paneIds ?? EMPTY_PANE_IDS },
     stalePaneIdsByTabId: { [tab.id]: flags?.stalePaneIds ?? EMPTY_PANE_IDS },
+    terminalPaneIdsByTabId: { [tab.id]: flags?.terminalPaneIds ?? EMPTY_PANE_IDS },
     terminalLayoutsByTabId: terminalLayout ? { [tab.id]: terminalLayout } : undefined,
     hasPermission: flags?.hasPermission ?? false,
     hasLiveWorking: flags?.hasLiveWorking ?? false,

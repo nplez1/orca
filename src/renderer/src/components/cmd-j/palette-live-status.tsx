@@ -42,6 +42,7 @@ type PaletteLiveStatus = {
   liveAgentStatusByWorktreeId: ReadonlyMap<string, LiveAgentWorktreeStatus>
   agentStatusPaneIdsByTabId: Record<string, ReadonlySet<string>>
   stalePaneIdsByTabId: Record<string, ReadonlySet<string>>
+  terminalPaneIdsByTabId: Record<string, ReadonlySet<string>>
   paneSources: TabPaneInputSources
   tabsByWorktree: Record<string, TerminalTab[]>
   browserTabsByWorktree: Record<string, BrowserWorkspace[]>
@@ -108,6 +109,7 @@ export function PaletteLiveStatusProvider({
       ),
       agentStatusPaneIdsByTabId: livePaneIds.paneIdsByTabId,
       stalePaneIdsByTabId: livePaneIds.stalePaneIdsByTabId,
+      terminalPaneIdsByTabId: livePaneIds.terminalPaneIdsByTabId,
       paneSources: {
         entriesByTabId,
         ptyIdsByTabId,
@@ -140,19 +142,25 @@ export function PaletteLiveStatusProvider({
   )
 }
 
-/** Fresh rows suppress all title heuristics; stale rows suppress generated permission labels. */
+/**
+ * Fresh rows suppress all title heuristics; stale rows suppress generated permission labels, and a
+ * row that records a finish also quiets the cached title a mirrored pane carries.
+ */
 function buildLiveAgentStatusPaneIdsByTabId(
   entriesByTabId: ReadonlyMap<string, readonly AgentStatusEntry[]>,
   now: number
 ): {
   paneIdsByTabId: Record<string, ReadonlySet<string>>
   stalePaneIdsByTabId: Record<string, ReadonlySet<string>>
+  terminalPaneIdsByTabId: Record<string, ReadonlySet<string>>
 } {
   const paneIdsByTabId: Record<string, ReadonlySet<string>> = {}
   const stalePaneIdsByTabId: Record<string, ReadonlySet<string>> = {}
+  const terminalPaneIdsByTabId: Record<string, ReadonlySet<string>> = {}
   for (const [tabId, entries] of entriesByTabId) {
     const paneIds = new Set<string>()
     const stalePaneIds = new Set<string>()
+    const terminalPaneIds = new Set<string>()
     for (const entry of entries) {
       const paneId = parsePaneKey(entry.paneKey)?.leafId
       if (!paneId) {
@@ -163,6 +171,9 @@ function buildLiveAgentStatusPaneIdsByTabId(
         !isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS)
       ) {
         stalePaneIds.add(paneId)
+        if (entry.state === 'done') {
+          terminalPaneIds.add(paneId)
+        }
         continue
       }
       paneIds.add(paneId)
@@ -173,8 +184,11 @@ function buildLiveAgentStatusPaneIdsByTabId(
     if (stalePaneIds.size > 0) {
       stalePaneIdsByTabId[tabId] = stalePaneIds
     }
+    if (terminalPaneIds.size > 0) {
+      terminalPaneIdsByTabId[tabId] = terminalPaneIds
+    }
   }
-  return { paneIdsByTabId, stalePaneIdsByTabId }
+  return { paneIdsByTabId, stalePaneIdsByTabId, terminalPaneIdsByTabId }
 }
 
 const EMPTY_LIVE_INPUTS = Object.freeze({
@@ -215,6 +229,7 @@ export function PaletteWorktreeStatusDot({
       liveAgentStatus: live.liveAgentStatusByWorktreeId.get(worktree.id),
       agentStatusPaneIdsByTabId: live.agentStatusPaneIdsByTabId,
       stalePaneIdsByTabId: live.stalePaneIdsByTabId,
+      terminalPaneIdsByTabId: live.terminalPaneIdsByTabId,
       terminalLayoutsByTabId: live.paneSources.terminalLayoutsByTabId
     }
   )
