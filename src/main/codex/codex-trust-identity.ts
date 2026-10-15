@@ -91,6 +91,9 @@ function resolveThroughExistingAncestor(path: string): string {
   const missing: string[] = []
   let current = path
   for (;;) {
+    if (isMacHomeAutomounterMountPoint(current)) {
+      return join(current, ...missing.toReversed())
+    }
     try {
       return join(realpathSync.native(current), ...missing.toReversed())
     } catch {
@@ -102,6 +105,16 @@ function resolveThroughExistingAncestor(path: string): string {
       current = parent
     }
   }
+}
+
+// Why: stock macOS maps /home to autofs (`/home auto_home` in /etc/auto_master) and Bun blocks in
+// open() while that map is unmounted. Only the mount point: /home/<user> can be a real network home.
+function isMacHomeAutomounterMountPoint(path: string): boolean {
+  if (process.platform !== 'darwin') {
+    return false
+  }
+  // Why normalized: the walk's `dirname` can hand us `/home/` for a torn `/home//<user>` spelling.
+  return trimNonRootTrailingSeparators(pathPosix.normalize(path), '/', /\//) === '/home'
 }
 
 export function normalizeCodexTrustSourcePath(sourcePath: string): string {
