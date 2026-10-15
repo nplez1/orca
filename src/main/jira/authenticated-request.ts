@@ -24,10 +24,22 @@ export function apiBasePath(site: JiraSite): string {
 
 export class JiraApiError extends Error {
   status: number | null
+  /** Jira's per-field rejections, keyed by field key. Present when Jira answered
+   *  with an `errors` object, which is how a transition or edit names the field
+   *  it refused. */
+  fieldErrors?: Record<string, string>
+  /** Jira's non-field error strings, e.g. a workflow rule that failed outright. */
+  errorMessages?: string[]
 
-  constructor(message: string, status: number | null = null) {
+  constructor(
+    message: string,
+    status: number | null = null,
+    detail?: { fieldErrors?: Record<string, string>; errorMessages?: string[] }
+  ) {
     super(message)
     this.status = status
+    this.fieldErrors = detail?.fieldErrors
+    this.errorMessages = detail?.errorMessages
   }
 }
 
@@ -112,7 +124,8 @@ export async function requestWithCredentials(
     headers
   })
   if (!response.ok) {
-    throw new JiraApiError(await readJiraError(response), response.status)
+    const detail = await readJiraErrorDetail(response)
+    throw new JiraApiError(detail.message, response.status, detail)
   }
   if (response.status === 204) {
     return null
@@ -120,25 +133,45 @@ export async function requestWithCredentials(
   return response.json()
 }
 
-async function readJiraError(response: Response): Promise<string> {
+type JiraErrorDetail = {
+  message: string
+  fieldErrors?: Record<string, string>
+  errorMessages?: string[]
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+async function readJiraErrorDetail(response: Response): Promise<JiraErrorDetail> {
   try {
-    const data = (await response.json()) as {
-      errorMessages?: string[]
-      errors?: Record<string, string>
-      message?: string
-    }
+    const raw: unknown = await response.json()
+    const data = isUnknownRecord(raw) ? raw : {}
+    const errors = isUnknownRecord(data.errors) ? data.errors : {}
+    const fieldErrors = Object.fromEntries(
+      Object.entries(errors).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    )
+    const errorMessages = Array.isArray(data.errorMessages)
+      ? data.errorMessages.filter((message): message is string => typeof message === 'string')
+      : undefined
     const messages = [
-      ...(Array.isArray(data.errorMessages) ? data.errorMessages : []),
-      ...Object.values(data.errors ?? {}),
-      ...(data.message ? [data.message] : [])
+      ...(errorMessages ?? []),
+      ...Object.values(fieldErrors),
+      ...(typeof data.message === 'string' ? [data.message] : [])
     ].filter(Boolean)
     if (messages.length > 0) {
-      return messages.join('; ')
+      return {
+        message: messages.join('; '),
+        ...(Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}),
+        ...(errorMessages && errorMessages.length > 0 ? { errorMessages } : {})
+      }
     }
   } catch {
     // Fall through to status text.
   }
-  return response.statusText || `Jira request failed (${response.status})`
+  return { message: response.statusText || `Jira request failed (${response.status})` }
 }
 
 export async function jiraRequest<T>(
@@ -156,7 +189,8 @@ export async function jiraRequest<T>(
     headers
   })
   if (!response.ok) {
-    throw new JiraApiError(await readJiraError(response), response.status)
+    const detail = await readJiraErrorDetail(response)
+    throw new JiraApiError(detail.message, response.status, detail)
   }
   if (response.status === 204) {
     return null as T
@@ -185,7 +219,8 @@ export async function jiraRequestBinary(
   headers.set('Authorization', client.authorization)
   const response = await jiraFetch(requestUrl.toString(), { headers })
   if (!response.ok) {
-    throw new JiraApiError(await readJiraError(response), response.status)
+    const detail = await readJiraErrorDetail(response)
+    throw new JiraApiError(detail.message, response.status, detail)
   }
   const contentType = response.headers.get('content-type') || 'application/octet-stream'
   return {

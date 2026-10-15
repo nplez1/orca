@@ -13,6 +13,9 @@ import { translate } from '@/i18n/i18n'
 type JiraTransitionPickerProps = {
   issue: JiraIssue | null
   transitions: JiraTransition[]
+  /** Which promise the picker is keeping: a lane drop, or a drop on the
+   *  "Other statuses" bucket whose target status is not a column. */
+  mode: 'column' | 'otherStatuses'
   onSelect: (transition: JiraTransition) => void
   onClose: () => void
   disabled: boolean
@@ -21,6 +24,7 @@ type JiraTransitionPickerProps = {
 export function TaskPageJiraTransitionPicker({
   issue,
   transitions,
+  mode,
   onSelect,
   onClose,
   disabled
@@ -34,11 +38,17 @@ export function TaskPageJiraTransitionPicker({
           </DialogTitle>
           <DialogDescription>
             {issue
-              ? translate(
-                  'auto.components.TaskPage.jiraChooseTransitionDescription',
-                  'More than one Jira transition can move {{value0}} to that column. Choose one to continue.',
-                  { value0: issue.key }
-                )
+              ? mode === 'otherStatuses'
+                ? translate(
+                    'auto.components.TaskPage.jiraChooseOtherStatusTransition',
+                    '{{value0}} does not sit in a board column. Choose the status change to apply.',
+                    { value0: issue.key }
+                  )
+                : translate(
+                    'auto.components.TaskPage.jiraChooseTransitionDescription',
+                    'More than one Jira transition can move {{value0}} to that column. Choose one to continue.',
+                    { value0: issue.key }
+                  )
               : null}
           </DialogDescription>
         </DialogHeader>

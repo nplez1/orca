@@ -185,7 +185,8 @@
         "duplicateIssueNumberPlaceholder": "Issue number",
         "f294c500ef": "No GitLab work matches this filter.",
         "f51e254d35": "Try different search terms or JQL.",
-        "fe28c9821f": "view"
+        "fe28c9821f": "view",
+        "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}."
       },
       "Terminal": {
         "cdc9ac4b2d": "editor"

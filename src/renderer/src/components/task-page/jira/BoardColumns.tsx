@@ -19,12 +19,16 @@ type TaskPageJiraBoardColumnsProps = {
   selectedIssue: JiraIssue | null
   issueWorkspaceAttachmentIndex: JiraIssueWorkspaceAttachmentIndex
   draggingIssueKey: string | null
-  updatingIssueKey: string | null
+  updatingIssueKeys: readonly string[]
   onOpenIssue: (issue: JiraIssue) => void
   onDragStart: (issue: JiraIssue, event: DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
   onDragOver: (column: TaskPageJiraBoardColumn, event: DragEvent<HTMLElement>) => void
   onDrop: (column: TaskPageJiraBoardColumn, event: DragEvent<HTMLElement>) => void
+  /** The "Other statuses" bucket spans several statuses, so it is its own drop
+   *  rule rather than a lane: dropping there asks which status to move to. */
+  onDragOverOther: (event: DragEvent<HTMLElement>) => void
+  onDropOther: (event: DragEvent<HTMLElement>) => void
   dragOverColumnKey: string | null
 }
 
@@ -132,27 +136,32 @@ export function TaskPageJiraBoardColumns({
   selectedIssue,
   issueWorkspaceAttachmentIndex,
   draggingIssueKey,
-  updatingIssueKey,
+  updatingIssueKeys,
   onOpenIssue,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDrop,
+  onDragOverOther,
+  onDropOther,
   dragOverColumnKey
 }: TaskPageJiraBoardColumnsProps): JSX.Element {
   const renderColumn = (
     key: string,
     label: string,
     issues: JiraIssue[],
-    column?: TaskPageJiraBoardColumn
+    column?: TaskPageJiraBoardColumn,
+    isOtherBucket = false
   ): JSX.Element => (
     <section
       key={key}
-      onDragOver={column ? (event) => onDragOver(column, event) : undefined}
-      onDrop={column ? (event) => onDrop(column, event) : undefined}
+      onDragOver={
+        column ? (event) => onDragOver(column, event) : isOtherBucket ? onDragOverOther : undefined
+      }
+      onDrop={column ? (event) => onDrop(column, event) : isOtherBucket ? onDropOther : undefined}
       className={cn(
         'min-h-0 rounded-md border border-border/50 bg-muted/20 transition-[border-color,box-shadow]',
-        column?.column.statusIds.length && dragOverColumnKey === key
+        (Boolean(column?.column.statusIds.length) || isOtherBucket) && dragOverColumnKey === key
           ? 'border-ring/70 ring-1 ring-ring/70'
           : undefined
       )}
@@ -179,7 +188,7 @@ export function TaskPageJiraBoardColumns({
               issue={issue}
               selected={isSelected(issue, selectedIssue)}
               dragging={draggingIssueKey === issue.key}
-              updating={updatingIssueKey === issue.key}
+              updating={updatingIssueKeys.includes(issue.key)}
               onOpenIssue={onOpenIssue}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
@@ -198,7 +207,9 @@ export function TaskPageJiraBoardColumns({
           issues
         })
       )}
-      {otherIssues.length > 0 ? renderColumn('other', 'Other statuses', otherIssues) : null}
+      {otherIssues.length > 0
+        ? renderColumn('other', 'Other statuses', otherIssues, undefined, true)
+        : null}
     </div>
   )
 }

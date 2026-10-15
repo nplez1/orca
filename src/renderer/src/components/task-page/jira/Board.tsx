@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, JSX } from 'react'
+import type { JSX } from 'react'
 import type {
-  JiraBoardColumn,
   JiraBoardSelection,
   JiraIssue,
-  JiraProjectStatusOrder,
-  JiraTransition
+  JiraProjectStatusOrder
 } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardModel } from '../../task-page-jira-board-types'
 export type { TaskPageJiraBoardModel } from '../../task-page-jira-board-types'
 import { useTaskPageJiraBoard } from '../../use-task-page-jira-board'
-import {
-  getTaskPageJiraBoardTransitionTargets,
-  groupTaskPageJiraBoardIssues
-} from '../../task-page-jira-board-model'
-import { jiraListTransitions, jiraUpdateIssue } from '@/runtime/runtime-jira-client'
+import { groupTaskPageJiraBoardIssues } from '../../task-page-jira-board-model'
 import { TaskPageJiraBacklogView } from './BacklogView'
 import { TaskPageJiraBoardColumns } from './BoardColumns'
 import { TaskPageJiraBoardHeader } from './BoardHeader'
 import { TaskPageJiraTransitionPicker } from './TransitionPicker'
+import { TaskPageJiraTransitionFieldsDialog } from './TransitionFieldsDialog'
+import { useJiraBoardDrop } from './use-jira-board-drop'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -36,14 +32,6 @@ import {
   updateJiraBoardViewPreferences
 } from '../../jira-board-view-storage'
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : 'Jira board update failed.'
-}
-
-function columnKey(column: JiraBoardColumn, index: number): string {
-  return `${column.name}:${index}:${column.statusIds.join(',')}`
-}
-
 function loadMoreLabel(loading: boolean, label: string): string {
   return loading ? translate('auto.components.TaskPage.jiraBoardLoadingMore', 'Loading…') : label
 }
@@ -60,12 +48,6 @@ export function TaskPageJiraBoard({
   onIssueMoved: (issue: JiraIssue) => void
 }): JSX.Element {
   const board = useTaskPageJiraBoard(model, selection)
-  const [draggingIssueKey, setDraggingIssueKey] = useState<string | null>(null)
-  const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null)
-  const [movingIssueKey, setMovingIssueKey] = useState<string | null>(null)
-  const [pendingIssue, setPendingIssue] = useState<JiraIssue | null>(null)
-  const [pendingTransitions, setPendingTransitions] = useState<JiraTransition[]>([])
-  const [transitionSaving, setTransitionSaving] = useState(false)
   const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
     () => loadJiraBoardViewPreferences().activeView
   )
@@ -87,6 +69,14 @@ export function TaskPageJiraBoard({
   const statusOrder: JiraProjectStatusOrder | null = board.overview
     ? { statusIdsByColumn: board.overview.columns.map((column) => column.statusIds) }
     : null
+  const drop = useJiraBoardDrop({
+    providerSettings,
+    sprintIssues: board.sprintIssues,
+    columns: filteredColumns.columns,
+    applyIssuePatch: board.applyIssuePatch,
+    refreshBoard: board.refresh,
+    onIssueMoved
+  })
 
   useEffect(() => {
     if (!board.runtimeBoardUnavailable || legacyRuntimeFallbackApplied.current) {
@@ -101,79 +91,6 @@ export function TaskPageJiraBoard({
     )
     onUseIssueList()
   }, [board.runtimeBoardUnavailable, onUseIssueList])
-
-  const applyTransition = async (issue: JiraIssue, transition: JiraTransition): Promise<void> => {
-    setTransitionSaving(true)
-    try {
-      const result = await jiraUpdateIssue(
-        providerSettings,
-        issue.key,
-        { transitionId: transition.id },
-        issue.siteId
-      )
-      if (!result.ok) {
-        throw new Error(result.error)
-      }
-      toast.success(
-        translate('auto.components.TaskPage.jiraIssueMoved', '{{value0}} moved to {{value1}}', {
-          value0: issue.key,
-          value1: transition.to.name
-        })
-      )
-      setPendingIssue(null)
-      setPendingTransitions([])
-      onIssueMoved(issue)
-      board.refresh()
-    } catch (error) {
-      toast.error(errorText(error))
-    } finally {
-      setTransitionSaving(false)
-    }
-  }
-
-  const handleDrop = async (
-    column: JiraBoardColumn,
-    event: DragEvent<HTMLElement>
-  ): Promise<void> => {
-    event.preventDefault()
-    event.stopPropagation()
-    setDragOverColumnKey(null)
-    const issueKey = event.dataTransfer.getData('text/plain') || draggingIssueKey
-    setDraggingIssueKey(null)
-    if (!issueKey || movingIssueKey) {
-      return
-    }
-    const issue = board.sprintIssues.find((candidate) => candidate.key === issueKey)
-    if (!issue || column.statusIds.includes(issue.status.id)) {
-      return
-    }
-    setMovingIssueKey(issue.key)
-    try {
-      const transitions = await jiraListTransitions(providerSettings, issue.key, issue.siteId)
-      const matchingTransitions = getTaskPageJiraBoardTransitionTargets(
-        transitions,
-        column.statusIds
-      )
-      if (matchingTransitions.length === 0) {
-        toast.error(
-          translate(
-            'auto.components.TaskPage.jiraNoStatusTransition',
-            'Jira has no available transition to {{value0}} for {{value1}}.',
-            { value0: column.name, value1: issue.key }
-          )
-        )
-      } else if (matchingTransitions.length === 1) {
-        await applyTransition(issue, matchingTransitions[0])
-      } else {
-        setPendingIssue(issue)
-        setPendingTransitions(matchingTransitions)
-      }
-    } catch (error) {
-      toast.error(errorText(error))
-    } finally {
-      setMovingIssueKey(null)
-    }
-  }
 
   return (
     <div className="flex min-h-0 max-h-full flex-1 flex-col overflow-hidden rounded-md border border-border/50 bg-background shadow-sm">
@@ -261,43 +178,16 @@ export function TaskPageJiraBoard({
                   otherIssues={filteredColumns.otherIssues}
                   selectedIssue={model.selectedJiraIssue}
                   issueWorkspaceAttachmentIndex={model.jiraIssueAttachmentIndex}
-                  draggingIssueKey={draggingIssueKey}
-                  updatingIssueKey={movingIssueKey}
-                  dragOverColumnKey={dragOverColumnKey}
+                  draggingIssueKey={drop.draggingIssueKey}
+                  updatingIssueKeys={drop.movingIssueKeys}
+                  dragOverColumnKey={drop.dragOverColumnKey}
                   onOpenIssue={model.openJiraDetailPage}
-                  onDragStart={(issue, event) => {
-                    if (movingIssueKey) {
-                      event.preventDefault()
-                      return
-                    }
-                    try {
-                      event.dataTransfer.setData('text/plain', issue.key)
-                      event.dataTransfer.effectAllowed = 'move'
-                      setDraggingIssueKey(issue.key)
-                    } catch {
-                      event.preventDefault()
-                    }
-                  }}
-                  onDragEnd={() => {
-                    setDraggingIssueKey(null)
-                    setDragOverColumnKey(null)
-                  }}
-                  onDragOver={(columnGroup, event) => {
-                    const index = filteredColumns.columns.findIndex(
-                      (entry) => entry.column === columnGroup.column
-                    )
-                    if (
-                      index === -1 ||
-                      columnGroup.column.statusIds.length === 0 ||
-                      movingIssueKey
-                    ) {
-                      return
-                    }
-                    event.preventDefault()
-                    event.dataTransfer.dropEffect = 'move'
-                    setDragOverColumnKey(columnKey(columnGroup.column, index))
-                  }}
-                  onDrop={(columnGroup, event) => void handleDrop(columnGroup.column, event)}
+                  onDragStart={drop.startDrag}
+                  onDragEnd={drop.endDrag}
+                  onDragOver={drop.handleDragOver}
+                  onDrop={(columnGroup, event) => void drop.handleDrop(columnGroup.column, event)}
+                  onDragOverOther={drop.handleDragOverOther}
+                  onDropOther={(event) => void drop.handleOtherDrop(event)}
                 />
               ) : null}
               {board.sprintIssues.length === 0 &&
@@ -336,20 +226,29 @@ export function TaskPageJiraBoard({
       )}
 
       <TaskPageJiraTransitionPicker
-        issue={pendingIssue}
-        transitions={pendingTransitions}
-        disabled={transitionSaving}
-        onClose={() => {
-          if (!transitionSaving) {
-            setPendingIssue(null)
-            setPendingTransitions([])
-          }
-        }}
-        onSelect={(transition) => {
-          if (pendingIssue) {
-            void applyTransition(pendingIssue, transition)
-          }
-        }}
+        issue={drop.pendingIssue}
+        transitions={drop.pendingTransitions}
+        mode={drop.pendingTransitionMode}
+        disabled={drop.transitionSaving}
+        onClose={drop.closeTransitionPicker}
+        onSelect={drop.selectTransition}
+      />
+
+      <TaskPageJiraTransitionFieldsDialog
+        request={
+          drop.pendingTransitionFields
+            ? {
+                issueKey: drop.pendingTransitionFields.issue.key,
+                transitionName: drop.pendingTransitionFields.transition.name,
+                siteId: drop.pendingTransitionFields.issue.siteId,
+                fields: drop.pendingTransitionFields.fields
+              }
+            : null
+        }
+        providerSettings={providerSettings}
+        submitting={drop.transitionSaving}
+        onClose={drop.closeTransitionFields}
+        onSubmit={drop.submitTransitionFields}
       />
     </div>
   )

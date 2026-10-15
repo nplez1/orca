@@ -577,6 +577,14 @@ pnpm run sync:localization-runtime-catalog
     `defaultScopeSource(...)` value, and because that allocates on every call it must be
     `useMemo`-stabilised at each call site, or it re-triggers the hooks that list `providerSettings`
     as a dependency and re-fetches on every render (see "Silent losses" below).
+  - **Issue #98 (Jira lane drag-and-drop, Dev/QE field editing) raised five focus-read counts.**
+    The feature adds real provider reads of its own: an `editmeta` read for the issue detail
+    (`jira-issue-workspace-detail-state.ts` 3→4, `jira-issue-workspace-side-data.ts` 4→6,
+    `runtime/runtime-jira-client.ts` 17→18) and two new board-drop hook files at 1 each
+    (`task-page/jira/use-jira-board-drop.ts`, `use-jira-board-transition-move.ts`). `Board.tsx`
+    moved its transition calls into those hooks and pruned 4→3. They are recorded in
+    `config/focus-setting-read-baseline.txt` at their current counts, the same fork-code shape as
+    the 2026-10-11 sync above; owner-routing remains the follow-up and is unchanged by this work.
   - **Silent losses found only after the merge was first committed, and repaired.** Three classes —
     none visible to a conflict marker, a typecheck, or a `node-runtime`-only test run, so the fork's
     own release line would have shipped all three:

@@ -8,10 +8,12 @@ import type {
   JiraConnectionStatus,
   JiraCreateField,
   JiraCreateIssueArgs,
+  JiraEditableField,
   JiraIssue,
   JiraIssueFilter,
   JiraIssueType,
   JiraIssueUpdate,
+  JiraMutationResult,
   JiraPriority,
   JiraProject,
   JiraProjectStatusOrder,
@@ -61,7 +63,7 @@ export type JiraApi = {
     key: string
     updates: JiraIssueUpdate
     siteId?: string
-  }) => Promise<{ ok: true } | { ok: false; error: string }>
+  }) => Promise<JiraMutationResult>
   addIssueComment: (args: {
     key: string
     body: string
@@ -76,6 +78,7 @@ export type JiraApi = {
     issueTypeId: string
     siteId?: string
   }) => Promise<JiraCreateField[]>
+  listEditFields: (args: { key: string; siteId?: string }) => Promise<JiraEditableField[]>
   listPriorities: (args?: { siteId?: string }) => Promise<JiraPriority[]>
   listAssignableUsers: (args: {
     key: string

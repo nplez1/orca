@@ -7,7 +7,7 @@ import type {
   JiraSite
 } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
-import { apiBasePath, jiraRequest } from './authenticated-request'
+import { apiBasePath, jiraRequest, JiraApiError } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { issueUrl, toBodyText } from './jira-issue-mapping'
 import { markdownCommentBody } from './jira-comment-body'
@@ -36,6 +36,48 @@ function toUserFieldValue(site: JiraSite, value: unknown): unknown {
   return value
 }
 
+/**
+ * Writes custom-field values into a Jira field map, shaping the keys named by
+ * `userFieldKeys`. `null` clears a field and must reach Jira, so an update keeps
+ * it; create cannot set null and skips it.
+ */
+function applyCustomFieldValues(
+  site: JiraSite,
+  target: JiraRecord,
+  values: Record<string, unknown> | undefined,
+  userFieldKeys: readonly string[] | undefined,
+  mode: 'create' | 'update'
+): void {
+  const userKeys = new Set(userFieldKeys ?? [])
+  for (const [fieldKey, value] of Object.entries(values ?? {})) {
+    if (!fieldKey || value === undefined) {
+      continue
+    }
+    if (userKeys.has(fieldKey)) {
+      target[fieldKey] = value === null || value === '' ? null : toUserFieldValue(site, value)
+      continue
+    }
+    if (value !== null && value !== '') {
+      target[fieldKey] = value
+    } else if (mode === 'update') {
+      target[fieldKey] = value
+    }
+  }
+}
+
+/** Jira's own field-level rejections, so the UI can name the offending field. */
+function describeUpdateFailure(error: unknown): JiraMutationResult {
+  if (error instanceof JiraApiError) {
+    return {
+      ok: false,
+      error: error.message,
+      ...(error.fieldErrors ? { fieldErrors: error.fieldErrors } : {}),
+      ...(error.errorMessages ? { errorMessages: error.errorMessages } : {})
+    }
+  }
+  return { ok: false, error: error instanceof Error ? error.message : 'Failed to update issue.' }
+}
+
 /** Creates an issue, shaping the customFields keys named by `userFieldKeys`. */
 export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreateIssueResult> {
   const entry = getClients(args.siteId)[0]
@@ -57,13 +99,7 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
     if (args.description?.trim()) {
       fields.description = toBodyText(entry.site, args.description.trim())
     }
-    const userFieldKeys = new Set(args.userFieldKeys ?? [])
-    for (const [fieldKey, value] of Object.entries(args.customFields ?? {})) {
-      if (!fieldKey || value === undefined || value === null || value === '') {
-        continue
-      }
-      fields[fieldKey] = userFieldKeys.has(fieldKey) ? toUserFieldValue(entry.site, value) : value
-    }
+    applyCustomFieldValues(entry.site, fields, args.customFields, args.userFieldKeys, 'create')
     const created = await jiraRequest<{ id: string; key: string; self: string }>(
       entry,
       `${apiBasePath(entry.site)}/issue`,
@@ -107,6 +143,13 @@ export async function updateIssue(
       fields.priority = updates.priorityId ? { id: updates.priorityId } : null
     }
     const issueBase = `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}`
+    applyCustomFieldValues(
+      entry.site,
+      fields,
+      updates.customFields,
+      updates.userFieldKeys,
+      'update'
+    )
     if (Object.keys(fields).length > 0) {
       await jiraRequest(entry, issueBase, {
         method: 'PUT',
@@ -121,9 +164,20 @@ export async function updateIssue(
       })
     }
     if (updates.transitionId) {
+      const transitionFields: JiraRecord = {}
+      applyCustomFieldValues(
+        entry.site,
+        transitionFields,
+        updates.transitionFields,
+        updates.transitionUserFieldKeys,
+        'update'
+      )
       await jiraRequest(entry, `${issueBase}/transitions`, {
         method: 'POST',
-        body: JSON.stringify({ transition: { id: updates.transitionId } })
+        body: JSON.stringify({
+          transition: { id: updates.transitionId },
+          ...(Object.keys(transitionFields).length > 0 ? { fields: transitionFields } : {})
+        })
       })
     }
     return { ok: true }
@@ -132,7 +186,7 @@ export async function updateIssue(
       clearToken(entry.site.id)
       throw error
     }
-    return { ok: false, error: error instanceof Error ? error.message : 'Failed to update issue.' }
+    return describeUpdateFailure(error)
   } finally {
     release()
   }

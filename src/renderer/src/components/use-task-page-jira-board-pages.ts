@@ -15,6 +15,7 @@ import {
   JIRA_BOARD_ISSUE_PAGE_SIZE,
   readJiraBoardScopePages
 } from './task-page-jira-board-page-fetch'
+import { useJiraBoardIssuePatch } from './use-jira-board-issue-patch'
 
 export function useTaskPageJiraBoardPages(args: {
   providerSettings: RuntimeJiraSettings
@@ -82,6 +83,18 @@ export function useTaskPageJiraBoardPages(args: {
     },
     [cacheKey, setBacklogPageLocal]
   )
+
+  /**
+   * Applies a local-only patch to one issue in both loaded scopes, so an
+   * optimistic move renders before Jira confirms it. Deliberately not cached: a
+   * status Jira has not accepted must not become the value a reload trusts.
+   */
+  const patchBoardIssue = useJiraBoardIssuePatch({
+    sprintPageRef,
+    backlogPageRef,
+    setSprintPageLocal,
+    setBacklogPageLocal
+  })
 
   useEffect(() => {
     const generation = ++sprintGeneration.current
@@ -300,6 +313,7 @@ export function useTaskPageJiraBoardPages(args: {
     backlogLoading,
     backlogLoadingMore,
     backlogError,
-    loadMoreBacklog
+    loadMoreBacklog,
+    patchBoardIssue
   }
 }

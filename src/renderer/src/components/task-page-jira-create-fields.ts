@@ -126,11 +126,16 @@ export function buildJiraCreateCustomFields(
 }
 
 // Only populated user fields require the remote user-field capability.
+export type JiraCreateFieldSubmission = {
+  customFields?: Record<string, unknown>
+  userFieldKeys?: string[]
+}
+
 export function buildJiraCreateSubmission(
   fields: readonly JiraCreateField[],
   values: Record<string, string>,
   assigneeAccountId?: string | null
-): { customFields?: Record<string, unknown>; userFieldKeys?: string[] } {
+): JiraCreateFieldSubmission {
   const customFields = { ...buildJiraCreateCustomFields(fields, values) }
   if (assigneeAccountId) {
     customFields[JIRA_ASSIGNEE_FIELD_KEY] = assigneeAccountId

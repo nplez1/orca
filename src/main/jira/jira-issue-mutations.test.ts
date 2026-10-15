@@ -29,9 +29,17 @@ vi.mock('./authenticated-request', () => ({
   jiraRequestBinary: (...args: unknown[]) => jiraRequestBinaryMock(...args),
   JiraApiError: class JiraApiError extends Error {
     status: number | null
-    constructor(message: string, status: number | null = null) {
+    fieldErrors?: Record<string, string>
+    errorMessages?: string[]
+    constructor(
+      message: string,
+      status: number | null = null,
+      detail?: { fieldErrors?: Record<string, string>; errorMessages?: string[] }
+    ) {
       super(message)
       this.status = status
+      this.fieldErrors = detail?.fieldErrors
+      this.errorMessages = detail?.errorMessages
     }
   }
 }))
@@ -264,5 +272,70 @@ describe('Jira issue mutations', () => {
       '/rest/api/2/issue/ALP-1/assignee',
       expect.objectContaining({ body: JSON.stringify({ name: 'wquintal' }) })
     )
+  })
+
+  it('writes and clears custom fields through the field-edit PUT', async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue(
+      'ALP-1',
+      {
+        customFields: { customfield_10001: 'account-9', customfield_2: null },
+        userFieldKeys: ['customfield_10001']
+      },
+      'site-1'
+    )
+
+    // Dev/QE are user pickers, so the id must arrive as a ref; null is the clear.
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      fields: { customfield_10001: { accountId: 'account-9' }, customfield_2: null }
+    })
+  })
+
+  it("submits a transition screen's fields beside the transition", async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    jiraRequestMock.mockResolvedValue(null)
+    const { updateIssue } = await import('./issues')
+
+    await updateIssue(
+      'ALP-1',
+      {
+        transitionId: '31',
+        transitionFields: { resolution: { id: '10000' }, customfield_5: 'done' }
+      },
+      'site-1'
+    )
+
+    const [, path] = jiraRequestMock.mock.calls[0]
+    expect(path).toBe('/rest/api/3/issue/ALP-1/transitions')
+    expect(readPostedJsonBody(jiraRequestMock.mock.calls[0])).toEqual({
+      transition: { id: '31' },
+      fields: { resolution: { id: '10000' }, customfield_5: 'done' }
+    })
+  })
+
+  it("surfaces Jira's field-level rejection rather than one flattened string", async () => {
+    getClientsMock.mockReturnValue([makeEntry()])
+    const { JiraApiError } = await import('./authenticated-request')
+    jiraRequestMock.mockRejectedValueOnce(
+      new JiraApiError('Dev is required', 400, {
+        fieldErrors: { customfield_10001: 'Dev is required' }
+      })
+    )
+    const { updateIssue } = await import('./issues')
+
+    const result = await updateIssue(
+      'ALP-1',
+      { customFields: { customfield_10001: 'account-9' }, userFieldKeys: ['customfield_10001'] },
+      'site-1'
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Dev is required',
+      fieldErrors: { customfield_10001: 'Dev is required' }
+    })
   })
 })

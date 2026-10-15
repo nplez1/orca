@@ -19,6 +19,7 @@ import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
+import { JiraEditFieldsRow } from './JiraEditFieldsRow'
 import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
@@ -158,6 +159,14 @@ export function JiraLinkedIssuePane({
               />
               <JiraPriorityRow displayed={displayed} detail={detail} />
               <JiraLabelsRow displayed={displayed} detail={detail} />
+              <JiraEditFieldsRow
+                issue={displayed}
+                fields={detail.editFields}
+                loading={detail.editFieldsLoading}
+                pending={detail.pendingField === 'fields'}
+                providerSettings={providerSettings}
+                onSubmit={detail.submitIssueFields}
+              />
             </div>
 
             <section className="border-t border-border/40 p-3">

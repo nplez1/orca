@@ -1791,7 +1791,13 @@
         "2a829a2f00": "priority",
         "693be070d0": "transition",
         "ef21405c6d": "Jira issue",
-        "commentTooLarge": "Comment is too large to submit safely."
+        "commentTooLarge": "Comment is too large to submit safely.",
+        "editFieldsTitle": "Edit Jira fields",
+        "editFieldsDescription": "Custom fields Jira allows you to change on {{value0}}.",
+        "editFieldsEmpty": "Jira reports no editable custom fields on this issue.",
+        "editFieldsSaving": "Saving…",
+        "editFields": "Edit fields",
+        "noIssueSelected": "No Jira issue is selected."
       },
       "Landing": {
         "76a95f7f47": "Create",
@@ -2650,7 +2656,20 @@
         "jiraChooseTransition": "Choose a status change",
         "jiraChooseTransitionDescription": "More than one Jira transition can move {{value0}} to that column. Choose one to continue.",
         "jiraFilterGroupLabel": "Filter Jira issues",
-        "jiraBoardLoading": "Loading…"
+        "jiraBoardLoading": "Loading…",
+        "jiraUnassignedFilter": "Unassigned",
+        "jiraTransitionFieldsTitle": "Update fields to move {{value0}}",
+        "jiraTransitionFieldsDescription": "Jira requires these fields before it will apply the {{value0}} transition.",
+        "jiraTransitionFieldsUnsupported": "Orca cannot set {{value0}}, so Jira will refuse this move. Complete the transition in Jira.",
+        "jiraTransitionFieldsApplying": "Moving…",
+        "jiraTransitionFieldsApply": "Apply and move",
+        "jiraChooseOtherStatusTransition": "{{value0}} does not sit in a board column. Choose the status change to apply.",
+        "jiraBoardIssueMoving": "{{value0}} is still moving.",
+        "jiraBoardAlreadyInColumn": "{{value0}} is already in {{value1}}.",
+        "jiraNoAvailableTransitions": "Jira lists no available transitions for {{value0}}; the issue may be closed or you may lack permission.",
+        "jiraNoStatusTransitionAvailable": "Jira cannot move {{value0}} to {{value1}}. Available moves: {{value2}}.",
+        "jiraNoOtherStatusTransition": "Jira has no move from {{value0}} to a status outside the board columns.",
+        "jiraNoPendingTransition": "No transition is pending."
       },
       "Terminal": {
         "73768427cf": "Close",
@@ -14918,7 +14937,10 @@
             "unlinkIssue": "Unlink issue from workspace",
             "unlinkIssueDescription": "Orca will hide {{value0}} from this workspace. The issue on {{value1}} won’t be changed.",
             "linkAnotherIssue": "Link another issue",
-            "folderWorkspaceLink": "A folder workspace keeps the issue it was created from."
+            "folderWorkspaceLink": "A folder workspace keeps the issue it was created from.",
+            "fields": "Fields",
+            "editableFields": "{{value0}} editable",
+            "noEditableFields": "None editable"
           },
           "IssueAssignee": {
             "label": "Assignee",
@@ -19999,6 +20021,9 @@
     },
     "automations": {
       "runTerminalUnavailable": "Run terminal is unavailable."
+    },
+    "jiraSchemaField": {
+      "noUser": "None"
     }
   },
   "dashboardPopout": {

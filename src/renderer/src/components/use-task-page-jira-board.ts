@@ -184,6 +184,8 @@ export function useTaskPageJiraBoard(model: TaskPageJiraBoardModel, selection: J
     query,
     setQuery,
     meFilterReady: Boolean(viewerAccountId),
+    /** Local-only patch so an optimistic move renders before Jira confirms it. */
+    applyIssuePatch: pages.patchBoardIssue,
     refresh: () => setRefreshNonce((nonce) => nonce + 1)
   }
 }
