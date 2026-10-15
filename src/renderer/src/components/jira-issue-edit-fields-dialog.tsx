@@ -6,7 +6,7 @@ import type {
   JiraIssue,
   JiraUser
 } from '../../../shared/jira-types'
-import { isJiraUserField } from '../../../shared/jira-field-rendering'
+import { isJiraTextAreaField, isJiraUserField } from '../../../shared/jira-field-rendering'
 import { buildJiraCreateFieldValue } from '@/components/task-page-jira-create-fields'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,7 @@ function EditFieldsForm({
   onSubmit: (updates: {
     customFields: Record<string, unknown>
     userFieldKeys: string[]
+    textFieldKeys: string[]
   }) => Promise<JiraIssueFieldOutcome>
   onClose: () => void
 }): JSX.Element {
@@ -72,6 +73,7 @@ function EditFieldsForm({
     setFieldErrors({})
     const customFields: Record<string, unknown> = {}
     const userFieldKeys: string[] = []
+    const textFieldKeys: string[] = []
     for (const entry of fields) {
       const key = entry.field.key
       const draft = drafts[key] ?? ''
@@ -89,13 +91,15 @@ function EditFieldsForm({
       customFields[key] = value
       if (isJiraUserField(entry.field)) {
         userFieldKeys.push(key)
+      } else if (isJiraTextAreaField(entry.field)) {
+        textFieldKeys.push(key)
       }
     }
     if (Object.keys(customFields).length === 0) {
       onClose()
       return
     }
-    const outcome = await onSubmit({ customFields, userFieldKeys })
+    const outcome = await onSubmit({ customFields, userFieldKeys, textFieldKeys })
     if (!outcome.ok) {
       setError(outcome.error)
       setFieldErrors(outcome.fieldErrors ?? {})
@@ -209,6 +213,7 @@ export function JiraIssueEditFieldsDialog({
   onSubmit: (updates: {
     customFields: Record<string, unknown>
     userFieldKeys: string[]
+    textFieldKeys: string[]
   }) => Promise<JiraIssueFieldOutcome>
 }): JSX.Element {
   return (

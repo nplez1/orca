@@ -41,6 +41,13 @@ export function useJiraIssueSideData({
   const [editFields, setEditFields] = useState<JiraEditableField[]>([])
   const [editFieldsLoading, setEditFieldsLoading] = useState(false)
   const requestIdRef = useRef(0)
+  // Why a key ref rather than the request counter: a reload for the old issue
+  // must be dropped without also discarding the new issue's in-flight load.
+  const editFieldsIssueKeyRef = useRef<string | null>(issueKey)
+
+  useEffect(() => {
+    editFieldsIssueKeyRef.current = issueKey
+  }, [issueKey])
 
   useEffect(() => {
     if (!issueKey) {
@@ -92,11 +99,11 @@ export function useJiraIssueSideData({
     if (!issueKey) {
       return
     }
-    // Why the shared request id: a save that lands after the user switched issue
-    // must not repopulate the new issue's form with the old issue's fields.
-    const requestId = ++requestIdRef.current
-    const next = await jiraListEditFields(providerSettings, issueKey, issueSiteId).catch(() => null)
-    if (next && requestId === requestIdRef.current) {
+    const requestedKey = issueKey
+    const next = await jiraListEditFields(providerSettings, requestedKey, issueSiteId).catch(
+      () => null
+    )
+    if (next && editFieldsIssueKeyRef.current === requestedKey) {
       setEditFields(next)
     }
   }, [issueKey, issueSiteId, providerSettings])

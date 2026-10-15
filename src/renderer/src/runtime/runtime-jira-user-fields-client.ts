@@ -6,7 +6,7 @@ import type {
 import {
   JIRA_USER_FIELDS_RUNTIME_CAPABILITY,
   JIRA_USER_FIELDS_UPDATE_REQUIRED_MESSAGE
-} from '../../../shared/protocol-version'
+} from '../../../shared/jira-runtime-capabilities'
 import {
   assertRuntimeEnvironmentCapability,
   callRuntimeRpc,
@@ -14,6 +14,7 @@ import {
 } from './runtime-rpc-client'
 import { isRuntimeProviderSearchQueryWithinLimit } from './runtime-provider-search-bounds'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
+import { foldTextFieldsForTarget } from './runtime-jira-text-fields'
 
 export async function jiraCreateIssue(
   settings: RuntimeJiraSettings,
@@ -28,9 +29,15 @@ export async function jiraCreateIssue(
       30_000
     )
   }
+  const folded = await foldTextFieldsForTarget(target, args.customFields, args.textFieldKeys)
+  const adjustedArgs: JiraCreateIssueArgs = args.customFields
+    ? { ...args, customFields: folded.values, textFieldKeys: folded.textFieldKeys }
+    : args
   return target.kind === 'environment'
-    ? callRuntimeRpc<JiraCreateIssueResult>(target, 'jira.createIssue', args, { timeoutMs: 30_000 })
-    : window.api.jira.createIssue(args)
+    ? callRuntimeRpc<JiraCreateIssueResult>(target, 'jira.createIssue', adjustedArgs, {
+        timeoutMs: 30_000
+      })
+    : window.api.jira.createIssue(adjustedArgs)
 }
 
 export async function jiraListAssignableUsers(

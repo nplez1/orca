@@ -63,7 +63,8 @@ describe('JiraIssueEditFieldsDialog', () => {
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
         customFields: { customfield_2: 'new' },
-        userFieldKeys: []
+        userFieldKeys: [],
+        textFieldKeys: []
       })
     )
   })
@@ -90,7 +91,8 @@ describe('JiraIssueEditFieldsDialog', () => {
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
         customFields: { customfield_2: null },
-        userFieldKeys: []
+        userFieldKeys: [],
+        textFieldKeys: []
       })
     )
   })
@@ -120,6 +122,43 @@ describe('JiraIssueEditFieldsDialog', () => {
 
     expect((await screen.findAllByText('Dev is required')).length).toBeGreaterThan(0)
     expect(onOpenChange).not.toHaveBeenCalledWith(false)
+  })
+
+  it('names a changed textarea field so the host can convert it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[
+          {
+            field: {
+              key: 'customfield_7',
+              name: 'Notes',
+              required: false,
+              schema: { custom: 'com.atlassian.jira:textarea' }
+            },
+            value: ''
+          }
+        ]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={onSubmit}
+      />
+    )
+
+    await user.type(screen.getByRole('textbox'), 'hello')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        customFields: { customfield_7: 'hello' },
+        userFieldKeys: [],
+        textFieldKeys: ['customfield_7']
+      })
+    )
   })
 
   it('shows the current assignee name for a user-picker field', () => {

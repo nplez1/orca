@@ -23,6 +23,7 @@ import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { isRuntimeProviderSearchQueryWithinLimit } from './runtime-provider-search-bounds'
 import { readRuntimeJiraPayload } from './runtime-jira-payload-stream'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from './runtime-jira-target'
+import { foldIssueUpdateForTarget } from './runtime-jira-text-fields'
 import { parseJiraConnectionStatus } from './runtime-jira-connection-status'
 
 export { jiraLookupIssueSummary, jiraReadStatus } from './runtime-jira-summary-client'
@@ -173,7 +174,11 @@ export async function jiraUpdateIssue(
   siteId?: string | null
 ): Promise<JiraMutationResult> {
   const target = getJiraRuntimeTarget(settings)
-  const args = { key, updates, siteId: siteId ?? undefined }
+  const args = {
+    key,
+    updates: await foldIssueUpdateForTarget(target, updates),
+    siteId: siteId ?? undefined
+  }
   return target.kind === 'environment'
     ? callRuntimeRpc<JiraMutationResult>(target, 'jira.updateIssue', args, { timeoutMs: 30_000 })
     : window.api.jira.updateIssue(args)
