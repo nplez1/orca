@@ -78,7 +78,8 @@ describe('JiraStoryPointsRow', () => {
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
       { customFields: { customfield_10016: 3 } },
-      { storyPoints: 3 }
+      { storyPoints: 3 },
+      { reportsInline: true }
     )
   })
 

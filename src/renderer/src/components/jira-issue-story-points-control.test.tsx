@@ -82,7 +82,8 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
       { customFields: { [POINTS_KEY]: 8 } },
-      { storyPoints: 8 }
+      { storyPoints: 8 },
+      { reportsInline: true }
     )
   })
 
@@ -98,7 +99,8 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
       { customFields: { [POINTS_KEY]: null } },
-      { storyPoints: undefined }
+      { storyPoints: undefined },
+      { reportsInline: true }
     )
   })
 
@@ -117,7 +119,7 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
   })
 
-  it('keeps the field open with its draft when Jira rejects the write', async () => {
+  it("keeps the field open with its draft and Jira's reason when the write is refused", async () => {
     const user = userEvent.setup()
     const mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: false, error: 'Not a number' }))
     renderControl({ displayed: issue(5), editFields: [pointsField('5')], mutateIssue })
@@ -130,6 +132,34 @@ describe('JiraIssueStoryPointsControl', () => {
 
     expect(await screen.findByRole('textbox', { name: 'Story points' })).toBeTruthy()
     expect(screen.getByDisplayValue('8')).toBeTruthy()
+    // The reason stays where the value it rejected is, rather than in a toast.
+    expect(screen.getByRole('alert').textContent).toBe('Not a number')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('describes the field with its own message, and with none when there is none', async () => {
+    const user = userEvent.setup()
+    renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
+
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    const describedBy = input.getAttribute('aria-describedby')
+
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy ?? '')?.textContent).toBe(
+      'An empty value clears the field.'
+    )
+  })
+
+  it('points at no description at all when there is nothing to say', async () => {
+    const user = userEvent.setup()
+    renderControl({ displayed: issue(), editFields: [pointsField('')] })
+
+    await user.click(screen.getByRole('button', { name: 'No points' }))
+
+    expect(
+      screen.getByRole('textbox', { name: 'Story points' }).getAttribute('aria-describedby')
+    ).toBeNull()
   })
 
   it('refuses a draft that is not a number instead of reading it as a clear', async () => {
@@ -185,7 +215,8 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
       { customFields: { [POINTS_KEY]: 8 } },
-      { storyPoints: 8 }
+      { storyPoints: 8 },
+      { reportsInline: true }
     )
   })
 
@@ -216,7 +247,8 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
       { customFields: { [POINTS_KEY]: 8 } },
-      { storyPoints: 8 }
+      { storyPoints: 8 },
+      { reportsInline: true }
     )
   })
 

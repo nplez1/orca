@@ -267,7 +267,9 @@ function mapStoryPoints(
       return { storyPoints: value, storyPointsFieldId: id }
     }
   }
-  return {}
+  // Why both keys even when unset: a refresh is spread onto the issue already on
+  // screen, so an omitted key would leave points Jira no longer has.
+  return { storyPoints: undefined, storyPointsFieldId: undefined }
 }
 
 export function mapJiraIssue(

@@ -80,14 +80,16 @@ describe('JiraIssueWorkspace story points', () => {
     await openPointsEditor('5', '8')
     await flushPromises()
 
-    // The card moves with the write, and returns when Jira rejects it.
+    // The chip carries the write optimistically, and returns when Jira rejects it.
     expect(screen.getByRole('button', { name: 'Points: 8' })).toBeTruthy()
     await act(async () => write.resolve({ ok: false, error: 'Not a number' }))
     await flushPromises()
 
     expect(screen.getByRole('button', { name: 'Points: 5' })).toBeTruthy()
-    // The reason has to reach the user; this form has nowhere to show it.
-    expect(toast.error).toHaveBeenCalledWith('Not a number')
+    // The reason stays beside the field the user has to correct, not in a toast that
+    // disappears while they are still looking at it.
+    expect(screen.getByText('Not a number')).toBeTruthy()
+    expect(toast.error).not.toHaveBeenCalled()
     // A refused write changes nothing, so nothing needs re-reading.
     expect(runtimeMocks.jiraListEditFieldsForTarget.mock.calls.length).toBe(1)
   })

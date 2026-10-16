@@ -34,7 +34,7 @@ function holdsPoints(entry: JiraEditableField, points: number | undefined): bool
  * an issue with no points yet may be written through whichever field Jira
  * offers.
  */
-export function findJiraStoryPointsField(
+function findJiraStoryPointsField(
   fields: readonly JiraEditableField[],
   issue: Pick<JiraIssue, 'storyPoints' | 'storyPointsFieldId'>
 ): JiraEditableField | undefined {
@@ -56,7 +56,7 @@ export function jiraStoryPointsLabel(points: number | undefined): string {
 /** The detail bar has no column heading above it and no label beside it, so the
  *  chip names the field; the Issue pane's row is labelled already. A label rather
  *  than a unit suffix keeps one point from reading as "1 pts" in any language. */
-export function jiraStoryPointsChipLabel(points: number | undefined): string {
+function jiraStoryPointsChipLabel(points: number | undefined): string {
   return points === undefined
     ? jiraStoryPointsLabel(points)
     : translate('auto.components.JiraIssueStoryPointsControl.value', 'Points: {{value0}}', {
@@ -86,6 +86,8 @@ export type JiraStoryPointsEditor = {
   setDraft: (value: string) => void
   invalid: boolean
   changed: boolean
+  /** Jira's own reason for refusing the last write, until the next attempt. */
+  error: string | null
   /** This field's own write is in flight. */
   pending: boolean
   /** Any write on the issue is in flight, so a save here would be refused. */
@@ -114,6 +116,7 @@ export function useJiraStoryPointsEditor({
   const points = displayed.storyPoints
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const trimmedDraft = draft.trim()
   // Why the input is a text box parsed here: a number input reports '' for text it
   // cannot parse, so "5e" or "1." would read as an empty draft and clear the field.
@@ -128,6 +131,7 @@ export function useJiraStoryPointsEditor({
     // the user is still typing into.
     if (nextOpen) {
       setDraft(points === undefined ? '' : String(points))
+      setError(null)
     }
   }
 
@@ -140,22 +144,29 @@ export function useJiraStoryPointsEditor({
     setDraft,
     invalid,
     changed,
+    error,
     pending: pendingField === 'storyPoints',
     blocked: pendingField !== null,
     submit: async (): Promise<void> => {
       if (!pointsField || invalid || !changed) {
         return
       }
+      setError(null)
       // Why null rather than an omitted key: the update path only writes the fields
       // it is given, so an omitted key would leave the old points in place.
       const result = await mutateIssue(
         'storyPoints',
         { customFields: { [pointsField.field.key]: nextValue } },
-        { storyPoints: nextValue ?? undefined }
+        { storyPoints: nextValue ?? undefined },
+        // Why: this form shows the reason beside the field, where the user has to
+        // act on it; a toast would name it once and disappear.
+        { reportsInline: true }
       )
       if (result.ok) {
         setOpen(false)
+        return
       }
+      setError(result.error)
     }
   }
 }
@@ -167,16 +178,20 @@ export function JiraStoryPointsEditorForm({
   editor: JiraStoryPointsEditor
 }): React.JSX.Element {
   const messageId = useId()
-  // Why conditional: nothing to describe means no described-by, so the input is not
-  // pointed at an empty message.
-  const message = editor.invalid
+  // Jira's own refusal outranks the hint, and a draft that is not a number outranks
+  // both: the draft the user is looking at is what needs answering. Nothing to say
+  // means no described-by, so the input is never pointed at an empty message.
+  const problem = editor.invalid
     ? translate('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')
-    : editor.points === undefined
+    : editor.error
+  const hint =
+    editor.points === undefined
       ? null
       : translate(
           'auto.components.JiraIssueStoryPointsControl.clearHint',
           'An empty value clears the field.'
         )
+  const message = problem ?? hint
   return (
     <form
       className="flex flex-col gap-2"
@@ -195,15 +210,14 @@ export function JiraStoryPointsEditorForm({
         // Why read-only rather than disabled: a disabled field loses focus part-way
         // through a save, so the user would have to click back in to fix a refusal.
         readOnly={editor.blocked}
-        aria-invalid={editor.invalid || undefined}
+        aria-invalid={problem ? true : undefined}
         onChange={(event) => editor.setDraft(event.target.value)}
       />
       {message ? (
         <p
           id={messageId}
-          className={
-            editor.invalid ? 'text-[11px] text-destructive' : 'text-[11px] text-muted-foreground'
-          }
+          role={problem ? 'alert' : undefined}
+          className={problem ? 'text-[11px] text-destructive' : 'text-[11px] text-muted-foreground'}
         >
           {message}
         </p>
@@ -262,7 +276,9 @@ export function JiraIssueStoryPointsControl({
       <PopoverTrigger asChild>
         <button
           type="button"
-          disabled={pendingField !== null}
+          // Why not disabled for this field's own write: Esc closes the popover, and
+          // Radix restores focus to the trigger, which a disabled button cannot take.
+          disabled={editor.blocked && !editor.pending}
           title={pointsTitle(editor.points)}
           className={TRIGGER_CLASS}
         >
