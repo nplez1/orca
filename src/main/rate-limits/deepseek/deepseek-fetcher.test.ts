@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setMainHttpClient } from '../../network/http-client'
 
 const { netFetchMock } = vi.hoisted(() => ({ netFetchMock: vi.fn() }))
 
-// Why: the fetcher must use the default session's net.fetch (proxy guard); the
-// mock exposes no `session` so a partition-based transport would fail loudly.
-vi.mock('electron', () => ({ net: { fetch: netFetchMock } }))
+// Why: the fetcher reads the host HTTP port, whose desktop client is the default
+// session's net.fetch (proxy guard included). Installing the port keeps that contract
+// and lets the module load under the runtime, where Electron is absent.
+setMainHttpClient({ fetch: netFetchMock, proxySession: () => null })
 
 import { fetchDeepSeekRateLimits } from './deepseek-fetcher'
 

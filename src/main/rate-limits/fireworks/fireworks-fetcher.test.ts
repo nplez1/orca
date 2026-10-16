@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setMainHttpClient } from '../../network/http-client'
 
 const netFetchMock = vi.hoisted(() => vi.fn())
 const balanceMock = vi.hoisted(() => vi.fn())
 
-// Why: net.fetch on the default session is what the proxy guard covers, so the
-// mock only needs that one surface.
-vi.mock('electron', () => ({ net: { fetch: netFetchMock } }))
+// Why: the fetcher reads the host HTTP port, whose desktop client is the default
+// session's net.fetch that the proxy guard covers — so the mock needs only that one
+// surface, and the module still loads under the runtime where Electron is absent.
+setMainHttpClient({ fetch: netFetchMock, proxySession: () => null })
 
 // Why: the balance readout goes over node:http2 to the control-plane gateway, which
 // the net.fetch mock cannot intercept — without this the suite would dial the real
