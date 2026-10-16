@@ -19,13 +19,16 @@ afterEach(() => {
 })
 
 describe('Jira list columns', () => {
-  it('defaults to the previous columns with planning fields hidden', () => {
+  // Why this diverges from upstream, which hides every planning column: a scrum
+  // board is planned by points, so the fork shows them without the column picker.
+  it('shows story points by default and leaves the other planning fields hidden', () => {
     expect([...defaultJiraListColumnIds()]).toEqual([
       'key',
       'title',
       'status',
       'priority',
       'assignee',
+      'storyPoints',
       'updated'
     ])
   })

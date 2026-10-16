@@ -30,7 +30,11 @@ export const JIRA_LIST_COLUMNS: readonly JiraListColumn[] = [
   { id: 'assignee', widths: [0, 136, 160], defaultVisible: true },
   { id: 'parent', widths: [150, 150, 150], defaultVisible: false },
   { id: 'sprint', widths: [110, 110, 110], defaultVisible: false },
-  { id: 'storyPoints', widths: [60, 60, 60], defaultVisible: false },
+  // Why on by default, where upstream hides the planning columns: a scrum board is
+  // planned by points, so a fork that surfaces them in the issue detail should not
+  // make every reader find the column picker first. The other planning columns stay
+  // opt-in, and anyone with a saved column choice keeps it.
+  { id: 'storyPoints', widths: [60, 60, 60], defaultVisible: true },
   { id: 'originalEstimate', widths: [88, 88, 88], defaultVisible: false },
   { id: 'remainingEstimate', widths: [88, 88, 88], defaultVisible: false },
   { id: 'updated', widths: [80, 96, 128], defaultVisible: true }
