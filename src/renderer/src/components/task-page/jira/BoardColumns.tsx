@@ -14,6 +14,16 @@ import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 
+/** Story points, as the board's own `3sp` shorthand: Jira's own board shows the
+ *  number alone, but a card carries no column heading to say what it is. */
+function cardStoryPoints(issue: JiraIssue): string | null {
+  return issue.storyPoints === undefined
+    ? null
+    : translate('auto.components.TaskPage.jiraCardStoryPoints', '{{value0}}sp', {
+        value0: issue.storyPoints
+      })
+}
+
 type TaskPageJiraBoardColumnsProps = {
   columns: TaskPageJiraBoardColumn[]
   otherIssues: JiraIssue[]
@@ -63,6 +73,7 @@ function JiraBoardCard({
   onDragEnd: () => void
 }): JSX.Element {
   const prioritySurface = getJiraPrioritySurfaceTone(issue.priority)
+  const storyPoints = cardStoryPoints(issue)
   return (
     <div
       role="button"
@@ -104,16 +115,26 @@ function JiraBoardCard({
             {issue.title}
           </h3>
         </div>
-        {issue.status.name ? (
-          <span
-            className={cn(
-              'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-              getJiraStatusTone(issue.status.categoryKey)
-            )}
-          >
-            {issue.status.name}
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {issue.status.name ? (
+            <span
+              className={cn(
+                'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+                getJiraStatusTone(issue.status.categoryKey)
+              )}
+            >
+              {issue.status.name}
+            </span>
+          ) : null}
+          {storyPoints ? (
+            <span
+              title={translate('auto.components.TaskPage.jiraCardStoryPointsTitle', 'Story points')}
+              className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+            >
+              {storyPoints}
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
         <span className="truncate">

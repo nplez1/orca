@@ -2672,6 +2672,8 @@
         "jiraColumnsPicker": "Columns",
         "jiraColumnParent": "Parent",
         "jiraColumnSprint": "Sprint",
+        "jiraCardStoryPoints": "{{value0}}sp",
+        "jiraCardStoryPointsTitle": "Story points",
         "jiraColumnStoryPoints": "Points",
         "jiraColumnOriginalEstimate": "Estimate",
         "jiraColumnRemainingEstimate": "Remaining",
