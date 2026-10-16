@@ -134,6 +134,25 @@ describe('Session History scan progress, scanner child to window', () => {
     })
   })
 
+  it('publishes nothing for an answer that carries no tally, because no scan ran', async () => {
+    const { child, scan, published } = startScan()
+    readyAiVaultServiceChild(child)
+    await vi.waitFor(() => expect(localAiVaultScanProgress('')?.stage).toBe('finding'))
+    const id = aiVaultServiceRequestId(child, 'scan')
+    // What the fork's index-first path returns: the host listed from its index, so it has no
+    // work to report. A finished row here would render as "Scanned 0 files".
+    child.emit('message', {
+      type: 'result',
+      id,
+      operation: 'scan',
+      value: { result: { sessions: [], issues: [], scannedAt: '' }, durationMs: 1, work: null }
+    })
+    await scan
+
+    expect(published.map((progress) => progress?.stage ?? null)).toEqual([null, 'finding', null])
+    expect(localAiVaultScanProgress('')).toBeNull()
+  })
+
   it('reports a scan the no-progress deadline ended as stopped on the agent still walking', async () => {
     vi.useFakeTimers()
     const { child, scan, published } = startScan()

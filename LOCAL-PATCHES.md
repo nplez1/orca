@@ -391,8 +391,8 @@ pnpm run sync:localization-runtime-catalog
     `accounts-pane-claude-section.test.tsx` is deleted (both of its cases now live in
     `AccountsPane.test.tsx`), and `tui-agent-startup.test.ts` became an import barrel over
     upstream's new `.spec.ts` files, so the fork's `orca-np` launch expectations moved into
-    `tui-agent-startup.spec.ts`. The test names are upstream's; only the expected command and
-    two SSH-relay comments are the fork's.
+    `tui-agent-startup.spec.ts`. One test name is the fork's (the local Claude Agent Teams
+    case), the rest are upstream's; the expectations and two SSH-relay comments are the fork's.
   - **`use-section-rows.ts` was split, not raised.** Upstream keeps it at the `max-lines` budget,
     so the fork's same-branch merge overflowed it and the commit hook caught it. The
     rendered-row key collector moved to `rendered-sidebar-row-keys.ts` and the merge policy to
@@ -409,8 +409,9 @@ pnpm run sync:localization-runtime-catalog
     tip it was already red on the ts-nocheck ratchet
     (`workspace-process-listing.ts`, from the 2026-10-15 sync's mixin base-class swap) and on the
     focus-read ratchet (five Jira files). Both were re-run at `e27bc2efbf` in a fresh worktree
-    and reproduce identically there; both are now recorded in their baselines with a dated note
-    and their reason, and the typing fix behind the ts-nocheck one is a named follow-up. The
+    and reproduce identically there; both were recorded in their baselines with a dated note and
+    their reason. The ts-nocheck one lasted only until the review below, which found the chain fix
+    that removes it outright. The
     third red was **this sync's**: upstream's `provider-account-services` extraction makes orcad
     build `RateLimitService`, which statically reaches the fork's DeepSeek and Fireworks
     fetchers, and those imported `net` from Electron directly. Both now read the host HTTP port
@@ -425,12 +426,37 @@ pnpm run sync:localization-runtime-catalog
     fresh worktree — 1 of its 25 cases, leaving a stale `subagent_parent_session_id` in the
     index. Every module it imports is byte-identical to the pre-sync tip and this sync did not
     touch `src/main/ai-vault-search/`, so it is recorded rather than chased.
+  - **The Opus review found two must-fix items, and both are fixed.** `claude/opus` at high
+    reasoning, tool-enabled, over the merge diff (`git show --remerge-diff ae9db02137` plus the
+    repair commits), told not to accept these docs as evidence. The first was that the
+    `@ts-nocheck` described below as unavoidable **was avoidable**: upstream already declares those
+    forward references in `workspace-process-listing-dependencies.ts`, and the 2026-10-15 sync
+    orphaned that layer by re-pointing the file at `OrcaRuntimeWithSetupRunnerState` directly.
+    Chaining the two — `OrcaRuntimeWithWorktreePsDependencies` now extends the fork's
+    `OrcaRuntimeWithSetupRunnerState`, and `OrcaRuntimeWithGetWorktreePs` extends it in turn —
+    removes the suppression: `pnpm tc:node` is clean without it, the ratchet is back to its one
+    grandfathered entry, and the file sits closer to upstream than the fork had left it. The second
+    was user-visible: on the index-first path `work: null` reached `finish()`, which published a
+    finished row with no tally, so the strip read "Scanned 0 files" with a tick on the default path.
+    `finish()` now publishes nothing when there is no work and nothing was ever reported, with a
+    case for the index answer in `ai-vault-scan-progress-flow.test.ts`. Its two lesser findings are
+    fixed too: eight keys upstream had deleted with their call sites came back in the `en.json`
+    union (`queuePaused*`, `sendConfirm*`, plus the fork's own dead `queuePausedCleared`), and
+    `components.native-chat.find` was still duplicated by a 2026-10-09 fork commit.
+  - **Two side effects of the merge worth naming.** The commit hook's `oxfmt --write` normalised
+    about a dozen upstream files the merge had touched — wrapped calls the union pushed past the
+    print width. That is the repo's own formatter doing what `pnpm format` would, but it is diff
+    surface upstream owns, and it is why `git show --remerge-diff` lists files outside the 31. The
+    second is a behaviour change on orcad: the fork's provider wiring now runs there too, per the
+    ledger's decision, so orcad builds the DeepSeek/Fireworks/Copilot resolvers against its own
+    credential store and spawns the `gh auth status` warm-up unless Copilot is disabled. Intended,
+    and new for that host.
   - **What the run produced.** post-sync passed all ten gates (conflict markers, the identity
     sweep with 1168 report-only findings, the derived catalog regenerating to no diff, both
     localization verifiers, the builder config, the update-feed references, the deleted-module
     surface scan, oxlint and `pnpm tc`); the changed-code quality gate reports 0 findings across
-    940 changed files; `pnpm lint` is green end to end; and the touched areas' suites ran 4,592
-    tests — 4,573 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
+    946 changed files; `pnpm lint` is green end to end; and the touched areas' suites ran 4,605
+    tests — 4,586 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
     bundle fence was not re-measured**: `mobile/node_modules` is not installed here, so
     `pnpm build:mobile-web` cannot run. Its only input, `mobile-web-page-routes.mjs`, was
     touched by neither side in this range (diffed against `e27bc2efbf` and `ac015cd3b2`), so the
@@ -442,14 +468,13 @@ pnpm run sync:localization-runtime-catalog
     pre-existing (reproduced with two reporters and under sharding). It is being tracked as its
     own work in the separate `hunt-vitest-nonexit` worktree, and this release does not block on
     it.
-  - **Follow-ups opened by this sync, by name.** (1) Remove
-    `src/main/runtime/workspaces/workspace-process-listing.ts`'s `@ts-nocheck` by declaring the
-    seven members it forward-references from later in the mixin chain, then prune its baseline
-    entry. (2) Route the fork's remaining Jira `activeRuntimeEnvironmentId` reads through the
-    resource owner; the focus-read baseline now records five more files, dated. (3) The port hop
-    is done for the two fetchers this sync exposed — check the other fork-only rate-limit paths
-    the same way. (4) `local/sync/post-sync.mjs` should run `verify:localization-catalogs` too:
-    its dotted-key check is what would have caught the previous merge's stray key.
+  - **Follow-ups opened by this sync, by name.** (1) Route the fork's remaining Jira
+    `activeRuntimeEnvironmentId` reads through the resource owner; the focus-read baseline now
+    records four more files and pruned one, dated. (2) The port hop is done for the two fetchers
+    this sync exposed — check the other fork-only rate-limit paths the same way. (3)
+    `local/sync/post-sync.mjs` should run `verify:localization-catalogs` too: its dotted-key check
+    is what would have caught the previous merge's stray key, and the duplicate-key check the
+    `native-chat.find` one.
 
 - **2026-10-15 — merge of upstream `e8c7b32a90` (311 commits) into the release line, from
   `bb043b9724`** (merge base `8b0fa15e943b`, backup `backup/nplez1-main-pre-sync`, rollback tag

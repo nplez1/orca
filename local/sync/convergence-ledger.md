@@ -274,6 +274,10 @@ That move is what turned the runtime-electron ratchet red, because orcad now rea
 instead (`getMainHttpClient()`, the way the Gemini and Kimi fetchers already do); their suites
 install the port rather than a fake `electron` module.
 
+It is also a behaviour change on orcad, and deliberately so: orcad builds the fork's three resolvers
+against its own credential store, honours the enable/disable setting, and spawns the `gh auth status`
+warm-up unless Copilot is disabled — none of which it did while the wiring was desktop-only.
+
 Do not put an Electron import back into any fetcher reachable from `createProviderAccountServices`:
 the runtime, orcad and the structured-chat lanes must boot on plain Node.
 
@@ -308,7 +312,16 @@ The fork's query rule now lives inside upstream's helpers rather than beside the
 replaced the fork's inline cache key with `aiVaultLocalScanScopeKey`/`aiVaultLocalScanKey`, and
 `aiVaultLocalScanScopeKey` carries `aiVaultHostListQuery(args?.query ?? '')`. That keeps the cache
 key, the coordinator key and the renderer's `requestedScanKey` in agreement — a query in the cache
-key but not the coordinator key would let a filtered request coalesce onto an unfiltered scan.
+key but not the coordinator key would let a filtered request coalesce onto an unfiltered scan. The
+renderer's key omits `query` today only because the panel never sends one; a panel that starts
+sending `hostQuery` has to add it to `requestedScanKey` in the same change, or the strip stops
+matching the host's scans.
+
+`work: null` is also a rendering decision, not just a protocol one: upstream's strip turns a
+finished row into "Scanned N files", so a zero-tally finish showed "Scanned 0 files" with a tick on
+the index path. `finish()` publishes nothing when the work is null **and** nothing was ever reported
+(no agents, no reads); a scan that really ran always reports something. Keep that pairing — the
+condition is "no scan ran", not "the tally is empty".
 
 Do not add a fifth parameter here; the two sides of the seam are request and progress, and either
 one silently dropped reports success with the wrong rows or no progress.
@@ -1024,18 +1037,26 @@ is the point: two were already red at the pre-sync tip and one was this sync's.
   makes orcad build `RateLimitService`, which statically reaches the fork's DeepSeek and Fireworks
   fetchers; both imported `net` from Electron. They now read the host HTTP port. Re-run at
   `e27bc2efbf` the ratchet is green, at HEAD it was red, so this one is on the sync.
-- **ts-nocheck and focus-read were pre-existing, and are recorded.** Both reproduce identically at
-  the pre-sync tip in a fresh worktree. `workspace-process-listing.ts` gained `@ts-nocheck` in the
-  2026-10-15 sync, when its base class was re-pointed at the fork's `OrcaRuntimeWithSetupRunnerState`
-  (that mixin carries `armWorktreeSetupRunner`/`reapWorktreeSetupRunnerState` for the whole chain —
-  dropping it breaks ~40 concrete classes, verified by trying), which leaves seven members provided
-  later in the chain as forward references. The five Jira focus-read files are the owner-routing
-  follow-up the ledger already carries for five other files.
+- **ts-nocheck was pre-existing, and is now gone rather than recorded.** It reproduced identically
+  at the pre-sync tip in a fresh worktree: `workspace-process-listing.ts` gained `@ts-nocheck` in the
+  2026-10-15 sync, when its base class was re-pointed straight at the fork's
+  `OrcaRuntimeWithSetupRunnerState`. The mixin has to stay in the chain (it carries
+  `armWorktreeSetupRunner`/`reapWorktreeSetupRunnerState` for the whole chain; dropping it breaks
+  ~40 concrete classes, verified by trying), but the suppression did not. **Upstream already declares
+  the seven forward references in `workspace-process-listing-dependencies.ts`**, in a
+  declarations-only layer the 2026-10-15 sync orphaned; chaining it —
+  `OrcaRuntimeWithWorktreePsDependencies extends OrcaRuntimeWithSetupRunnerState`, and
+  `OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktreePsDependencies` — is what closes the
+  hole. The entry was recorded during the sync and removed by the review that found this.
+- **focus-read was pre-existing, and is recorded.** Four files added (one a `__mocks__` fixture the
+  scanner does not exclude), one pruned; they are the owner-routing follow-up the ledger already
+  carries for five other files.
 
-Both baseline entries name their cause and their date. Do not add a ratchet entry without that, and
-do not "fix" either by bumping a count: the ts-nocheck entry exists to be removed once the seven
-members are declared, and the focus-read counts exist to fall as the owner routing lands. **This is
-also why `local/sync/post-sync.mjs` should run `verify:localization-catalogs`** — its dotted-key
-check is what would have caught the stray top-level `settings.appearance.chat.title` that the
-previous merge's union left beside the nested object, and post-sync's three localization checks do
-not include it.
+The focus-read entries name their cause and their date. Do not add a ratchet entry without that, and
+do not "fix" one by bumping a count: the focus-read counts exist to fall as the owner routing lands.
+The ts-nocheck ratchet is back to its single grandfathered entry, and its baseline is the place a
+future forward-reference chain has to justify itself — reach for the declarations layer first.
+**This is also why `local/sync/post-sync.mjs` should run `verify:localization-catalogs`** — its
+dotted-key check is what would have caught the stray top-level `settings.appearance.chat.title` that
+the previous merge's union left beside the nested object, and post-sync's three localization checks
+do not include it.

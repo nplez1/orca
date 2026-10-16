@@ -81,6 +81,13 @@ export function startLocalAiVaultScanProgress(
     finish: (work) => {
       if (currentHandles.get(scanKey) === handle) {
         currentHandles.delete(scanKey)
+        // Why: a host can answer a list from its session index without scanning, and that answer
+        // carries no tally. Publishing a finished row for it renders "Scanned 0 files" with a tick
+        // on the default path, so publish nothing — the strip is for a scan that ran.
+        if (!work && current.agents.length === 0 && current.read.total === 0) {
+          publish(scanKey, null)
+          return
+        }
         publish(scanKey, { ...current, ...work, stage: 'finished', settledAt: now() })
       }
     },

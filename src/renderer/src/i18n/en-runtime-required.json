@@ -3315,16 +3315,7 @@
         "awaitingAnswerHold": "Waiting for your answer",
         "editAlreadySent": "Already sent — your text is still in the composer.",
         "from": "From {{names}}",
-        "pausedKept": "Not sent yet — press Send to send it.",
-        "queuePaused": "Queue paused",
-        "queuePausedCleared": "Queue paused after you cleared the conversation",
-        "queuePausedStopped": "Queue paused because you interrupted",
-        "sendConfirmBody": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?",
-        "sendConfirmBody_one": "You are about to send a message. Do you want to clear the {{count}} message previously queued?",
-        "sendConfirmBody_other": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?",
-        "sendConfirmClear": "Clear queue",
-        "sendConfirmSend": "Send message",
-        "sendConfirmTitle": "Send message?"
+        "pausedKept": "Not sent yet — press Send to send it."
       },
       "receipt": {
         "cancelled": "Cancelled",

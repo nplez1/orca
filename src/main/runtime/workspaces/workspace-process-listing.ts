@@ -1,7 +1,8 @@
-// @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
+// The worktree listing's forward references are declared one layer below, so this file needs
+// no suppression: `OrcaRuntimeWithWorktreePsDependencies` carries them as abstract members.
+import { OrcaRuntimeWithWorktreePsDependencies } from './workspace-process-listing-dependencies'
 import { resolveStructuredCodexAccountKind } from '../structured-agent-account-home'
 import { collectRuntimeWorktreeAgentSources } from '../runtime-worktree-agent-sources'
-import { OrcaRuntimeWithSetupRunnerState } from '../orca-runtime-setup-runner-state'
 import { DEFAULT_WORKTREE_PS_LIMIT } from '../orca-runtime-postlude'
 import type { RuntimeWorktreePsResult } from '../../../shared/runtime-types'
 import { buildRuntimeWorktreePsSummaries } from '../runtime-worktree-ps-summaries'
@@ -60,7 +61,7 @@ import {
 } from '../runtime-visible-catalog'
 import { isStructuredAttentionWorkspaceHidden } from '../structured-attention-hidden-workspace'
 
-export abstract class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithSetupRunnerState {
+export abstract class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktreePsDependencies {
   async getWorktreePs(
     limit = DEFAULT_WORKTREE_PS_LIMIT,
     sourceDefaultsSupported = true

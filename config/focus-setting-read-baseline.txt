@@ -67,7 +67,7 @@
 1 src/renderer/src/components/floating-terminal/use-floating-terminal-panel-store-state.ts
 1 src/renderer/src/components/jira-connect-dialog.tsx
 2 src/renderer/src/components/jira-issue-workspace-comments.ts # fork-only file; owner-routing migration recorded as an Open item in LOCAL-PATCHES.md (2026-10-11 sync)
-2 src/renderer/src/components/jira-issue-workspace-detail-state.ts # fork-only file; owner-routing migration recorded as an Open item in LOCAL-PATCHES.md (2026-10-11 sync; +1 for the issue #98 edit-fields save)
+2 src/renderer/src/components/jira-issue-workspace-detail-state.ts # fork-only file; owner-routing migration recorded as an Open item in LOCAL-PATCHES.md (2026-10-11 sync; fell from 4 to 2 when the 2026-10-15 merge re-based the edit-fields save)
 1 src/renderer/src/components/jira-issue-workspace-field-submission.ts # fork-only file; owner-routing migration recorded as an Open item in LOCAL-PATCHES.md (2026-10-15 merge; recorded 2026-10-16)
 8 src/renderer/src/components/jira-issue-workspace-side-data.ts # fork-only file; owner-routing migration recorded as an Open item in LOCAL-PATCHES.md (2026-10-11 sync; +2 for the issue #98 editmeta read; +2 for the 2026-10-15 merge)
 1 src/renderer/src/components/jira-user-picker.tsx
