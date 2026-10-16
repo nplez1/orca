@@ -3525,8 +3525,13 @@
     }
   },
   "jira": {
+    "copy": {
+      "actions": "Copy issue context",
+      "context": "Copy context for {{key}}"
+    },
     "workspace": {
-      "open": "Open workspace linked to {{key}}"
+      "open": "Open workspace linked to {{key}}",
+      "openFailed": "Unable to open the workspace linked to this Jira issue."
     }
   },
   "menu": {
