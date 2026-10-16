@@ -599,8 +599,10 @@ instead.
 **2026-10-16 addendum.** Two more of upstream's consolidations were taken with the fork's content
 re-homed rather than restored: `accounts-pane-claude-section.test.tsx` (deleted; both cases live in
 `AccountsPane.test.tsx`) and the `tui-agent-startup` suite split into `.spec.ts` files under a
-barrel. The barrel's own `.test.ts` extension is upstream's and stays. Twenty `.test.ts` →
-`.spec.ts` renames landed the same way; none carried fork content, which is why none conflicted.
+barrel. The barrel's own `.test.ts` extension is upstream's and stays. Nineteen `.test.ts` →
+`.spec.ts` renames landed the same way; none carried fork content, which is why none conflicted. The
+twentieth new `.spec.ts` is `tui-agent-startup.spec.ts`, the case above, whose fork expectations were
+re-homed by that same commit.
 
 ---
 

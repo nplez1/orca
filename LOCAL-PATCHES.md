@@ -412,7 +412,7 @@ pnpm run sync:localization-runtime-catalog
     and reproduce identically there; both were recorded in their baselines with a dated note and
     their reason. The ts-nocheck one lasted only until the review below, which found the chain fix
     that removes it outright. The
-    third red was **this sync's**: upstream's `provider-account-services` extraction makes orcad
+    fourth red, and the only one this sync caused, was: upstream's `provider-account-services` extraction makes orcad
     build `RateLimitService`, which statically reaches the fork's DeepSeek and Fireworks
     fetchers, and those imported `net` from Electron directly. Both now read the host HTTP port
     the way the Gemini and Kimi fetchers already do (`getMainHttpClient()`), which the ratchet
@@ -479,6 +479,12 @@ pnpm run sync:localization-runtime-catalog
     `local/sync/post-sync.mjs` should run `verify:localization-catalogs` too: its dotted-key check
     is what would have caught the previous merge's stray key, and the duplicate-key check the
     `native-chat.find` one.
+
+    One further upstream file is edited by this sync:
+    `.github/scripts/check-required-pr-context.mjs`, where the changed-code gate rejected upstream's
+    untyped array interpolated into a template literal, so the message reads
+    `${owners.join(', ')}`. Behaviour is unchanged, and it is one line to reconcile at the next
+    sync.
 
 - **2026-10-15 — merge of upstream `e8c7b32a90` (311 commits) into the release line, from
   `bb043b9724`** (merge base `8b0fa15e943b`, backup `backup/nplez1-main-pre-sync`, rollback tag
