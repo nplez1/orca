@@ -46,7 +46,9 @@ export function JiraStoryPointsRow({
         <IssuePanePropertyRow
           label={jiraStoryPointsFieldLabel()}
           pending={editor.pending}
-          disabled={pendingField !== null}
+          // Why not disabled for this field's own write: the popover's Esc restores
+          // focus to this row, which a disabled button cannot take.
+          disabled={editor.blocked && !editor.pending}
           value={
             editor.points === undefined ? (
               <span className="text-muted-foreground">

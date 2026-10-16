@@ -1,5 +1,6 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -117,6 +118,9 @@ export function useJiraStoryPointsEditor({
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Why a ref as well as the state: a refusal that lands after the form was dismissed
+  // has to be reported somewhere the user can still see it.
+  const openRef = useRef(false)
   const trimmedDraft = draft.trim()
   // Why the input is a text box parsed here: a number input reports '' for text it
   // cannot parse, so "5e" or "1." would read as an empty draft and clear the field.
@@ -125,6 +129,7 @@ export function useJiraStoryPointsEditor({
   const changed = nextValue !== (points ?? null)
 
   const openEditor = (nextOpen: boolean): void => {
+    openRef.current = nextOpen
     setOpen(nextOpen)
     // Why on open rather than in an effect: a publish while the form is open — a
     // refresh, or another field's optimistic patch — must not replace the draft
@@ -141,7 +146,12 @@ export function useJiraStoryPointsEditor({
     open,
     setOpen: openEditor,
     draft,
-    setDraft,
+    // Why the message goes with the draft: a refusal names the value that was sent,
+    // and letting it outlive the next keystroke would mark a draft never refused.
+    setDraft: (value: string): void => {
+      setDraft(value)
+      setError(null)
+    },
     invalid,
     changed,
     error,
@@ -158,15 +168,21 @@ export function useJiraStoryPointsEditor({
         'storyPoints',
         { customFields: { [pointsField.field.key]: nextValue } },
         { storyPoints: nextValue ?? undefined },
-        // Why: this form shows the reason beside the field, where the user has to
-        // act on it; a toast would name it once and disappear.
+        // Why: while this form is up it shows the reason beside the field the user has
+        // to correct; a toast would name it once and disappear. A refusal that lands
+        // after the form went away is the toast's job instead.
         { reportsInline: true }
       )
       if (result.ok) {
         setOpen(false)
+        openRef.current = false
         return
       }
-      setError(result.error)
+      if (openRef.current) {
+        setError(result.error)
+        return
+      }
+      toast.error(result.error)
     }
   }
 }

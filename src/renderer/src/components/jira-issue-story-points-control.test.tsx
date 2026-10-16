@@ -1,11 +1,22 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import type { JiraEditableField, JiraIssue } from '../../../shared/jira-types'
 import { JiraIssueStoryPointsControl } from './jira-issue-story-points-control'
+
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+vi.mock('sonner', () => ({ toast: { error: toastError } }))
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve = (_value: T): void => undefined
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -66,7 +77,10 @@ function renderControl({
   return mutateIssue
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  toastError.mockReset()
+})
 
 describe('JiraIssueStoryPointsControl', () => {
   it('shows the points the issue holds and writes a new value', async () => {
@@ -137,7 +151,7 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(input.getAttribute('aria-invalid')).toBe('true')
   })
 
-  it('describes the field with its own message, and with none when there is none', async () => {
+  it('describes the field with its own message', async () => {
     const user = userEvent.setup()
     renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
 
@@ -160,6 +174,62 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(
       screen.getByRole('textbox', { name: 'Story points' }).getAttribute('aria-describedby')
     ).toBeNull()
+  })
+
+  it('reports a refusal in a toast when the form is already closed', async () => {
+    const user = userEvent.setup()
+    const write = deferred<{ ok: false; error: string }>()
+    const mutateIssue = vi.fn<MutateIssue>(() => write.promise)
+    renderControl({ displayed: issue(5), editFields: [pointsField('5')], mutateIssue })
+
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    // Esc backs out while the write is still in flight.
+    await user.keyboard('{Escape}')
+    await act(async () => write.resolve({ ok: false, error: 'Not a number' }))
+
+    // Nothing is on screen to show the reason, so it must not be swallowed.
+    expect(toastError).toHaveBeenCalledWith('Not a number')
+  })
+
+  it('stays clickable during its own write but cannot submit again', async () => {
+    const user = userEvent.setup()
+    const write = deferred<{ ok: true }>()
+    const mutateIssue = vi.fn<MutateIssue>(() => write.promise)
+    const props = { displayed: issue(5), editFields: [pointsField('5')], mutateIssue }
+    const { rerender } = render(<JiraIssueStoryPointsControl {...props} pendingField={null} />)
+
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    rerender(<JiraIssueStoryPointsControl {...props} pendingField="storyPoints" />)
+
+    // Why the trigger stays enabled: Escape has to be able to put focus back on it.
+    expect(screen.getByRole('button', { name: /Points/ }).hasAttribute('disabled')).toBe(false)
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    await act(async () => write.resolve({ ok: true }))
+  })
+
+  it('drops a refusal once the draft it was about changes', async () => {
+    const user = userEvent.setup()
+    const mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: false, error: 'Not a number' }))
+    renderControl({ displayed: issue(5), editFields: [pointsField('5')], mutateIssue })
+
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+
+    await user.type(input, '9')
+
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('refuses a draft that is not a number instead of reading it as a clear', async () => {
