@@ -1964,6 +1964,39 @@ What it deliberately does not do:
 Remove this patch — the `continue-on-error`, the report arguments, the verdict step and the script —
 once Vitest closes #11153.
 
+### `local(ci)`: the upstream release-tag mirror
+
+`.github/workflows/fork-upstream-tags.yml` mirrors upstream's desktop `v*` tags into this fork on a
+daily schedule (`17 3 * * *`) and on `workflow_dispatch`. It exists because
+`tests/e2e/cross-version-wire/` materializes released versions by tag and pins tags up to `v1.4.224`,
+so a fork that lags upstream's release train fails for every branch with "could not resolve ref
+vX.Y.Z" — a red check about this fork's tag list, not about the change under test.
+
+Only `v*` desktop tags are fetched. The two mobile release workflows trigger on `mobile-ios-v*` /
+`mobile-android-v*` — the only workflows in the tree with a `tags:` trigger, here or upstream at
+`v1.4.224` — so mirroring those would start App Store and Play builds, while a `v*` push is inert.
+
+**It needs a credential the job cannot make for itself: the `FORK_TAG_MIRROR_TOKEN` secret.** A tag
+brings the commits behind it, upstream's release cuts routinely rewrite `.github/workflows/**`, and
+pushing workflow-file changes needs the `workflows` permission, which the Actions `GITHUB_TOKEN` can
+never hold — `permissions:` has no `workflows` scope to grant. So the push was rejected on every
+scheduled run from 2026-10-10 with "Unable to determine if workflow can be created or updated due to
+timeout; `workflows` scope may be required" on `v1.4.223` and `v1.4.224`, and no fork sync could
+clear it: those are release-line commits that are not ancestors of `upstream/main`. The checkout now
+authenticates with a fine-grained PAT on `nplez1/orca` — Contents: read and write, plus Workflows:
+read and write — which `actions/checkout` persists in the git config the `git push` uses. Nothing
+authenticates with the built-in token afterwards, so `permissions:` is `contents: read`.
+
+**Rotating that PAT is the maintenance.** A fine-grained PAT expires, and an expired one fails the
+job at checkout with "Input required and not supplied: token" rather than the old rejection. The
+same failure means the secret is missing entirely, because an empty `token` does not fall back to
+the built-in one — so a missing or lapsed credential is a config error, never a repeat of the
+permissions rejection. Set a fresh PAT as the repository secret and nothing else changes.
+
+**Verified 2026-10-16:** with the secret set and the change merged (`077e5e06`), a dispatched run
+went green in 1m18s and mirrored `v1.4.223`, `v1.4.224` and `v1.4.227` — the first successful run
+since 2026-10-08, and `v1.4.224` is the highest tag that suite pins.
+
 ### `local(hooks)`: refuse fork-only commits on a PR branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
