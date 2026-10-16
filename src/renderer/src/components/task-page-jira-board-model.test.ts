@@ -89,6 +89,26 @@ describe('Jira board projection', () => {
     ).toEqual(['ABC-3'])
   })
 
+  it('matches the viewer in any role field, and never on who reported the issue', () => {
+    const ada = { accountId: 'viewer-1', displayName: 'Ada' }
+    const grace = { accountId: 'viewer-2', displayName: 'Grace' }
+    const issues = [
+      issue('ABC-1', '1', { assignee: ada }),
+      issue('ABC-2', '2', { roleAssignees: [ada] }),
+      issue('ABC-3', '3', { assignee: grace, roleAssignees: [ada] }),
+      issue('ABC-4', '1', { reporter: ada }),
+      issue('ABC-5', '1', { assignee: grace, roleAssignees: [grace] }),
+      issue('ABC-6', '1')
+    ]
+
+    expect(filterTaskPageJiraBoardIssues(issues, 'me', 'viewer-1').map((item) => item.key)).toEqual(
+      ['ABC-1', 'ABC-2', 'ABC-3']
+    )
+    expect(filterTaskPageJiraBoardIssues(issues, 'me', 'viewer-2').map((item) => item.key)).toEqual(
+      ['ABC-3', 'ABC-5']
+    )
+  })
+
   it('matches the board filter query against key, summary, assignee, status, type, and labels', () => {
     const issues = [
       issue('ABC-1', '1', {

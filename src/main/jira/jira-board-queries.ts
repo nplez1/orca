@@ -11,6 +11,7 @@ import { jiraRequest } from './authenticated-request'
 import { clearToken, getClients, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, JIRA_CLOUD_SOFTWARE_API } from './jira-agile-api'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
+import { getBoardJiraFieldSelection } from './jira-agile-fields'
 import { fetchBoardSprints } from './jira-sprint-queries'
 import { withJiraQueuedDeadline } from './jira-read-failure'
 import {
@@ -25,6 +26,12 @@ import {
 
 const BOARD_PAGE_SIZE = 50
 const BOARD_ISSUE_PAGE_SIZE = 100
+/** Role-field ids are a site-wide list riding in this GET's query string. The whole request
+ *  line and headers share Jira's ~8 KB limit, and URL-encoding each id adds a little, so past
+ *  this budget the board asks for none of them rather than 414 on a site with hundreds of
+ *  person pickers. */
+const BOARD_ROLE_FIELD_BUDGET_CHARS = 4096
+const roleFieldBudgetWarnedSites = new Set<string>()
 // Why: a stalled settings read left these selects disabled with no way to retry.
 const BOARD_SETTINGS_READ_TIMEOUT_MS = 30_000
 
@@ -33,6 +40,21 @@ function readBoardSettings<T>(
   read: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
   return withJiraQueuedDeadline(description, BOARD_SETTINGS_READ_TIMEOUT_MS, read)
+}
+
+/** The site's role fields, or none when they would not fit the request. Dropping them
+ *  degrades "Me" to the assignee everywhere at once, and says so once per site. */
+function withinBoardRoleFieldBudget(siteId: string, roleFields: readonly string[]): string[] {
+  if (roleFields.join(',').length <= BOARD_ROLE_FIELD_BUDGET_CHARS) {
+    return [...roleFields]
+  }
+  if (!roleFieldBudgetWarnedSites.has(siteId)) {
+    roleFieldBudgetWarnedSites.add(siteId)
+    console.warn(
+      `[jira] ${roleFields.length} role fields exceed the board's ${BOARD_ROLE_FIELD_BUDGET_CHARS}-character budget; the board will match "Me" on the assignee only.`
+    )
+  }
+  return []
 }
 
 function mapBoard(value: unknown, siteId: string, siteName: string): JiraBoard | null {
@@ -156,7 +178,12 @@ export async function listBoardIssues(
     Math.max(1, Math.floor(request.maxResults ?? BOARD_ISSUE_PAGE_SIZE)),
     100
   )
-  const fields = [...ISSUE_LIST_FIELDS]
+  // Why: the site's own role-field ids, so "Me" can match any role the viewer holds.
+  const roleFields = withinBoardRoleFieldBudget(
+    entry.site.id,
+    (await getBoardJiraFieldSelection(entry)).roleFields
+  )
+  const fields = [...ISSUE_LIST_FIELDS, ...roleFields]
   const params = new URLSearchParams({
     maxResults: String(maxResults),
     fields: fields.join(',')
@@ -191,7 +218,9 @@ export async function listBoardIssues(
       isLast?: boolean
       nextPageToken?: string
     }>(entry, path)
-    const issues = (response.issues ?? []).map((issue) => mapJiraIssue(entry.site, issue))
+    const issues = (response.issues ?? []).map((issue) =>
+      mapJiraIssue(entry.site, issue, undefined, { roleFields })
+    )
     const responseStartAt = asFiniteNumber(response.startAt) ?? startAt
     const total = asFiniteNumber(response.total)
     const nextPageToken = asString(response.nextPageToken) || null

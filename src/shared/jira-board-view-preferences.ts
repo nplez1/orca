@@ -18,8 +18,9 @@ export type JiraBoardViewPreferences = {
   viewMode: JiraBoardViewMode
   /** Sprint vs backlog tab inside the board. */
   activeView: JiraBoardActiveView
-  /** Me = assigned to the viewer, All = every issue in the board filter,
-   *  Unassigned = issues with no assignee yet. */
+  /** Me = the viewer holds a role on the issue (its assignee, or a Dev/QE-style
+   *  user-picker field), All = every issue in the board filter, Unassigned =
+   *  issues with no assignee yet. */
   filter: JiraBoardFilter
   /** Free-text filter applied to already-loaded board issues. */
   query: string
