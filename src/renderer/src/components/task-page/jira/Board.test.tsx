@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
@@ -426,6 +426,33 @@ describe('TaskPageJiraBoard', () => {
     expect(screen.getByText('ABC-7 title')).toBeTruthy()
     expect(screen.queryByText('Loading…')).toBeNull()
     expect(mocks.jiraGetBoardOverview).toHaveBeenCalled()
+  })
+
+  it("shows the card's story points in its top corner, and nothing when Jira holds none", async () => {
+    const pointed = issue('ABC-5', '1', { storyPoints: 3, storyPointsFieldId: 'customfield_3' })
+    const zeroed = issue('ABC-6', '1', { storyPoints: 0, storyPointsFieldId: 'customfield_3' })
+    const unpointed = issue('ABC-7', '1')
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        Promise.resolve({
+          issues: request.scope === 'backlog' ? [] : [pointed, zeroed, unpointed],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 3,
+          isLast: true
+        })
+    )
+    renderBoard()
+
+    const card = await screen.findByRole('button', { name: /ABC-5 title/ })
+    expect(within(card).getByTitle('Story points').textContent).toBe('3sp')
+    // Zero is a value Jira holds, not an absence.
+    expect((await screen.findByRole('button', { name: /ABC-6 title/ })).textContent).toContain(
+      '0sp'
+    )
+    // A card with no points holds no chip at all rather than an empty one.
+    const bare = await screen.findByRole('button', { name: /ABC-7 title/ })
+    expect(within(bare).queryByTitle('Story points')).toBeNull()
   })
 
   it('washes a blocker card and labels its severity', async () => {

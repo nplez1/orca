@@ -11,7 +11,7 @@ import { jiraRequest } from './authenticated-request'
 import { clearToken, getClients, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, JIRA_CLOUD_SOFTWARE_API } from './jira-agile-api'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
-import { getBoardJiraFieldSelection } from './jira-agile-fields'
+import { agileFieldIdList, getBoardJiraFieldSelection } from './jira-agile-fields'
 import { fetchBoardSprints } from './jira-sprint-queries'
 import { withJiraQueuedDeadline } from './jira-read-failure'
 import {
@@ -178,12 +178,13 @@ export async function listBoardIssues(
     Math.max(1, Math.floor(request.maxResults ?? BOARD_ISSUE_PAGE_SIZE)),
     100
   )
-  // Why: the site's own role-field ids, so "Me" can match any role the viewer holds.
-  const roleFields = withinBoardRoleFieldBudget(
-    entry.site.id,
-    (await getBoardJiraFieldSelection(entry)).roleFields
-  )
-  const fields = [...ISSUE_LIST_FIELDS, ...roleFields]
+  // One catalog read serves both: the role-field ids, so "Me" can match any role the
+  // viewer holds, and the agile planning fields, so a card can show the site's story
+  // points. The board waits on it with its own patience, and a catalog that cannot be
+  // read leaves the page loading on its own fields alone.
+  const selection = await getBoardJiraFieldSelection(entry)
+  const roleFields = withinBoardRoleFieldBudget(entry.site.id, selection.roleFields)
+  const fields = [...ISSUE_LIST_FIELDS, ...agileFieldIdList(selection.agile), ...roleFields]
   const params = new URLSearchParams({
     maxResults: String(maxResults),
     fields: fields.join(',')
@@ -219,7 +220,7 @@ export async function listBoardIssues(
       nextPageToken?: string
     }>(entry, path)
     const issues = (response.issues ?? []).map((issue) =>
-      mapJiraIssue(entry.site, issue, undefined, { roleFields })
+      mapJiraIssue(entry.site, issue, undefined, { ...selection.agile, roleFields })
     )
     const responseStartAt = asFiniteNumber(response.startAt) ?? startAt
     const total = asFiniteNumber(response.total)

@@ -20,6 +20,7 @@ import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 import { JiraEditFieldsRow } from './JiraEditFieldsRow'
+import { JiraStoryPointsRow } from './jira-story-points-row'
 import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
 
@@ -158,6 +159,12 @@ export function JiraLinkedIssuePane({
                 }
               />
               <JiraPriorityRow displayed={displayed} detail={detail} />
+              <JiraStoryPointsRow
+                displayed={displayed}
+                editFields={detail.editFields}
+                pendingField={detail.pendingField}
+                mutateIssue={detail.mutateIssue}
+              />
               <JiraLabelsRow displayed={displayed} detail={detail} />
               <JiraEditFieldsRow
                 issue={displayed}

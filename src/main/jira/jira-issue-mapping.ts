@@ -284,6 +284,26 @@ export function mapSprint(value: unknown): string | undefined {
   return sprintName(active ?? sprints.at(-1))
 }
 
+/**
+ * The issue's story points and the field they were read from. A site can expose
+ * more than one points field, and a writer has to know which one produced the
+ * value on screen or it would write where the view never reads.
+ */
+function mapStoryPoints(
+  fields: JiraRecord,
+  ids: readonly string[] | undefined
+): Pick<JiraIssue, 'storyPoints' | 'storyPointsFieldId'> {
+  for (const id of ids ?? []) {
+    const value = asFiniteNumber(fields[id])
+    if (value !== null) {
+      return { storyPoints: value, storyPointsFieldId: id }
+    }
+  }
+  // Why both keys even when unset: a refresh is spread onto the issue already on
+  // screen, so an omitted key would leave points Jira no longer has.
+  return { storyPoints: undefined, storyPointsFieldId: undefined }
+}
+
 export function mapJiraIssue(
   site: JiraSite,
   raw: JiraRecord,
@@ -317,10 +337,7 @@ export function mapJiraIssue(
     priority: mapPriority(fields.priority),
     parent: mapParent(fields.parent),
     sprint: fieldIds.sprint ? mapSprint(fields[fieldIds.sprint]) : undefined,
-    storyPoints:
-      fieldIds.storyPoints
-        ?.map((id) => asFiniteNumber(fields[id]))
-        .find((value) => value !== null) ?? undefined,
+    ...mapStoryPoints(fields, fieldIds.storyPoints),
     originalEstimateSeconds: asFiniteNumber(fields.timeoriginalestimate) ?? undefined,
     remainingEstimateSeconds: asFiniteNumber(fields.timeestimate) ?? undefined,
     createdAt: asString(fields.created, new Date().toISOString()),

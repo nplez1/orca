@@ -435,6 +435,38 @@ describe('Jira board queries', () => {
     }
   })
 
+  it("asks for the site's story-points field so a board card can show it", async () => {
+    const record = issueRecord()
+    mockBoardIssueReads(
+      {
+        startAt: 0,
+        maxResults: 50,
+        total: 1,
+        isLast: true,
+        issues: [{ ...record, fields: { ...record.fields, customfield_3: 5 } }]
+      },
+      [
+        ...ROLE_FIELD_CATALOG,
+        // The float custom field a site names "Story points", as the catalog reports it.
+        {
+          id: 'customfield_3',
+          name: 'Story Points',
+          schema: { custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' }
+        }
+      ]
+    )
+    const { listBoardIssues } = await import('./jira-board-queries')
+
+    const page = await listBoardIssues({ boardId: '42', siteId: 'site-1', scope: 'backlog' })
+
+    // One catalog read answers both the role fields and the planning ones.
+    expect(fieldCatalogCallCount()).toBe(1)
+    const requested = new URL(boardIssueCallUrl(), 'https://example.invalid')
+    expect(requested.searchParams.get('fields')?.split(',')).toContain('customfield_3')
+    expect(page.issues[0]?.storyPoints).toBe(5)
+    expect(page.issues[0]?.storyPointsFieldId).toBe('customfield_3')
+  })
+
   it('uses offset pagination for self-hosted Jira backlogs', async () => {
     getClientsMock.mockReturnValue([makeServerEntry()])
     mockBoardIssueReads({

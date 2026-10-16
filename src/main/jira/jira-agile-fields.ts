@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
+import { isJiraStoryPointsField, isJiraUserField } from '../../shared/jira-field-rendering'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { mapCreateField, type JiraAgileFieldIds } from './jira-issue-mapping'
-import { isJiraUserField } from '../../shared/jira-field-rendering'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
 import { acquire, release } from './request-queue'
 import { settleJiraSummaryRead, withJiraDeadline } from './jira-read-failure'
@@ -11,8 +11,8 @@ import { settleJiraSummaryRead, withJiraDeadline } from './jira-read-failure'
 // read wants a fast guess while the board's role filter cannot answer without it.
 
 const SPRINT_FIELD_TYPE = 'com.pyxis.greenhopper.jira:gh-sprint'
-const STORY_POINTS_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
-const NUMBER_FIELD_TYPE = 'com.atlassian.jira.plugin.system.customfieldtypes:float'
+// Why no story-points type constants here: the rule for that field lives in
+// shared/jira-field-rendering, because the issue detail's editmeta lookup uses it too.
 const CUSTOM_FIELD_PREFIX = 'customfield_'
 const FAILED_DISCOVERY_RETRY_MS = 60_000
 const FIELD_CATALOG_TTL_MS = 10 * 60_000
@@ -68,10 +68,7 @@ export function pickAgileFieldIds(fields: readonly JiraRecord[]): JiraAgileField
     if (!ids.sprint && custom === SPRINT_FIELD_TYPE) {
       ids.sprint = id
     }
-    if (
-      custom === STORY_POINTS_TYPE ||
-      (custom === NUMBER_FIELD_TYPE && /story points?/i.test(asString(field.name)))
-    ) {
+    if (isJiraStoryPointsField({ name: asString(field.name), schema: { custom } })) {
       ids.storyPoints ??= []
       if (!ids.storyPoints.includes(id)) {
         ids.storyPoints.push(id)

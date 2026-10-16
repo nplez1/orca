@@ -272,6 +272,24 @@ describe('jira agile fields', () => {
     expect(issue.remainingEstimateSeconds).toBe(3600)
     expect(issue.sprint).toBe('Sprint 2')
     expect(issue.storyPoints).toBe(5)
+    // The field the value came from is named, so a writer can target it rather than
+    // guessing which of a site's points fields the view is showing.
+    expect(issue.storyPointsFieldId).toBe('customfield_3')
+  })
+
+  it('keeps the points keys on an issue whose points were cleared', () => {
+    // Why: a refresh is spread onto the issue on screen, so an omitted key would
+    // leave a value Jira no longer holds.
+    const issue = mapJiraIssue(
+      site,
+      { id: '1', key: 'ALP-1', fields: { summary: 'Story' } },
+      undefined,
+      { storyPoints: ['customfield_3'] }
+    )
+
+    expect('storyPoints' in issue).toBe(true)
+    expect('storyPointsFieldId' in issue).toBe(true)
+    expect(issue.storyPoints).toBeUndefined()
   })
 
   it('maps the role holders, and tells "nobody holds one" from "never asked"', () => {

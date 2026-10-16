@@ -207,6 +207,10 @@ export type JiraIssue = {
   parent?: { key: string; title: string; issueTypeName?: string }
   sprint?: string
   storyPoints?: number
+  /** The custom-field id `storyPoints` was read from. A site can expose more than
+   *  one story-points field, so a writer has to know which one produced the value
+   *  on screen; a host that predates this omits it. */
+  storyPointsFieldId?: string
   originalEstimateSeconds?: number
   remainingEstimateSeconds?: number
   updatedAt: string

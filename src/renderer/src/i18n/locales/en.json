@@ -1856,6 +1856,16 @@
         "noIssueSelected": "No Jira issue is selected.",
         "anotherUpdatePending": "Another Jira update is still in progress."
       },
+      "JiraIssueStoryPointsControl": {
+        "label": "Story points",
+        "current": "Story points: {{value0}}",
+        "value": "Points: {{value0}}",
+        "none": "No points",
+        "clearHint": "An empty value clears the field.",
+        "invalid": "Enter a number.",
+        "cancel": "Cancel",
+        "save": "Save"
+      },
       "Landing": {
         "76a95f7f47": "Create",
         "f05d237049": "Add a project first",
@@ -2662,6 +2672,9 @@
         "jiraColumnsPicker": "Columns",
         "jiraColumnParent": "Parent",
         "jiraColumnSprint": "Sprint",
+        "jiraCardStoryPoints": "{{value0}}sp",
+        "jiraCardStoryPointsLabel": "{{value0}} story points",
+        "jiraCardStoryPointsTitle": "Story points",
         "jiraColumnStoryPoints": "Points",
         "jiraColumnOriginalEstimate": "Estimate",
         "jiraColumnRemainingEstimate": "Remaining",

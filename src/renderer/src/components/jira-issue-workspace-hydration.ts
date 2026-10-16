@@ -1,6 +1,13 @@
 import type { JiraIssue } from '../../../shared/jira-types'
 
-const EDITABLE_JIRA_ISSUE_FIELDS = ['title', 'labels', 'status', 'priority', 'assignee'] as const
+const EDITABLE_JIRA_ISSUE_FIELDS = [
+  'title',
+  'labels',
+  'status',
+  'priority',
+  'assignee',
+  'storyPoints'
+] as const
 export type EditableJiraIssueField = (typeof EDITABLE_JIRA_ISSUE_FIELDS)[number]
 
 /** Editable fields an optimistic patch touches, including ones it clears to undefined. */
@@ -23,7 +30,8 @@ export function mergeJiraIssueHydration(
     labels: edited.has('labels') ? current.labels : fetched.labels,
     status: edited.has('status') ? current.status : fetched.status,
     priority: edited.has('priority') ? current.priority : fetched.priority,
-    assignee: edited.has('assignee') ? current.assignee : fetched.assignee
+    assignee: edited.has('assignee') ? current.assignee : fetched.assignee,
+    storyPoints: edited.has('storyPoints') ? current.storyPoints : fetched.storyPoints
   }
 }
 
