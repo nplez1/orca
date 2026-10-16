@@ -8,7 +8,7 @@ import { JiraUserPicker, splitJiraUserPickerOptions } from './jira-user-picker'
 
 vi.mock('@/runtime/runtime-jira-client', () => ({ jiraSearchUsers: vi.fn() }))
 
-const SETTINGS: RuntimeJiraSettings = { kind: 'default-scope', settings: null }
+const SETTINGS: RuntimeJiraSettings = { kind: 'local' }
 
 function user(accountId: string, displayName: string, email?: string): JiraUser {
   return { accountId, displayName, email }

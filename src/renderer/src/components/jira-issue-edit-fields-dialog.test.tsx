@@ -3,7 +3,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createGlobalSettingsFixture } from '../../../shared/global-settings-test-fixture'
 import type { JiraEditableField, JiraIssue } from '../../../shared/jira-types'
 import { JiraIssueEditFieldsDialog } from './jira-issue-edit-fields-dialog'
 
@@ -25,10 +24,8 @@ const issue: JiraIssue = {
   updatedAt: '2026-09-02T00:00:00.000Z'
 }
 
-const providerSettings = {
-  kind: 'default-scope' as const,
-  settings: createGlobalSettingsFixture()
-}
+/** The dialog only forwards its source, so a decided local owner is enough here. */
+const providerSettings = { kind: 'local' } as const
 
 function textField(value: string): JiraEditableField {
   return {

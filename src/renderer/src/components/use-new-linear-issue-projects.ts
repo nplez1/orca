@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { LinearProjectSummary } from '../../../shared/linear/project-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultCreationHost } from '@/lib/default-creation-host'
 import { linearListProjects } from '@/runtime/runtime-linear-project-client'
 
 /** Projects offered by the new Linear issue dialog for its target team. */
@@ -28,7 +28,7 @@ export function useNewLinearIssueProjects(args: {
       targetTeam.workspaceId ||
       (selectedLinearWorkspaceId !== 'all' ? selectedLinearWorkspaceId : null)
     // Why: with no Tasks source chosen, the list comes from the default scope host.
-    const source = linearTaskSourceContext ?? defaultScopeSource(settings)
+    const source = linearTaskSourceContext ?? defaultCreationHost(settings)
     linearListProjects(source, undefined, 100, targetWorkspaceId)
       .then((p) => {
         if (!cancelled) {

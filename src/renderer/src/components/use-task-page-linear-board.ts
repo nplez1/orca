@@ -17,10 +17,10 @@ import {
   findLinearWorkflowStateForStatus,
   getLinearStatusSectionState
 } from './task-page-linear-issue-model'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel) {
   const {
-    settings,
+    accountBackedTaskSourceHostId,
     invalidateLinearIssueLists,
     patchLinearIssue,
     linearTaskSourceContext,
@@ -38,6 +38,17 @@ export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel)
     filteredLinearIssues,
     pagedLinearIssues
   } = model
+  // Why the page's own account host and not a live settings read: a board move reads and writes
+  // the page's Linear account — the host its already-migrated list surfaces route by — so the two
+  // cannot name different hosts for one issue. That capture is the focused host on this page by
+  // design; a source that genuinely differs arrives with the row. Why the host id and not the
+  // source object: a re-created source would allocate a new target and re-trigger every callback
+  // that depends on it.
+  const linearBoardOwnerHostId = linearTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
+  const providerSettings = useMemo(
+    () => taskSourceRuntimeTarget({ hostId: linearBoardOwnerHostId }),
+    [linearBoardOwnerHostId]
+  )
   const linearBoardSections = useMemo(
     () =>
       groupLinearIssues(
@@ -114,11 +125,7 @@ export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel)
         )
       }
       try {
-        const states = await linearTeamStates(
-          linearTaskSourceContext ?? defaultScopeSource(settings),
-          issue.team.id,
-          issue.workspaceId
-        )
+        const states = await linearTeamStates(providerSettings, issue.team.id, issue.workspaceId)
         const workflowState = findLinearWorkflowStateForStatus(states, targetState)
         if (!workflowState) {
           toast.error(
@@ -152,7 +159,7 @@ export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel)
         })
         applyFallbackState(nextState)
         const result = await linearUpdateIssue(
-          linearTaskSourceContext ?? defaultScopeSource(settings),
+          providerSettings,
           issue.id,
           {
             stateId: workflowState.id
@@ -217,7 +224,7 @@ export function useTaskPageLinearBoard(model: TaskPageLinearListProjectionModel)
       patchScopedLinearIssue,
       patchLinearIssue,
       linearTaskSourceContext,
-      settings,
+      providerSettings,
       setLinearBoardDragOverKey,
       setSelectedLinearIssueFallback,
       setLinearBoardUpdatingIssueIds

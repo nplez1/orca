@@ -155,6 +155,13 @@ const source: TaskSourceContext = {
   projectId: 'board-detail-project',
   hostId: 'runtime:board-detail-owner'
 }
+/** What a detail open with no explicit task source routes by: the page's own Jira account. */
+const accountSource: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'account-backed-task-source',
+  hostId: 'runtime:board-detail-owner'
+}
 const issue: JiraIssue = {
   id: 'board-detail-1',
   key: 'REGRESSION-1',
@@ -192,7 +199,7 @@ function StoreBackedBoardAndDetail({
   sourceContext,
   scopeKey
 }: {
-  sourceContext: TaskSourceContext | null
+  sourceContext: TaskSourceContext
   scopeKey: string
 }): React.JSX.Element {
   const [cachedIssue, setCachedIssue] = useState(issue)
@@ -253,7 +260,7 @@ afterEach(async () => {
 describe('Jira board and detail mutation integration', () => {
   it.each([
     { kind: 'explicit', sourceContext: source },
-    { kind: 'default', sourceContext: null }
+    { kind: 'account', sourceContext: accountSource }
   ])(
     'serializes a $kind-source board move after a rejected detail status save',
     async ({ kind, sourceContext }) => {
@@ -327,8 +334,8 @@ describe('Jira board and detail mutation integration', () => {
   it.each([
     { kind: 'explicit', sourceContext: source, settlement: 'success' },
     { kind: 'explicit', sourceContext: source, settlement: 'rejection' },
-    { kind: 'default', sourceContext: null, settlement: 'success' },
-    { kind: 'default', sourceContext: null, settlement: 'rejection' }
+    { kind: 'account', sourceContext: accountSource, settlement: 'success' },
+    { kind: 'account', sourceContext: accountSource, settlement: 'rejection' }
   ])(
     'refreshes the $kind-source detail timeline only after a board comment save $settlement',
     async ({ kind, sourceContext, settlement }) => {

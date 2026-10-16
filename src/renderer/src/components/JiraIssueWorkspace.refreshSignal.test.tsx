@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 const mocks = vi.hoisted(() => {
@@ -99,6 +100,14 @@ afterEach(() => {
 
 const EMPTY_ATTACHMENT_INDEX = buildJiraIssueWorkspaceAttachmentIndex([])
 
+/** The issue's own source, so the pane's reads and patches route by its owner. */
+const REFRESH_SOURCE: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'refresh-project',
+  hostId: 'local'
+}
+
 describe('JiraIssueWorkspace refresh signal', () => {
   it('refreshes the selected issue after a board transition without replacing the selection', async () => {
     const selectedIssue = issue('1', 'Ready')
@@ -117,6 +126,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
         issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
         onOpenOrStartWorkspace={onOpenOrStartWorkspace}
         onClose={onClose}
+        sourceContext={REFRESH_SOURCE}
         refreshSignal={0}
       />
     )
@@ -128,6 +138,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
         issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
         onOpenOrStartWorkspace={onOpenOrStartWorkspace}
         onClose={onClose}
+        sourceContext={REFRESH_SOURCE}
         refreshSignal={1}
       />
     )
@@ -136,7 +147,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
     expect(onClose).not.toHaveBeenCalled()
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
     expect(mocks.patchJiraIssue).toHaveBeenCalledWith('ABC-1', movedIssue, {
-      sourceContext: undefined
+      sourceContext: REFRESH_SOURCE
     })
   })
 
@@ -160,6 +171,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
         onOpenOrStartWorkspace={vi.fn()}
         onClose={vi.fn()}
         refreshSignal={0}
+        sourceContext={REFRESH_SOURCE}
       />
     )
 

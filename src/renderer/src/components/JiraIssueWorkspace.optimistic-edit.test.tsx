@@ -18,33 +18,43 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import { getDefaultSettings } from '../../../shared/constants'
-import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
+import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import JiraIssueWorkspace from './JiraIssueWorkspace'
 
 describe('JiraIssueWorkspace optimistic edits', () => {
   it.each([true, false])(
-    'captures the default host when a save settles after navigation (%s)',
+    'captures the owner when a save settles after the source moves (%s)',
     async (ok) => {
       const oldSave = deferred<JiraMutationResult>()
       runtimeMocks.jiraUpdateIssueForTarget.mockReturnValue(oldSave.promise)
-      const contextKey = getProviderRuntimeContextKey(editState.settings)
+      // The owner at submit time: the save must land here even after the selection moves on.
+      const submittedSource = { ...initialSource, accountLabel: 'Account A' }
+      const contextKey = getJiraReadIdentity(editState.settings, submittedSource).contextKey
       const view = render(
         <TooltipProvider>
-          <JiraIssueWorkspace issue={jiraIssue('Old title')} onUse={vi.fn()} onClose={vi.fn()} />
+          <JiraIssueWorkspace
+            issue={jiraIssue('Old title')}
+            sourceContext={submittedSource}
+            onUse={vi.fn()}
+            onClose={vi.fn()}
+          />
         </TooltipProvider>
       )
       await flushPromises()
       saveTitle('Old title', 'Local edit')
       await flushPromises()
-      editState.settings = { ...getDefaultSettings(''), activeRuntimeEnvironmentId: 'remote-1' }
       runtimeMocks.jiraGetIssueForTarget.mockImplementation(async (source: RuntimeClientTarget) =>
         jiraIssue(source.kind === 'environment' ? 'Remote title' : 'Local edit')
       )
       view.rerender(
         <TooltipProvider>
-          <JiraIssueWorkspace issue={jiraIssue('Remote title')} onUse={vi.fn()} onClose={vi.fn()} />
+          <JiraIssueWorkspace
+            issue={jiraIssue('Remote title')}
+            sourceContext={{ ...submittedSource, hostId: 'runtime:remote-1' }}
+            onUse={vi.fn()}
+            onClose={vi.fn()}
+          />
         </TooltipProvider>
       )
       await flushPromises()

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira-types'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import { JiraLinkedIssuePane } from './JiraLinkedIssuePane'
 
 const mocks = vi.hoisted(() => ({
@@ -61,6 +62,22 @@ const linkedIssue = {
   title: 'Fix checkout'
 }
 
+/** The workspace's own host: what the pane routes by when it has no creation-time task source. */
+const PANE_OWNER_SOURCE: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'account-backed-task-source',
+  hostId: 'runtime:pane-owner'
+}
+
+/** A creation-time task source on another server: the linked issue's own provider account. */
+const LINKED_TASK_SOURCE = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'project-1',
+  hostId: 'runtime:task-owner'
+} as const
+
 function issue(): JiraIssue {
   return {
     id: '1001',
@@ -106,7 +123,7 @@ describe('JiraLinkedIssuePane', () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
       </TooltipProvider>
     )
 
@@ -127,7 +144,7 @@ describe('JiraLinkedIssuePane', () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
       </TooltipProvider>
     )
 
@@ -145,7 +162,7 @@ describe('JiraLinkedIssuePane', () => {
 
     await waitFor(() =>
       expect(mocks.jiraAddIssueComment).toHaveBeenCalledWith(
-        { kind: 'default-scope', settings: null },
+        PANE_OWNER_SOURCE,
         'ABC-1',
         'Looks good to me',
         'site-1',
@@ -179,7 +196,7 @@ describe('JiraLinkedIssuePane', () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
       </TooltipProvider>
     )
 
@@ -203,7 +220,7 @@ describe('JiraLinkedIssuePane', () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
       </TooltipProvider>
     )
 
@@ -216,5 +233,42 @@ describe('JiraLinkedIssuePane', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
 
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Transition rejected'))
+  })
+
+  it('reads through the workspace owner when the link has no task source', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([])
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(mocks.jiraGetIssue).toHaveBeenCalled())
+    // Why the assertion on the transport: the linked issue's Jira account is on the workspace's
+    // host, so a focused-server change must not move this read to another host's account.
+    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(PANE_OWNER_SOURCE, 'ABC-1', undefined)
+  })
+
+  it('prefers the creation-time task source over the workspace host', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([])
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={LINKED_TASK_SOURCE} />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(mocks.jiraGetIssue).toHaveBeenCalled())
+    // A workspace on another host still reads the account its task came from.
+    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(LINKED_TASK_SOURCE, 'ABC-1', undefined)
   })
 })

@@ -11,13 +11,13 @@ import { useAppStore } from '@/store'
 import { useAllWorktrees } from '@/store/selectors'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
 import { translate } from '@/i18n/i18n'
 import { LinearIssueActivity } from './linear-issue-activity'
 import { LinearIssueSubIssues } from './linear-issue-sub-issues'
 import { useLinearIssueWorkspaceDetail } from './linear-issue-workspace-detail-state'
 import { LinearIssueWorkspaceHeader } from './linear-issue-workspace-header'
 import { LinearIssueWorkspaceSidebar } from './linear-issue-workspace-sidebar'
-import { defaultScopeSource } from '@/lib/default-creation-host'
 
 type LinearIssueWorkspaceProps = {
   issue: LinearIssue | null
@@ -26,7 +26,10 @@ type LinearIssueWorkspaceProps = {
   onClose: () => void
   variant?: 'sheet' | 'page'
   backLabel?: string
-  sourceContext?: TaskSourceContext | null
+  /** The issue's own source; every read, write and cache patch routes by its owner. Required,
+   *  because a Linear issue always belongs to a source and a row-less open would otherwise read
+   *  whichever server is focused. */
+  sourceContext: TaskSourceContext
 }
 
 type LinearIssueWorkspaceIssueProps = Omit<
@@ -49,8 +52,7 @@ function LinearIssueWorkspaceIssue({
   sourceContext,
   requestKey
 }: LinearIssueWorkspaceIssueProps): React.JSX.Element {
-  const settings = useAppStore((state) => state.settings)
-  const providerSettings = sourceContext ?? defaultScopeSource(settings)
+  const providerSettings: RuntimeLinearSettings = sourceContext
   const allWorktrees = useAllWorktrees()
   const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
   const attachmentWorkspaces = useMemo(
@@ -117,6 +119,7 @@ function LinearIssueWorkspaceIssue({
             onEditStateChange={detail.handleEditStateChange}
             onProjectChanged={detail.handleProjectChanged}
             onOpenAttachedWorkspace={handleOpenOrUseIssue}
+            providerSettings={providerSettings}
             sourceContext={sourceContext}
           />
         </div>
@@ -169,7 +172,6 @@ export default function LinearIssueWorkspace({
   backLabel = 'Back',
   sourceContext
 }: LinearIssueWorkspaceProps): React.JSX.Element {
-  const settings = useAppStore((state) => state.settings)
   if (!issue) {
     if (variant === 'page') {
       return (
@@ -178,7 +180,7 @@ export default function LinearIssueWorkspace({
     }
     return <Sheet open={false} onOpenChange={(open) => !open && onClose()} />
   }
-  const requestKey = `${sourceContext?.hostId ?? settings?.activeRuntimeEnvironmentId ?? 'local'}:${issue.workspaceId ?? 'selected'}:${issue.id}`
+  const requestKey = `${sourceContext.hostId}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   return (
     <LinearIssueWorkspaceIssue
       key={requestKey}

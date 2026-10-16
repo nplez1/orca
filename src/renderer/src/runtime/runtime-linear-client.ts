@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/linear/workspace-types'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import { rowLessSourceTarget, type RowLessSource } from '@/lib/default-creation-host'
+import { ownedSourceTarget, type OwnedSource } from '@/lib/provider-source-target'
 import { isRuntimeProviderSearchQueryWithinLimit } from './runtime-provider-search-bounds'
 import type { LinearIssueAttributeFilter } from '../../../shared/linear/issue-attribute-filter'
 import {
@@ -17,7 +17,11 @@ import {
 } from '../../../shared/linear/issue-attribute-filter'
 import { LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 
-export type RuntimeLinearSettings = RowLessSource
+/**
+ * Owner-routed Linear source. Every Linear read and write resolves the owner here, so a list or
+ * issue read lands on the resource's host even when another server is the Active Server.
+ */
+export type RuntimeLinearSettings = OwnedSource
 
 // Why: mixed-version remotes must not look like an empty filtered result. The
 // Linear store swallows most read failures; this typed error is rethrown so UI
@@ -52,7 +56,7 @@ export function linearReadForce(options?: LinearReadOptions): { force: true } | 
 }
 
 export function getLinearRuntimeTarget(source: RuntimeLinearSettings): RuntimeClientTarget {
-  return rowLessSourceTarget(source)
+  return ownedSourceTarget(source)
 }
 
 function normalizeLinearIssueCollectionResult(

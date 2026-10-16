@@ -8,7 +8,7 @@ import {
   issueMatchesTaskPageJiraBoardQuery,
   type TaskPageJiraBoardFilter
 } from './task-page-jira-board-model'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { useTaskPageJiraBoardPages } from './use-task-page-jira-board-pages'
 import {
   patchTaskPageJiraBoardCache,
@@ -30,9 +30,18 @@ export function useTaskPageJiraBoard(
   /** A board-relevant change made outside the board, such as the open issue's sprint. */
   refreshSignal = 0
 ) {
+  // Why the page's own account host and not a live settings read: this board's Jira account is the
+  // page's own — the host its already-migrated list surfaces route by — so re-reading the Active
+  // Server per call could name a different host than the list that supplied these issues. That
+  // capture is the focused host on this page by design; a source that genuinely differs (a Cmd-J
+  // open, a linked workspace) arrives with the row. A host that names no server stays a server
+  // target, so the read fails instead of running here.
+  const ownerHostId = model.jiraTaskSourceContext?.hostId ?? model.accountBackedTaskSourceHostId
+  // Why the host id and not the source object: a re-created source would allocate a new target and
+  // re-trigger every load effect, refetching the board on each render.
   const providerSettings = useMemo(
-    () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
-    [model.jiraTaskSourceContext, model.settings]
+    () => taskSourceRuntimeTarget({ hostId: ownerHostId }),
+    [ownerHostId]
   )
   const viewerAccountId = getTaskPageJiraBoardViewerAccountId(model.jiraStatus, selection.siteId)
   const cacheKey = taskPageJiraBoardCacheKey(selection)
@@ -172,6 +181,7 @@ export function useTaskPageJiraBoard(
   }, [effectiveFilter, pages.backlogIssues, query, viewerAccountId])
 
   return {
+    providerSettings,
     overview,
     overviewLoading,
     overviewError,

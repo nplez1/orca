@@ -3,14 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { jiraListProjectsForTarget, jiraStatusForTarget } from './runtime-jira-project-client'
 
-const { callRuntimeRpc, rowLessSourceTarget } = vi.hoisted(() => ({
-  callRuntimeRpc: vi.fn(),
-  rowLessSourceTarget: vi.fn(() => {
-    throw new Error('Project inventory must not resolve the default host')
-  })
-}))
+const { callRuntimeRpc } = vi.hoisted(() => ({ callRuntimeRpc: vi.fn() }))
 vi.mock('./runtime-rpc-client', () => ({ callRuntimeRpc }))
-vi.mock('@/lib/default-creation-host', () => ({ rowLessSourceTarget }))
 
 const status = vi.fn()
 const listProjects = vi.fn()
@@ -31,7 +25,6 @@ describe('Jira project inventory target transport', () => {
     expect(status).toHaveBeenCalledExactlyOnceWith()
     expect(listProjects).toHaveBeenCalledExactlyOnceWith({ siteId: 'all' })
     expect(callRuntimeRpc).not.toHaveBeenCalled()
-    expect(rowLessSourceTarget).not.toHaveBeenCalled()
   })
 
   it('sends status and project reads to the explicit paired owner', async () => {
@@ -53,7 +46,6 @@ describe('Jira project inventory target transport', () => {
     )
     expect(status).not.toHaveBeenCalled()
     expect(listProjects).not.toHaveBeenCalled()
-    expect(rowLessSourceTarget).not.toHaveBeenCalled()
   })
 
   it('keeps the optional project selector absent and normalizes a malformed status', async () => {

@@ -4,7 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { useEffect, useState, type JSX } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
 import type {
   JiraBoardIssuePageRequest,
   JiraIssue,
@@ -127,10 +126,12 @@ const boardOverview = {
   ]
 }
 
+/** The account host the model names for this board. The model carries no settings, so the
+ *  reader cannot re-derive one — which is what this fixture pins. */
+const BOARD_OWNER = { kind: 'environment', environmentId: 'board-owner' } as const
+
 const model: TaskPageJiraBoardModel = {
-  settings: createGlobalSettingsFixture({
-    defaultJiraBoard: { boardId: '42', siteId: 'site-1' }
-  }),
+  accountBackedTaskSourceHostId: 'runtime:board-owner',
   jiraTaskSourceContext: null,
   jiraStatus: {
     connected: true,
@@ -224,7 +225,7 @@ describe('TaskPageJiraBoard', () => {
     expect(await screen.findByText('1 loaded')).toBeTruthy()
     expect(await screen.findByText('ABC-2 title')).toBeTruthy()
     expect(mocks.jiraListBoardIssues).toHaveBeenCalledWith(
-      { kind: 'default-scope', settings: model.settings },
+      BOARD_OWNER,
       expect.objectContaining({ boardId: '42', scope: 'backlog', siteId: 'site-1' })
     )
   })
@@ -334,19 +335,36 @@ describe('TaskPageJiraBoard', () => {
     expect(loadJiraBoardViewPreferences()).toMatchObject({ filter: 'me', viewMode: 'list' })
   })
 
-  it('does not re-show a loader when a settings reload re-runs the fetch', async () => {
+  it('does not refetch when the model is re-created for the same owner', async () => {
+    const view = renderBoard()
+    await screen.findByText('ABC-1 title')
+    const overviewCalls = mocks.jiraGetBoardOverview.mock.calls.length
+    const pageCalls = mocks.jiraListBoardIssues.mock.calls.length
+
+    // Why: a store write re-creates the model object, and re-deriving a fresh owner target here
+    // would re-run every load effect. Only the owner's own host id may move them.
+    view.rerender(boardTree({ ...model }))
+
+    expect(mocks.jiraGetBoardOverview).toHaveBeenCalledTimes(overviewCalls)
+    expect(mocks.jiraListBoardIssues).toHaveBeenCalledTimes(pageCalls)
+  })
+
+  it('revalidates behind the loaded board when the owner changes', async () => {
     const view = renderBoard()
     await screen.findByText('ABC-1 title')
 
     // Pending reads prove the rerun revalidated behind the loaded board instead of blanking it.
     mocks.jiraGetBoardOverview.mockReturnValue(new Promise(() => {}))
     mocks.jiraListBoardIssues.mockReturnValue(new Promise(() => {}))
-    view.rerender(
-      boardTree({ ...model, settings: createGlobalSettingsFixture(model.settings ?? {}) })
-    )
+    view.rerender(boardTree({ ...model, accountBackedTaskSourceHostId: 'runtime:other-owner' }))
 
     expect(screen.queryByText('Loading…')).toBeNull()
     expect(screen.getByText('ABC-1 title')).toBeTruthy()
+    expect(mocks.jiraGetBoardOverview).toHaveBeenLastCalledWith(
+      { kind: 'environment', environmentId: 'other-owner' },
+      '42',
+      'site-1'
+    )
   })
 
   it('remembers the selected sprint across a remount without mixing sprint pages', async () => {
@@ -523,7 +541,7 @@ describe('TaskPageJiraBoard', () => {
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
-        { kind: 'default-scope', settings: model.settings },
+        BOARD_OWNER,
         backlogIssue.key,
         { sprintId: '88' },
         backlogIssue.siteId
@@ -617,7 +635,7 @@ describe('TaskPageJiraBoard', () => {
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
-        { kind: 'default-scope', settings: model.settings },
+        BOARD_OWNER,
         sprintIssue.key,
         { transitionId: 'start-work' },
         sprintIssue.siteId
@@ -680,7 +698,7 @@ describe('TaskPageJiraBoard', () => {
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
-        { kind: 'default-scope', settings: model.settings },
+        BOARD_OWNER,
         sprintIssue.key,
         expect.objectContaining({
           transitionId: 'start-work',

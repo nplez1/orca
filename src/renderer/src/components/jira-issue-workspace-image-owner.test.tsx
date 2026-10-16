@@ -179,7 +179,7 @@ function comment(id: string): JiraComment {
 
 async function render(
   selected: JiraIssue | null,
-  context: TaskSourceContext | null = sourceContext
+  context: TaskSourceContext = sourceContext
 ): Promise<void> {
   if (!root) {
     throw new Error('Missing React root')
@@ -285,8 +285,8 @@ describe('Jira issue workspace image ownership', () => {
     expect(text('transitions')).toBe('new')
   })
 
-  it('uses one account owner for row-less detail, comments, transitions and images', async () => {
-    await render(issue(), null)
+  it('uses one account owner for detail, comments, transitions and images', async () => {
+    await render(issue(), { ...sourceContext, hostId: 'runtime:environment-1' })
     const detail = take(boundary.issues)
     const comments = take(boundary.comments)
     const transitions = take(boundary.transitions)

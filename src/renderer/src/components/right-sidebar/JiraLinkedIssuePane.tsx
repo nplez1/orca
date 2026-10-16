@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { useJiraIssueWorkspaceDetail } from '@/components/jira-issue-workspace-detail-state'
 import { JiraIssueCommentComposer } from '@/components/jira-issue-workspace-content'
 import { jiraSearchUsers } from '@/runtime/runtime-jira-client'
+import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { useAppStore } from '@/store'
-import { defaultScopeSource } from '@/lib/default-creation-host'
 import { cn } from '@/lib/utils'
 import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -68,15 +68,14 @@ export function JiraLinkedIssuePane({
   sourceContext
 }: {
   linkedIssue: JiraLinked
-  sourceContext: TaskSourceContext | null
+  /** The issue's provider account: the host the workspace's creation-time task came from, else the
+   *  workspace's own host. Never the Active Server, so one source drives every read, write and
+   *  cache patch this pane owns. */
+  sourceContext: TaskSourceContext
 }): React.JSX.Element {
-  const settings = useAppStore((s) => s.settings)
   const viewerAccountId = useAppStore((s) => s.jiraStatus.viewer?.accountId ?? null)
   const linkActions = useLinkedIssuePaneActions()
-  const providerSettings = useMemo(
-    () => sourceContext ?? defaultScopeSource(settings),
-    [sourceContext, settings]
-  )
+  const providerSettings: RuntimeJiraSettings = sourceContext
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
     // Why: the workspace persists only the issue key; the hook hydrates the rest.

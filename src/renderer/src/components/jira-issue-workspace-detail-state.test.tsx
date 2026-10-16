@@ -12,7 +12,7 @@ import type {
   JiraTransition,
   JiraUser
 } from '../../../shared/jira-types'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 
 const mocks = vi.hoisted(() => ({
@@ -92,13 +92,13 @@ function sprintBoardFor(siteId: string): { boardId: string; siteId: string } {
   return created
 }
 
-const DEFAULT_SCOPE_SOURCE = defaultScopeSource(null)
+const DEFAULT_SCOPE_HOST = defaultScopeHost(null)
 
 function Probe(): React.JSX.Element {
   const detail = useJiraIssueWorkspaceDetail({
     issue: null,
     fetchKey: 'ABC-1',
-    providerSettings: DEFAULT_SCOPE_SOURCE
+    providerSettings: DEFAULT_SCOPE_HOST
   })
   return <div data-testid="key">{detail.displayed?.key ?? 'loading'}</div>
 }
@@ -116,7 +116,7 @@ const sprintAssignment: JiraSprintAssignment = {
 function TransitionProbe({ reportsInline }: { reportsInline: boolean }): React.JSX.Element {
   const detail = useJiraIssueWorkspaceDetail({
     issue: issueFor('ABC-1'),
-    providerSettings: DEFAULT_SCOPE_SOURCE
+    providerSettings: DEFAULT_SCOPE_HOST
   })
   return (
     <div>
@@ -152,7 +152,7 @@ function SprintProbe({
   const detail = useJiraIssueWorkspaceDetail({
     issue: issueFor(issueKey),
     sprintBoard: sprintBoardFor(boardSiteId),
-    providerSettings: DEFAULT_SCOPE_SOURCE,
+    providerSettings: DEFAULT_SCOPE_HOST,
     onSprintChange
   })
   return (
@@ -182,7 +182,7 @@ describe('useJiraIssueWorkspaceDetail with a bare fetch key', () => {
     render(<Probe />)
 
     await waitFor(() => expect(screen.getByTestId('key').textContent).toBe('ABC-1'))
-    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(DEFAULT_SCOPE_SOURCE, 'ABC-1', undefined)
+    expect(mocks.jiraGetIssue).toHaveBeenCalledWith(DEFAULT_SCOPE_HOST, 'ABC-1', undefined)
   })
 
   it('keeps the fetched issue when the side-data load advances its own request', async () => {
@@ -219,7 +219,7 @@ describe('useJiraIssueWorkspaceDetail sprint assignment', () => {
     render(<SprintProbe />)
     await waitFor(() => expect(screen.getByTestId('sprint').textContent).toBe('September sprint'))
     expect(mocks.jiraGetIssueSprintAssignment).toHaveBeenCalledWith(
-      DEFAULT_SCOPE_SOURCE,
+      DEFAULT_SCOPE_HOST,
       'ABC-1',
       'site-1',
       '42'
@@ -229,7 +229,7 @@ describe('useJiraIssueWorkspaceDetail sprint assignment', () => {
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
-        DEFAULT_SCOPE_SOURCE,
+        DEFAULT_SCOPE_HOST,
         'ABC-1',
         { sprintId: '88' },
         'site-1'

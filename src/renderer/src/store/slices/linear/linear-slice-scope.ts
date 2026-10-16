@@ -11,8 +11,8 @@ import {
 } from '../../../../../shared/linear/issue-attribute-filter'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { getLinearCacheGeneration, getLinearMutationGeneration } from './linear-slice-request-state'
-import { defaultScopeSource } from '@/lib/default-creation-host'
-import type { RowLessSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
+import type { OwnedSource } from '@/lib/provider-source-target'
 
 export function normalizeListAttributeFilter(
   attributeFilter?: LinearIssueAttributeFilter | null
@@ -24,7 +24,7 @@ export function normalizeListAttributeFilter(
 }
 
 export type LinearReadScope = {
-  settings: RowLessSource
+  settings: OwnedSource
   contextKey: string
   cachePrefix: string | null
   explicitSource: boolean
@@ -58,7 +58,7 @@ export function getLinearReadScope(
   if (!sourceContext) {
     return {
       // Why: no Tasks source chosen yet; the default scope host is the row-less source's host.
-      settings: defaultScopeSource(settings),
+      settings: defaultScopeHost(settings),
       contextKey: getProviderRuntimeContextKey(settings),
       cachePrefix: null,
       explicitSource: false
@@ -74,6 +74,14 @@ export function getLinearReadScope(
   }
 }
 
-export function scopedLinearCacheKey(scope: LinearReadScope, key: string): string {
+export function scopedLinearCacheKey(
+  scope: Pick<LinearReadScope, 'cachePrefix'>,
+  key: string
+): string {
   return scope.cachePrefix ? `${scope.cachePrefix}::${key}` : key
+}
+
+/** Cache key for a read scoped to an explicit source, where no row-less fallback applies. */
+export function scopedLinearCacheKeyForSource(source: TaskSourceContext, key: string): string {
+  return scopedLinearCacheKey({ cachePrefix: getTaskSourceCacheScope(source) }, key)
 }

@@ -17,8 +17,8 @@ import { JiraIssueMetadataBar, JiraIssueWorkspaceHeader } from './jira-issue-wor
 import { getJiraSelfUser } from './jira-self-user'
 import { JiraIssueCommentComposer, JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
 import { getJiraIssueWorkspaceActions } from './jira-issue-workspace-actions'
-import { defaultScopeSource, defaultScopeHost } from '@/lib/default-creation-host'
-import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
+import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
+import { getJiraRuntimeTarget } from '@/runtime/runtime-jira-target'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
@@ -33,7 +33,10 @@ type JiraIssueWorkspaceProps = {
    *  one belonging to this issue instead of offering to start a duplicate. */
   issueWorkspaceAttachmentIndex?: JiraIssueWorkspaceAttachmentIndex
   onClose: () => void
-  sourceContext?: TaskSourceContext | null
+  /** The issue's own source; every read, write and cache patch routes by its owner. Required,
+   *  because a Jira issue always belongs to a source and a row-less open would otherwise read
+   *  whichever server is focused. */
+  sourceContext: TaskSourceContext
   /** Board the issue's sprint is changed on. Sprint membership is board state, so
    *  without one there is nothing to move the issue into; the caller omits it
    *  where the surface has no board. */
@@ -84,16 +87,12 @@ export default function JiraIssueWorkspace({
     (target: JiraIssue) => openOrStartWorkspace(target, sourceContext),
     [openOrStartWorkspace, sourceContext]
   )
-  const settings = useAppStore((s) => s.settings)
   const jiraStatus = useAppStore((s) => s.jiraStatus)
-  const providerSettings = useMemo(
-    () => sourceContext ?? defaultScopeSource(settings),
-    [sourceContext, settings]
-  )
-  const owner = useMemo(
-    () => (sourceContext ? taskSourceRuntimeTarget(sourceContext) : defaultScopeHost(settings)),
-    [settings, sourceContext]
-  )
+  const providerSettings: RuntimeJiraSettings = sourceContext
+  // Why derived rather than resolved twice: the image target and the RPC source must name the
+  // same host, or the detail renders one server's issue beside another server's images. Why the
+  // memo: the resolver allocates a target per call, and the detail hook refetches on its identity.
+  const owner = useMemo(() => getJiraRuntimeTarget(sourceContext), [sourceContext])
   const runtimeContextKey = getEnvironmentRuntimeContextKey(runtimeTargetEnvironmentId(owner))
   const detail = useJiraIssueWorkspaceDetail({
     issue,

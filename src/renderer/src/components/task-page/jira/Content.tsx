@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JiraIssue } from '../../../../../shared/jira-types'
+import { accountBackedDetailSource } from '@/lib/account-backed-detail-source'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
 import { LoaderCircle } from 'lucide-react'
 import { JiraIcon } from '@/components/icons/JiraIcon'
@@ -106,6 +107,15 @@ export function TaskPageJiraContent({
     }
   }, [jiraBoardSelectionKey, setJiraBoardViewMode])
 
+  // Why memoised: the workspace refetches on its source's identity, and a fresh object per render
+  // would re-run every detail read.
+  const jiraDetailOwnerSource = useMemo(
+    () =>
+      jiraDetailSourceContext ??
+      jiraTaskSourceContext ??
+      accountBackedDetailSource('jira', accountBackedTaskSourceHostId),
+    [accountBackedTaskSourceHostId, jiraDetailSourceContext, jiraTaskSourceContext]
+  )
   const boardTarget = ipcOrRuntimeTargetForHostId(
     jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
   )
@@ -168,7 +178,7 @@ export function TaskPageJiraContent({
         issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
         onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
-        sourceContext={jiraDetailSourceContext}
+        sourceContext={jiraDetailOwnerSource}
         sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
         onSprintChange={notifyJiraSprintChange}
@@ -324,7 +334,7 @@ export function TaskPageJiraContent({
         issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
         onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
-        sourceContext={jiraDetailSourceContext}
+        sourceContext={jiraDetailOwnerSource}
         sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
         onSprintChange={notifyJiraSprintChange}

@@ -7,7 +7,7 @@ import {
 import { jiraCreateIssue, jiraGetIssue } from '@/runtime/runtime-jira-client'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultCreationHost } from '@/lib/default-creation-host'
 export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationModel) {
   const {
     settings,
@@ -54,7 +54,7 @@ export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationM
     setNewJiraIssueSubmitting(true)
     const submitProviderRuntimeContextKey = providerRuntimeContextKey
     try {
-      const result = await jiraCreateIssue(jiraTaskSourceContext ?? defaultScopeSource(settings), {
+      const result = await jiraCreateIssue(jiraTaskSourceContext ?? defaultCreationHost(settings), {
         siteId: newJiraIssueTargetProject.siteId,
         projectId: newJiraIssueTargetProject.id,
         issueTypeId: newJiraIssueTargetType.id,
@@ -95,7 +95,7 @@ export function useTaskPageJiraIssueCreation(model: TaskPageLinearIssueCreationM
       setNewJiraIssueAssignee(null)
       setJiraRefreshNonce((n) => n + 1)
       void jiraGetIssue(
-        jiraTaskSourceContext ?? defaultScopeSource(settings),
+        jiraTaskSourceContext ?? defaultCreationHost(settings),
         result.key,
         newJiraIssueTargetProject.siteId
       )
