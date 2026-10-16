@@ -128,6 +128,13 @@ function JiraBoardCard({
           ) : null}
           {storyPoints ? (
             <span
+              // Why the label as well as the shorthand: a screen reader reads "3sp"
+              // as "3 s p", and the card's own name is built from its text.
+              aria-label={translate(
+                'auto.components.TaskPage.jiraCardStoryPointsLabel',
+                '{{value0}} story points',
+                { value0: issue.storyPoints }
+              )}
               title={translate('auto.components.TaskPage.jiraCardStoryPointsTitle', 'Story points')}
               className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
             >

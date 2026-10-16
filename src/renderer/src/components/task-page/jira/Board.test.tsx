@@ -414,9 +414,8 @@ describe('TaskPageJiraBoard', () => {
       '0sp'
     )
     // A card with no points holds no chip at all rather than an empty one.
-    expect((await screen.findByRole('button', { name: /ABC-7 title/ })).textContent).not.toContain(
-      'sp'
-    )
+    const bare = await screen.findByRole('button', { name: /ABC-7 title/ })
+    expect(within(bare).queryByTitle('Story points')).toBeNull()
   })
 
   it('washes a blocker card and labels its severity', async () => {

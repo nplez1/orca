@@ -2673,6 +2673,7 @@
         "jiraColumnParent": "Parent",
         "jiraColumnSprint": "Sprint",
         "jiraCardStoryPoints": "{{value0}}sp",
+        "jiraCardStoryPointsLabel": "{{value0}} story points",
         "jiraCardStoryPointsTitle": "Story points",
         "jiraColumnStoryPoints": "Points",
         "jiraColumnOriginalEstimate": "Estimate",
