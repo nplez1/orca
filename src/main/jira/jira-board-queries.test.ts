@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
-import type * as JiraAgileFields from './jira-agile-fields'
 
 const {
   clearTokenMock,
@@ -8,24 +7,14 @@ const {
   isAuthErrorMock,
   jiraRequestMock,
   acquireMock,
-  releaseMock,
-  agileFieldsMock
+  releaseMock
 } = vi.hoisted(() => ({
   clearTokenMock: vi.fn(),
   getClientsMock: vi.fn(),
   isAuthErrorMock: vi.fn(),
   jiraRequestMock: vi.fn(),
   acquireMock: vi.fn().mockResolvedValue(undefined),
-  releaseMock: vi.fn(),
-  agileFieldsMock: vi.fn()
-}))
-
-// Why the real module with one override: the board read has to resolve the site's
-// agile field ids without the field-catalogue request these tests count, and
-// `agileFieldIdList`'s own shape is not what is under test here.
-vi.mock('./jira-agile-fields', async (importOriginal) => ({
-  ...(await importOriginal<typeof JiraAgileFields>()),
-  getAgileFieldIds: (...args: unknown[]) => agileFieldsMock(...args)
+  releaseMock: vi.fn()
 }))
 
 vi.mock('./request-queue', () => ({ acquire: acquireMock, release: releaseMock }))
@@ -90,6 +79,31 @@ function issueRecord() {
   }
 }
 
+const ROLE_FIELD_CATALOG = [
+  { id: 'customfield_71', name: 'Dev', schema: { type: 'user' } },
+  { id: 'customfield_72', name: 'QE', schema: { type: 'user' } }
+]
+
+/** A board issue read discovers the site's role fields before it asks for the page, so
+ *  the page response is routed by path rather than by call order. */
+function mockBoardIssueReads(
+  page: unknown,
+  catalog: readonly unknown[] = ROLE_FIELD_CATALOG
+): void {
+  jiraRequestMock.mockImplementation((_entry: unknown, path: unknown) =>
+    Promise.resolve(String(path).endsWith('/field') ? catalog : page)
+  )
+}
+
+function fieldCatalogCallCount(): number {
+  return jiraRequestMock.mock.calls.filter((entry) => String(entry[1]).endsWith('/field')).length
+}
+
+function boardIssueCallUrl(): string {
+  const call = jiraRequestMock.mock.calls.find((entry) => String(entry[1]).includes('/board/'))
+  return String(call?.[1])
+}
+
 async function expectSettingsReadTimeout(read: () => Promise<unknown>): Promise<void> {
   vi.useFakeTimers()
   try {
@@ -121,11 +135,13 @@ async function expectSettingsReadTimeout(read: () => Promise<unknown>): Promise<
 
 describe('Jira board queries', () => {
   beforeEach(() => {
+    // The field-catalog cache is module state with a 10-minute TTL, so without this a
+    // test would read whichever catalog an earlier test in the file happened to prime.
+    vi.resetModules()
     vi.clearAllMocks()
     isAuthErrorMock.mockReturnValue(false)
     getClientsMock.mockReturnValue([makeEntry()])
     jiraRequestMock.mockReset()
-    agileFieldsMock.mockReset().mockResolvedValue({})
     acquireMock.mockResolvedValue(undefined)
     releaseMock.mockImplementation(() => {})
   })
@@ -291,7 +307,7 @@ describe('Jira board queries', () => {
   })
 
   it('reads a board-filter backlog page', async () => {
-    jiraRequestMock.mockResolvedValueOnce({
+    mockBoardIssueReads({
       startAt: 100,
       maxResults: 25,
       total: 130,
@@ -322,38 +338,138 @@ describe('Jira board queries', () => {
         }
       ]
     })
-    const url = String(jiraRequestMock.mock.calls[0]?.[1])
+    const url = boardIssueCallUrl()
     expect(url).toContain('/rest/software/1.0/board/42/backlog?')
     expect(url).toContain('nextPageToken=previous-page')
     expect(url).toContain('maxResults=25')
   })
 
-  it("asks for the site's story-points field so a board card can show it", async () => {
-    agileFieldsMock.mockResolvedValue({ storyPoints: ['customfield_3'], sprint: 'customfield_1' })
-    jiraRequestMock.mockResolvedValueOnce({
+  it('asks for the site role fields and maps their users onto every board issue', async () => {
+    const record = issueRecord()
+    mockBoardIssueReads({
       startAt: 0,
-      maxResults: 100,
+      maxResults: 50,
+      total: 1,
       isLast: true,
-      issues: [{ ...issueRecord(), fields: { ...issueRecord().fields, customfield_3: 5 } }]
+      issues: [
+        {
+          ...record,
+          fields: {
+            ...record.fields,
+            customfield_71: { accountId: 'account-dev', displayName: 'Dev Name' },
+            customfield_72: null
+          }
+        }
+      ]
     })
     const { listBoardIssues } = await import('./jira-board-queries')
 
-    const page = await listBoardIssues({
-      boardId: '42',
-      siteId: 'site-1',
-      scope: 'sprint',
-      sprintId: '87'
-    })
+    const page = await listBoardIssues({ boardId: '42', siteId: 'site-1', scope: 'backlog' })
 
-    const url = new URL(String(jiraRequestMock.mock.calls[0]?.[1]), 'https://example.invalid')
-    expect(url.searchParams.get('fields')).toContain('customfield_3')
+    const requested = decodeURIComponent(boardIssueCallUrl())
+    expect(fieldCatalogCallCount()).toBe(1)
+    expect(requested).toContain('fields=')
+    expect(requested).toContain('customfield_71')
+    expect(requested).toContain('customfield_72')
+    expect(page.issues[0]?.roleAssignees).toEqual([
+      { accountId: 'account-dev', displayName: 'Dev Name' }
+    ])
+  })
+
+  it('still loads the page on the assignee fields alone when the catalog read fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      jiraRequestMock.mockImplementation((_entry: unknown, path: unknown) => {
+        if (String(path).endsWith('/field')) {
+          return Promise.reject(new Error('field catalog unavailable'))
+        }
+        return Promise.resolve({
+          startAt: 0,
+          maxResults: 50,
+          total: 1,
+          isLast: true,
+          issues: [issueRecord()]
+        })
+      })
+      const { listBoardIssues } = await import('./jira-board-queries')
+
+      const page = await listBoardIssues({ boardId: '42', siteId: 'site-1', scope: 'backlog' })
+
+      expect(page.issues.map((entry) => entry.key)).toEqual(['ABC-1'])
+      expect(decodeURIComponent(boardIssueCallUrl())).not.toContain('customfield_')
+      expect(page.issues[0]?.roleAssignees).toBeUndefined()
+      // The board's own "Me" answer degrades here, so it must not be silent.
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('asks for no role fields when the site declares more than the request can carry', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      // 260 ids join to 4,679 characters, past the board's 4 KB request budget.
+      const crowded = Array.from({ length: 260 }, (_, index) => ({
+        id: `customfield_${70000 + index}`,
+        name: `Role ${index}`,
+        schema: { type: 'user' }
+      }))
+      mockBoardIssueReads(
+        { startAt: 0, maxResults: 50, total: 1, isLast: true, issues: [issueRecord()] },
+        crowded
+      )
+      const { listBoardIssues } = await import('./jira-board-queries')
+
+      const request = { boardId: '42', siteId: 'site-1', scope: 'backlog' } as const
+      await listBoardIssues(request)
+      const firstUrl = decodeURIComponent(boardIssueCallUrl())
+      expect(firstUrl).not.toContain('customfield_')
+
+      // One warning per site, however many pages the board asks for.
+      await listBoardIssues(request)
+      expect(
+        warn.mock.calls.filter(([message]) => String(message).includes('role fields'))
+      ).toHaveLength(1)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it("asks for the site's story-points field so a board card can show it", async () => {
+    const record = issueRecord()
+    mockBoardIssueReads(
+      {
+        startAt: 0,
+        maxResults: 50,
+        total: 1,
+        isLast: true,
+        issues: [{ ...record, fields: { ...record.fields, customfield_3: 5 } }]
+      },
+      [
+        ...ROLE_FIELD_CATALOG,
+        // The float custom field a site names "Story points", as the catalog reports it.
+        {
+          id: 'customfield_3',
+          name: 'Story Points',
+          schema: { custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' }
+        }
+      ]
+    )
+    const { listBoardIssues } = await import('./jira-board-queries')
+
+    const page = await listBoardIssues({ boardId: '42', siteId: 'site-1', scope: 'backlog' })
+
+    // One catalog read answers both the role fields and the planning ones.
+    expect(fieldCatalogCallCount()).toBe(1)
+    const requested = new URL(boardIssueCallUrl(), 'https://example.invalid')
+    expect(requested.searchParams.get('fields')?.split(',')).toContain('customfield_3')
     expect(page.issues[0]?.storyPoints).toBe(5)
     expect(page.issues[0]?.storyPointsFieldId).toBe('customfield_3')
   })
 
   it('uses offset pagination for self-hosted Jira backlogs', async () => {
     getClientsMock.mockReturnValue([makeServerEntry()])
-    jiraRequestMock.mockResolvedValueOnce({
+    mockBoardIssueReads({
       startAt: 100,
       maxResults: 25,
       total: 125,
@@ -370,14 +486,12 @@ describe('Jira board queries', () => {
         maxResults: 25
       })
     ).resolves.toMatchObject({ startAt: 100, isLast: false, nextPageToken: null })
-    expect(String(jiraRequestMock.mock.calls[0]?.[1])).toContain(
-      '/rest/agile/1.0/board/42/backlog?'
-    )
-    expect(String(jiraRequestMock.mock.calls[0]?.[1])).toContain('startAt=100')
+    expect(boardIssueCallUrl()).toContain('/rest/agile/1.0/board/42/backlog?')
+    expect(boardIssueCallUrl()).toContain('startAt=100')
   })
 
   it('reads current-sprint pages without crossing site scope', async () => {
-    jiraRequestMock.mockResolvedValueOnce({
+    mockBoardIssueReads({
       startAt: 100,
       maxResults: 100,
       isLast: false,
@@ -401,18 +515,14 @@ describe('Jira board queries', () => {
       isLast: false,
       issues: [{ key: 'ABC-1' }]
     })
-    expect(String(jiraRequestMock.mock.calls[0]?.[1])).toContain(
-      '/rest/software/1.0/board/42/sprint/87/issue?'
-    )
-    expect(String(jiraRequestMock.mock.calls[0]?.[1])).toContain(
-      'nextPageToken=previous-sprint-page'
-    )
+    expect(boardIssueCallUrl()).toContain('/rest/software/1.0/board/42/sprint/87/issue?')
+    expect(boardIssueCallUrl()).toContain('nextPageToken=previous-sprint-page')
     expect(getClientsMock).toHaveBeenCalledWith('site-1')
   })
 
   it('uses board-scoped offset pagination for self-hosted sprint issues', async () => {
     getClientsMock.mockReturnValue([makeServerEntry()])
-    jiraRequestMock.mockResolvedValueOnce({
+    mockBoardIssueReads({
       startAt: 50,
       maxResults: 50,
       total: 100,
@@ -430,7 +540,7 @@ describe('Jira board queries', () => {
       maxResults: 50
     })
 
-    const url = String(jiraRequestMock.mock.calls[0]?.[1])
+    const url = boardIssueCallUrl()
     expect(url).toContain('/rest/agile/1.0/board/42/sprint/87/issue?')
     expect(url).toContain('startAt=50')
     expect(getClientsMock).toHaveBeenCalledWith('server-1')

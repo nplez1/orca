@@ -140,20 +140,20 @@ export function useTaskPageJiraBoard(model: TaskPageJiraBoardModel, selection: J
   const effectiveFilter: TaskPageJiraBoardFilter =
     filter === 'me' && !viewerAccountId ? 'all' : filter
   const displayedSprintIssues = useMemo(() => {
-    const byAssignee = filterTaskPageJiraBoardIssues(
+    const byViewer = filterTaskPageJiraBoardIssues(
       pages.sprintIssues,
       effectiveFilter,
       viewerAccountId
     )
-    return byAssignee.filter((issue) => issueMatchesTaskPageJiraBoardQuery(issue, query))
+    return byViewer.filter((issue) => issueMatchesTaskPageJiraBoardQuery(issue, query))
   }, [effectiveFilter, pages.sprintIssues, query, viewerAccountId])
   const displayedBacklogIssues = useMemo(() => {
-    const byAssignee = filterTaskPageJiraBoardIssues(
+    const byViewer = filterTaskPageJiraBoardIssues(
       pages.backlogIssues,
       effectiveFilter,
       viewerAccountId
     )
-    return byAssignee.filter((issue) => issueMatchesTaskPageJiraBoardQuery(issue, query))
+    return byViewer.filter((issue) => issueMatchesTaskPageJiraBoardQuery(issue, query))
   }, [effectiveFilter, pages.backlogIssues, query, viewerAccountId])
 
   return {

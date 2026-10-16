@@ -6,7 +6,7 @@ import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-r
 import { parseEphemeralVmLifetimeDuration } from '../../../../shared/ephemeral-vm-lifetime'
 import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../shared/ephemeral-vm-recipe-destroy-result'
 import {
-  isReleasedEphemeralVmRuntime,
+  isEphemeralVmHostActionable,
   refreshEphemeralVmRuntimes,
   resolveEphemeralVmRuntimeLease
 } from '@/hooks/useEphemeralVmRuntimes'
@@ -51,9 +51,10 @@ export function getVisibleEphemeralVmRuntimes(
  * that extension, so offering it would only produce an action that always fails.
  */
 export function getEphemeralVmExtendDurations(runtime: EphemeralVmRuntimeRecord): string[] {
-  // Why the shared predicate: "this host is only a record now" is the same question the lease chip
-  // and the context menu ask, and it already covers reclaimed, cleaned and released.
-  if (!runtime.extend || isReleasedEphemeralVmRuntime(runtime)) {
+  // Why the shared predicate: "this host cannot take an action" is the same question the lease chip,
+  // the context menu and main's refusal all ask, and it covers reclaimed, cleaned, released, and a
+  // teardown that already started.
+  if (!runtime.extend || !isEphemeralVmHostActionable(runtime)) {
     return []
   }
   return (runtime.extendDurations ?? []).filter(

@@ -16,7 +16,13 @@ export type ProcessRunResult = {
 }
 
 /** The lifecycle mode a recipe command runs in; published to it as `ORCA_VM_MODE`. */
-export type EphemeralVmRecipeProcessMode = 'create' | 'suspend' | 'resume' | 'destroy' | 'extend'
+export type EphemeralVmRecipeProcessMode =
+  | 'create'
+  | 'suspend'
+  | 'resume'
+  | 'destroy'
+  | 'extend'
+  | 'context-menu'
 
 export function quoteShellToken(value: string): string {
   if (process.platform === 'win32') {

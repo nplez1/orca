@@ -6421,7 +6421,13 @@
           "extendTo": "Extend to {{value0}}",
           "extending": "Extending…",
           "extended": "Lease extended",
-          "extendedUntil": "Lease extended to {{value0}}"
+          "extendedUntil": "Lease extended to {{value0}}",
+          "extendFailed": "Couldn’t extend the lease. Try again."
+        },
+        "EphemeralVmContextMenuItems": {
+          "failed": "Couldn’t run {{value0}}",
+          "ranItem": "Ran {{value0}}",
+          "running": "Running {{value0}}…"
         },
         "HiddenWorktreeRecoveryList": {
           "64e6f53f05": "Show one without enabling its source.",

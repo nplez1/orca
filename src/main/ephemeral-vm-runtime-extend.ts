@@ -1,5 +1,8 @@
 import type { Store } from './persistence'
-import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
+import {
+  isEphemeralVmHostActionable,
+  type EphemeralVmRuntimeRecord
+} from '../shared/ephemeral-vm-runtimes'
 import {
   getEphemeralVmRecipeResultConnection,
   getEphemeralVmLifetimeLossError,
@@ -66,14 +69,9 @@ async function extendLocked(
       `Recipe "${resolved.recipe.id}" does not offer the lifetime "${args.lifetime}".`
     )
   }
-  if (
-    existing.reclaimedAt !== undefined ||
-    existing.status === 'cleaned' ||
-    // Why cleanup_pending too: a destroy is in flight, so an extension could buy time on a machine
-    // that is being torn down, and the two would race the same record.
-    existing.status === 'cleanup_pending' ||
-    existing.cleanupStatus === 'succeeded'
-  ) {
+  // Why the shared predicate: it is the same question every action on this host asks, so a lease can
+  // never be extended on a machine whose destroy is already racing it.
+  if (!isEphemeralVmHostActionable(existing)) {
     throw new Error('This host has already been released, so its lease can no longer be extended.')
   }
 

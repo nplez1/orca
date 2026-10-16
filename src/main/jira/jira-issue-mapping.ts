@@ -216,6 +216,38 @@ export type JiraAgileFieldIds = {
   storyPoints?: string[]
 }
 
+/** The site's custom field ids `mapJiraIssue` reads back: the agile planning fields,
+ *  plus its user-picker fields, which name the roles an issue carries besides its
+ *  assignee (Dev, QE, …). */
+export type JiraIssueFieldIds = JiraAgileFieldIds & {
+  roleFields?: readonly string[]
+}
+
+/** `undefined` = the site's role fields were never read, so no extra roles are known;
+ *  `[]` = read, and nobody holds one. */
+function mapRoleAssignees(
+  fields: JiraRecord,
+  roleFields: readonly string[] | undefined
+): JiraUser[] | undefined {
+  if (!roleFields || roleFields.length === 0) {
+    return undefined
+  }
+  const users: JiraUser[] = []
+  const seen = new Set<string>()
+  for (const id of roleFields) {
+    const raw = fields[id]
+    for (const entry of Array.isArray(raw) ? raw : [raw]) {
+      const user = mapUser(entry)
+      // A person holding two roles is one role holder.
+      if (user && !seen.has(user.accountId)) {
+        seen.add(user.accountId)
+        users.push(user)
+      }
+    }
+  }
+  return users
+}
+
 function mapParent(value: unknown): JiraIssue['parent'] {
   const parent = asRecord(value)
   const key = asString(parent.key)
@@ -276,7 +308,7 @@ export function mapJiraIssue(
   site: JiraSite,
   raw: JiraRecord,
   adfOptions?: AdfToMarkdownOptions,
-  agileFields: JiraAgileFieldIds = {},
+  fieldIds: JiraIssueFieldIds = {},
   renderedOptions?: RenderedJiraHtmlOptions
 ): JiraIssue {
   const fields = asRecord(raw.fields)
@@ -301,10 +333,11 @@ export function mapJiraIssue(
     labels: asStringArray(fields.labels),
     assignee: mapUser(fields.assignee),
     reporter: mapUser(fields.reporter),
+    roleAssignees: mapRoleAssignees(fields, fieldIds.roleFields),
     priority: mapPriority(fields.priority),
     parent: mapParent(fields.parent),
-    sprint: agileFields.sprint ? mapSprint(fields[agileFields.sprint]) : undefined,
-    ...mapStoryPoints(fields, agileFields.storyPoints),
+    sprint: fieldIds.sprint ? mapSprint(fields[fieldIds.sprint]) : undefined,
+    ...mapStoryPoints(fields, fieldIds.storyPoints),
     originalEstimateSeconds: asFiniteNumber(fields.timeoriginalestimate) ?? undefined,
     remainingEstimateSeconds: asFiniteNumber(fields.timeestimate) ?? undefined,
     createdAt: asString(fields.created, new Date().toISOString()),

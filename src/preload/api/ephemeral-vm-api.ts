@@ -3,6 +3,7 @@ import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environ
 import type { EphemeralVmRecipeDoctorResult } from '../../shared/ephemeral-vm-recipes'
 import type { EphemeralVmRecipeResultWarning } from '../../shared/ephemeral-vm-recipe-diagnostics'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
+import type { EphemeralVmRuntimeContextMenuItemRun } from '../../shared/ephemeral-vm-recipe-context-menu-runner'
 import type { EphemeralVmRuntimeReclaimed } from '../../shared/ephemeral-vm-runtime-reclaim'
 
 export type EphemeralVmApi = {
@@ -75,6 +76,16 @@ export type EphemeralVmApi = {
     runtimeId: string
     lifetime: string
   }) => Promise<EphemeralVmRuntimeRecord>
+  /**
+   * Run one recipe-declared context-menu item against the workspace's host. Rejects with the
+   * script's own failure message, so the caller can surface it verbatim.
+   */
+  runContextMenuItem: (args: {
+    runtimeId: string
+    itemId: string
+    /** The workspace's path as its row carries it; the desktop surface is what has the row. */
+    workspacePath: string
+  }) => Promise<EphemeralVmRuntimeContextMenuItemRun>
   /**
    * Fires when main reclaims an expired host whose machine is gone. The workspace rows are the
    * renderer's to remove, so this is how it learns to forget them.

@@ -4,6 +4,7 @@ import {
 } from '../shared/ephemeral-vm-recipes'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import {
+  toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeExtendFields,
   toEphemeralVmRuntimeRecipeSnapshot
 } from '../shared/ephemeral-vm-runtimes'
@@ -38,6 +39,9 @@ export async function cleanupFailedEphemeralVmStart(
     recipeId: args.recipe.id,
     recipe: toEphemeralVmRuntimeRecipeSnapshot(args.recipe),
     ...toEphemeralVmRuntimeExtendFields(args.recipe),
+    // Why here too: cleanup failed, so the machine is probably still there and the actions its
+    // recipe declared still apply to it.
+    ...toEphemeralVmRuntimeContextMenuFields(args.recipe),
     ...(args.repoId ? { repoId: args.repoId } : {}),
     ...(args.projectId ? { projectId: args.projectId } : {}),
     ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),

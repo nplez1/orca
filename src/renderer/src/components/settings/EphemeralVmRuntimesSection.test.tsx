@@ -98,6 +98,14 @@ describe('EphemeralVmRuntimesSection helpers', () => {
     expect(getEphemeralVmExtendDurations({ ...extendable, reclaimedAt: 1 })).toEqual([])
     expect(getEphemeralVmExtendDurations({ ...extendable, status: 'cleaned' })).toEqual([])
     expect(getEphemeralVmExtendDurations({ ...extendable, cleanupStatus: 'succeeded' })).toEqual([])
+    // A destroy already in flight is refused by main too, so the action must not be offered.
+    expect(
+      getEphemeralVmExtendDurations({
+        ...extendable,
+        status: 'cleanup_pending',
+        cleanupStatus: 'running'
+      })
+    ).toEqual([])
     // A recipe with no extend verb, and one whose declared durations are not all usable.
     expect(getEphemeralVmExtendDurations(makeRuntime({ extendDurations: ['1h'] }))).toEqual([])
     expect(

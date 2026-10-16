@@ -195,4 +195,57 @@ describe('doctorEphemeralVmRecipe', () => {
     expect(checkById(result, 'recipe.extend_durations')).toBeUndefined()
     expect(result.ok).toBe(true)
   })
+
+  it('checks every context-menu item command path, keyed by the item id the user clicks', () => {
+    const repo = makeRepo({
+      'create.sh': { mode: 0o755 },
+      'launch-vnc.sh': { mode: 0o755 },
+      'launch-rdp.sh': { mode: 0o755 }
+    })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      contextMenuItems: [
+        { id: 'launch-vnc', label: 'Launch VNC', command: './launch-vnc.sh' },
+        { id: 'launch-rdp', label: 'Launch RDP', command: './launch-rdp.sh' }
+      ]
+    })
+
+    expect(checkById(result, 'recipe.context_menu_item.launch-vnc')?.status).toBe('pass')
+    expect(checkById(result, 'recipe.context_menu_item.launch-rdp')?.status).toBe('pass')
+    expect(result.ok).toBe(true)
+  })
+
+  it('fails when a declared item points at a script that is not there', () => {
+    const repo = makeRepo({ 'create.sh': { mode: 0o755 } })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true,
+      contextMenuItems: [{ id: 'launch-vnc', label: 'Launch VNC', command: './missing.sh' }]
+    })
+
+    expect(checkById(result, 'recipe.context_menu_item.launch-vnc')).toMatchObject({
+      status: 'fail',
+      message: 'Command path does not exist: ./missing.sh'
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('records no item checks for a recipe that declares none', () => {
+    const repo = makeRepo({ 'create.sh': { mode: 0o755 } })
+    const result = run(repo, {
+      id: 'cloud',
+      name: 'Cloud',
+      create: './create.sh',
+      destroyDisabled: true
+    })
+
+    expect(
+      result.checks.filter((check) => check.id.startsWith('recipe.context_menu_item'))
+    ).toEqual([])
+  })
 })

@@ -46,6 +46,16 @@ export type OrcaVmRecipe = {
   /** The lifetimes this recipe's provider is willing to sell, such as `4h` or `1d`.
    *  Orca offers only these, so it can never ask for a lease the provider rejects. */
   extendDurations?: string[]
+  /** Extra actions this recipe adds to its workspaces' context menu. Each one is offered only on
+   *  a workspace whose host was created by this recipe, and clicking it runs `command` with the
+   *  workspace's host name, workspace name, and workspace path. */
+  contextMenuItems?: OrcaVmRecipeContextMenuItem[]
+}
+
+export type OrcaVmRecipeContextMenuItem = {
+  id: string
+  label: string
+  command: string
 }
 
 export type OrcaVmRecipeDiagnostic = {
