@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
+import type * as JiraAgileFields from './jira-agile-fields'
 
 const {
   clearTokenMock,
@@ -7,14 +8,24 @@ const {
   isAuthErrorMock,
   jiraRequestMock,
   acquireMock,
-  releaseMock
+  releaseMock,
+  agileFieldsMock
 } = vi.hoisted(() => ({
   clearTokenMock: vi.fn(),
   getClientsMock: vi.fn(),
   isAuthErrorMock: vi.fn(),
   jiraRequestMock: vi.fn(),
   acquireMock: vi.fn().mockResolvedValue(undefined),
-  releaseMock: vi.fn()
+  releaseMock: vi.fn(),
+  agileFieldsMock: vi.fn()
+}))
+
+// Why the real module with one override: the board read has to resolve the site's
+// agile field ids without the field-catalogue request these tests count, and
+// `agileFieldIdList`'s own shape is not what is under test here.
+vi.mock('./jira-agile-fields', async (importOriginal) => ({
+  ...(await importOriginal<typeof JiraAgileFields>()),
+  getAgileFieldIds: (...args: unknown[]) => agileFieldsMock(...args)
 }))
 
 vi.mock('./request-queue', () => ({ acquire: acquireMock, release: releaseMock }))
@@ -114,6 +125,7 @@ describe('Jira board queries', () => {
     isAuthErrorMock.mockReturnValue(false)
     getClientsMock.mockReturnValue([makeEntry()])
     jiraRequestMock.mockReset()
+    agileFieldsMock.mockReset().mockResolvedValue({})
     acquireMock.mockResolvedValue(undefined)
     releaseMock.mockImplementation(() => {})
   })
@@ -314,6 +326,29 @@ describe('Jira board queries', () => {
     expect(url).toContain('/rest/software/1.0/board/42/backlog?')
     expect(url).toContain('nextPageToken=previous-page')
     expect(url).toContain('maxResults=25')
+  })
+
+  it("asks for the site's story-points field so a board card can show it", async () => {
+    agileFieldsMock.mockResolvedValue({ storyPoints: ['customfield_3'], sprint: 'customfield_1' })
+    jiraRequestMock.mockResolvedValueOnce({
+      startAt: 0,
+      maxResults: 100,
+      isLast: true,
+      issues: [{ ...issueRecord(), fields: { ...issueRecord().fields, customfield_3: 5 } }]
+    })
+    const { listBoardIssues } = await import('./jira-board-queries')
+
+    const page = await listBoardIssues({
+      boardId: '42',
+      siteId: 'site-1',
+      scope: 'sprint',
+      sprintId: '87'
+    })
+
+    const url = new URL(String(jiraRequestMock.mock.calls[0]?.[1]), 'https://example.invalid')
+    expect(url.searchParams.get('fields')).toContain('customfield_3')
+    expect(page.issues[0]?.storyPoints).toBe(5)
+    expect(page.issues[0]?.storyPointsFieldId).toBe('customfield_3')
   })
 
   it('uses offset pagination for self-hosted Jira backlogs', async () => {

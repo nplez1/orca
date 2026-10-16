@@ -11,6 +11,7 @@ import { jiraRequest } from './authenticated-request'
 import { clearToken, getClients, getSingleClient, isAuthError } from './client'
 import { JIRA_AGILE_API, JIRA_CLOUD_SOFTWARE_API } from './jira-agile-api'
 import { ISSUE_LIST_FIELDS, mapJiraIssue } from './jira-issue-mapping'
+import { agileFieldIdList, getAgileFieldIds } from './jira-agile-fields'
 import { fetchBoardSprints } from './jira-sprint-queries'
 import { withJiraQueuedDeadline } from './jira-read-failure'
 import {
@@ -156,7 +157,11 @@ export async function listBoardIssues(
     Math.max(1, Math.floor(request.maxResults ?? BOARD_ISSUE_PAGE_SIZE)),
     100
   )
-  const fields = [...ISSUE_LIST_FIELDS]
+  // Why: story points live in a site-specific custom field, so a board card can only
+  // show them if this read asks for the discovered id — the field catalogue read is
+  // shared and cached per site, and answers `{}` when it cannot be read.
+  const agileFields = await getAgileFieldIds(entry)
+  const fields = [...ISSUE_LIST_FIELDS, ...agileFieldIdList(agileFields)]
   const params = new URLSearchParams({
     maxResults: String(maxResults),
     fields: fields.join(',')
@@ -191,7 +196,9 @@ export async function listBoardIssues(
       isLast?: boolean
       nextPageToken?: string
     }>(entry, path)
-    const issues = (response.issues ?? []).map((issue) => mapJiraIssue(entry.site, issue))
+    const issues = (response.issues ?? []).map((issue) =>
+      mapJiraIssue(entry.site, issue, undefined, agileFields)
+    )
     const responseStartAt = asFiniteNumber(response.startAt) ?? startAt
     const total = asFiniteNumber(response.total)
     const nextPageToken = asString(response.nextPageToken) || null
