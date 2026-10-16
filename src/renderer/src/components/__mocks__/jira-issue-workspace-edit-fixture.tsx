@@ -46,7 +46,10 @@ const store = vi.hoisted(() => ({
   patchJiraIssue:
     vi.fn<(key: string, patch: Partial<JiraIssue>, options?: JiraPatchOptions) => void>()
 }))
-const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }))
+const toast = vi.hoisted(() => ({
+  error: vi.fn<(message: string) => void>(),
+  success: vi.fn<(message: string) => void>()
+}))
 export const editState: { settings: GlobalSettings | null; serverTitle: string } = {
   settings: null,
   serverTitle: 'Old title'
