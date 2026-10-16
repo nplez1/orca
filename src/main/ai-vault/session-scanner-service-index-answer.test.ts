@@ -65,12 +65,17 @@ function settle(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))
 }
 
+function isResult(
+  message: AiVaultServiceChildMessage
+): message is Extract<AiVaultServiceChildMessage, { type: 'result' }> {
+  return message.type === 'result'
+}
+
 function scanResponse(
   id: number
 ): Extract<AiVaultServiceChildMessage, { type: 'result' }> | undefined {
-  return sent.find((message) => message.type === 'result' && message.id === id) as
-    | Extract<AiVaultServiceChildMessage, { type: 'result' }>
-    | undefined
+  const message = sent.find((candidate) => candidate.type === 'result' && candidate.id === id)
+  return message && isResult(message) ? message : undefined
 }
 
 /** The `scan` value of a settled scan request, or null when it did not answer as one. */
@@ -164,6 +169,6 @@ describe('AI Vault service scan answered from the session index', () => {
     expect(value?.result).toEqual(scannedResult)
     // A scan that ran always tallies, even when it finds nothing — the distinction the
     // index answer's null relies on.
-    expect(value?.work).not.toBeNull()
+    expect(value?.work).toEqual(expect.objectContaining({ agents: expect.any(Array) }))
   })
 })

@@ -1,8 +1,6 @@
-// The worktree listing's forward references are declared one layer below, so this file needs
-// no suppression: `OrcaRuntimeWithWorktreePsDependencies` carries them as abstract members.
-import { OrcaRuntimeWithWorktreePsDependencies } from './workspace-process-listing-dependencies'
 import { resolveStructuredCodexAccountKind } from '../structured-agent-account-home'
 import { collectRuntimeWorktreeAgentSources } from '../runtime-worktree-agent-sources'
+import { OrcaRuntimeWithWorktreePsDependencies } from './workspace-process-listing-dependencies'
 import { DEFAULT_WORKTREE_PS_LIMIT } from '../orca-runtime-postlude'
 import type { RuntimeWorktreePsResult } from '../../../shared/runtime-types'
 import { buildRuntimeWorktreePsSummaries } from '../runtime-worktree-ps-summaries'

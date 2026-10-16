@@ -429,7 +429,7 @@ pnpm run sync:localization-runtime-catalog
   - **The Opus review found two must-fix items, and both are fixed.** `claude/opus` at high
     reasoning, tool-enabled, over the merge diff (`git show --remerge-diff ae9db02137` plus the
     repair commits), told not to accept these docs as evidence. The first was that the
-    `@ts-nocheck` described below as unavoidable **was avoidable**: upstream already declares those
+    `@ts-nocheck` described above as unavoidable **was avoidable**: upstream already declares those
     forward references in `workspace-process-listing-dependencies.ts`, and the 2026-10-15 sync
     orphaned that layer by re-pointing the file at `OrcaRuntimeWithSetupRunnerState` directly.
     Chaining the two — `OrcaRuntimeWithWorktreePsDependencies` now extends the fork's
@@ -451,12 +451,16 @@ pnpm run sync:localization-runtime-catalog
     ledger's decision, so orcad builds the DeepSeek/Fireworks/Copilot resolvers against its own
     credential store and spawns the `gh auth status` warm-up unless Copilot is disabled. Intended,
     and new for that host.
-  - **What the run produced.** post-sync passed all ten gates (conflict markers, the identity
-    sweep with 1168 report-only findings, the derived catalog regenerating to no diff, both
-    localization verifiers, the builder config, the update-feed references, the deleted-module
-    surface scan, oxlint and `pnpm tc`); the changed-code quality gate reports 0 findings across
-    946 changed files; `pnpm lint` is green end to end; and the touched areas' suites ran 4,605
-    tests — 4,586 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
+  - **What the run produced.** post-sync reports 9 of its 10 checks passing and one informational:
+    conflict markers, the identity sweep (1168 report-only findings), the derived catalog
+    regenerating to no diff, both localization verifiers, the builder config, the update-feed
+    references, the deleted-module surface scan, oxlint and `pnpm tc` all pass, and the red-flag
+    scan flags three files this sync touched deliberately —
+    `src/main/runtime/workspaces/workspace-process-listing.ts` and
+    `…-dependencies.ts` (the chain fix below) and `config/focus-setting-read-baseline.txt` (the
+    recorded counts). The changed-code quality gate reports 0 findings across 946 changed files;
+    `pnpm lint` is green end to end; and the touched areas' suites ran 4,600
+    tests — 4,581 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
     bundle fence was not re-measured**: `mobile/node_modules` is not installed here, so
     `pnpm build:mobile-web` cannot run. Its only input, `mobile-web-page-routes.mjs`, was
     touched by neither side in this range (diffed against `e27bc2efbf` and `ac015cd3b2`), so the

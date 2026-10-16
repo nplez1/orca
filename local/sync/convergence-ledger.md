@@ -321,7 +321,10 @@ matching the host's scans.
 finished row into "Scanned N files", so a zero-tally finish showed "Scanned 0 files" with a tick on
 the index path. `finish()` publishes nothing when the work is null **and** nothing was ever reported
 (no agents, no reads); a scan that really ran always reports something. Keep that pairing — the
-condition is "no scan ran", not "the tally is empty".
+condition is "no scan ran", not "the tally is empty". The one remaining route to a zero-count row is
+the `fail()` path: an index answer that hits the service's no-progress deadline still publishes
+`stage: 'stopped'`, which reads "Stopped after 0 files". That is upstream's deadline behaviour and
+needs a reconcile slower than 130s to reach, so it is recorded rather than worked around.
 
 Do not add a fifth parameter here; the two sides of the seam are request and progress, and either
 one silently dropped reports success with the wrong rows or no progress.
@@ -1048,6 +1051,9 @@ is the point: two were already red at the pre-sync tip and one was this sync's.
   `OrcaRuntimeWithWorktreePsDependencies extends OrcaRuntimeWithSetupRunnerState`, and
   `OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktreePsDependencies` — is what closes the
   hole. The entry was recorded during the sync and removed by the review that found this.
+  `workspace-process-listing.ts` is byte-identical to upstream's copy again: the fork's whole delta
+  in this seam is the one parent change in the declarations layer, which is one file to reconcile at
+  the next sync instead of two.
 - **focus-read was pre-existing, and is recorded.** Four files added (one a `__mocks__` fixture the
   scanner does not exclude), one pruned; they are the owner-routing follow-up the ledger already
   carries for five other files.
