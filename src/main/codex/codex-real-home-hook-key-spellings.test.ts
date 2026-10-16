@@ -246,3 +246,20 @@ describe('both spellings of a symlinked ~/.codex', () => {
     expect(JSON.parse(readFileSync(hooksPath(), 'utf-8'))).toEqual({ hooks: {} })
   })
 })
+
+describe('a Linux-side home', () => {
+  it.runIf(process.platform === 'darwin')(
+    'stays as spelled instead of resolving through the macOS automounter',
+    () => {
+      // Why darwin-only: the guard is darwin-only, and some Linux hosts symlink /home (Fedora
+      // Silverblue maps it to /var/home), where resolving it is the correct behaviour.
+      expect(getCodexExplicitHomeHookSourcePath('/home/alice/.codex/hooks.json')).toBe(
+        '/home/alice/.codex/hooks.json'
+      )
+      // Why the torn spelling too: `dirname` of `/home//alice` is `/home/`, which must not be opened.
+      expect(getCodexExplicitHomeHookSourcePath('/home//alice/.codex/hooks.json')).toBe(
+        '/home/alice/.codex/hooks.json'
+      )
+    }
+  )
+})
