@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -121,6 +121,14 @@ export function useJiraStoryPointsEditor({
   // Why a ref as well as the state: a refusal that lands after the form was dismissed
   // has to be reported somewhere the user can still see it.
   const openRef = useRef(false)
+  // Why the cleanup: an unmount (the pane's own remount, a worktree switch) is not a
+  // dismissal, so nothing else would mark the form gone.
+  useEffect(
+    () => () => {
+      openRef.current = false
+    },
+    []
+  )
   const trimmedDraft = draft.trim()
   // Why the input is a text box parsed here: a number input reports '' for text it
   // cannot parse, so "5e" or "1." would read as an empty draft and clear the field.
