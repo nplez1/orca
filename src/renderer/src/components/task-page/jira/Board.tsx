@@ -43,14 +43,18 @@ export function TaskPageJiraBoard({
   model,
   selection,
   onUseIssueList,
-  onIssueMoved
+  onIssueMoved,
+  refreshSignal = 0
 }: {
   model: TaskPageJiraBoardModel
   selection: JiraBoardSelection
   onUseIssueList: () => void
   onIssueMoved: (issue: JiraIssue) => void
+  /** A sprint move made outside the board (the open issue's picker), which takes the
+   *  item in or out of these lists just as a row move does. */
+  refreshSignal?: number
 }): JSX.Element {
-  const board = useTaskPageJiraBoard(model, selection)
+  const board = useTaskPageJiraBoard(model, selection, refreshSignal)
   const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
     () => loadJiraBoardViewPreferences().activeView
   )

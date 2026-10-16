@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useEffect, useState, type JSX } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
@@ -742,5 +743,88 @@ describe('TaskPageJiraBoard', () => {
 
     await waitFor(() => expect(screen.queryByText('ABC-1')).toBeNull())
     expect(screen.getByText('ABC-5')).toBeTruthy()
+  })
+})
+
+describe('TaskPageJiraBoard external refresh signal', () => {
+  /** Set by `RefreshHost`'s effect so a test can raise the parent's signal. */
+  let bumpBoardRefresh: () => void = () => {}
+  /** What Jira answers for the backlog once a move has taken the item out of it. */
+  let movedToSprint = false
+  // Why counted here rather than read off mock.calls: the scope only narrows the argument.
+  let backlogFetches = 0
+
+  beforeEach(() => {
+    clearTaskPageJiraBoardCache()
+    localStorage.clear()
+    movedToSprint = false
+    backlogFetches = 0
+    // Why: a host left behind by another case must not be reachable from this one.
+    bumpBoardRefresh = () => {}
+    mocks.jiraGetBoardOverview.mockResolvedValue(boardOverview)
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) => {
+        if (request.scope === 'backlog') {
+          backlogFetches += 1
+        }
+        return Promise.resolve({
+          issues:
+            request.scope === 'backlog' ? (movedToSprint ? [] : [backlogIssue]) : [sprintIssue],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 1,
+          isLast: true
+        })
+      }
+    )
+    mocks.jiraListTransitions.mockResolvedValue([startTransition])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+  })
+
+  /** Hosts the board the way the tasks page does, so the parent can raise the signal. */
+  function RefreshHost(): JSX.Element {
+    // Why non-zero: a signal the parent raised before this board mounted must not be
+    // mistaken for a refresh request, and only a value it could not have started at
+    // can catch an implementation that forgot the guard.
+    const [signal, setSignal] = useState(3)
+    useEffect(() => {
+      bumpBoardRefresh = () => setSignal((value) => value + 1)
+    }, [])
+    return (
+      <TooltipProvider>
+        <TaskPageJiraBoard
+          model={model}
+          selection={{ boardId: '42', siteId: 'site-1' }}
+          onUseIssueList={vi.fn()}
+          onIssueMoved={vi.fn()}
+          refreshSignal={signal}
+        />
+      </TooltipProvider>
+    )
+  }
+
+  it('reloads the backlog and the overview when the tasks view signals a sprint move', async () => {
+    const user = userEvent.setup()
+    render(<RefreshHost />)
+    await screen.findByText('ABC-1 title')
+    // The signal it mounted with did not ask for a reload.
+    expect(mocks.jiraGetBoardOverview).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Backlog' }))
+    await screen.findByText('ABC-2 title')
+    const overviewCalls = mocks.jiraGetBoardOverview.mock.calls.length
+    expect(backlogFetches).toBe(1)
+
+    await act(async () => {
+      movedToSprint = true
+      bumpBoardRefresh()
+    })
+
+    // The reload, not a local removal, is what takes the moved item out of the backlog:
+    // a fetch that started but answered stale data would leave the row on screen.
+    await waitFor(() => expect(backlogFetches).toBe(2))
+    await waitFor(() => expect(screen.queryByText('ABC-2 title')).toBeNull())
+    expect(screen.getByText('No backlog issues match this filter.')).toBeTruthy()
+    expect(mocks.jiraGetBoardOverview.mock.calls.length).toBe(overviewCalls + 1)
   })
 })

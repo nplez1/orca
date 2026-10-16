@@ -142,15 +142,18 @@ function TransitionProbe({ reportsInline }: { reportsInline: boolean }): React.J
  *  optimistic patch, its rollback, and its reload are all observable. */
 function SprintProbe({
   issueKey = 'ABC-1',
-  boardSiteId = 'site-1'
+  boardSiteId = 'site-1',
+  onSprintChange
 }: {
   issueKey?: string
   boardSiteId?: string
+  onSprintChange?: () => void
 } = {}): React.JSX.Element {
   const detail = useJiraIssueWorkspaceDetail({
     issue: issueFor(issueKey),
     sprintBoard: sprintBoardFor(boardSiteId),
-    providerSettings: DEFAULT_SCOPE_SOURCE
+    providerSettings: DEFAULT_SCOPE_SOURCE,
+    onSprintChange
   })
   return (
     <div>
@@ -274,6 +277,45 @@ describe('useJiraIssueWorkspaceDetail sprint assignment', () => {
     view.rerender(<SprintProbe issueKey="ABC-2" />)
 
     expect(screen.getByTestId('sprint').textContent).toBe('none')
+  })
+
+  it('announces a committed move so the lists holding the issue reload', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([] satisfies JiraComment[])
+    mocks.jiraListAssignableUsers.mockResolvedValue([] satisfies JiraUser[])
+    mocks.jiraListPriorities.mockResolvedValue([] satisfies JiraPriority[])
+    mocks.jiraListTransitions.mockResolvedValue([] satisfies JiraTransition[])
+    mocks.jiraGetIssueSprintAssignment.mockResolvedValue(sprintAssignment)
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+    const onSprintChange = vi.fn()
+    const user = userEvent.setup()
+
+    render(<SprintProbe onSprintChange={onSprintChange} />)
+    await waitFor(() => expect(screen.getByTestId('sprint').textContent).toBe('September sprint'))
+
+    await user.click(screen.getByRole('button', { name: 'move' }))
+
+    await waitFor(() => expect(onSprintChange).toHaveBeenCalledTimes(1))
+  })
+
+  it('announces nothing when Jira rejects the move', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([] satisfies JiraComment[])
+    mocks.jiraListAssignableUsers.mockResolvedValue([] satisfies JiraUser[])
+    mocks.jiraListPriorities.mockResolvedValue([] satisfies JiraPriority[])
+    mocks.jiraListTransitions.mockResolvedValue([] satisfies JiraTransition[])
+    mocks.jiraGetIssueSprintAssignment.mockResolvedValue(sprintAssignment)
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: false, error: 'Sprint is closed' })
+    const onSprintChange = vi.fn()
+    const user = userEvent.setup()
+
+    render(<SprintProbe onSprintChange={onSprintChange} />)
+    await waitFor(() => expect(screen.getByTestId('sprint').textContent).toBe('September sprint'))
+
+    await user.click(screen.getByRole('button', { name: 'move' }))
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Sprint is closed'))
+    expect(onSprintChange).not.toHaveBeenCalled()
   })
 
   it('reads no board for an issue that belongs to another site', async () => {

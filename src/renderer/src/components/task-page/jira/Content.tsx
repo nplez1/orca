@@ -76,6 +76,7 @@ export function TaskPageJiraContent({
   } = model
   const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
+  const [jiraBoardRefreshSignal, setJiraBoardRefreshSignal] = useState(0)
   const boardSelectionRef = useRef<string | null>(null)
   const jiraBoardSelectionKey = defaultJiraBoard
     ? `${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`
@@ -87,6 +88,12 @@ export function TaskPageJiraContent({
     ) {
       setJiraDetailRefreshSignal((signal) => signal + 1)
     }
+  }
+  // Why both: a sprint move changes which list an item is in, and the surface holding that
+  // list differs by view — the board's own pages in board mode, the searched list otherwise.
+  const notifyJiraSprintChange = (): void => {
+    setJiraRefreshNonce((value) => value + 1)
+    setJiraBoardRefreshSignal((value) => value + 1)
   }
 
   useEffect(() => {
@@ -154,6 +161,7 @@ export function TaskPageJiraContent({
         selection={defaultJiraBoard}
         onUseIssueList={() => setJiraBoardViewMode('list')}
         onIssueMoved={notifyJiraIssueMoved}
+        refreshSignal={jiraBoardRefreshSignal}
       />
       <JiraIssueWorkspace
         issue={selectedJiraIssue}
@@ -163,6 +171,7 @@ export function TaskPageJiraContent({
         sourceContext={jiraDetailSourceContext}
         sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
+        onSprintChange={notifyJiraSprintChange}
       />
     </>
   ) : (
@@ -318,6 +327,7 @@ export function TaskPageJiraContent({
         sourceContext={jiraDetailSourceContext}
         sprintBoard={defaultJiraBoard}
         refreshSignal={jiraDetailRefreshSignal}
+        onSprintChange={notifyJiraSprintChange}
       />
     </div>
   )
