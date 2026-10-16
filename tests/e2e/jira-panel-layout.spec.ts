@@ -72,7 +72,15 @@ test('Jira titles and sort headings adapt to panel width inside a wide window', 
 
   const title = orcaPage.getByRole('heading', { name: ISSUE_TITLE })
   await expect(title).toBeVisible()
-  for (const width of [500, 780, 1050, 1320]) {
+  // Why the md step measures 860 rather than this test's original 780: this fork shows
+  // the story-points column by default, which widens the row's minimum to 830px at the
+  // md tier and 1032px at the lg tier (measured in the app), so a panel just above the
+  // 768/1024 breakpoints (roughly 768-842, 1024-1049) now scrolls sideways by up to 63px.
+  // 860 is still the md tier and is wide enough for the default set to fit, which is what
+  // the fit check below asserts; 780 only ever asserted the title floor, and its original
+  // 200px expectation already failed there with upstream's columns on a machine with a
+  // stable scrollbar gutter (189px measured).
+  for (const width of [500, 860, 1050, 1320]) {
     await title.evaluate((element, width) => {
       const host =
         element.closest('[role="button"]')?.parentElement?.parentElement?.parentElement
@@ -83,16 +91,30 @@ test('Jira titles and sort headings adapt to panel width inside a wide window', 
       host.style.width = `${width}px`
       host.style.maxWidth = 'none'
     }, width)
-    // Why the floor at the md and lg steps instead of this test's original 200px: this
-    // fork shows the story-points column by default, which spends 72px of fixed tracks
-    // at the widths where the full column set fills the row, so the title lands on the
-    // grid's own minmax(180px, 1fr) floor (measured 180 at 780 and 185 at 1050, against
-    // 337 at 500 and 367 at 1320). It still guards the floor, and the fixed tracks below
-    // are unchanged.
+    // Why the md and lg steps assert the grid's own title floor rather than the 200px
+    // this test was calibrated on: with the points column on by default the row's minimum
+    // is 830px at md and 1032px at lg, so the title sits on minmax(180px, 1fr) there —
+    // measured 180 at 860 and 185 at 1050, against 337 at 500 and 367 at 1320. The floor
+    // is still what the readable-title guarantee means at those widths.
     const minimumTitleWidth = width >= 768 && width < 1280 ? 180 : 200
     await expect
       .poll(() => title.evaluate((element) => element.getBoundingClientRect().width))
       .toBeGreaterThanOrEqual(minimumTitleWidth)
+    // And the row has to fit where the default column set should: the two ends, and the md
+    // step above. 1050 sits exactly on the lg minimum (1037 needed, 1037 visible), so its
+    // fit is left to the title floor rather than asserted on a zero-pixel margin.
+    if (width !== 1050) {
+      expect(
+        await title.evaluate((element) => {
+          const row = element.closest('[role="button"]')
+          const scroll = row?.parentElement?.parentElement?.parentElement?.parentElement
+          if (!(row instanceof HTMLElement) || !(scroll instanceof HTMLElement)) {
+            throw new Error('Jira list scroll container unavailable')
+          }
+          return scroll.scrollWidth - scroll.clientWidth
+        })
+      ).toBeLessThanOrEqual(0)
+    }
     const mobileSort = orcaPage.getByTestId('jira-mobile-sort-controls')
     const assignee = orcaPage.getByRole('button', { name: 'Assignee', exact: true })
     await (width < 768 ? expect(mobileSort).toBeVisible() : expect(mobileSort).toBeHidden())
