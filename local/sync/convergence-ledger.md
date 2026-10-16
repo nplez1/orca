@@ -65,6 +65,14 @@ stores use upstream's factory (`providerLabel`/`logScope`, not `description`/`lo
 **Do not:** reintroduce a second factory, or a store that throws a plain decrypt error for a
 transient read failure.
 
+
+**2026-10-16 addendum.** Both sides replaced Electron's `safeStorage` in the same files, so the
+merge is upstream's `getSecretStore()` shape plus the fork's own rules: the sealed-envelope-only
+port consultation, the "secret encryption unavailable" wording, and `adoptLegacyHomeStore()` for
+the home-directory identity. Where upstream left a test on a per-suite `setSecretStore({...})` call,
+the fork's `secretStoreMock` const plus `_resetSecretStoreForTests()` is kept instead — it was
+already the port, and it resets between cases rather than only setting up.
+
 ---
 
 ## Repo detection and local Git children
@@ -251,6 +259,24 @@ then stays in the live set until the descendant lane's quiet-reap window retract
 **Do not:** let a union duplicate a member (the concatenation repeats the shared ones), or drop the
 `disabled.has(...)` gate when re-seating a provider.
 
+
+**2026-10-16 addendum.** Upstream extracted the desktop's inline account-service construction into
+`createProviderAccountServices`, which the desktop and orcad both call. The fork's additions moved
+with it rather than staying behind in `main-process-account-services.ts`: the DeepSeek, Fireworks
+and Copilot config resolvers, the `disabledUsageProviders` gate on `RateLimitService`'s
+construction, the enable/disable settings hook, and the `gh auth status` warm-up gated on Copilot
+being enabled. Keeping them at the desktop call site was the alternative and was rejected: the
+resolvers define the providers' credentials, and upstream's module is the one place that knows how
+a host builds the usage service.
+
+That move is what turned the runtime-electron ratchet red, because orcad now reaches
+`RateLimitService`. The two fork fetchers that imported `net` from Electron read the host HTTP port
+instead (`getMainHttpClient()`, the way the Gemini and Kimi fetchers already do); their suites
+install the port rather than a fake `electron` module.
+
+Do not put an Electron import back into any fetcher reachable from `createProviderAccountServices`:
+the runtime, orcad and the structured-chat lanes must boot on plain Node.
+
 ---
 
 ## AI Vault session index and the parse cache
@@ -270,6 +296,23 @@ gone), and two meanings under one number silently replay wrong rows.
 
 **Do not:** reintroduce `AiVaultWorkerScanOptions` or a second schema constant.
 
+
+**2026-10-16 addendum.** Upstream and the fork both extended the same third parameter of
+`scanAiVaultSessionsInService` in one sync — upstream with the scan-progress handle (#28788), the
+fork with `request: { refresh, query }`. Both are kept: the request is the third argument, the
+progress handle the fourth, and `scanAiVaultSessionsInBackground` forwards both. `work` is
+upstream's final tally and the fork's index-first path reports `work: null`, because an answer from
+`sessionSearch.listSessions` runs no scan to tally.
+
+The fork's query rule now lives inside upstream's helpers rather than beside them: upstream
+replaced the fork's inline cache key with `aiVaultLocalScanScopeKey`/`aiVaultLocalScanKey`, and
+`aiVaultLocalScanScopeKey` carries `aiVaultHostListQuery(args?.query ?? '')`. That keeps the cache
+key, the coordinator key and the renderer's `requestedScanKey` in agreement — a query in the cache
+key but not the coordinator key would let a filtered request coalesce onto an unfiltered scan.
+
+Do not add a fifth parameter here; the two sides of the seam are request and progress, and either
+one silently dropped reports success with the wrong rows or no progress.
+
 ---
 
 ## Accounts settings, search catalogs, provider panes
@@ -285,6 +328,14 @@ or a GLMT plan section needs those `window.api` doubles in its test.
 to stay inside it, and no `max-lines` suppression is allowed.
 
 **Do not:** add a `max-lines` disable, or inline a credential section back into `AccountsPane.tsx`.
+
+
+**2026-10-16 addendum.** Upstream's "trim redundant tests" pass (#29156) deleted
+`accounts-pane-claude-section.test.tsx` and moved both of its cases into `AccountsPane.test.tsx`,
+so the deletion is taken and the fork's only contribution there — the DeepSeek/Fireworks/Copilot
+fields its section model needed — is re-applied to upstream's consolidated file. The same pass
+turned `tui-agent-startup.test.ts` into an import barrel over new `.spec.ts` files, so the fork's
+`orca-np` launch expectations moved into `tui-agent-startup.spec.ts`.
 
 ---
 
@@ -528,6 +579,13 @@ now describe guards upstream retired.
 **Do not:** re-add a deleted inventory to carry one fork entry; add the assertion to a surviving test
 instead.
 
+
+**2026-10-16 addendum.** Two more of upstream's consolidations were taken with the fork's content
+re-homed rather than restored: `accounts-pane-claude-section.test.tsx` (deleted; both cases live in
+`AccountsPane.test.tsx`) and the `tui-agent-startup` suite split into `.spec.ts` files under a
+barrel. The barrel's own `.test.ts` extension is upstream's and stays. Twenty `.test.ts` →
+`.spec.ts` renames landed the same way; none carried fork content, which is why none conflicted.
+
 ---
 
 ## Node-runtime test inclusion
@@ -713,6 +771,16 @@ fork lines (`export * from './runtime-protocol-versions'`, the `HOST_SETTINGS_RE
 sync overflowed `src/renderer/src/runtime/runtime-jira-client.ts` by 8 lines, so `jiraListEditFields`
 now lives in `runtime-jira-detail-client.ts` as `jiraListEditFieldsForTarget` and is re-exported —
 mirroring upstream's own split of that file.
+
+
+**2026-10-16 addendum.** `src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts`
+overflowed the `.ts` budget by 26 lines once the fork's same-branch merge was re-expressed on
+upstream's `buildSidebarRowPlan` shape, and the pre-commit hook caught it before the merge commit
+existed. Split, per the standing remedy: `rendered-sidebar-row-keys.ts` took the rendered-row key
+collector and `use-merged-sidebar-rows.ts` took the merge policy plus its dependency list, leaving
+`use-section-rows.ts` at 295 raw lines. This is the same shape as the five splits of the
+2026-10-15 sync — upstream keeps a file at the budget, so the fork's addition is the line that
+moves.
 
 ---
 
@@ -942,3 +1010,32 @@ the other four helpers are byte-identical and `isNestedWorktreePath` / `getNeste
 are the two upstream moved into the nested-worktrees module.
 
 **Do not:** re-add a fork-local copy of those helpers; import upstream's.
+
+---
+
+## Quality ratchets: runtime-electron, ts-nocheck, focus-read
+
+**Paths:** `config/ts-nocheck-baseline.txt`, `config/focus-setting-read-baseline.txt`, `config/scripts/check-runtime-electron-ratchet.mjs`
+
+**2026-10-16 addendum.** Three quality ratchets had to be settled, and the distinction between them
+is the point: two were already red at the pre-sync tip and one was this sync's.
+
+- **runtime-electron was this sync's, and is fixed.** Upstream's `createProviderAccountServices`
+  makes orcad build `RateLimitService`, which statically reaches the fork's DeepSeek and Fireworks
+  fetchers; both imported `net` from Electron. They now read the host HTTP port. Re-run at
+  `e27bc2efbf` the ratchet is green, at HEAD it was red, so this one is on the sync.
+- **ts-nocheck and focus-read were pre-existing, and are recorded.** Both reproduce identically at
+  the pre-sync tip in a fresh worktree. `workspace-process-listing.ts` gained `@ts-nocheck` in the
+  2026-10-15 sync, when its base class was re-pointed at the fork's `OrcaRuntimeWithSetupRunnerState`
+  (that mixin carries `armWorktreeSetupRunner`/`reapWorktreeSetupRunnerState` for the whole chain —
+  dropping it breaks ~40 concrete classes, verified by trying), which leaves seven members provided
+  later in the chain as forward references. The five Jira focus-read files are the owner-routing
+  follow-up the ledger already carries for five other files.
+
+Both baseline entries name their cause and their date. Do not add a ratchet entry without that, and
+do not "fix" either by bumping a count: the ts-nocheck entry exists to be removed once the seven
+members are declared, and the focus-read counts exist to fall as the owner routing lands. **This is
+also why `local/sync/post-sync.mjs` should run `verify:localization-catalogs`** — its dotted-key
+check is what would have caught the stray top-level `settings.appearance.chat.title` that the
+previous merge's union left beside the nested object, and post-sync's three localization checks do
+not include it.

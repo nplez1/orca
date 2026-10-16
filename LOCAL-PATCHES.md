@@ -343,6 +343,114 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-16 — merge of upstream `ac015cd3b2` (60 commits) into the release line, from
+  `e27bc2efbf`** (merge base `e8c7b32a90`, merge `ae9db02137`, backup
+  `backup/nplez1-main-pre-sync`, rollback tag `archive/pre-sync-e27bc2efbf`). The line was
+  fast-forwarded to `ac70d2bad0` first, so the seven merged PRs (#113, #114, #116, #120, #121,
+  #122, #123) ship in this release. The upstream-branch workflow left `origin/main` where it
+  was.
+
+  Pre-flight failed once, on the derived runtime-required English catalog: two post-sync Jira
+  cleanups dropped the literal-default call sites for `jira.copy.actions`, `jira.copy.context`
+  and `jira.workspace.openFailed` without regenerating it, and the generator keeps every
+  `en.json` entry no call site carries a literal default for. Regenerating it (`e27bc2efbf`) was
+  the gate's required state. The drift predates this sync — neither commit (`9e8e83bef8`,
+  `8932ce3b1a`) is in it — and no commit pulled in today touched either file.
+
+  The merge produced **31 conflicted paths** — `both-rewrote 24, union 5, modify/delete 1,
+  rename-replay 1` — the same 31 the dry run named. Upstream's window was mostly the AI Vault
+  scan-progress work (#28788, #29126), a provider-account-services extraction, the credential
+  stores moving onto a `SecretStore` port, a runtime mixin rework, and the "trim redundant
+  tests" consolidation (#29156).
+
+  - **The AI Vault scan seam gained a parameter on both sides.** Upstream put a progress handle
+    where the fork put `request: { refresh, query }` — the same third argument of
+    `scanAiVaultSessionsInService`. Both are kept, request third and progress fourth, and
+    `cached-session-list.ts` passes both. Everything else about the scan follows upstream:
+    `scanReportingProgress` returns upstream's `{ result, work }`, and the fork's index-first
+    listing answers from `sessionSearch.listSessions` when it can, falling back to the scan with
+    `work: null` — an indexed list runs no scan, so there is no tally to report.
+  - **The query is part of the scan's scope key, inside upstream's helper.** Upstream replaced
+    the fork's inline key with `aiVaultLocalScanScopeKey`/`aiVaultLocalScanKey`; the fork's rule
+    (a filtered listing must never be served for an unfiltered request) is re-expressed in
+    `aiVaultLocalScanScopeKey`, so the cache key and the coordinator key still agree and the
+    renderer's `requestedScanKey` still matches the host's.
+  - **The fork's provider wiring moved onto upstream's extracted module.** Upstream pulled the
+    desktop's inline account-service construction into `createProviderAccountServices`, which
+    the desktop and orcad share. The fork's DeepSeek/Fireworks/Copilot config resolvers, the
+    `disabledUsageProviders` gate on `RateLimitService`'s construction, the enable/disable
+    settings hook and the gated `gh auth status` warm-up moved with it, so both entry points get
+    them. **This is what turned the runtime-electron ratchet red** (below).
+  - **The credential stores converged on the `SecretStore` port.** Both sides replaced Electron's
+    `safeStorage` in the same files. Upstream's inline `getSecretStore()` calls are kept, with
+    the fork's sealed-vs-plaintext rule, its "secret encryption unavailable" wording and its
+    `adoptLegacyHomeStore()` identity intact. The fork's test mocks — a plain `secretStoreMock`
+    plus `_resetSecretStoreForTests()` — are kept over upstream's per-suite `setSecretStore`
+    calls, because they were already the port and they reset.
+  - **Upstream's test consolidation was taken, with the fork's expectations re-homed.**
+    `accounts-pane-claude-section.test.tsx` is deleted (both of its cases now live in
+    `AccountsPane.test.tsx`), and `tui-agent-startup.test.ts` became an import barrel over
+    upstream's new `.spec.ts` files, so the fork's `orca-np` launch expectations moved into
+    `tui-agent-startup.spec.ts`. The test names are upstream's; only the expected command and
+    two SSH-relay comments are the fork's.
+  - **`use-section-rows.ts` was split, not raised.** Upstream keeps it at the `max-lines` budget,
+    so the fork's same-branch merge overflowed it and the commit hook caught it. The
+    rendered-row key collector moved to `rendered-sidebar-row-keys.ts` and the merge policy to
+    `use-merged-sidebar-rows.ts` — the ledger's standing remedy.
+  - **The breaks no conflict marker showed, all repaired (`96824ecfd7`).** `pnpm tc` found four:
+    the scan signal passed twice, after the resolution put two arguments side by side;
+    `AccountsPane.test.tsx` needing the fork's provider fields on its section model; upstream
+    removing `WorktreeRow.lineageTrail` under three fork fixtures; and upstream's own new
+    account-label test using the identifier `issue`, which the fork's half of that file had
+    renamed to `linkedIssue` for its `issue()` helper — upstream's test text resolved to a
+    function.
+  - **The full lint chain was red, three items of it before this sync (`e3fc6d2e1c`).** `pnpm
+    lint` is a wider gate than post-sync's three localization/type checks, and at the pre-sync
+    tip it was already red on the ts-nocheck ratchet
+    (`workspace-process-listing.ts`, from the 2026-10-15 sync's mixin base-class swap) and on the
+    focus-read ratchet (five Jira files). Both were re-run at `e27bc2efbf` in a fresh worktree
+    and reproduce identically there; both are now recorded in their baselines with a dated note
+    and their reason, and the typing fix behind the ts-nocheck one is a named follow-up. The
+    third red was **this sync's**: upstream's `provider-account-services` extraction makes orcad
+    build `RateLimitService`, which statically reaches the fork's DeepSeek and Fireworks
+    fetchers, and those imported `net` from Electron directly. Both now read the host HTTP port
+    the way the Gemini and Kimi fetchers already do (`getMainHttpClient()`), which the ratchet
+    accepts and both provider suites still pass; their own suites install the port instead of a
+    fake `electron` module (`6424ea5833`). The catalogs verifier's red was the previous merge's:
+    a stray top-level `settings.appearance.chat.title` dotted key left beside the nested object
+    upstream had already moved it into.
+  - **One failure proved not ours, the way this section asks for it.**
+    `src/main/ai-vault-search/session-search-file-write.test.ts` ("clears a stale lineage when a
+    re-read says the session is a root") fails identically at the pre-sync tip `e27bc2efbf` in a
+    fresh worktree — 1 of its 25 cases, leaving a stale `subagent_parent_session_id` in the
+    index. Every module it imports is byte-identical to the pre-sync tip and this sync did not
+    touch `src/main/ai-vault-search/`, so it is recorded rather than chased.
+  - **What the run produced.** post-sync passed all ten gates (conflict markers, the identity
+    sweep with 1168 report-only findings, the derived catalog regenerating to no diff, both
+    localization verifiers, the builder config, the update-feed references, the deleted-module
+    surface scan, oxlint and `pnpm tc`); the changed-code quality gate reports 0 findings across
+    940 changed files; `pnpm lint` is green end to end; and the touched areas' suites ran 4,592
+    tests — 4,573 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
+    bundle fence was not re-measured**: `mobile/node_modules` is not installed here, so
+    `pnpm build:mobile-web` cannot run. Its only input, `mobile-web-page-routes.mjs`, was
+    touched by neither side in this range (diffed against `e27bc2efbf` and `ac015cd3b2`), so the
+    sweep is not staled — but the per-route script counts against the four-script margin are
+    unmeasured on this tree.
+  - **The full `pnpm test` run still does not complete in this environment, and the release says
+    so.** Unchanged from the 2026-10-15 entry: the runner stalls at 0% CPU with no summary, the
+    file that holds the worker open passes its assertions and never releases it, and it is
+    pre-existing (reproduced with two reporters and under sharding). It is being tracked as its
+    own work in the separate `hunt-vitest-nonexit` worktree, and this release does not block on
+    it.
+  - **Follow-ups opened by this sync, by name.** (1) Remove
+    `src/main/runtime/workspaces/workspace-process-listing.ts`'s `@ts-nocheck` by declaring the
+    seven members it forward-references from later in the mixin chain, then prune its baseline
+    entry. (2) Route the fork's remaining Jira `activeRuntimeEnvironmentId` reads through the
+    resource owner; the focus-read baseline now records five more files, dated. (3) The port hop
+    is done for the two fetchers this sync exposed — check the other fork-only rate-limit paths
+    the same way. (4) `local/sync/post-sync.mjs` should run `verify:localization-catalogs` too:
+    its dotted-key check is what would have caught the previous merge's stray key.
+
 - **2026-10-15 — merge of upstream `e8c7b32a90` (311 commits) into the release line, from
   `bb043b9724`** (merge base `8b0fa15e943b`, backup `backup/nplez1-main-pre-sync`, rollback tag
   `archive/pre-sync-bb043b9724`). The upstream-branch workflow still leaves `origin/main` where it

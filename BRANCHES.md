@@ -1,16 +1,23 @@
 # Branch tracker
 
-Last updated **2026-10-15** — `nplez1/main` merged upstream main @ `e8c7b32a90` (311 commits) into
-the release line from `bb043b9724` (merge `79d7351d64`, backup `backup/nplez1-main-pre-sync`,
-rollback tag `archive/pre-sync-bb043b9724`). 88 conflicted paths, and the convergence was the fork's
-**Jira product line**: upstream spent the same window building the assignee search, board, sprint
-filter, planning columns and linked-workspace views this fork built, so the two lines converged per
-capability rather than per feature (see [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
-§ The Jira product line). The breaks no conflict marker showed, all repaired: two `JiraApiError`
-classes, an orphaned `searchWorkspacePathNameFilter`, a runtime mixin upstream made abstract, an
-upstream field dropped from `PersistedUIState` (plus the exhaustiveness maps upstream's sweeps
-require), and five `max-lines` overflows. See [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)
-for how a sync is done and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what this one cost.
+Last updated **2026-10-16** — `nplez1/main` merged upstream main @ `ac015cd3b2` (60 commits) into
+the release line from `e27bc2efbf` (merge `ae9db02137`, backup `backup/nplez1-main-pre-sync`,
+rollback tag `archive/pre-sync-e27bc2efbf`). 31 conflicted paths, and the convergence was three
+seams rather than one product line: the **AI Vault scan gained a parameter on both sides**
+(upstream's progress handle and the fork's `refresh`/`query` request share the same third argument,
+so the merged signature carries both), the **fork's provider wiring moved onto upstream's extracted
+`createProviderAccountServices`** (DeepSeek/Fireworks/Copilot resolvers and the disabled-provider
+gate, because that module is what the desktop and orcad both build the usage service from), and the
+**credential stores converged on the `SecretStore` port**, upstream's shape with the fork's
+sealed-envelope rule, wording and home-directory identity. See
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) for the decisions. The breaks
+no conflict marker showed, all repaired: the scan signal passed twice, the fork's provider fields
+missing from upstream's consolidated `AccountsPane.test.tsx`, three row fixtures still setting a
+field upstream removed, and upstream's own new test resolving to a fork helper's name. One
+`max-lines` overflow was split rather than capped, and the full lint chain — wider than post-sync's
+checks — was red on three ratchets, one of them this sync's. See
+[UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how a sync is done and
+[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what this one cost.
 
 **Branch measurements could not be re-taken in this worktree.** The PR-bound branches are not
 fetched here, so `node local/branch-status.mjs` reports every one as `MISSING locally` and the
@@ -76,6 +83,11 @@ that `terminal-session-reconnect` adds. Splitting it further would mean duplicat
 dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
+
+**2026-10-16:** the same two fork PRs (`#109`, `#110`) are still open and now sit two syncs behind:
+they were cut before the 2026-10-15 sync, and `nplez1/main` has since moved to `ae9db02137` plus
+this sync's repairs. Neither was rebased. `#20813` and every unopened branch below are where the
+2026-10-13 measurements left them — re-measure rather than trusting a figure in this file.
 
 **2026-10-15:** two fork PRs are open against `nplez1/main` and were cut before this sync, so they now
 sit on `bb043b9724` and need a catch-up merge before they can be updated — `#109`
