@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { JiraIssueAssigneeControl } from '@/components/jira-issue-assignee-control'
 import { JiraSprintPicker, backlogLabel, sprintTriggerLabel } from '@/components/jira-sprint-picker'
+import { JiraIssueStoryPointsControl } from '@/components/jira-issue-story-points-control'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { JiraIssueTransitionControl } from './jira-issue-transition-control'
@@ -223,6 +224,13 @@ export function JiraIssueMetadataBar({
             </button>
           </JiraSprintPicker>
         ) : null}
+
+        <JiraIssueStoryPointsControl
+          displayed={displayed}
+          editFields={editFields}
+          pendingField={pendingField}
+          mutateIssue={mutateIssue}
+        />
 
         <Button
           type="button"
