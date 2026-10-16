@@ -4,7 +4,7 @@
 # get CI green; fix the types instead.
 # Regenerate/prune: pnpm check:ts-nocheck-ratchet --prune   (removes stale entries only)
 #
-# 2026-10-17: workspace-process-listing.ts re-pointed its base class at the fork's
+# 2026-10-16: workspace-process-listing.ts re-pointed its base class at the fork's
 # OrcaRuntimeWithSetupRunnerState in the 2026-10-15 sync (that mixin carries
 # armWorktreeSetupRunner/reapWorktreeSetupRunnerState for the whole chain, and dropping
 # it breaks ~40 concrete classes), which leaves seven members provided later in the mixin
