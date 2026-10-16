@@ -253,6 +253,43 @@ describe('TaskPageJiraBoard', () => {
     expect(await screen.findByText('ABC-9 title')).toBeTruthy()
   })
 
+  it('keeps an issue the viewer holds a role on and drops one they only reported', async () => {
+    const user = userEvent.setup()
+    const roleIssue = issue('ABC-4', '1', {
+      assignee: { accountId: 'viewer-2', displayName: 'Grace' },
+      roleAssignees: [{ accountId: 'viewer-1', displayName: 'Ada' }]
+    })
+    const reportedIssue = issue('ABC-6', '1', {
+      assignee: { accountId: 'viewer-2', displayName: 'Grace' },
+      reporter: { accountId: 'viewer-1', displayName: 'Ada' }
+    })
+    mocks.jiraListBoardIssues.mockImplementation(
+      (_settings: unknown, request: JiraBoardIssuePageRequest) =>
+        Promise.resolve({
+          issues:
+            request.scope === 'backlog'
+              ? [backlogIssue]
+              : [sprintIssue, otherAssigneeIssue, roleIssue, reportedIssue],
+          startAt: request.startAt ?? 0,
+          nextPageToken: null,
+          total: 4,
+          isLast: true
+        })
+    )
+    renderBoard()
+
+    // The board opens on the viewer's own work, which is any role they hold — not only
+    // the assignee, and never just having filed the issue.
+    expect(await screen.findByText('ABC-4 title')).toBeTruthy()
+    expect(screen.getByText('ABC-1 title')).toBeTruthy()
+    expect(screen.queryByText('ABC-6 title')).toBeNull()
+    expect(screen.queryByText('ABC-9 title')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(await screen.findByText('ABC-6 title')).toBeTruthy()
+    expect(screen.getByText('ABC-9 title')).toBeTruthy()
+  })
+
   it('shows every issue when the board site has no resolvable viewer account', async () => {
     renderBoard({
       model: {

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
-import { getAgileFieldIds, pickAgileFieldIds } from './jira-agile-fields'
+import {
+  getAgileFieldIds,
+  getBoardJiraFieldSelection,
+  pickAgileFieldIds,
+  pickJiraFieldSelection
+} from './jira-agile-fields'
 import { mapJiraIssue, mapSprint } from './jira-issue-mapping'
 import type { JiraSite } from '../../shared/jira-types'
 
@@ -201,6 +206,49 @@ describe('jira agile fields', () => {
     })
   })
 
+  it('picks the user-picker custom fields as role fields and skips the system user fields', () => {
+    const userPicker = 'com.atlassian.jira.plugin.system.customfieldtypes:userpicker'
+    const multiUserPicker = 'com.atlassian.jira.plugin.system.customfieldtypes:multiuserpicker'
+    expect(
+      pickJiraFieldSelection([
+        { id: 'assignee', name: 'Assignee', schema: { type: 'user' } },
+        { id: 'reporter', name: 'Reporter', schema: { type: 'user' } },
+        { id: 'creator', name: 'Creator', schema: { type: 'user' } },
+        { id: 'customfield_11', name: 'Dev', schema: { type: 'user', custom: userPicker } },
+        { id: 'customfield_12', name: 'QE', schema: { type: 'user', custom: userPicker } },
+        // A person list names roles too, and a site may well model QE that way.
+        {
+          id: 'customfield_13',
+          name: 'QEs',
+          schema: { type: 'array', items: 'user', custom: multiUserPicker }
+        },
+        // A string list is not a person the filter could ever match.
+        { id: 'customfield_15', name: 'Components', schema: { type: 'array', items: 'string' } },
+        // JSM's own person lists are not roles: a request participant is copied in.
+        {
+          id: 'customfield_16',
+          name: 'Request participants',
+          schema: {
+            type: 'array',
+            items: 'user',
+            custom: 'com.atlassian.servicedesk:sd-request-participants'
+          }
+        },
+        // Same field repeated by a two-page catalog must not double the request.
+        { id: 'customfield_11', name: 'Dev', schema: { type: 'user', custom: userPicker } },
+        { id: '', name: 'Dev', schema: { type: 'user', custom: userPicker } },
+        {
+          id: 'customfield_14',
+          name: 'Sprint',
+          schema: { custom: 'com.pyxis.greenhopper.jira:gh-sprint' }
+        }
+      ])
+    ).toEqual({
+      agile: { sprint: 'customfield_14' },
+      roleFields: ['customfield_11', 'customfield_12', 'customfield_13']
+    })
+  })
+
   it('maps parent, estimates and agile custom fields onto the issue', () => {
     const issue = mapJiraIssue(
       site,
@@ -224,5 +272,69 @@ describe('jira agile fields', () => {
     expect(issue.remainingEstimateSeconds).toBe(3600)
     expect(issue.sprint).toBe('Sprint 2')
     expect(issue.storyPoints).toBe(5)
+  })
+
+  it('maps the role holders, and tells "nobody holds one" from "never asked"', () => {
+    const raw = {
+      id: '1',
+      key: 'ALP-1',
+      fields: {
+        summary: 'Story',
+        assignee: { accountId: 'account-ada', displayName: 'Ada' },
+        reporter: { accountId: 'account-reporter', displayName: 'Grace' },
+        customfield_11: { accountId: 'account-dev', displayName: 'Dev Name' },
+        // Dev Name holds the list field too, so one person in two roles counts once.
+        customfield_13: [
+          { accountId: 'account-dev', displayName: 'Dev Name' },
+          { accountId: 'account-lint', displayName: 'Lint' }
+        ],
+        customfield_12: null
+      }
+    }
+
+    expect(
+      mapJiraIssue(site, raw, undefined, {
+        roleFields: ['customfield_11', 'customfield_12', 'customfield_13']
+      })
+    ).toMatchObject({
+      assignee: { accountId: 'account-ada' },
+      reporter: { accountId: 'account-reporter' },
+      roleAssignees: [
+        { accountId: 'account-dev', displayName: 'Dev Name' },
+        { accountId: 'account-lint', displayName: 'Lint' }
+      ]
+    })
+    // Asked, and unset: an empty role field is not a role holder.
+    expect(
+      mapJiraIssue(site, raw, undefined, { roleFields: ['customfield_12'] }).roleAssignees
+    ).toEqual([])
+    // Never asked for any: absent, so it cannot be read as "nobody holds one".
+    expect(mapJiraIssue(site, raw).roleAssignees).toBeUndefined()
+  })
+
+  describe('getBoardJiraFieldSelection', () => {
+    beforeEach(() => {
+      jiraRequestMock.mockReset()
+      acquireMock.mockClear()
+      releaseMock.mockClear()
+    })
+
+    it('keeps waiting past the optional patience for a caller that needs the catalog', async () => {
+      vi.useFakeTimers()
+      try {
+        const response = Promise.withResolvers<unknown[]>()
+        jiraRequestMock.mockReturnValue(response.promise)
+        const read = getBoardJiraFieldSelection(clientFor('board-patient-site'))
+
+        await vi.advanceTimersByTimeAsync(500)
+        expect(jiraRequestMock.mock.calls[0]?.[2].signal.aborted).toBe(false)
+
+        response.resolve([{ id: 'customfield_9', name: 'Dev', schema: { type: 'user' } }])
+        expect(await read).toEqual({ agile: {}, roleFields: ['customfield_9'] })
+        expect(releaseMock).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

@@ -33,6 +33,19 @@ export function getTaskPageJiraBoardViewerAccountId(
   return status.activeSiteId === siteId ? (status.viewer?.accountId ?? null) : null
 }
 
+/** Every role an issue names by a person field: the assignee, plus the Dev/QE-style
+ *  user-picker custom fields. Reporting an issue is not a role, so `reporter` — and
+ *  the creator behind it — is deliberately not one of them. */
+function issueRoleAccountIds(issue: JiraIssue): string[] {
+  const accountIds: string[] = []
+  for (const person of [issue.assignee, ...(issue.roleAssignees ?? [])]) {
+    if (person) {
+      accountIds.push(person.accountId)
+    }
+  }
+  return accountIds
+}
+
 export function filterTaskPageJiraBoardIssues(
   issues: readonly JiraIssue[],
   filter: TaskPageJiraBoardFilter,
@@ -45,7 +58,7 @@ export function filterTaskPageJiraBoardIssues(
     return issues.filter((issue) => !issue.assignee)
   }
   return viewerAccountId
-    ? issues.filter((issue) => issue.assignee?.accountId === viewerAccountId)
+    ? issues.filter((issue) => issueRoleAccountIds(issue).includes(viewerAccountId))
     : []
 }
 

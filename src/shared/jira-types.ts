@@ -199,6 +199,9 @@ export type JiraIssue = {
   labels: string[]
   assignee?: JiraUser
   reporter?: JiraUser
+  /** Users holding one of the issue's user-picker custom fields — the site's Dev/QE
+   *  roles. Absent when those fields were never read; `[]` when nobody holds one. */
+  roleAssignees?: JiraUser[]
   priority?: JiraPriority
   /** Parent issue (epic for stories, parent story for subtasks). */
   parent?: { key: string; title: string; issueTypeName?: string }
