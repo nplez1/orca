@@ -167,6 +167,16 @@ export function JiraStoryPointsEditorForm({
   editor: JiraStoryPointsEditor
 }): React.JSX.Element {
   const messageId = useId()
+  // Why conditional: nothing to describe means no described-by, so the input is not
+  // pointed at an empty message.
+  const message = editor.invalid
+    ? translate('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')
+    : editor.points === undefined
+      ? null
+      : translate(
+          'auto.components.JiraIssueStoryPointsControl.clearHint',
+          'An empty value clears the field.'
+        )
   return (
     <form
       className="flex flex-col gap-2"
@@ -180,7 +190,7 @@ export function JiraStoryPointsEditorForm({
         inputMode="decimal"
         autoFocus
         aria-label={jiraStoryPointsFieldLabel()}
-        aria-describedby={messageId}
+        aria-describedby={message ? messageId : undefined}
         value={editor.draft}
         // Why read-only rather than disabled: a disabled field loses focus part-way
         // through a save, so the user would have to click back in to fix a refusal.
@@ -188,20 +198,16 @@ export function JiraStoryPointsEditorForm({
         aria-invalid={editor.invalid || undefined}
         onChange={(event) => editor.setDraft(event.target.value)}
       />
-      {editor.invalid ? (
-        <p id={messageId} className="text-[11px] text-destructive">
-          {translate('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')}
+      {message ? (
+        <p
+          id={messageId}
+          className={
+            editor.invalid ? 'text-[11px] text-destructive' : 'text-[11px] text-muted-foreground'
+          }
+        >
+          {message}
         </p>
-      ) : editor.points === undefined ? (
-        <span id={messageId} />
-      ) : (
-        <p id={messageId} className="text-[11px] text-muted-foreground">
-          {translate(
-            'auto.components.JiraIssueStoryPointsControl.clearHint',
-            'An empty value clears the field.'
-          )}
-        </p>
-      )}
+      ) : null}
       <div className="flex justify-end gap-1.5">
         <Button
           type="button"

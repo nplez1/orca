@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira-types'
 import { JiraLinkedIssuePane } from './JiraLinkedIssuePane'
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   jiraGetIssue: vi.fn(),
   jiraIssueComments: vi.fn(),
   jiraListAssignableUsers: vi.fn(),
+  jiraListEditFields: vi.fn(),
   jiraListPriorities: vi.fn(),
   jiraListTransitions: vi.fn(),
   jiraUpdateIssue: vi.fn(),
@@ -35,7 +36,7 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListAssignableUsers: (...args: unknown[]) => mocks.jiraListAssignableUsers(...args),
   jiraListPriorities: (...args: unknown[]) => mocks.jiraListPriorities(...args),
   jiraListTransitions: (...args: unknown[]) => mocks.jiraListTransitions(...args),
-  jiraListEditFields: async () => [],
+  jiraListEditFields: (...args: unknown[]) => mocks.jiraListEditFields(...args),
   jiraUpdateIssue: (...args: unknown[]) => mocks.jiraUpdateIssue(...args),
   jiraSearchUsers: (...args: unknown[]) => mocks.jiraSearchUsers(...args),
   jiraAddIssueComment: (...args: unknown[]) => mocks.jiraAddIssueComment(...args)
@@ -86,6 +87,10 @@ function issue(): JiraIssue {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+beforeEach(() => {
+  mocks.jiraListEditFields.mockResolvedValue([])
 })
 
 describe('JiraLinkedIssuePane', () => {
@@ -149,6 +154,37 @@ describe('JiraLinkedIssuePane', () => {
       )
     )
     expect(await screen.findByText('Looks good to me')).toBeTruthy()
+  })
+
+  it('shows the points row for an issue whose points Jira lets this user write', async () => {
+    mocks.jiraGetIssue.mockResolvedValue({ ...issue(), storyPoints: 5, storyPointsFieldId: 'cf' })
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([])
+    mocks.jiraListEditFields.mockResolvedValue([
+      {
+        field: {
+          key: 'cf',
+          name: 'Story Points',
+          required: false,
+          schema: {
+            type: 'number',
+            custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float'
+          }
+        },
+        value: '5'
+      }
+    ])
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={null} />
+      </TooltipProvider>
+    )
+
+    const row = await screen.findByRole('button', { name: /Story points/ })
+    expect(row.textContent).toContain('5')
   })
 
   it('toasts when a status change fails from the pane', async () => {
