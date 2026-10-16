@@ -429,7 +429,7 @@ pnpm run sync:localization-runtime-catalog
   - **The Opus review found two must-fix items, and both are fixed.** `claude/opus` at high
     reasoning, tool-enabled, over the merge diff (`git show --remerge-diff ae9db02137` plus the
     repair commits), told not to accept these docs as evidence. The first was that the
-    `@ts-nocheck` described above as unavoidable **was avoidable**: upstream already declares those
+    `@ts-nocheck` recorded above **was avoidable**: upstream already declares those
     forward references in `workspace-process-listing-dependencies.ts`, and the 2026-10-15 sync
     orphaned that layer by re-pointing the file at `OrcaRuntimeWithSetupRunnerState` directly.
     Chaining the two — `OrcaRuntimeWithWorktreePsDependencies` now extends the fork's
@@ -457,8 +457,8 @@ pnpm run sync:localization-runtime-catalog
     references, the deleted-module surface scan, oxlint and `pnpm tc` all pass, and the red-flag
     scan flags three files this sync touched deliberately —
     `src/main/runtime/workspaces/workspace-process-listing.ts` and
-    `…-dependencies.ts` (the chain fix below) and `config/focus-setting-read-baseline.txt` (the
-    recorded counts). The changed-code quality gate reports 0 findings across 946 changed files;
+    `…-dependencies.ts` (the chain fix above) and `config/focus-setting-read-baseline.txt` (the
+    recorded counts). The changed-code quality gate reports 0 findings across 947 changed files;
     `pnpm lint` is green end to end; and the touched areas' suites ran 4,600
     tests — 4,581 passing, 18 skipped, and the one pre-existing failure above. The **mobile web
     bundle fence was not re-measured**: `mobile/node_modules` is not installed here, so
