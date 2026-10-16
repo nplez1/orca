@@ -49,9 +49,9 @@ function getSetupTrustContent(yamlHooks: OrcaHooks | null): string {
  * The recipe declarations a user is asked to approve, so actions Orca can take on their behalf are
  * visible before they are approved.
  *
- * Why the context-menu item commands are listed: each one runs a script on a click, so a recipe that
- * already has an approval must not be able to gain one without the prompt changing. A recipe that
- * declares no items produces exactly the content it always did.
+ * Why the extend hook and the context-menu item commands are listed: both run a script on a click or
+ * a keystroke, so a recipe that already has an approval must not be able to gain one without the
+ * prompt changing. A recipe that declares neither produces exactly the content it always did.
  */
 function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
   return (yamlHooks?.environmentRecipes ?? [])
@@ -63,6 +63,10 @@ function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
         `create: ${recipe.create}`,
         recipe.suspend ? `suspend: ${recipe.suspend}` : null,
         recipe.resume ? `resume: ${recipe.resume}` : null,
+        recipe.extend ? `extend: ${recipe.extend}` : null,
+        recipe.extendDurations?.length
+          ? `extendDurations: ${recipe.extendDurations.join(', ')}`
+          : null,
         recipe.destroyDisabled
           ? 'destroy: none'
           : recipe.destroy

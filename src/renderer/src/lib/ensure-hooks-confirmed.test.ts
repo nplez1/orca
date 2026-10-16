@@ -177,6 +177,34 @@ describe('ensureHooksConfirmed', () => {
     await expect(promise).resolves.toBe('run')
   })
 
+  it('shows the recipe extend hook and its lifetimes in the trust prompt', async () => {
+    const { state, pending } = createTestState()
+    hooksCheckMock.mockResolvedValue({
+      hasHooks: true,
+      hooks: {
+        environmentRecipes: [
+          {
+            id: 'cloud-sandbox',
+            name: 'Cloud Sandbox',
+            create: './scripts/start-vm.sh',
+            extend: './scripts/extend-vm.sh',
+            extendDurations: ['1h', '4h']
+          }
+        ]
+      },
+      mayNeedUpdate: false
+    })
+
+    const promise = ensureHooksConfirmed(state, 'repo-1', 'vmRecipe')
+
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
+    expect(pending[0].data.scriptContent).toContain('extend: ./scripts/extend-vm.sh')
+    expect(pending[0].data.scriptContent).toContain('extendDurations: 1h, 4h')
+
+    pending[0].resolve('run')
+    await expect(promise).resolves.toBe('run')
+  })
+
   it('shows each recipe context menu item command in the trust prompt', async () => {
     const { state, pending } = createTestState()
     hooksCheckMock.mockResolvedValue({
