@@ -13,8 +13,9 @@ vi.mock('@/i18n/i18n', () => ({
 }))
 
 const FLOAT = 'com.atlassian.jira.plugin.system.customfieldtypes:float'
+const POINTS_KEY = 'customfield_10016'
 
-function issue(storyPoints?: number): JiraIssue {
+function issue(storyPoints?: number, storyPointsFieldId?: string): JiraIssue {
   return {
     id: '1001',
     key: 'ABC-1',
@@ -27,18 +28,16 @@ function issue(storyPoints?: number): JiraIssue {
     labels: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-02T00:00:00.000Z',
-    ...(storyPoints === undefined ? {} : { storyPoints })
+    // The host names the field exactly when it found a value, so the fixture does too.
+    ...(storyPoints === undefined
+      ? {}
+      : { storyPoints, storyPointsFieldId: storyPointsFieldId ?? POINTS_KEY })
   }
 }
 
-function pointsField(value: string, key = 'customfield_10016'): JiraEditableField {
+function pointsField(value: string, key = POINTS_KEY, name = 'Story Points'): JiraEditableField {
   return {
-    field: {
-      key,
-      name: 'Story Points',
-      required: false,
-      schema: { type: 'number', custom: FLOAT }
-    },
+    field: { key, name, required: false, schema: { type: 'number', custom: FLOAT } },
     value
   }
 }
@@ -74,7 +73,7 @@ describe('JiraIssueStoryPointsControl', () => {
     const user = userEvent.setup()
     const mutateIssue = renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     const input = screen.getByLabelText('Story points')
     await user.clear(input)
     await user.type(input, '8')
@@ -82,7 +81,7 @@ describe('JiraIssueStoryPointsControl', () => {
 
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
-      { customFields: { customfield_10016: 8 } },
+      { customFields: { [POINTS_KEY]: 8 } },
       { storyPoints: 8 }
     )
   })
@@ -91,23 +90,29 @@ describe('JiraIssueStoryPointsControl', () => {
     const user = userEvent.setup()
     const mutateIssue = renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     await user.clear(screen.getByLabelText('Story points'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     // null is the clear; an omitted key would leave the old points behind.
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
-      { customFields: { customfield_10016: null } },
+      { customFields: { [POINTS_KEY]: null } },
       { storyPoints: undefined }
     )
+  })
+
+  it('names the value without leaning on a plural ending', () => {
+    renderControl({ displayed: issue(1), editFields: [pointsField('1')] })
+
+    expect(screen.getByRole('button', { name: 'Points: 1' })).toBeTruthy()
   })
 
   it('offers nothing to submit until the value changes', async () => {
     const user = userEvent.setup()
     renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
 
     expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
   })
@@ -117,7 +122,7 @@ describe('JiraIssueStoryPointsControl', () => {
     const mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: false, error: 'Not a number' }))
     renderControl({ displayed: issue(5), editFields: [pointsField('5')], mutateIssue })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     const input = screen.getByLabelText('Story points')
     await user.clear(input)
     await user.type(input, '8')
@@ -131,7 +136,7 @@ describe('JiraIssueStoryPointsControl', () => {
     const user = userEvent.setup()
     const mutateIssue = renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     const input = screen.getByRole('textbox', { name: 'Story points' })
     await user.clear(input)
     await user.type(input, '5e')
@@ -141,17 +146,13 @@ describe('JiraIssueStoryPointsControl', () => {
     expect(mutateIssue).not.toHaveBeenCalled()
   })
 
-  it('blocks a save while another field of the issue is being written', async () => {
+  it('keeps the value editable but unsendable while another field is writing', async () => {
     const user = userEvent.setup()
     const mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: true }))
-    const props = {
-      displayed: issue(5),
-      editFields: [pointsField('5')],
-      mutateIssue
-    }
+    const props = { displayed: issue(5), editFields: [pointsField('5')], mutateIssue }
     const { rerender } = render(<JiraIssueStoryPointsControl {...props} pendingField={null} />)
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     const input = screen.getByRole('textbox', { name: 'Story points' })
     await user.clear(input)
     await user.type(input, '8')
@@ -160,29 +161,21 @@ describe('JiraIssueStoryPointsControl', () => {
 
     // The write would be refused with an error this form has nowhere to show it.
     expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
-    expect(input.hasAttribute('disabled')).toBe(true)
     expect(mutateIssue).not.toHaveBeenCalled()
+    // Read-only rather than disabled, so this form's own save cannot drop focus.
+    expect(screen.getByRole('textbox', { name: 'Story points' }).hasAttribute('readonly')).toBe(
+      true
+    )
   })
 
-  it('writes to the points field that holds the value the view shows', async () => {
+  it('writes the field the issue says its points came from', async () => {
     const user = userEvent.setup()
     const mutateIssue = renderControl({
-      displayed: issue(5),
-      editFields: [
-        {
-          field: {
-            key: 'customfield_10020',
-            name: 'Story point estimate',
-            required: false,
-            schema: { type: 'number', custom: FLOAT }
-          },
-          value: ''
-        },
-        pointsField('5')
-      ]
+      displayed: issue(5, 'customfield_10016'),
+      editFields: [pointsField('', 'customfield_10020', 'Story point estimate'), pointsField('5')]
     })
 
-    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
     const input = screen.getByRole('textbox', { name: 'Story points' })
     await user.clear(input)
     await user.type(input, '8')
@@ -191,34 +184,46 @@ describe('JiraIssueStoryPointsControl', () => {
     // The estimate field sorts first, but the value on screen came from this one.
     expect(mutateIssue).toHaveBeenCalledWith(
       'storyPoints',
-      { customFields: { customfield_10016: 8 } },
+      { customFields: { [POINTS_KEY]: 8 } },
       { storyPoints: 8 }
     )
   })
 
-  it('leaves a number field that is not the story-points field alone', () => {
+  it('offers no editor when Jira will not write the field the value came from', () => {
     renderControl({
-      editFields: [
-        {
-          field: {
-            key: 'customfield_2',
-            name: 'Budget',
-            required: false,
-            schema: { type: 'number', custom: FLOAT }
-          },
-          value: '10'
-        }
-      ]
+      displayed: issue(5, 'customfield_99999'),
+      editFields: [pointsField('5')]
     })
 
-    // Nothing to show and nothing Jira offers to write, so no control at all.
+    // Writing the other field would leave the value on screen unchanged.
+    expect(screen.getByText('Points: 5')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('matches the value for a host that does not name the field', async () => {
+    const user = userEvent.setup()
+    const mutateIssue = renderControl({
+      displayed: { ...issue(5), storyPointsFieldId: undefined },
+      editFields: [pointsField('', 'customfield_10020', 'Story point estimate'), pointsField('5')]
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(mutateIssue).toHaveBeenCalledWith(
+      'storyPoints',
+      { customFields: { [POINTS_KEY]: 8 } },
+      { storyPoints: 8 }
+    )
   })
 
   it('shows points Jira will not let this user write', () => {
     renderControl({ displayed: issue(3), editFields: [] })
 
-    expect(screen.getByText('3 pts')).toBeTruthy()
+    expect(screen.getByText('Points: 3')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
   })
 

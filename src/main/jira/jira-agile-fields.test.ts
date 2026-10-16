@@ -224,5 +224,8 @@ describe('jira agile fields', () => {
     expect(issue.remainingEstimateSeconds).toBe(3600)
     expect(issue.sprint).toBe('Sprint 2')
     expect(issue.storyPoints).toBe(5)
+    // The field the value came from is named, so a writer can target it rather than
+    // guessing which of a site's points fields the view is showing.
+    expect(issue.storyPointsFieldId).toBe('customfield_3')
   })
 })

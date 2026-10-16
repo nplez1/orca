@@ -21,7 +21,6 @@ const POINTS_FIELD: JiraEditableField = {
   },
   value: '5'
 }
-
 function issue(storyPoints?: number): JiraIssue {
   return {
     id: '1001',
@@ -35,7 +34,9 @@ function issue(storyPoints?: number): JiraIssue {
     labels: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-02T00:00:00.000Z',
-    ...(storyPoints === undefined ? {} : { storyPoints })
+    ...(storyPoints === undefined
+      ? {}
+      : { storyPoints, storyPointsFieldId: POINTS_FIELD.field.key })
   }
 }
 
@@ -87,13 +88,13 @@ describe('JiraStoryPointsRow', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('shows points Jira will not let this user write, without an editor', async () => {
-    const user = userEvent.setup()
-    renderRow({ editFields: [] })
+  it('shows points Jira will not let this user write, without an editor', () => {
+    renderRow({ displayed: issue(5), editFields: [] })
 
-    expect(screen.getByText('5')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: /Story points/ }))
-    expect(screen.queryByRole('textbox', { name: 'Story points' })).toBeNull()
+    const row = screen.getByRole('button', { name: /Story points/ })
+    expect(row.textContent).toContain('5')
+    // Nothing to open: the row is a button, so an uneditable value has no action.
+    expect(row.hasAttribute('disabled')).toBe(true)
   })
 
   it('cannot be opened while another field of the issue is being written', () => {

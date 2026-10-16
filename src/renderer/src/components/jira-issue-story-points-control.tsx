@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,24 +22,29 @@ export type JiraStoryPointsMutation = (
   options?: { reportsInline?: boolean }
 ) => Promise<JiraMutationResult>
 
-/** The story-points field Jira lets this user write on this issue, when it has one. */
+/** Whether an editable field is the one holding the value the view shows. */
+function holdsPoints(entry: JiraEditableField, points: number | undefined): boolean {
+  return points !== undefined && entry.value.trim() !== '' && Number(entry.value) === points
+}
+
+/**
+ * The story-points field Jira lets this user write on this issue, when there is
+ * one to offer. The issue names the field its value came from, so that is the
+ * field to write; a host that predates the name leaves the value to match, and
+ * an issue with no points yet may be written through whichever field Jira
+ * offers.
+ */
 export function findJiraStoryPointsField(
   fields: readonly JiraEditableField[],
-  points: number | undefined
+  issue: Pick<JiraIssue, 'storyPoints' | 'storyPointsFieldId'>
 ): JiraEditableField | undefined {
   const candidates = fields.filter((entry) => isJiraStoryPointsField(entry.field))
-  if (points !== undefined) {
-    // Why: a site can expose more than one story-points field (a classic float
-    // beside a next-gen estimate), and the one holding the value this view shows is
-    // the one to write back — otherwise a save lands where the view never reads.
-    const holding = candidates.find(
-      (entry) => entry.value.trim() !== '' && Number(entry.value) === points
-    )
-    if (holding) {
-      return holding
-    }
+  if (issue.storyPointsFieldId !== undefined) {
+    // Why no fallback: writing another points field would leave the value on screen
+    // unchanged, so an unwritable source field means there is nothing to offer.
+    return candidates.find((entry) => entry.field.key === issue.storyPointsFieldId)
   }
-  return candidates[0]
+  return candidates.find((entry) => holdsPoints(entry, issue.storyPoints)) ?? candidates[0]
 }
 
 export function jiraStoryPointsLabel(points: number | undefined): string {
@@ -49,11 +54,12 @@ export function jiraStoryPointsLabel(points: number | undefined): string {
 }
 
 /** The detail bar has no column heading above it and no label beside it, so the
- *  chip names its own unit; the Issue pane's row is already labelled. */
+ *  chip names the field; the Issue pane's row is labelled already. A label rather
+ *  than a unit suffix keeps one point from reading as "1 pts" in any language. */
 export function jiraStoryPointsChipLabel(points: number | undefined): string {
   return points === undefined
     ? jiraStoryPointsLabel(points)
-    : translate('auto.components.JiraIssueStoryPointsControl.value', '{{value0}} pts', {
+    : translate('auto.components.JiraIssueStoryPointsControl.value', 'Points: {{value0}}', {
         value0: points
       })
 }
@@ -104,7 +110,7 @@ export function useJiraStoryPointsEditor({
   pendingField: string | null
   mutateIssue: JiraStoryPointsMutation
 }): JiraStoryPointsEditor {
-  const pointsField = findJiraStoryPointsField(editFields, displayed.storyPoints)
+  const pointsField = findJiraStoryPointsField(editFields, displayed)
   const points = displayed.storyPoints
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
@@ -160,6 +166,7 @@ export function JiraStoryPointsEditorForm({
 }: {
   editor: JiraStoryPointsEditor
 }): React.JSX.Element {
+  const messageId = useId()
   return (
     <form
       className="flex flex-col gap-2"
@@ -173,17 +180,22 @@ export function JiraStoryPointsEditorForm({
         inputMode="decimal"
         autoFocus
         aria-label={jiraStoryPointsFieldLabel()}
+        aria-describedby={messageId}
         value={editor.draft}
-        disabled={editor.blocked}
+        // Why read-only rather than disabled: a disabled field loses focus part-way
+        // through a save, so the user would have to click back in to fix a refusal.
+        readOnly={editor.blocked}
         aria-invalid={editor.invalid || undefined}
         onChange={(event) => editor.setDraft(event.target.value)}
       />
       {editor.invalid ? (
-        <p className="text-[11px] text-destructive">
+        <p id={messageId} className="text-[11px] text-destructive">
           {translate('auto.components.JiraIssueStoryPointsControl.invalid', 'Enter a number.')}
         </p>
-      ) : editor.points === undefined ? null : (
-        <p className="text-[11px] text-muted-foreground">
+      ) : editor.points === undefined ? (
+        <span id={messageId} />
+      ) : (
+        <p id={messageId} className="text-[11px] text-muted-foreground">
           {translate(
             'auto.components.JiraIssueStoryPointsControl.clearHint',
             'An empty value clears the field.'
@@ -246,7 +258,6 @@ export function JiraIssueStoryPointsControl({
           type="button"
           disabled={pendingField !== null}
           title={pointsTitle(editor.points)}
-          aria-label={pointsTitle(editor.points)}
           className={TRIGGER_CLASS}
         >
           {jiraStoryPointsChipLabel(editor.points)}

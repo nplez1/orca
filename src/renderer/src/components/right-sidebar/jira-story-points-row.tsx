@@ -33,6 +33,9 @@ export function JiraStoryPointsRow({
       <IssuePanePropertyRow
         label={jiraStoryPointsFieldLabel()}
         withChevron={false}
+        // Why disabled: the row is a button, and a value Jira will not let this user
+        // write has no action to offer.
+        disabled
         value={jiraStoryPointsLabel(editor.points)}
       />
     )
