@@ -258,7 +258,7 @@ set -euo pipefail
 # 4. print one recipe-result JSON object to stdout
 ```
 
-### 7d. Suspend, resume, extend, destroy
+### 7d. Suspend, resume, extend, destroy, and context menu items
 
 ```bash
 #!/usr/bin/env bash
@@ -276,6 +276,38 @@ resource_id="$(node -e 'const d=JSON.parse(process.argv[1]); process.stdout.writ
 `extend` is the one hook whose job is to move a clock: it reads `lifetime` (the canonical spelling of
 one of the recipe's own `extendDurations`) out of that same payload, and must end with the provider's
 own new deadline, because that is the only deadline the provider enforces.
+
+A **context menu item** is a script of the same kind with no lifecycle meaning: Orca runs it when the
+user clicks the item, hands it the workspace's identity, and expects nothing back. Each declared item
+names the script it runs, and one script may serve several items by switching on
+`$ORCA_CONTEXT_MENU_ITEM_ID`.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+# The host is named by the SSH connection's own label, so publish the provider's node id there.
+node_id="${ORCA_HOST_NAME:?}"
+workspace="${ORCA_WORKSPACE_NAME:-}"
+path="${ORCA_WORKSPACE_PATH:-}"
+case "${ORCA_CONTEXT_MENU_ITEM_ID:?}" in
+  launch-vnc) team-machines vnc "$node_id" </dev/null >/dev/null 2>&1 & ;;
+  launch-rdp) team-machines rdp "$node_id" </dev/null >/dev/null 2>&1 & ;;
+  # Why: an unknown id that exits 0 reports a success the user never got.
+  *) echo "unknown context menu item: $ORCA_CONTEXT_MENU_ITEM_ID" >&2; exit 2 ;;
+esac
+printf 'launched %s for %s (%s)\n' "$ORCA_CONTEXT_MENU_ITEM_ID" "$workspace" "$path" >&2
+```
+
+**Detach anything that outlives the click.** Orca reads the command's stdout and stderr, so the click
+stays pending until every process holding those pipes has exited. A bare `team-machines vnc "$node_id" &`
+keeps them open, and so does `nohup` — it leaves the streams alone when they are pipes rather than a
+terminal. Redirect all three and the process survives on its own:
+
+```bash
+team-machines vnc "$node_id" </dev/null >/dev/null 2>&1 &
+```
+
+Use `setsid` on Linux when the tool must survive the shell, and `start "" <tool>` on Windows.
 
 ### 7e. State file
 
@@ -295,6 +327,13 @@ environmentRecipes:
     extend: ./scripts/orca-vm/cloud-sandbox-extend.sh
     extendDurations: [1h, 4h, 24h]
     destroy: ./scripts/orca-vm/cloud-sandbox-destroy.sh
+    contextMenuItems:
+      - id: launch-vnc
+        label: Launch VNC
+        command: ./scripts/orca-vm/cloud-sandbox-launch-vnc.sh
+      - id: launch-rdp
+        label: Launch RDP
+        command: ./scripts/orca-vm/cloud-sandbox-launch-rdp.sh
 ```
 
 `create` is required, runs locally from the repo root, and prints exactly one JSON object on stdout.
@@ -303,6 +342,52 @@ fresh recipe JSON because the pairing may have changed. `extend` is optional too
 `extendDurations`: Orca offers only the lifetimes that list declares, and rejects the recipe outright
 when `extendDurations` appears without `extend`. `destroy` may be omitted only with `destroy: none`.
 The legacy keys `command` and `cleanup` still map to `create` and `destroy`.
+
+### Workspace context menu items
+
+`contextMenuItems` adds actions to the context menu of every workspace whose host this recipe created —
+and of no other workspace. Each entry needs an `id` (1-64 lowercase letters, numbers, dots,
+underscores or hyphens, unique within the recipe), a `label` the user sees, and a `command` Orca runs
+from the repository root exactly like the lifecycle hooks. One recipe may declare up to 20 items; a bad
+entry rejects the whole recipe with a diagnostic rather than dropping the action silently.
+
+Clicking an item runs that command with `ORCA_VM_MODE=context-menu` and one JSON line on stdin,
+carrying the workspace's identity together with the recipe result:
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "context-menu",
+  "recipeId": "cloud-sandbox",
+  "instanceId": "orca-…",
+  "projectId": "…",
+  "workspaceId": "…",
+  "workspaceName": "feature-x",
+  "recipeResult": { "...": "the result create printed, as persisted" },
+  "hostName": "node-9f2c",
+  "workspacePath": "/workspace/repo",
+  "itemId": "launch-vnc",
+  "itemLabel": "Launch VNC"
+}
+```
+
+| Value          | Environment variable           | Meaning                                                                                                                                                                                                    |
+| -------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| host name      | `ORCA_HOST_NAME`               | The name Orca holds for the workspace's host. In SSH mode that is the connection's `target.label`, so publish the provider's node id there. For an Orca-server host it is the registered environment name. |
+| workspace name | `ORCA_WORKSPACE_NAME`          | The name the workspace was created with. A rename afterwards is not reflected here.                                                                                                                        |
+| workspace path | `ORCA_WORKSPACE_PATH`          | The workspace's path on its host — the path its own row carries in Orca.                                                                                                                                   |
+| item           | `ORCA_CONTEXT_MENU_ITEM_ID`    | The clicked item's declared `id`, so one script can serve several items.                                                                                                                                   |
+| item           | `ORCA_CONTEXT_MENU_ITEM_LABEL` | The label the user clicked, for logging.                                                                                                                                                                   |
+
+The whole callback is on stdin as the JSON above, so a script can parse it instead of reading the
+variables. Exit `0` means the action ran; any other exit is reported to the user with the exit code and
+the script's own last stderr line, redacted. Nothing is read from stdout, and the click stays pending
+until the command's output streams close — see the detach note in step 7d.
+
+Orca snapshots the declared items onto the host when it is created, exactly as it does for `extend`:
+a later `orca.yaml` edit cannot redirect an existing workspace's menu at a different script, and the
+menu offers exactly what the host recorded. A host created before `contextMenuItems` existed therefore
+shows no items until it is re-created.
 
 The base result, which is what Orca-server mode prints:
 
@@ -361,7 +446,7 @@ An ephemeral host can be put on a provider deadline. Four `userData` keys are we
   no countdown: `create` has already run by then, so failing the result would strand a machine the
   provider is billing for. You see a `recipe.result.lifetime.unreadable` warning instead — in the
   provisioning flow and in `orca vm recipe doctor --provision`. An unreadable deadline is treated as
-  *no* deadline everywhere, so the host is never reclaimed automatically. An `extend` or `resume`
+  _no_ deadline everywhere, so the host is never reclaimed automatically. An `extend` or `resume`
   that would lose an existing deadline **is** refused, because there the record survives and you can
   retry. Emit an offset (`Z` for UTC) and a whole number of positive seconds.
 - **`lifetimeSeconds` never substitutes for the deadline.** A provider may report the original lease
@@ -429,9 +514,10 @@ parses as JSON; if the process dies first, dump its stderr log and fail.
 
 `ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json` validates static wiring only; it boots
 nothing. It checks local-host execution, the repo path, that the recipe id exists, that the create,
-destroy, suspend, resume, and extend command paths resolve, that suspend and resume are paired, that
-an `extend` hook declares `extendDurations` to offer, and that each script is executable (the POSIX
-exec bit, skipped on Windows).
+destroy, suspend, resume, and extend command paths resolve, that every declared `contextMenuItems`
+command resolves, that suspend and resume are paired, that an `extend` hook declares
+`extendDurations` to offer, and that each script is executable (the POSIX exec bit, skipped on
+Windows).
 
 **The free gate is clear only with no `fail` and no `warn`.** A `warn` keeps `ok: true`, so `ok`
 alone proves nothing. Resolve each `warn`, or say why you accept it, before spending money on

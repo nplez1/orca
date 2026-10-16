@@ -18,6 +18,7 @@ import {
   suspendEphemeralVmRuntime
 } from '../ephemeral-vm-runtime-service'
 import { extendEphemeralVmRuntimeLease } from '../ephemeral-vm-runtime-extend'
+import { runEphemeralVmRuntimeContextMenuItem } from '../ephemeral-vm-runtime-context-menu'
 import { removeEphemeralVmRuntimeSshTarget } from '../ephemeral-vm-runtime-ssh-cleanup'
 import {
   buildEphemeralVmRecipeCleanupCommand,
@@ -49,6 +50,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:resumeWorkspace')
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
   ipcMain.removeHandler('ephemeralVm:extendLifetime')
+  ipcMain.removeHandler('ephemeralVm:runContextMenuItem')
 
   ipcMain.handle('ephemeralVm:listRuntimes', (): EphemeralVmRuntimeRecord[] => {
     return listEphemeralVmRuntimes(app.getPath('userData'))
@@ -262,6 +264,18 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
         lifetime: args.lifetime
       })
     }
+  )
+
+  ipcMain.handle(
+    'ephemeralVm:runContextMenuItem',
+    (_event, args: { runtimeId: string; itemId: string; workspacePath: string }) =>
+      runEphemeralVmRuntimeContextMenuItem({
+        userDataPath: app.getPath('userData'),
+        store,
+        runtimeId: args.runtimeId,
+        itemId: args.itemId,
+        workspacePath: args.workspacePath
+      })
   )
 
   ipcMain.handle(

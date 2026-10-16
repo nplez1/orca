@@ -165,6 +165,33 @@ describe('EphemeralVmExtendLifetimeMenu', () => {
     expect((await renderMenu()).textContent).toBe('')
   })
 
+  it('renders nothing for a host whose destroy is already in flight', async () => {
+    // Why: main refuses that extension, so offering it could only produce an action that fails.
+    installRuntimes([
+      {
+        ...runtimeRecord({ extend: 'extend.sh', extendDurations: ['4h'] }),
+        status: 'cleanup_pending',
+        cleanupStatus: 'running'
+      }
+    ])
+    await refreshEphemeralVmRuntimes()
+
+    expect((await renderMenu()).textContent).toBe('')
+  })
+
+  it('falls back to a readable message when the refusal carries none', async () => {
+    installRuntimes([runtimeRecord({ extend: 'extend.sh', extendDurations: ['4h'] })])
+    await refreshEphemeralVmRuntimes()
+    extendLifetime.mockRejectedValue('not an error')
+    await renderMenu()
+
+    await act(async () => {
+      captured.items.at(-1)?.onSelect?.()
+    })
+
+    expect(toastError).toHaveBeenCalledWith('Couldn’t extend the lease. Try again.')
+  })
+
   it('offers one entry per declared duration', async () => {
     installRuntimes([runtimeRecord({ extend: 'extend.sh', extendDurations: ['1h', '4h', '1d'] })])
     await refreshEphemeralVmRuntimes()
@@ -230,7 +257,13 @@ describe('EphemeralVmExtendLifetimeMenu', () => {
     expect(captured.items.at(-1)?.children).toBe('Extending…')
 
     await act(async () => {
-      pending.reject(new Error('quota exceeded for this region'))
+      // Why the Electron-shaped rejection: main's message arrives wrapped in the channel it came
+      // from, and the provider's reason is the part the user needs.
+      pending.reject(
+        new Error(
+          "Error invoking remote method 'ephemeralVm:extendLifetime': Error: quota exceeded for this region"
+        )
+      )
       await pending.promise.catch(() => undefined)
     })
 

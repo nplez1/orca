@@ -10,16 +10,15 @@ import {
 import { useMountedRef } from '@/hooks/useMountedRef'
 import {
   findEphemeralVmRuntimeForWorkspace,
+  isEphemeralVmHostActionable,
   refreshEphemeralVmRuntimes,
   useEphemeralVmRuntimes
 } from '@/hooks/useEphemeralVmRuntimes'
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { translate } from '@/i18n/i18n'
 import { readEphemeralVmLifetime } from '../../../../shared/ephemeral-vm-lifetime'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/ephemeral-vm-runtimes'
-import {
-  formatEphemeralVmDeadline,
-  isReleasedEphemeralVmRuntime
-} from './ephemeral-vm-lease-presentation'
+import { formatEphemeralVmDeadline } from './ephemeral-vm-lease-presentation'
 
 function describeExtendSuccess(runtime: EphemeralVmRuntimeRecord): string {
   const read = readEphemeralVmLifetime(runtime.recipeResult.userData)
@@ -69,8 +68,17 @@ export function EphemeralVmExtendLifetimeMenu({
         // Why: a successful extension can have re-addressed the host, so the cached records are stale.
         await refreshEphemeralVmRuntimes()
       } catch (cause) {
-        // Why verbatim: only the provider's own message says whether a retry could succeed.
-        toast.error(cause instanceof Error ? cause.message : String(cause))
+        // Why unwrapped: Electron prefixes every rejection with the channel it came from, so a
+        // provider's reason would arrive buried.
+        toast.error(
+          extractIpcErrorMessage(
+            cause,
+            translate(
+              'auto.components.sidebar.EphemeralVmExtendLifetimeMenu.extendFailed',
+              'Couldn’t extend the lease. Try again.'
+            )
+          )
+        )
       } finally {
         if (mountedRef.current) {
           setPendingLifetime(null)
@@ -81,8 +89,9 @@ export function EphemeralVmExtendLifetimeMenu({
   )
 
   const durations = runtime?.extend ? (runtime.extendDurations ?? []) : []
-  // Why hide it on a released host: main refuses that extension outright, so offering it could only fail.
-  if (!runtime?.extend || durations.length === 0 || isReleasedEphemeralVmRuntime(runtime)) {
+  // Why hide it on a host that is gone or going: main refuses that extension outright, so offering
+  // it could only fail.
+  if (!runtime?.extend || durations.length === 0 || !isEphemeralVmHostActionable(runtime)) {
     return null
   }
 
