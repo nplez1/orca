@@ -1,4 +1,4 @@
-import { net } from 'electron'
+import { getMainHttpClient } from '../../network/http-client'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import { makeDeepSeekError, makeDeepSeekUnavailable } from './deepseek-fetcher-data'
 import { parseDeepSeekBalanceResponse } from './deepseek-fetcher-parse'
@@ -24,9 +24,10 @@ export async function fetchDeepSeekRateLimits(
     return makeDeepSeekUnavailable('DeepSeek API key not configured')
   }
   try {
-    // Why: plain net.fetch on the default session stays behind Orca's proxy
-    // guard; a Bearer header needs no cookie jar.
-    const response = await net.fetch(DEEPSEEK_BALANCE_URL, {
+    // Why: the host HTTP port, not Electron directly — the runtime and orcad load this
+    // module too, and only the desktop build has Chromium's network stack. The port's
+    // desktop client is the same default-session fetch, proxy guard included.
+    const response = await getMainHttpClient().fetch(DEEPSEEK_BALANCE_URL, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(API_TIMEOUT_MS)
     })

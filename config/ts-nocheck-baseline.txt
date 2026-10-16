@@ -3,4 +3,12 @@
 # runtime mixin chain cannot express forward references yet — do NOT add entries to
 # get CI green; fix the types instead.
 # Regenerate/prune: pnpm check:ts-nocheck-ratchet --prune   (removes stale entries only)
+#
+# 2026-10-17: workspace-process-listing.ts re-pointed its base class at the fork's
+# OrcaRuntimeWithSetupRunnerState in the 2026-10-15 sync (that mixin carries
+# armWorktreeSetupRunner/reapWorktreeSetupRunnerState for the whole chain, and dropping
+# it breaks ~40 concrete classes), which leaves seven members provided later in the mixin
+# chain as forward references this file cannot express. Recording it rather than fixing it
+# inside the sync; the typing fix is named as a follow-up in LOCAL-PATCHES.md § Sync log.
 src/main/runtime/orca-runtime-owned-controllers.ts
+src/main/runtime/workspaces/workspace-process-listing.ts

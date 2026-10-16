@@ -1,4 +1,4 @@
-import { net } from 'electron'
+import { getMainHttpClient } from '../../network/http-client'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import {
   FIREWORKS_API_BASE_URL,
@@ -48,14 +48,14 @@ function readErrorMessage(error: unknown): string {
     : 'Fireworks billing request failed'
 }
 
-// Why: plain net.fetch on the default session, which Orca's proxy guard holds
-// until the persisted proxy has been applied.
+// Why: the host HTTP port, which Orca's proxy guard holds until the persisted proxy
+// has been applied. DeepSeek's fetcher reads it the same way.
 async function getFireworksJson(args: {
   path: string
   apiKey: string
 }): Promise<FireworksJsonResult> {
   try {
-    const response = await net.fetch(`${FIREWORKS_API_BASE_URL}${args.path}`, {
+    const response = await getMainHttpClient().fetch(`${FIREWORKS_API_BASE_URL}${args.path}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${args.apiKey}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(FIREWORKS_REQUEST_TIMEOUT_MS)
