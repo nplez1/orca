@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
+import { accountBackedDetailSource } from '@/lib/account-backed-detail-source'
 import LinearIssueWorkspace from '@/components/LinearIssueWorkspace'
 import { LoaderCircle } from 'lucide-react'
 import { LinearIcon } from '@/components/task-page-localized-options'
@@ -20,6 +22,8 @@ export function TaskPageLinearContent({
     taskSource,
     selectedLinearIssue,
     linearDetailSourceContext,
+    linearTaskSourceContext,
+    accountBackedTaskSourceHostId,
     openRelatedLinearIssue,
     closeTaskDetailPage,
     linearMode,
@@ -30,6 +34,15 @@ export function TaskPageLinearContent({
     setLinearConnectOpen,
     handleUseLinearItem
   } = model
+  // Why memoised: the workspace refetches on its source's identity, and a fresh object per render
+  // would re-run every detail read.
+  const linearDetailOwnerSource = useMemo(
+    () =>
+      linearDetailSourceContext ??
+      linearTaskSourceContext ??
+      accountBackedDetailSource('linear', accountBackedTaskSourceHostId),
+    [accountBackedTaskSourceHostId, linearDetailSourceContext, linearTaskSourceContext]
+  )
   return taskSource === 'linear' && selectedLinearIssue ? (
     <LinearIssueWorkspace
       issue={selectedLinearIssue}
@@ -38,7 +51,7 @@ export function TaskPageLinearContent({
       onUse={handleUseLinearItem}
       onOpenIssue={openRelatedLinearIssue}
       onClose={closeTaskDetailPage}
-      sourceContext={linearDetailSourceContext}
+      sourceContext={linearDetailOwnerSource}
     />
   ) : !linearStatusReady ? (
     <div className="mt-4 flex items-center justify-center py-14">

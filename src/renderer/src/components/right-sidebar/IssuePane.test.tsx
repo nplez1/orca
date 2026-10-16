@@ -1,82 +1,215 @@
 // @vitest-environment happy-dom
 
-import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Repo } from '../../../../shared/repo-types'
+import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { Worktree } from '../../../../shared/worktree/types'
+import { getWorkspaceAttachmentSourceContext } from '../sidebar/workspace-attachment-source-result'
 import IssuePane from './IssuePane'
 
-const mocks = vi.hoisted(() => {
-  const state: { worktree: unknown } = { worktree: null }
-  return state
-})
+const mocks = vi.hoisted(
+  (): {
+    worktree: Worktree | null
+    repo: Repo | null
+    /** Every source the Jira pane was handed, so a re-render's identity is checkable. */
+    jiraSources: TaskSourceContext[]
+  } => ({ worktree: null, repo: null, jiraSources: [] })
+)
 
 vi.mock('@/store/selectors', () => ({
-  useActiveWorktree: () => mocks.worktree
+  useActiveWorktree: () => mocks.worktree,
+  useRepoById: () => mocks.repo
 }))
-vi.mock('./GithubLinkedIssuePane', () => ({
-  GithubLinkedIssuePane: () => <div data-testid="github-pane" />
+vi.mock('./GithubLinkedIssuePane', () => ({ GithubLinkedIssuePane: () => null }))
+vi.mock('./JiraLinkedIssuePane', () => ({
+  JiraLinkedIssuePane: ({ sourceContext }: { sourceContext: TaskSourceContext }) => {
+    mocks.jiraSources.push(sourceContext)
+    return <output data-testid="jira-source">{JSON.stringify(sourceContext)}</output>
+  }
 }))
 vi.mock('./LinearLinkedIssuePane', () => ({
-  LinearLinkedIssuePane: () => <div data-testid="linear-pane" />
-}))
-vi.mock('./JiraLinkedIssuePane', () => ({
-  JiraLinkedIssuePane: () => <div data-testid="jira-pane" />
-}))
-vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback?: string) => fallback ?? _key
+  LinearLinkedIssuePane: ({ sourceContext }: { sourceContext: TaskSourceContext }) => (
+    <output data-testid="linear-source">{JSON.stringify(sourceContext)}</output>
+  )
 }))
 
-function baseWorktree(overrides: Record<string, unknown> = {}) {
+function repo(overrides: Partial<Repo> = {}): Repo {
   return {
-    id: 'worktree-1',
-    linkedIssue: null,
-    linkedLinearIssue: null,
-    linkedLinearIssueWorkspaceId: null,
-    linkedLinearIssueOrganizationUrlKey: null,
-    linkedGitLabIssue: null,
-    linkedWorkItem: null,
-    linkedTaskSourceContext: null,
-    repoId: 'repo-1',
+    id: 'repo-1',
+    path: '/tmp/repo-1',
+    displayName: 'repo-1',
+    badgeColor: '#000',
+    addedAt: 0,
+    connectionId: null,
+    executionHostId: null,
     ...overrides
   }
 }
 
-describe('IssuePane', () => {
-  it('shows the no-link state when there is no active worktree', () => {
-    mocks.worktree = null
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('No issue is linked to this workspace.')
-  })
+function worktree(overrides: Partial<Worktree> = {}): Worktree {
+  return {
+    id: 'repo-1::/tmp/wt',
+    repoId: 'repo-1',
+    hostId: 'runtime:workspace-host',
+    path: '/tmp/wt',
+    head: 'abc123',
+    branch: 'refs/heads/feature',
+    isBare: false,
+    isMainWorktree: false,
+    displayName: 'wt',
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    linkedGitLabIssue: null,
+    linkedWorkItem: null,
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0,
+    ...overrides
+  }
+}
 
-  it('shows the no-link state when the active worktree has no linked issue', () => {
-    mocks.worktree = baseWorktree()
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('No issue is linked to this workspace.')
-  })
+const jiraTaskSource: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'jira-project',
+  hostId: 'runtime:jira-task-host'
+}
+const linearTaskSource: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'linear',
+  projectId: 'linear-project',
+  hostId: 'runtime:linear-task-host'
+}
 
-  it('dispatches to the GitHub pane for a GitHub link', () => {
-    mocks.worktree = baseWorktree({ linkedIssue: 42 })
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('data-testid="github-pane"')
-  })
+/** A Jira work item, so the pane can be rendered for a link with no Linear or GitHub slot. */
+function jiraWorkItem(key: string): NonNullable<Worktree['linkedWorkItem']> {
+  return {
+    provider: 'jira',
+    type: 'issue',
+    number: 0,
+    title: key,
+    url: `https://jira.invalid/browse/${key}`,
+    jiraIdentifier: key
+  }
+}
 
-  it('dispatches to the Linear pane for a Linear link', () => {
-    mocks.worktree = baseWorktree({ linkedLinearIssue: 'ENG-42' })
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('data-testid="linear-pane"')
-  })
+function linearWorkItem(key: string): NonNullable<Worktree['linkedWorkItem']> {
+  return {
+    provider: 'linear',
+    type: 'issue',
+    number: 0,
+    title: key,
+    url: `https://linear.invalid/${key}`,
+    linearIdentifier: key
+  }
+}
 
-  it('dispatches to the Jira pane for a Jira work item', () => {
-    mocks.worktree = baseWorktree({
-      linkedWorkItem: {
-        provider: 'jira',
-        type: 'issue',
-        number: 1,
-        title: 'x',
-        url: 'https://acme.atlassian.net/browse/PROJ-1',
-        jiraIdentifier: 'PROJ-1'
-      }
+function sourceShown(testId: 'jira-source' | 'linear-source'): TaskSourceContext {
+  const text = screen.getByTestId(testId).textContent ?? ''
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the pane renders the source it was handed as JSON.
+  return JSON.parse(text) as TaskSourceContext
+}
+
+afterEach(() => {
+  cleanup()
+  mocks.repo = null
+  mocks.jiraSources.length = 0
+})
+
+describe('IssuePane linked-issue owner', () => {
+  it('uses a creation-time task source of the same provider', () => {
+    mocks.worktree = worktree({
+      linkedLinearIssue: 'LIN-1',
+      linkedTaskSourceContext: linearTaskSource
     })
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('data-testid="jira-pane"')
+    render(<IssuePane />)
+
+    expect(sourceShown('linear-source')).toEqual(linearTaskSource)
   })
 
-  it('shows the no-link state for a provider the pane cannot render', () => {
-    mocks.worktree = baseWorktree({ linkedGitLabIssue: 5 })
-    expect(renderToStaticMarkup(<IssuePane />)).toContain('No issue is linked to this workspace.')
+  it("does not route a Linear link through the Jira task's host", () => {
+    // A workspace created from a Jira task keeps that source when a Linear link is added later,
+    // and the Linear link wins the pane. Routing by the Jira host would ask a server that may have
+    // no Linear account at all.
+    const current = worktree({
+      linkedLinearIssue: 'LIN-1',
+      linkedTaskSourceContext: jiraTaskSource,
+      linkedWorkItem: jiraWorkItem('JIR-1')
+    })
+    mocks.worktree = current
+    render(<IssuePane />)
+
+    expect(sourceShown('linear-source')).toMatchObject({
+      provider: 'linear',
+      hostId: 'runtime:workspace-host'
+    })
+  })
+
+  it('names the same source the workspace card resolves, so neither can go stale', () => {
+    // The card, the attachment search and this pane share one resolver; a cache patch scoped to one
+    // of them has to land under the key the others read.
+    const current = worktree({
+      linkedWorkItem: linearWorkItem('LIN-2'),
+      linkedLinearIssueWorkspaceId: 'linear-workspace-1'
+    })
+    mocks.worktree = current
+    render(<IssuePane />)
+
+    expect(sourceShown('linear-source')).toEqual(
+      getWorkspaceAttachmentSourceContext('linear', undefined, current)
+    )
+  })
+
+  it('reads through the paired server that transports an SSH workspace', () => {
+    // An SSH workspace behind a paired server keeps `ssh:<target>` as its host and names the server
+    // separately; the server holds the Jira/Linear credentials, so this computer must not answer.
+    mocks.worktree = worktree({
+      hostId: 'ssh:example',
+      runtimeOwnerEnvironmentId: 'server-1',
+      linkedWorkItem: jiraWorkItem('JIR-4')
+    })
+    render(<IssuePane />)
+
+    expect(sourceShown('jira-source')).toMatchObject({ hostId: 'runtime:server-1' })
+  })
+
+  it('uses the repository host when the workspace row names none', () => {
+    // Pre-project-host rows carry no host, and the repo row is the owner they fall back to.
+    mocks.repo = repo({ executionHostId: 'runtime:repo-host' })
+    mocks.worktree = worktree({ hostId: undefined, linkedWorkItem: jiraWorkItem('JIR-5') })
+    render(<IssuePane />)
+
+    expect(sourceShown('jira-source')).toMatchObject({ hostId: 'runtime:repo-host' })
+  })
+
+  it('keeps one source reference across a row write that changes nothing an owner uses', () => {
+    // A PTY bind bumps `lastActivityAt` on the active row, so the store replaces the object; the
+    // panes refetch on their source's identity, which must not follow a routine row write.
+    mocks.worktree = worktree({ linkedWorkItem: jiraWorkItem('JIR-6') })
+    const view = render(<IssuePane />)
+    const first = mocks.jiraSources.at(-1)
+
+    mocks.worktree = { ...mocks.worktree, lastActivityAt: 1 }
+    view.rerender(<IssuePane />)
+
+    // Why the length: a memoised child would make the reference check vacuous.
+    expect(mocks.jiraSources).toHaveLength(2)
+    expect(mocks.jiraSources.at(-1)).toBe(first)
+  })
+
+  it('uses the workspace host for a hand-linked issue', () => {
+    mocks.worktree = worktree({ linkedWorkItem: jiraWorkItem('JIR-9') })
+    render(<IssuePane />)
+
+    expect(sourceShown('jira-source')).toMatchObject({
+      kind: 'task-source',
+      provider: 'jira',
+      hostId: 'runtime:workspace-host'
+    })
   })
 })

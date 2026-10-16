@@ -25,7 +25,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { translate } from '@/i18n/i18n'
-import { defaultScopeSource } from '@/lib/default-creation-host'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import { toast } from 'sonner'
 import { LoaderCircle } from 'lucide-react'
@@ -58,16 +57,13 @@ export function TaskPageJiraBoard({
   const [activeView, setActiveViewState] = useState<'sprint' | 'backlog'>(
     () => loadJiraBoardViewPreferences().activeView
   )
+  const providerSettings = board.providerSettings
   const setActiveView = useCallback((view: 'sprint' | 'backlog') => {
     setActiveViewState(view)
     updateJiraBoardViewPreferences({ activeView: view })
   }, [])
   const legacyRuntimeFallbackApplied = useRef(false)
   const [assigningSprintIssueKey, setAssigningSprintIssueKey] = useState<string | null>(null)
-  const providerSettings = useMemo(
-    () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
-    [model.jiraTaskSourceContext, model.settings]
-  )
   const filteredColumns = useMemo(
     () => groupTaskPageJiraBoardIssues(board.overview?.columns ?? [], board.sprintIssues),
     [board.overview?.columns, board.sprintIssues]

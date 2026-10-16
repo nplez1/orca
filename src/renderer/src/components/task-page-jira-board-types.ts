@@ -2,7 +2,7 @@ import type { TaskPageComposerActionsModel } from './use-task-page-composer-acti
 
 export type TaskPageJiraBoardModel = Pick<
   TaskPageComposerActionsModel,
-  | 'settings'
+  | 'accountBackedTaskSourceHostId'
   | 'jiraTaskSourceContext'
   | 'jiraStatus'
   | 'jiraIssueAttachmentIndex'

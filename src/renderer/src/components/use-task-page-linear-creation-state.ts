@@ -5,7 +5,7 @@ import { useTaskCreationDraftRetention } from '@/components/use-task-creation-dr
 import { useNewLinearIssueProjects } from './use-new-linear-issue-projects'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { writeNewLinearIssueDraft, writeNewLinearProjectDraft } from './task-page-draft-storage'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultCreationHost } from '@/lib/default-creation-host'
 export function useTaskPageLinearCreationState(model: TaskPageJiraListProjectionModel) {
   const {
     settings,
@@ -39,12 +39,12 @@ export function useTaskPageLinearCreationState(model: TaskPageJiraListProjection
   )
   const newLinearProjectMembers = useTeamMembers(
     newLinearProjectOpen ? (newLinearProjectTargetTeam?.id ?? null) : null,
-    defaultScopeSource(settings),
+    defaultCreationHost(settings),
     newLinearProjectTargetTeam?.workspaceId
   )
   const newLinearProjectLabels = useTeamLabels(
     newLinearProjectOpen ? (newLinearProjectTargetTeam?.id ?? null) : null,
-    defaultScopeSource(settings),
+    defaultCreationHost(settings),
     newLinearProjectTargetTeam?.workspaceId
   )
   const setNewLinearProjectTeamId = (id: string | null): void => {
@@ -114,17 +114,17 @@ export function useTaskPageLinearCreationState(model: TaskPageJiraListProjection
   }
   const newLinearStates = useTeamStates(
     linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    defaultScopeSource(settings),
+    defaultCreationHost(settings),
     newLinearIssueTargetTeam?.workspaceId
   )
   const newLinearMembers = useTeamMembers(
     linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    defaultScopeSource(settings),
+    defaultCreationHost(settings),
     newLinearIssueTargetTeam?.workspaceId
   )
   const newLinearLabels = useTeamLabels(
     linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    defaultScopeSource(settings),
+    defaultCreationHost(settings),
     newLinearIssueTargetTeam?.workspaceId
   )
   useEffect(() => {

@@ -7,7 +7,7 @@ import type { ComponentProps } from 'react'
 import type { JiraIssue, JiraSprintAssignment } from '../../../shared/jira-types'
 import { JiraIssueMetadataBar } from './jira-issue-workspace-chrome'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -63,7 +63,7 @@ function renderBar({
         editFields={[]}
         editFieldsLoading={false}
         selfUser={null}
-        providerSettings={defaultScopeSource(null)}
+        providerSettings={defaultScopeHost(null)}
         owner={{ kind: 'local' }}
         runtimeContextKey="local#0"
         sprintAssignment={assignment}

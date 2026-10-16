@@ -14,8 +14,9 @@ import {
 } from '../../../../shared/task-source-context'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { parseJiraStatusError } from '../../../../shared/jira-status-error'
-import { defaultScopeSource } from '@/lib/default-creation-host'
-import type { RowLessSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
+import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
+import type { OwnedSource } from '@/lib/provider-source-target'
 
 const CACHE_TTL = 60_000
 const MAX_CACHE_ENTRIES = 500
@@ -38,7 +39,7 @@ export type JiraReadIdentity = {
 }
 
 export type JiraReadScope = JiraReadIdentity & {
-  settings: RowLessSource
+  settings: OwnedSource
 }
 
 export const inflightIssueRequests = new Map<string, InflightJiraReadRequest<JiraIssue | null>>()
@@ -221,7 +222,7 @@ export function getJiraReadScope(
 ): JiraReadScope {
   return {
     ...getJiraReadIdentity(settings, sourceContext),
-    settings: sourceContext ?? defaultScopeSource(settings)
+    settings: sourceContext ?? defaultScopeHost(settings)
   }
 }
 
@@ -229,15 +230,11 @@ export function scopedJiraCacheKey(scope: JiraReadIdentity, key: string): string
   return scope.cachePrefix ? `${scope.cachePrefix}::${key}` : key
 }
 
-function jiraConnectionRevisionContextKey(source: RowLessSource): string {
+function jiraConnectionRevisionContextKey(source: OwnedSource): string {
   return getProviderRuntimeContextKey(
-    source.kind === 'default-scope'
-      ? source.settings
-      : source.kind === 'task-source'
-        ? getTaskSourceRuntimeSettings(source)
-        : {
-            activeRuntimeEnvironmentId: source.kind === 'environment' ? source.environmentId : null
-          }
+    source.kind === 'task-source'
+      ? getTaskSourceRuntimeSettings(source)
+      : { activeRuntimeEnvironmentId: runtimeTargetEnvironmentId(source) }
   )
 }
 

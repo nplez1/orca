@@ -10,6 +10,7 @@ import { buildLinearIssueBranchName } from '@/components/linear-issue-workspace-
 import type { LinearComment, LinearIssue } from '../../../shared/linear/issue-types'
 import type { LinearProjectSummary } from '../../../shared/linear/project-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
 import { copyLinearIssueText } from './linear-issue-clipboard'
 import { LinearIssueProjectSelector } from './linear-issue-project-selector'
 
@@ -133,6 +134,7 @@ export function LinearIssueWorkspaceSidebar({
   onEditStateChange,
   onProjectChanged,
   onOpenAttachedWorkspace,
+  providerSettings,
   sourceContext
 }: {
   issue: LinearIssue
@@ -142,6 +144,8 @@ export function LinearIssueWorkspaceSidebar({
   onEditStateChange: (patch: Partial<LinearEditState>) => void
   onProjectChanged: (project: LinearProjectSummary) => void
   onOpenAttachedWorkspace: () => void
+  /** Owner-routed source, resolved by the workspace so the sidebar cannot re-derive it. */
+  providerSettings: RuntimeLinearSettings
   sourceContext?: TaskSourceContext | null
 }): React.JSX.Element {
   return (
@@ -151,6 +155,7 @@ export function LinearIssueWorkspaceSidebar({
         editState={editState}
         onEditStateChange={onEditStateChange}
         layout="properties"
+        providerSettings={providerSettings}
         sourceContext={sourceContext}
       />
       <LinearIssueProjectSelector

@@ -28,6 +28,7 @@ import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTimeFromDate } from '@/i18n/relative-time-format'
 import type { LinearComment, LinearIssue } from '../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
 import type { Worktree } from '../../../shared/worktree/types'
 import type { LinearEditState, LinearLocalComment } from '@/components/linear-item-drawer-types'
 
@@ -53,6 +54,8 @@ type LinearItemDrawerSheetProps = {
     ? Handler
     : never
   sourceContext: TaskSourceContext | null | undefined
+  /** Owner-routed source, resolved once by the drawer so the edit section cannot re-derive it. */
+  providerSettings: RuntimeLinearSettings
   editState: LinearEditState | null
   handleEditStateChange: (patch: Partial<LinearEditState>) => void
   commentsLoading: boolean
@@ -70,6 +73,7 @@ export function renderLinearItemDrawerSheet({
   displayed,
   handleIssueTextChange,
   sourceContext,
+  providerSettings,
   editState,
   handleEditStateChange,
   commentsLoading,
@@ -179,6 +183,7 @@ export function renderLinearItemDrawerSheet({
                 issue={displayed}
                 editState={editState}
                 onEditStateChange={handleEditStateChange}
+                providerSettings={providerSettings}
                 sourceContext={sourceContext}
               />
             )}

@@ -134,7 +134,7 @@ describe('createLinearSlice caching', () => {
     })
 
     expect(linearListProjectIssues).toHaveBeenCalledWith(
-      { kind: 'default-scope', settings: null },
+      { kind: 'local' },
       'project-1',
       120,
       'workspace-1',
@@ -241,7 +241,7 @@ describe('createLinearSlice caching', () => {
     })
 
     expect(linearListCustomViewIssues).toHaveBeenCalledWith(
-      { kind: 'default-scope', settings: null },
+      { kind: 'local' },
       'view-1',
       120,
       'workspace-1',
@@ -328,7 +328,7 @@ describe('createLinearSlice caching', () => {
     ).resolves.toMatchObject({ id: 'view-1' })
 
     expect(linearGetCustomView).toHaveBeenCalledWith(
-      { kind: 'default-scope', settings: null },
+      { kind: 'local' },
       'view-1',
       'project',
       'workspace-1',

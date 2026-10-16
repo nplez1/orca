@@ -1,5 +1,6 @@
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
 
 export type LinearItemDrawerProps = {
   issue: LinearIssue | null
@@ -22,6 +23,9 @@ export type LinearIssueEditSectionProps = {
   editState: LinearEditState
   onEditStateChange: (patch: Partial<LinearEditState>) => void
   layout?: 'chips' | 'properties'
+  /** Owner-routed source for this issue's reads and writes. Decided by the rendering surface so
+   *  an edit can never land on whichever server is focused. */
+  providerSettings: RuntimeLinearSettings
   sourceContext?: TaskSourceContext | null
 }
 

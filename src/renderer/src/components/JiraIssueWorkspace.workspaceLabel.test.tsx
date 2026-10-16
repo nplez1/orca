@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import type { JiraIssue } from '../../../shared/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 
 const state = vi.hoisted(() => {
   const holder: { displayed: JiraIssue | null } = { displayed: null }
@@ -104,6 +105,13 @@ const attachmentIndex = buildJiraIssueWorkspaceAttachmentIndex([
   attachedWorkspace('ALP-1', 'alp-1-fix-payments')
 ])
 
+const SHEET_SOURCE: TaskSourceContext = {
+  kind: 'task-source',
+  provider: 'jira',
+  projectId: 'sheet-project',
+  hostId: 'local'
+}
+
 function renderSheet(selectedIssue: JiraIssue): void {
   render(
     <JiraIssueWorkspace
@@ -111,6 +119,7 @@ function renderSheet(selectedIssue: JiraIssue): void {
       issueWorkspaceAttachmentIndex={attachmentIndex}
       onOpenOrStartWorkspace={vi.fn()}
       onClose={vi.fn()}
+      sourceContext={SHEET_SOURCE}
     />
   )
 }

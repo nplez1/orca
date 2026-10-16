@@ -1,4 +1,5 @@
 import { getWorkspaceReferenceIdentity } from '../../../../shared/workspace-reference-identity'
+import { workspaceAccountHostId } from '@/lib/workspace-account-host-id'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 import {
@@ -23,11 +24,15 @@ export function getWorkspaceAttachmentSourceContext(
   if (stored?.provider === provider) {
     return stored
   }
+  // Why the account host: a paired server that transports this workspace holds the credentials, so
+  // it owns the source — and every reader that resolves one has to agree, or a patch scoped to one
+  // leaves the other stale.
+  const hostId = workspaceAccountHostId(repo, workspace)
   if (repo) {
     return buildTaskSourceContextFromRepo({
       provider,
       projectId: workspace?.projectId ?? repo.id,
-      repo: { ...repo, executionHostId: workspace?.hostId ?? repo.executionHostId },
+      repo: { ...repo, executionHostId: hostId },
       projectHostSetupId: workspace?.projectHostSetupId
     })
   }
@@ -35,7 +40,7 @@ export function getWorkspaceAttachmentSourceContext(
     ? normalizeTaskSourceContext({
         provider,
         projectId: workspace.projectId ?? workspace.repoId,
-        hostId: workspace.hostId,
+        hostId,
         projectHostSetupId: workspace.projectHostSetupId
       })
     : null

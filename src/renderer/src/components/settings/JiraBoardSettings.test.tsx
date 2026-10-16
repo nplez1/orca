@@ -50,14 +50,7 @@ describe('JiraBoardSettings', () => {
       <JiraBoardSettings settings={settings} updateSettings={updateSettings} />
     )
     await waitFor(() =>
-      expect(mocks.jiraListBoards).toHaveBeenCalledWith(
-        {
-          kind: 'default-scope',
-          settings: { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }
-        },
-        'site-1',
-        undefined
-      )
+      expect(mocks.jiraListBoards).toHaveBeenCalledWith({ kind: 'local' }, 'site-1', undefined)
     )
     expect(container.querySelector('[data-settings-section="tasks-jira-board"]')).not.toBeNull()
 
@@ -95,14 +88,7 @@ describe('JiraBoardSettings', () => {
     await user.type(await screen.findByPlaceholderText('Search boards by name...'), 'Nebulite')
 
     await waitFor(() =>
-      expect(mocks.jiraListBoards).toHaveBeenCalledWith(
-        {
-          kind: 'default-scope',
-          settings: { activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }
-        },
-        'site-1',
-        'Nebulite'
-      )
+      expect(mocks.jiraListBoards).toHaveBeenCalledWith({ kind: 'local' }, 'site-1', 'Nebulite')
     )
   })
 

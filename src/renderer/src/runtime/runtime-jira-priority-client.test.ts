@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { jiraListPriorities } from './runtime-jira-client'
 import { jiraListPrioritiesForTarget } from './runtime-jira-detail-client'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 
 const transport = vi.hoisted(() => ({ rpc: vi.fn(), local: vi.fn() }))
 vi.mock('./runtime-rpc-client', () => ({ callRuntimeRpc: transport.rpc }))
@@ -41,8 +41,8 @@ describe('Jira priority owner transport', () => {
     expect(transport.local).not.toHaveBeenCalled()
   })
 
-  it('preserves the settings compatibility entry point', async () => {
-    await jiraListPriorities(defaultScopeSource({ activeRuntimeEnvironmentId: 'legacy' }), null)
+  it('sends the settings-scope owner the caller resolved', async () => {
+    await jiraListPriorities(defaultScopeHost({ activeRuntimeEnvironmentId: 'legacy' }), null)
     expect(transport.rpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'legacy' },
       'jira.listPriorities',

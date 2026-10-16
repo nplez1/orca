@@ -15,7 +15,7 @@ import { linearAddIssueComment } from '@/runtime/runtime-linear-issue-mutations'
 import { translate } from '@/i18n/i18n'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { LinearLocalComment } from '@/components/linear-item-drawer-types'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultScopeHost } from '@/lib/default-creation-host'
 
 export function LinearIssueCommentFooter({
   issueId,
@@ -31,7 +31,7 @@ export function LinearIssueCommentFooter({
   sourceContext?: TaskSourceContext | null
 }): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
-  const providerSettings = sourceContext ?? defaultScopeSource(settings)
+  const providerSettings = sourceContext ?? defaultScopeHost(settings)
   const submitShortcutLabel = getScreenSubmitShortcutLabel()
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)

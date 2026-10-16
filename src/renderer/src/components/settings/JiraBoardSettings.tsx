@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { runtimeHostIdFromEnvironmentId } from '../../../../shared/task-source-context'
 import type { JiraBoard, JiraSiteSelection } from '../../../../shared/jira-types'
 import { Button } from '@/components/ui/button'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
@@ -38,9 +39,13 @@ export function JiraBoardSettings({
     jiraStatus.selectedSiteId === 'all'
       ? 'all'
       : (jiraStatus.selectedSiteId ?? jiraStatus.activeSiteId ?? undefined)
+  // Why the host id and not the settings object: the effect below refetches on the target's
+  // identity, so keying on `settings` would re-list the boards — and re-check the connection — on
+  // every unrelated settings write, including this pane's own board selection.
+  const scopeEnvironmentId = settings.activeRuntimeEnvironmentId
   const runtimeSettings = useMemo<RuntimeJiraSettings>(
-    () => defaultScopeSource({ activeRuntimeEnvironmentId: settings.activeRuntimeEnvironmentId }),
-    [settings.activeRuntimeEnvironmentId]
+    () => taskSourceRuntimeTarget({ hostId: runtimeHostIdFromEnvironmentId(scopeEnvironmentId) }),
+    [scopeEnvironmentId]
   )
   const selectedBoard = settings.defaultJiraBoard
   const [boards, setBoards] = useState<JiraBoard[]>([])

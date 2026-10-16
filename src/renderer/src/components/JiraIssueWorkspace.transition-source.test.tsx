@@ -126,7 +126,7 @@ async function openForm(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
   await screen.findByLabelText('Comment')
 }
-function workspace(context?: TaskSourceContext) {
+function workspace(context: TaskSourceContext) {
   return (
     <JiraIssueWorkspace issue={issue} sourceContext={context} onUse={() => {}} onClose={() => {}} />
   )
@@ -222,11 +222,10 @@ describe('Jira transition form source ownership', () => {
       )
     )
   })
-  it('drops the form when a source without a selected project changes execution host', async () => {
-    const view = render(workspace())
+  it('drops a half-filled form when the source changes execution host', async () => {
+    const view = render(workspace(source))
     await openForm()
-    mocks.settings = { activeRuntimeEnvironmentId: 'environment-b' }
-    view.rerender(workspace())
+    view.rerender(workspace({ ...source, hostId: 'runtime:environment-b' }))
     await waitForTransitions()
     expect(screen.queryByLabelText('Comment')).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()

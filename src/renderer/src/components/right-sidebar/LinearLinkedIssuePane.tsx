@@ -3,10 +3,11 @@ import { LinearIssueTextEditor } from '@/components/LinearIssueTextEditor'
 import { LinearIssueCommentFooter } from '@/components/LinearItemDrawer'
 import { LinearIssueEditRows } from '@/components/linear-issue-edit-rows'
 import { useLinearIssueWorkspaceDetail } from '@/components/linear-issue-workspace-detail-state'
-import { defaultScopeSource } from '@/lib/default-creation-host'
 import { useAppStore } from '@/store'
 import type { LinearComment, LinearIssue } from '../../../../shared/linear/issue-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import type { RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
+import { scopedLinearCacheKeyForSource } from '@/store/slices/linear/linear-slice-scope'
 import { translate } from '@/i18n/i18n'
 import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { IssuePaneHeader } from './IssuePaneHeader'
@@ -35,13 +36,21 @@ export function LinearLinkedIssuePane({
   sourceContext
 }: {
   linkedIssue: LinearLinked
-  sourceContext: TaskSourceContext | null
+  /** The issue's provider account: the host the workspace's creation-time task came from, else the
+   *  workspace's own host. Never the Active Server, so one source drives every read, write and
+   *  cache key this pane owns. */
+  sourceContext: TaskSourceContext
 }): React.JSX.Element {
   const fetchLinearIssue = useAppStore((s) => s.fetchLinearIssue)
+  // Why only the owner's own key: the cache is in-memory, and a reader with no source at all writes
+  // the bare `all::<id>` key through the Active Server. A Linear identifier is unique only inside its
+  // workspace, so serving such an entry could show an issue another host's account read while every
+  // write from here goes to this owner. This pane always knows its source.
   const entry = useAppStore(
     (s) =>
-      s.linearIssueCache[`all::${linkedIssue.identifier}`] ??
-      s.linearIssueCache[linkedIssue.identifier]
+      s.linearIssueCache[
+        scopedLinearCacheKeyForSource(sourceContext, `all::${linkedIssue.identifier}`)
+      ]
   )
   const issue = entry?.data ?? null
   const [refreshing, setRefreshing] = useState(false)
@@ -102,14 +111,13 @@ function LinearLinkedIssueDetail({
   onRefresh
 }: {
   issue: LinearIssue
-  sourceContext: TaskSourceContext | null
+  sourceContext: TaskSourceContext
   refreshing: boolean
   onRefresh: () => void
 }): React.JSX.Element {
-  const settings = useAppStore((state) => state.settings)
-  const providerSettings = sourceContext ?? defaultScopeSource(settings)
   const linkActions = useLinkedIssuePaneActions()
-  const requestKey = `${sourceContext?.hostId ?? settings?.activeRuntimeEnvironmentId ?? 'local'}:${issue.workspaceId ?? 'selected'}:${issue.id}`
+  const providerSettings: RuntimeLinearSettings = sourceContext
+  const requestKey = `${sourceContext.hostId}:${issue.workspaceId ?? 'selected'}:${issue.id}`
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })
 
   return (
@@ -132,6 +140,7 @@ function LinearLinkedIssueDetail({
             issue={detail.displayed}
             editState={detail.editState}
             onEditStateChange={detail.handleEditStateChange}
+            providerSettings={providerSettings}
             sourceContext={sourceContext}
           />
         </div>

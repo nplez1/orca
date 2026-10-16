@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { linearCreateIssue, linearGetIssue } from '@/runtime/runtime-linear-issue-mutations'
 import { useAppStore } from '@/store'
-import { defaultScopeSource } from '@/lib/default-creation-host'
+import { defaultCreationHost } from '@/lib/default-creation-host'
 export function useTaskPageLinearIssueCreation(model: TaskPageLinearProjectCreationModel) {
   const {
     settings,
@@ -59,7 +59,7 @@ export function useTaskPageLinearIssueCreation(model: TaskPageLinearProjectCreat
     const submitProviderRuntimeContextKey = providerRuntimeContextKey
     try {
       const result = await linearCreateIssue(
-        linearTaskSourceContext ?? defaultScopeSource(settings),
+        linearTaskSourceContext ?? defaultCreationHost(settings),
         {
           teamId: newLinearIssueTargetTeam.id,
           title,
@@ -109,7 +109,7 @@ export function useTaskPageLinearIssueCreation(model: TaskPageLinearProjectCreat
 
       // Why: auto-select the new issue so the user sees exactly what was filed (mirrors the GitHub create-issue flow).
       void linearGetIssue(
-        linearTaskSourceContext ?? defaultScopeSource(settings),
+        linearTaskSourceContext ?? defaultCreationHost(settings),
         result.id,
         newLinearIssueTargetTeam.workspaceId
       )
