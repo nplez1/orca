@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isJiraStoryPointsField } from '../../shared/jira-field-rendering'
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
 import type { JiraAgileFieldIds } from './jira-issue-mapping'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
@@ -6,8 +7,6 @@ import { acquire, release } from './request-queue'
 import { settleJiraSummaryRead, withJiraDeadline } from './jira-read-failure'
 
 const SPRINT_FIELD_TYPE = 'com.pyxis.greenhopper.jira:gh-sprint'
-const STORY_POINTS_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
-const NUMBER_FIELD_TYPE = 'com.atlassian.jira.plugin.system.customfieldtypes:float'
 const cache = new Map<string, Promise<JiraAgileFieldIds>>()
 const discoveryExpiresAt = new Map<string, number>()
 const FAILED_DISCOVERY_RETRY_MS = 60_000
@@ -24,10 +23,7 @@ export function pickAgileFieldIds(fields: readonly JiraRecord[]): JiraAgileField
     if (!ids.sprint && custom === SPRINT_FIELD_TYPE) {
       ids.sprint = id
     }
-    if (
-      custom === STORY_POINTS_TYPE ||
-      (custom === NUMBER_FIELD_TYPE && /story points?/i.test(asString(field.name)))
-    ) {
+    if (isJiraStoryPointsField({ name: asString(field.name), schema: { custom } })) {
       ids.storyPoints ??= []
       if (!ids.storyPoints.includes(id)) {
         ids.storyPoints.push(id)

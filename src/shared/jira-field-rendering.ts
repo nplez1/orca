@@ -1,5 +1,8 @@
 import type { JiraCreateField } from './jira-types'
 
+const STORY_POINTS_CUSTOM_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
+const NUMBER_CUSTOM_TYPE = 'com.atlassian.jira.plugin.system.customfieldtypes:float'
+
 /** The control Orca renders for a Jira field's schema. */
 export type JiraFieldControlKind =
   | 'user'
@@ -60,6 +63,24 @@ export function resolveJiraFieldControlKind(field: JiraCreateField): JiraFieldCo
 /** True for fields whose value Jira expects as a body document, not a bare string. */
 export function isJiraTextAreaField(field: JiraCreateField): boolean {
   return field.schema?.custom?.includes(':textarea') === true || field.schema?.type === 'textarea'
+}
+
+/**
+ * Jira's story-points field, by the rule the host's field catalogue uses to
+ * discover it: Greenhopper's own field type, or the float custom field a site
+ * names "Story points". Team-managed sites name theirs in the site's language,
+ * so the type is what identifies it there. Accepts a raw field-catalogue record
+ * as well as a mapped `JiraCreateField`.
+ */
+export function isJiraStoryPointsField(field: {
+  name?: string | undefined
+  schema?: { custom?: string | undefined } | undefined
+}): boolean {
+  const custom = field.schema?.custom ?? ''
+  return (
+    custom === STORY_POINTS_CUSTOM_TYPE ||
+    (custom === NUMBER_CUSTOM_TYPE && /story points?/i.test(field.name ?? ''))
+  )
 }
 
 /** True for single- and multi-user fields, which need an accountId/id, not a name. */
