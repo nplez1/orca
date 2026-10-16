@@ -29,7 +29,8 @@ export function useJiraIssueWorkspaceDetail({
   sprintBoard = null,
   providerSettings,
   sourceContext,
-  refreshSignal = 0
+  refreshSignal = 0,
+  onSprintChange
 }: {
   issue: JiraIssue | null
   fetchKey?: string | null
@@ -40,6 +41,8 @@ export function useJiraIssueWorkspaceDetail({
   providerSettings: RuntimeJiraSettings
   sourceContext?: TaskSourceContext | null
   refreshSignal?: number
+  /** Called once a sprint move is committed, so the surfaces listing this issue reload. */
+  onSprintChange?: () => void
 }): JiraIssueWorkspaceDetailState {
   const settings = useAppStore((s) => s.settings)
   const [fullIssue, setFullIssue] = useState<JiraIssue | null>(null)
@@ -187,7 +190,8 @@ export function useJiraIssueWorkspaceDetail({
     sideData,
     scopeGenerationRef,
     editedFieldsRef,
-    setPendingField
+    setPendingField,
+    onSprintChange
   })
 
   const submitIssueFields = useCallback(

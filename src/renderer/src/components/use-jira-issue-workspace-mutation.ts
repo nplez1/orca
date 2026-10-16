@@ -27,7 +27,8 @@ export function useJiraIssueWorkspaceMutation({
   sideData,
   scopeGenerationRef,
   editedFieldsRef,
-  setPendingField
+  setPendingField,
+  onSprintChange
 }: {
   displayed: JiraIssue | null
   requestKey: string | null
@@ -40,6 +41,9 @@ export function useJiraIssueWorkspaceMutation({
   scopeGenerationRef: MutableRefObject<number>
   editedFieldsRef: MutableRefObject<Set<EditableJiraIssueField>>
   setPendingField: Dispatch<SetStateAction<string | null>>
+  /** Sprint membership is invisible to every other list this issue appears in, so a
+   *  committed move has to be announced rather than inferred from an issue field. */
+  onSprintChange?: () => void
 }): (
   field: string,
   updates: Parameters<typeof jiraUpdateIssue>[2],
@@ -100,6 +104,9 @@ export function useJiraIssueWorkspaceMutation({
             })
         })
         if (sprintChanged) {
+          // Why before the re-read: the move is committed by the time this thunk resolves,
+          // and the board's reload must not wait on a round trip that only feeds the picker.
+          onSprintChange?.()
           await reloadSprintAssignment()
         }
         if (updates.customFields) {
@@ -140,6 +147,7 @@ export function useJiraIssueWorkspaceMutation({
       displayed,
       editedFieldsRef,
       mutationContextKey,
+      onSprintChange,
       patchJiraIssue,
       pendingField,
       providerSettings,

@@ -39,6 +39,9 @@ type JiraIssueWorkspaceProps = {
    *  where the surface has no board. */
   sprintBoard?: { boardId: string; siteId: string } | null
   refreshSignal?: number
+  /** Reports a committed sprint move to the surface hosting this sheet, so the lists
+   *  the issue appears in reload — sprint membership is board state, not an issue field. */
+  onSprintChange?: () => void
 } &
   // Why the union: the fork's callers pass `onOpenOrStartWorkspace`, upstream's tests
   // and fixtures pass `onUse`; requiring exactly one keeps the primary button from
@@ -70,7 +73,8 @@ export default function JiraIssueWorkspace({
   onClose,
   sourceContext,
   sprintBoard = null,
-  refreshSignal = 0
+  refreshSignal = 0,
+  onSprintChange
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const openOrStartWorkspace = resolveOpenOrStartWorkspace(onOpenOrStartWorkspace, onUse)
   // Why the bound source: the label resolves `sourceContext` (the detail source, which
@@ -96,7 +100,8 @@ export default function JiraIssueWorkspace({
     providerSettings,
     sourceContext,
     sprintBoard,
-    refreshSignal
+    refreshSignal,
+    onSprintChange
   })
   const { displayed } = detail
   // Why derived from `displayed` and not the selected issue: the buttons below send

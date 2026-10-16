@@ -24,7 +24,12 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Unable to load this Jira board.'
 }
 
-export function useTaskPageJiraBoard(model: TaskPageJiraBoardModel, selection: JiraBoardSelection) {
+export function useTaskPageJiraBoard(
+  model: TaskPageJiraBoardModel,
+  selection: JiraBoardSelection,
+  /** A board-relevant change made outside the board, such as the open issue's sprint. */
+  refreshSignal = 0
+) {
   const providerSettings = useMemo(
     () => model.jiraTaskSourceContext ?? defaultScopeSource(model.settings),
     [model.jiraTaskSourceContext, model.settings]
@@ -34,6 +39,16 @@ export function useTaskPageJiraBoard(model: TaskPageJiraBoardModel, selection: J
   const [cacheSnapshot] = useState(() => readTaskPageJiraBoardCache(cacheKey))
   const overviewLoadedRef = useRef(cacheSnapshot?.overview != null)
   const [refreshNonce, setRefreshNonce] = useState(0)
+  // Why a nonce rather than a dependency: the parent's signal must reload exactly the
+  // way the board's own refresh does, loaders and page resets included.
+  const lastRefreshSignalRef = useRef(refreshSignal)
+  useEffect(() => {
+    if (lastRefreshSignalRef.current === refreshSignal) {
+      return
+    }
+    lastRefreshSignalRef.current = refreshSignal
+    setRefreshNonce((nonce) => nonce + 1)
+  }, [refreshSignal])
   const [overview, setOverview] = useState<JiraBoardOverview | null>(
     cacheSnapshot?.overview ?? null
   )
