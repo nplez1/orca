@@ -25,6 +25,7 @@ const runtimeMocks: {
   jiraGetIssueForTarget: Mock<typeof RuntimeJiraClient.jiraGetIssueForTarget>
   jiraIssueCommentsForTarget: Mock<typeof RuntimeJiraClient.jiraIssueCommentsForTarget>
   jiraListAssignableUsersForTarget: Mock<typeof RuntimeJiraClient.jiraListAssignableUsersForTarget>
+  jiraListEditFieldsForTarget: Mock<typeof RuntimeJiraClient.jiraListEditFieldsForTarget>
   jiraListPrioritiesForTarget: Mock<typeof RuntimeJiraClient.jiraListPrioritiesForTarget>
   jiraListTransitionsForTarget: Mock<typeof RuntimeJiraClient.jiraListTransitionsForTarget>
   jiraUpdateIssueForTarget: Mock<typeof RuntimeJiraClient.jiraUpdateIssueForTarget>
@@ -34,6 +35,7 @@ const runtimeMocks: {
   jiraIssueCommentsForTarget: vi.fn<typeof RuntimeJiraClient.jiraIssueCommentsForTarget>(),
   jiraListAssignableUsersForTarget:
     vi.fn<typeof RuntimeJiraClient.jiraListAssignableUsersForTarget>(),
+  jiraListEditFieldsForTarget: vi.fn<typeof RuntimeJiraClient.jiraListEditFieldsForTarget>(),
   jiraListPrioritiesForTarget: vi.fn<typeof RuntimeJiraClient.jiraListPrioritiesForTarget>(),
   jiraListTransitionsForTarget: vi.fn<typeof RuntimeJiraClient.jiraListTransitionsForTarget>(),
   jiraUpdateIssueForTarget: vi.fn<typeof RuntimeJiraClient.jiraUpdateIssueForTarget>()
@@ -44,6 +46,7 @@ const store = vi.hoisted(() => ({
   patchJiraIssue:
     vi.fn<(key: string, patch: Partial<JiraIssue>, options?: JiraPatchOptions) => void>()
 }))
+const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }))
 export const editState: { settings: GlobalSettings | null; serverTitle: string } = {
   settings: null,
   serverTitle: 'Old title'
@@ -80,7 +83,8 @@ vi.mock('@/runtime/runtime-jira-client', () => ({
   jiraListPriorities: (settings: RuntimeJiraSettings, siteId?: string | null) =>
     runtimeMocks.jiraListPrioritiesForTarget(getJiraRuntimeTarget(settings), siteId),
   jiraListAssignableUsers: async () => [],
-  jiraListEditFields: async () => []
+  jiraListEditFields: (settings: RuntimeJiraSettings, key: string, siteId?: string | null) =>
+    runtimeMocks.jiraListEditFieldsForTarget(getJiraRuntimeTarget(settings), key, siteId)
 }))
 vi.mock('@/store', () => ({
   useAppStore: (
@@ -114,7 +118,7 @@ vi.mock('@/i18n/i18n', async (importOriginal) => ({
 vi.mock('@/components/sidebar/CommentMarkdown', () => ({
   default: ({ content }: { content: string }) => <div>{content}</div>
 }))
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast }))
 
 export function jiraIssue(title: string, overrides: Partial<JiraIssue> = {}): JiraIssue {
   return {
@@ -223,6 +227,8 @@ beforeEach(() => {
   editState.serverTitle = 'Old title'
   store.patchJiraIssue.mockReset()
   store.readJiraStatus.mockReset().mockResolvedValue({ connected: false, viewer: null })
+  toast.error.mockReset()
+  toast.success.mockReset()
   for (const mock of Object.values(runtimeMocks)) {
     mock.mockReset()
   }
@@ -233,6 +239,7 @@ beforeEach(() => {
   runtimeMocks.jiraListTransitionsForTarget.mockResolvedValue([])
   runtimeMocks.jiraListPrioritiesForTarget.mockResolvedValue([])
   runtimeMocks.jiraListAssignableUsersForTarget.mockResolvedValue([])
+  runtimeMocks.jiraListEditFieldsForTarget.mockResolvedValue([])
 })
 
 afterEach(async () => {
@@ -245,4 +252,4 @@ afterEach(async () => {
   })
 })
 
-export { runtimeMocks, store }
+export { runtimeMocks, store, toast }

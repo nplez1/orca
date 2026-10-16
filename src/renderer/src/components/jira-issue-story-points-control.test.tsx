@@ -123,8 +123,77 @@ describe('JiraIssueStoryPointsControl', () => {
     await user.type(input, '8')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByRole('spinbutton', { name: 'Story points' })).toBeTruthy()
+    expect(await screen.findByRole('textbox', { name: 'Story points' })).toBeTruthy()
     expect(screen.getByDisplayValue('8')).toBeTruthy()
+  })
+
+  it('refuses a draft that is not a number instead of reading it as a clear', async () => {
+    const user = userEvent.setup()
+    const mutateIssue = renderControl({ displayed: issue(5), editFields: [pointsField('5')] })
+
+    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '5e')
+
+    expect(screen.getByText('Enter a number.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    expect(mutateIssue).not.toHaveBeenCalled()
+  })
+
+  it('blocks a save while another field of the issue is being written', async () => {
+    const user = userEvent.setup()
+    const mutateIssue = vi.fn<MutateIssue>(async () => ({ ok: true }))
+    const props = {
+      displayed: issue(5),
+      editFields: [pointsField('5')],
+      mutateIssue
+    }
+    const { rerender } = render(<JiraIssueStoryPointsControl {...props} pendingField={null} />)
+
+    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    // Another surface's write can start while this form is already open.
+    rerender(<JiraIssueStoryPointsControl {...props} pendingField="labels" />)
+
+    // The write would be refused with an error this form has nowhere to show it.
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    expect(input.hasAttribute('disabled')).toBe(true)
+    expect(mutateIssue).not.toHaveBeenCalled()
+  })
+
+  it('writes to the points field that holds the value the view shows', async () => {
+    const user = userEvent.setup()
+    const mutateIssue = renderControl({
+      displayed: issue(5),
+      editFields: [
+        {
+          field: {
+            key: 'customfield_10020',
+            name: 'Story point estimate',
+            required: false,
+            schema: { type: 'number', custom: FLOAT }
+          },
+          value: ''
+        },
+        pointsField('5')
+      ]
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Story points: 5' }))
+    const input = screen.getByRole('textbox', { name: 'Story points' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    // The estimate field sorts first, but the value on screen came from this one.
+    expect(mutateIssue).toHaveBeenCalledWith(
+      'storyPoints',
+      { customFields: { customfield_10016: 8 } },
+      { storyPoints: 8 }
+    )
   })
 
   it('leaves a number field that is not the story-points field alone', () => {
@@ -149,7 +218,7 @@ describe('JiraIssueStoryPointsControl', () => {
   it('shows points Jira will not let this user write', () => {
     renderControl({ displayed: issue(3), editFields: [] })
 
-    expect(screen.getByText('3')).toBeTruthy()
+    expect(screen.getByText('3 pts')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
   })
 

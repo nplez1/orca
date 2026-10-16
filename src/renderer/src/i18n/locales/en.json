@@ -1859,6 +1859,7 @@
       "JiraIssueStoryPointsControl": {
         "label": "Story points",
         "current": "Story points: {{value0}}",
+        "value": "{{value0}} pts",
         "none": "No points",
         "clearHint": "An empty value clears the field.",
         "invalid": "Enter a number.",

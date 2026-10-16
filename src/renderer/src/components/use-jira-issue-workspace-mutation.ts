@@ -47,8 +47,13 @@ export function useJiraIssueWorkspaceMutation({
   options?: { reportsInline?: boolean }
 ) => Promise<JiraMutationResult> {
   const patchJiraIssue = useAppStore((s) => s.patchJiraIssue)
-  const { selectSprint, reloadSprintAssignment, restoreSprintAssignment, sprintAssignment } =
-    sideData
+  const {
+    selectSprint,
+    reloadSprintAssignment,
+    restoreSprintAssignment,
+    reloadEditFields,
+    sprintAssignment
+  } = sideData
 
   return useCallback(
     async (
@@ -97,6 +102,11 @@ export function useJiraIssueWorkspaceMutation({
         if (sprintChanged) {
           await reloadSprintAssignment()
         }
+        if (updates.customFields) {
+          // Why: the "Edit fields" form seeds itself from the same editmeta read, so
+          // a value written here has to be re-read or the two disagree about the field.
+          await reloadEditFields()
+        }
         return { ok: true }
       } catch (error) {
         if (sprintChanged) {
@@ -133,6 +143,7 @@ export function useJiraIssueWorkspaceMutation({
       patchJiraIssue,
       pendingField,
       providerSettings,
+      reloadEditFields,
       reloadSprintAssignment,
       requestKey,
       restoreSprintAssignment,

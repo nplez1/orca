@@ -69,7 +69,7 @@ describe('JiraStoryPointsRow', () => {
     const mutateIssue = renderRow()
 
     await user.click(screen.getByRole('button', { name: /Story points/ }))
-    const input = screen.getByRole('spinbutton', { name: 'Story points' })
+    const input = screen.getByRole('textbox', { name: 'Story points' })
     await user.clear(input)
     await user.type(input, '3')
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -93,6 +93,19 @@ describe('JiraStoryPointsRow', () => {
 
     expect(screen.getByText('5')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /Story points/ }))
-    expect(screen.queryByRole('spinbutton', { name: 'Story points' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Story points' })).toBeNull()
+  })
+
+  it('cannot be opened while another field of the issue is being written', () => {
+    render(
+      <JiraStoryPointsRow
+        displayed={issue(5)}
+        editFields={[POINTS_FIELD]}
+        pendingField="labels"
+        mutateIssue={vi.fn<MutateIssue>(async () => ({ ok: true }))}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /Story points/ }).hasAttribute('disabled')).toBe(true)
   })
 })

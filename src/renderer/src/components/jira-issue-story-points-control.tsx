@@ -24,15 +24,38 @@ export type JiraStoryPointsMutation = (
 
 /** The story-points field Jira lets this user write on this issue, when it has one. */
 export function findJiraStoryPointsField(
-  fields: readonly JiraEditableField[]
+  fields: readonly JiraEditableField[],
+  points: number | undefined
 ): JiraEditableField | undefined {
-  return fields.find((entry) => isJiraStoryPointsField(entry.field))
+  const candidates = fields.filter((entry) => isJiraStoryPointsField(entry.field))
+  if (points !== undefined) {
+    // Why: a site can expose more than one story-points field (a classic float
+    // beside a next-gen estimate), and the one holding the value this view shows is
+    // the one to write back — otherwise a save lands where the view never reads.
+    const holding = candidates.find(
+      (entry) => entry.value.trim() !== '' && Number(entry.value) === points
+    )
+    if (holding) {
+      return holding
+    }
+  }
+  return candidates[0]
 }
 
 export function jiraStoryPointsLabel(points: number | undefined): string {
   return points === undefined
     ? translate('auto.components.JiraIssueStoryPointsControl.none', 'No points')
     : String(points)
+}
+
+/** The detail bar has no column heading above it and no label beside it, so the
+ *  chip names its own unit; the Issue pane's row is already labelled. */
+export function jiraStoryPointsChipLabel(points: number | undefined): string {
+  return points === undefined
+    ? jiraStoryPointsLabel(points)
+    : translate('auto.components.JiraIssueStoryPointsControl.value', '{{value0}} pts', {
+        value0: points
+      })
 }
 
 export function jiraStoryPointsFieldLabel(): string {
@@ -57,7 +80,10 @@ export type JiraStoryPointsEditor = {
   setDraft: (value: string) => void
   invalid: boolean
   changed: boolean
+  /** This field's own write is in flight. */
   pending: boolean
+  /** Any write on the issue is in flight, so a save here would be refused. */
+  blocked: boolean
   submit: () => Promise<void>
 }
 
@@ -78,19 +104,22 @@ export function useJiraStoryPointsEditor({
   pendingField: string | null
   mutateIssue: JiraStoryPointsMutation
 }): JiraStoryPointsEditor {
-  const pointsField = findJiraStoryPointsField(editFields)
+  const pointsField = findJiraStoryPointsField(editFields, displayed.storyPoints)
   const points = displayed.storyPoints
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const nextValue = draft.trim() === '' ? null : Number(draft)
-  // Jira takes a number or an explicit clear; anything else would be rejected.
+  const trimmedDraft = draft.trim()
+  // Why the input is a text box parsed here: a number input reports '' for text it
+  // cannot parse, so "5e" or "1." would read as an empty draft and clear the field.
+  const nextValue = trimmedDraft === '' ? null : Number(trimmedDraft)
   const invalid = nextValue !== null && !Number.isFinite(nextValue)
   const changed = nextValue !== (points ?? null)
 
   const openEditor = (nextOpen: boolean): void => {
     setOpen(nextOpen)
-    // Why on open rather than in an effect: the draft is a snapshot of the value
-    // this form is editing, and an effect would also overwrite a reopen's draft.
+    // Why on open rather than in an effect: a publish while the form is open — a
+    // refresh, or another field's optimistic patch — must not replace the draft
+    // the user is still typing into.
     if (nextOpen) {
       setDraft(points === undefined ? '' : String(points))
     }
@@ -106,6 +135,7 @@ export function useJiraStoryPointsEditor({
     invalid,
     changed,
     pending: pendingField === 'storyPoints',
+    blocked: pendingField !== null,
     submit: async (): Promise<void> => {
       if (!pointsField || invalid || !changed) {
         return
@@ -139,13 +169,12 @@ export function JiraStoryPointsEditorForm({
       }}
     >
       <Input
-        type="number"
+        type="text"
         inputMode="decimal"
-        step="any"
         autoFocus
         aria-label={jiraStoryPointsFieldLabel()}
         value={editor.draft}
-        disabled={editor.pending}
+        disabled={editor.blocked}
         aria-invalid={editor.invalid || undefined}
         onChange={(event) => editor.setDraft(event.target.value)}
       />
@@ -174,7 +203,7 @@ export function JiraStoryPointsEditorForm({
         <Button
           type="submit"
           size="xs"
-          disabled={editor.pending || editor.invalid || !editor.changed}
+          disabled={editor.blocked || editor.invalid || !editor.changed}
         >
           {translate('auto.components.JiraIssueStoryPointsControl.save', 'Save')}
         </Button>
@@ -206,7 +235,7 @@ export function JiraIssueStoryPointsControl({
         className="px-1.5 py-0.5 text-[11px] text-muted-foreground"
         title={pointsTitle(editor.points)}
       >
-        {jiraStoryPointsLabel(editor.points)}
+        {jiraStoryPointsChipLabel(editor.points)}
       </span>
     )
   }
@@ -220,7 +249,7 @@ export function JiraIssueStoryPointsControl({
           aria-label={pointsTitle(editor.points)}
           className={TRIGGER_CLASS}
         >
-          {jiraStoryPointsLabel(editor.points)}
+          {jiraStoryPointsChipLabel(editor.points)}
           {editor.pending ? <LoaderCircle className="size-3 shrink-0 animate-spin" /> : null}
         </button>
       </PopoverTrigger>
