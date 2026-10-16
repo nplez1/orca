@@ -8,6 +8,7 @@ import {
 } from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import {
+  toEphemeralVmRuntimeContextMenuFields,
   toEphemeralVmRuntimeExtendFields,
   toEphemeralVmRuntimeRecipeSnapshot
 } from '../shared/ephemeral-vm-runtimes'
@@ -57,6 +58,9 @@ export async function persistProvisionedEphemeralVmRuntime(
       // Why snapshotted beside the recipe: the lease this host was created under must stay
       // extendable by the recipe that bought it, even if orca.yaml changes or drops it later.
       ...toEphemeralVmRuntimeExtendFields(args.recipe),
+      // Same reason: a menu item an existing host's recipe declared must keep pointing at the
+      // script it was approved with, not at whatever repo it later resolves to.
+      ...toEphemeralVmRuntimeContextMenuFields(args.recipe),
       ...(args.repoId ? { repoId: args.repoId } : {}),
       ...(args.projectId ? { projectId: args.projectId } : {}),
       ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),

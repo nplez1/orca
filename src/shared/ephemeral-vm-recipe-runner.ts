@@ -17,8 +17,9 @@ import {
 export {
   buildEphemeralVmRecipeCleanupCommand,
   buildEphemeralVmRecipeCleanupPayload,
+  buildEphemeralVmRecipeLifecyclePayload,
   buildEphemeralVmRecipeExtendPayload,
-  type EphemeralVmRecipeCleanupPayload
+  type EphemeralVmRecipeLifecyclePayload
 } from './ephemeral-vm-recipe-lifecycle-payload'
 
 export type EphemeralVmRecipeContext = {

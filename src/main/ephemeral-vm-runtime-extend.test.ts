@@ -454,6 +454,25 @@ describe('extending an ephemeral VM lease', () => {
     expect(storedRuntime(fixture)).toEqual(before)
   })
 
+  it('refuses to extend a runtime whose destroy is already in flight', async () => {
+    // Why: the extension would buy time on a machine being torn down, and the two would race the
+    // same record.
+    const fixture = makeFixture()
+    const script = writeExtendScript(fixture.repoPath, 'teardown-extend', {
+      kind: 'fixed',
+      releaseAt: SECOND_RELEASE_AT
+    })
+    seedRuntime(fixture, {
+      extend: script.command,
+      extendDurations: ['1h'],
+      status: 'cleanup_pending',
+      cleanupStatus: 'running'
+    })
+
+    await expect(extend(fixture)).rejects.toThrow('already been released')
+    expect(existsSync(script.markerPath)).toBe(false)
+  })
+
   it('queues a concurrent extend behind the one in flight and reads its result', async () => {
     const fixture = makeFixture()
     const script = writeExtendScript(fixture.repoPath, 'increment-extend', { kind: 'increment' })

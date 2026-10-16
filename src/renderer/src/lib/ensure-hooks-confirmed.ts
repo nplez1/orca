@@ -45,6 +45,14 @@ function getSetupTrustContent(yamlHooks: OrcaHooks | null): string {
   return [yamlHooks?.scripts?.setup?.trim(), ...defaultTabCommands].filter(Boolean).join('\n\n')
 }
 
+/**
+ * The recipe declarations a user is asked to approve, so actions Orca can take on their behalf are
+ * visible before they are approved.
+ *
+ * Why the context-menu item commands are listed: each one runs a script on a click, so a recipe that
+ * already has an approval must not be able to gain one without the prompt changing. A recipe that
+ * declares no items produces exactly the content it always did.
+ */
 function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
   return (yamlHooks?.environmentRecipes ?? [])
     .map((recipe) =>
@@ -59,7 +67,10 @@ function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
           ? 'destroy: none'
           : recipe.destroy
             ? `destroy: ${recipe.destroy}`
-            : null
+            : null,
+        ...(recipe.contextMenuItems ?? []).map(
+          (item) => `contextMenuItems.${item.id} (${item.label}): ${item.command}`
+        )
       ]
         .filter((entry): entry is string => entry !== null)
         .join('\n')

@@ -1,5 +1,9 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import type { EphemeralVmRuntimeRecord } from '../../../shared/ephemeral-vm-runtimes'
+import {
+  isEphemeralVmHostActionable,
+  isReleasedEphemeralVmRuntime,
+  type EphemeralVmRuntimeRecord
+} from '../../../shared/ephemeral-vm-runtimes'
 import {
   getEphemeralVmRemainingMs,
   isEphemeralVmLifetimeExpired,
@@ -95,18 +99,10 @@ export function useEphemeralVmRuntimes(): EphemeralVmRuntimeRecord[] {
 }
 
 /**
- * Whether this runtime is only a record now — reclaimed, or already released.
- *
- * A tombstone has no lease to count down and nothing to extend, so every surface that renders a
- * lease has to treat it as absent rather than as a host that is still there.
+ * The host-action predicates, defined in `shared` and re-exported here so every existing renderer
+ * import keeps one spelling of "this host is gone" and "this host can still take an action".
  */
-export function isReleasedEphemeralVmRuntime(runtime: EphemeralVmRuntimeRecord): boolean {
-  return (
-    runtime.reclaimedAt !== undefined ||
-    runtime.status === 'cleaned' ||
-    runtime.cleanupStatus === 'succeeded'
-  )
-}
+export { isEphemeralVmHostActionable, isReleasedEphemeralVmRuntime }
 
 /**
  * A host is identified by the workspace it serves, not by its own id, because that is the pairing
@@ -116,7 +112,8 @@ export function isReleasedEphemeralVmRuntime(runtime: EphemeralVmRuntimeRecord):
  * fixed `projectRoot`), and this picks the first live record because a sidebar card carries no host
  * identity to disambiguate on. Both cards would then show the same host's lease. The destructive
  * paths do not rely on this — the reclaim bridge matches on the reclaimed host's own identities —
- * so the cost of the ambiguity is a wrong countdown, not a wrong deletion.
+ * so the cost of the ambiguity is a wrong countdown and a context-menu item run against the other
+ * host, never a wrong deletion.
  */
 export function findEphemeralVmRuntimeForWorkspace(
   records: readonly EphemeralVmRuntimeRecord[],

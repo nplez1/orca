@@ -23,6 +23,7 @@ export const ephemeralVmApi = {
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
   extendLifetime: (args) => ipcRenderer.invoke('ephemeralVm:extendLifetime', args),
+  runContextMenuItem: (args) => ipcRenderer.invoke('ephemeralVm:runContextMenuItem', args),
   onRuntimeReclaimed: (callback) => {
     const listener = (
       _event: Electron.IpcRendererEvent,

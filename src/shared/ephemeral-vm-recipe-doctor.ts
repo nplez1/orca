@@ -84,6 +84,13 @@ export function doctorEphemeralVmRecipe(args: {
       })
     }
   }
+  // Why each item: a context-menu action whose script is missing or not executable fails only when
+  // the user clicks it, on a workspace that may by then be the only one they have.
+  for (const item of recipe.contextMenuItems ?? []) {
+    checks.push(
+      checkCommandPath(args.repoPath, item.command, `recipe.context_menu_item.${item.id}`)
+    )
+  }
   // Why: a workspace suspended by `suspend` can only be woken if `resume` exists;
   // defining one without the other strands the workspace asleep.
   if (Boolean(recipe.suspend) !== Boolean(recipe.resume)) {
