@@ -836,6 +836,41 @@ pnpm run sync:localization-runtime-catalog
     `defaultScopeSource(...)` value, and because that allocates on every call it must be
     `useMemo`-stabilised at each call site, or it re-triggers the hooks that list `providerSettings`
     as a dependency and re-fetches on every render (see "Silent losses" below).
+  - **CLOSED (2026-10-16, issue #124): the fork's Jira/Linear surfaces now route by the resource's
+    owner.** The transport type is the fix, not a call-site edit: `RuntimeJiraSettings` /
+    `RuntimeLinearSettings` were `RowLessSource` (`TaskSourceContext | RuntimeClientTarget |
+    DefaultScopeSource`), and resolving the `default-scope` arm inside `getJiraRuntimeTarget` /
+    `getLinearRuntimeTarget` *is* the Active Server read. Those two now take `OwnedSource`
+    (`TaskSourceContext | RuntimeClientTarget`, the new `lib/provider-source-target.ts`), so a caller
+    has to name an owner before it can call anything, and `defaultScopeSource`, `rowLessSourceTarget`
+    and `DefaultScopeSource` are gone. Read surfaces take a real owner, and where that owner really
+    can differ from the focused host it is now used: the right-sidebar issue panes read *and write*
+    through the workspace's creation-time task source when that task is the same provider, else the
+    workspace's own host, and a Cmd-J-opened detail keeps its own source. The task page's board and detail route by the host
+    the page already captured for its Jira/Linear account, which on that page *is* the focused host
+    by design — so their behaviour is unchanged, and what changed is that the read is now a decided
+    target rather than a per-call settings read. A pane now carries one source rather than a target
+    beside a nullable context: the Linear pane's issue-cache lookup keys on the source it fetched
+    with instead of only the bare identifier, so the store hydration, the detail read, the property
+    edit and the comment all name one host. Creation, connection and settings-scope flows resolve
+    `defaultCreationHost` / `defaultScopeHost` explicitly, the same target as before, so
+    `getJiraRuntimeTarget` never allocates on their behalf. Every source the board hooks and the Jira
+    board picker derive is `useMemo`-stabilised on a *primitive* host id
+    (`jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId`), not on the model, the source
+    object or the settings object — the ledger's trap was that a re-created object re-triggers every
+    load effect, and the board suite now fails if the memo returns a fresh target. The memos that do
+    key on a source object key on ones `use-task-page-detail-routing` already memoises, except the
+    issue pane's: it derives its source from the workspace row through the sidebar's own resolver —
+    one resolver, so the card and the pane cannot cache under different scopes — and holds it stable
+    by value (`useStableTaskSource`), because the active row is replaced on routine writes that
+    change nothing an owner depends on and the panes refetch on their source's identity.
+    The ratchet fell **1161 → 959 reads** and 19 of the 22 annotated rows are gone entirely; the
+    three that remain are at 1 read each and name their cause in the baseline: `JiraBoardSettings`
+    (the default Jira board is a global setting, so the pane's board list belongs to the focused
+    host's account and its memo keys on that host id) and two files that read the setting
+    *transitively* through non-Jira code (`openHttpLink`'s Link Routing; the agent-detection owner
+    resolver's focused-runtime fallback before a workspace's owner hydrates). No count was raised to
+    make this land.
   - **Issue #98 (Jira lane drag-and-drop, Dev/QE field editing) raised five focus-read counts.**
     The feature adds real provider reads of its own: an `editmeta` read for the issue detail
     (`jira-issue-workspace-detail-state.ts` 3→4, `jira-issue-workspace-side-data.ts` 4→6,

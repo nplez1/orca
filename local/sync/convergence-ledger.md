@@ -1060,6 +1060,34 @@ is the point: two were already red at the pre-sync tip and one was this sync's.
   scanner does not exclude), one pruned; they are the owner-routing follow-up the ledger already
   carries for five other files.
 
+**2026-10-16 — the owner-routing follow-up landed (issue #124), and the counts fell.**
+`RuntimeJiraSettings` and `RuntimeLinearSettings` are now `OwnedSource`
+(`TaskSourceContext | RuntimeClientTarget`, `src/renderer/src/lib/provider-source-target.ts`) instead
+of `RowLessSource`, so the `default-scope` arm — and the Active Server read inside it — is gone from
+`getJiraRuntimeTarget`/`getLinearRuntimeTarget` and from every wrapper that resolved through them.
+`defaultScopeSource`, `rowLessSourceTarget` and `DefaultScopeSource` are deleted; a creation or
+connection flow resolves `defaultCreationHost`, a settings scope resolves `defaultScopeHost`, and a
+read surface resolves its resource's owner. The owner that genuinely differed from the focused host
+was the right-sidebar linked-issue pane's — the workspace's creation-time task source when that task
+is the same provider, else the workspace's own host — and that pane now carries **one** source: the store hydration, the
+detail read, the property edit, the comment and the cache key it looks its issue up under all name
+it, where before the hydration and the children could fall back to the focused server while the
+detail read the workspace's. The task page's own board and detail capture the focused host as the
+page's Jira/Linear account, so their behaviour is unchanged. The measured result: **1161 → 959
+reads**, 19 of the 22 annotated rows removed, and no row raised. The **trap held** — the fix is to
+memoise on the *primitive* host id rather than the model, the source object or the settings object,
+because `TaskPageJiraBoard` re-creates its model on every store write and `JiraBoardSettings`
+receives a new settings object on every settings write; a memo keyed on either would have re-fetched
+the board each time. The board suite fails if that memo returns a fresh target. A memo that does key
+on a source object keys on one a `use-task-page-detail-routing` memo already stabilised — except the
+issue pane's: it derives its source from the workspace row through the sidebar's own resolver, so
+the card and the pane cannot cache under different scopes, and holds it stable *by value*
+(`useStableTaskSource`), because the active row is replaced on routine writes — a PTY bind bumps
+`lastActivityAt` — and the panes refetch on their source's identity. Three rows survive at 1 read each
+and name their cause in the baseline: the global default-Jira-board setting, and two *transitive*
+readers that are not Jira/Linear surfaces at all (`openHttpLink`'s Link Routing; the agent-detection
+owner resolver's focused-runtime fallback for a workspace whose owner has not hydrated).
+
 The focus-read entries name their cause and their date. Do not add a ratchet entry without that, and
 do not "fix" one by bumping a count: the focus-read counts exist to fall as the owner routing lands.
 The ts-nocheck ratchet is back to its single grandfathered entry, and its baseline is the place a
