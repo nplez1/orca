@@ -917,7 +917,7 @@ describe('computeVisibleWorktreeIds', () => {
     expect(result).toEqual([child.id])
   })
 
-  it('does not include a known cross-project parent hidden by another filter', () => {
+  it('keeps a cross-project ancestor visible through the default-branch filter', () => {
     const parent = Object.assign(makeWorktree('parent'), {
       projectId: 'project-b',
       isMainWorktree: true
@@ -934,6 +934,6 @@ describe('computeVisibleWorktreeIds', () => {
       })
     )
 
-    expect(result).toEqual([child.id])
+    expect(result).toEqual([parent.id, child.id])
   })
 })

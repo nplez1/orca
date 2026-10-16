@@ -49,11 +49,10 @@ function readEnvelope(envelope: ZcodePlanApiKeyEnvelope): string {
   // Why only a sealed envelope consults the port: a plaintext one is the host's own bytes
   // and needs no sealing facility, so a plaintext store stays readable even where no store
   // was ever installed.
-  const store = getSecretStore()
-  if (!store.isEncryptionAvailable()) {
+  if (!getSecretStore().isEncryptionAvailable()) {
     throw new Error('GLM Coding Plan API key could not be decrypted')
   }
-  return store.decryptString(envelope.payload)
+  return getSecretStore().decryptString(envelope.payload)
 }
 
 export function hasZcodePlanApiKey(): boolean {
@@ -126,11 +125,10 @@ export function saveZcodePlanApiKey(key: string): void {
   if (/[\r\n]/.test(trimmed)) {
     throw new Error('GLM Coding Plan API key must be a single line')
   }
-  const store = getSecretStore()
-  if (store.isEncryptionAvailable()) {
+  if (getSecretStore().isEncryptionAvailable()) {
     writeSecureFile(
       getZcodePlanApiKeyPath(),
-      encodeApiKeyEnvelope('encrypted', store.encryptString(trimmed))
+      encodeApiKeyEnvelope('encrypted', getSecretStore().encryptString(trimmed))
     )
     cachedZcodePlanApiKey = trimmed
     return

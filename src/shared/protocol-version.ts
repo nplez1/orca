@@ -1,6 +1,7 @@
 import { HOST_SETTINGS_REPLICATION_RUNTIME_CAPABILITY } from './host-settings-replication'
 import { JIRA_RUNTIME_CAPABILITIES } from './jira-runtime-capabilities'
 export * from './runtime-protocol-versions'
+import { AI_VAULT_CHAT_FORK_SOURCE_CAPABILITY } from './ai-vault-resume-preparation'
 import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from './jira-agent-capability'
 import { JIRA_STATUS_FILTER_RUNTIME_CAPABILITY } from './jira-quick-filters'
 import { JIRA_SAVED_FILTER_RUNTIME_CAPABILITY } from './jira-saved-filter-capability'
@@ -149,6 +150,7 @@ export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
 ] as const
 
 export const RUNTIME_CAPABILITIES = [
+  AI_VAULT_CHAT_FORK_SOURCE_CAPABILITY,
   jiraDetailCapabilities.JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
   JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY,
   jiraDetailCapabilities.JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY,

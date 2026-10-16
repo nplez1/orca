@@ -152,6 +152,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   })
 
   usePendingSidebarReveal({
+    occurrencePlan: props.occurrencePlan,
     pendingRevealWorktree: props.pendingRevealWorktree,
     pendingRevealSidebarRow: props.pendingRevealSidebarRow,
     clearPendingRevealWorktreeId: props.clearPendingRevealWorktreeId,

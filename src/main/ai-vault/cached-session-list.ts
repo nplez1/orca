@@ -7,12 +7,21 @@ import {
 } from './session-scanner-background'
 import { getCachedWslDistros, hasCachedWslDistros, listRunningWslHomeDirsAsync } from '../wsl'
 import { filterPathsToRunningWslDistrosAsync } from '../wsl-running-path-filter'
-import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
+import {
+  isAiVaultScanCancelledError,
+  type AiVaultListArgs,
+  type AiVaultListResult
+} from '../../shared/ai-vault-types'
+import { aiVaultLocalScanKey, aiVaultLocalScanScopeKey } from '../../shared/ai-vault-local-scan-key'
 import { aiVaultHostListQuery } from '../../shared/ai-vault-session-filters'
 import type { AiVaultScanOptions } from './session-scanner-types'
 import { prepareOpenCodeWslReaders } from './opencode-wsl-runtime-preparation'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { AiVaultScanCoordinator } from './ai-vault-scan-coordinator'
+import {
+  startLocalAiVaultScanProgress,
+  type LocalAiVaultScanProgressHandle
+} from './ai-vault-local-scan-progress'
 import {
   aiVaultSessionDepthCovers,
   requestedAiVaultSessionDepth,
@@ -24,6 +33,15 @@ import {
 // RPC method share a single cache instance — opening the desktop panel and the
 // mobile screen for the same scope must not double-scan hundreds of transcripts.
 const AI_VAULT_CACHE_TTL_MS = 60_000
+
+export class AiVaultLocalScanError extends Error {
+  constructor(
+    readonly scanId: string,
+    readonly original: unknown
+  ) {
+    super(original instanceof Error ? original.message : String(original))
+  }
+}
 
 // Why: codex-home + WSL home dirs must be sourced from a serve-mode-reachable
 // seam (the OrcaRuntimeService deps), NOT the window-only registerCoreHandlers
@@ -89,15 +107,12 @@ export async function listAiVaultSessions(
   options: { signal?: AbortSignal } = {}
 ): Promise<AiVaultListResult> {
   // Scope paths and the query both change the result set, so both belong in the
-  // key: a filtered listing must never be served for an unfiltered request.
+  // key (the shared scope key carries the query): a filtered listing must never
+  // be served for an unfiltered request.
   const query = aiVaultHostListQuery(args?.query ?? '')
-  const key = JSON.stringify({
-    scopePaths: [...new Set(args?.scopePaths ?? [])].sort(),
-    includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true,
-    query
-  })
+  const key = aiVaultLocalScanScopeKey(args)
   const depth = requestedAiVaultSessionDepth(args)
-  const scanKey = JSON.stringify({ key, depth })
+  const scanKey = aiVaultLocalScanKey(args)
   const now = Date.now()
   if (args?.force === true) {
     clearAiVaultBackgroundRestartCircuit()
@@ -116,12 +131,23 @@ export async function listAiVaultSessions(
   // microtask, so an invalidation landing in that gap would otherwise be read
   // as having happened before this scan and leave the stale result cacheable.
   const startGeneration = cacheGeneration
+  let progress: LocalAiVaultScanProgressHandle | null = null
   return scanCoordinator.run({
     key: scanKey,
     force: args?.force,
     signal: options.signal,
-    start: async (scanSignal) => {
-      const result = await scanAiVaultSessionsInBackground(
+    onCreate: (scanId) => {
+      progress = startLocalAiVaultScanProgress(scanKey, scanId)
+    },
+    onError: (error) => progress?.fail(error),
+    onReject: (error, scanId) =>
+      isAiVaultScanCancelledError(error) ? error : new AiVaultLocalScanError(scanId, error),
+    start: async (scanSignal, scanId) => {
+      const scanProgress = progress
+      if (!scanProgress) {
+        throw new Error('Local scan progress was not created.')
+      }
+      const scanned = await scanAiVaultSessionsInBackground(
         {
           includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
           limit: args?.limit,
@@ -130,14 +156,17 @@ export async function listAiVaultSessions(
           ...(await localAiVaultScanRoots())
         },
         scanSignal,
+        scanSignal,
         {
           // A forced list is a refresh: the host reconciles its index first so a
           // session that just started is in the answer, rather than rescanning
           // every transcript the way this used to.
           ...(args?.force === true ? { refresh: true } : {}),
           ...(query ? { query } : {})
-        }
+        },
+        scanProgress
       )
+      const result = { ...scanned, scanId }
       // A delete (or other invalidation) landed while this scan was running:
       // its result predates the delete, so caching it would resurrect the
       // deleted session for the TTL. Return it to this caller but don't cache.

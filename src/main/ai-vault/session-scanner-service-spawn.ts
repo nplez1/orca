@@ -24,10 +24,15 @@ import { AiVaultScannerServiceClient } from './session-scanner-service-client'
 import { getAiVaultServiceEntryPath } from './session-scanner-service-entry-path'
 import { lowerAiVaultServicePriority } from './session-scanner-service-priority'
 import type {
+  AiVaultServiceResultValue,
   AiVaultServiceScanOptions,
   AiVaultServiceSubagentRequest,
   AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
+import {
+  requestLocalAiVaultScan,
+  type LocalAiVaultScanProgressHandle
+} from './ai-vault-local-scan-progress'
 
 export function spawnAiVaultServiceProcess(): ChildProcess {
   const entryPath = getAiVaultServiceEntryPath()
@@ -68,21 +73,26 @@ export function scanAiVaultSessionsInService(
    * reconcile its index before listing, `query` asks it to filter the listing so
    * a search covers the whole corpus rather than the rows already loaded.
    */
-  request: { refresh?: boolean; query?: string } = {}
+  request: { refresh?: boolean; query?: string } = {},
+  progress?: LocalAiVaultScanProgressHandle
 ): Promise<AiVaultListResult> {
   return withSpan('aiVault.scan.service', async (span) => {
-    const value = await getSharedClient().request<{
-      result: AiVaultListResult
-      durationMs: number
-    }>(
-      {
-        type: 'request',
-        operation: 'scan',
-        options,
-        ...(request.refresh ? { refresh: true } : {}),
-        ...(request.query ? { query: request.query } : {})
-      },
-      signal
+    const value = await requestLocalAiVaultScan(
+      (listener) =>
+        getSharedClient().request<
+          Extract<AiVaultServiceResultValue, { operation: 'scan' }>['value']
+        >(
+          {
+            type: 'request',
+            operation: 'scan',
+            options,
+            ...(request.refresh ? { refresh: true } : {}),
+            ...(request.query ? { query: request.query } : {})
+          },
+          signal,
+          listener
+        ),
+      { progress }
     )
     span.setAttribute('serviceDurationMs', value.durationMs)
     span.setAttribute('sessions', value.result.sessions.length)
@@ -124,15 +134,24 @@ export function searchSessionsInService(
 }
 
 export function sessionSearchStatusInService(): Promise<AiVaultSearchStatus> {
-  return getSharedClient().request({ type: 'request', operation: 'searchStatus' })
+  return getSharedClient().request({
+    type: 'request',
+    operation: 'searchStatus'
+  })
 }
 
 export function reconcileSessionSearchInService(): Promise<void> {
-  return getSharedClient().request({ type: 'request', operation: 'searchReconcile' })
+  return getSharedClient().request({
+    type: 'request',
+    operation: 'searchReconcile'
+  })
 }
 
 export function clearSessionSearchInService(): Promise<void> {
-  return getSharedClient().request({ type: 'request', operation: 'searchClear' })
+  return getSharedClient().request({
+    type: 'request',
+    operation: 'searchClear'
+  })
 }
 
 /** Boot and every settings change: push the policy and keep a child while the index runs. */

@@ -9,16 +9,12 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../../../shared/execution-host'
-import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
-import { getFolderWorkspaceHostIdentity } from '../../../../../../shared/folder-workspace-worktree'
 import { getHostDisplayLabelOverrides } from '../../../../../../shared/host-setting-overrides'
-import { buildRows } from '../grouping/build-rows'
-import { mergeSameBranchRows } from '../grouping/branch-groups'
-import {
-  buildProjectGroupingIndex,
-  type ProjectGroupingModel
-} from '../../../../../../shared/project-section-grouping'
+import { buildSidebarRowPlan } from '../grouping/build-rows'
+import { useEffectiveCollapsedGroups } from './use-collapsed-groups'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
+import { useMergedSidebarRows } from './use-merged-sidebar-rows'
+import { collectRenderedSidebarRowKeys } from './rendered-sidebar-row-keys'
 import type { PinnedWorktreeDisplayPolicy, Row, WorktreeGroupBy } from '../grouping/row-types'
 import { getLogicalRepoOrderRankById } from '../../../../../../shared/project-section-order'
 import { getEmptyProjectPlaceholderRepoIds } from '../../empty-project-placeholder-repos'
@@ -29,6 +25,7 @@ import { buildSidebarHostOptions } from '../../sidebar-host-options'
 import { selectPendingWorktreeCreationKeys } from './pending-worktree-creation-keys'
 
 type SectionRowsArgs = {
+  agentSendTargetWorktreeId?: string | null
   groupBy: WorktreeGroupBy
   projectOrderBy: ProjectOrderBy
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy
@@ -46,38 +43,17 @@ type SectionRowsArgs = {
   visibleReposForRows: readonly Repo[]
   visibleProjectGroupsForRows: readonly ProjectGroup[]
   visibleFolderWorkspacesForRows: readonly FolderWorkspace[]
-  importedWorktreesByRepo: Parameters<typeof buildRows>[14]
-  newExternalWorktreesInboxByRepo: Parameters<typeof buildRows>[15]
+  importedWorktreesByRepo: Parameters<typeof buildSidebarRowPlan>[14]
+  newExternalWorktreesInboxByRepo: Parameters<typeof buildSidebarRowPlan>[15]
   filterRepoIds: readonly string[]
   visibleWorkspaceHostIds: readonly ExecutionHostId[] | null
   workspaceHostScope: AppState['workspaceHostScope']
 }
 
-function collectRenderedSidebarRowKeys(sectionRows: ReturnType<typeof addHostSectionRows>) {
-  const keys = new Set<string>()
-  for (const row of sectionRows) {
-    if (row.type === 'header') {
-      keys.add(row.key)
-    } else if (row.type === 'item') {
-      keys.add(row.rowKey)
-    } else if (row.type === 'folder-workspace') {
-      keys.add(getFolderWorkspaceHostIdentity(row.folderWorkspace))
-      keys.add(folderWorkspaceKey(row.folderWorkspace.id))
-    } else if (row.type === 'pending-creation') {
-      keys.add(`pending:${row.creationId}`)
-    } else if (row.type === 'imported-worktrees-card') {
-      keys.add(row.key)
-    } else if (row.type === 'new-external-worktrees-inbox') {
-      keys.add(row.key)
-    }
-  }
-  return keys
-}
-
 // Builds the full sidebar row model: grouped worktree rows first, then the host-section
 // tier wrapped around them.
 export function useSidebarSectionRows(args: SectionRowsArgs) {
-  const { repos, worktrees, repoMap, effectiveCollapsedGroups, defaultHostId } = args
+  const { repos, worktrees, repoMap, defaultHostId } = args
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
@@ -87,7 +63,6 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   const wslHostServerFilesMissing = useAppStore((s) => s.wslHostServerFiles === 'missing')
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
-  const mergeSameBranchWorkspaces = useAppStore((s) => s.mergeSameBranchWorkspaces)
 
   // Why: manual header order is bound to state.repos; Recent/Smart derive order from the sorted worktree stream.
   const repoOrder = useMemo(
@@ -159,7 +134,78 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
 
   const hostScopedGroups =
     args.workspaceHostScope !== 'all' || args.visibleWorkspaceHostIds !== null
-  // Host sections apply lane collapse after splitting the rows by owner.
+  const rowPlan = useMemo(
+    () =>
+      buildSidebarRowPlan(
+        args.groupBy,
+        worktrees,
+        repoMap,
+        args.prCache,
+        new Set(),
+        repoOrder,
+        args.workspaceStatuses,
+        args.projectOrderBy,
+        args.worktreeLineageById,
+        args.worktreeMap,
+        true,
+        args.settings,
+        args.visibleProjectGroupsForRows,
+        placeholderRepoIds,
+        args.importedWorktreesByRepo,
+        args.newExternalWorktreesInboxByRepo,
+        pendingCreations,
+        args.projectGrouping,
+        args.visibleFolderWorkspacesForRows,
+        hostLabelById,
+        defaultHostId,
+        args.pinnedDisplayPolicy,
+        args.filterRepoIds
+      ),
+    [
+      args.groupBy,
+      worktrees,
+      repoMap,
+      args.prCache,
+      defaultHostId,
+      repoOrder,
+      args.workspaceStatuses,
+      args.projectOrderBy,
+      args.worktreeLineageById,
+      args.worktreeMap,
+      args.settings,
+      args.projectGrouping,
+      args.visibleProjectGroupsForRows,
+      args.visibleFolderWorkspacesForRows,
+      placeholderRepoIds,
+      args.importedWorktreesByRepo,
+      args.newExternalWorktreesInboxByRepo,
+      pendingCreations,
+      hostLabelById,
+      args.pinnedDisplayPolicy,
+      args.filterRepoIds
+    ]
+  )
+  const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
+    occurrencePlan: rowPlan.occurrencePlan,
+    hostScopedGroups,
+    collapsedGroups: args.effectiveCollapsedGroups,
+    agentSendTargetWorktreeId: args.agentSendTargetWorktreeId ?? null,
+    groupBy: args.groupBy,
+    pinnedDisplayPolicy: args.pinnedDisplayPolicy,
+    worktrees,
+    visibleWorktrees: worktrees,
+    filterRepoIds: args.filterRepoIds,
+    repoMap,
+    worktreeMap: args.worktreeMap,
+    worktreeLineageById: args.worktreeLineageById,
+    prCache: args.prCache,
+    workspaceStatuses: args.workspaceStatuses,
+    settings: args.settings,
+    projectGroups: args.visibleProjectGroupsForRows,
+    projectGrouping: args.projectGrouping,
+    folderWorkspaces: args.visibleFolderWorkspacesForRows,
+    defaultHostId
+  })
   const rowCollapsedGroups = useMemo(
     () =>
       hostScopedGroups
@@ -167,74 +213,17 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         : effectiveCollapsedGroups,
     [effectiveCollapsedGroups, hostScopedGroups]
   )
-
-  const rows: Row[] = useMemo(() => {
-    const built = buildRows(
-      args.groupBy,
-      worktrees,
-      repoMap,
-      args.prCache,
-      rowCollapsedGroups,
-      repoOrder,
-      args.workspaceStatuses,
-      args.projectOrderBy,
-      args.worktreeLineageById,
-      args.worktreeMap,
-      true,
-      args.settings,
-      args.visibleProjectGroupsForRows,
-      placeholderRepoIds,
-      args.importedWorktreesByRepo,
-      args.newExternalWorktreesInboxByRepo,
-      pendingCreations,
-      args.projectGrouping,
-      args.visibleFolderWorkspacesForRows,
-      hostLabelById,
-      defaultHostId,
-      args.pinnedDisplayPolicy
-    )
-    // Why: merging is only sound inside a project section. An explicit host
-    // filter splits rows into host sections, where a cross-host card has no home.
-    const shouldMergeSameBranch =
-      args.groupBy === 'repo' &&
-      mergeSameBranchWorkspaces &&
-      args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE &&
-      !args.visibleWorkspaceHostIds
-    return shouldMergeSameBranch
-      ? mergeSameBranchRows(
-          built,
-          repoMap,
-          buildProjectGroupingIndex(args.projectGrouping),
-          defaultHostId,
-          hostLabelById
-        )
-      : built
-  }, [
-    args.groupBy,
-    worktrees,
-    repoMap,
-    args.prCache,
+  const rows: Row[] = useMergedSidebarRows({
+    rowPlan,
     rowCollapsedGroups,
+    groupBy: args.groupBy,
+    workspaceHostScope: args.workspaceHostScope,
+    visibleWorkspaceHostIds: args.visibleWorkspaceHostIds,
+    repoMap,
+    projectGrouping: args.projectGrouping,
     defaultHostId,
-    repoOrder,
-    args.workspaceStatuses,
-    args.projectOrderBy,
-    args.worktreeLineageById,
-    args.worktreeMap,
-    args.settings,
-    args.projectGrouping,
-    args.visibleProjectGroupsForRows,
-    args.visibleFolderWorkspacesForRows,
-    placeholderRepoIds,
-    args.importedWorktreesByRepo,
-    args.newExternalWorktreesInboxByRepo,
-    pendingCreations,
-    hostLabelById,
-    args.pinnedDisplayPolicy,
-    mergeSameBranchWorkspaces,
-    args.workspaceHostScope,
-    args.visibleWorkspaceHostIds
-  ])
+    hostLabelById
+  })
   const orderedHostOptions = useMemo(
     () => orderHostSectionOptions(hostOptions, workspaceHostOrder),
     [hostOptions, workspaceHostOrder]
@@ -293,6 +282,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   )
 
   return {
+    occurrencePlan: rowPlan.occurrencePlan,
+    effectiveCollapsedGroups,
     rows,
     sectionRows,
     renderedSidebarRowKeys,

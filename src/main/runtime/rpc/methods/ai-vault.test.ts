@@ -576,7 +576,8 @@ describe('aiVault.listSessions handler + shared cache', () => {
       expect.objectContaining({ limit: undefined, unlimited: true }),
       expect.any(AbortSignal),
       // The fork's third argument: no refresh or query for a plain listing.
-      {}
+      {},
+      expect.objectContaining({ sent: expect.any(Function), work: expect.any(Function) })
     )
   })
 

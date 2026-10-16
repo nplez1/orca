@@ -776,6 +776,12 @@
             "thisScope": "This",
             "worktreeScope": "Worktree"
           },
+          "AiVaultScanProgressStrip": {
+            "databaseCount_one": "{{value0}} database",
+            "databaseCount_other": "{{value0}} databases",
+            "fileCount_one": "{{value0}} file",
+            "fileCount_other": "{{value0}} files"
+          },
           "AiVaultSessionDetails": {
             "assistant": "Assistant",
             "branch": "Branch",
@@ -3282,6 +3288,7 @@
         "queueFull": "Too many messages were waiting for the agent, so this one was not sent.",
         "runCommandAgain": "Run /{{command}} again.",
         "runCommandWhenDone": "Run /{{command}} when it's done.",
+        "runtimeNotInstalled": "{{agent}} isn't installed on the computer running this chat. Install it from the chat in a current version of Orca.",
         "sendAgainToTryOnceMore": "Send your message again to try once more.",
         "sendToTryAgain": "Send your message to try again.",
         "sessionNotRestored": "{{agent}} couldn't reopen its earlier session, so this chat continues in a new one. {{agent}} doesn't remember the earlier messages.",
@@ -3309,9 +3316,23 @@
         "editAlreadySent": "Already sent — your text is still in the composer.",
         "from": "From {{names}}",
         "pausedKept": "Not sent yet — press Send to send it.",
+        "queuePaused": "Queue paused",
         "queuePausedCleared": "Queue paused after you cleared the conversation",
+        "queuePausedStopped": "Queue paused because you interrupted",
+        "sendConfirmBody": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?",
         "sendConfirmBody_one": "You are about to send a message. Do you want to clear the {{count}} message previously queued?",
-        "sendConfirmBody_other": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?"
+        "sendConfirmBody_other": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?",
+        "sendConfirmClear": "Clear queue",
+        "sendConfirmSend": "Send message",
+        "sendConfirmTitle": "Send message?"
+      },
+      "receipt": {
+        "cancelled": "Cancelled",
+        "cancelledBy": "Cancelled on {{device}}",
+        "emptyAnswer": "Empty answer",
+        "resolved": "Resolved",
+        "resolver": "Answered on {{device}}",
+        "unavailable": "Selected answer unavailable"
       },
       "state": {
         "empty": {

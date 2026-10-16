@@ -415,7 +415,16 @@ describe('Jira workspace attachment identity', () => {
   it('rejects another execution host or Jira account but allows other repo contexts', () => {
     const workspace = linked('same-key')
     expect(matches([workspace], linkedIssue, { ...source, hostId: 'runtime:cloud' })).toEqual([])
-    expect(matches([workspace], linkedIssue, { ...source, accountLabel: 'another' })).toEqual([])
+    // Another login on the same site has its own siteId, and its issues carry it.
+    const otherSite: JiraSite = { ...site, id: 'site-a2', accountId: 'other-user' }
+    const otherLogin: TaskSourceContext = {
+      ...source,
+      providerIdentity: { provider: 'jira', siteId: otherSite.id, siteUrl: site.siteUrl }
+    }
+    expect(matches([workspace], { ...linkedIssue, siteId: otherSite.id }, otherLogin)).toEqual([])
+    expect(
+      collectLinkedJiraIssueRefs([workspace], [site, otherSite], otherSite.id, otherLogin)
+    ).toEqual([])
     expect(
       matches([workspace], linkedIssue, {
         ...source,
@@ -444,6 +453,27 @@ describe('Jira workspace attachment identity', () => {
       }
     })
     expect(matches([legacy])).toEqual([legacy])
+  })
+  it('matches links whose account label differs from the Tasks page label', () => {
+    const emailLabeled = makeWorktree({
+      id: 'email-labeled',
+      repoId: 'repo',
+      linkedItems: [
+        {
+          provider: 'jira',
+          type: 'issue',
+          number: 0,
+          identifier: 'APP-1',
+          url: issue.url,
+          taskSourceContext: { ...source, accountLabel: 'dev@acme.example' }
+        }
+      ]
+    })
+    const tasksPage = { ...source, accountLabel: 'Acme' }
+    expect(matches([emailLabeled], issue, tasksPage)).toEqual([emailLabeled])
+    expect(collectLinkedJiraIssueRefs([emailLabeled], [site], 'all', tasksPage)).toMatchObject([
+      { key: 'APP-1', siteId: site.id }
+    ])
   })
   it('matches account-scoped links in the all-sites view', () => {
     expect(matches([linked('one')], linkedIssue, { ...source, accountLabel: null })).toHaveLength(1)

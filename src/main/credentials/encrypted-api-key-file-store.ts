@@ -71,11 +71,10 @@ export function createEncryptedApiKeyFileStore({
     // Why only a sealed envelope consults the port: a plaintext one is the host's own bytes
     // and needs no sealing facility, so a plaintext store stays readable even where no store
     // was ever installed.
-    const store = getSecretStore()
-    if (!store.isEncryptionAvailable()) {
+    if (!getSecretStore().isEncryptionAvailable()) {
       throw new Error(`${providerLabel} API key could not be decrypted`)
     }
-    return store.decryptString(envelope.payload)
+    return getSecretStore().decryptString(envelope.payload)
   }
 
   function has(): boolean {
@@ -114,11 +113,10 @@ export function createEncryptedApiKeyFileStore({
     if (!trimmed) {
       throw new Error(`${providerLabel} API key is required`)
     }
-    const store = getSecretStore()
-    if (store.isEncryptionAvailable()) {
+    if (getSecretStore().isEncryptionAvailable()) {
       writeSecureFile(
         getApiKeyPath(),
-        encodeApiKeyEnvelope('encrypted', store.encryptString(trimmed)),
+        encodeApiKeyEnvelope('encrypted', getSecretStore().encryptString(trimmed)),
         { durable: true }
       )
       cachedApiKey = trimmed
