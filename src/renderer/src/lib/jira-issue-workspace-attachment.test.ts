@@ -464,13 +464,13 @@ describe('Jira workspace attachment identity', () => {
           type: 'issue',
           number: 0,
           identifier: 'APP-1',
-          url: issue.url,
+          url: linkedIssue.url,
           taskSourceContext: { ...source, accountLabel: 'dev@acme.example' }
         }
       ]
     })
     const tasksPage = { ...source, accountLabel: 'Acme' }
-    expect(matches([emailLabeled], issue, tasksPage)).toEqual([emailLabeled])
+    expect(matches([emailLabeled], linkedIssue, tasksPage)).toEqual([emailLabeled])
     expect(collectLinkedJiraIssueRefs([emailLabeled], [site], 'all', tasksPage)).toMatchObject([
       { key: 'APP-1', siteId: site.id }
     ])

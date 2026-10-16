@@ -46,7 +46,6 @@ function makeRow(): WorktreeRow {
     repo,
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0,
     branchGroupKey: GROUP_KEY,

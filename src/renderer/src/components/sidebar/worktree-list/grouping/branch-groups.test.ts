@@ -34,7 +34,6 @@ function itemRow(overrides: Partial<WorktreeRow> & { worktree: Worktree }): Work
     repo: projectRepoMap.get(overrides.worktree.repoId),
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0,
     ...overrides

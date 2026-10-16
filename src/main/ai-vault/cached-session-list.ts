@@ -156,7 +156,6 @@ export async function listAiVaultSessions(
           ...(await localAiVaultScanRoots())
         },
         scanSignal,
-        scanSignal,
         {
           // A forced list is a refresh: the host reconciles its index first so a
           // session that just started is in the answer, rather than rescanning
