@@ -12,6 +12,10 @@ export const AI_VAULT_SCOPE_PATH_MAX_LENGTH = 4096
 
 export const AI_VAULT_LIMIT_MAX = 2000
 
+// Why: an offset the host pages from must stay a row index, not a client-chosen
+// cursor that can address a list far past any scan.
+export const AI_VAULT_LIST_OFFSET_MAX = 1_000_000
+
 export const executionHostIdSchema = z.string().transform((value, ctx): `runtime:${string}` => {
   const parsed = parseExecutionHostId(value)
   if (parsed?.kind === 'runtime') {
@@ -59,7 +63,22 @@ export const AiVaultListSessionsParams = z
     // Why: desktop/web callers name the runtime host they are addressing; mobile
     // omits it. The scan itself is host-local either way, so the id must never
     // change what is scanned — it only restamps the shared cached result.
-    executionHostId: executionHostIdSchema.optional()
+    executionHostId: executionHostIdSchema.optional(),
+    // Why a separate field and not "offset was sent": page 0 must be bounded too,
+    // and a client that predates paging must keep receiving one complete reply.
+    paged: OptionalBoolean,
+    // A client's own held-list fingerprint; only a paging client keeps one to send back.
+    syncFromFingerprint: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    offset: z
+      .unknown()
+      .transform((value) =>
+        typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined
+      )
+      .pipe(z.union([z.number().int().max(AI_VAULT_LIST_OFFSET_MAX), z.undefined()]))
+      .optional()
   })
   .superRefine((params, ctx) => {
     if (params.unlimited !== true && params.limit && params.limit > AI_VAULT_LIMIT_MAX) {

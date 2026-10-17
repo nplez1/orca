@@ -348,11 +348,11 @@ export function updateLatestLocation(
   }
 }
 
-export function sessionSortTime(session: AiVaultSession): number {
-  return Date.parse(session.updatedAt ?? session.modifiedAt)
-}
-
 // Why: moved to the values module so the sub-agent declaration reader can use
 // it without importing this module back (import/no-cycle); existing importers
 // keep the accumulator as their source.
 export { sessionIdFromFileName } from './session-scanner-values'
+
+// Why shared: a client applying a delta re-derives the same order the host listed
+// by, and one formula must serve both sides.
+export { aiVaultSessionSortTime as sessionSortTime } from '../../shared/ai-vault-session-sort'

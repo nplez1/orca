@@ -71,6 +71,9 @@ function runtimeScanArgs(
   if (listArgs?.afterFingerprint !== undefined) {
     scanArgs.afterFingerprint = listArgs.afterFingerprint
   }
+  if (listArgs?.syncFromFingerprint !== undefined) {
+    scanArgs.syncFromFingerprint = listArgs.syncFromFingerprint
+  }
   if (listArgs?.limit !== undefined) {
     scanArgs.limit = listArgs.limit
   }

@@ -14,15 +14,39 @@ import type {
 } from '../../../../shared/ai-vault-session-title'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../../shared/ai-vault-types'
 import {
+  aiVaultPartialListIssue,
+  readAiVaultListPages
+} from '../../../../shared/ai-vault-list-pages'
+import {
   normalizeExecutionHostId,
   normalizeExecutionHostScope,
   toRuntimeExecutionHostId
 } from '../../../../shared/execution-host'
 import type { ExecutionHostId, ExecutionHostScope } from '../../../../shared/execution-host'
 import { callRuntimeResult } from './web-runtime-calls'
+import {
+  applyHeldBrowserAiVaultDelta,
+  browserHeldAiVaultList,
+  forgetBrowserAiVaultList,
+  rememberBrowserAiVaultList,
+  reusedBrowserAiVaultList
+} from './web-ai-vault-list-sync'
 import { requireActiveEnvironment } from './web-runtime-session'
 import { noopUnsubscribe } from './web-storage'
 import { translate } from '@/i18n/i18n'
+
+/** One listing identity: the same scope, depth and opt-ins is the same list. */
+function browserListKey(
+  args: AiVaultListArgs | undefined,
+  requestedScope: ExecutionHostScope
+): string {
+  return JSON.stringify([
+    requestedScope,
+    args?.scopePaths ?? [],
+    args?.limit ?? null,
+    args?.includeAntigravityIdeSessions === true
+  ])
+}
 
 export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault']> {
   const search = createSessionSearchClient(
@@ -44,26 +68,67 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
     setSearchEnabled: () => Promise.reject(new Error('unsupported')),
     clearSearchIndex: () =>
       Promise.reject(new Error('Clearing Agent Session History is unavailable in the browser.')),
-    listSessions: (args?: AiVaultListArgs) => {
+    listSessions: async (args?: AiVaultListArgs) => {
       const environment = requireActiveEnvironment()
       const executionHostId = toRuntimeExecutionHostId(environment.id)
       const requestedScope = normalizeExecutionHostScope(
         args?.executionHostScope ?? executionHostId
       )
       if (requestedScope !== 'all' && requestedScope !== executionHostId) {
-        return Promise.resolve(webAiVaultUnavailableResult(requestedScope))
+        return webAiVaultUnavailableResult(requestedScope)
       }
-      // Why: no local filesystem in the browser, so every history scan runs on and is stamped as the paired runtime host.
-      return callRuntimeResult<AiVaultListResult>('aiVault.listSessions', {
-        includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
-        limit: args?.limit,
-        force: args?.force,
-        ...(requestedScope === executionHostId && args?.afterFingerprint !== undefined
-          ? { afterFingerprint: args.afterFingerprint }
-          : {}),
-        scopePaths: args?.scopePaths,
-        executionHostId
+      const listKey = browserListKey(args, requestedScope)
+      const held = browserHeldAiVaultList(listKey)
+      // Why: no local filesystem in the browser, so every history scan runs on and is stamped as the paired runtime host. The reply is drained page by page because the paired connection refuses any frame over 4 MiB, and a refresh asks for only the rows that changed.
+      const read = await readAiVaultListPages({
+        firstPageArgs: {
+          includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
+          limit: args?.limit,
+          force: args?.force,
+          ...(requestedScope === executionHostId && args?.afterFingerprint !== undefined
+            ? { afterFingerprint: args.afterFingerprint }
+            : {}),
+          ...(held ? { syncFromFingerprint: held.fingerprint } : {}),
+          scopePaths: args?.scopePaths
+        },
+        fetchPage: (pageArgs) =>
+          callRuntimeResult<AiVaultListResult>('aiVault.listSessions', {
+            ...pageArgs,
+            executionHostId
+          })
       })
+      if (read.kind === 'failed') {
+        forgetBrowserAiVaultList(listKey)
+        throw read.error
+      }
+      if (read.kind === 'partial') {
+        // The rows on screen stay usable; the held list is dropped so the next refresh is a full one.
+        forgetBrowserAiVaultList(listKey)
+        return {
+          ...read.result,
+          issues: [
+            ...read.result.issues,
+            aiVaultPartialListIssue({
+              executionHostId,
+              path: environment.id,
+              error: read.error
+            })
+          ]
+        }
+      }
+      if (read.result.unchanged || read.result.syncDelta) {
+        if (!held) {
+          forgetBrowserAiVaultList(listKey)
+          throw new Error('The host answered with changes to a list this client does not hold.')
+        }
+        const rebuilt = read.result.unchanged
+          ? reusedBrowserAiVaultList(held, read.result)
+          : applyHeldBrowserAiVaultDelta(held, read.result)
+        rememberBrowserAiVaultList(listKey, rebuilt)
+        return rebuilt
+      }
+      rememberBrowserAiVaultList(listKey, read.result)
+      return read.result
     },
     resolveSessionTitles: (args: AiVaultSessionTitlesArgs) => {
       const environment = requireActiveEnvironment()

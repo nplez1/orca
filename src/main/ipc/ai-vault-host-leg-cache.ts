@@ -1,5 +1,10 @@
 import { MAX_TIMER_DELAY_MS } from '../../shared/timer-delay'
-import type { AiVaultListResult } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListResult,
+  AiVaultListSyncDelta,
+  AiVaultSession
+} from '../../shared/ai-vault-types'
+import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
 import {
   aiVaultSessionDepthCovers,
   truncateAiVaultListResult,
@@ -53,6 +58,12 @@ function scheduleHostLegExpiry(): void {
   expiryTimer.unref?.()
 }
 
+/** What this host's held list was, so a refresh can ask for the difference from it. */
+export type AiVaultHostLegSyncBasis = {
+  fingerprint: string
+  sessions: readonly AiVaultSession[]
+}
+
 /** Serves one host's leg from the per-host TTL cache, and stores it only when
  * that host answered without a host issue — a failing host is retried on the
  * next open while its healthy neighbours stay cached. */
@@ -62,7 +73,8 @@ export async function scanHostLegWithCache(args: {
   scopePaths?: readonly string[]
   force: boolean
   afterFingerprint?: string | null
-  scan: () => Promise<AiVaultListResult>
+  /** Receives the basis to sync from, or undefined when this leg holds no full list yet. */
+  scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
 }): Promise<AiVaultListResult> {
   const now = Date.now()
   const startGeneration = cacheGeneration
@@ -77,7 +89,18 @@ export async function scanHostLegWithCache(args: {
   ) {
     return truncateAiVaultListResult(cached.result, args.depth, args.scopePaths)
   }
-  const result = await args.scan()
+  // Why capture rather than look up afterwards: the basis is what the delta is applied to, and a
+  // concurrent scan must not swap it out between the request and the reply.
+  const basis = hostLegSyncBasis(args.cacheKey, args.depth)
+  const scanned = await args.scan(basis)
+  // A delta is only ever answered to a request that sent a token, so the basis is the list it
+  // described; anything else would mean the host diffed against a list this leg never held.
+  const delta = scanned.syncDelta
+  if (delta && !basis) {
+    // A host diffed against a list this leg never sent; applying it would paint a list nobody holds.
+    throw new Error('The session host answered with changes this computer does not hold.')
+  }
+  const result = delta && basis ? withAppliedDelta(basis.sessions, delta, scanned) : scanned
   // A delete's invalidation landed while this leg was scanning; caching a
   // pre-delete result would resurrect the deleted session for the TTL.
   if (startGeneration !== cacheGeneration) {
@@ -109,6 +132,31 @@ export async function scanHostLegWithCache(args: {
   })
   scheduleHostLegExpiry()
   return result
+}
+
+/** The full list this leg holds at exactly this depth; a shallower depth cannot reuse it. */
+function hostLegSyncBasis(
+  cacheKey: string,
+  depth: AiVaultSessionDepth
+): AiVaultHostLegSyncBasis | undefined {
+  const held = lastFullHostLegs.get(cacheKey)
+  const fingerprint = held?.result.fingerprint
+  return held?.depth === depth && fingerprint
+    ? { fingerprint, sessions: held.result.sessions }
+    : undefined
+}
+
+function withAppliedDelta(
+  held: readonly AiVaultSession[],
+  delta: AiVaultListSyncDelta,
+  reply: AiVaultListResult
+): AiVaultListResult {
+  return {
+    sessions: applyAiVaultListDelta(held, delta),
+    issues: reply.issues,
+    scannedAt: reply.scannedAt,
+    ...(reply.fingerprint ? { fingerprint: reply.fingerprint } : {})
+  }
 }
 
 /** Returns the full list an `unchanged` reply stands for when one is known. */

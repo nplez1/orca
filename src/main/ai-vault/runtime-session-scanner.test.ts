@@ -62,6 +62,8 @@ describe('runtime AI Vault session scanner', () => {
         limit: 25,
         force: true,
         scopePaths: ['/srv/app'],
+        paged: true,
+        offset: 0,
         executionHostId: 'runtime:env-1'
       },
       3000
@@ -141,6 +143,120 @@ describe('runtime AI Vault session scanner', () => {
     })
     expect(invalid.unchanged).toBeUndefined()
     expect(invalid.issues[0]?.kind).toBe('host')
+  })
+
+  it('drains a paged host listing into one complete leg', async () => {
+    mocks.callRuntimeEnvironment
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          ...result([session('runtime:env-1', 'session-1')]),
+          fingerprint: 'a'.repeat(64),
+          hasMore: true,
+          nextOffset: 1
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        result: result([session('runtime:env-1', 'session-2')])
+      })
+
+    const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', { unlimited: true })
+
+    expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1', 'session-2'])
+    expect(scanResult.fingerprint).toBe('a'.repeat(64))
+    expect(scanResult.hasMore).toBeUndefined()
+    expect(mocks.callRuntimeEnvironment).toHaveBeenNthCalledWith(
+      2,
+      '/user-data',
+      'env-1',
+      'aiVault.listSessions',
+      expect.objectContaining({ paged: true, offset: 1 }),
+      undefined
+    )
+  })
+
+  it('asks for the difference from the list this leg holds and retags the changed rows', async () => {
+    const fingerprint = 'a'.repeat(64)
+    mocks.callRuntimeEnvironment.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        sessions: [],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        fingerprint: 'b'.repeat(64),
+        syncDelta: {
+          upserts: [session('local', 'session-2')],
+          removedIds: ['runtime:env-1:codex:session-1:/sessions/session-1.jsonl']
+        }
+      }
+    })
+
+    const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', {
+      syncFromFingerprint: fingerprint
+    })
+
+    expect(mocks.callRuntimeEnvironment).toHaveBeenCalledWith(
+      '/user-data',
+      'env-1',
+      'aiVault.listSessions',
+      expect.objectContaining({ syncFromFingerprint: fingerprint, offset: 0 }),
+      undefined
+    )
+    expect(scanResult.sessions).toEqual([])
+    expect(scanResult.syncDelta).toEqual({
+      upserts: [
+        expect.objectContaining({
+          id: 'runtime:env-1:codex:session-2:/sessions/session-2.jsonl',
+          executionHostId: 'runtime:env-1'
+        })
+      ],
+      removedIds: ['runtime:env-1:codex:session-1:/sessions/session-1.jsonl']
+    })
+  })
+
+  it('keeps the rows already read when a later page fails', async () => {
+    mocks.callRuntimeEnvironment
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          ...result([session('runtime:env-1', 'session-1')]),
+          hasMore: true,
+          nextOffset: 1
+        }
+      })
+      .mockResolvedValueOnce({ ok: false, error: { code: 'connection_lost', message: 'gone' } })
+
+    const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', { unlimited: true })
+
+    expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1'])
+    expect(scanResult.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'host',
+        executionHostId: 'runtime:env-1',
+        message: 'Only part of the session list loaded. gone'
+      })
+    )
+  })
+
+  it('refuses a delta this request never asked for', async () => {
+    mocks.callRuntimeEnvironment.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        sessions: [],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        syncDelta: { upserts: [session('local', 'session-2')], removedIds: [] }
+      }
+    })
+
+    const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', {})
+
+    expect(scanResult.sessions).toEqual([])
+    expect(scanResult.issues[0]).toMatchObject({
+      kind: 'host',
+      message: 'Invalid aiVault.listSessions response: Unexpected session delta'
+    })
   })
 
   it('prepares a resume on the transcript-owning runtime', async () => {

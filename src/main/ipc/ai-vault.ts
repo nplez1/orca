@@ -44,7 +44,8 @@ import {
 import {
   invalidateAiVaultHostLegCache,
   resetAiVaultHostLegCacheForTests,
-  scanHostLegWithCache
+  scanHostLegWithCache,
+  type AiVaultHostLegSyncBasis
 } from './ai-vault-host-leg-cache'
 import { requestedAiVaultSessionDepth } from '../../shared/ai-vault-session-depth'
 import type {
@@ -111,9 +112,8 @@ async function listAiVaultSessions(
     force: args?.force,
     signal: options.signal,
     start: (scanSignal) => {
-      const scan = () => scanAiVaultSessionsByHostScope(args, executionHostScope, scanSignal, key)
       if (executionHostScope === LOCAL_EXECUTION_HOST_ID) {
-        return scan()
+        return scanAiVaultSessionsByHostScope(args, executionHostScope, scanSignal, key)
       }
       return scanHostLegWithCache({
         cacheKey: key,
@@ -121,10 +121,31 @@ async function listAiVaultSessions(
         scopePaths,
         force: args?.force === true,
         afterFingerprint,
-        scan
+        scan: (syncFrom) =>
+          scanAiVaultSessionsByHostScope(
+            syncFrom ? { ...args, syncFromFingerprint: syncFrom.fingerprint } : args,
+            executionHostScope,
+            scanSignal,
+            key
+          )
       })
     }
   })
+}
+
+// Why both fields are per leg: the merged 'all' result has no single fingerprint, but each host's
+// own held list still lets that leg answer with a delta.
+function legListArgs(
+  args: AiVaultListArgs | undefined,
+  syncFrom: AiVaultHostLegSyncBasis | undefined
+): AiVaultListArgs | undefined {
+  return args
+    ? {
+        ...args,
+        afterFingerprint: undefined,
+        ...(syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+      }
+    : undefined
 }
 
 async function scanAiVaultSessionsByHostScope(
@@ -149,11 +170,11 @@ async function scanAiVaultSessionsByHostScope(
           depth,
           scopePaths,
           force: args?.force === true,
-          scan: () =>
+          scan: (syncFrom) =>
             scanRuntimeAiVaultSessions({
               hostInfo,
               scanner: handlerOptions.scanRuntimeAiVaultSessions,
-              listArgs: args ? { ...args, afterFingerprint: undefined } : undefined,
+              listArgs: legListArgs(args, syncFrom),
               options: {
                 signal,
                 timeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScan

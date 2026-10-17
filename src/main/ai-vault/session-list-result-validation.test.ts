@@ -256,6 +256,61 @@ function validSession(sessionId = 'session-1'): Record<string, unknown> {
   }
 }
 
+describe('parseAiVaultListResult paging and deltas', () => {
+  it('keeps a bounded page cursor and its fingerprint', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [validSession()],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64),
+      hasMore: true,
+      nextOffset: 1
+    })
+
+    expect(parsed).toMatchObject({ hasMore: true, nextOffset: 1, fingerprint: 'a'.repeat(64) })
+  })
+
+  it('rejects a page that claims more rows without a cursor', () => {
+    expect(() =>
+      parseAiVaultListResult({
+        sessions: [validSession()],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        hasMore: true
+      })
+    ).toThrow('Invalid paged response')
+  })
+
+  it('parses a delta and drops only its malformed rows', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: { upserts: [validSession('session-2'), { id: 42 }], removedIds: ['gone'] }
+    })
+
+    expect(parsed.syncDelta).toEqual({
+      upserts: [expect.objectContaining({ sessionId: 'session-2' })],
+      removedIds: ['gone']
+    })
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('rejects a reply that carries both a delta and a listing body', () => {
+    expect(() =>
+      parseAiVaultListResult({
+        sessions: [validSession()],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        syncDelta: { upserts: [], removedIds: [] }
+      })
+    ).toThrow('Invalid session delta response')
+  })
+})
+
 function validScanIssue(agent = 'codex'): Record<string, unknown> {
   return {
     agent,

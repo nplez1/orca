@@ -1,0 +1,133 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
+import {
+  AI_VAULT_CACHE_TTL_MS,
+  invalidateAiVaultHostLegCache,
+  scanHostLegWithCache,
+  type AiVaultHostLegSyncBasis
+} from './ai-vault-host-leg-cache'
+
+const SCANNED_AT = '2026-10-02T00:00:00.000Z'
+const FIRST_FINGERPRINT = 'a'.repeat(64)
+const SECOND_FINGERPRINT = 'b'.repeat(64)
+
+function session(sessionId: string, modifiedAt = SCANNED_AT): AiVaultSession {
+  return {
+    id: `runtime:env-1:codex:${sessionId}:/srv/${sessionId}.jsonl`,
+    executionHostId: 'runtime:env-1',
+    agent: 'codex',
+    sessionId,
+    title: sessionId,
+    cwd: '/srv/app',
+    branch: null,
+    model: null,
+    filePath: `/srv/${sessionId}.jsonl`,
+    codexHome: null,
+    createdAt: null,
+    updatedAt: null,
+    modifiedAt,
+    messageCount: 1,
+    totalTokens: 0,
+    previewMessages: [],
+    queuedMessageCount: 0,
+    subagentTranscriptCount: 0,
+    resumeCommand: `codex resume ${sessionId}`,
+    subagent: null
+  }
+}
+
+const EARLY = '2026-10-01T00:00:00.000Z'
+
+function listing(sessions: readonly AiVaultSession[], fingerprint?: string): AiVaultListResult {
+  return {
+    sessions: [...sessions],
+    issues: [],
+    scannedAt: SCANNED_AT,
+    ...(fingerprint ? { fingerprint } : {})
+  }
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(1_000)
+})
+
+afterEach(() => {
+  invalidateAiVaultHostLegCache()
+  vi.useRealTimers()
+})
+
+describe('host leg change sync', () => {
+  it('asks for the difference from the list it holds and applies it', async () => {
+    const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
+    const held = [session('one'), session('two', EARLY)]
+    scan.mockResolvedValueOnce(listing(held, FIRST_FINGERPRINT))
+    const args = { cacheKey: 'leg', depth: 'unlimited' as const, force: false, scan }
+
+    const first = await scanHostLegWithCache(args)
+    expect(scan).toHaveBeenNthCalledWith(1, undefined)
+    expect(first.fingerprint).toBe(FIRST_FINGERPRINT)
+
+    // Past the TTL, so the leg asks the host again — for the change, not the whole list.
+    vi.setSystemTime(1_000 + AI_VAULT_CACHE_TTL_MS + 1)
+    scan.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-10-03T00:00:00.000Z',
+      fingerprint: SECOND_FINGERPRINT,
+      syncDelta: { upserts: [session('three')], removedIds: [held[0]!.id] }
+    })
+
+    const second = await scanHostLegWithCache(args)
+
+    expect(scan).toHaveBeenNthCalledWith(2, {
+      fingerprint: FIRST_FINGERPRINT,
+      sessions: held
+    })
+    expect(second.sessions.map((row) => row.sessionId)).toEqual(['three', 'two'])
+    expect(second.fingerprint).toBe(SECOND_FINGERPRINT)
+    expect(second.syncDelta).toBeUndefined()
+  })
+
+  it('syncs the next refresh from the applied fingerprint', async () => {
+    const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
+    scan.mockResolvedValueOnce(listing([session('one')], FIRST_FINGERPRINT))
+    const args = { cacheKey: 'leg', depth: 'unlimited' as const, force: false, scan }
+    await scanHostLegWithCache(args)
+
+    vi.setSystemTime(1_000 + AI_VAULT_CACHE_TTL_MS + 1)
+    scan.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: SECOND_FINGERPRINT,
+      syncDelta: { upserts: [session('two')], removedIds: [] }
+    })
+    await scanHostLegWithCache(args)
+
+    vi.setSystemTime(1_000 + 2 * (AI_VAULT_CACHE_TTL_MS + 1))
+    scan.mockResolvedValueOnce(listing([session('one'), session('two')]))
+    await scanHostLegWithCache(args)
+
+    // Equal mtimes, so the id tiebreak orders the held list the same way a full listing would.
+    expect(scan).toHaveBeenNthCalledWith(3, {
+      fingerprint: SECOND_FINGERPRINT,
+      sessions: [session('one'), session('two')]
+    })
+  })
+
+  it('refuses a delta it never gave the host a list to diff against', async () => {
+    const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
+    scan.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: SECOND_FINGERPRINT,
+      syncDelta: { upserts: [session('two')], removedIds: [] }
+    })
+
+    await expect(
+      scanHostLegWithCache({ cacheKey: 'leg', depth: 'unlimited', force: false, scan })
+    ).rejects.toThrow('does not hold')
+  })
+})

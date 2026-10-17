@@ -106,7 +106,13 @@ const aiVaultListResultEnvelopeSchema = z
       .string()
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
-    unchanged: z.literal(true).optional()
+    unchanged: z.literal(true).optional(),
+    // A bounded page: `hasMore` without a cursor to ask for can never make progress.
+    hasMore: z.literal(true).optional(),
+    nextOffset: z.number().int().min(1).optional(),
+    syncDelta: z
+      .object({ upserts: z.array(z.unknown()), removedIds: z.array(z.string()) })
+      .optional()
   })
   .refine(
     (value) =>
@@ -114,34 +120,49 @@ const aiVaultListResultEnvelopeSchema = z
       (value.fingerprint !== undefined && value.sessions.length === 0 && value.issues.length === 0),
     'Invalid unchanged response'
   )
+  .refine((value) => !value.hasMore || value.nextOffset !== undefined, 'Invalid paged response')
+  .refine(
+    (value) => !value.syncDelta || (value.sessions.length === 0 && value.hasMore === undefined),
+    'Invalid session delta response'
+  )
+
+function parseSessions(rows: readonly unknown[]): {
+  sessions: AiVaultSession[]
+  malformed: number
+  wellFormed: number
+} {
+  const sessions: AiVaultSession[] = []
+  let malformed = 0
+  let wellFormed = 0
+  for (const row of rows) {
+    const parsed = aiVaultSessionSchema.safeParse(row)
+    if (!parsed.success) {
+      malformed += 1
+      continue
+    }
+    wellFormed += 1
+    if (isAiVaultAgent(parsed.data.agent)) {
+      sessions.push({ ...parsed.data, agent: parsed.data.agent })
+    }
+  }
+  return { sessions, malformed, wellFormed }
+}
 
 export function parseAiVaultListResult(value: unknown): AiVaultListResult {
   const envelope = aiVaultListResultEnvelopeSchema.safeParse(value)
   if (!envelope.success) {
     throw new Error(envelope.error.issues[0]?.message ?? 'unexpected result shape')
   }
-  const sessions: AiVaultSession[] = []
-  let malformedSessionCount = 0
-  let wellFormedSessionCount = 0
-  for (const session of envelope.data.sessions) {
-    const parsed = aiVaultSessionSchema.safeParse(session)
-    if (!parsed.success) {
-      malformedSessionCount += 1
-      continue
-    }
-    wellFormedSessionCount += 1
-    if (!isAiVaultAgent(parsed.data.agent)) {
-      continue
-    }
-    sessions.push({ ...parsed.data, agent: parsed.data.agent })
-  }
-  if (
-    envelope.data.sessions.length > 0 &&
-    malformedSessionCount > 0 &&
-    wellFormedSessionCount === 0
-  ) {
+  const listed = parseSessions(envelope.data.sessions)
+  if (envelope.data.sessions.length > 0 && listed.malformed > 0 && listed.wellFormed === 0) {
     throw new Error('all supplied Agent Session History sessions were invalid')
   }
+  const sessions = listed.sessions
+  // A delta's rows are the same rows; one malformed row must not discard the rest of the change.
+  const deltaUpserts = envelope.data.syncDelta
+    ? parseSessions(envelope.data.syncDelta.upserts)
+    : null
+  const malformedSessionCount = listed.malformed + (deltaUpserts?.malformed ?? 0)
   const issues: AiVaultScanIssue[] = []
   let malformedIssueCount = 0
   for (const issue of envelope.data.issues) {
@@ -168,6 +189,16 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     issues,
     scannedAt: envelope.data.scannedAt,
     ...(envelope.data.fingerprint ? { fingerprint: envelope.data.fingerprint } : {}),
-    ...(envelope.data.unchanged ? { unchanged: true as const } : {})
+    ...(envelope.data.unchanged ? { unchanged: true as const } : {}),
+    ...(envelope.data.hasMore ? { hasMore: true as const } : {}),
+    ...(envelope.data.nextOffset !== undefined ? { nextOffset: envelope.data.nextOffset } : {}),
+    ...(envelope.data.syncDelta
+      ? {
+          syncDelta: {
+            upserts: deltaUpserts?.sessions ?? [],
+            removedIds: envelope.data.syncDelta.removedIds
+          }
+        }
+      : {})
   }
 }

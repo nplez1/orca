@@ -34,6 +34,7 @@ import {
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
 } from '../../../../shared/rpc-contract/ai-vault-params'
+import { aiVaultPagedListReply } from '../../../ai-vault/ai-vault-paged-list-reply'
 export { AiVaultListSessionsParams, AiVaultPrepareSessionResumeParams, AiVaultSessionTitlesParams }
 
 export const AI_VAULT_METHODS = [
@@ -115,13 +116,29 @@ export const AI_VAULT_METHODS = [
       const projected = projectStructuredAiVaultSessions(result, (agent) =>
         clientOpensStructuredChatFromHistory({ clientKind, clientCapabilities }, agent)
       )
-      return conditionalAiVaultListResult(
-        params.executionHostId
-          ? restampAiVaultListResult(projected, params.executionHostId)
-          : projected,
-        params.unlimited ? undefined : params.afterFingerprint,
-        params.force
-      )
+      const stamped = params.executionHostId
+        ? restampAiVaultListResult(projected, params.executionHostId)
+        : projected
+      // A page past the first is a different body, so a fingerprint comparison there would
+      // answer "unchanged" for rows the caller has never seen.
+      if (params.paged !== true) {
+        return conditionalAiVaultListResult(
+          stamped,
+          params.unlimited ? undefined : params.afterFingerprint,
+          params.force
+        )
+      }
+      return aiVaultPagedListReply({
+        result: stamped,
+        offset: params.offset ?? 0,
+        force: params.force === true,
+        ...(params.afterFingerprint !== undefined
+          ? { afterFingerprint: params.afterFingerprint }
+          : {}),
+        ...(params.syncFromFingerprint !== undefined
+          ? { syncFromFingerprint: params.syncFromFingerprint }
+          : {})
+      })
     }
   }),
   defineMethod({
