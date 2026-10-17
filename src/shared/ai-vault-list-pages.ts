@@ -14,8 +14,12 @@ import { describeAiVaultScanError } from './ai-vault-scan-error-message'
  * today's single reply rather than a silently truncated list.
  */
 
-/** Progress guard, not a size policy: ~128 wire pages is far past any real history. */
-export const AI_VAULT_LIST_MAX_PAGES = 128
+/**
+ * Progress guard, and a memory ceiling for the drain: 32 pages is ~64 MiB buffered (far past any
+ * real history, which is thousands of ~1.5 KB rows), and a listing that large is reported partial
+ * rather than held in the main process.
+ */
+export const AI_VAULT_LIST_MAX_PAGES = 32
 
 export const AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE =
   'The session list was too large to load in one go. Refresh to try again.'
@@ -104,9 +108,12 @@ export async function readAiVaultListPages(args: {
     if (args.deadlineMs !== undefined && Date.now() > args.deadlineMs) {
       return incomplete(pages, new Error(AI_VAULT_LIST_DEADLINE_MESSAGE))
     }
+    // One request object for the fetch and for vetting the reply: what a page may answer depends
+    // on what that page actually asked, and later pages carry no fingerprints.
+    const requestArgs = aiVaultListPageArgs(pageArgs, offset)
     let result: AiVaultListResult
     try {
-      result = await args.fetchPage(aiVaultListPageArgs(pageArgs, offset))
+      result = await args.fetchPage(requestArgs)
     } catch (error) {
       return pages.length === 0
         ? { kind: 'failed', error }
@@ -119,8 +126,8 @@ export async function readAiVaultListPages(args: {
     if (result.unchanged || result.syncDelta) {
       const askedForConditional =
         result.syncDelta !== undefined
-          ? pageArgs.syncFromFingerprint !== undefined
-          : pageArgs.afterFingerprint !== undefined && pageArgs.afterFingerprint !== null
+          ? requestArgs.syncFromFingerprint !== undefined
+          : requestArgs.afterFingerprint !== undefined && requestArgs.afterFingerprint !== null
       return askedForConditional
         ? { kind: 'complete', result }
         : incomplete(pages, new Error(AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE))

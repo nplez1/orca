@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join, sep } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
 import type * as CachedSessionListModule from '../ai-vault/cached-session-list'
 import type * as SessionParseCacheModule from '../ai-vault/session-scanner-parse-cache'
@@ -124,6 +124,20 @@ describe('listAiVaultSessions host routing', () => {
 
 describe('listAiVaultSessions change sync wiring', () => {
   const fingerprint = 'a'.repeat(64)
+  const AI_VAULT_LEG_TTL_MS = 15_000
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function expireHostLegCache(): void {
+    vi.setSystemTime(Date.now() + AI_VAULT_LEG_TTL_MS + 1)
+  }
 
   it('sends the fingerprint of the list this computer holds on a warm refresh', async () => {
     registerAiVaultHandlers({
@@ -140,10 +154,12 @@ describe('listAiVaultSessions change sync wiring', () => {
       force: true
     }
 
-    await _internals.listAiVaultSessions(request)
+    await _internals.listAiVaultSessions({ ...request, force: false })
     expect(mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]?.syncFromFingerprint).toBeUndefined()
 
-    await _internals.listAiVaultSessions(request)
+    // Past the leg's TTL, so the second call really asks the host again.
+    expireHostLegCache()
+    await _internals.listAiVaultSessions({ ...request, force: false })
     // Why the same depth and cache key: the host can only diff against the list it served here.
     expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
       fingerprint
@@ -184,14 +200,15 @@ describe('listAiVaultSessions change sync wiring', () => {
       force: true
     }
 
-    await _internals.listAiVaultSessions(request)
+    await _internals.listAiVaultSessions({ ...request, force: false })
     const firstLegArgs = mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]
     // Why neither field is the caller's: the merged list has no single fingerprint, so the merge
     // neither asks "is it unchanged" of a leg nor reuses a token that leg never sent.
     expect(firstLegArgs?.afterFingerprint).toBeUndefined()
     expect(firstLegArgs?.syncFromFingerprint).toBeUndefined()
 
-    await _internals.listAiVaultSessions(request)
+    expireHostLegCache()
+    await _internals.listAiVaultSessions({ ...request, force: false })
     expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
       fingerprint
     )
@@ -211,13 +228,12 @@ describe('listAiVaultSessions change sync wiring', () => {
 
     await _internals.listAiVaultSessions({
       executionHostScope: 'runtime:env-1',
-      scopePaths: ['/repo'],
-      force: true
+      scopePaths: ['/repo']
     })
+    expireHostLegCache()
     await _internals.listAiVaultSessions({
       executionHostScope: 'all',
-      scopePaths: ['/repo'],
-      force: true
+      scopePaths: ['/repo']
     })
 
     // Why this matters: a 15 MB listing cannot finish inside one leg's drain budget, so the

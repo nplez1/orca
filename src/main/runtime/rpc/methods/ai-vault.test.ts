@@ -801,20 +801,32 @@ describe('aiVault.listSessions paging and change sync', () => {
     })
   })
 
-  it('answers a forced refresh with a full page even when the token still matches', async () => {
+  it('answers a forced refresh with a diff, but never with unchanged', async () => {
     scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
     const dispatcher = makeDispatcher()
     const first = await listResult(dispatcher, { paged: true, unlimited: true })
+
+    // Forcing means "rescan the host". The diff is computed against that fresh scan, so a routine
+    // forced refresh — a delete, a new session, the Refresh button — stays cheap.
     const forced = await listResult(dispatcher, {
       paged: true,
       unlimited: true,
       force: true,
       syncFromFingerprint: first.fingerprint
     })
+    expect(forced.unchanged).toBeUndefined()
+    expect(forced.syncDelta).toEqual({ upserts: [], removedIds: [] })
 
-    // A held list is what the user may be asking to get past, so force never diffs against it.
-    expect(forced.syncDelta).toBeUndefined()
-    expect(forced.sessions).toHaveLength(1)
+    // `unchanged` is still refused, so a forced refresh always carries a body to paint.
+    const forcedWithoutToken = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      force: true,
+      afterFingerprint: first.fingerprint
+    })
+    expect(forcedWithoutToken.unchanged).toBeUndefined()
+    expect(forcedWithoutToken.syncDelta).toBeUndefined()
+    expect(forcedWithoutToken.sessions).toHaveLength(1)
   })
 
   it('names the served rows with the page token, across pages and across rescans', async () => {

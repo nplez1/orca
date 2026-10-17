@@ -82,6 +82,9 @@ export function aiVaultListSyncDelta(args: {
   // Why measured row by row: a sync from a very old basis can name the whole listing, and
   // serialising it just to discover it is too large is exactly the work this bound avoids.
   let bytes = Buffer.byteLength(JSON.stringify(args.issues), 'utf8')
+  if (bytes > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES) {
+    return null
+  }
   const upserts: AiVaultSession[] = []
   for (const session of args.sessions) {
     if (args.previous.get(session.id) === args.current.digests.get(session.id)) {

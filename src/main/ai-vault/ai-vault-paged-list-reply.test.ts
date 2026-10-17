@@ -75,7 +75,7 @@ describe('aiVaultPagedListReply', () => {
     expect(store.retainedAiVaultListDigests).not.toHaveBeenCalled()
   })
 
-  it('refuses every fingerprint shortcut when the caller forced a refresh', () => {
+  it('refuses unchanged on a forced refresh but still answers the diff', () => {
     const reply = aiVaultPagedListReply({
       result: listing(),
       offset: 0,
@@ -84,9 +84,10 @@ describe('aiVaultPagedListReply', () => {
       syncFromFingerprint: FINGERPRINT
     })
 
+    // Why unchanged is refused: a forced refresh has to paint a body the caller will apply.
     expect(reply.unchanged).toBeUndefined()
-    expect(reply.syncDelta).toBeUndefined()
-    expect(reply.sessions).toHaveLength(1)
-    expect(store.aiVaultListSyncDelta).not.toHaveBeenCalled()
+    // Why the diff is not refused: forcing rescans the host, and the diff is that fresh scan.
+    expect(reply.syncDelta).toEqual({ upserts: [], removedIds: [] })
+    expect(store.aiVaultListSyncDelta).toHaveBeenCalled()
   })
 })

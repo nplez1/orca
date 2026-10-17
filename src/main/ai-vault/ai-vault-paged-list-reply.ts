@@ -52,10 +52,11 @@ export function aiVaultPagedListReply(args: {
       unchanged: true
     }
   }
-  // Why force refuses the delta too: a forced refresh is the user's "show me the real list", and a
-  // delta can only be applied to whatever this client holds — the held list is what they may be
-  // asking to get past.
-  const delta = args.force ? null : deltaFrom(previous, snapshot, served)
+  // Why force still answers a delta: force means "rescan the host's disk", which has already
+  // happened, so the diff is computed against the fresh scan and is the real list. Refusing it
+  // would make every routine forced refresh — a delete, a newly started session, the Refresh
+  // button — download a whole 15 MB history again, which is the cost this exists to remove.
+  const delta = deltaFrom(previous, snapshot, served)
   if (delta) {
     // Why not `unchanged` for a matching token: an unchanged reply means "keep the body you have",
     // and a caller that asked for a full body (a retry after a mismatch) has to receive rows.

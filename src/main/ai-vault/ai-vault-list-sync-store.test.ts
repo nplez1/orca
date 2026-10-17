@@ -84,12 +84,12 @@ describe('aiVaultListSyncDelta', () => {
   })
 
   it('refuses a delta whose issues alone would overrun one reply', () => {
+    // No changed rows at all: the issues are what makes this reply too large to send.
     const held = [session('a')]
-    const current = [session('a'), session('b')]
     const delta = aiVaultListSyncDelta({
       previous: snapshot(held, 'old').digests,
-      current: snapshot(current, 'new'),
-      sessions: current,
+      current: snapshot(held, 'new'),
+      sessions: held,
       issues: [
         {
           agent: 'codex',
