@@ -34,20 +34,27 @@ type GithubPaneWorktree = Pick<
   'id' | 'repoId' | 'linkedWorkItem' | 'linkedTaskSourceContext'
 >
 
-/** Repo ids this issue can be read from, most authoritative first: the repo the
- *  linked item came from, then the workspace's own repo.
+/** The repo this issue's number belongs to.
  *
- *  They differ whenever the workspace is not in the item's repo — a task listed on
- *  another host or project creates the workspace in that project's repo, and a
- *  folder workspace borrows a synthetic id. The issue only exists in the item's
- *  repo, so reading the workspace repo fails with "Couldn't load this GitHub
- *  issue" even though the link is intact. */
-function githubPaneRepoIdCandidates(worktree: GithubPaneWorktree): string[] {
-  const itemRepoId = worktree.linkedWorkItem?.repoId
-  if (!itemRepoId || itemRepoId === worktree.repoId) {
-    return [worktree.repoId]
+ *  A workspace is not always in its issue's repo: a task listed on one host creates the
+ *  workspace in the target project's repo on another, and a folder workspace borrows a
+ *  synthetic repo id. The issue only exists in the repo the item came from, so reading it
+ *  from the workspace repo asked the other host for a repo it does not have and rendered
+ *  "Couldn't load this GitHub issue" over a link that was intact.
+ *
+ *  Two things keep that from becoming a new way to read the wrong issue. The item's repo is
+ *  borrowed only when the item *is* the link: `linkedIssue` and `linkedWorkItem` are separate
+ *  slots and the former wins, so the pane can show an issue the item does not describe (a PR,
+ *  a Linear task, a different number) — that item's repo is not this number's repo. And when
+ *  the item's repo is not registered on this device there is no fallback: the workspace repo
+ *  would resolve the same number against a different project and show an unrelated issue,
+ *  which is worse than the unavailable state it renders instead. */
+function githubPaneRepoId(worktree: GithubPaneWorktree, issueNumber: number): string {
+  const item = worktree.linkedWorkItem
+  if (item?.provider !== 'github' || item.type !== 'issue' || item.number !== issueNumber) {
+    return worktree.repoId
   }
-  return [itemRepoId, worktree.repoId]
+  return item.repoId ?? worktree.repoId
 }
 
 /** GitHub issue detail for the pane. Reuses the Task view's work-item fetch,
@@ -62,13 +69,8 @@ export function GithubLinkedIssuePane({
   sourceContext: TaskSourceContext | null
 }): React.JSX.Element {
   const repo = useAppStore((s) => {
-    for (const repoId of githubPaneRepoIdCandidates(worktree)) {
-      const candidate = s.repos.find((item) => item.id === repoId)
-      if (candidate) {
-        return candidate
-      }
-    }
-    return null
+    const repoId = githubPaneRepoId(worktree, linkedIssue.number)
+    return s.repos.find((item) => item.id === repoId) ?? null
   })
   const linkActions = useLinkedIssuePaneActions()
   const [workItem, setWorkItem] = useState<GitHubWorkItem | null>(null)
