@@ -43,7 +43,8 @@ function browserListKey(
   return JSON.stringify([
     environmentId,
     requestedScope,
-    args?.scopePaths ?? [],
+    // Canonical like the desktop key: the same paths in another order are the same listing.
+    [...new Set(args?.scopePaths ?? [])].sort(),
     args?.limit ?? null,
     args?.unlimited === true,
     args?.includeAntigravityIdeSessions === true
