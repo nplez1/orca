@@ -8,6 +8,7 @@ import {
   throwIfAiVaultScanCancelled
 } from '../ai-vault/ai-vault-scan-cancellation'
 import { aiVaultScanIssueResult } from '../ai-vault/session-list-results'
+import { aiVaultAppliedScopePaths } from '../../shared/ai-vault-session-depth'
 
 export type RuntimeAiVaultHostInfo = {
   environmentId: string
@@ -80,8 +81,12 @@ function runtimeScanArgs(
   if (listArgs?.force !== undefined) {
     scanArgs.force = listArgs.force
   }
-  if (listArgs?.scopePaths !== undefined) {
-    scanArgs.scopePaths = listArgs.scopePaths
+  // Why: under no bound a scope adds nothing to the whole table the host lists
+  // anyway, and a host old enough to narrow on it would answer 'All' with one
+  // project's sessions.
+  const scopePaths = aiVaultAppliedScopePaths(listArgs)
+  if (scopePaths !== undefined) {
+    scanArgs.scopePaths = scopePaths
   }
   if (listArgs?.includeAntigravityIdeSessions === true) {
     scanArgs.includeAntigravityIdeSessions = true

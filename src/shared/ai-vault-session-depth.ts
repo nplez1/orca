@@ -33,6 +33,21 @@ export function aiVaultSessionDepthCovers(
   return cached === 'unlimited' || (requested !== 'unlimited' && cached >= requested)
 }
 
+/**
+ * The scope paths a list request's answer actually depends on.
+ *
+ * An unbounded read is the whole table, so a scope adds nothing to it. Anything that
+ * keys such a request, or carries it to another host, must therefore leave the scope
+ * out: keying on it repeats an identical read, and a host that still narrows on a
+ * scope would answer 'All' with one project's sessions. Dropping it costs an older
+ * host only the scope's guarantee past its own default cap.
+ */
+export function aiVaultAppliedScopePaths(
+  args?: Pick<AiVaultListArgs, 'scopePaths' | 'unlimited'>
+): readonly string[] | undefined {
+  return args?.unlimited === true ? undefined : args?.scopePaths
+}
+
 export function truncateAiVaultListResult(
   result: AiVaultListResult,
   depth: AiVaultSessionDepth,

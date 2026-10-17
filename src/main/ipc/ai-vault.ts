@@ -46,7 +46,11 @@ import {
   resetAiVaultHostLegCacheForTests,
   scanHostLegWithCache
 } from './ai-vault-host-leg-cache'
-import { requestedAiVaultSessionDepth } from '../../shared/ai-vault-session-depth'
+import {
+  requestedAiVaultSessionDepth,
+  aiVaultAppliedScopePaths
+} from '../../shared/ai-vault-session-depth'
+import { aiVaultHostListQuery } from '../../shared/ai-vault-session-filters'
 import type {
   AiVaultSessionTitlesArgs,
   AiVaultSessionTitlesResult
@@ -88,26 +92,32 @@ async function listAiVaultSessions(
   options: { signal?: AbortSignal } = {}
 ): Promise<AiVaultListResult> {
   const executionHostScope = requestedExecutionHostScope(args?.executionHostScope)
-  // Canonicalize bounded workspace sets so equivalent scopes share a scan.
+  const parsedHost = parseRoutableExecutionHostId(executionHostScope)
+  // Canonicalize workspace sets under the cap so equivalent scopes share a scan, and
+  // key on none of them when the depth has no bound to narrow.
   const scopePaths = args?.scopePaths ?? []
-  const key = JSON.stringify({
-    scopePaths:
-      scopePaths.length <= AI_VAULT_SCOPE_PATHS_MAX_COUNT
-        ? [...new Set(scopePaths)].sort()
-        : scopePaths,
-    executionHostScope,
-    includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true
-  })
+  const scopeKey = (paths: readonly string[]): string =>
+    JSON.stringify({
+      scopePaths:
+        paths.length <= AI_VAULT_SCOPE_PATHS_MAX_COUNT ? [...new Set(paths)].sort() : paths,
+      executionHostScope,
+      includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true
+    })
+  const key = scopeKey(aiVaultAppliedScopePaths(args) ?? [])
   const depth = requestedAiVaultSessionDepth(args)
-  const afterFingerprint =
-    parseRoutableExecutionHostId(executionHostScope)?.kind === 'runtime'
-      ? args?.afterFingerprint
-      : undefined
+  const afterFingerprint = parsedHost?.kind === 'runtime' ? args?.afterFingerprint : undefined
+  // The host query keys the scan that applies it. runtimeScanArgs never forwards it to a
+  // runtime host, so one host is one scan per query-free answer — and the local leg's is
+  // not: leaving the query out shared one query's filtered rows with another.
+  const query = parsedHost?.kind === 'runtime' ? '' : aiVaultHostListQuery(args?.query ?? '')
+  // An 'all' merge holds the local leg's filtered rows, so its outer entry is per query.
+  // JSON, so a query can never be read as the text of a separator.
+  const legKey = (scopeKeyValue: string): string => JSON.stringify({ key: scopeKeyValue, query })
   // Why: every renderer request carries its own cancellation signal, so
   // coalescing has to survive them — the coordinator hands all same-key callers
   // one scan and only aborts it once every one of them has cancelled.
   return scanCoordinator.run({
-    key: JSON.stringify({ key, depth, afterFingerprint }),
+    key: JSON.stringify({ key, query, depth, afterFingerprint }),
     force: args?.force,
     signal: options.signal,
     start: (scanSignal) => {
@@ -116,7 +126,9 @@ async function listAiVaultSessions(
         return scan()
       }
       return scanHostLegWithCache({
-        cacheKey: key,
+        cacheKey: legKey(key),
+        // An unbounded leg answers every scope at every depth: store it without one.
+        unboundedCacheKey: legKey(scopeKey([])),
         depth,
         scopePaths,
         force: args?.force === true,
@@ -165,7 +177,8 @@ async function scanAiVaultSessionsByHostScope(
     return mergeAiVaultListResults(
       [...scannedResults, ...runtimeResults],
       args?.limit,
-      args?.unlimited
+      args?.unlimited,
+      args?.scopePaths ?? []
     )
   }
 
