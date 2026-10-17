@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { withFreshOmpLaunch } from '../../shared/omp-fresh-launch'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -6,6 +7,7 @@ import {
   wslUncDirectoryExistsAsyncMock
 } from './pty-ipc-mock-registry'
 import { TEST_CODEX_HOME, BUNDLED_CLI_PATH } from './pty-ipc-test-constants'
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { __resetPersistedWindowsPathCacheForTests } from '../pty/windows-environment-path'
@@ -135,7 +137,7 @@ describe('registerPtyHandlers', () => {
             agentStatusHooksEnabled: false
           }
         )
-        expect(env.ORCA_CLI_COMMAND).toBe('/tmp/orca-user-data/cli/bin/orca-np-dev')
+        expect(env.ORCA_CLI_COMMAND).toBe(join('/tmp/orca-user-data', 'cli', 'bin', 'orca-np-dev'))
       } finally {
         Object.defineProperty(process, 'platform', {
           configurable: true,
@@ -144,30 +146,27 @@ describe('registerPtyHandlers', () => {
       }
     })
 
-    it('keeps the bare registered name in a WSL pane, which the shell wrappers resolve by directory', () => {
-      // Why darwin with a resources root: that is the lane whose launcher would otherwise be
-      // exported, so this fails if the WSL restore is dropped rather than passing vacuously.
-      const originalPlatform = process.platform
-      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+    it('keeps the bare registered name in a WSL pane, whatever launcher the host resolved', () => {
+      // Why a headless-host launcher hook: that is the one lane that writes ORCA_CLI_COMMAND after
+      // the WSL branch, so this fails if the restore is dropped instead of passing vacuously.
+      installFakeAppEnvironment({ getCliLauncherPath: () => '/host/bin/orca-np' })
       try {
         const env = buildPtyHostEnv(
           'wsl-cli-pane',
           {},
           {
             isPackaged: true,
-            resourcesPath: '/tmp/orca-bundled-resources',
             userDataPath: '/tmp/orca-user-data',
             selectedCodexHomePath: null,
             isWsl: true,
             agentStatusHooksEnabled: false
           }
         )
+        // Why: the shell wrappers resolve `$ORCA_WSL_CLI_DIR/$ORCA_CLI_COMMAND`, so a host path here
+        // is a file the guest cannot execute.
         expect(env.ORCA_CLI_COMMAND).toBe('orca-np')
       } finally {
-        Object.defineProperty(process, 'platform', {
-          configurable: true,
-          value: originalPlatform
-        })
+        installFakeAppEnvironment()
       }
     })
 
