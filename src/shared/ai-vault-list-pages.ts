@@ -74,9 +74,9 @@ export function combineAiVaultListPages(pages: readonly AiVaultListResult[]): Ai
   const first = pages.at(0)
   return {
     sessions: pages.flatMap((page) => page.sessions),
-    // Why page 0 only: issues describe the scan, and the host carries them on the first page.
-    // Concatenating would duplicate a page that repeated them.
-    issues: first?.issues ?? [],
+    // Why every page's issues: the host carries scan issues on page 0, but a page can also report
+    // rows it had to skip, and dropping those would hide the only sign that rows are missing.
+    issues: pages.flatMap((page) => page.issues),
     scannedAt: pages.at(-1)?.scannedAt ?? new Date().toISOString(),
     // Every page but the first carries no fingerprint; the listing's is page 0's.
     ...(first?.fingerprint ? { fingerprint: first.fingerprint } : {})

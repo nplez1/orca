@@ -133,15 +133,12 @@ function parseSessions(rows: readonly unknown[]): {
   sessions: AiVaultSession[]
   malformed: number
   wellFormed: number
-  /** Rows this listing dropped — unreadable, or from an agent this build does not know. */
-  dropped: number
   /** Rows this build cannot represent, by the id they named; a delta has to drop them. */
   rejectedIds: string[]
 } {
   const sessions: AiVaultSession[] = []
   const rejectedIds: string[] = []
   let malformed = 0
-  let unknownAgent = 0
   let wellFormed = 0
   for (const row of rows) {
     const parsed = aiVaultSessionSchema.safeParse(row)
@@ -156,11 +153,9 @@ function parseSessions(rows: readonly unknown[]): {
     wellFormed += 1
     if (isAiVaultAgent(parsed.data.agent)) {
       sessions.push({ ...parsed.data, agent: parsed.data.agent })
-    } else {
-      unknownAgent += 1
     }
   }
-  return { sessions, malformed, wellFormed, rejectedIds, dropped: malformed + unknownAgent }
+  return { sessions, malformed, wellFormed, rejectedIds }
 }
 
 const namedRowIdSchema = z.object({ id: z.string().min(1) })
@@ -206,13 +201,13 @@ export function parseAiVaultListResult(
     }
     issues.push({ ...parsed.data, agent: parsed.data.agent })
   }
-  // Why drop the fingerprint whenever a row was dropped: the host's fingerprint names a body that
-  // includes that row, so a client holding this one would be missing rows its fingerprint claims,
-  // and the host would never re-send them (their digest never changes). Without the fingerprint the
-  // next refresh is a full read, which is also what surfaces the row once this build can read it.
-  const droppedRows = listed.dropped + (deltaUpserts?.dropped ?? 0)
+  // Why drop the fingerprint only here: a rejected diff row that named no id cannot be removed from
+  // the list this client holds, so that body would no longer match its fingerprint. A row this
+  // build cannot read at all is a different case — the skip row says so on every reply, and
+  // disabling the diff for the whole host would cost more than the row is worth.
+  const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
   const fingerprint =
-    envelope.data.fingerprint && droppedRows === 0 ? envelope.data.fingerprint : undefined
+    envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
   const invalidCount = malformedSessionCount + malformedIssueCount
   if (invalidCount > 0) {
     issues.push({

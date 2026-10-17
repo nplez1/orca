@@ -135,6 +135,34 @@ describe('a host reply applied by the desktop leg', () => {
     expect(third.fingerprint).toBe(second.fingerprint)
   })
 
+  it('keeps the skip notice the held body carried when a diff arrives without one', async () => {
+    const skipped = {
+      agent: 'codex' as const,
+      path: 'aiVault.listSessions',
+      message: 'Skipped 1 invalid Agent Session History result entry.'
+    }
+    const held = { ...hostReply([session('one')]), issues: [skipped] }
+    await scanHostLegWithCache(legArgs(async () => held))
+
+    const changed = [session('one'), session('two')]
+    expireLegCache()
+    let sentDelta = false
+    const syncedScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
+      const reply = hostReply(
+        changed,
+        syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {}
+      )
+      sentDelta ||= reply.syncDelta !== undefined
+      return reply
+    }
+    const synced = await scanHostLegWithCache(legArgs(syncedScan))
+
+    expect(sentDelta).toBe(true)
+    // The diff does not re-send the skipped row, so without carrying the notice the user would see
+    // a row quietly missing after one refresh.
+    expect(synced.issues).toContainEqual(skipped)
+  })
+
   it('rescans on a forced refresh and still applies only the diff', async () => {
     const held = [session('one'), session('two')]
     const firstScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) =>

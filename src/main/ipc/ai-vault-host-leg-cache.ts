@@ -2,6 +2,7 @@ import { MAX_TIMER_DELAY_MS } from '../../shared/timer-delay'
 import type {
   AiVaultListResult,
   AiVaultListSyncDelta,
+  AiVaultScanIssue,
   AiVaultSession
 } from '../../shared/ai-vault-types'
 import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
@@ -41,6 +42,10 @@ const LAST_FULL_HOST_LEGS_MAX = 8
  * Rows these held lists may total, ~1.5 KB each from the scanner, so main keeps tens of megabytes
  * rather than one 15 MB history per scope and host. A count cap alone would not bound that: every
  * paged reply now carries a fingerprint, including an unlimited listing.
+ *
+ * The trade-off is deliberate: a host whose own listing approaches this bound can be evicted by
+ * another host's store and then pays a full read on its next refresh, which is cheaper than
+ * holding every scope's history for the life of the process.
  */
 export const LAST_FULL_HOST_LEG_MAX_ROWS = 40_000
 let expiryTimer: ReturnType<typeof setTimeout> | null = null
@@ -68,6 +73,7 @@ function scheduleHostLegExpiry(): void {
 export type AiVaultHostLegSyncBasis = {
   fingerprint: string
   sessions: readonly AiVaultSession[]
+  issues: readonly AiVaultScanIssue[]
 }
 
 /** Serves one host's leg from the per-host TTL cache, and stores it only when
@@ -108,7 +114,7 @@ export async function scanHostLegWithCache(args: {
   const basis = hostLegSyncBasis(args.syncBasisKey, args.depth)
   const scanned = await scanWithSyncBasis(args, basis)
   const delta = scanned.syncDelta
-  const result = delta && basis ? withAppliedDelta(basis.sessions, delta, scanned) : scanned
+  const result = delta && basis ? withAppliedDelta(basis, delta, scanned) : scanned
   // A delete's invalidation landed while this leg was scanning; caching a
   // pre-delete result would resurrect the deleted session for the TTL.
   if (startGeneration !== cacheGeneration) {
@@ -183,21 +189,35 @@ function hostLegSyncBasis(
   const held = lastFullHostLegs.get(cacheKey)
   const fingerprint = held?.result.fingerprint
   return held?.depth === depth && fingerprint
-    ? { fingerprint, sessions: held.result.sessions }
+    ? { fingerprint, sessions: held.result.sessions, issues: held.result.issues }
     : undefined
 }
 
 function withAppliedDelta(
-  held: readonly AiVaultSession[],
+  basis: AiVaultHostLegSyncBasis,
   delta: AiVaultListSyncDelta,
   reply: AiVaultListResult
 ): AiVaultListResult {
   return {
-    sessions: applyAiVaultListDelta(held, delta),
-    issues: reply.issues,
+    sessions: applyAiVaultListDelta(basis.sessions, delta),
+    issues: issuesAfterDelta(reply.issues, basis.issues),
     scannedAt: reply.scannedAt,
     ...(reply.fingerprint ? { fingerprint: reply.fingerprint } : {})
   }
+}
+
+/**
+ * A diff carries no rows it did not change, so a transcript this build had to skip would stop
+ * being reported after one refresh. Skip rows (the ones with no `kind`) are carried forward; any
+ * the reply reports itself replace them.
+ */
+function issuesAfterDelta(
+  replyIssues: readonly AiVaultScanIssue[],
+  heldIssues: readonly AiVaultScanIssue[]
+): AiVaultScanIssue[] {
+  return replyIssues.some((issue) => !issue.kind)
+    ? [...replyIssues]
+    : [...replyIssues, ...heldIssues.filter((issue) => !issue.kind)]
 }
 
 /** Returns the full list an `unchanged` reply stands for when one is known. */

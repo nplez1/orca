@@ -31,9 +31,10 @@ describe('parseAiVaultListResult', () => {
     expect(parsed.sessions[0]?.agent).toBe('codex')
     expect(parsed.sessions[0]?.sessionId).toBe('session-1')
     expect(parsed.issues).toEqual([])
-    // The host's fingerprint names a body that includes the dropped row, so this body cannot
-    // claim it: the next read must be a full one, which is also what surfaces the row on upgrade.
-    expect(parsed.fingerprint).toBeUndefined()
+    // Why the fingerprint stays: a row from an agent this build does not know is a build-version
+    // gap, and dropping the fingerprint would switch off the diff for the whole host. The row is
+    // reported by the agent list instead of by a listing error.
+    expect(parsed.fingerprint).toBe('a'.repeat(64))
   })
 
   it('keeps the fingerprint when every row was readable', () => {
@@ -337,6 +338,8 @@ describe('parseAiVaultListResult paging and deltas', () => {
       upserts: [],
       removedIds: [validSession('session-2').id]
     })
+    // The list still matches its fingerprint, so the diff keeps working.
+    expect(parsed.fingerprint).toBe('b'.repeat(64))
     expect(parsed.issues).toContainEqual(
       expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
     )

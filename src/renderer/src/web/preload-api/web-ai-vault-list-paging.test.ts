@@ -73,27 +73,31 @@ describe('web session listing pages and syncs', () => {
     })
   })
 
-  it('takes issues from the page that carries them, not from every page', async () => {
-    const issue = { agent: 'codex', kind: 'host', path: 'owning-host', message: 'one' }
+  it('keeps the issues a later page reports instead of only page 0', async () => {
+    const scanIssue = { agent: 'codex', kind: 'host', path: 'owning-host', message: 'one' }
+    const skippedRow = {
+      agent: 'codex',
+      path: 'aiVault.listSessions',
+      message: 'Skipped 1 invalid'
+    }
     callRuntimeResult
       .mockResolvedValueOnce({
         sessions: [session('a')],
-        issues: [issue],
+        issues: [scanIssue],
         scannedAt: SCANNED_AT,
         hasMore: true,
         nextOffset: 1
       })
-      // A page that repeats a stale copy must not duplicate the row on screen.
+      // A page can report rows it had to skip; dropping that hides the only sign rows are missing.
       .mockResolvedValueOnce({
         sessions: [session('b')],
-        issues: [issue, { ...issue, message: 'two' }],
+        issues: [skippedRow],
         scannedAt: SCANNED_AT
       })
 
     const result = await createWebAiVaultApi().listSessions({ ...SCOPE })
 
-    // Issues describe the scan and ride on page 0; a later page's copy is not appended again.
-    expect(result.issues).toEqual([issue])
+    expect(result.issues).toEqual([scanIssue, skippedRow])
   })
 
   it('asks the host for the difference from the list this tab holds', async () => {

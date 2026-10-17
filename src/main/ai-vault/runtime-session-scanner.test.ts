@@ -339,6 +339,42 @@ describe('runtime AI Vault session scanner', () => {
     )
   })
 
+  it('keeps the fingerprint when a later page had to skip a row', async () => {
+    mocks.callRuntimeEnvironment
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          ...result([session('runtime:env-1', 'session-1')]),
+          fingerprint: 'a'.repeat(64),
+          hasMore: true,
+          nextOffset: 1
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          // A row with a value this build does not know: it cannot be shown, but the rest can.
+          sessions: [
+            {
+              ...session('runtime:env-1', 'session-2'),
+              previewMessages: [{ role: 'future-role', text: 'x', timestamp: null }]
+            }
+          ],
+          issues: [],
+          scannedAt: '2026-07-27T00:00:00.000Z'
+        }
+      })
+
+    const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', { unlimited: true })
+
+    expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1'])
+    // The skip row is the only sign a row is missing, and the diff keeps working for the rest.
+    expect(scanResult.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+    expect(scanResult.fingerprint).toBe('a'.repeat(64))
+  })
+
   it('keeps the rows already read when a later page fails', async () => {
     mocks.callRuntimeEnvironment
       .mockResolvedValueOnce({
