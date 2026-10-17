@@ -4,7 +4,7 @@ import { aiVaultPagedListReply } from '../ai-vault/ai-vault-paged-list-reply'
 import { resetAiVaultListSyncStoreForTests } from '../ai-vault/ai-vault-list-sync-store'
 import { parseAiVaultListResult } from '../ai-vault/session-list-result-validation'
 import {
-  invalidateAiVaultHostLegCache,
+  resetAiVaultHostLegCacheForTests,
   scanHostLegWithCache,
   type AiVaultHostLegSyncBasis
 } from './ai-vault-host-leg-cache'
@@ -72,7 +72,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  invalidateAiVaultHostLegCache()
+  // Why the full reset: the held lists survive invalidation now, so they would leak between tests.
+  resetAiVaultHostLegCacheForTests()
   resetAiVaultListSyncStoreForTests()
   vi.useRealTimers()
 })
@@ -144,13 +145,22 @@ describe('a host reply applied by the desktop leg', () => {
     // computed against that fresh scan, so it is still the real listing.
     const rescanned = [session('two'), session('three')]
     let sentBasis: string | undefined
+    let sentDelta = false
     const forcedScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
       sentBasis = syncFrom?.fingerprint
-      return hostReply(rescanned, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+      // The wire request carries force, so the host's own forced path runs: unchanged is refused
+      // and the diff is still answered.
+      const reply = hostReply(rescanned, {
+        force: true,
+        ...(syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+      })
+      sentDelta ||= reply.syncDelta !== undefined
+      return reply
     }
     const forced = await scanHostLegWithCache({ ...legArgs(forcedScan), force: true })
 
     expect(sentBasis).toBeDefined()
+    expect(sentDelta).toBe(true)
     expect(forced.sessions.map((row) => row.sessionId)).toEqual(['three', 'two'])
     expect(forced.syncDelta).toBeUndefined()
   })

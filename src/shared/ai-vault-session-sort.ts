@@ -14,14 +14,21 @@ export function aiVaultSessionSortTime(
 export function sortAiVaultSessionsByRecency<
   T extends Pick<AiVaultSession, 'id' | 'updatedAt' | 'modifiedAt'>
 >(sessions: readonly T[]): T[] {
-  return [...sessions].sort((left, right) => {
-    const leftTime = aiVaultSessionSortTime(left)
-    const rightTime = aiVaultSessionSortTime(right)
-    const byTime =
-      (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime)
-    if (byTime !== 0) {
-      return byTime
-    }
-    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+  // Why decorate: this runs over the whole listing on every page, and a comparator would parse
+  // each timestamp once per comparison instead of once per row.
+  const decorated = sessions.map((session) => {
+    const time = aiVaultSessionSortTime(session)
+    return { session, time: Number.isNaN(time) ? 0 : time }
   })
+  decorated.sort((left, right) => {
+    const byTime = right.time - left.time
+    return byTime !== 0
+      ? byTime
+      : left.session.id < right.session.id
+        ? -1
+        : left.session.id > right.session.id
+          ? 1
+          : 0
+  })
+  return decorated.map((entry) => entry.session)
 }

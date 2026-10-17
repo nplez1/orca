@@ -27,7 +27,6 @@ import { callRuntimeResult } from './web-runtime-calls'
 import {
   applyHeldBrowserAiVaultDelta,
   browserHeldAiVaultList,
-  forgetBrowserAiVaultList,
   rememberBrowserAiVaultList,
   reusedBrowserAiVaultList
 } from './web-ai-vault-list-sync'
@@ -102,13 +101,12 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
             executionHostId
           })
       })
+      // Why the held list survives a failed or partial read: it is still the list its fingerprint
+      // names, so the next refresh can ask for the difference from it instead of the whole history.
       if (read.kind === 'failed') {
-        forgetBrowserAiVaultList(listKey)
         throw read.error
       }
       if (read.kind === 'partial') {
-        // The rows on screen stay usable; the held list is dropped so the next refresh is a full one.
-        forgetBrowserAiVaultList(listKey)
         return {
           ...read.result,
           issues: [
@@ -122,11 +120,11 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
         }
       }
       if (read.result.unchanged) {
-        // Why pass it through when the held list is gone: the renderer already treats `unchanged`
-        // as "ask again for the body", and relabelling a different list with this fingerprint would
-        // store a body under a fingerprint it does not match.
+        // Why pass it through when the held list names a different body: the renderer treats
+        // `unchanged` as "ask again for the body", and relabelling a list with a fingerprint it
+        // does not match would break the next diff. The held list stays: it is still valid at its
+        // own fingerprint.
         if (!held || held.fingerprint !== read.result.fingerprint) {
-          forgetBrowserAiVaultList(listKey)
           return read.result
         }
         const reused = reusedBrowserAiVaultList(held, read.result)
@@ -135,7 +133,6 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
       }
       if (read.result.syncDelta) {
         if (!held) {
-          forgetBrowserAiVaultList(listKey)
           throw new Error('The host answered with changes to a list this client does not hold.')
         }
         const rebuilt = applyHeldBrowserAiVaultDelta(held, read.result)
