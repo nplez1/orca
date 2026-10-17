@@ -60,6 +60,7 @@ vi.mock('../wsl', () => ({
 
 const { resolveOmpSessionsDir } = await import('../ai-vault/omp-session-root')
 const { _internals, registerAiVaultHandlers } = await import('./ai-vault')
+const { invalidateAiVaultHostLegCache } = await import('./ai-vault-host-leg-cache')
 const { deleteAiVaultSession: deleteAiVaultSessionWithDeps } = await import('./ai-vault-delete')
 
 beforeEach(() => {
@@ -238,6 +239,33 @@ describe('listAiVaultSessions change sync wiring', () => {
 
     // Why this matters: a 15 MB listing cannot finish inside one leg's drain budget, so the
     // all-hosts row could only ever be partial unless it diffs against a list already loaded.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('keeps the basis across a delete so the refresh after it still diffs', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+    await _internals.listAiVaultSessions(request)
+
+    // The delete handler drops cached legs, and the renderer then forces a refresh.
+    invalidateAiVaultHostLegCache()
+    await _internals.listAiVaultSessions(request)
+
+    // Why: re-downloading every remote host's whole history after one local delete is exactly the
+    // cost the sync exists to remove, and a diff still describes the delete.
     expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
       fingerprint
     )

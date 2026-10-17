@@ -235,7 +235,9 @@ function pruneExpiredHostLegs(now: number): void {
 export function invalidateAiVaultHostLegCache(): void {
   cacheGeneration++
   cachedHostLegs.clear()
-  lastFullHostLegs.clear()
+  // Why the held lists survive: they are the basis every refresh diffs against, and a diff still
+  // describes the delete — the row arrives in `removedIds`. Clearing them would make the forced
+  // refresh that follows a delete re-download each remote host's whole history.
   if (expiryTimer !== null) {
     clearTimeout(expiryTimer)
   }
@@ -244,4 +246,5 @@ export function invalidateAiVaultHostLegCache(): void {
 
 export function resetAiVaultHostLegCacheForTests(): void {
   invalidateAiVaultHostLegCache()
+  lastFullHostLegs.clear()
 }

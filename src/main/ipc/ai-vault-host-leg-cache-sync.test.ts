@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
 import {
   AI_VAULT_CACHE_TTL_MS,
-  invalidateAiVaultHostLegCache,
+  resetAiVaultHostLegCacheForTests,
   scanHostLegWithCache,
   type AiVaultHostLegSyncBasis
 } from './ai-vault-host-leg-cache'
@@ -50,10 +50,11 @@ function listing(sessions: readonly AiVaultSession[], fingerprint?: string): AiV
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(1_000)
+  resetAiVaultHostLegCacheForTests()
 })
 
 afterEach(() => {
-  invalidateAiVaultHostLegCache()
+  resetAiVaultHostLegCacheForTests()
   vi.useRealTimers()
 })
 

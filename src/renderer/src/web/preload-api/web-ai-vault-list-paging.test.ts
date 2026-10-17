@@ -121,7 +121,7 @@ describe('web session listing pages and syncs', () => {
     expect(synced.fingerprint).toBe('b'.repeat(64))
   })
 
-  it('replaces the held list on a forced refresh instead of diffing against it', async () => {
+  it('answers a forced refresh with a diff, not a fresh download', async () => {
     callRuntimeResult.mockResolvedValueOnce({
       sessions: [session('a')],
       issues: [],
@@ -139,7 +139,12 @@ describe('web session listing pages and syncs', () => {
     })
     const forced = await api.listSessions({ ...SCOPE, force: true })
 
-    // The host answers a forced request with a full listing, and the held list becomes that body.
+    // Force means "rescan the host": the request still names the list this tab holds, and the
+    // answer is the host's diff against it.
+    expect(callRuntimeResult).toHaveBeenLastCalledWith(
+      'aiVault.listSessions',
+      expect.objectContaining({ force: true, syncFromFingerprint: FINGERPRINT })
+    )
     expect(forced.sessions.map((row) => row.sessionId)).toEqual(['b'])
 
     callRuntimeResult.mockResolvedValueOnce({
