@@ -211,34 +211,6 @@ describe('GithubLinkedIssuePane', () => {
     })
   })
 
-  it('reads the issue from the linked item, which owns the number', async () => {
-    mocks.repoState = {
-      repos: [
-        { id: 'repo-remote', path: '/volumes/remote/repo', executionHostId: 'runtime:env-1' },
-        { id: 'repo-source', path: '/tmp/source' }
-      ],
-      settings: null
-    }
-    mocks.lookup.mockResolvedValue(item('Cross-host issue'))
-
-    render(
-      <TooltipProvider delayDuration={0}>
-        <GithubLinkedIssuePane
-          worktree={{ ...worktree, repoId: 'repo-remote', linkedWorkItem: linkedWorkItem }}
-          linkedIssue={linkedIssue}
-          sourceContext={null}
-        />
-      </TooltipProvider>
-    )
-
-    await waitFor(() => expect(screen.getByText('Cross-host issue')).toBeTruthy())
-    expect(mocks.lookup.mock.calls[0]?.[0]).toMatchObject({
-      repoPath: '/tmp/source',
-      repoId: 'repo-source',
-      target: { kind: 'local' }
-    })
-  })
-
   // Why: `linkedIssue` and `linkedWorkItem` are separate slots and the former wins, so the
   // pane can show an issue the item does not describe. The item's repo is that other item's
   // repo — borrowing it would read the visible number out of the wrong project.

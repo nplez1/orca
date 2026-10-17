@@ -5,7 +5,7 @@ import { getWorkspaceAttachmentSourceContext } from './workspace-attachment-sour
 import { getWorkspaceReferenceLinearWorkspaceId } from './workspace-reference-details'
 import { getWorktreeGitIdentityDisplay } from '../../../../shared/worktree/git-identity-display'
 import { useAppStore } from '@/store'
-import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
+import { findLinkedIssueRepo, linkedIssueRepoIsOffDevice } from '@/lib/linked-issue-repo'
 import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
@@ -58,6 +58,13 @@ export function useWorktreeCardReviewDetails({
   // about this workspace's own git repo, not about its issue.
   const issueRepo = useAppStore((s) =>
     worktree.linkedIssue ? findLinkedIssueRepo(s.repos, worktree, worktree.linkedIssue) : null
+  )
+  // Why: with no row there is no cache key, so the entry stays `undefined` — which the
+  // presentation reads as "still loading". The link cannot load here, so it must settle.
+  const issueRepoIsOffDevice = useAppStore((s) =>
+    worktree.linkedIssue
+      ? linkedIssueRepoIsOffDevice(s.repos, worktree, worktree.linkedIssue)
+      : false
   )
   const hostedReviewCacheKey =
     hostedReviewExactKey ??
@@ -217,6 +224,7 @@ export function useWorktreeCardReviewDetails({
     folderMetaRowContent,
     hostedReviewCacheKey,
     issueRepo,
+    issueRepoIsOffDevice,
     issueCacheKey,
     issueEntry,
     linearIssueEntry,

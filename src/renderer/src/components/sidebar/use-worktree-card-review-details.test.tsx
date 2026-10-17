@@ -102,7 +102,7 @@ describe('useWorktreeCardReviewDetails issue cache key', () => {
     )
   })
 
-  it('keys nothing when the issue repo is not registered on this device', () => {
+  it('keys nothing and settles the entry when the issue repo is not on this device', () => {
     useAppStore.setState({ repos: [workspaceRepo] })
 
     const { result } = renderDetails(
@@ -114,5 +114,22 @@ describe('useWorktreeCardReviewDetails issue cache key', () => {
     )
 
     expect(result.current.issueCacheKey).toBe('')
+    // Why: no key means no entry, and an absent entry reads as "still loading" — the link
+    // cannot load here, so the card has to settle instead of spinning forever.
+    expect(result.current.issueEntry).toBeUndefined()
+    expect(result.current.issueRepoIsOffDevice).toBe(true)
+  })
+
+  it('does not report off-device when the issue repo is registered', () => {
+    const { result } = renderDetails(
+      makeWorktree('wt-history', 'History', {
+        repoId: workspaceRepo.id,
+        linkedIssue: 97,
+        linkedWorkItem
+      })
+    )
+
+    expect(result.current.issueCacheKey).not.toBe('')
+    expect(result.current.issueRepoIsOffDevice).toBe(false)
   })
 })

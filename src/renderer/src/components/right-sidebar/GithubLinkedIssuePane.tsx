@@ -36,10 +36,10 @@ type GithubPaneWorktree = Pick<Worktree, 'repoId' | 'linkedWorkItem'>
  * Task-source context to pass alongside this repo row, or null.
  *
  * The row names the repo path, the repo id and the transport for this read. A source context
- * that names a different repo is the workspace's creation record, not this link's repo — it
- * only re-introduces the disagreement that made the pane unreadable (the host is asked for a
- * repo id only this device has). When it names the same repo it is consistent, and passing it
- * keeps whatever account the read was created under.
+ * that names a different repo is the workspace's creation record, not this link's repo, and
+ * forwarding it is what asked another host for a repo id only this device has. One that names
+ * the same repo is consistent, and is kept so the read keeps its source-scoped cache identity.
+ * (It selects no account: downstream it only scopes the cache and the host guard.)
  */
 function readSourceContext(
   sourceContext: TaskSourceContext | null,
