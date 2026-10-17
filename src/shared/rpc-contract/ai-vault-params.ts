@@ -72,13 +72,9 @@ export const AiVaultListSessionsParams = z
       .string()
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
-    offset: z
-      .unknown()
-      .transform((value) =>
-        typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined
-      )
-      .pipe(z.union([z.number().int().max(AI_VAULT_LIST_OFFSET_MAX), z.undefined()]))
-      .optional()
+    // Why reject rather than coerce: an offset a client cannot follow would silently restart the
+    // listing at page 0, and the drain would append the same rows twice.
+    offset: z.number().int().min(0).max(AI_VAULT_LIST_OFFSET_MAX).optional()
   })
   .superRefine((params, ctx) => {
     if (params.unlimited !== true && params.limit && params.limit > AI_VAULT_LIMIT_MAX) {

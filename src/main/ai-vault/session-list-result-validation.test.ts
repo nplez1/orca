@@ -327,6 +327,20 @@ describe('parseAiVaultListResult paging and deltas', () => {
     )
   })
 
+  it('drops the fingerprint when a rejected delta row cannot be named', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: { upserts: [{ id: 42 }], removedIds: [] }
+    })
+
+    // The held list cannot be corrected by id, so the body no longer matches this fingerprint.
+    expect(parsed.syncDelta).toEqual({ upserts: [], removedIds: [] })
+    expect(parsed.fingerprint).toBeUndefined()
+  })
+
   it('rejects a reply that carries both a delta and a listing body', () => {
     expect(() =>
       parseAiVaultListResult({

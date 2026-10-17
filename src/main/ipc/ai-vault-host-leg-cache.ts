@@ -73,6 +73,8 @@ export async function scanHostLegWithCache(args: {
   scopePaths?: readonly string[]
   force: boolean
   afterFingerprint?: string | null
+  /** The host this leg addresses; names it in an issue row this module has to author itself. */
+  hostLabel: string
   /** Receives the basis to sync from, or undefined when this leg holds no full list yet. */
   scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
 }): Promise<AiVaultListResult> {
@@ -92,12 +94,7 @@ export async function scanHostLegWithCache(args: {
   // Why capture rather than look up afterwards: the basis is what the delta is applied to, and a
   // concurrent scan must not swap it out between the request and the reply.
   const basis = hostLegSyncBasis(args.cacheKey, args.depth)
-  let scanned = await args.scan(basis)
-  if (scanned.syncDelta && !basis) {
-    // Why re-ask instead of failing: under the 'all' scope a throw here would reject the merged
-    // Promise.all and take every other host's list down with it, so the leg recovers instead.
-    scanned = await args.scan(undefined)
-  }
+  const scanned = await scanWithSyncBasis(args, basis)
   const delta = scanned.syncDelta
   const result = delta && basis ? withAppliedDelta(basis.sessions, delta, scanned) : scanned
   // A delete's invalidation landed while this leg was scanning; caching a
@@ -131,6 +128,39 @@ export async function scanHostLegWithCache(args: {
   })
   scheduleHostLegExpiry()
   return result
+}
+
+/**
+ * A delta is only meaningful against the list this leg sent, so a host that answers one without a
+ * basis gets one retry without a token. Why not throw: under the 'all' scope a throw here would
+ * reject the merged Promise.all and take every other host's list down with it.
+ */
+async function scanWithSyncBasis(
+  args: Parameters<typeof scanHostLegWithCache>[0],
+  basis: AiVaultHostLegSyncBasis | undefined
+): Promise<AiVaultListResult> {
+  const first = await args.scan(basis)
+  if (!first.syncDelta || basis) {
+    return first
+  }
+  const retried = await args.scan(undefined)
+  if (!retried.syncDelta) {
+    return retried
+  }
+  // Both attempts named a list this leg never sent; say so instead of caching an empty body.
+  return {
+    sessions: [],
+    issues: [
+      ...retried.issues,
+      {
+        agent: 'codex',
+        kind: 'host',
+        path: args.hostLabel,
+        message: 'The session host answered with changes this computer does not hold.'
+      }
+    ],
+    scannedAt: retried.scannedAt
+  }
 }
 
 /** The full list this leg holds at exactly this depth; a shallower depth cannot reuse it. */

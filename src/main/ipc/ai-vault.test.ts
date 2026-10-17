@@ -116,7 +116,122 @@ describe('listAiVaultSessions host routing', () => {
         executionHostScope: 'runtime:remote-server',
         force: true
       },
-      {}
+      // Why the signal is there: a cancelled listing must stop its page drain, not just its caller.
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+  })
+})
+
+describe('listAiVaultSessions change sync wiring', () => {
+  const fingerprint = 'a'.repeat(64)
+
+  it('sends the fingerprint of the list this computer holds on a warm refresh', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+
+    await _internals.listAiVaultSessions(request)
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]?.syncFromFingerprint).toBeUndefined()
+
+    await _internals.listAiVaultSessions(request)
+    // Why the same depth and cache key: the host can only diff against the list it served here.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('never forwards a fingerprint the caller supplied itself', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      syncFromFingerprint: 'c'.repeat(64)
+    })
+
+    // A token this leg never sent names no list, so the host must not answer a delta for it.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]?.syncFromFingerprint).toBeUndefined()
+  })
+
+  it('strips the caller fingerprint and keeps each host leg to its own token', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [
+        { environmentId: 'env-1', executionHostId: 'runtime:env-1' }
+      ],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:env-1', 'env-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'all' as const,
+      scopePaths: ['/repo'],
+      afterFingerprint: 'c'.repeat(64),
+      syncFromFingerprint: 'c'.repeat(64),
+      force: true
+    }
+
+    await _internals.listAiVaultSessions(request)
+    const firstLegArgs = mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]
+    // Why neither field is the caller's: the merged list has no single fingerprint, so the merge
+    // neither asks "is it unchanged" of a leg nor reuses a token that leg never sent.
+    expect(firstLegArgs?.afterFingerprint).toBeUndefined()
+    expect(firstLegArgs?.syncFromFingerprint).toBeUndefined()
+
+    await _internals.listAiVaultSessions(request)
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('keeps the held list when a host answers with a host issue', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValueOnce({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    await _internals.listAiVaultSessions(request)
+
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValueOnce({
+      sessions: [],
+      issues: [
+        {
+          executionHostId: 'runtime:remote-server',
+          agent: 'codex',
+          kind: 'host',
+          path: 'remote-server',
+          message: 'The connection closed.'
+        }
+      ],
+      scannedAt: new Date().toISOString()
+    })
+    await _internals.listAiVaultSessions(request)
+
+    // A failed leg is not a new body, so the next refresh still diffs against the last good one.
+    await _internals.listAiVaultSessions(request)
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[2]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
     )
   })
 })

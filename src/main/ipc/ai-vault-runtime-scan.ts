@@ -16,6 +16,7 @@ export type RuntimeAiVaultHostInfo = {
 
 export type RuntimeAiVaultScanOptions = {
   timeoutMs?: number
+  signal?: AbortSignal
 }
 
 export type RuntimeAiVaultScanner = (
@@ -32,7 +33,7 @@ export async function scanRuntimeAiVaultSessions(args: {
   hostInfo: RuntimeAiVaultHostInfo
   scanner: RuntimeAiVaultScanner | undefined
   listArgs?: AiVaultListArgs
-  options?: RuntimeAiVaultScanOptions & { signal?: AbortSignal }
+  options?: RuntimeAiVaultScanOptions
 }): Promise<AiVaultListResult> {
   const { signal, ...scannerOptions } = args.options ?? {}
   throwIfAiVaultScanCancelled(signal)
@@ -45,7 +46,8 @@ export async function scanRuntimeAiVaultSessions(args: {
   try {
     return await abandonRemoteSessionScanOnCancel(
       args.scanner(args.hostInfo.environmentId, runtimeScanArgs(args.hostInfo, args.listArgs), {
-        ...scannerOptions
+        ...scannerOptions,
+        ...(signal ? { signal } : {})
       }),
       signal
     )

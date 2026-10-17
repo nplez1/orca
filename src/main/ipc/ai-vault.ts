@@ -121,9 +121,12 @@ async function listAiVaultSessions(
         scopePaths,
         force: args?.force === true,
         afterFingerprint,
+        hostLabel: executionHostScope,
+        // Why always overwrite: a token the caller supplied itself names a list this leg never
+        // sent, and letting it through would hand back a delta there is no basis to apply.
         scan: (syncFrom) =>
           scanAiVaultSessionsByHostScope(
-            syncFrom ? { ...args, syncFromFingerprint: syncFrom.fingerprint } : args,
+            { ...args, syncFromFingerprint: syncFrom?.fingerprint },
             executionHostScope,
             scanSignal,
             key
@@ -140,11 +143,7 @@ function legListArgs(
   syncFrom: AiVaultHostLegSyncBasis | undefined
 ): AiVaultListArgs | undefined {
   return args
-    ? {
-        ...args,
-        afterFingerprint: undefined,
-        ...(syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
-      }
+    ? { ...args, afterFingerprint: undefined, syncFromFingerprint: syncFrom?.fingerprint }
     : undefined
 }
 
@@ -170,6 +169,7 @@ async function scanAiVaultSessionsByHostScope(
           depth,
           scopePaths,
           force: args?.force === true,
+          hostLabel: hostInfo.executionHostId,
           scan: (syncFrom) =>
             scanRuntimeAiVaultSessions({
               hostInfo,

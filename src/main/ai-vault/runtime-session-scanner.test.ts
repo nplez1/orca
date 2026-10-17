@@ -215,6 +215,48 @@ describe('runtime AI Vault session scanner', () => {
     })
   })
 
+  it('stops reading pages when its caller cancels', async () => {
+    const controller = new AbortController()
+    mocks.callRuntimeEnvironment.mockImplementationOnce(async () => {
+      controller.abort()
+      return {
+        ok: true,
+        result: {
+          ...result([session('runtime:env-1', 'session-1')]),
+          hasMore: true,
+          nextOffset: 1
+        }
+      }
+    })
+
+    const scanResult = await scanRuntimeAiVaultSessions(
+      '/user-data',
+      'env-1',
+      { unlimited: true },
+      { signal: controller.signal }
+    )
+
+    expect(mocks.callRuntimeEnvironment).toHaveBeenCalledTimes(1)
+    expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1'])
+    expect(scanResult.fingerprint).toBeUndefined()
+  })
+
+  it('passes its signal to the transport so a page in flight can be abandoned', async () => {
+    const controller = new AbortController()
+    await scanRuntimeAiVaultSessions('/user-data', 'env-1', {}, { signal: controller.signal })
+
+    expect(mocks.callRuntimeEnvironment).toHaveBeenCalledWith(
+      '/user-data',
+      'env-1',
+      'aiVault.listSessions',
+      expect.anything(),
+      undefined,
+      undefined,
+      undefined,
+      { signal: controller.signal }
+    )
+  })
+
   it('keeps the rows already read when a later page fails', async () => {
     mocks.callRuntimeEnvironment
       .mockResolvedValueOnce({

@@ -192,6 +192,11 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     }
     issues.push({ ...parsed.data, agent: parsed.data.agent })
   }
+  // Why drop the fingerprint: a rejected delta row that named no id cannot be dropped from the
+  // list this client holds, so the body would no longer match the fingerprint it is stored under.
+  const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
+  const fingerprint =
+    envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
   const invalidCount = malformedSessionCount + malformedIssueCount
   if (invalidCount > 0) {
     issues.push({
@@ -204,7 +209,7 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     sessions,
     issues,
     scannedAt: envelope.data.scannedAt,
-    ...(envelope.data.fingerprint ? { fingerprint: envelope.data.fingerprint } : {}),
+    ...(fingerprint ? { fingerprint } : {}),
     ...(envelope.data.unchanged ? { unchanged: true as const } : {}),
     ...(envelope.data.hasMore ? { hasMore: true as const } : {}),
     ...(envelope.data.nextOffset !== undefined ? { nextOffset: envelope.data.nextOffset } : {}),

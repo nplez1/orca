@@ -30,7 +30,8 @@ let retainedBytes = 0
 function snapshotBytes(digests: ReadonlyMap<string, string>): number {
   let bytes = 0
   for (const [id, digest] of digests) {
-    bytes += id.length + digest.length + ENTRY_OVERHEAD_BYTES
+    // Why bytes: a transcript path may hold non-ASCII, and `length` undercounts it by up to 3x.
+    bytes += Buffer.byteLength(id, 'utf8') + digest.length + ENTRY_OVERHEAD_BYTES
   }
   return bytes
 }
@@ -76,16 +77,32 @@ export function aiVaultListSyncDelta(args: {
   sessions: readonly AiVaultSession[]
   issues: readonly AiVaultScanIssue[]
 }): AiVaultListSyncDelta | null {
-  const upserts = args.sessions.filter(
-    (session) => args.previous.get(session.id) !== args.current.digests.get(session.id)
-  )
-  const removedIds = [...args.previous.keys()].filter((id) => !args.current.digests.has(id))
-  const delta: AiVaultListSyncDelta = { upserts: [...upserts], removedIds }
-  // Why count the issues: they ride along in the same reply, so the cap has to cover them too.
-  const bytes =
-    Buffer.byteLength(JSON.stringify(delta), 'utf8') +
-    Buffer.byteLength(JSON.stringify(args.issues), 'utf8')
-  return bytes > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES ? null : delta
+  // Why measured row by row: a sync from a very old basis can name the whole listing, and
+  // serialising it just to discover it is too large is exactly the work this bound avoids.
+  let bytes = Buffer.byteLength(JSON.stringify(args.issues), 'utf8')
+  const upserts: AiVaultSession[] = []
+  for (const session of args.sessions) {
+    if (args.previous.get(session.id) === args.current.digests.get(session.id)) {
+      continue
+    }
+    bytes += Buffer.byteLength(JSON.stringify(session), 'utf8') + 1
+    if (bytes > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES) {
+      return null
+    }
+    upserts.push(session)
+  }
+  const removedIds: string[] = []
+  for (const id of args.previous.keys()) {
+    if (args.current.digests.has(id)) {
+      continue
+    }
+    bytes += Buffer.byteLength(JSON.stringify(id), 'utf8') + 1
+    if (bytes > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES) {
+      return null
+    }
+    removedIds.push(id)
+  }
+  return { upserts, removedIds }
 }
 
 export function resetAiVaultListSyncStoreForTests(): void {

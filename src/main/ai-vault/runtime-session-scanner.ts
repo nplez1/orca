@@ -30,6 +30,8 @@ export type RuntimeAiVaultHostInfo = {
 
 export type RuntimeAiVaultScanOptions = {
   timeoutMs?: number
+  /** Stops the page drain when the caller cancels; each page request carries it too. */
+  signal?: AbortSignal
 }
 
 // Why: zod strips unknown keys, so the repin home must be declared or the
@@ -70,7 +72,11 @@ export async function scanRuntimeAiVaultSessions(
   const read = await readAiVaultListPages({
     firstPageArgs: args,
     fetchPage: (pageArgs) =>
-      fetchRuntimeAiVaultListPage(userDataPath, environmentId, pageArgs, options)
+      fetchRuntimeAiVaultListPage(userDataPath, environmentId, pageArgs, options),
+    ...(options.signal ? { signal: options.signal } : {}),
+    // Why one deadline for the whole drain: the caller's timeout bounded one reply before paging,
+    // and an 'all'-scope leg must not hold the merge open for pages × timeout.
+    ...(options.timeoutMs !== undefined ? { deadlineMs: Date.now() + options.timeoutMs } : {})
   })
   if (read.kind === 'failed') {
     return runtimeScanIssueResult({
@@ -108,12 +114,11 @@ async function fetchRuntimeAiVaultListPage(
   args: AiVaultListArgs,
   options: RuntimeAiVaultScanOptions
 ): Promise<AiVaultListResult> {
-  const response = await callRuntimeEnvironment(
+  const response = await callHostListPage(
     userDataPath,
     environmentId,
-    'aiVault.listSessions',
     runtimeListPageParams(args, toRuntimeExecutionHostId(environmentId)),
-    options.timeoutMs
+    options
   )
   if (response.ok !== true) {
     throw new Error(response.error.message)
@@ -135,6 +140,37 @@ async function fetchRuntimeAiVaultListPage(
       }`
     )
   }
+}
+
+/**
+ * Why the transport's option slot only when there is a signal: a cancelled listing must stop the
+ * page in flight, or the host keeps re-projecting pages nobody will read, and the positional
+ * arguments other callers already rely on stay as they are.
+ */
+function callHostListPage(
+  userDataPath: string,
+  environmentId: string,
+  params: Record<string, unknown>,
+  options: RuntimeAiVaultScanOptions
+): ReturnType<typeof callRuntimeEnvironment> {
+  return options.signal
+    ? callRuntimeEnvironment(
+        userDataPath,
+        environmentId,
+        'aiVault.listSessions',
+        params,
+        options.timeoutMs,
+        undefined,
+        undefined,
+        { signal: options.signal }
+      )
+    : callRuntimeEnvironment(
+        userDataPath,
+        environmentId,
+        'aiVault.listSessions',
+        params,
+        options.timeoutMs
+      )
 }
 
 function errorMessage(error: unknown): string {

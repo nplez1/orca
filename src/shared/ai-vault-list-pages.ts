@@ -1,4 +1,9 @@
-import type { AiVaultListArgs, AiVaultListResult, AiVaultScanIssue } from './ai-vault-types'
+import {
+  AI_VAULT_SCAN_CANCELLED_MESSAGE,
+  type AiVaultListArgs,
+  type AiVaultListResult,
+  type AiVaultScanIssue
+} from './ai-vault-types'
 import type { ExecutionHostId } from './execution-host'
 import { describeAiVaultScanError } from './ai-vault-scan-error-message'
 
@@ -23,6 +28,9 @@ export const AI_VAULT_LIST_CHANGING_SCAN_MESSAGE =
 
 export const AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE =
   'The session host returned a page list this client cannot follow. Refresh to try again.'
+
+export const AI_VAULT_LIST_DEADLINE_MESSAGE =
+  'Loading this session list took too long. Refresh to try again.'
 
 export type AiVaultListPageRead =
   | { kind: 'complete'; result: AiVaultListResult }
@@ -74,14 +82,28 @@ export async function readAiVaultListPages(args: {
   /** The caller's request, including the fingerprint/force that belong to page 0 alone. */
   firstPageArgs: AiVaultListArgs
   fetchPage: (pageArgs: AiVaultListArgs) => Promise<AiVaultListResult>
+  /** Stops the drain once its caller walked away, instead of reading pages nobody will use. */
+  signal?: AbortSignal
+  /** Epoch ms after which the drain reports what it has; one slow host cannot hold a merge open. */
+  deadlineMs?: number
 }): Promise<AiVaultListPageRead> {
   let pages: AiVaultListResult[] = []
   let offset = 0
   let restarts = 0
+  let pageArgs = args.firstPageArgs
   for (;;) {
+    if (args.signal?.aborted) {
+      // The caller walked away; the rows read so far are not worth reporting as a failure.
+      const aborted = new Error(AI_VAULT_SCAN_CANCELLED_MESSAGE)
+      aborted.name = 'AbortError'
+      return incomplete(pages, aborted)
+    }
+    if (args.deadlineMs !== undefined && Date.now() > args.deadlineMs) {
+      return incomplete(pages, new Error(AI_VAULT_LIST_DEADLINE_MESSAGE))
+    }
     let result: AiVaultListResult
     try {
-      result = await args.fetchPage(aiVaultListPageArgs(args.firstPageArgs, offset))
+      result = await args.fetchPage(aiVaultListPageArgs(pageArgs, offset))
     } catch (error) {
       return pages.length === 0
         ? { kind: 'failed', error }
@@ -107,6 +129,10 @@ export async function readAiVaultListPages(args: {
       restarts += 1
       pages = []
       offset = 0
+      // Why drop force: the restart only needs page 0 of a fresh listing, and a forced page 0
+      // would rescan the host's whole home again for one click.
+      const { force: _force, ...restarted } = pageArgs
+      pageArgs = restarted
       continue
     }
     pages.push(result)
@@ -131,6 +157,12 @@ export async function readAiVaultListPages(args: {
     }
     offset = next
   }
+}
+
+function incomplete(pages: readonly AiVaultListResult[], error: Error): AiVaultListPageRead {
+  return pages.length === 0
+    ? { kind: 'failed', error }
+    : { kind: 'partial', result: partialAiVaultList(pages), error }
 }
 
 /**

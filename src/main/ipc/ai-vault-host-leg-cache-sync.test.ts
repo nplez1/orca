@@ -62,7 +62,13 @@ describe('host leg change sync', () => {
     const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
     const held = [session('one'), session('two', EARLY)]
     scan.mockResolvedValueOnce(listing(held, FIRST_FINGERPRINT))
-    const args = { cacheKey: 'leg', depth: 'unlimited' as const, force: false, scan }
+    const args = {
+      cacheKey: 'leg',
+      depth: 'unlimited' as const,
+      force: false,
+      hostLabel: 'runtime:env-1',
+      scan
+    }
 
     const first = await scanHostLegWithCache(args)
     expect(scan).toHaveBeenNthCalledWith(1, undefined)
@@ -92,7 +98,13 @@ describe('host leg change sync', () => {
   it('syncs the next refresh from the applied fingerprint', async () => {
     const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
     scan.mockResolvedValueOnce(listing([session('one')], FIRST_FINGERPRINT))
-    const args = { cacheKey: 'leg', depth: 'unlimited' as const, force: false, scan }
+    const args = {
+      cacheKey: 'leg',
+      depth: 'unlimited' as const,
+      force: false,
+      hostLabel: 'runtime:env-1',
+      scan
+    }
     await scanHostLegWithCache(args)
 
     vi.setSystemTime(1_000 + AI_VAULT_CACHE_TTL_MS + 1)
@@ -135,6 +147,7 @@ describe('host leg change sync', () => {
       cacheKey: 'leg',
       depth: 'unlimited',
       force: false,
+      hostLabel: 'runtime:env-1',
       scan
     })
 

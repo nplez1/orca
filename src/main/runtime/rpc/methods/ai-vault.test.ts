@@ -186,6 +186,13 @@ describe('aiVault.listSessions params schema', () => {
     expect(parsed.success).toBe(false)
   })
 
+  it('rejects an offset a page loop cannot follow instead of coercing it to page 0', () => {
+    expect(AiVaultListSessionsParams.safeParse({ offset: -1 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 1.5 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 1_000_001 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 2 }).success).toBe(true)
+  })
+
   it('rejects non-runtime execution host ids before dispatch', () => {
     expect(
       AiVaultListSessionsParams.safeParse({ executionHostId: 'not-a-runtime-host' }).success

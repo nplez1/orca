@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AiVaultListArgs, AiVaultListResult, AiVaultSession } from './ai-vault-types'
 import {
   AI_VAULT_LIST_CHANGING_SCAN_MESSAGE,
+  AI_VAULT_LIST_DEADLINE_MESSAGE,
   AI_VAULT_LIST_MAX_PAGES,
   AI_VAULT_LIST_MAX_SCAN_RESTARTS,
   AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE,
@@ -271,6 +272,65 @@ describe('readAiVaultListPages', () => {
 
     expect(requested).toEqual([0, 2, 0])
     expect(read).toMatchObject({ kind: 'complete', result: { unchanged: true } })
+  })
+
+  it('asks for no further page once its caller cancelled', async () => {
+    const controller = new AbortController()
+    const requested: number[] = []
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      signal: controller.signal,
+      fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
+        controller.abort()
+        return page(['a'], 1)
+      }
+    })
+
+    expect(requested).toEqual([0])
+    expect(read.kind).toBe('partial')
+    if (read.kind !== 'partial') {
+      throw new Error('expected a partial listing')
+    }
+    // A cancelled read is not a partial download to report; the rows are dropped either way.
+    expect(read.result.sessions).toHaveLength(1)
+    expect(read.result.fingerprint).toBeUndefined()
+  })
+
+  it('stops at its deadline instead of holding a merge open for more pages', async () => {
+    const requested: number[] = []
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      deadlineMs: 0,
+      fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
+        return page(['a'], 1)
+      }
+    })
+
+    expect(requested).toEqual([])
+    expect(read).toMatchObject({ kind: 'failed', error: new Error(AI_VAULT_LIST_DEADLINE_MESSAGE) })
+  })
+
+  it('does not re-force the host when it restarts a listing', async () => {
+    const requests: AiVaultListArgs[] = []
+    await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        requests.push(args)
+        if (requests.length === 1) {
+          return page(['a'], 1, 'scan-a')
+        }
+        if (requests.length === 2) {
+          return page(['b'], 2, 'scan-b')
+        }
+        return page(['a'])
+      }
+    })
+
+    expect(requests[0]).toMatchObject({ force: true })
+    // A restart only needs page 0 of a fresh listing; forcing it would rescan the host again.
+    expect(requests[2]).not.toHaveProperty('force')
   })
 
   it('reports a listing that keeps changing instead of retrying forever', async () => {

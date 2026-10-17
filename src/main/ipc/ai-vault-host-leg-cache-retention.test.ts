@@ -65,6 +65,7 @@ function args(scan: () => Promise<AiVaultListResult>, force = false, depth = 4) 
     cacheKey: 'leg',
     depth,
     force,
+    hostLabel: 'runtime:env-1',
     scopePaths: ['/workspaces/project'],
     scan
   }
