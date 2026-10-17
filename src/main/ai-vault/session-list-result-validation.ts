@@ -197,6 +197,10 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
   const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
   const fingerprint =
     envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
+  // Why a dropped row keeps the listing's fingerprint: the row is one this build cannot represent,
+  // so it is missing from every reply that carries it — the skip row states that once, and a
+  // fingerprint that changed every time would re-read the whole history on every refresh for a row
+  // that still could not be shown.
   const invalidCount = malformedSessionCount + malformedIssueCount
   if (invalidCount > 0) {
     issues.push({
