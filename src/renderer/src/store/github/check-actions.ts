@@ -184,6 +184,9 @@ export const createCheckActions = (
         if (prStatusUpdate?.prCache) {
           nextState.prCache = prStatusUpdate.prCache
         }
+        if (prStatusUpdate?.hostedReviewCache) {
+          nextState.hostedReviewCache = prStatusUpdate.hostedReviewCache
+        }
 
         return nextState
       })

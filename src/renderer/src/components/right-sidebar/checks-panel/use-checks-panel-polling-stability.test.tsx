@@ -87,16 +87,16 @@ describe('checks detail polling ownership', () => {
     expect(fetch).toHaveBeenCalledTimes(3)
   })
 
-  it('preserves the timer and backoff when repository cache objects are replaced', async () => {
+  it('preserves the focused timer across repository cache object replacement', async () => {
     const model = createModel()
     const fetch = vi.fn().mockResolvedValue(pending)
     model.fetchPRChecks = fetch
     const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
       initialProps: { input: model }
     })
-    await advance(60_000)
+    await advance(10_000)
     expect(fetch).toHaveBeenCalledTimes(2)
-    await advance(30_000)
+    await advance(5_000)
     hook.rerender({
       input: {
         ...model,
@@ -106,9 +106,10 @@ describe('checks detail polling ownership', () => {
           : null
       }
     })
-    await advance(60_000)
+    // Identical rows each read, so the loop is on its eased-off step; the rerender must not shift it.
+    await advance(14_999)
     expect(fetch).toHaveBeenCalledTimes(2)
-    await advance(30_000)
+    await advance(1)
     expect(fetch).toHaveBeenCalledTimes(3)
   })
 
@@ -136,7 +137,7 @@ describe('checks detail polling ownership', () => {
         activeGitLabReview: model.activeGitLabReview ? { ...model.activeGitLabReview } : null
       }
     })
-    await advance(59_999)
+    await advance(9_999)
     expect(gitlab.fetchDetails).toHaveBeenCalledOnce()
     await advance(1)
     expect(gitlab.fetchDetails).toHaveBeenCalledTimes(2)
@@ -189,7 +190,7 @@ describe('checks detail polling ownership', () => {
     const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
       initialProps: { input: model }
     })
-    await advance(60_000)
+    await advance(10_000)
     expect(fetch).toHaveBeenCalledTimes(2)
     const writes = vi.mocked(model.setChecks).mock.calls.length
     await advance(1_000)
@@ -228,7 +229,7 @@ describe('checks detail polling ownership', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps settled details stopped across a quick reopening and discovers stale exposure once', async () => {
+  it('keeps settled details stopped across a reopening', async () => {
     const model = createModel()
     if (model.pr) {
       model.pr = { ...model.pr, state: 'merged', checksStatus: 'success' }
@@ -247,9 +248,10 @@ describe('checks detail polling ownership', () => {
     hook.rerender({ input: { ...model, isPanelVisible: false } })
     hook.rerender({ input: { ...model, isPanelVisible: true } })
     await advance(0)
-    expect(fetch).toHaveBeenCalledTimes(2)
+    // Why: reopening freshness belongs to the tab-entry gate (15s grace), not to this timer.
+    expect(fetch).toHaveBeenCalledOnce()
     await advance(900_000)
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledOnce()
   })
 
   it('clears details and starts discovery when the review identity changes after failure', async () => {
@@ -320,6 +322,66 @@ describe('checks detail polling ownership', () => {
     await advance(8_999)
     expect(fetch).toHaveBeenCalledOnce()
     await advance(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'head-1',
+      model.pr?.prRepo,
+      expect.objectContaining({ force: true })
+    )
+  })
+
+  it('refetches the pushed head immediately and uncached', async () => {
+    const model = createModel()
+    if (model.pr) {
+      model.pr = { ...model.pr, headSha: 'old-head', checksStatus: 'success' }
+    }
+    const fetch = vi.fn().mockResolvedValue(settled)
+    model.fetchPRChecks = fetch
+    const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: model }
+    })
+    await advance(1_000)
+    expect(fetch).toHaveBeenCalledOnce()
+    // The background refresh publishes the push first: new head, new pending run.
+    hook.rerender({
+      input: {
+        ...model,
+        pr: model.pr ? { ...model.pr, headSha: 'new-head', checksStatus: 'pending' } : null
+      }
+    })
+    await advance(0)
+    // Why uncached: the provider read is cached per PR, not per head, so a plain read can answer
+    // with the run that preceded the push.
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'new-head',
+      model.pr?.prRepo,
+      expect.objectContaining({ force: true })
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('pulls the rows forward when the rollup reports a run they do not show', async () => {
+    const model = createModel()
+    if (model.pr) {
+      model.pr = { ...model.pr, checksStatus: 'failure' }
+    }
+    const fetch = vi.fn().mockResolvedValue(settled)
+    model.fetchPRChecks = fetch
+    const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: model }
+    })
+    await advance(1_000)
+    expect(fetch).toHaveBeenCalledOnce()
+    // Rows green, rollup failing: the icon has news this panel cannot see, so the rows are re-read
+    // instead of sitting apart until the settled cadence.
+    hook.rerender({ input: { ...model, checks: settled } })
+    await advance(9_000)
     expect(fetch).toHaveBeenCalledTimes(2)
     expect(fetch).toHaveBeenLastCalledWith(
       '/workspace/repo',

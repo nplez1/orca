@@ -71,8 +71,9 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
   const fetchChecks = useCallback(
     async ({
       force = false,
+      background = false,
       prNumberOverride
-    }: { force?: boolean; prNumberOverride?: number | null } = {}) => {
+    }: { force?: boolean; background?: boolean; prNumberOverride?: number | null } = {}) => {
       const {
         repo,
         prNumber,
@@ -94,7 +95,11 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       if (!repo || !targetPRNumber) {
         return
       }
-      setChecksLoading(true)
+      // Why: a scheduled poll refreshes rows that are already on screen; flipping the panel's
+      // loading state for it blanks counts and disables buttons on every tick.
+      if (!background) {
+        setChecksLoading(true)
+      }
       try {
         const requestKey = checksPanelAsyncResultKey(
           prCacheKey,
@@ -144,6 +149,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         pollIntervalRef.current = Math.min(Math.max(60_000, pollIntervalRef.current * 2), 900_000)
       } finally {
         if (
+          !background &&
           isCurrentAsyncResult(
             checksPanelAsyncResultKey(prCacheKey, branch, targetPRNumber, pr?.prRepo, pr?.headSha)
           )
@@ -160,11 +166,13 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       mrNumberOverride,
       headShaOverride,
       commitAsCurrent = false,
+      background = false,
       isRequestCurrent
     }: {
       mrNumberOverride?: number | null
       headShaOverride?: string | null
       commitAsCurrent?: boolean
+      background?: boolean
       isRequestCurrent?: () => boolean
     } = {}) => {
       const {
@@ -204,10 +212,16 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
       if (commitAsCurrent) {
         asyncResultKeyRef.current = requestKey
       }
-      const loadingGeneration = gitLabDetailsLoadingGenerationRef.current + 1
-      gitLabDetailsLoadingGenerationRef.current = loadingGeneration
-      setChecksLoading(true)
-      setCommentsLoading(true)
+      // Why: a background poll must not invalidate the generation a foreground request is about to
+      // clear, or the flags it set stay true with nobody left to unset them.
+      const loadingGeneration = background
+        ? gitLabDetailsLoadingGenerationRef.current
+        : gitLabDetailsLoadingGenerationRef.current + 1
+      if (!background) {
+        gitLabDetailsLoadingGenerationRef.current = loadingGeneration
+        setChecksLoading(true)
+        setCommentsLoading(true)
+      }
       try {
         const details = await fetchGitLabMRDetailsForChecks({
           repoPath: repo.path,
@@ -247,6 +261,7 @@ export function useChecksPanelPolling(model: ChecksPanelPollingInput) {
         pollIntervalRef.current = Math.min(Math.max(60_000, pollIntervalRef.current * 2), 900_000)
       } finally {
         if (
+          !background &&
           gitLabDetailsLoadingGenerationRef.current === loadingGeneration &&
           isCurrentAsyncResult(requestKey)
         ) {
