@@ -4,7 +4,9 @@ export const AI_VAULT_ALL_HOST_TIMEOUT_MS = {
   runtimeScan: 3_000,
   // Why a second bound: a paged listing is several replies, so the single-reply number would end
   // every large history as a partial read — and a partial read never becomes the basis a later
-  // refresh diffs against, so it could never converge.
+  // refresh diffs against, so it could never converge. A history that still cannot finish in this
+  // window shows its rows with an "only part loaded" row and keeps re-reading them here; one load
+  // of that host in the single-host view gives both views the basis they diff against.
   runtimeScanDrain: 20_000,
   // Why: a remote home with many agent roots routinely needs seconds to walk,
   // stat and parse. The old shared 3s bound emptied healthy SSH hosts in the

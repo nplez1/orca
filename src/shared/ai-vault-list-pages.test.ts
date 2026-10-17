@@ -350,9 +350,11 @@ describe('readAiVaultListPages', () => {
 
   it('reports a listing that keeps changing instead of retrying forever', async () => {
     let token = 0
+    const requested: number[] = []
     const read = await readAiVaultListPages({
       firstPageArgs: FIRST_PAGE_ARGS,
       fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
         if ((args.offset ?? 0) === 0) {
           token += 1
           return page(['a'], 1, `scan-${token}`)
@@ -361,7 +363,10 @@ describe('readAiVaultListPages', () => {
       }
     })
 
-    expect(AI_VAULT_LIST_MAX_SCAN_RESTARTS).toBeGreaterThan(0)
+    // One first attempt plus one per restart, and no more.
+    expect(requested.filter((offset) => offset === 0)).toHaveLength(
+      AI_VAULT_LIST_MAX_SCAN_RESTARTS + 1
+    )
     expect(read.kind).toBe('partial')
     if (read.kind !== 'partial') {
       throw new Error('expected a partial listing')

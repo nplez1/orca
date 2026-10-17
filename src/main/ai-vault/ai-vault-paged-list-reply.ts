@@ -75,7 +75,9 @@ export function aiVaultPagedListReply(args: {
 /**
  * Which rows a page offsets into, and in what order — the thing an offset is relative to. Ids are
  * unique within a listing, so the sequence names the row set exactly; it does not cover a row's
- * *content*, so a title that changes between pages slips through and is healed by the next delta.
+ * *content*, so a row whose fields change between pages is stored as the later page saw it. The
+ * next delta heals that, except when the row reverts to exactly its page-0 form before the refresh:
+ * then the fingerprint still matches and the drifted copy stays until that row changes again.
  *
  * Why not the scan id: what a page is sliced from is the *served* list, and serving filters rows per
  * request (structured-chat ownership is read live), so one scan can back two different served

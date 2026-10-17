@@ -73,7 +73,7 @@ describe('web session listing pages and syncs', () => {
     })
   })
 
-  it('keeps the first page issues instead of repeating them per page', async () => {
+  it('takes issues from the page that carries them, not from every page', async () => {
     const issue = { agent: 'codex', kind: 'host', path: 'owning-host', message: 'one' }
     callRuntimeResult
       .mockResolvedValueOnce({
@@ -83,10 +83,16 @@ describe('web session listing pages and syncs', () => {
         hasMore: true,
         nextOffset: 1
       })
-      .mockResolvedValueOnce({ sessions: [session('b')], issues: [], scannedAt: SCANNED_AT })
+      // A page that repeats a stale copy must not duplicate the row on screen.
+      .mockResolvedValueOnce({
+        sessions: [session('b')],
+        issues: [issue, { ...issue, message: 'two' }],
+        scannedAt: SCANNED_AT
+      })
 
     const result = await createWebAiVaultApi().listSessions({ ...SCOPE })
 
+    // Issues describe the scan and ride on page 0; a later page's copy is not appended again.
     expect(result.issues).toEqual([issue])
   })
 
@@ -132,15 +138,16 @@ describe('web session listing pages and syncs', () => {
     await api.listSessions({ ...SCOPE })
 
     callRuntimeResult.mockResolvedValueOnce({
-      sessions: [session('b')],
+      sessions: [],
       issues: [],
       scannedAt: '2026-07-27T03:00:00.000Z',
-      fingerprint: 'd'.repeat(64)
+      fingerprint: 'd'.repeat(64),
+      syncDelta: { upserts: [session('b')], removedIds: [session('a').id] }
     })
     const forced = await api.listSessions({ ...SCOPE, force: true })
 
     // Force means "rescan the host": the request still names the list this tab holds, and the
-    // answer is the host's diff against it.
+    // answer is the host's diff against it — not the whole listing again.
     expect(callRuntimeResult).toHaveBeenLastCalledWith(
       'aiVault.listSessions',
       expect.objectContaining({ force: true, syncFromFingerprint: FINGERPRINT })
@@ -201,6 +208,74 @@ describe('web session listing pages and syncs', () => {
 
     // The renderer treats `unchanged` as "ask again for the body", so it must not be an error.
     expect(result).toMatchObject({ unchanged: true, sessions: [] })
+  })
+
+  it('keeps the held list when the first page fails, so the next refresh can diff', async () => {
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [session('a')],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: FINGERPRINT
+    })
+    const api = createWebAiVaultApi()
+    await api.listSessions({ ...SCOPE })
+
+    callRuntimeResult.mockRejectedValueOnce(new Error('The connection closed.'))
+    await expect(api.listSessions({ ...SCOPE })).rejects.toThrow('The connection closed.')
+
+    // The body this tab holds is still the list its fingerprint names, so the next refresh asks
+    // for the difference instead of the whole history.
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T05:00:00.000Z',
+      fingerprint: FINGERPRINT,
+      syncDelta: { upserts: [], removedIds: [] }
+    })
+    await api.listSessions({ ...SCOPE })
+
+    expect(callRuntimeResult).toHaveBeenLastCalledWith(
+      'aiVault.listSessions',
+      expect.objectContaining({ syncFromFingerprint: FINGERPRINT })
+    )
+  })
+
+  it('keeps the held list when a later page fails', async () => {
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [session('a')],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: FINGERPRINT
+    })
+    const api = createWebAiVaultApi()
+    await api.listSessions({ ...SCOPE })
+
+    callRuntimeResult
+      .mockResolvedValueOnce({
+        sessions: [session('a')],
+        issues: [],
+        scannedAt: SCANNED_AT,
+        fingerprint: 'b'.repeat(64),
+        hasMore: true,
+        nextOffset: 1
+      })
+      .mockRejectedValueOnce(new Error('The connection closed.'))
+    await api.listSessions({ ...SCOPE })
+
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T06:00:00.000Z',
+      fingerprint: FINGERPRINT,
+      syncDelta: { upserts: [], removedIds: [] }
+    })
+    await api.listSessions({ ...SCOPE })
+
+    // Still the list from before the failed read, not the failed read's page 0.
+    expect(callRuntimeResult).toHaveBeenLastCalledWith(
+      'aiVault.listSessions',
+      expect.objectContaining({ syncFromFingerprint: FINGERPRINT })
+    )
   })
 
   it('degrades a failed later page to the rows already read and retries full next time', async () => {

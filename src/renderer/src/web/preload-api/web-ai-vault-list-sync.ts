@@ -45,10 +45,6 @@ export function rememberBrowserAiVaultList(key: string, result: AiVaultListResul
   }
 }
 
-export function forgetBrowserAiVaultList(key: string): void {
-  heldLists.delete(key)
-}
-
 /** The full list this tab holds, rebuilt from the host's changes to it. */
 export function applyHeldBrowserAiVaultDelta(
   held: HeldBrowserList,
