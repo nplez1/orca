@@ -99,19 +99,21 @@ it('serves preview turns from the parse cache rather than the transcript', async
   child.close()
 })
 
-it('adds a scope to the capped list instead of replacing it with the scope', async () => {
-  const inScope = '11111111-1111-4111-8111-111111111111'
-  const elsewhere = '22222222-2222-4222-8222-222222222222'
+const IN_SCOPE_SESSION_ID = '11111111-1111-4111-8111-111111111111'
+const ELSEWHERE_SESSION_ID = '22222222-2222-4222-8222-222222222222'
+
+/** Two conversations one scope apart, the older one inside it, in a reconciled child. */
+async function openScopedListChild(): Promise<SessionScannerServiceSearch> {
   await writeClaudeTranscript(
-    join(harness.claudeProjectDir, `${inScope}.jsonl`),
+    join(harness.claudeProjectDir, `${IN_SCOPE_SESSION_ID}.jsonl`),
     ['the older, in-scope conversation'],
-    inScope,
+    IN_SCOPE_SESSION_ID,
     { cwd: '/repo/app' }
   )
   await writeClaudeTranscript(
-    join(harness.claudeProjectDir, `${elsewhere}.jsonl`),
+    join(harness.claudeProjectDir, `${ELSEWHERE_SESSION_ID}.jsonl`),
     ['the newer conversation somewhere else'],
-    elsewhere,
+    ELSEWHERE_SESSION_ID,
     { cwd: '/other/place', startIndex: 10 }
   )
 
@@ -121,8 +123,13 @@ it('adds a scope to the capped list instead of replacing it with the scope', asy
     roots: harness.roots,
     settings: { contentEnabled: true, historyDays: null }
   })
-  const listed = await child.listSessions({ platform: 'darwin', limit: 50, scopePaths: [] }, true)
-  expect(listed?.sessions.map((session) => session.sessionId)).toEqual([elsewhere, inScope])
+  // A forced list reconciles, so the index owns both rows before anything asserts.
+  await child.listSessions({ platform: 'darwin', limit: 50, scopePaths: [] }, true)
+  return child
+}
+
+it('adds a scope to the capped list instead of replacing it with the scope', async () => {
+  const child = await openScopedListChild()
 
   // A scope is what the panel's own filter narrows from, so it must hold the
   // scope's sessions past the cap AND the ones the cap already kept — the
@@ -132,6 +139,38 @@ it('adds a scope to the capped list instead of replacing it with the scope', asy
     { platform: 'darwin', limit: 1, scopePaths: ['/repo/app'] },
     false
   )
-  expect(scoped?.sessions.map((session) => session.sessionId)).toEqual([elsewhere, inScope])
+  expect(scoped?.sessions.map((session) => session.sessionId)).toEqual([
+    ELSEWHERE_SESSION_ID,
+    IN_SCOPE_SESSION_ID
+  ])
+  child.close()
+})
+
+it('answers an unbounded scope with the whole list, as the scanner does', async () => {
+  const child = await openScopedListChild()
+
+  // Unlimited is no bound, so the scope adds nothing to a read that already holds
+  // every row.
+  const listed = await child.listSessions(
+    { platform: 'darwin', unlimited: true, scopePaths: ['/repo/app'] },
+    false
+  )
+  expect(listed?.sessions.map((session) => session.sessionId)).toEqual([
+    ELSEWHERE_SESSION_ID,
+    IN_SCOPE_SESSION_ID
+  ])
+
+  // Row for row, not read shape: which listing source answered cannot change
+  // which sessions the same request contains.
+  const scanned = await scanAiVaultSessions({
+    ...harness.roots,
+    platform: 'darwin',
+    unlimited: true,
+    scopePaths: ['/repo/app']
+  })
+  expect(scanned.sessions.map((session) => session.sessionId)).toEqual([
+    ELSEWHERE_SESSION_ID,
+    IN_SCOPE_SESSION_ID
+  ])
   child.close()
 })

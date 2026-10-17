@@ -1,5 +1,5 @@
 import type { AiVaultListArgs } from './ai-vault-types'
-import { requestedAiVaultSessionDepth } from './ai-vault-session-depth'
+import { aiVaultAppliedScopePaths, requestedAiVaultSessionDepth } from './ai-vault-session-depth'
 import { aiVaultHostListQuery } from './ai-vault-session-filters'
 
 /** The local cache and coordinator entry for one scope and scan depth. */
@@ -15,7 +15,7 @@ export function aiVaultLocalScanKey(args?: AiVaultListArgs): string {
 // must never be served for an unfiltered one (nor the reverse).
 export function aiVaultLocalScanScopeKey(args?: AiVaultListArgs): string {
   return JSON.stringify({
-    scopePaths: [...new Set(args?.scopePaths ?? [])].sort(),
+    scopePaths: [...new Set(aiVaultAppliedScopePaths(args) ?? [])].sort(),
     includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true,
     query: aiVaultHostListQuery(args?.query ?? '')
   })

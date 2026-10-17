@@ -23,6 +23,7 @@ import {
   type LocalAiVaultScanProgressHandle
 } from './ai-vault-local-scan-progress'
 import {
+  aiVaultAppliedScopePaths,
   aiVaultSessionDepthCovers,
   requestedAiVaultSessionDepth,
   truncateAiVaultListResult,
@@ -102,6 +103,26 @@ export function configuredAdditionalCodexHomePaths(): readonly string[] {
   return sources.getAdditionalCodexHomePaths?.() ?? []
 }
 
+// An unbounded list holds every scope at every depth, but it is stored without one, so
+// a scoped request rides on it rather than re-reading the same rows.
+function localCacheHit(
+  cached: CachedAiVaultList | null,
+  key: string,
+  unboundedKey: string | null,
+  depth: AiVaultSessionDepth,
+  now: number
+): CachedAiVaultList | null {
+  if (!cached || cached.expiresAt <= now || !aiVaultSessionDepthCovers(cached.depth, depth)) {
+    return null
+  }
+  if (cached.key === key) {
+    return cached
+  }
+  return unboundedKey !== null && cached.depth === 'unlimited' && cached.key === unboundedKey
+    ? cached
+    : null
+}
+
 export async function listAiVaultSessions(
   args?: AiVaultListArgs,
   options: { signal?: AbortSignal } = {}
@@ -112,6 +133,10 @@ export async function listAiVaultSessions(
   const query = aiVaultHostListQuery(args?.query ?? '')
   const key = aiVaultLocalScanScopeKey(args)
   const depth = requestedAiVaultSessionDepth(args)
+  const unboundedKey =
+    args?.unlimited === true
+      ? null
+      : aiVaultLocalScanScopeKey({ ...args, scopePaths: [], unlimited: true })
   const scanKey = aiVaultLocalScanKey(args)
   const now = Date.now()
   if (args?.force === true) {
@@ -119,13 +144,10 @@ export async function listAiVaultSessions(
   }
   // Why: opening this panel repeatedly should not re-parse hundreds of JSONL
   // transcripts; explicit refreshes bypass the cache and preempt stale scans.
-  if (
-    args?.force !== true &&
-    cachedList?.key === key &&
-    cachedList.expiresAt > now &&
-    aiVaultSessionDepthCovers(cachedList.depth, depth)
-  ) {
-    return truncateAiVaultListResult(cachedList.result, depth, args?.scopePaths)
+  const cached =
+    args?.force === true ? null : localCacheHit(cachedList, key, unboundedKey, depth, now)
+  if (cached) {
+    return truncateAiVaultListResult(cached.result, depth, args?.scopePaths)
   }
   // Captured here, not inside start(): the coordinator defers start() by a
   // microtask, so an invalidation landing in that gap would otherwise be read
@@ -152,7 +174,9 @@ export async function listAiVaultSessions(
           includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
           limit: args?.limit,
           unlimited: args?.unlimited,
-          scopePaths: args?.scopePaths,
+          // An unbounded scan already covers every scope, so a scope walk would only
+          // re-discover files the main pass has parsed.
+          scopePaths: aiVaultAppliedScopePaths(args),
           ...(await localAiVaultScanRoots())
         },
         scanSignal,

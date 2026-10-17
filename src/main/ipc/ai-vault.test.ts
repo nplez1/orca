@@ -19,7 +19,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   app: { on: vi.fn() },
-  ipcMain: { handle: mocks.ipcHandle }
+  ipcMain: { handle: mocks.ipcHandle },
+  // The local leg publishes scan progress to every window; a hidden list still asks.
+  BrowserWindow: { getAllWindows: () => [] }
 }))
 
 vi.mock('../ai-vault/session-scanner-service-spawn', async (importOriginal) => ({
@@ -118,6 +120,144 @@ describe('listAiVaultSessions host routing', () => {
       },
       {}
     )
+  })
+
+  it('sends a scope to a runtime host only when the read is bounded', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    // The query is sent, and must not reach the host: no runtime RPC applies it.
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      limit: 250,
+      scopePaths: ['/repo/app'],
+      query: 'vault'
+    })
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenLastCalledWith(
+      'remote-server',
+      { executionHostScope: 'runtime:remote-server', limit: 250, scopePaths: ['/repo/app'] },
+      {}
+    )
+
+    // Unlimited lists the host's whole table, so the scope would only narrow it —
+    // as hosts that still treat a scope as a filter do.
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      unlimited: true,
+      scopePaths: ['/repo/app']
+    })
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenLastCalledWith(
+      'remote-server',
+      { executionHostScope: 'runtime:remote-server', unlimited: true },
+      {}
+    )
+  })
+
+  it("keeps a scope's rows when the all-host merge caps", async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [
+        { environmentId: 'remote-server', executionHostId: 'runtime:remote-server' }
+      ],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    const newerElsewhere = {
+      ...session('runtime:remote-server', 'elsewhere'),
+      cwd: '/other/place',
+      updatedAt: '2026-07-05T00:00:00.000Z'
+    }
+    const olderInScope = { ...session('local', 'in-scope'), cwd: '/repo/app' }
+    mocks.scanLocalSessions.mockResolvedValue(result([olderInScope]))
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue(result([newerElsewhere]))
+
+    const listed = await _internals.listAiVaultSessions({
+      executionHostScope: 'all',
+      limit: 1,
+      scopePaths: ['/repo/app']
+    })
+
+    // The cap keeps the newest row and the scope's row rides beside it, which is the
+    // answer one host already gives. Slicing the merged list dropped the project it
+    // was opened for.
+    expect(listed.sessions.map((row) => row.sessionId)).toEqual(['elsewhere', 'in-scope'])
+  })
+
+  it('serves a scoped bounded local list from the unbounded one already loaded', async () => {
+    await _internals.listAiVaultSessions({ executionHostScope: 'local', unlimited: true })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'local',
+      limit: 250,
+      scopePaths: ['/repo/app']
+    })
+
+    // One local answer, reused: the unbounded list already holds the project's rows.
+    expect(mocks.scanLocalSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not serve a scoped local list from a capped scopeless one', async () => {
+    await _internals.listAiVaultSessions({ executionHostScope: 'local', limit: 250 })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'local',
+      limit: 250,
+      scopePaths: ['/repo/app']
+    })
+
+    // Two scans: a capped page without a scope can be missing the scope's older rows.
+    expect(mocks.scanLocalSessions).toHaveBeenCalledTimes(2)
+  })
+
+  it('serves a scoped bounded all-host list from the unbounded one already loaded', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    await _internals.listAiVaultSessions({ executionHostScope: 'all', unlimited: true })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'all',
+      limit: 250,
+      scopePaths: ['/repo/app']
+    })
+
+    // The unbounded answer already holds every scope at every depth, so dropping to a
+    // preset inside a project must not scan again.
+    expect(mocks.scanLocalSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('serves a scoped bounded runtime list from the unbounded one already loaded', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      unlimited: true
+    })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      limit: 250,
+      scopePaths: ['/repo/app']
+    })
+
+    // One host, one unbounded answer: narrowing the depth and naming a project is served
+    // from it rather than transferred again.
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not serve one all-host merge for another query', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    await _internals.listAiVaultSessions({ executionHostScope: 'all', query: 'alpha' })
+    await _internals.listAiVaultSessions({ executionHostScope: 'all', query: 'beta' })
+
+    // The local leg's rows are the query's, so a merge cached across both queries would
+    // hand beta alpha's rows for the life of the entry.
+    expect(mocks.scanLocalSessions).toHaveBeenCalledTimes(2)
   })
 })
 

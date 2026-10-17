@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiVaultListResult } from '../../shared/ai-vault-types'
+import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
 
 const mocks = vi.hoisted(() => ({
   scanAiVaultSessionsInService: vi.fn(),
@@ -103,6 +103,84 @@ describe('Agent Session History scan coalescing', () => {
     await expect(second).resolves.toMatchObject(EMPTY_RESULT)
   })
 
+  it('reuses one unbounded host scan for a second project', async () => {
+    registerRuntimeHost()
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      unlimited: true,
+      scopePaths: ['/repo/app']
+    })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      unlimited: true,
+      scopePaths: ['/repo/other']
+    })
+    // Switching project at Unlimited asks the same question, so it is one scan.
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a bounded scan per project, whose answer does depend on the scope', async () => {
+    registerRuntimeHost()
+    for (const scopePath of ['/repo/app', '/repo/other']) {
+      await _internals.listAiVaultSessions({
+        executionHostScope: 'runtime:remote-server',
+        limit: 250,
+        scopePaths: [scopePath]
+      })
+    }
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenCalledTimes(2)
+  })
+
+  it("keeps two host queries in two scans rather than sharing the first one's rows", async () => {
+    registerRuntimeHost()
+    const resolvers: ((result: AiVaultListResult) => void)[] = []
+    mocks.scanAiVaultSessionsInService.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+
+    const alpha = _internals.listAiVaultSessions({ executionHostScope: 'local', query: 'alpha' })
+    const beta = _internals.listAiVaultSessions({ executionHostScope: 'local', query: 'beta' })
+
+    // The host answers a filtered request from a different row set, so two queries
+    // are two scans: sharing one hands the second caller the first one's rows.
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2), { timeout: 2000 })
+    resolvers[0]?.({ ...EMPTY_RESULT, sessions: [sessionRow('alpha-hit')] })
+    resolvers[1]?.({ ...EMPTY_RESULT, sessions: [sessionRow('beta-hit')] })
+
+    await expect(alpha).resolves.toMatchObject({ sessions: [{ sessionId: 'alpha-hit' }] })
+    await expect(beta).resolves.toMatchObject({ sessions: [{ sessionId: 'beta-hit' }] })
+  })
+
+  it('joins an in-flight runtime scan when only the query changes', async () => {
+    registerRuntimeHost()
+    const resolvers: ((result: AiVaultListResult) => void)[] = []
+    mocks.scanRuntimeAiVaultSessions.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+
+    const alpha = _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      query: 'alpha'
+    })
+    const beta = _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      query: 'beta'
+    })
+
+    // No runtime RPC carries the query, so beta asks the same question while alpha's
+    // transfer is still open: a query-keyed scan would send the whole table twice.
+    await vi.waitFor(() => expect(resolvers).toHaveLength(1), { timeout: 2000 })
+    resolvers[0]?.(EMPTY_RESULT)
+    await Promise.all([alpha, beta])
+    expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenCalledTimes(1)
+  })
+
   it('reports a failed local scan as a host issue rather than rejecting', async () => {
     mocks.scanAiVaultSessionsInService.mockRejectedValue(new Error('transcript root is unreadable'))
     registerAiVaultHandlers()
@@ -130,6 +208,31 @@ function registerRuntimeHost(): void {
     ],
     scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
   })
+}
+
+function sessionRow(sessionId: string): AiVaultSession {
+  return {
+    id: `local:codex:${sessionId}:/tmp/${sessionId}.jsonl`,
+    executionHostId: 'local',
+    agent: 'codex',
+    sessionId,
+    title: sessionId,
+    cwd: '/repo',
+    branch: null,
+    model: null,
+    filePath: `/tmp/${sessionId}.jsonl`,
+    codexHome: null,
+    createdAt: null,
+    updatedAt: '2026-07-04T01:00:00.000Z',
+    modifiedAt: '2026-07-04T00:00:00.000Z',
+    messageCount: 1,
+    totalTokens: 0,
+    previewMessages: [],
+    queuedMessageCount: 0,
+    subagentTranscriptCount: 0,
+    resumeCommand: `codex resume ${sessionId}`,
+    subagent: null
+  }
 }
 
 function ipcHandler(channel: string): (...args: unknown[]) => unknown {
