@@ -23,13 +23,29 @@ describe('parseAiVaultListResult', () => {
     const parsed = parseAiVaultListResult({
       sessions: [validSession(), { ...validSession('session-new'), agent: 'future-agent' }],
       issues: [],
-      scannedAt: '2026-07-27T00:00:00.000Z'
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64)
     })
 
     expect(parsed.sessions).toHaveLength(1)
     expect(parsed.sessions[0]?.agent).toBe('codex')
     expect(parsed.sessions[0]?.sessionId).toBe('session-1')
     expect(parsed.issues).toEqual([])
+    // Why the fingerprint stays: a row from an agent this build does not know is a build-version
+    // gap, and dropping the fingerprint would switch off the diff for the whole host. The row is
+    // reported by the agent list instead of by a listing error.
+    expect(parsed.fingerprint).toBe('a'.repeat(64))
+  })
+
+  it('keeps the fingerprint when every row was readable', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [validSession()],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64)
+    })
+
+    expect(parsed.fingerprint).toBe('a'.repeat(64))
   })
 
   it('keeps known scan issues while silently dropping unknown-agent issues', () => {
@@ -255,6 +271,143 @@ function validSession(sessionId = 'session-1'): Record<string, unknown> {
     subagent: null
   }
 }
+
+describe('parseAiVaultListResult paging and deltas', () => {
+  it('keeps a bounded page cursor and its fingerprint', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [validSession()],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64),
+      hasMore: true,
+      nextOffset: 1
+    })
+
+    expect(parsed).toMatchObject({ hasMore: true, nextOffset: 1, fingerprint: 'a'.repeat(64) })
+  })
+
+  it('rejects a page that claims more rows without a cursor', () => {
+    expect(() =>
+      parseAiVaultListResult({
+        sessions: [validSession()],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        hasMore: true
+      })
+    ).toThrow('Invalid paged response')
+  })
+
+  it('parses a delta and drops only its malformed rows', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: { upserts: [validSession('session-2'), { id: 42 }], removedIds: ['gone'] }
+    })
+
+    expect(parsed.syncDelta).toEqual({
+      upserts: [expect.objectContaining({ sessionId: 'session-2' })],
+      removedIds: ['gone']
+    })
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('drops a delta row this build cannot read instead of leaving the old one in place', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: {
+        upserts: [
+          {
+            ...validSession('session-2'),
+            previewMessages: [{ role: 'future-role', text: 'x', timestamp: null }]
+          }
+        ],
+        removedIds: []
+      }
+    })
+
+    // Keeping the row this client already holds would show stale data under the new fingerprint,
+    // and the host would never send it again because its digest did not change.
+    expect(parsed.syncDelta).toEqual({
+      upserts: [],
+      removedIds: [validSession('session-2').id]
+    })
+    // The body is still the host's list minus the row this build cannot show, so an `unchanged`
+    // reply can still be honoured against it. (The leg declines to *diff* such a body.)
+    expect(parsed.fingerprint).toBe('b'.repeat(64))
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('drops the fingerprint when a rejected delta row cannot be named', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: { upserts: [{ id: 42 }], removedIds: [] }
+    })
+
+    // The held list cannot be corrected by id, so the body no longer matches this fingerprint.
+    expect(parsed.syncDelta).toEqual({ upserts: [], removedIds: [] })
+    expect(parsed.fingerprint).toBeUndefined()
+  })
+
+  it('counts an unreadable later page instead of failing the whole listing', () => {
+    const parsed = parseAiVaultListResult(
+      {
+        sessions: [{ id: 42 }],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z'
+      },
+      { offset: 2 }
+    )
+
+    // A page this build cannot read must cost that page's rows, not every page after it.
+    expect(parsed.sessions).toEqual([])
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('reports an unreadable first page instead of failing the whole listing', () => {
+    const parsed = parseAiVaultListResult(
+      { sessions: [{ id: 42 }], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' },
+      { offset: 0 }
+    )
+
+    // A page whose rows all use a value this build does not know is version skew, not a broken
+    // reply: the readable pages after it still arrive.
+    expect(parsed.sessions).toEqual([])
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('still refuses a single reply made entirely of unreadable rows', () => {
+    expect(() =>
+      parseAiVaultListResult({ sessions: [{ id: 42 }], issues: [], scannedAt: 'x' })
+    ).toThrow('all supplied Agent Session History sessions were invalid')
+  })
+
+  it('rejects a reply that carries both a delta and a listing body', () => {
+    expect(() =>
+      parseAiVaultListResult({
+        sessions: [validSession()],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z',
+        syncDelta: { upserts: [], removedIds: [] }
+      })
+    ).toThrow('Invalid session delta response')
+  })
+})
 
 function validScanIssue(agent = 'codex'): Record<string, unknown> {
   return {

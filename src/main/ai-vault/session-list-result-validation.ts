@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   AI_VAULT_AGENTS,
+  AI_VAULT_LIST_SKIP_ISSUE_PATH,
   type AiVaultAgent,
   type AiVaultListResult,
   type AiVaultScanIssue,
@@ -106,7 +107,16 @@ const aiVaultListResultEnvelopeSchema = z
       .string()
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
-    unchanged: z.literal(true).optional()
+    unchanged: z.literal(true).optional(),
+    // A bounded page: `hasMore` without a cursor to ask for can never make progress.
+    hasMore: z.literal(true).optional(),
+    nextOffset: z.number().int().min(1).optional(),
+    // Why catch: a token is a consistency hint, so a longer one from a later host drops the hint
+    // instead of failing the listing.
+    listToken: z.string().max(128).optional().catch(undefined),
+    syncDelta: z
+      .object({ upserts: z.array(z.unknown()), removedIds: z.array(z.string()) })
+      .optional()
   })
   .refine(
     (value) =>
@@ -114,34 +124,76 @@ const aiVaultListResultEnvelopeSchema = z
       (value.fingerprint !== undefined && value.sessions.length === 0 && value.issues.length === 0),
     'Invalid unchanged response'
   )
+  .refine((value) => !value.hasMore || value.nextOffset !== undefined, 'Invalid paged response')
+  .refine(
+    (value) => !value.syncDelta || (value.sessions.length === 0 && value.hasMore === undefined),
+    'Invalid session delta response'
+  )
 
-export function parseAiVaultListResult(value: unknown): AiVaultListResult {
+function parseSessions(rows: readonly unknown[]): {
+  sessions: AiVaultSession[]
+  malformed: number
+  wellFormed: number
+  /** Rows this build cannot represent, by the id they named; a delta has to drop them. */
+  rejectedIds: string[]
+} {
+  const sessions: AiVaultSession[] = []
+  const rejectedIds: string[] = []
+  let malformed = 0
+  let wellFormed = 0
+  for (const row of rows) {
+    const parsed = aiVaultSessionSchema.safeParse(row)
+    if (!parsed.success) {
+      malformed += 1
+      const rejectedId = namedRowId(row)
+      if (rejectedId !== null) {
+        rejectedIds.push(rejectedId)
+      }
+      continue
+    }
+    wellFormed += 1
+    if (isAiVaultAgent(parsed.data.agent)) {
+      sessions.push({ ...parsed.data, agent: parsed.data.agent })
+    }
+  }
+  return { sessions, malformed, wellFormed, rejectedIds }
+}
+
+const namedRowIdSchema = z.object({ id: z.string().min(1) })
+
+/** The id an unreadable row still names, so a delta can drop it from the list it holds. */
+function namedRowId(row: unknown): string | null {
+  const parsed = namedRowIdSchema.safeParse(row)
+  return parsed.success ? parsed.data.id : null
+}
+
+export function parseAiVaultListResult(
+  value: unknown,
+  options: { offset?: number } = {}
+): AiVaultListResult {
   const envelope = aiVaultListResultEnvelopeSchema.safeParse(value)
   if (!envelope.success) {
     throw new Error(envelope.error.issues[0]?.message ?? 'unexpected result shape')
   }
-  const sessions: AiVaultSession[] = []
-  let malformedSessionCount = 0
-  let wellFormedSessionCount = 0
-  for (const session of envelope.data.sessions) {
-    const parsed = aiVaultSessionSchema.safeParse(session)
-    if (!parsed.success) {
-      malformedSessionCount += 1
-      continue
-    }
-    wellFormedSessionCount += 1
-    if (!isAiVaultAgent(parsed.data.agent)) {
-      continue
-    }
-    sessions.push({ ...parsed.data, agent: parsed.data.agent })
-  }
+  const listed = parseSessions(envelope.data.sessions)
+  // Why not for a paged read: a page whose rows all use a field this build does not know is
+  // version skew, not a broken reply, and throwing would lose every page after it (the old single
+  // reply showed the readable rows with a skip notice). The envelope schema still refuses a reply
+  // of the wrong shape, which is what this check was for.
   if (
+    options.offset === undefined &&
     envelope.data.sessions.length > 0 &&
-    malformedSessionCount > 0 &&
-    wellFormedSessionCount === 0
+    listed.malformed > 0 &&
+    listed.wellFormed === 0
   ) {
     throw new Error('all supplied Agent Session History sessions were invalid')
   }
+  const sessions = listed.sessions
+  // A delta's rows are the same rows; one malformed row must not discard the rest of the change.
+  const deltaUpserts = envelope.data.syncDelta
+    ? parseSessions(envelope.data.syncDelta.upserts)
+    : null
+  const malformedSessionCount = listed.malformed + (deltaUpserts?.malformed ?? 0)
   const issues: AiVaultScanIssue[] = []
   let malformedIssueCount = 0
   for (const issue of envelope.data.issues) {
@@ -155,11 +207,20 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     }
     issues.push({ ...parsed.data, agent: parsed.data.agent })
   }
+  // Why drop the fingerprint only here: a rejected diff row that named no id cannot be removed from
+  // the list this client holds, so that body would no longer match its fingerprint. A row this
+  // build cannot read at all keeps it — the body still is the host's list minus rows this build
+  // cannot show, an `unchanged` reply can still be honoured, and the skip row says so on every full
+  // read. What such a body is *not* good for is a diff: see `hostLegSyncBasis`.
+  const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
+  const fingerprint =
+    envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
   const invalidCount = malformedSessionCount + malformedIssueCount
   if (invalidCount > 0) {
     issues.push({
       agent: 'codex',
-      path: 'aiVault.listSessions',
+      path: AI_VAULT_LIST_SKIP_ISSUE_PATH,
+      // The drain re-counts these across pages, so the wording is a contract with that reader.
       message: `Skipped ${invalidCount} invalid Agent Session History result ${invalidCount === 1 ? 'entry' : 'entries'}.`
     })
   }
@@ -167,7 +228,24 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     sessions,
     issues,
     scannedAt: envelope.data.scannedAt,
-    ...(envelope.data.fingerprint ? { fingerprint: envelope.data.fingerprint } : {}),
-    ...(envelope.data.unchanged ? { unchanged: true as const } : {})
+    ...(fingerprint ? { fingerprint } : {}),
+    ...(envelope.data.unchanged ? { unchanged: true as const } : {}),
+    ...(envelope.data.hasMore ? { hasMore: true as const } : {}),
+    ...(envelope.data.nextOffset !== undefined ? { nextOffset: envelope.data.nextOffset } : {}),
+    ...(envelope.data.listToken ? { listToken: envelope.data.listToken } : {}),
+    ...(envelope.data.syncDelta
+      ? {
+          syncDelta: {
+            upserts: deltaUpserts?.sessions ?? [],
+            // Why also the rejected upsert ids: the change cannot be applied, so keeping the row
+            // this client already holds would show stale data under the new fingerprint, and the
+            // host would never send it again.
+            removedIds: [
+              ...envelope.data.syncDelta.removedIds,
+              ...(deltaUpserts?.rejectedIds ?? [])
+            ]
+          }
+        }
+      : {})
   }
 }

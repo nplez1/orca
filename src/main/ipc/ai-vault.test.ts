@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join, sep } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
 import type * as CachedSessionListModule from '../ai-vault/cached-session-list'
 import type * as SessionParseCacheModule from '../ai-vault/session-scanner-parse-cache'
@@ -62,6 +62,7 @@ vi.mock('../wsl', () => ({
 
 const { resolveOmpSessionsDir } = await import('../ai-vault/omp-session-root')
 const { _internals, registerAiVaultHandlers } = await import('./ai-vault')
+const { invalidateAiVaultHostLegCache } = await import('./ai-vault-host-leg-cache')
 const { deleteAiVaultSession: deleteAiVaultSessionWithDeps } = await import('./ai-vault-delete')
 
 beforeEach(() => {
@@ -118,7 +119,195 @@ describe('listAiVaultSessions host routing', () => {
         executionHostScope: 'runtime:remote-server',
         force: true
       },
-      {}
+      // Why the signal is there: a cancelled listing must stop its page drain, not just its caller.
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+  })
+})
+
+describe('listAiVaultSessions change sync wiring', () => {
+  const fingerprint = 'a'.repeat(64)
+  const AI_VAULT_LEG_TTL_MS = 15_000
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function expireHostLegCache(): void {
+    vi.setSystemTime(Date.now() + AI_VAULT_LEG_TTL_MS + 1)
+  }
+
+  it('sends the fingerprint of the list this computer holds on a warm refresh', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+
+    await _internals.listAiVaultSessions({ ...request, force: false })
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]?.syncFromFingerprint).toBeUndefined()
+
+    // Past the leg's TTL, so the second call really asks the host again.
+    expireHostLegCache()
+    await _internals.listAiVaultSessions({ ...request, force: false })
+    // Why the same depth and cache key: the host can only diff against the list it served here.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('never forwards a fingerprint the caller supplied itself', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:remote-server',
+      syncFromFingerprint: 'c'.repeat(64)
+    })
+
+    // A token this leg never sent names no list, so the host must not answer a delta for it.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]?.syncFromFingerprint).toBeUndefined()
+  })
+
+  it('strips the caller fingerprint and keeps each host leg to its own token', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [
+        { environmentId: 'env-1', executionHostId: 'runtime:env-1' }
+      ],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:env-1', 'env-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'all' as const,
+      scopePaths: ['/repo'],
+      afterFingerprint: 'c'.repeat(64),
+      syncFromFingerprint: 'c'.repeat(64),
+      force: true
+    }
+
+    await _internals.listAiVaultSessions({ ...request, force: false })
+    const firstLegArgs = mocks.scanRuntimeAiVaultSessions.mock.calls[0]?.[1]
+    // Why neither field is the caller's: the merged list has no single fingerprint, so the merge
+    // neither asks "is it unchanged" of a leg nor reuses a token that leg never sent.
+    expect(firstLegArgs?.afterFingerprint).toBeUndefined()
+    expect(firstLegArgs?.syncFromFingerprint).toBeUndefined()
+
+    expireHostLegCache()
+    await _internals.listAiVaultSessions({ ...request, force: false })
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('lets the all-hosts view sync from the list the single-host view loaded', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [
+        { environmentId: 'env-1', executionHostId: 'runtime:env-1' }
+      ],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:env-1', 'env-session')]),
+      fingerprint
+    })
+
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:env-1',
+      scopePaths: ['/repo']
+    })
+    expireHostLegCache()
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'all',
+      scopePaths: ['/repo']
+    })
+
+    // Why this matters: a 15 MB listing cannot finish inside one leg's drain budget, so the
+    // all-hosts row could only ever be partial unless it diffs against a list already loaded.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('keeps the basis across a delete so the refresh after it still diffs', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+    await _internals.listAiVaultSessions(request)
+
+    // The delete handler drops cached legs, and the renderer then forces a refresh.
+    invalidateAiVaultHostLegCache()
+    await _internals.listAiVaultSessions(request)
+
+    // Why: re-downloading every remote host's whole history after one local delete is exactly the
+    // cost the sync exists to remove, and a diff still describes the delete.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
+  it('keeps the held list when a host answers with a host issue', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    const request = {
+      executionHostScope: 'runtime:remote-server' as const,
+      scopePaths: ['/repo'],
+      force: true
+    }
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValueOnce({
+      ...result([session('runtime:remote-server', 'runtime-session')]),
+      fingerprint
+    })
+    await _internals.listAiVaultSessions(request)
+
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValueOnce({
+      sessions: [],
+      issues: [
+        {
+          executionHostId: 'runtime:remote-server',
+          agent: 'codex',
+          kind: 'host',
+          path: 'remote-server',
+          message: 'The connection closed.'
+        }
+      ],
+      scannedAt: new Date().toISOString()
+    })
+    await _internals.listAiVaultSessions(request)
+
+    // A failed leg is not a new body, so the next refresh still diffs against the last good one.
+    await _internals.listAiVaultSessions(request)
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[2]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
     )
   })
 
@@ -138,7 +327,8 @@ describe('listAiVaultSessions host routing', () => {
     expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenLastCalledWith(
       'remote-server',
       { executionHostScope: 'runtime:remote-server', limit: 250, scopePaths: ['/repo/app'] },
-      {}
+      // The signal rides along so a cancelled listing stops its page drain.
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
 
     // Unlimited lists the host's whole table, so the scope would only narrow it —
@@ -151,7 +341,7 @@ describe('listAiVaultSessions host routing', () => {
     expect(mocks.scanRuntimeAiVaultSessions).toHaveBeenLastCalledWith(
       'remote-server',
       { executionHostScope: 'runtime:remote-server', unlimited: true },
-      {}
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
   })
 

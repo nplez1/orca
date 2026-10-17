@@ -99,7 +99,11 @@ it('load-all processes deduplication linearly and retains late canonical aliases
     `${JSON.stringify({ candidates: fixture.sessions.length, scanMs: performance.now() - started, dedupVisits: fixture.visits })}\n`
   )
   expect(result.issues).toEqual([])
-  expect(result.sessions).toEqual(expected)
+  // Which rows survive dedupe is the subject here; the listing's own order is recency-first with
+  // an id tiebreak, which equal fixture timestamps do not preserve.
+  expect([...result.sessions].sort((left, right) => left.id.localeCompare(right.id))).toEqual(
+    [...expected].sort((left, right) => left.id.localeCompare(right.id))
+  )
   expect(fixture.visits).toBeLessThanOrEqual(fixture.sessions.length * 2)
 }, 30000)
 

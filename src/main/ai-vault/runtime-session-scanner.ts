@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   AI_VAULT_AGENTS,
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
+  isAiVaultScanCancelledError,
   type AiVaultListArgs,
   type AiVaultListResult,
   type AiVaultSession
@@ -19,6 +20,7 @@ import type {
   AiVaultSessionTitlesResult
 } from '../../shared/ai-vault-session-title'
 import { parseAiVaultListResult } from './session-list-result-validation'
+import { aiVaultPartialListIssue, readAiVaultListPages } from '../../shared/ai-vault-list-pages'
 import { parseAiVaultSessionTitlesResult } from './session-title-result-validation'
 import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
 
@@ -28,7 +30,12 @@ export type RuntimeAiVaultHostInfo = {
 }
 
 export type RuntimeAiVaultScanOptions = {
+  /** One page's request bound. */
   timeoutMs?: number
+  /** The whole drain's bound, so a paged listing gets more than one reply's worth of time. */
+  drainTimeoutMs?: number
+  /** Stops the page drain when the caller cancels; each page request carries it too. */
+  signal?: AbortSignal
 }
 
 // Why: zod strips unknown keys, so the repin home must be declared or the
@@ -64,66 +71,146 @@ export async function scanRuntimeAiVaultSessions(
   options: RuntimeAiVaultScanOptions = {}
 ): Promise<AiVaultListResult> {
   const executionHostId = toRuntimeExecutionHostId(environmentId)
-  const response = await callRuntimeEnvironment(
+  const drainBudget = drainBudgetMs(options)
+  // Why drain here: a remote reply is capped at one 4 MiB frame, so a host's thousands of rows
+  // arrive as byte-bounded pages and every desktop reader still sees one complete list.
+  const read = await readAiVaultListPages({
+    firstPageArgs: args,
+    fetchPage: (pageArgs) =>
+      fetchRuntimeAiVaultListPage(userDataPath, environmentId, pageArgs, options),
+    ...(options.signal ? { signal: options.signal } : {}),
+    // Why the drain budget wins over the per-page one: the timeout bounded one reply before
+    // paging, and an 'all'-scope leg must not hold the merge open for pages × timeout.
+    ...(drainBudget !== undefined ? { deadlineMs: Date.now() + drainBudget } : {})
+  })
+  if (read.kind === 'failed') {
+    return runtimeScanIssueResult({
+      executionHostId,
+      environmentId,
+      message: errorMessage(read.error)
+    })
+  }
+  if (read.result.unchanged) {
+    return read.result
+  }
+  const result = withRuntimeExecutionHost(read.result, executionHostId)
+  const issues = [...result.issues]
+  // Why not for a cancelled read: the caller left, so an "only part loaded" row would report its
+  // own cancellation as a failure. Its rows are dropped by that caller in any case.
+  if (read.kind === 'partial' && !isAiVaultScanCancelledError(read.error)) {
+    // Why: the rows already read stay on screen; only the rest is missing, and Refresh retries it.
+    issues.push(
+      aiVaultPartialListIssue({ executionHostId, path: environmentId, error: read.error })
+    )
+  }
+  if (args.scopePaths && args.scopePaths.length > AI_VAULT_SCOPE_PATHS_MAX_COUNT) {
+    issues.push({
+      executionHostId,
+      agent: 'codex',
+      kind: 'scope',
+      path: environmentId,
+      message: `Only the first ${AI_VAULT_SCOPE_PATHS_MAX_COUNT} project paths were scanned.`
+    })
+  }
+  return issues.length === result.issues.length ? result : { ...result, issues }
+}
+
+async function fetchRuntimeAiVaultListPage(
+  userDataPath: string,
+  environmentId: string,
+  args: AiVaultListArgs,
+  options: RuntimeAiVaultScanOptions
+): Promise<AiVaultListResult> {
+  const response = await callHostListPage(
     userDataPath,
     environmentId,
-    'aiVault.listSessions',
-    {
-      includeAntigravityIdeSessions: args.includeAntigravityIdeSessions,
-      limit: args.limit,
-      unlimited: args.unlimited,
-      force: args.force,
-      ...(args.afterFingerprint !== undefined ? { afterFingerprint: args.afterFingerprint } : {}),
-      // Why: cap here so the set of scanned paths is explicit on this side —
-      // the RPC schema CLAMPS to the same bound anyway (older hosts had no
-      // cap). Dropped paths only lose the older-than-recency-cap guarantee,
-      // never the recent sessions themselves.
-      scopePaths: args.scopePaths?.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT),
-      executionHostId
-    },
-    options.timeoutMs
+    runtimeListPageParams(args, toRuntimeExecutionHostId(environmentId)),
+    options
   )
-  if (response.ok === true) {
-    try {
-      const parsed = parseAiVaultListResult(response.result)
-      if (parsed.unchanged) {
-        if (parsed.fingerprint !== args.afterFingerprint) {
-          throw new Error('Unchanged response did not match the requested fingerprint')
-        }
-        return parsed
-      }
-      const result = withRuntimeExecutionHost(parsed, executionHostId)
-      if (!args.scopePaths || args.scopePaths.length <= AI_VAULT_SCOPE_PATHS_MAX_COUNT) {
-        return result
-      }
-      return {
-        ...result,
-        issues: [
-          ...result.issues,
-          {
-            executionHostId,
-            agent: 'codex',
-            kind: 'scope',
-            path: environmentId,
-            message: `Only the first ${AI_VAULT_SCOPE_PATHS_MAX_COUNT} project paths were scanned.`
-          }
-        ]
-      }
-    } catch (error) {
-      return runtimeScanIssueResult({
-        executionHostId,
-        environmentId,
-        message: `Invalid aiVault.listSessions response: ${
-          error instanceof Error ? error.message : 'unexpected result shape'
-        }`
-      })
-    }
+  if (response.ok !== true) {
+    throw new Error(response.error.message)
   }
-  return runtimeScanIssueResult({
-    executionHostId,
-    environmentId,
-    message: response.error.message
-  })
+  try {
+    const parsed = parseAiVaultListResult(response.result, { offset: args.offset })
+    if (parsed.unchanged && parsed.fingerprint !== args.afterFingerprint) {
+      throw new Error('Unchanged response did not match the requested fingerprint')
+    }
+    // Why refuse: a delta this request never asked for names no list to apply it to.
+    if (parsed.syncDelta && args.syncFromFingerprint === undefined) {
+      throw new Error('Unexpected session delta')
+    }
+    return parsed
+  } catch (error) {
+    throw new Error(
+      `Invalid aiVault.listSessions response: ${
+        error instanceof Error ? error.message : 'unexpected result shape'
+      }`
+    )
+  }
+}
+
+/**
+ * Why the transport's option slot only when there is a signal: a cancelled listing must stop the
+ * page in flight, or the host keeps re-projecting pages nobody will read, and the positional
+ * arguments other callers already rely on stay as they are.
+ */
+function callHostListPage(
+  userDataPath: string,
+  environmentId: string,
+  params: Record<string, unknown>,
+  options: RuntimeAiVaultScanOptions
+): ReturnType<typeof callRuntimeEnvironment> {
+  return options.signal
+    ? callRuntimeEnvironment(
+        userDataPath,
+        environmentId,
+        'aiVault.listSessions',
+        params,
+        options.timeoutMs,
+        undefined,
+        undefined,
+        { signal: options.signal }
+      )
+    : callRuntimeEnvironment(
+        userDataPath,
+        environmentId,
+        'aiVault.listSessions',
+        params,
+        options.timeoutMs
+      )
+}
+
+function drainBudgetMs(options: RuntimeAiVaultScanOptions): number | undefined {
+  return options.drainTimeoutMs ?? options.timeoutMs
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Remote Orca server is unavailable.'
+}
+
+function runtimeListPageParams(
+  args: AiVaultListArgs,
+  executionHostId: `runtime:${string}`
+): Record<string, unknown> {
+  return {
+    includeAntigravityIdeSessions: args.includeAntigravityIdeSessions,
+    limit: args.limit,
+    unlimited: args.unlimited,
+    force: args.force,
+    ...(args.afterFingerprint !== undefined ? { afterFingerprint: args.afterFingerprint } : {}),
+    ...(args.syncFromFingerprint !== undefined
+      ? { syncFromFingerprint: args.syncFromFingerprint }
+      : {}),
+    // Why: cap here so the set of scanned paths is explicit on this side —
+    // the RPC schema CLAMPS to the same bound anyway (older hosts had no
+    // cap). Dropped paths only lose the older-than-recency-cap guarantee,
+    // never the recent sessions themselves.
+    scopePaths: args.scopePaths?.slice(0, AI_VAULT_SCOPE_PATHS_MAX_COUNT),
+    // A host that predates paging strips both keys and answers with one reply, as it always did.
+    paged: true,
+    offset: args.offset,
+    executionHostId
+  }
 }
 
 export async function resolveRuntimeAiVaultSessionTitles(
@@ -185,7 +272,19 @@ function withRuntimeExecutionHost(
     sessions: result.sessions.map((session) => retagRuntimeSession(session, executionHostId)),
     issues: result.issues.map((issue) => ({ ...issue, executionHostId })),
     scannedAt: result.scannedAt,
-    ...(result.fingerprint ? { fingerprint: result.fingerprint } : {})
+    ...(result.fingerprint ? { fingerprint: result.fingerprint } : {}),
+    // Why retag upserts too: the delta is applied to a list this parent already stamped, so its
+    // ids must be in this parent's spelling. Removed ids already are.
+    ...(result.syncDelta
+      ? {
+          syncDelta: {
+            upserts: result.syncDelta.upserts.map((session) =>
+              retagRuntimeSession(session, executionHostId)
+            ),
+            removedIds: result.syncDelta.removedIds
+          }
+        }
+      : {})
   }
 }
 

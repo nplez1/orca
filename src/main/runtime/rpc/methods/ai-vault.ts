@@ -34,6 +34,7 @@ import {
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
 } from '../../../../shared/rpc-contract/ai-vault-params'
+import { aiVaultPagedListReply } from '../../../ai-vault/ai-vault-paged-list-reply'
 export { AiVaultListSessionsParams, AiVaultPrepareSessionResumeParams, AiVaultSessionTitlesParams }
 
 export const AI_VAULT_METHODS = [
@@ -115,13 +116,28 @@ export const AI_VAULT_METHODS = [
       const projected = projectStructuredAiVaultSessions(result, (agent) =>
         clientOpensStructuredChatFromHistory({ clientKind, clientCapabilities }, agent)
       )
-      return conditionalAiVaultListResult(
-        params.executionHostId
-          ? restampAiVaultListResult(projected, params.executionHostId)
-          : projected,
-        params.unlimited ? undefined : params.afterFingerprint,
-        params.force
-      )
+      const stamped = params.executionHostId
+        ? restampAiVaultListResult(projected, params.executionHostId)
+        : projected
+      // A client that predates paging gets exactly today's reply, fingerprints and all.
+      if (params.paged !== true) {
+        return conditionalAiVaultListResult(
+          stamped,
+          params.unlimited ? undefined : params.afterFingerprint,
+          params.force
+        )
+      }
+      // The same rule as the legacy reply: an unlimited listing never answers "unchanged".
+      const afterFingerprint = params.unlimited ? undefined : params.afterFingerprint
+      return aiVaultPagedListReply({
+        result: stamped,
+        offset: params.offset ?? 0,
+        force: params.force === true,
+        ...(afterFingerprint !== undefined ? { afterFingerprint } : {}),
+        ...(params.syncFromFingerprint !== undefined
+          ? { syncFromFingerprint: params.syncFromFingerprint }
+          : {})
+      })
     }
   }),
   defineMethod({

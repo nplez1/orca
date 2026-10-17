@@ -47,10 +47,11 @@ import {
   scanHostLegWithCache
 } from './ai-vault-host-leg-cache'
 import {
-  requestedAiVaultSessionDepth,
-  aiVaultAppliedScopePaths
+  aiVaultAppliedScopePaths,
+  requestedAiVaultSessionDepth
 } from '../../shared/ai-vault-session-depth'
 import { aiVaultHostListQuery } from '../../shared/ai-vault-session-filters'
+import { aiVaultLegScopeKey, legListArgs } from './ai-vault-leg-request'
 import type {
   AiVaultSessionTitlesArgs,
   AiVaultSessionTitlesResult
@@ -121,9 +122,8 @@ async function listAiVaultSessions(
     force: args?.force,
     signal: options.signal,
     start: (scanSignal) => {
-      const scan = () => scanAiVaultSessionsByHostScope(args, executionHostScope, scanSignal, key)
       if (executionHostScope === LOCAL_EXECUTION_HOST_ID) {
-        return scan()
+        return scanAiVaultSessionsByHostScope(args, executionHostScope, scanSignal, key)
       }
       return scanHostLegWithCache({
         cacheKey: legKey(key),
@@ -133,7 +133,18 @@ async function listAiVaultSessions(
         scopePaths,
         force: args?.force === true,
         afterFingerprint,
-        scan
+        hostLabel: executionHostScope,
+        // The same string the all-hosts view uses for this host, so the two views share a basis.
+        syncBasisKey: aiVaultLegScopeKey(args, executionHostScope),
+        // Why always overwrite: a token the caller supplied itself names a list this leg never
+        // sent, and letting it through would hand back a delta there is no basis to apply.
+        scan: (syncFrom) =>
+          scanAiVaultSessionsByHostScope(
+            { ...args, syncFromFingerprint: syncFrom?.fingerprint },
+            executionHostScope,
+            scanSignal,
+            key
+          )
       })
     }
   })
@@ -161,14 +172,17 @@ async function scanAiVaultSessionsByHostScope(
           depth,
           scopePaths,
           force: args?.force === true,
-          scan: () =>
+          hostLabel: hostInfo.executionHostId,
+          syncBasisKey: aiVaultLegScopeKey(args, hostInfo.executionHostId),
+          scan: (syncFrom) =>
             scanRuntimeAiVaultSessions({
               hostInfo,
               scanner: handlerOptions.scanRuntimeAiVaultSessions,
-              listArgs: args ? { ...args, afterFingerprint: undefined } : undefined,
+              listArgs: legListArgs(args, syncFrom),
               options: {
                 signal,
-                timeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScan
+                timeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScan,
+                drainTimeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScanDrain
               }
             })
         })

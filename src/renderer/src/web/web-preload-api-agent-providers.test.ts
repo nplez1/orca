@@ -251,6 +251,9 @@ describe('web AI Vault preload API', () => {
           limit: 25,
           force: true,
           scopePaths: ['/srv/app'],
+          // Why: the browser drains byte-bounded pages, so it is one of the clients that opts in.
+          paged: true,
+          offset: 0,
           executionHostId: 'runtime:web-env-1'
         }
       }

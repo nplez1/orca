@@ -33,6 +33,9 @@ import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-
 import { recordStructuredAgentSessionHostInstallRefusal } from '../../structured-agent-session-host-refusal'
 import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
 import { installCopyingChat } from '../../../ai-vault/structured-session-ownership.test-support'
+import { resetAiVaultListSyncStoreForTests } from '../../../ai-vault/ai-vault-list-sync-store'
+import { parseAiVaultListResult } from '../../../ai-vault/session-list-result-validation'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../../../shared/remote-runtime-memory-limits'
 import {
   configureAiVaultSessionSources,
   listAiVaultSessions,
@@ -181,6 +184,13 @@ describe('aiVault.listSessions params schema', () => {
   it('rejects an over-long scopePath', () => {
     const parsed = AiVaultListSessionsParams.safeParse({ scopePaths: ['/'.padEnd(5000, 'a')] })
     expect(parsed.success).toBe(false)
+  })
+
+  it('rejects an offset a page loop cannot follow instead of coercing it to page 0', () => {
+    expect(AiVaultListSessionsParams.safeParse({ offset: -1 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 1.5 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 1_000_001 }).success).toBe(false)
+    expect(AiVaultListSessionsParams.safeParse({ offset: 2 }).success).toBe(true)
   })
 
   it('rejects non-runtime execution host ids before dispatch', () => {
@@ -667,3 +677,236 @@ describe('aiVault.listSessions handler + shared cache', () => {
     expect(options?.additionalCodexSessionsDirs).toContain('/ctor/codex/home/sessions')
   })
 })
+
+describe('aiVault.listSessions paging and change sync', () => {
+  beforeEach(() => {
+    resetAiVaultSessionListCacheForTests()
+    resetAiVaultListSyncStoreForTests()
+    scanAiVaultSessionsInService.mockReset()
+    resolveAiVaultSessionTitlesInService.mockReset()
+    resolveAiVaultSessionTitlesInService.mockResolvedValue({ titles: [] })
+  })
+
+  afterEach(() => {
+    resetAiVaultSessionListCacheForTests()
+    resetAiVaultListSyncStoreForTests()
+  })
+
+  it('answers a long history with byte-bounded pages the client can drain', async () => {
+    const sessions = Array.from({ length: 5 }, (_, index) =>
+      largeSession(`sess-${index}`, 600 * 1024)
+    )
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions))
+    const dispatcher = makeDispatcher()
+
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    expect(first.sessions.length).toBeGreaterThan(0)
+    expect(first.sessions.length).toBeLessThan(sessions.length)
+    expect(first.hasMore).toBe(true)
+    expect(first.nextOffset).toBe(first.sessions.length)
+    expect(first.fingerprint).toMatch(/^[0-9a-f]{64}$/)
+    // Why: the whole reply, not just the content budget, has to fit one encrypted frame.
+    expect(Buffer.byteLength(JSON.stringify({ result: first }), 'utf8')).toBeLessThanOrEqual(
+      REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES
+    )
+
+    const second = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      offset: first.nextOffset
+    })
+    expect(second.hasMore).toBeUndefined()
+    expect(second.fingerprint).toBeUndefined()
+    expect([...first.sessions, ...second.sessions].map((row) => row.sessionId)).toEqual(
+      sessions.map((row) => row.sessionId)
+    )
+  })
+
+  it('keeps a client that predates paging on one complete reply', async () => {
+    const sessions = [makeSession(), largeSession('sess-big', 600 * 1024)]
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions))
+    const result = await listResult(makeDispatcher(), { unlimited: true })
+
+    expect(result.sessions).toHaveLength(2)
+    expect(result.hasMore).toBeUndefined()
+    expect(result.fingerprint).toBeUndefined()
+  })
+
+  it('sends only the changed rows and removed ids when the client names the list it holds', async () => {
+    const held = [makeSession(), session('sess-b', 'kept'), session('sess-c', 'dropped')]
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(held))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    if (!first.fingerprint) {
+      throw new Error('Paged reply carried no fingerprint')
+    }
+
+    // A new scan: one row changed, one dropped, one added.
+    resetAiVaultSessionListCacheForTests()
+    scanAiVaultSessionsInService.mockResolvedValue(
+      listOf([session('sess-b', 'kept'), session('sess-c', 'changed'), session('sess-d', 'added')])
+    )
+    const synced = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      syncFromFingerprint: first.fingerprint
+    })
+
+    expect(synced.sessions).toEqual([])
+    expect(synced.fingerprint).not.toBe(first.fingerprint)
+    expect(synced.syncDelta?.removedIds).toEqual([held[0]!.id])
+    expect(synced.syncDelta?.upserts.map((row) => row.sessionId)).toEqual(['sess-c', 'sess-d'])
+  })
+
+  it('answers an unchanged list with an empty delta rather than a body the retry cannot use', async () => {
+    scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    const synced = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      syncFromFingerprint: first.fingerprint
+    })
+
+    expect(synced.unchanged).toBeUndefined()
+    expect(synced.syncDelta).toEqual({ upserts: [], removedIds: [] })
+    expect(synced.fingerprint).toBe(first.fingerprint)
+  })
+
+  it('falls back to a full page when the fingerprint was never retained', async () => {
+    scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
+    const result = await listResult(makeDispatcher(), {
+      paged: true,
+      unlimited: true,
+      syncFromFingerprint: 'b'.repeat(64)
+    })
+
+    expect(result.syncDelta).toBeUndefined()
+    expect(result.sessions).toHaveLength(1)
+  })
+
+  it('answers the legacy fingerprint question with unchanged on the paged path', async () => {
+    scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, afterFingerprint: null })
+    const second = await listResult(dispatcher, {
+      paged: true,
+      afterFingerprint: first.fingerprint
+    })
+
+    expect(second).toMatchObject({
+      unchanged: true,
+      sessions: [],
+      fingerprint: first.fingerprint
+    })
+  })
+
+  it('answers a forced refresh with a diff, but never with unchanged', async () => {
+    scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+
+    // Forcing means "rescan the host". The diff is computed against that fresh scan, so a routine
+    // forced refresh — a delete, a new session, the Refresh button — stays cheap.
+    const forced = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      force: true,
+      syncFromFingerprint: first.fingerprint
+    })
+    expect(forced.unchanged).toBeUndefined()
+    expect(forced.syncDelta).toEqual({ upserts: [], removedIds: [] })
+
+    // `unchanged` is still refused, so a forced refresh always carries a body to paint.
+    const forcedWithoutToken = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      force: true,
+      afterFingerprint: first.fingerprint
+    })
+    expect(forcedWithoutToken.unchanged).toBeUndefined()
+    expect(forcedWithoutToken.syncDelta).toBeUndefined()
+    expect(forcedWithoutToken.sessions).toHaveLength(1)
+  })
+
+  it('names the served rows with the page token, across pages and across rescans', async () => {
+    const sessions = Array.from({ length: 3 }, (_, index) =>
+      largeSession(`sess-${index}`, 600 * 1024)
+    )
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    const second = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      offset: first.nextOffset
+    })
+
+    expect(first.listToken).toMatch(/^[0-9a-f]{64}$/)
+    expect(second.listToken).toBe(first.listToken)
+
+    // Why a rescan must keep the token: a drain slower than the host's scan cache outlives it, and
+    // restarting on an unchanged rescan would leave a long history unable to finish loading.
+    resetAiVaultSessionListCacheForTests()
+    const rescanned = await listResult(dispatcher, { paged: true, unlimited: true })
+    expect(rescanned.listToken).toBe(first.listToken)
+
+    // A served row that is gone is a different list, so its pages cannot be mixed.
+    resetAiVaultSessionListCacheForTests()
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions.slice(0, 2)))
+    const shrunk = await listResult(dispatcher, { paged: true, unlimited: true })
+    expect(shrunk.listToken).not.toBe(first.listToken)
+  })
+
+  it('prefers a full page over a delta too large for one reply', async () => {
+    const small = listOf([makeSession()])
+    scanAiVaultSessionsInService.mockResolvedValue(small)
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+
+    resetAiVaultSessionListCacheForTests()
+    scanAiVaultSessionsInService.mockResolvedValue(
+      listOf([makeSession(), largeSession('sess-huge', 3 * 1024 * 1024)])
+    )
+    const synced = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      syncFromFingerprint: first.fingerprint
+    })
+
+    expect(synced.syncDelta).toBeUndefined()
+    expect(synced.sessions.map((row) => row.sessionId)).toEqual(['sess-1'])
+  })
+})
+
+function listOf(sessions: readonly AiVaultSession[]): AiVaultListResult {
+  return { sessions: [...sessions], issues: [], scannedAt: SCANNED_AT }
+}
+
+function session(sessionId: string, title = sessionId): AiVaultSession {
+  return {
+    ...makeSession(),
+    id: `local:claude:${sessionId}:/tmp/${sessionId}.jsonl`,
+    sessionId,
+    title
+  }
+}
+
+function largeSession(sessionId: string, previewBytes: number): AiVaultSession {
+  return {
+    ...session(sessionId),
+    previewMessages: [{ role: 'user', text: 'x'.repeat(previewBytes), timestamp: null }]
+  }
+}
+
+async function listResult(
+  dispatcher: RpcDispatcher,
+  params: Record<string, unknown>
+): Promise<AiVaultListResult> {
+  const response = await dispatcher.dispatch(makeRequest('aiVault.listSessions', params))
+  if (!response.ok) {
+    throw new Error(`listSessions failed: ${response.error.message}`)
+  }
+  // Parsed with the wire's own reader, so every assertion here also proves the reply is shippable.
+  return parseAiVaultListResult(response.result)
+}

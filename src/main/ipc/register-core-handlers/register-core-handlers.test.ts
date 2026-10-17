@@ -700,6 +700,8 @@ describe('registerCoreHandlers', () => {
         limit: 10,
         force: undefined,
         scopePaths: ['/workspace'],
+        paged: true,
+        offset: 0,
         executionHostId: 'runtime:env-123'
       },
       3000

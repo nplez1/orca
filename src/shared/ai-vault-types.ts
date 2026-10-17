@@ -34,6 +34,13 @@ export const AI_VAULT_AGENTS = [
 // value are optional belt-and-braces, not required for the request to succeed.
 export const AI_VAULT_SCOPE_PATHS_MAX_COUNT = 64
 
+/**
+ * The path this client stamps on the row it writes when it had to skip result entries. It is the
+ * only marker that separates that row from a host's own per-transcript issues, which carry no
+ * `kind` either.
+ */
+export const AI_VAULT_LIST_SKIP_ISSUE_PATH = 'aiVault.listSessions'
+
 // Why: IPC rejection drops `Error.name`, so the renderer can only recognise a
 // cancelled scan by its message. Both sides share this literal.
 export const AI_VAULT_SCAN_CANCELLED_MESSAGE = 'Agent Session History scan was cancelled'
@@ -220,6 +227,12 @@ export type AiVaultScanIssue = {
 export type AiVaultListArgs = {
   /** Opts a selected runtime-host refresh into content-conditional replies. */
   afterFingerprint?: string | null
+  /**
+   * The fingerprint of the listing this client already holds. A host that retained that snapshot
+   * answers with `syncDelta` — the rows that changed and the ids that vanished — instead of the
+   * whole list.
+   */
+  syncFromFingerprint?: string
   /** Opt-in promises this client starts IDE history in a new CLI conversation. */
   includeAntigravityIdeSessions?: boolean
   limit?: number
@@ -236,6 +249,13 @@ export type AiVaultListArgs = {
   query?: string
   executionHostScope?: ExecutionHostScope
   requestToken?: string
+  /**
+   * Opts into a size-bounded reply (`hasMore` + `nextOffset`) from a host whose wire caps one
+   * frame. Only a client that drains pages may set it: an older client gets today's single reply.
+   */
+  paged?: boolean
+  /** Row offset inside the sorted list; read only when `paged` is set. */
+  offset?: number
 }
 
 export type AiVaultListResult = {
@@ -247,8 +267,25 @@ export type AiVaultListResult = {
   sessions: AiVaultSession[]
   issues: AiVaultScanIssue[]
   scannedAt: string
+  /** A paged reply holding more rows than this one reply could carry; request `nextOffset`. */
+  hasMore?: true
+  /** Rows already returned, to send back as `offset` for the next page. */
+  nextOffset?: number
+  /**
+   * Identity of the listed rows and their order. Every page of one listing must repeat it: a page
+   * sliced from a different list cannot be appended to the pages already read.
+   */
+  listToken?: string
+  /** Only what changed since `syncFromFingerprint`; apply it to the list the caller already holds. */
+  syncDelta?: AiVaultListSyncDelta
   /** Set only by the desktop IPC boundary: this scan was superseded, so its empty body means "nothing to apply". */
   cancelled?: true
+}
+
+/** A listing's changes relative to one fingerprint: rows to add/replace, and ids that vanished. */
+export type AiVaultListSyncDelta = {
+  upserts: AiVaultSession[]
+  removedIds: string[]
 }
 
 export function aiVaultAgentLabel(agent: AiVaultAgent): string {

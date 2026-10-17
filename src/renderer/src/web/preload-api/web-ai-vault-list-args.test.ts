@@ -31,6 +31,9 @@ describe('web session list arguments', () => {
       unlimited: true,
       force: undefined,
       scopePaths: undefined,
+      // The listing is read page by page, so even the first request asks for a page.
+      paged: true,
+      offset: 0,
       executionHostId: 'runtime:owning-host'
     })
   })
@@ -44,6 +47,8 @@ describe('web session list arguments', () => {
       unlimited: undefined,
       force: undefined,
       scopePaths: ['/repo/app'],
+      paged: true,
+      offset: 0,
       executionHostId: 'runtime:owning-host'
     })
   })
