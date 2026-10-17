@@ -34,7 +34,7 @@ vi.mock('./gitlab-review-client', async (importOriginal) => {
   return { ...original, fetchGitLabMRDetailsForChecks: gitlab.fetchDetails }
 })
 
-import { useChecksPanelPolling } from './use-checks-panel-polling'
+import { useChecksPanelPolling, type ChecksPanelPollingInput } from './use-checks-panel-polling'
 
 import { createModel } from './checks-panel-polling-test-model'
 
@@ -68,17 +68,21 @@ describe('useChecksPanelPolling live behavior', () => {
 
     hook.rerender({ input: { ...model, isPanelVisible: true } })
     expect(poller.install).toHaveBeenCalledOnce()
-    expect(poller.getDelayMs?.()).toBe(60_000)
+    // Nothing has been read yet for this panel, so the first attempt is due immediately.
+    expect(poller.getDelayMs?.()).toBe(0)
 
     hook.rerender({ input: { ...model, isPanelVisible: false } })
     expect(poller.cleanup).toHaveBeenCalledOnce()
   })
 
   it.each([
+    ['open', 'success', 60_000],
+    ['open', 'pending', 10_000],
+    ['draft', 'neutral', 60_000],
     ['merged', 'success', null],
     ['merged', 'pending', 60_000],
     ['closed', 'success', 15 * 60_000]
-  ] as const)('paces %s checks with %s status', (state, checksStatus, interval) => {
+  ] as const)('paces %s checks with %s status', async (state, checksStatus, interval) => {
     const model = createModel()
     renderHook(() =>
       useChecksPanelPolling({
@@ -86,24 +90,189 @@ describe('useChecksPanelPolling live behavior', () => {
         pr: model.pr ? { ...model.pr, state, checksStatus } : null
       })
     )
+    await act(async () => poller.run?.())
     expect(poller.getDelayMs?.()).toBe(interval)
   })
 
-  it('preserves live repeated-empty backoff at 60, then 120 seconds', async () => {
+  it('keeps an unfinished run on the focused loop, easing off while its rows do not move', async () => {
     const model = createModel()
     renderHook(() => useChecksPanelPolling(model))
 
     await act(async () => poller.run?.())
     expect(model.pollIntervalRef.current).toBe(60_000)
+    // Why: the settled backoff is 60s and the failure backoff is longer still; a live run is what
+    // someone is watching, so neither may stretch it.
+    expect(poller.getDelayMs?.()).toBe(10_000)
+    vi.setSystemTime(Date.now() + 10_000)
+    await act(async () => poller.run?.())
+    expect(model.pollIntervalRef.current).toBe(120_000)
+    // The mock answers identically each read, so this is the stuck-run shape.
+    expect(poller.getDelayMs?.()).toBe(20_000)
+  })
+
+  it('lets a settled review keep the unchanged-details backoff', async () => {
+    const model = createModel()
+    renderHook(() =>
+      useChecksPanelPolling({
+        ...model,
+        pr: model.pr ? { ...model.pr, checksStatus: 'success' } : null
+      })
+    )
+
+    await act(async () => poller.run?.())
     expect(poller.getDelayMs?.()).toBe(60_000)
     vi.setSystemTime(Date.now() + 60_000)
     await act(async () => poller.run?.())
     expect(model.pollIntervalRef.current).toBe(120_000)
     expect(poller.getDelayMs?.()).toBe(120_000)
-    vi.setSystemTime(Date.now() + 120_000)
+  })
+
+  it('never reschedules a skipped attempt at zero or infinity, and still lands the force', async () => {
+    const model = createModel()
+    const mergedPR: ChecksPanelPollingInput['pr'] = model.pr
+      ? { ...model.pr, state: 'merged', checksStatus: 'success' }
+      : null
+    const fetch = vi.fn().mockResolvedValue([])
+    model.fetchPRChecks = fetch
+    const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: { ...model, pr: mergedPR } }
+    })
+
     await act(async () => poller.run?.())
-    expect(model.pollIntervalRef.current).toBe(120_000)
-    expect(poller.getDelayMs?.()).toBe(120_000)
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(poller.getDelayMs?.()).toBe(null)
+    // A pending flip arms a force whose cooldown ends before the merged cadence would.
+    vi.setSystemTime(Date.now() + 1_000)
+    hook.rerender({
+      input: { ...model, pr: mergedPR ? { ...mergedPR, checksStatus: 'pending' } : null }
+    })
+    for (let i = 0; i < 8; i++) {
+      const step = 1_000
+      vi.setSystemTime(Date.now() + step)
+      const before = fetch.mock.calls.length
+      await act(async () => poller.run?.())
+      if (fetch.mock.calls.length === before) {
+        // Why: a 0 here re-arms the poller immediately and Infinity is clamped to the same 0ms.
+        const delay = poller.getDelayMs?.()
+        expect(delay).not.toBe(0)
+        expect(Number.isFinite(delay ?? Infinity)).toBe(true)
+      }
+    }
+    // The cooldown is up, so the forced read lands instead of waiting out the 60s cadence.
+    vi.setSystemTime(Date.now() + 1_000)
+    await act(async () => poller.run?.())
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/workspace/repo',
+      42,
+      'main',
+      'head-1',
+      model.pr?.prRepo,
+      expect.objectContaining({ force: true })
+    )
+  })
+
+  it('does not schedule against a request that is already running', async () => {
+    const model = createModel()
+    let finish: (checks: PRCheckDetail[]) => void = () => {}
+    const fetch = vi.fn(() => new Promise<PRCheckDetail[]>((resolve) => (finish = resolve)))
+    model.fetchPRChecks = fetch
+    const hook = renderHook(({ input }) => useChecksPanelPolling(input), {
+      initialProps: { input: model }
+    })
+    await act(async () => {
+      void poller.run?.()
+    })
+    expect(fetch).toHaveBeenCalledOnce()
+    // Reopening reinstalls the poller while the read is still out. A delay here — Infinity included —
+    // is clamped to 0ms by the browser, so the panel would spin for as long as the request runs.
+    hook.rerender({ input: { ...model, isPanelVisible: false } })
+    hook.rerender({ input: { ...model, isPanelVisible: true } })
+    await act(async () => poller.run?.())
+    expect(poller.getDelayMs?.()).toBe(null)
+    expect(fetch).toHaveBeenCalledOnce()
+    await act(async () => finish([]))
+  })
+
+  it('clears the loading state when a foreground read overlaps a scheduled one', async () => {
+    const model = createModel({
+      activeGitLabReview: {
+        provider: 'gitlab',
+        number: 17,
+        headSha: 'head',
+        title: 'MR',
+        state: 'open',
+        url: '',
+        status: 'pending',
+        updatedAt: '',
+        mergeable: 'UNKNOWN'
+      }
+    })
+    const resolvers: ((value: unknown) => void)[] = []
+    gitlab.fetchDetails.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const { result } = renderHook(() => useChecksPanelPolling(model))
+    await act(async () => {
+      void poller.run?.()
+    })
+    await act(async () =>
+      resolvers[0]?.({ item: { projectRef: null }, pipelineJobs: [], comments: [] })
+    )
+    // A foreground pass takes the loading state; a scheduled poll then starts beside it.
+    const foreground = result.current.fetchGitLabDetails()
+    await act(() => Promise.resolve())
+    vi.setSystemTime(Date.now() + 10_000)
+    await act(async () => {
+      void poller.run?.()
+    })
+    expect(gitlab.fetchDetails).toHaveBeenCalledTimes(3)
+    await act(async () =>
+      resolvers[1]?.({ item: { projectRef: null }, pipelineJobs: [], comments: [] })
+    )
+    await act(async () => foreground)
+    await act(async () =>
+      resolvers[2]?.({ item: { projectRef: null }, pipelineJobs: [], comments: [] })
+    )
+    // Why: the scheduled read must not claim the generation the foreground read has to clear.
+    expect(model.setCommentsLoading).toHaveBeenLastCalledWith(false)
+    expect(model.setChecksLoading).toHaveBeenLastCalledWith(false)
+  })
+
+  it('does not flash the loading state on a scheduled refresh', async () => {
+    const model = createModel()
+    renderHook(() => useChecksPanelPolling(model))
+
+    await act(async () => poller.run?.())
+    expect(model.setChecksLoading).toHaveBeenCalledWith(true)
+    vi.mocked(model.setChecksLoading).mockClear()
+    vi.setSystemTime(Date.now() + 10_000)
+    await act(async () => poller.run?.())
+    // Why: rows are already on screen; flipping loading blanks counts and disables buttons.
+    expect(model.setChecksLoading).not.toHaveBeenCalled()
+  })
+
+  it('does not flash the comment loading state on a scheduled MR refresh', async () => {
+    const model = createModel({
+      activeGitLabReview: {
+        provider: 'gitlab',
+        number: 17,
+        headSha: 'head',
+        title: 'MR',
+        state: 'open',
+        url: '',
+        status: 'pending',
+        updatedAt: '',
+        mergeable: 'UNKNOWN'
+      }
+    })
+    renderHook(() => useChecksPanelPolling(model))
+
+    await act(async () => poller.run?.())
+    expect(model.setCommentsLoading).toHaveBeenCalledWith(true)
+    vi.mocked(model.setCommentsLoading).mockClear()
+    vi.setSystemTime(Date.now() + 10_000)
+    await act(async () => poller.run?.())
+    // Why: every tick would otherwise disable the comment-send buttons for the whole request.
+    expect(model.setCommentsLoading).not.toHaveBeenCalled()
   })
 
   it('selects the GitLab adapter without calling the GitHub checks provider', async () => {

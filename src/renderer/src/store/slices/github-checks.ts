@@ -1,7 +1,8 @@
 import type { AppState } from '../types'
 import type { PRCheckDetail } from '../../../../shared/github/check-types'
-import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
+import type { GitHubOwnerRepo, PRInfo } from '../../../../shared/github/pull-request-types'
 import { getGitHubPRCacheKey } from './github-cache-key'
+import { getHostedReviewCacheKey } from './hosted-review-cache-identity'
 import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { derivePRCheckStatus } from '../../../../shared/pr-check-status'
 
@@ -52,21 +53,77 @@ export function syncPRChecksStatus(
   }
 
   const nextStatus = deriveCheckStatusFromChecks(checks)
-  if (prEntry.data.checksStatus === nextStatus) {
+  const prCache =
+    prEntry.data.checksStatus === nextStatus
+      ? null
+      : {
+          ...state.prCache,
+          [prCacheKey]: {
+            ...prEntry,
+            data: {
+              ...prEntry.data,
+              checksStatus: nextStatus
+            }
+          }
+        }
+  // Why: the sidebar card renders a GitHub review from the hosted-review entry, so the same verdict
+  // has to land there too or the card trails the panel until the next background PR refresh.
+  const hostedReviewCache = syncHostedReviewStatus({
+    state,
+    repoPath,
+    repoId,
+    branch: normalized,
+    settings,
+    connectionId,
+    executionHostId,
+    hasRepoOwner,
+    number: prEntry.data.number,
+    headSha,
+    status: nextStatus
+  })
+  if (!prCache && !hostedReviewCache) {
     return null
   }
+  return { ...(prCache ? { prCache } : {}), ...(hostedReviewCache ? { hostedReviewCache } : {}) }
+}
 
+function syncHostedReviewStatus(args: {
+  state: AppState
+  repoPath: string
+  repoId: string | undefined
+  branch: string
+  settings: AppState['settings'] | undefined
+  connectionId: string | null | undefined
+  executionHostId: string | null | undefined
+  hasRepoOwner: boolean
+  number: number
+  headSha: string | undefined
+  status: PRInfo['checksStatus']
+}): AppState['hostedReviewCache'] | null {
+  const cacheKey = getHostedReviewCacheKey(
+    args.repoPath,
+    args.branch,
+    args.settings,
+    args.repoId,
+    args.connectionId,
+    args.executionHostId,
+    args.hasRepoOwner
+  )
+  const entry = args.state.hostedReviewCache?.[cacheKey]
+  const review = entry?.data
+  if (
+    !entry ||
+    !review ||
+    review.provider !== 'github' ||
+    review.number !== args.number ||
+    review.status === args.status ||
+    (args.headSha && review.headSha && review.headSha !== args.headSha)
+  ) {
+    return null
+  }
   return {
-    prCache: {
-      ...state.prCache,
-      [prCacheKey]: {
-        ...prEntry,
-        data: {
-          ...prEntry.data,
-          checksStatus: nextStatus
-        }
-      }
-    }
+    ...args.state.hostedReviewCache,
+    [cacheKey]: { ...entry, data: { ...review, status: args.status } }
   }
 }
 

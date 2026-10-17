@@ -3,6 +3,8 @@ import type { CheckStatus } from './github/pull-request-types'
 
 export const REVIEW_REFRESH_COOLDOWN_MS = 10_000
 export const CLOSED_REVIEW_REFRESH_INTERVAL_MS = 15 * 60_000
+/** Cadence of the check list while a run is unfinished and the Checks tab is on screen. */
+export const FOCUSED_CHECKS_REFRESH_INTERVAL_MS = 10_000
 
 export function reviewRefreshIntervalMs(input: {
   state?: HostedReviewState | null
