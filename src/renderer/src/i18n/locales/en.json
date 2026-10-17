@@ -15035,7 +15035,8 @@
             "folderWorkspaceLink": "A folder workspace keeps the issue it was created from.",
             "fields": "Fields",
             "editableFields": "{{value0}} editable",
-            "noEditableFields": "None editable"
+            "noEditableFields": "None editable",
+            "repoOffDevice": "The repo this {{value0}} issue lives in isn't set up on this device."
           },
           "IssueAssignee": {
             "label": "Assignee",

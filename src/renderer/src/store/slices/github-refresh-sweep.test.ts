@@ -289,6 +289,100 @@ describe('createGitHubSlice.refreshAllGitHub', () => {
       number: 123
     })
   })
+
+  it('reads a linked issue from the repo its work item came from', async () => {
+    const store = createTestStore()
+
+    store.setState({
+      repos: [
+        {
+          id: 'repo-workspace',
+          path: '/repo/workspace',
+          displayName: 'workspace',
+          badgeColor: '#000000',
+          addedAt: 1,
+          kind: 'git'
+        },
+        {
+          id: 'repo-issue',
+          path: '/repo/issue',
+          displayName: 'issue',
+          badgeColor: '#000000',
+          addedAt: 1,
+          kind: 'git'
+        }
+      ],
+      groupBy: 'repo',
+      worktreeCardProperties: ['issue'],
+      rightSidebarOpen: false,
+      worktreesByRepo: {
+        'repo-workspace': [
+          makePRRefreshWorktree({
+            repoId: 'repo-workspace',
+            linkedIssue: 97,
+            linkedWorkItem: {
+              provider: 'github',
+              type: 'issue',
+              number: 97,
+              title: 'History shows everything',
+              url: 'https://github.com/acme/orca/issues/97',
+              repoId: 'repo-issue'
+            }
+          })
+        ]
+      }
+    })
+
+    store.getState().refreshAllGitHub()
+    await Promise.resolve()
+
+    expect(mockApi.gh.issue).toHaveBeenCalledWith({
+      repoPath: '/repo/issue',
+      repoId: 'repo-issue',
+      number: 97
+    })
+  })
+
+  it('skips a linked issue whose repo is not registered on this device', async () => {
+    const store = createTestStore()
+
+    store.setState({
+      repos: [
+        {
+          id: 'repo-workspace',
+          path: '/repo/workspace',
+          displayName: 'workspace',
+          badgeColor: '#000000',
+          addedAt: 1,
+          kind: 'git'
+        }
+      ],
+      groupBy: 'repo',
+      worktreeCardProperties: ['issue'],
+      rightSidebarOpen: false,
+      worktreesByRepo: {
+        'repo-workspace': [
+          makePRRefreshWorktree({
+            repoId: 'repo-workspace',
+            linkedIssue: 97,
+            linkedWorkItem: {
+              provider: 'github',
+              type: 'issue',
+              number: 97,
+              title: 'History shows everything',
+              url: 'https://github.com/acme/orca/issues/97',
+              repoId: 'repo-missing'
+            }
+          })
+        ]
+      }
+    })
+
+    store.getState().refreshAllGitHub()
+    await Promise.resolve()
+
+    expect(mockApi.gh.issue).not.toHaveBeenCalled()
+  })
 })
 
 describe('createGitHubSlice.refreshGitHubForWorktree', () => {

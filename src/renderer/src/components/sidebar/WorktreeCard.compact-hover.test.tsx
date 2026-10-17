@@ -25,6 +25,9 @@ const cacheTimerMocks = vi.hoisted(() => ({
 let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'ports']
 let hostedReviewCache: Record<string, unknown> = {}
 let issueCache: Record<string, unknown> = {}
+// Why: the card resolves its linked issue's repo through the store, and this mock
+// is the store's only `repos` source.
+let repos: Repo[] = []
 let projectGroups: unknown[] = []
 let workspacePortScan: { key: string; result: WorkspacePortScanResult } | null = null
 let settings: Partial<GlobalSettings> | null = { compactWorktreeCards: true }
@@ -50,6 +53,7 @@ vi.mock('@/store', () => {
     ptyIdsByTabId: {},
     recordFeatureInteraction,
     remoteBranchConflictByWorktreeId: {},
+    repos,
     setRemoteBrowserPageHandle: vi.fn(),
     replaceWorkspacePortScans,
     setWorkspacePortScanRefreshing,
@@ -307,6 +311,8 @@ describe('WorktreeCard compact hover details', () => {
       experimentalNewWorktreeCardStyle: true
     }
     worktreeCardProperties = ['status']
+    // Why: the issue read keys on the repo's owner, so the repo row has to be in the store.
+    repos = [makeRepo()]
     issueCache = {
       'repo-1::123': {
         data: { number: 123, title: 'Local owner issue', state: 'open', url: null },

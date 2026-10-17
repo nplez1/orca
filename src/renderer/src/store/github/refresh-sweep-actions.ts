@@ -7,6 +7,7 @@ import { issueCacheKey, prCacheKey } from './cache-identity'
 import { CACHE_TTL, evictStaleEntries } from './cache-policy'
 import { pruneExpiredPRRefreshStates } from './pr-refresh-state'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
+import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 
 export const createRefreshSweepActions = (
   set: Parameters<StateCreator<AppState>>[0],
@@ -55,19 +56,26 @@ export const createRefreshSweepActions = (
         }
 
         if (wt.linkedIssue) {
-          const ownerSettings = settingsForGitHubRepoOwner(state.settings, repo)
+          // Why the link's repo: a workspace created from a task on another host lives in that
+          // project's repo while the issue stays where the task was listed, so the workspace
+          // row would key a fetch the card never reads. Same helper as the card and the pane.
+          const issueRepo = findLinkedIssueRepo(state.repos, wt, wt.linkedIssue)
+          if (!issueRepo) {
+            continue
+          }
+          const ownerSettings = settingsForGitHubRepoOwner(state.settings, issueRepo)
           const issueKey = issueCacheKey(
-            repo.path,
-            repo.id,
+            issueRepo.path,
+            issueRepo.id,
             wt.linkedIssue,
             ownerSettings,
-            repo.connectionId,
-            repo.executionHostId,
+            issueRepo.connectionId,
+            issueRepo.executionHostId,
             true
           )
           const issueEntry = state.issueCache[issueKey]
           if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
-            void get().fetchIssue(repo.path, wt.linkedIssue, { repoId: repo.id })
+            void get().fetchIssue(issueRepo.path, wt.linkedIssue, { repoId: issueRepo.id })
           }
         }
       }
@@ -87,7 +95,8 @@ export const createRefreshSweepActions = (
       return
     }
 
-    const repo = state.repos.find((r) => r.id === worktree.repoId)
+    const repoLookup = getGitHubRepoLookupIndex(state.repos)
+    const repo = repoLookup.findById(worktree.repoId)
     if (!repo) {
       return
     }
@@ -103,17 +112,24 @@ export const createRefreshSweepActions = (
       repo.connectionId,
       repo.executionHostId
     )
-    const issueKey = worktree.linkedIssue
-      ? issueCacheKey(
-          repo.path,
-          repo.id,
-          worktree.linkedIssue,
-          ownerSettings,
-          repo.connectionId,
-          repo.executionHostId,
-          true
-        )
-      : ''
+    // Why the link's repo: the issue lives where the task was listed, which is not always
+    // this workspace's repo — keying off the workspace invalidates an entry the card never
+    // reads and refetches through the wrong repo.
+    const issueRepo = worktree.linkedIssue
+      ? findLinkedIssueRepo(state.repos, worktree, worktree.linkedIssue)
+      : null
+    const issueKey =
+      issueRepo && worktree.linkedIssue
+        ? issueCacheKey(
+            issueRepo.path,
+            issueRepo.id,
+            worktree.linkedIssue,
+            settingsForGitHubRepoOwner(state.settings, issueRepo),
+            issueRepo.connectionId,
+            issueRepo.executionHostId,
+            true
+          )
+        : ''
 
     set((s) => {
       const updates: Partial<AppState> = {}
@@ -133,8 +149,12 @@ export const createRefreshSweepActions = (
     if (!worktree.isBare && branch) {
       get().enqueueGitHubPRRefresh(worktreeId, 'post-push', 100)
     }
-    if ((state.worktreeCardProperties ?? []).includes('issue') && worktree.linkedIssue) {
-      void get().fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })
+    if (
+      (state.worktreeCardProperties ?? []).includes('issue') &&
+      worktree.linkedIssue &&
+      issueRepo
+    ) {
+      void get().fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
     }
   }
 })

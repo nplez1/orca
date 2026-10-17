@@ -107,6 +107,7 @@ function ActivityThreadHoverCardContent({
     deleteState: foundation.deleteState,
     branch: review.branch,
     issueEntry: review.issueEntry,
+    issueRepoIsOffDevice: review.issueRepoIsOffDevice,
     linearIssueEntry: review.linearIssueEntry,
     linearIssueFallbackEntry: review.linearIssueFallbackEntry,
     prDisplay: review.prDisplay
@@ -115,6 +116,7 @@ function ActivityThreadHoverCardContent({
   useWorktreeCardLifecycleEffects({
     worktree,
     repo: repo ?? undefined,
+    issueRepo: review.issueRepo,
     isFolder: review.isFolder,
     hostedReviewCacheKey: review.hostedReviewCacheKey,
     cachedBranchFallbackGitHubPRNumber: review.cachedBranchFallbackGitHubPRNumber,
