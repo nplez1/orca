@@ -6,6 +6,7 @@ import {
   AI_VAULT_LIST_MAX_PAGES,
   AI_VAULT_LIST_MAX_SCAN_RESTARTS,
   AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE,
+  AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE,
   AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE,
   readAiVaultListPages
 } from './ai-vault-list-pages'
@@ -216,7 +217,7 @@ describe('readAiVaultListPages', () => {
     expect(read.result.sessions.map((row) => row.sessionId)).toEqual(['a', 'b', 'c'])
   })
 
-  it('restarts onto a delta and lets the caller apply it to its own list', async () => {
+  it('refuses a whole-list reply to the restarted page that asked for none', async () => {
     const requested: number[] = []
     const read = await readAiVaultListPages({
       firstPageArgs: FIRST_PAGE_ARGS,
@@ -228,7 +229,8 @@ describe('readAiVaultListPages', () => {
         if (requested.length === 2) {
           return page(['c'], 3, 'scan-b')
         }
-        // The restarted page 0 comes back as the host's diff against the fingerprint sent.
+        // The restart carries no fingerprint, so a host answering with a diff is answering a
+        // question this request never asked, against a list nobody named.
         return {
           sessions: [],
           issues: [],
@@ -240,38 +242,29 @@ describe('readAiVaultListPages', () => {
     })
 
     expect(requested).toEqual([0, 2, 0])
-    expect(read.kind).toBe('complete')
-    if (read.kind !== 'complete') {
-      throw new Error('expected a complete read')
-    }
-    expect(read.result.syncDelta?.upserts).toHaveLength(1)
-    expect(read.result.sessions).toEqual([])
+    // Nothing survived the restart, so the refusal is a failed read rather than a partial one.
+    expect(read).toMatchObject({
+      kind: 'failed',
+      error: new Error(AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE)
+    })
   })
 
-  it('restarts onto an unchanged reply and passes it through', async () => {
-    const requested: number[] = []
+  it('refuses an unchanged reply to a page that sent no fingerprint', async () => {
     const read = await readAiVaultListPages({
-      firstPageArgs: FIRST_PAGE_ARGS,
-      fetchPage: async (args) => {
-        requested.push(args.offset ?? -1)
-        if (requested.length === 1) {
-          return page(['a', 'b'], 2, 'scan-a')
-        }
-        if (requested.length === 2) {
-          return page(['c'], 3, 'scan-b')
-        }
-        return {
-          sessions: [],
-          issues: [],
-          scannedAt: SCANNED_AT,
-          fingerprint: FINGERPRINT,
-          unchanged: true
-        }
-      }
+      firstPageArgs: { ...FIRST_PAGE_ARGS, afterFingerprint: null },
+      fetchPage: async () => ({
+        sessions: [],
+        issues: [],
+        scannedAt: SCANNED_AT,
+        fingerprint: FINGERPRINT,
+        unchanged: true
+      })
     })
 
-    expect(requested).toEqual([0, 2, 0])
-    expect(read).toMatchObject({ kind: 'complete', result: { unchanged: true } })
+    expect(read).toMatchObject({
+      kind: 'failed',
+      error: new Error(AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE)
+    })
   })
 
   it('asks for no further page once its caller cancelled', async () => {

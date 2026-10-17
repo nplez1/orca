@@ -8,7 +8,9 @@ import { AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES } from './session-list-page-bou
 
 /**
  * Digests a host keeps for the listings it has served, so the next refresh can answer with only
- * what changed. Bounded: a token whose entry was evicted simply falls back to a full listing.
+ * what changed. Bounded, with one deliberate exception: the newest entry is always kept even when
+ * it alone exceeds the budget, because evicting it would make the listing just served the one list
+ * that can never sync. A token whose entry was evicted falls back to a full listing.
  */
 export const AI_VAULT_LIST_SYNC_RETAINED_BYTES = 16 * 1024 * 1024
 

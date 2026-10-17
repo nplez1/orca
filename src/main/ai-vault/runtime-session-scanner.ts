@@ -71,6 +71,7 @@ export async function scanRuntimeAiVaultSessions(
   options: RuntimeAiVaultScanOptions = {}
 ): Promise<AiVaultListResult> {
   const executionHostId = toRuntimeExecutionHostId(environmentId)
+  const drainBudget = drainBudgetMs(options)
   // Why drain here: a remote reply is capped at one 4 MiB frame, so a host's thousands of rows
   // arrive as byte-bounded pages and every desktop reader still sees one complete list.
   const read = await readAiVaultListPages({
@@ -78,9 +79,9 @@ export async function scanRuntimeAiVaultSessions(
     fetchPage: (pageArgs) =>
       fetchRuntimeAiVaultListPage(userDataPath, environmentId, pageArgs, options),
     ...(options.signal ? { signal: options.signal } : {}),
-    // Why one deadline for the whole drain: the caller's timeout bounded one reply before paging,
-    // and an 'all'-scope leg must not hold the merge open for pages × timeout.
-    ...(options.timeoutMs !== undefined ? { deadlineMs: Date.now() + options.timeoutMs } : {})
+    // Why the drain budget wins over the per-page one: the timeout bounded one reply before
+    // paging, and an 'all'-scope leg must not hold the merge open for pages × timeout.
+    ...(drainBudget !== undefined ? { deadlineMs: Date.now() + drainBudget } : {})
   })
   if (read.kind === 'failed') {
     return runtimeScanIssueResult({
@@ -177,6 +178,10 @@ function callHostListPage(
         params,
         options.timeoutMs
       )
+}
+
+function drainBudgetMs(options: RuntimeAiVaultScanOptions): number | undefined {
+  return options.drainTimeoutMs ?? options.timeoutMs
 }
 
 function errorMessage(error: unknown): string {

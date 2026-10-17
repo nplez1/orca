@@ -173,7 +173,8 @@ describe('web session listing pages and syncs', () => {
       fingerprint: FINGERPRINT,
       unchanged: true
     })
-    const reused = await api.listSessions({ ...SCOPE })
+    // `unchanged` answers a fingerprint the request carried, as the renderer's refresh does.
+    const reused = await api.listSessions({ ...SCOPE, afterFingerprint: FINGERPRINT })
 
     expect(reused.sessions.map((row) => row.sessionId)).toEqual(['a'])
     expect(reused.scannedAt).toBe('2026-07-27T02:00:00.000Z')

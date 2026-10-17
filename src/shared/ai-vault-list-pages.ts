@@ -32,6 +32,9 @@ export const AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE =
 export const AI_VAULT_LIST_DEADLINE_MESSAGE =
   'Loading this session list took too long. Refresh to try again.'
 
+export const AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE =
+  'The session host answered a page request with a whole-list reply. Refresh to try again.'
+
 export type AiVaultListPageRead =
   | { kind: 'complete'; result: AiVaultListResult }
   /** Later pages arrived; this one failed. The rows already read are still worth showing. */
@@ -110,9 +113,17 @@ export async function readAiVaultListPages(args: {
         : { kind: 'partial', result: partialAiVaultList(pages), error }
     }
     // An unchanged reply stands for the caller's previous body, and a delta reply carries the
-    // changes to it; neither is a page of a listing.
+    // changes to it; neither is a page of a listing. Each answers a fingerprint this request had
+    // to carry — a page after a restart carries none, so a conditional reply there names a list
+    // nobody asked about and must not be applied.
     if (result.unchanged || result.syncDelta) {
-      return { kind: 'complete', result }
+      const askedForConditional =
+        result.syncDelta !== undefined
+          ? pageArgs.syncFromFingerprint !== undefined
+          : pageArgs.afterFingerprint !== undefined && pageArgs.afterFingerprint !== null
+      return askedForConditional
+        ? { kind: 'complete', result }
+        : incomplete(pages, new Error(AI_VAULT_LIST_UNEXPECTED_CONDITIONAL_MESSAGE))
     }
     // Why: pages are row offsets, so appending one sliced from a *different* scan of the same
     // scope both duplicates and skips rows — and a delta computed later would never re-send the

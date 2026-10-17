@@ -241,6 +241,88 @@ describe('runtime AI Vault session scanner', () => {
     expect(scanResult.fingerprint).toBeUndefined()
   })
 
+  it('drains within the drain budget even when each page outlives the page timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(0)
+      let page = 0
+      mocks.callRuntimeEnvironment.mockImplementation(async () => {
+        // Each page takes longer than one request's timeout; only the drain budget bounds them all.
+        vi.setSystemTime(Date.now() + 2_000)
+        page += 1
+        return {
+          ok: true,
+          result:
+            page < 3
+              ? {
+                  ...result([session('runtime:env-1', `session-${page}`)]),
+                  hasMore: true,
+                  nextOffset: page
+                }
+              : result([session('runtime:env-1', `session-${page}`)])
+        }
+      })
+
+      const scanResult = await scanRuntimeAiVaultSessions(
+        '/user-data',
+        'env-1',
+        { unlimited: true },
+        {
+          timeoutMs: 1_500,
+          drainTimeoutMs: 10_000
+        }
+      )
+
+      expect(scanResult.sessions.map((row) => row.sessionId)).toEqual([
+        'session-1',
+        'session-2',
+        'session-3'
+      ])
+      expect(scanResult.issues).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports what it read once the drain budget itself runs out', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(0)
+      let page = 0
+      mocks.callRuntimeEnvironment.mockImplementation(async () => {
+        vi.setSystemTime(Date.now() + 2_000)
+        page += 1
+        return {
+          ok: true,
+          result: {
+            ...result([session('runtime:env-1', `session-${page}`)]),
+            hasMore: true,
+            nextOffset: page
+          }
+        }
+      })
+
+      const scanResult = await scanRuntimeAiVaultSessions(
+        '/user-data',
+        'env-1',
+        { unlimited: true },
+        {
+          timeoutMs: 1_500,
+          drainTimeoutMs: 3_000
+        }
+      )
+
+      // Two pages fit the budget; the third would start after it.
+      expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1', 'session-2'])
+      expect(scanResult.fingerprint).toBeUndefined()
+      expect(scanResult.issues).toContainEqual(
+        expect.objectContaining({ kind: 'host', message: expect.stringContaining('took too long') })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('passes its signal to the transport so a page in flight can be abandoned', async () => {
     const controller = new AbortController()
     await scanRuntimeAiVaultSessions('/user-data', 'env-1', {}, { signal: controller.signal })
