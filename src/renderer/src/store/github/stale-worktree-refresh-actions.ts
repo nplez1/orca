@@ -6,6 +6,7 @@ import { rightSidebarShowsPullRequestData } from '@/lib/right-sidebar-visibility
 import { issueCacheKey } from './cache-identity'
 import { CACHE_TTL } from './cache-policy'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
+import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
 import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 
 export const createStaleWorktreeRefreshActions = (
@@ -25,7 +26,8 @@ export const createStaleWorktreeRefreshActions = (
       return
     }
 
-    const repo = state.repos.find((r) => r.id === worktree.repoId)
+    const repoLookup = getGitHubRepoLookupIndex(state.repos)
+    const repo = repoLookup.findById(worktree.repoId)
     if (!repo) {
       return
     }

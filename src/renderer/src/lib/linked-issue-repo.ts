@@ -1,5 +1,6 @@
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import { getGitHubRepoLookupIndex } from '@/store/slices/github-repo-lookup-index'
 
 /** The worktree fields the rule reads. Everything that renders or refreshes a workspace's
  *  linked issue resolves its repo through here, so the pane, the sidebar card and the
@@ -30,15 +31,21 @@ export function linkedIssueRepoId(worktree: LinkedIssueWorktree, issueNumber: nu
   return item.repoId ?? worktree.repoId
 }
 
+/**
+ * The row for that id, or null.
+ *
+ * Resolves through the store's memoised lookup index rather than scanning the array: the
+ * refresh sweeps call this once per worktree, and a per-call scan re-reads every row, which is
+ * the O(N*M) identity-read budget those paths are pinned to.
+ */
 export function findLinkedIssueRepo(
-  /** Optional like `RepoRuntimeOwnerState.repos`: card surfaces render against projected
-   *  store states that may not carry the slice, and an absent list names no repo. */
+  /** Optional like `RepoRuntimeOwnerState.repos`: surfaces render against projected store
+   *  states that may not carry the slice, and an absent list names no repo. */
   repos: readonly Repo[] | undefined,
   worktree: LinkedIssueWorktree,
   issueNumber: number
 ): Repo | null {
-  const repoId = linkedIssueRepoId(worktree, issueNumber)
-  return repos?.find((repo) => repo.id === repoId) ?? null
+  return getGitHubRepoLookupIndex(repos).findById(linkedIssueRepoId(worktree, issueNumber)) ?? null
 }
 
 /**
@@ -54,5 +61,5 @@ export function linkedIssueRepoIsOffDevice(
   const repoId = linkedIssueRepoId(worktree, issueNumber)
   // An absent slice is not evidence about where the issue lives; the workspace-repo case
   // keeps its existing "no row, nothing to show" behaviour.
-  return repoId !== worktree.repoId && !(repos ?? []).some((repo) => repo.id === repoId)
+  return repoId !== worktree.repoId && !getGitHubRepoLookupIndex(repos).findById(repoId)
 }

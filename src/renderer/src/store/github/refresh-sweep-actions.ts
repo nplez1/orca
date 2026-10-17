@@ -95,7 +95,8 @@ export const createRefreshSweepActions = (
       return
     }
 
-    const repo = state.repos.find((r) => r.id === worktree.repoId)
+    const repoLookup = getGitHubRepoLookupIndex(state.repos)
+    const repo = repoLookup.findById(worktree.repoId)
     if (!repo) {
       return
     }
@@ -111,17 +112,24 @@ export const createRefreshSweepActions = (
       repo.connectionId,
       repo.executionHostId
     )
-    const issueKey = worktree.linkedIssue
-      ? issueCacheKey(
-          repo.path,
-          repo.id,
-          worktree.linkedIssue,
-          ownerSettings,
-          repo.connectionId,
-          repo.executionHostId,
-          true
-        )
-      : ''
+    // Why the link's repo: the issue lives where the task was listed, which is not always
+    // this workspace's repo — keying off the workspace invalidates an entry the card never
+    // reads and refetches through the wrong repo.
+    const issueRepo = worktree.linkedIssue
+      ? findLinkedIssueRepo(state.repos, worktree, worktree.linkedIssue)
+      : null
+    const issueKey =
+      issueRepo && worktree.linkedIssue
+        ? issueCacheKey(
+            issueRepo.path,
+            issueRepo.id,
+            worktree.linkedIssue,
+            settingsForGitHubRepoOwner(state.settings, issueRepo),
+            issueRepo.connectionId,
+            issueRepo.executionHostId,
+            true
+          )
+        : ''
 
     set((s) => {
       const updates: Partial<AppState> = {}
@@ -141,8 +149,12 @@ export const createRefreshSweepActions = (
     if (!worktree.isBare && branch) {
       get().enqueueGitHubPRRefresh(worktreeId, 'post-push', 100)
     }
-    if ((state.worktreeCardProperties ?? []).includes('issue') && worktree.linkedIssue) {
-      void get().fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })
+    if (
+      (state.worktreeCardProperties ?? []).includes('issue') &&
+      worktree.linkedIssue &&
+      issueRepo
+    ) {
+      void get().fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
     }
   }
 })
