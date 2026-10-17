@@ -75,8 +75,9 @@ export function combineAiVaultListPages(pages: readonly AiVaultListResult[]): Ai
   return {
     sessions: pages.flatMap((page) => page.sessions),
     // Why every page's issues: the host carries scan issues on page 0, but a page can also report
-    // rows it had to skip, and dropping those would hide the only sign that rows are missing.
-    issues: pages.flatMap((page) => page.issues),
+    // rows it had to skip, and dropping those would hide the only sign that rows are missing. An
+    // identical notice from another page adds nothing, so one copy is kept.
+    issues: uniqueIssues(pages.flatMap((page) => page.issues)),
     scannedAt: pages.at(-1)?.scannedAt ?? new Date().toISOString(),
     // Every page but the first carries no fingerprint; the listing's is page 0's.
     ...(first?.fingerprint ? { fingerprint: first.fingerprint } : {})
@@ -183,6 +184,18 @@ export async function readAiVaultListPages(args: {
     }
     offset = next
   }
+}
+
+function uniqueIssues(issues: readonly AiVaultScanIssue[]): AiVaultScanIssue[] {
+  const seen = new Set<string>()
+  return issues.filter((issue) => {
+    const key = `${issue.executionHostId ?? ''}|${issue.kind ?? ''}|${issue.agent}|${issue.path}|${issue.message}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
 }
 
 function incomplete(pages: readonly AiVaultListResult[], error: Error): AiVaultListPageRead {

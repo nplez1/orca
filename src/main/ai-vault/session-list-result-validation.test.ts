@@ -376,12 +376,23 @@ describe('parseAiVaultListResult paging and deltas', () => {
     )
   })
 
-  it('still fails the first page when every row in it is unreadable', () => {
+  it('reports an unreadable first page instead of failing the whole listing', () => {
+    const parsed = parseAiVaultListResult(
+      { sessions: [{ id: 42 }], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' },
+      { offset: 0 }
+    )
+
+    // A page whose rows all use a value this build does not know is version skew, not a broken
+    // reply: the readable pages after it still arrive.
+    expect(parsed.sessions).toEqual([])
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('still refuses a single reply made entirely of unreadable rows', () => {
     expect(() =>
-      parseAiVaultListResult(
-        { sessions: [{ id: 42 }], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' },
-        { offset: 0 }
-      )
+      parseAiVaultListResult({ sessions: [{ id: 42 }], issues: [], scannedAt: 'x' })
     ).toThrow('all supplied Agent Session History sessions were invalid')
   })
 

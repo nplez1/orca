@@ -74,7 +74,6 @@ function scheduleHostLegExpiry(): void {
 export type AiVaultHostLegSyncBasis = {
   fingerprint: string
   sessions: readonly AiVaultSession[]
-  issues: readonly AiVaultScanIssue[]
 }
 
 /** Serves one host's leg from the per-host TTL cache, and stores it only when
@@ -189,9 +188,16 @@ function hostLegSyncBasis(
 ): AiVaultHostLegSyncBasis | undefined {
   const held = lastFullHostLegs.get(cacheKey)
   const fingerprint = held?.result.fingerprint
-  return held?.depth === depth && fingerprint
-    ? { fingerprint, sessions: held.result.sessions, issues: held.result.issues }
-    : undefined
+  if (held?.depth !== depth || !fingerprint) {
+    return undefined
+  }
+  // Why refuse a body that reported skips: a diff never re-sends the rows it did not change, so
+  // the notice could never be withdrawn once the row was fixed — and a full read derives it again
+  // from the rows in front of it, which is the only way it stays true.
+  if (held.result.issues.some(isClientSkipIssue)) {
+    return undefined
+  }
+  return { fingerprint, sessions: held.result.sessions }
 }
 
 function withAppliedDelta(
@@ -201,27 +207,13 @@ function withAppliedDelta(
 ): AiVaultListResult {
   return {
     sessions: applyAiVaultListDelta(basis.sessions, delta),
-    issues: issuesAfterDelta(reply.issues, basis.issues),
+    issues: reply.issues,
     scannedAt: reply.scannedAt,
     ...(reply.fingerprint ? { fingerprint: reply.fingerprint } : {})
   }
 }
 
-/**
- * A diff carries no rows it did not change, so a result entry this build had to skip would stop
- * being reported after one refresh. Only this client's own skip row is carried forward: a host's
- * per-transcript issues carry no `kind` either, and carrying those would keep a fixed problem on
- * screen for as long as the basis lives.
- */
-function issuesAfterDelta(
-  replyIssues: readonly AiVaultScanIssue[],
-  heldIssues: readonly AiVaultScanIssue[]
-): AiVaultScanIssue[] {
-  return replyIssues.some(isClientSkipIssue)
-    ? [...replyIssues]
-    : [...replyIssues, ...heldIssues.filter(isClientSkipIssue)]
-}
-
+/** The row this client writes when it had to skip result entries it cannot read. */
 function isClientSkipIssue(issue: AiVaultScanIssue): boolean {
   return issue.path === AI_VAULT_LIST_SKIP_ISSUE_PATH
 }

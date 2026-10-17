@@ -122,10 +122,16 @@ describe('a host reply applied by the desktop leg', () => {
     const first = await scanHostLegWithCache(legArgs(firstScan))
 
     const shrunk = [session('two')]
-    const secondScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) =>
-      hostReply(shrunk, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+    let sentDelta = false
+    const secondScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
+      const reply = hostReply(shrunk, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+      sentDelta ||= reply.syncDelta !== undefined
+      return reply
+    }
     expireLegCache()
     const second = await scanHostLegWithCache(legArgs(secondScan))
+
+    expect(sentDelta).toBe(true)
 
     expect(second.sessions.map((row) => row.sessionId)).toEqual(['two'])
     expect(second.fingerprint).not.toBe(first.fingerprint)
@@ -135,66 +141,28 @@ describe('a host reply applied by the desktop leg', () => {
     expect(third.fingerprint).toBe(second.fingerprint)
   })
 
-  it('carries only the client skip row forward, not a host transcript issue', async () => {
+  it('does not offer a list it could not fully read as a diff basis', async () => {
     const clientSkip = {
       agent: 'codex' as const,
       path: 'aiVault.listSessions',
       message: 'Skipped 1 invalid Agent Session History result entry.'
     }
-    const hostTranscriptIssue = {
-      agent: 'zcode' as const,
-      path: '/srv/.zcode/db',
-      message: 'EACCES: permission denied'
-    }
-    const held = { ...hostReply([session('one')]), issues: [clientSkip, hostTranscriptIssue] }
+    const held = { ...hostReply([session('one')]), issues: [clientSkip] }
     await scanHostLegWithCache(legArgs(async () => held))
 
-    // The host fixed the transcript it could not read, so its reply carries no issues at all.
-    const changed = [session('one'), session('two')]
     expireLegCache()
-    const synced = await scanHostLegWithCache(
-      legArgs(async (syncFrom) =>
-        hostReply(changed, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
-      )
-    )
-
-    // The fixed problem must clear; the dropped result entry is still dropped, and still says so.
-    expect(synced.issues).toEqual([clientSkip])
-  })
-
-  it('keeps the client skip row when a diff carries its own host transcript issue', async () => {
-    const clientSkip = {
-      agent: 'codex' as const,
-      path: 'aiVault.listSessions',
-      message: 'Skipped 1 invalid Agent Session History result entry.'
+    let sentBasis: string | undefined = 'unset'
+    const nextScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
+      sentBasis = syncFrom?.fingerprint
+      return hostReply([session('one'), session('two')])
     }
-    await scanHostLegWithCache(
-      legArgs(async () => ({ ...hostReply([session('one')]), issues: [clientSkip] }))
-    )
+    const next = await scanHostLegWithCache(legArgs(nextScan))
 
-    const changed = [session('one'), session('two')]
-    expireLegCache()
-    let sentDelta = false
-    const synced = await scanHostLegWithCache(
-      legArgs(async (syncFrom) => {
-        const reply = hostReply(
-          changed,
-          syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {}
-        )
-        sentDelta ||= reply.syncDelta !== undefined
-        return {
-          ...reply,
-          issues: [{ agent: 'zcode' as const, path: '/srv/.zcode/db', message: 'EACCES' }]
-        }
-      })
-    )
-
-    expect(sentDelta).toBe(true)
-    // A host's kind-less issue must not stand in for this client's skip row.
-    expect(synced.issues).toEqual([
-      { agent: 'zcode', path: '/srv/.zcode/db', message: 'EACCES' },
-      clientSkip
-    ])
+    // Why no basis: a diff never re-sends unchanged rows, so the notice could never be withdrawn
+    // once the row was fixed. A full read derives it again from the rows actually in front of it.
+    expect(sentBasis).toBeUndefined()
+    expect(next.sessions.map((row) => row.sessionId)).toEqual(['one', 'two'])
+    expect(next.issues).toEqual([])
   })
 
   it('rescans on a forced refresh and still applies only the diff', async () => {

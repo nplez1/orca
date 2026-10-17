@@ -182,12 +182,17 @@ export function parseAiVaultListResult(
     throw new Error(envelope.error.issues[0]?.message ?? 'unexpected result shape')
   }
   const listed = parseSessions(envelope.data.sessions)
-  // Why only the first page is refused: later pages are read one after another, and a page this
-  // build cannot read at all must cost that page's rows, not every page after it.
-  if (options.offset === undefined || options.offset === 0) {
-    if (envelope.data.sessions.length > 0 && listed.malformed > 0 && listed.wellFormed === 0) {
-      throw new Error('all supplied Agent Session History sessions were invalid')
-    }
+  // Why not for a paged read: a page whose rows all use a field this build does not know is
+  // version skew, not a broken reply, and throwing would lose every page after it (the old single
+  // reply showed the readable rows with a skip notice). The envelope schema still refuses a reply
+  // of the wrong shape, which is what this check was for.
+  if (
+    options.offset === undefined &&
+    envelope.data.sessions.length > 0 &&
+    listed.malformed > 0 &&
+    listed.wellFormed === 0
+  ) {
+    throw new Error('all supplied Agent Session History sessions were invalid')
   }
   const sessions = listed.sessions
   // A delta's rows are the same rows; one malformed row must not discard the rest of the change.

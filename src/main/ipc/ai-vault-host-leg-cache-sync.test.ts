@@ -90,9 +90,7 @@ describe('host leg change sync', () => {
 
     expect(scan).toHaveBeenNthCalledWith(2, {
       fingerprint: FIRST_FINGERPRINT,
-      sessions: held,
-      // Carried with the basis so a diff keeps the skip notices the held body reported.
-      issues: []
+      sessions: held
     })
     expect(second.sessions.map((row) => row.sessionId)).toEqual(['three', 'two'])
     expect(second.fingerprint).toBe(SECOND_FINGERPRINT)
@@ -129,8 +127,7 @@ describe('host leg change sync', () => {
     // Equal mtimes, so the id tiebreak orders the held list the same way a full listing would.
     expect(scan).toHaveBeenNthCalledWith(3, {
       fingerprint: SECOND_FINGERPRINT,
-      sessions: [session('one'), session('two')],
-      issues: []
+      sessions: [session('one'), session('two')]
     })
   })
 
