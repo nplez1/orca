@@ -273,13 +273,16 @@ describe('web session listing pages and syncs', () => {
       fingerprint: FINGERPRINT,
       syncDelta: { upserts: [], removedIds: [] }
     })
-    await api.listSessions({ ...SCOPE })
+    const afterFailure = await api.listSessions({ ...SCOPE })
 
-    // Still the list from before the failed read, not the failed read's page 0.
+    // Still the list from before the failed read, not the failed read's page 0: the diff applies to
+    // the body the fingerprint names, so `a` is there even though the failed read's page 0 also had
+    // it — a stored partial body would have reported the same row from a different basis.
     expect(callRuntimeResult).toHaveBeenLastCalledWith(
       'aiVault.listSessions',
       expect.objectContaining({ syncFromFingerprint: FINGERPRINT })
     )
+    expect(afterFailure.sessions.map((row) => row.sessionId)).toEqual(['a'])
   })
 
   it('degrades a failed later page to the rows already read and retries full next time', async () => {
