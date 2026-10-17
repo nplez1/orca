@@ -1,4 +1,5 @@
 import {
+  AI_VAULT_LIST_SKIP_ISSUE_PATH,
   AI_VAULT_SCAN_CANCELLED_MESSAGE,
   type AiVaultListArgs,
   type AiVaultListResult,
@@ -75,9 +76,8 @@ export function combineAiVaultListPages(pages: readonly AiVaultListResult[]): Ai
   return {
     sessions: pages.flatMap((page) => page.sessions),
     // Why every page's issues: the host carries scan issues on page 0, but a page can also report
-    // rows it had to skip, and dropping those would hide the only sign that rows are missing. An
-    // identical notice from another page adds nothing, so one copy is kept.
-    issues: uniqueIssues(pages.flatMap((page) => page.issues)),
+    // rows it had to skip, and dropping those would hide the only sign that rows are missing.
+    issues: mergedSkipNotices(pages.flatMap((page) => page.issues)),
     scannedAt: pages.at(-1)?.scannedAt ?? new Date().toISOString(),
     // Every page but the first carries no fingerprint; the listing's is page 0's.
     ...(first?.fingerprint ? { fingerprint: first.fingerprint } : {})
@@ -186,16 +186,36 @@ export async function readAiVaultListPages(args: {
   }
 }
 
-function uniqueIssues(issues: readonly AiVaultScanIssue[]): AiVaultScanIssue[] {
-  const seen = new Set<string>()
-  return issues.filter((issue) => {
-    const key = `${issue.executionHostId ?? ''}|${issue.kind ?? ''}|${issue.agent}|${issue.path}|${issue.message}`
-    if (seen.has(key)) {
-      return false
+/** The one notice shape this module re-counts; anything else is left exactly as it arrived. */
+const SKIP_NOTICE_MESSAGE =
+  /^Skipped (\d+) invalid Agent Session History result (?:entry|entries)\.$/
+
+/**
+ * Pages each report the entries they had to skip, so one listing would otherwise show a notice per
+ * page. They are summed into one, which needs no state of its own: a notice that does not match the
+ * known shape is left alone rather than guessed at.
+ */
+function mergedSkipNotices(issues: readonly AiVaultScanIssue[]): AiVaultScanIssue[] {
+  const skips = issues.filter((issue) => issue.path === AI_VAULT_LIST_SKIP_ISSUE_PATH)
+  if (skips.length < 2) {
+    return [...issues]
+  }
+  let total = 0
+  for (const skip of skips) {
+    const counted = SKIP_NOTICE_MESSAGE.exec(skip.message.trim())
+    if (!counted) {
+      return [...issues]
     }
-    seen.add(key)
-    return true
-  })
+    total += Number(counted[1])
+  }
+  const [firstSkip] = skips
+  return [
+    ...issues.filter((issue) => issue.path !== AI_VAULT_LIST_SKIP_ISSUE_PATH),
+    {
+      ...firstSkip!,
+      message: `Skipped ${total} invalid Agent Session History result ${total === 1 ? 'entry' : 'entries'}.`
+    }
+  ]
 }
 
 function incomplete(pages: readonly AiVaultListResult[], error: Error): AiVaultListPageRead {

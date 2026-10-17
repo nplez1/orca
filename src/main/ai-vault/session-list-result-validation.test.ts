@@ -338,7 +338,8 @@ describe('parseAiVaultListResult paging and deltas', () => {
       upserts: [],
       removedIds: [validSession('session-2').id]
     })
-    // The list still matches its fingerprint, so the diff keeps working.
+    // The body is still the host's list minus the row this build cannot show, so an `unchanged`
+    // reply can still be honoured against it. (The leg declines to *diff* such a body.)
     expect(parsed.fingerprint).toBe('b'.repeat(64))
     expect(parsed.issues).toContainEqual(
       expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })

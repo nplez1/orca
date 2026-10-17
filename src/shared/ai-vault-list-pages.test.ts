@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AiVaultListArgs, AiVaultListResult, AiVaultSession } from './ai-vault-types'
+import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from './ai-vault-types'
 import {
   AI_VAULT_LIST_CHANGING_SCAN_MESSAGE,
   AI_VAULT_LIST_DEADLINE_MESSAGE,
@@ -346,6 +347,33 @@ describe('readAiVaultListPages', () => {
     expect(requests[2]).not.toHaveProperty('force')
     expect(requests[2]).not.toHaveProperty('afterFingerprint')
     expect(requests[2]).not.toHaveProperty('syncFromFingerprint')
+  })
+
+  it('sums the entries two pages had to skip into one notice', async () => {
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        const skip = {
+          agent: 'codex' as const,
+          path: AI_VAULT_LIST_SKIP_ISSUE_PATH,
+          message: 'Skipped 1 invalid Agent Session History result entry.'
+        }
+        return (args.offset ?? 0) === 0
+          ? { ...page(['a'], 1), issues: [skip] }
+          : { ...page(['b']), issues: [skip] }
+      }
+    })
+
+    expect(read.kind).toBe('complete')
+    if (read.kind !== 'complete') {
+      throw new Error('expected a complete listing')
+    }
+    // One notice per listing, and the count is the whole listing's, not one page's.
+    expect(read.result.issues).toEqual([
+      expect.objectContaining({
+        message: 'Skipped 2 invalid Agent Session History result entries.'
+      })
+    ])
   })
 
   it('reports a listing that keeps changing instead of retrying forever', async () => {

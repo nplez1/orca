@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   AI_VAULT_AGENTS,
+  AI_VAULT_LIST_SKIP_ISSUE_PATH,
   type AiVaultAgent,
   type AiVaultListResult,
   type AiVaultScanIssue,
@@ -9,13 +10,6 @@ import {
 import { normalizeExecutionHostId } from '../../shared/execution-host'
 
 const aiVaultAgentSet = new Set<string>(AI_VAULT_AGENTS)
-
-/**
- * The path this client stamps on the row it writes when it had to skip result entries. It is the
- * only marker that separates that row from a host's own per-transcript issues, which carry no
- * `kind` either.
- */
-export const AI_VAULT_LIST_SKIP_ISSUE_PATH = 'aiVault.listSessions'
 
 export function isAiVaultAgent(agent: string): agent is AiVaultAgent {
   return aiVaultAgentSet.has(agent)
@@ -215,8 +209,9 @@ export function parseAiVaultListResult(
   }
   // Why drop the fingerprint only here: a rejected diff row that named no id cannot be removed from
   // the list this client holds, so that body would no longer match its fingerprint. A row this
-  // build cannot read at all is a different case — the skip row says so on every reply, and
-  // disabling the diff for the whole host would cost more than the row is worth.
+  // build cannot read at all keeps it — the body still is the host's list minus rows this build
+  // cannot show, an `unchanged` reply can still be honoured, and the skip row says so on every full
+  // read. What such a body is *not* good for is a diff: see `hostLegSyncBasis`.
   const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
   const fingerprint =
     envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
@@ -225,6 +220,7 @@ export function parseAiVaultListResult(
     issues.push({
       agent: 'codex',
       path: AI_VAULT_LIST_SKIP_ISSUE_PATH,
+      // The drain re-counts these across pages, so the wording is a contract with that reader.
       message: `Skipped ${invalidCount} invalid Agent Session History result ${invalidCount === 1 ? 'entry' : 'entries'}.`
     })
   }

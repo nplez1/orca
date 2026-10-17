@@ -34,6 +34,13 @@ export const AI_VAULT_AGENTS = [
 // value are optional belt-and-braces, not required for the request to succeed.
 export const AI_VAULT_SCOPE_PATHS_MAX_COUNT = 64
 
+/**
+ * The path this client stamps on the row it writes when it had to skip result entries. It is the
+ * only marker that separates that row from a host's own per-transcript issues, which carry no
+ * `kind` either.
+ */
+export const AI_VAULT_LIST_SKIP_ISSUE_PATH = 'aiVault.listSessions'
+
 // Why: IPC rejection drops `Error.name`, so the renderer can only recognise a
 // cancelled scan by its message. Both sides share this literal.
 export const AI_VAULT_SCAN_CANCELLED_MESSAGE = 'Agent Session History scan was cancelled'

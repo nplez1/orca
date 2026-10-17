@@ -6,7 +6,7 @@ import type {
   AiVaultSession
 } from '../../shared/ai-vault-types'
 import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
-import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../ai-vault/session-list-result-validation'
+import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../../shared/ai-vault-types'
 import {
   aiVaultSessionDepthCovers,
   truncateAiVaultListResult,
@@ -191,9 +191,11 @@ function hostLegSyncBasis(
   if (held?.depth !== depth || !fingerprint) {
     return undefined
   }
-  // Why refuse a body that reported skips: a diff never re-sends the rows it did not change, so
-  // the notice could never be withdrawn once the row was fixed — and a full read derives it again
-  // from the rows in front of it, which is the only way it stays true.
+  // Why refuse a body that reported skips: a diff never re-sends the rows it did not change, so the
+  // notice could never be withdrawn once the row was fixed, and a full read derives it again from
+  // the rows in front of it — the only way it stays true. The cost is that a host serving a row this
+  // build cannot read is fully read on every refresh until the build can; that is bounded, visible,
+  // and cheaper than a warning that outlives its cause.
   if (held.result.issues.some(isClientSkipIssue)) {
     return undefined
   }

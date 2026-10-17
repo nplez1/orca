@@ -368,7 +368,8 @@ describe('runtime AI Vault session scanner', () => {
     const scanResult = await scanRuntimeAiVaultSessions('/user-data', 'env-1', { unlimited: true })
 
     expect(scanResult.sessions.map((row) => row.sessionId)).toEqual(['session-1'])
-    // The skip row is the only sign a row is missing, and the diff keeps working for the rest.
+    // The skip row is the only sign a row is missing; the fingerprint still names the body so an
+    // `unchanged` reply can be honoured (the leg declines to diff a body it could not fully read).
     expect(scanResult.issues).toContainEqual(
       expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
     )
