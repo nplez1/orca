@@ -272,11 +272,11 @@ export function buildPtyHostEnv(
   // Why: the name a managed WSL shell resolves under `ORCA_WSL_CLI_DIR`, never a host path. Taken
   // from the same function that names the launcher it is resolved against.
   const wslCliCommandName = getManagedWslCliLauncherName(opts.isPackaged)
-  // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so `orca` targets the live dev instance.
+  // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so the CLI targets the live dev instance.
   if (opts.isWsl) {
     wslInteropHealthMonitor.noteActivity(opts.wslDistro ?? null)
     baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
-    // Why: managed WSL registration uses `orca-np`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
+    // Why: managed WSL registration uses `orca-np`; exposing that name scopes agent guidance to WSL without a bare-orca shim.
     baseEnv.ORCA_CLI_COMMAND = wslCliCommandName
     const managedCliDir = getManagedWslCliDir(opts)
     if (managedCliDir) {

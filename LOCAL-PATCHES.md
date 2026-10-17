@@ -278,8 +278,9 @@ patch is locked to `stablyai/orca`, and dropping it would relabel this app's own
 party's same-named copies, so the review dialog would offer them as **Not from Orca** and never
 rewrite them from the fork.
 
-**The stubs' resolver.** The shared block `<!-- shared: resolver -->` in
-`skill-stubs/_shared/cli-resolution.md` is inlined into every `skills/*/SKILL.md`. It now resolves
+**The stubs' resolver.** The shared block `<!-- block: resolver -->` in
+`skill-stubs/_shared/cli-resolution.md` (inserted into each stub with a
+`<!-- shared: resolver -->` marker) is inlined into every `skills/*/SKILL.md`. It now resolves
 `orca-np` (this build) / `orca-np-dev` (dev) / `ORCA_CLI_COMMAND`, drops the upstream `orca-ide`
 rung (that is the official Linux CLI), keeps a relay-host exception so the remote plain-`orca` shim
 still works, says the exported value is an absolute path that must be quoted, and states that a bare
