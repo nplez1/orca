@@ -127,13 +127,13 @@ export const AI_VAULT_METHODS = [
           params.force
         )
       }
+      // The same rule as the legacy reply: an unlimited listing never answers "unchanged".
+      const afterFingerprint = params.unlimited ? undefined : params.afterFingerprint
       return aiVaultPagedListReply({
         result: stamped,
         offset: params.offset ?? 0,
         force: params.force === true,
-        ...(params.afterFingerprint !== undefined
-          ? { afterFingerprint: params.afterFingerprint }
-          : {}),
+        ...(afterFingerprint !== undefined ? { afterFingerprint } : {}),
         ...(params.syncFromFingerprint !== undefined
           ? { syncFromFingerprint: params.syncFromFingerprint }
           : {})

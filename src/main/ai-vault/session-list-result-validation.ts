@@ -10,6 +10,13 @@ import { normalizeExecutionHostId } from '../../shared/execution-host'
 
 const aiVaultAgentSet = new Set<string>(AI_VAULT_AGENTS)
 
+/**
+ * The path this client stamps on the row it writes when it had to skip result entries. It is the
+ * only marker that separates that row from a host's own per-transcript issues, which carry no
+ * `kind` either.
+ */
+export const AI_VAULT_LIST_SKIP_ISSUE_PATH = 'aiVault.listSessions'
+
 export function isAiVaultAgent(agent: string): agent is AiVaultAgent {
   return aiVaultAgentSet.has(agent)
 }
@@ -212,7 +219,7 @@ export function parseAiVaultListResult(
   if (invalidCount > 0) {
     issues.push({
       agent: 'codex',
-      path: 'aiVault.listSessions',
+      path: AI_VAULT_LIST_SKIP_ISSUE_PATH,
       message: `Skipped ${invalidCount} invalid Agent Session History result ${invalidCount === 1 ? 'entry' : 'entries'}.`
     })
   }

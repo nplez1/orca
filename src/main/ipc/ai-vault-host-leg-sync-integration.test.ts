@@ -135,32 +135,66 @@ describe('a host reply applied by the desktop leg', () => {
     expect(third.fingerprint).toBe(second.fingerprint)
   })
 
-  it('keeps the skip notice the held body carried when a diff arrives without one', async () => {
-    const skipped = {
+  it('carries only the client skip row forward, not a host transcript issue', async () => {
+    const clientSkip = {
       agent: 'codex' as const,
       path: 'aiVault.listSessions',
       message: 'Skipped 1 invalid Agent Session History result entry.'
     }
-    const held = { ...hostReply([session('one')]), issues: [skipped] }
+    const hostTranscriptIssue = {
+      agent: 'zcode' as const,
+      path: '/srv/.zcode/db',
+      message: 'EACCES: permission denied'
+    }
+    const held = { ...hostReply([session('one')]), issues: [clientSkip, hostTranscriptIssue] }
     await scanHostLegWithCache(legArgs(async () => held))
+
+    // The host fixed the transcript it could not read, so its reply carries no issues at all.
+    const changed = [session('one'), session('two')]
+    expireLegCache()
+    const synced = await scanHostLegWithCache(
+      legArgs(async (syncFrom) =>
+        hostReply(changed, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+      )
+    )
+
+    // The fixed problem must clear; the dropped result entry is still dropped, and still says so.
+    expect(synced.issues).toEqual([clientSkip])
+  })
+
+  it('keeps the client skip row when a diff carries its own host transcript issue', async () => {
+    const clientSkip = {
+      agent: 'codex' as const,
+      path: 'aiVault.listSessions',
+      message: 'Skipped 1 invalid Agent Session History result entry.'
+    }
+    await scanHostLegWithCache(
+      legArgs(async () => ({ ...hostReply([session('one')]), issues: [clientSkip] }))
+    )
 
     const changed = [session('one'), session('two')]
     expireLegCache()
     let sentDelta = false
-    const syncedScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
-      const reply = hostReply(
-        changed,
-        syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {}
-      )
-      sentDelta ||= reply.syncDelta !== undefined
-      return reply
-    }
-    const synced = await scanHostLegWithCache(legArgs(syncedScan))
+    const synced = await scanHostLegWithCache(
+      legArgs(async (syncFrom) => {
+        const reply = hostReply(
+          changed,
+          syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {}
+        )
+        sentDelta ||= reply.syncDelta !== undefined
+        return {
+          ...reply,
+          issues: [{ agent: 'zcode' as const, path: '/srv/.zcode/db', message: 'EACCES' }]
+        }
+      })
+    )
 
     expect(sentDelta).toBe(true)
-    // The diff does not re-send the skipped row, so without carrying the notice the user would see
-    // a row quietly missing after one refresh.
-    expect(synced.issues).toContainEqual(skipped)
+    // A host's kind-less issue must not stand in for this client's skip row.
+    expect(synced.issues).toEqual([
+      { agent: 'zcode', path: '/srv/.zcode/db', message: 'EACCES' },
+      clientSkip
+    ])
   })
 
   it('rescans on a forced refresh and still applies only the diff', async () => {

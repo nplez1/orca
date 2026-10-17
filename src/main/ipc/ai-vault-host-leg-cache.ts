@@ -6,6 +6,7 @@ import type {
   AiVaultSession
 } from '../../shared/ai-vault-types'
 import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
+import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../ai-vault/session-list-result-validation'
 import {
   aiVaultSessionDepthCovers,
   truncateAiVaultListResult,
@@ -207,17 +208,22 @@ function withAppliedDelta(
 }
 
 /**
- * A diff carries no rows it did not change, so a transcript this build had to skip would stop
- * being reported after one refresh. Skip rows (the ones with no `kind`) are carried forward; any
- * the reply reports itself replace them.
+ * A diff carries no rows it did not change, so a result entry this build had to skip would stop
+ * being reported after one refresh. Only this client's own skip row is carried forward: a host's
+ * per-transcript issues carry no `kind` either, and carrying those would keep a fixed problem on
+ * screen for as long as the basis lives.
  */
 function issuesAfterDelta(
   replyIssues: readonly AiVaultScanIssue[],
   heldIssues: readonly AiVaultScanIssue[]
 ): AiVaultScanIssue[] {
-  return replyIssues.some((issue) => !issue.kind)
+  return replyIssues.some(isClientSkipIssue)
     ? [...replyIssues]
-    : [...replyIssues, ...heldIssues.filter((issue) => !issue.kind)]
+    : [...replyIssues, ...heldIssues.filter(isClientSkipIssue)]
+}
+
+function isClientSkipIssue(issue: AiVaultScanIssue): boolean {
+  return issue.path === AI_VAULT_LIST_SKIP_ISSUE_PATH
 }
 
 /** Returns the full list an `unchanged` reply stands for when one is known. */
