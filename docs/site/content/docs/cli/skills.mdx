@@ -38,7 +38,7 @@ Use `npx skills add` with this build's repository and the skill name. Default ag
 
 After `npx skills add`, agents see a short stub that says:
 
-1. Resolve the CLI executable for this session (`ORCA_CLI_COMMAND`, dev `orca-np-dev`, Linux `orca-ide`, else `orca-np` — this build's CLI installs as `orca-np`, never the official install's `orca`).
+1. Resolve the CLI executable for this session: `ORCA_CLI_COMMAND` (normally an absolute path with spaces in it, so quote it), dev `orca-np-dev`, a relay host's own plain `orca` shim, else `orca-np`. This build's CLI installs as `orca-np`; the official install's `orca`/`orca-ide` is never the right answer.
 2. Load the full guide: `orca skills get <topic>` (or `--full` for the long guide).
 3. Prefer `--json` and do not invent flags from memory.
 

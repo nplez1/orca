@@ -19,27 +19,27 @@ handles device scoping, helper lifecycle, and worktree context.
 
 ## Resolve the CLI for this session
 
-This skill drives **Orca NP**, whose CLI installs as `orca-np`. Choose the executable once and
+This skill drives **Orca NP**, whose own CLI installs as `orca-np`. Choose the executable once and
 reuse it for every later command:
 
-- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca NP exports this for
-  the sessions it manages, normally as an absolute path to its own launcher.
+- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca NP exports this for the
+  sessions it manages, normally as an absolute path to its own launcher. Substitute it directly,
+  quoted — these paths contain spaces (`/Applications/Orca NP.app/…`, `…/Application Support/…`) —
+  with double quotes in POSIX shells, `& "…"` in PowerShell, and `"…"` in cmd.exe.
 - Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-np-dev`, the
   dev launcher the running build installed. Inside the repo, `pnpm exec orca-dev` reaches the
   same CLI.
-- Otherwise, on Linux, use `orca-ide`. Never run bare `orca` there — outside Orca's terminals it
-  normally resolves to the GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the
-  user's machine.
+- Otherwise, on an execution host served by Orca's SSH relay — where `orca-np` does not exist but a
+  plain `orca` shim does — use that `orca`: the relay deploys its own shim under the plain name.
 - Otherwise, use `orca-np`.
 
-One exception: an execution host served by Orca's SSH relay rather than the desktop app deploys a
-shim under the plain name `orca`, so use `orca` there, and only where `orca-np` does not exist.
-Everywhere else a bare `orca` is the official Orca install, which targets a different app and data
-directory — never fall through to it.
+Never use `orca-ide`, and never a bare `orca` outside that relay case: both belong to an official
+Orca install, which targets a different app and data directory. On Linux a bare `orca` is normally
+the GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the user's machine.
 
 Below, `ORCA` is a placeholder for the executable you resolved. Substitute it before
-running anything; do not create a shell variable or run `ORCA` literally. This works the
-same way in POSIX shells, PowerShell, and cmd.exe.
+running anything — quoted as above when it is a path — and do not create a shell variable or run
+`ORCA` literally. This works the same way in POSIX shells, PowerShell, and cmd.exe.
 
 If the selected executable cannot run, report its exact error and stop. Do not fall through
 to another executable, which could silently target a different Orca build.

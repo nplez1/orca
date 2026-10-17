@@ -280,11 +280,12 @@ rewrite them from the fork.
 
 **The stubs' resolver.** The shared block `<!-- shared: resolver -->` in
 `skill-stubs/_shared/cli-resolution.md` is inlined into every `skills/*/SKILL.md`. It now resolves
-`orca-np` (this build) / `orca-np-dev` (dev) / `ORCA_CLI_COMMAND`, keeps the Linux `orca-ide` rung
-and the relay-host exception so a remote shim still works, and states that a bare `orca` is the
-official install. Three guides lose an upstream equivalence that no longer holds for the same
-reason: the `orca-cli` dev-builds paragraph, the `orca-per-workspace-env` serve invocation, and
-`computer-use`'s command naming. `docs/site/content/docs/cli/skills.mdx` re-points every install
+`orca-np` (this build) / `orca-np-dev` (dev) / `ORCA_CLI_COMMAND`, drops the upstream `orca-ide`
+rung (that is the official Linux CLI), keeps a relay-host exception so the remote plain-`orca` shim
+still works, says the exported value is an absolute path that must be quoted, and states that a bare
+`orca` is the official install. Three guides lose an upstream equivalence that no longer holds for
+the same reason: the `orca-cli` dev-builds paragraph, the `orca-per-workspace-env` serve invocation,
+and `computer-use`'s command naming. `docs/site/content/docs/cli/skills.mdx` re-points every install
 command at this repository and says the CLI is `orca-np`.
 
 The identity sweep does not scan `skills/` or `skill-stubs/` (`local/sync/identity-sweep.mjs`,
@@ -320,6 +321,25 @@ owners accepted, a lookalike owner rejected), `src/cli/skills.test.ts` and
 Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
 `stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
 `github.com/stablyai/orca` share-card label — translated copy, per the rule in `local(identity)`.
+
+Two consequences to know before changing this again:
+
+- **Accepting `stablyai/orca` lets this build rewrite an official install's skills.** On a machine
+  running both apps, the update rail treats the official app's globally installed copy as its own
+  and replaces it with Orca NP's stubs. That is the intended trade — the alternative labels this
+  app's own pre-migration copies as a third party's and never updates them — but it is a takeover
+  of another install's files, not a no-op.
+- **On Windows the native launcher re-labels the exported path.** `native/windows-cli-launcher`
+  collapses any `ORCA_CLI_COMMAND` that is not exactly `orca-np` or `orca-ide` to `orca`, so the
+  CLI's own recovery/retry commands printed on Windows name `orca` even though the pane's env now
+  carries the absolute `orca-np.exe`. That rewrite is pre-existing and unchanged by this patch; the
+  export only makes the absolute-path input the normal case. Fixing it means teaching the launcher
+  to keep a path through, which is its own change.
+
+Also unverified, recorded so it is not rediscovered: the daemon decides "is this WSL" from the
+session id (`shell-launch-plan.ts`) while the main process uses its own `isWsl`, so a disagreement
+would carry a host path across `ORCA_CLI_COMMAND/u` into the guest. The WSL restore above makes the
+main-process lane correct either way; no mismatch was observed.
 
 ### `local(agents)`: the fork workflow section in `AGENTS.md`
 

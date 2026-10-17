@@ -265,12 +265,14 @@ export function buildPtyHostEnv(
 
   // Why: an inherited copy (e.g. Orca launched from a WSL pane) names another launch's CLI.
   delete baseEnv.ORCA_WSL_CLI_DIR
+  // Why: the name a managed WSL shell resolves under `ORCA_WSL_CLI_DIR`, never a host path.
+  const wslCliCommandName = opts.isPackaged ? 'orca-np' : 'orca-np-dev'
   // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so `orca` targets the live dev instance.
   if (opts.isWsl) {
     wslInteropHealthMonitor.noteActivity(opts.wslDistro ?? null)
     baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
     // Why: managed WSL registration uses `orca-np`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
-    baseEnv.ORCA_CLI_COMMAND = opts.isPackaged ? 'orca-np' : 'orca-np-dev'
+    baseEnv.ORCA_CLI_COMMAND = wslCliCommandName
     const managedCliDir = getManagedWslCliDir(opts)
     if (managedCliDir) {
       baseEnv.ORCA_WSL_CLI_DIR = managedCliDir
@@ -288,8 +290,12 @@ export function buildPtyHostEnv(
   })
   // Why: this app's skill stubs resolve the CLI from ORCA_CLI_COMMAND first, and a native PTY is
   // where an agent normally reads them; without it the ladder falls through to a bare `orca` that
-  // belongs to an official install. WSL keeps the bare name its wrappers use.
-  if (cliLauncher && !opts.isWsl) {
+  // belongs to an official install.
+  if (opts.isWsl) {
+    // Why restore after the call: a headless host's launcher hook exports a host path here, which a
+    // WSL shell cannot execute — and the wrappers resolve a bare name, not a path.
+    baseEnv.ORCA_CLI_COMMAND = wslCliCommandName
+  } else if (cliLauncher) {
     baseEnv.ORCA_CLI_COMMAND = cliLauncher
   }
 

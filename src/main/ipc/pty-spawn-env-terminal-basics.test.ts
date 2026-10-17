@@ -102,12 +102,23 @@ describe('registerPtyHandlers', () => {
     )
 
     it('exports the CLI launcher this app resolved, so the skill resolver stops at its first rung', async () => {
-      const env = await withBundledCli(() =>
-        spawnAndGetEnv({ ORCA_CLI_COMMAND: '/other-install/bin/orca' })
-      )
-      // Why: the bundled skill stubs read ORCA_CLI_COMMAND before anything else, and an inherited
-      // copy names whichever install launched this one.
-      expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
+      // Why pinned: BUNDLED_CLI_PATH is the darwin launcher, and the packaged Linux/Windows lanes
+      // resolve a different one — an unpinned test would only pass on the macOS CI host.
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      try {
+        const env = await withBundledCli(() =>
+          spawnAndGetEnv({ ORCA_CLI_COMMAND: '/other-install/bin/orca' })
+        )
+        // Why: the bundled skill stubs read ORCA_CLI_COMMAND before anything else, and an inherited
+        // copy names whichever install launched this one.
+        expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
+      }
     })
 
     it('names the dev launcher in a dev session', () => {
@@ -134,18 +145,30 @@ describe('registerPtyHandlers', () => {
     })
 
     it('keeps the bare registered name in a WSL pane, which the shell wrappers resolve by directory', () => {
-      const env = buildPtyHostEnv(
-        'wsl-cli-pane',
-        {},
-        {
-          isPackaged: true,
-          userDataPath: '/tmp/orca-user-data',
-          selectedCodexHomePath: null,
-          isWsl: true,
-          agentStatusHooksEnabled: false
-        }
-      )
-      expect(env.ORCA_CLI_COMMAND).toBe('orca-np')
+      // Why darwin with a resources root: that is the lane whose launcher would otherwise be
+      // exported, so this fails if the WSL restore is dropped rather than passing vacuously.
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      try {
+        const env = buildPtyHostEnv(
+          'wsl-cli-pane',
+          {},
+          {
+            isPackaged: true,
+            resourcesPath: '/tmp/orca-bundled-resources',
+            userDataPath: '/tmp/orca-user-data',
+            selectedCodexHomePath: null,
+            isWsl: true,
+            agentStatusHooksEnabled: false
+          }
+        )
+        expect(env.ORCA_CLI_COMMAND).toBe('orca-np')
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
+      }
     })
 
     it.each(['pi', 'omp', 'prime-agent'] as const)(
