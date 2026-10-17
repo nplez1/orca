@@ -131,14 +131,21 @@ function parseSessions(rows: readonly unknown[]): {
   sessions: AiVaultSession[]
   malformed: number
   wellFormed: number
+  /** Rows this build cannot represent, by the id they named; a delta has to drop them. */
+  rejectedIds: string[]
 } {
   const sessions: AiVaultSession[] = []
+  const rejectedIds: string[] = []
   let malformed = 0
   let wellFormed = 0
   for (const row of rows) {
     const parsed = aiVaultSessionSchema.safeParse(row)
     if (!parsed.success) {
       malformed += 1
+      const rejectedId = namedRowId(row)
+      if (rejectedId !== null) {
+        rejectedIds.push(rejectedId)
+      }
       continue
     }
     wellFormed += 1
@@ -146,7 +153,15 @@ function parseSessions(rows: readonly unknown[]): {
       sessions.push({ ...parsed.data, agent: parsed.data.agent })
     }
   }
-  return { sessions, malformed, wellFormed }
+  return { sessions, malformed, wellFormed, rejectedIds }
+}
+
+const namedRowIdSchema = z.object({ id: z.string().min(1) })
+
+/** The id an unreadable row still names, so a delta can drop it from the list it holds. */
+function namedRowId(row: unknown): string | null {
+  const parsed = namedRowIdSchema.safeParse(row)
+  return parsed.success ? parsed.data.id : null
 }
 
 export function parseAiVaultListResult(value: unknown): AiVaultListResult {
@@ -198,7 +213,13 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
       ? {
           syncDelta: {
             upserts: deltaUpserts?.sessions ?? [],
-            removedIds: envelope.data.syncDelta.removedIds
+            // Why also the rejected upsert ids: the change cannot be applied, so keeping the row
+            // this client already holds would show stale data under the new fingerprint, and the
+            // host would never send it again.
+            removedIds: [
+              ...envelope.data.syncDelta.removedIds,
+              ...(deltaUpserts?.rejectedIds ?? [])
+            ]
           }
         }
       : {})

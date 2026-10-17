@@ -116,6 +116,9 @@ describe('host leg change sync', () => {
     })
   })
 
+  // The wire parser already refuses a delta the request did not ask for, so this is the defence
+  // behind it: an in-process caller that sends a token of its own cannot be handed a delta that
+  // names a list this leg does not hold.
   it('asks again for a full listing when a delta arrives with no list to apply it to', async () => {
     const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
     scan

@@ -299,6 +299,34 @@ describe('parseAiVaultListResult paging and deltas', () => {
     )
   })
 
+  it('drops a delta row this build cannot read instead of leaving the old one in place', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'b'.repeat(64),
+      syncDelta: {
+        upserts: [
+          {
+            ...validSession('session-2'),
+            previewMessages: [{ role: 'future-role', text: 'x', timestamp: null }]
+          }
+        ],
+        removedIds: []
+      }
+    })
+
+    // Keeping the row this client already holds would show stale data under the new fingerprint,
+    // and the host would never send it again because its digest did not change.
+    expect(parsed.syncDelta).toEqual({
+      upserts: [],
+      removedIds: [validSession('session-2').id]
+    })
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
   it('rejects a reply that carries both a delta and a listing body', () => {
     expect(() =>
       parseAiVaultListResult({

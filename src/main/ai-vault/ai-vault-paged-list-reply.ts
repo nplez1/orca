@@ -29,6 +29,11 @@ export function aiVaultPagedListReply(args: {
     return { ...pageAiVaultListResult(args.result, args.offset), listToken }
   }
   const snapshot = aiVaultListSnapshot(args.result)
+  // Why before retaining: retaining the new listing can evict an older one, and the older one may
+  // be exactly the snapshot this reply is asked to diff against.
+  const previous = args.syncFromFingerprint
+    ? retainedAiVaultListDigests(args.syncFromFingerprint)
+    : null
   retainAiVaultListSnapshot(snapshot)
   if (!args.force && args.afterFingerprint === snapshot.fingerprint) {
     return {
@@ -42,7 +47,7 @@ export function aiVaultPagedListReply(args: {
   // Why force refuses the delta too: a forced refresh is the user's "show me the real list", and a
   // delta can only be applied to whatever this client holds — the held list is what they may be
   // asking to get past.
-  const delta = args.force ? null : deltaFrom(args.syncFromFingerprint, snapshot, args.result)
+  const delta = args.force ? null : deltaFrom(previous, snapshot, args.result)
   if (delta) {
     // Why not `unchanged` for a matching token: an unchanged reply means "keep the body you have",
     // and a caller that asked for a full body (a retry after a mismatch) has to receive rows.
@@ -59,9 +64,9 @@ export function aiVaultPagedListReply(args: {
 }
 
 /**
- * The listed rows in their order, as one identity. Ids are unique within a listing, so the sequence
- * names exactly which rows a page offsets into — which is what a page request needs, and nothing
- * more.
+ * Which rows a page offsets into, and in what order — the thing an offset is relative to. Ids are
+ * unique within a listing, so the sequence names the row set exactly; it does not cover a row's
+ * *content*, so a title that changes between pages slips through and is healed by the next delta.
  *
  * Why not the scan id: what a page is sliced from is the *served* list, and serving filters rows per
  * request (structured-chat ownership is read live), so one scan can back two different served
@@ -78,14 +83,10 @@ export function aiVaultListToken(result: AiVaultListResult): string {
 }
 
 function deltaFrom(
-  fingerprint: string | undefined,
+  previous: ReadonlyMap<string, string> | null,
   snapshot: AiVaultListSnapshot,
   result: AiVaultListResult
 ): AiVaultListSyncDelta | null {
-  if (fingerprint === undefined) {
-    return null
-  }
-  const previous = retainedAiVaultListDigests(fingerprint)
   return previous === null
     ? null
     : aiVaultListSyncDelta({
