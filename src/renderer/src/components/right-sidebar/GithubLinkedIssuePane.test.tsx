@@ -64,6 +64,15 @@ const linkedIssue: Extract<SupportedWorkspaceLinkedIssue, { provider: 'github' }
   title: null
 }
 
+const linkedWorkItem: Worktree['linkedWorkItem'] = {
+  provider: 'github',
+  type: 'issue',
+  number: 7,
+  title: 'Fix checkout',
+  url: 'https://github.com/acme/orca/issues/7',
+  repoId: 'repo-source'
+}
+
 const nextLinkedIssue: Extract<SupportedWorkspaceLinkedIssue, { provider: 'github' }> = {
   provider: 'github',
   number: 8,
@@ -168,5 +177,57 @@ describe('GithubLinkedIssuePane', () => {
         target: { kind: 'environment', environmentId: 'env-1' }
       })
     )
+  })
+
+  // Why: a workspace created from a task on another host lives in that project's repo there,
+  // while the issue stays in the repo the task was listed from. Reading the workspace repo
+  // looked up #97 in the other host's checkout and failed with "Couldn't load this GitHub
+  // issue" even though the link was intact.
+  it("reads the issue from the linked item's repo, not the workspace repo", async () => {
+    mocks.repoState = {
+      repos: [
+        { id: 'repo-remote', path: '/volumes/remote/repo', executionHostId: 'runtime:env-1' },
+        { id: 'repo-source', path: '/tmp/source' }
+      ],
+      settings: null
+    }
+    mocks.lookup.mockResolvedValue(item('Cross-host issue'))
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane
+          worktree={{ ...worktree, repoId: 'repo-remote', linkedWorkItem: linkedWorkItem }}
+          linkedIssue={linkedIssue}
+          sourceContext={null}
+        />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(screen.getByText('Cross-host issue')).toBeTruthy())
+    expect(mocks.lookup.mock.calls[0]?.[0]).toMatchObject({
+      repoPath: '/tmp/source',
+      repoId: 'repo-source',
+      target: { kind: 'local' }
+    })
+  })
+
+  it('falls back to the workspace repo when the item repo is not registered here', async () => {
+    mocks.lookup.mockResolvedValue(item('Same-host issue'))
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane
+          worktree={{ ...worktree, linkedWorkItem: linkedWorkItem }}
+          linkedIssue={linkedIssue}
+          sourceContext={null}
+        />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(screen.getByText('Same-host issue')).toBeTruthy())
+    expect(mocks.lookup.mock.calls[0]?.[0]).toMatchObject({
+      repoPath: '/tmp/repo',
+      repoId: 'repo-1'
+    })
   })
 })

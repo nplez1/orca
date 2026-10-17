@@ -8,7 +8,6 @@ import { useGitHubItemDialogDetails } from '@/components/github-item-dialog/load
 import { lookupGitHubWorkItemForSource } from '@/lib/github-work-item-source-lookup'
 import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
 import { useAppStore } from '@/store'
-import { projectGroupIdFromRepoId } from '../../../../shared/folder-workspace-worktree'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
@@ -35,13 +34,20 @@ type GithubPaneWorktree = Pick<
   'id' | 'repoId' | 'linkedWorkItem' | 'linkedTaskSourceContext'
 >
 
-/** Folder workspaces borrow a synthetic repo id; their real repo is the one the
- *  linked item was created from. */
-function resolveGithubRepoId(worktree: GithubPaneWorktree): string | null {
-  if (projectGroupIdFromRepoId(worktree.repoId)) {
-    return worktree.linkedWorkItem?.repoId ?? null
+/** Repo ids this issue can be read from, most authoritative first: the repo the
+ *  linked item came from, then the workspace's own repo.
+ *
+ *  They differ whenever the workspace is not in the item's repo — a task listed on
+ *  another host or project creates the workspace in that project's repo, and a
+ *  folder workspace borrows a synthetic id. The issue only exists in the item's
+ *  repo, so reading the workspace repo fails with "Couldn't load this GitHub
+ *  issue" even though the link is intact. */
+function githubPaneRepoIdCandidates(worktree: GithubPaneWorktree): string[] {
+  const itemRepoId = worktree.linkedWorkItem?.repoId
+  if (!itemRepoId || itemRepoId === worktree.repoId) {
+    return [worktree.repoId]
   }
-  return worktree.repoId
+  return [itemRepoId, worktree.repoId]
 }
 
 /** GitHub issue detail for the pane. Reuses the Task view's work-item fetch,
@@ -56,8 +62,13 @@ export function GithubLinkedIssuePane({
   sourceContext: TaskSourceContext | null
 }): React.JSX.Element {
   const repo = useAppStore((s) => {
-    const repoId = resolveGithubRepoId(worktree)
-    return repoId ? (s.repos.find((item) => item.id === repoId) ?? null) : null
+    for (const repoId of githubPaneRepoIdCandidates(worktree)) {
+      const candidate = s.repos.find((item) => item.id === repoId)
+      if (candidate) {
+        return candidate
+      }
+    }
+    return null
   })
   const linkActions = useLinkedIssuePaneActions()
   const [workItem, setWorkItem] = useState<GitHubWorkItem | null>(null)
