@@ -34,7 +34,10 @@ import {
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
 } from '../../../../shared/rpc-contract/ai-vault-params'
-import { aiVaultPagedListReply } from '../../../ai-vault/ai-vault-paged-list-reply'
+import {
+  aiVaultListToken,
+  aiVaultPagedListReply
+} from '../../../ai-vault/ai-vault-paged-list-reply'
 export { AiVaultListSessionsParams, AiVaultPrepareSessionResumeParams, AiVaultSessionTitlesParams }
 
 export const AI_VAULT_METHODS = [
@@ -132,6 +135,9 @@ export const AI_VAULT_METHODS = [
         result: stamped,
         offset: params.offset ?? 0,
         force: params.force === true,
+        // Taken before projection: the scan id is the scan's own identity, and stamping the rows
+        // for a runtime host deliberately drops it from the served body.
+        listToken: aiVaultListToken(result),
         ...(params.afterFingerprint !== undefined
           ? { afterFingerprint: params.afterFingerprint }
           : {}),

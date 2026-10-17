@@ -4,7 +4,7 @@ import type {
   AiVaultSession
 } from '../../shared/ai-vault-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
-import { sessionSortTime } from './session-scanner-accumulator'
+import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
 import { aiVaultScanLimit } from '../../shared/ai-vault-session-depth'
 
 export function aiVaultScanIssueResult(args: {
@@ -71,9 +71,7 @@ export function mergeAiVaultListResults(
     issues.push(...result.issues)
   }
   return {
-    sessions: [...byId.values()]
-      .sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
-      .slice(0, limit),
+    sessions: sortAiVaultSessionsByRecency([...byId.values()]).slice(0, limit),
     issues,
     // Why: a merge is not a new scan. Reminting here made every all-host cache
     // hit look fresh to the renderer, which only skipped apply when scannedAt
@@ -128,5 +126,5 @@ export function unionScopedSessions<T extends AiVaultSession>(
   for (const session of scopeSessions) {
     byId.set(session.id, session)
   }
-  return [...byId.values()].sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
+  return sortAiVaultSessionsByRecency([...byId.values()])
 }

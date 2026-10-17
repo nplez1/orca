@@ -6,7 +6,7 @@ import type {
 } from '../../shared/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../shared/execution-host'
 import { withSpan } from '../observability/tracer'
-import { sessionSortTime } from './session-scanner-accumulator'
+import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
 import { unionScopedSessions } from './session-list-results'
 import { ScannedSessionCollection, dedupeScannedSessions } from './session-root-dedup'
 import {
@@ -108,9 +108,9 @@ async function scanAiVaultSessionStores(options: AiVaultScanOptions): Promise<Ai
           antigravityWorkspaceResolver
         })
 
-        const cappedSessions = dedupeScannedSessions(parsedSessions)
-          .sort((left, right) => sessionSortTime(right) - sessionSortTime(left))
-          .slice(0, limit)
+        const cappedSessions = sortAiVaultSessionsByRecency(
+          dedupeScannedSessions(parsedSessions)
+        ).slice(0, limit)
 
         const scopeSessions = await scanInScopeSessions({
           discoveries,

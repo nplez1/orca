@@ -110,6 +110,7 @@ const aiVaultListResultEnvelopeSchema = z
     // A bounded page: `hasMore` without a cursor to ask for can never make progress.
     hasMore: z.literal(true).optional(),
     nextOffset: z.number().int().min(1).optional(),
+    listToken: z.string().max(128).optional(),
     syncDelta: z
       .object({ upserts: z.array(z.unknown()), removedIds: z.array(z.string()) })
       .optional()
@@ -192,6 +193,7 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     ...(envelope.data.unchanged ? { unchanged: true as const } : {}),
     ...(envelope.data.hasMore ? { hasMore: true as const } : {}),
     ...(envelope.data.nextOffset !== undefined ? { nextOffset: envelope.data.nextOffset } : {}),
+    ...(envelope.data.listToken ? { listToken: envelope.data.listToken } : {}),
     ...(envelope.data.syncDelta
       ? {
           syncDelta: {

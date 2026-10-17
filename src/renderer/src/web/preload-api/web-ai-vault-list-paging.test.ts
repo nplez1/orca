@@ -144,6 +144,24 @@ describe('web session listing pages and syncs', () => {
     expect(reused.scannedAt).toBe('2026-07-27T02:00:00.000Z')
   })
 
+  it('passes an unchanged reply through when this tab holds no list to reuse', async () => {
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: FINGERPRINT,
+      unchanged: true
+    })
+
+    const result = await createWebAiVaultApi().listSessions({
+      ...SCOPE,
+      afterFingerprint: FINGERPRINT
+    })
+
+    // The renderer treats `unchanged` as "ask again for the body", so it must not be an error.
+    expect(result).toMatchObject({ unchanged: true, sessions: [] })
+  })
+
   it('degrades a failed later page to the rows already read and retries full next time', async () => {
     callRuntimeResult
       .mockResolvedValueOnce({

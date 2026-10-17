@@ -15,6 +15,15 @@ export const AI_VAULT_LIST_MAX_PAGES = 128
 export const AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE =
   'The session list was too large to load in one go. Refresh to try again.'
 
+/** Restarts before a listing that keeps changing under the drain is reported instead of retried. */
+export const AI_VAULT_LIST_MAX_SCAN_RESTARTS = 3
+
+export const AI_VAULT_LIST_CHANGING_SCAN_MESSAGE =
+  'The session list kept changing while it loaded. Refresh to try again.'
+
+export const AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE =
+  'The session host returned a page list this client cannot follow. Refresh to try again.'
+
 export type AiVaultListPageRead =
   | { kind: 'complete'; result: AiVaultListResult }
   /** Later pages arrived; this one failed. The rows already read are still worth showing. */
@@ -66,8 +75,9 @@ export async function readAiVaultListPages(args: {
   firstPageArgs: AiVaultListArgs
   fetchPage: (pageArgs: AiVaultListArgs) => Promise<AiVaultListResult>
 }): Promise<AiVaultListPageRead> {
-  const pages: AiVaultListResult[] = []
+  let pages: AiVaultListResult[] = []
   let offset = 0
+  let restarts = 0
   for (;;) {
     let result: AiVaultListResult
     try {
@@ -75,27 +85,62 @@ export async function readAiVaultListPages(args: {
     } catch (error) {
       return pages.length === 0
         ? { kind: 'failed', error }
-        : { kind: 'partial', result: combineAiVaultListPages(pages), error }
+        : { kind: 'partial', result: partialAiVaultList(pages), error }
     }
     // An unchanged reply stands for the caller's previous body, and a delta reply carries the
     // changes to it; neither is a page of a listing.
     if (result.unchanged || result.syncDelta) {
       return { kind: 'complete', result }
     }
+    // Why: pages are row offsets, so appending one sliced from a *different* scan of the same
+    // scope both duplicates and skips rows — and a delta computed later would never re-send the
+    // skipped ones, because their digests never changed. Start the listing again instead.
+    const token = result.listToken
+    if (token !== undefined && pages.length > 0 && token !== pages[0]?.listToken) {
+      if (restarts >= AI_VAULT_LIST_MAX_SCAN_RESTARTS) {
+        return {
+          kind: 'partial',
+          result: partialAiVaultList(pages),
+          error: new Error(AI_VAULT_LIST_CHANGING_SCAN_MESSAGE)
+        }
+      }
+      restarts += 1
+      pages = []
+      offset = 0
+      continue
+    }
     pages.push(result)
     const next = aiVaultListNextOffset(result, offset)
     if (next === null) {
-      return { kind: 'complete', result: combineAiVaultListPages(pages) }
+      // Why not "the listing ends here": rows are still missing and the caller has to be told,
+      // or a bad cursor would quietly truncate the list it shows.
+      return result.hasMore === true
+        ? {
+            kind: 'partial',
+            result: partialAiVaultList(pages),
+            error: new Error(AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE)
+          }
+        : { kind: 'complete', result: combineAiVaultListPages(pages) }
     }
     if (pages.length >= AI_VAULT_LIST_MAX_PAGES) {
       return {
         kind: 'partial',
-        result: combineAiVaultListPages(pages),
+        result: partialAiVaultList(pages),
         error: new Error(AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE)
       }
     }
     offset = next
   }
+}
+
+/**
+ * Why no fingerprint: it names the whole listing, and a caller that reused it would ask "is my
+ * body current?" about rows it never received — the host then answers `unchanged` to a body that
+ * will never complete.
+ */
+function partialAiVaultList(pages: readonly AiVaultListResult[]): AiVaultListResult {
+  const { fingerprint: _fingerprint, ...rest } = combineAiVaultListPages(pages)
+  return rest
 }
 
 /** The row a reader adds when later pages failed: the rows it has stay on screen, the rest does not. */

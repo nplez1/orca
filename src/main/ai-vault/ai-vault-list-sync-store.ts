@@ -1,4 +1,8 @@
-import type { AiVaultListSyncDelta, AiVaultSession } from '../../shared/ai-vault-types'
+import type {
+  AiVaultListSyncDelta,
+  AiVaultScanIssue,
+  AiVaultSession
+} from '../../shared/ai-vault-types'
 import type { AiVaultListSnapshot } from './session-list-fingerprint'
 import { AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES } from './session-list-page-bounds'
 
@@ -8,8 +12,11 @@ import { AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES } from './session-list-page-bou
  */
 export const AI_VAULT_LIST_SYNC_RETAINED_BYTES = 16 * 1024 * 1024
 
-/** Map entry, digest and id-length bookkeeping, so the bound is not just the id+digest payload. */
-const ENTRY_OVERHEAD_BYTES = 16
+/**
+ * Map slot, two string headers and the key's own copy, so the bound covers what V8 actually
+ * retains rather than just the id and digest payload.
+ */
+const ENTRY_OVERHEAD_BYTES = 128
 
 type RetainedSnapshot = {
   digests: ReadonlyMap<string, string>
@@ -67,15 +74,18 @@ export function aiVaultListSyncDelta(args: {
   previous: ReadonlyMap<string, string>
   current: AiVaultListSnapshot
   sessions: readonly AiVaultSession[]
+  issues: readonly AiVaultScanIssue[]
 }): AiVaultListSyncDelta | null {
   const upserts = args.sessions.filter(
     (session) => args.previous.get(session.id) !== args.current.digests.get(session.id)
   )
   const removedIds = [...args.previous.keys()].filter((id) => !args.current.digests.has(id))
   const delta: AiVaultListSyncDelta = { upserts: [...upserts], removedIds }
-  return Buffer.byteLength(JSON.stringify(delta), 'utf8') > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES
-    ? null
-    : delta
+  // Why count the issues: they ride along in the same reply, so the cap has to cover them too.
+  const bytes =
+    Buffer.byteLength(JSON.stringify(delta), 'utf8') +
+    Buffer.byteLength(JSON.stringify(args.issues), 'utf8')
+  return bytes > AI_VAULT_LIST_PAGE_CONTENT_BUDGET_BYTES ? null : delta
 }
 
 export function resetAiVaultListSyncStoreForTests(): void {

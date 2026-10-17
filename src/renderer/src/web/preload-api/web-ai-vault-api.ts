@@ -35,15 +35,18 @@ import { requireActiveEnvironment } from './web-runtime-session'
 import { noopUnsubscribe } from './web-storage'
 import { translate } from '@/i18n/i18n'
 
-/** One listing identity: the same scope, depth and opt-ins is the same list. */
+/** One listing identity: the same host, scope, depth and opt-ins is the same list. */
 function browserListKey(
+  environmentId: string,
   args: AiVaultListArgs | undefined,
   requestedScope: ExecutionHostScope
 ): string {
   return JSON.stringify([
+    environmentId,
     requestedScope,
     args?.scopePaths ?? [],
     args?.limit ?? null,
+    args?.unlimited === true,
     args?.includeAntigravityIdeSessions === true
   ])
 }
@@ -77,13 +80,16 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
       if (requestedScope !== 'all' && requestedScope !== executionHostId) {
         return webAiVaultUnavailableResult(requestedScope)
       }
-      const listKey = browserListKey(args, requestedScope)
+      const listKey = browserListKey(environment.id, args, requestedScope)
       const held = browserHeldAiVaultList(listKey)
-      // Why: no local filesystem in the browser, so every history scan runs on and is stamped as the paired runtime host. The reply is drained page by page because the paired connection refuses any frame over 4 MiB, and a refresh asks for only the rows that changed.
+      // Why: no local filesystem in the browser, so every history scan runs on and is stamped as
+      // the paired runtime host. The reply is drained page by page because the paired connection
+      // refuses any frame over 4 MiB, and a refresh asks for only the rows that changed.
       const read = await readAiVaultListPages({
         firstPageArgs: {
           includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
           limit: args?.limit,
+          unlimited: args?.unlimited,
           force: args?.force,
           ...(requestedScope === executionHostId && args?.afterFingerprint !== undefined
             ? { afterFingerprint: args.afterFingerprint }
@@ -116,14 +122,24 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
           ]
         }
       }
-      if (read.result.unchanged || read.result.syncDelta) {
+      if (read.result.unchanged) {
+        // Why pass it through when the held list is gone: the renderer already treats `unchanged`
+        // as "ask again for the body", and relabelling a different list with this fingerprint would
+        // store a body under a fingerprint it does not match.
+        if (!held || held.fingerprint !== read.result.fingerprint) {
+          forgetBrowserAiVaultList(listKey)
+          return read.result
+        }
+        const reused = reusedBrowserAiVaultList(held, read.result)
+        rememberBrowserAiVaultList(listKey, reused)
+        return reused
+      }
+      if (read.result.syncDelta) {
         if (!held) {
           forgetBrowserAiVaultList(listKey)
           throw new Error('The host answered with changes to a list this client does not hold.')
         }
-        const rebuilt = read.result.unchanged
-          ? reusedBrowserAiVaultList(held, read.result)
-          : applyHeldBrowserAiVaultDelta(held, read.result)
+        const rebuilt = applyHeldBrowserAiVaultDelta(held, read.result)
         rememberBrowserAiVaultList(listKey, rebuilt)
         return rebuilt
       }

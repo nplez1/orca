@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { AiVaultListArgs, AiVaultListResult, AiVaultSession } from './ai-vault-types'
 import {
+  AI_VAULT_LIST_CHANGING_SCAN_MESSAGE,
   AI_VAULT_LIST_MAX_PAGES,
+  AI_VAULT_LIST_MAX_SCAN_RESTARTS,
   AI_VAULT_LIST_TOO_MANY_PAGES_MESSAGE,
+  AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE,
   readAiVaultListPages
 } from './ai-vault-list-pages'
 
@@ -34,11 +37,16 @@ function session(sessionId: string): AiVaultSession {
   }
 }
 
-function page(ids: readonly string[], nextOffset?: number): AiVaultListResult {
+function page(
+  ids: readonly string[],
+  nextOffset?: number,
+  listToken = 'scan-a'
+): AiVaultListResult {
   return {
     sessions: ids.map(session),
     issues: [],
     scannedAt: SCANNED_AT,
+    listToken,
     ...(nextOffset === undefined ? {} : { hasMore: true as const, nextOffset })
   }
 }
@@ -154,12 +162,13 @@ describe('readAiVaultListPages', () => {
       return
     }
     expect(read.result.sessions.map((row) => row.sessionId)).toEqual(['a', 'b'])
-    // The fingerprint still describes the whole corpus, so a later refresh can reuse it.
-    expect(read.result.fingerprint).toBe(FINGERPRINT)
+    // Why drop the fingerprint: it names the whole listing, and reusing it would let the host
+    // answer `unchanged` for rows this caller never received.
+    expect(read.result.fingerprint).toBeUndefined()
     expect(read.error).toEqual(new Error('The connection closed.'))
   })
 
-  it('stops when a host says hasMore without a usable cursor', async () => {
+  it('reports a host that says hasMore without a usable cursor instead of truncating quietly', async () => {
     const read = await readAiVaultListPages({
       firstPageArgs: FIRST_PAGE_ARGS,
       fetchPage: async () => ({
@@ -170,10 +179,80 @@ describe('readAiVaultListPages', () => {
       })
     })
 
+    expect(read.kind).toBe('partial')
+    if (read.kind !== 'partial') {
+      throw new Error('expected a partial listing')
+    }
+    expect(read.result.sessions).toHaveLength(1)
+    expect(read.error).toEqual(new Error(AI_VAULT_LIST_UNREADABLE_CURSOR_MESSAGE))
+  })
+
+  it('starts the listing again when a later page came from a different scan', async () => {
+    const requested: number[] = []
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
+        // Scan A serves page 0, then the listing is rescanned before page 1 is read.
+        if (requested.length === 1) {
+          return page(['a', 'b'], 2, 'scan-a')
+        }
+        if (requested.length === 2) {
+          return page(['c'], 3, 'scan-b')
+        }
+        return requested.length === 3
+          ? page(['a', 'b'], 2, 'scan-b')
+          : page(['c'], undefined, 'scan-b')
+      }
+    })
+
+    expect(requested).toEqual([0, 2, 0, 2])
     expect(read.kind).toBe('complete')
     if (read.kind !== 'complete') {
       throw new Error('expected a complete listing')
     }
+    // Every row in the answer belongs to scan B; scan A's page is not mixed in.
+    expect(read.result.sessions.map((row) => row.sessionId)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('reports a listing that keeps changing instead of retrying forever', async () => {
+    let token = 0
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        if ((args.offset ?? 0) === 0) {
+          token += 1
+          return page(['a'], 1, `scan-${token}`)
+        }
+        return page(['b'], undefined, `scan-${token}-other`)
+      }
+    })
+
+    expect(AI_VAULT_LIST_MAX_SCAN_RESTARTS).toBeGreaterThan(0)
+    expect(read.kind).toBe('partial')
+    if (read.kind !== 'partial') {
+      throw new Error('expected a partial listing')
+    }
+    expect(read.error).toEqual(new Error(AI_VAULT_LIST_CHANGING_SCAN_MESSAGE))
+  })
+
+  it('publishes no fingerprint with rows that are only part of a listing', async () => {
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        if ((args.offset ?? 0) === 0) {
+          return { ...page(['a'], 1), fingerprint: FINGERPRINT }
+        }
+        throw new Error('The connection closed.')
+      }
+    })
+
+    expect(read.kind).toBe('partial')
+    if (read.kind !== 'partial') {
+      throw new Error('expected a partial listing')
+    }
+    // Why: a fingerprint would make the host answer `unchanged` about rows never received.
+    expect(read.result.fingerprint).toBeUndefined()
     expect(read.result.sessions).toHaveLength(1)
   })
 

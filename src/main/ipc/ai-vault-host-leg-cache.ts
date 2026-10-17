@@ -93,8 +93,6 @@ export async function scanHostLegWithCache(args: {
   // concurrent scan must not swap it out between the request and the reply.
   const basis = hostLegSyncBasis(args.cacheKey, args.depth)
   const scanned = await args.scan(basis)
-  // A delta is only ever answered to a request that sent a token, so the basis is the list it
-  // described; anything else would mean the host diffed against a list this leg never held.
   const delta = scanned.syncDelta
   if (delta && !basis) {
     // A host diffed against a list this leg never sent; applying it would paint a list nobody holds.

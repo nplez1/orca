@@ -794,6 +794,44 @@ describe('aiVault.listSessions paging and change sync', () => {
     })
   })
 
+  it('answers a forced refresh with a full page even when the token still matches', async () => {
+    scanAiVaultSessionsInService.mockResolvedValue(listOf([makeSession()]))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    const forced = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      force: true,
+      syncFromFingerprint: first.fingerprint
+    })
+
+    // A held list is what the user may be asking to get past, so force never diffs against it.
+    expect(forced.syncDelta).toBeUndefined()
+    expect(forced.sessions).toHaveLength(1)
+  })
+
+  it('gives every page of one listing the same scan token', async () => {
+    const sessions = Array.from({ length: 3 }, (_, index) =>
+      largeSession(`sess-${index}`, 600 * 1024)
+    )
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions))
+    const dispatcher = makeDispatcher()
+    const first = await listResult(dispatcher, { paged: true, unlimited: true })
+    const second = await listResult(dispatcher, {
+      paged: true,
+      unlimited: true,
+      offset: first.nextOffset
+    })
+
+    expect(first.listToken).toBeDefined()
+    expect(second.listToken).toBe(first.listToken)
+
+    // The same scope, rescanned: the token names the scan, so it changes with it.
+    resetAiVaultSessionListCacheForTests()
+    const rescanned = await listResult(dispatcher, { paged: true, unlimited: true })
+    expect(rescanned.listToken).not.toBe(first.listToken)
+  })
+
   it('prefers a full page over a delta too large for one reply', async () => {
     const small = listOf([makeSession()])
     scanAiVaultSessionsInService.mockResolvedValue(small)
