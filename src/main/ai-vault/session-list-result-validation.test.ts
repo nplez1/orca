@@ -23,13 +23,28 @@ describe('parseAiVaultListResult', () => {
     const parsed = parseAiVaultListResult({
       sessions: [validSession(), { ...validSession('session-new'), agent: 'future-agent' }],
       issues: [],
-      scannedAt: '2026-07-27T00:00:00.000Z'
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64)
     })
 
     expect(parsed.sessions).toHaveLength(1)
     expect(parsed.sessions[0]?.agent).toBe('codex')
     expect(parsed.sessions[0]?.sessionId).toBe('session-1')
     expect(parsed.issues).toEqual([])
+    // The host's fingerprint names a body that includes the dropped row, so this body cannot
+    // claim it: the next read must be a full one, which is also what surfaces the row on upgrade.
+    expect(parsed.fingerprint).toBeUndefined()
+  })
+
+  it('keeps the fingerprint when every row was readable', () => {
+    const parsed = parseAiVaultListResult({
+      sessions: [validSession()],
+      issues: [],
+      scannedAt: '2026-07-27T00:00:00.000Z',
+      fingerprint: 'a'.repeat(64)
+    })
+
+    expect(parsed.fingerprint).toBe('a'.repeat(64))
   })
 
   it('keeps known scan issues while silently dropping unknown-agent issues', () => {
@@ -339,6 +354,32 @@ describe('parseAiVaultListResult paging and deltas', () => {
     // The held list cannot be corrected by id, so the body no longer matches this fingerprint.
     expect(parsed.syncDelta).toEqual({ upserts: [], removedIds: [] })
     expect(parsed.fingerprint).toBeUndefined()
+  })
+
+  it('counts an unreadable later page instead of failing the whole listing', () => {
+    const parsed = parseAiVaultListResult(
+      {
+        sessions: [{ id: 42 }],
+        issues: [],
+        scannedAt: '2026-07-27T00:00:00.000Z'
+      },
+      { offset: 2 }
+    )
+
+    // A page this build cannot read must cost that page's rows, not every page after it.
+    expect(parsed.sessions).toEqual([])
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 invalid') })
+    )
+  })
+
+  it('still fails the first page when every row in it is unreadable', () => {
+    expect(() =>
+      parseAiVaultListResult(
+        { sessions: [{ id: 42 }], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' },
+        { offset: 0 }
+      )
+    ).toThrow('all supplied Agent Session History sessions were invalid')
   })
 
   it('rejects a reply that carries both a delta and a listing body', () => {

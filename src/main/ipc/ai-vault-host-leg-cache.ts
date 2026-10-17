@@ -37,6 +37,12 @@ const lastFullHostLegs = new Map<
   { depth: AiVaultSessionDepth; result: AiVaultListResult }
 >()
 const LAST_FULL_HOST_LEGS_MAX = 8
+/**
+ * Rows these held lists may total, ~1.5 KB each from the scanner, so main keeps tens of megabytes
+ * rather than one 15 MB history per scope and host. A count cap alone would not bound that: every
+ * paged reply now carries a fingerprint, including an unlimited listing.
+ */
+export const LAST_FULL_HOST_LEG_MAX_ROWS = 40_000
 let expiryTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleHostLegExpiry(): void {
@@ -211,13 +217,26 @@ function rememberFullHostLeg(
   }
   lastFullHostLegs.delete(cacheKey)
   lastFullHostLegs.set(cacheKey, { depth, result })
-  for (const oldest of lastFullHostLegs.keys()) {
-    if (lastFullHostLegs.size <= LAST_FULL_HOST_LEGS_MAX) {
+  pruneHeldLists()
+  return result
+}
+
+/** Oldest first, and never the one just stored — it is the basis the next refresh diffs against. */
+function pruneHeldLists(): void {
+  let rows = 0
+  for (const entry of lastFullHostLegs.values()) {
+    rows += entry.result.sessions.length
+  }
+  for (const [cacheKey, entry] of lastFullHostLegs) {
+    if (lastFullHostLegs.size === 1) {
       break
     }
-    lastFullHostLegs.delete(oldest)
+    if (lastFullHostLegs.size <= LAST_FULL_HOST_LEGS_MAX && rows <= LAST_FULL_HOST_LEG_MAX_ROWS) {
+      break
+    }
+    lastFullHostLegs.delete(cacheKey)
+    rows -= entry.result.sessions.length
   }
-  return result
 }
 
 function pruneExpiredHostLegs(now: number): void {

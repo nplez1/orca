@@ -14,6 +14,9 @@ type HeldBrowserList = {
 /** The panel shows one list per scope; a couple of scopes are enough to keep a switch instant. */
 const MAX_HELD_LISTS = 4
 
+/** Rows those lists may total: a count cap alone would keep a whole 15 MB history per entry. */
+const MAX_HELD_ROWS = 20_000
+
 const heldLists = new Map<string, HeldBrowserList>()
 
 export function browserHeldAiVaultList(key: string): HeldBrowserList | null {
@@ -36,12 +39,19 @@ export function rememberBrowserAiVaultList(key: string, result: AiVaultListResul
     sessions: result.sessions,
     issues: result.issues
   })
-  while (heldLists.size > MAX_HELD_LISTS) {
-    const oldest = heldLists.keys().next().value
-    if (oldest === undefined) {
+  let rows = 0
+  for (const held of heldLists.values()) {
+    rows += held.sessions.length
+  }
+  for (const [key, held] of heldLists) {
+    if (heldLists.size === 1) {
       break
     }
-    heldLists.delete(oldest)
+    if (heldLists.size <= MAX_HELD_LISTS && rows <= MAX_HELD_ROWS) {
+      break
+    }
+    heldLists.delete(key)
+    rows -= held.sessions.length
   }
 }
 

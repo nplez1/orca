@@ -110,7 +110,9 @@ const aiVaultListResultEnvelopeSchema = z
     // A bounded page: `hasMore` without a cursor to ask for can never make progress.
     hasMore: z.literal(true).optional(),
     nextOffset: z.number().int().min(1).optional(),
-    listToken: z.string().max(128).optional(),
+    // Why catch: a token is a consistency hint, so a longer one from a later host drops the hint
+    // instead of failing the listing.
+    listToken: z.string().max(128).optional().catch(undefined),
     syncDelta: z
       .object({ upserts: z.array(z.unknown()), removedIds: z.array(z.string()) })
       .optional()
@@ -131,12 +133,15 @@ function parseSessions(rows: readonly unknown[]): {
   sessions: AiVaultSession[]
   malformed: number
   wellFormed: number
+  /** Rows this listing dropped — unreadable, or from an agent this build does not know. */
+  dropped: number
   /** Rows this build cannot represent, by the id they named; a delta has to drop them. */
   rejectedIds: string[]
 } {
   const sessions: AiVaultSession[] = []
   const rejectedIds: string[] = []
   let malformed = 0
+  let unknownAgent = 0
   let wellFormed = 0
   for (const row of rows) {
     const parsed = aiVaultSessionSchema.safeParse(row)
@@ -151,9 +156,11 @@ function parseSessions(rows: readonly unknown[]): {
     wellFormed += 1
     if (isAiVaultAgent(parsed.data.agent)) {
       sessions.push({ ...parsed.data, agent: parsed.data.agent })
+    } else {
+      unknownAgent += 1
     }
   }
-  return { sessions, malformed, wellFormed, rejectedIds }
+  return { sessions, malformed, wellFormed, rejectedIds, dropped: malformed + unknownAgent }
 }
 
 const namedRowIdSchema = z.object({ id: z.string().min(1) })
@@ -164,14 +171,21 @@ function namedRowId(row: unknown): string | null {
   return parsed.success ? parsed.data.id : null
 }
 
-export function parseAiVaultListResult(value: unknown): AiVaultListResult {
+export function parseAiVaultListResult(
+  value: unknown,
+  options: { offset?: number } = {}
+): AiVaultListResult {
   const envelope = aiVaultListResultEnvelopeSchema.safeParse(value)
   if (!envelope.success) {
     throw new Error(envelope.error.issues[0]?.message ?? 'unexpected result shape')
   }
   const listed = parseSessions(envelope.data.sessions)
-  if (envelope.data.sessions.length > 0 && listed.malformed > 0 && listed.wellFormed === 0) {
-    throw new Error('all supplied Agent Session History sessions were invalid')
+  // Why only the first page is refused: later pages are read one after another, and a page this
+  // build cannot read at all must cost that page's rows, not every page after it.
+  if (options.offset === undefined || options.offset === 0) {
+    if (envelope.data.sessions.length > 0 && listed.malformed > 0 && listed.wellFormed === 0) {
+      throw new Error('all supplied Agent Session History sessions were invalid')
+    }
   }
   const sessions = listed.sessions
   // A delta's rows are the same rows; one malformed row must not discard the rest of the change.
@@ -192,15 +206,13 @@ export function parseAiVaultListResult(value: unknown): AiVaultListResult {
     }
     issues.push({ ...parsed.data, agent: parsed.data.agent })
   }
-  // Why drop the fingerprint: a rejected delta row that named no id cannot be dropped from the
-  // list this client holds, so the body would no longer match the fingerprint it is stored under.
-  const deltaHidItsId = (deltaUpserts?.malformed ?? 0) > (deltaUpserts?.rejectedIds.length ?? 0)
+  // Why drop the fingerprint whenever a row was dropped: the host's fingerprint names a body that
+  // includes that row, so a client holding this one would be missing rows its fingerprint claims,
+  // and the host would never re-send them (their digest never changes). Without the fingerprint the
+  // next refresh is a full read, which is also what surfaces the row once this build can read it.
+  const droppedRows = listed.dropped + (deltaUpserts?.dropped ?? 0)
   const fingerprint =
-    envelope.data.fingerprint && !deltaHidItsId ? envelope.data.fingerprint : undefined
-  // Why a dropped row keeps the listing's fingerprint: the row is one this build cannot represent,
-  // so it is missing from every reply that carries it — the skip row states that once, and a
-  // fingerprint that changed every time would re-read the whole history on every refresh for a row
-  // that still could not be shown.
+    envelope.data.fingerprint && droppedRows === 0 ? envelope.data.fingerprint : undefined
   const invalidCount = malformedSessionCount + malformedIssueCount
   if (invalidCount > 0) {
     issues.push({

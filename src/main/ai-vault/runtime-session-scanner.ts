@@ -131,7 +131,7 @@ async function fetchRuntimeAiVaultListPage(
     throw new Error(response.error.message)
   }
   try {
-    const parsed = parseAiVaultListResult(response.result)
+    const parsed = parseAiVaultListResult(response.result, { offset: args.offset })
     if (parsed.unchanged && parsed.fingerprint !== args.afterFingerprint) {
       throw new Error('Unchanged response did not match the requested fingerprint')
     }
