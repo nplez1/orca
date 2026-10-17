@@ -14,25 +14,31 @@ keywords:
 
 Orca ships **skills** that agents install into their skill directories. Public install packages are **hybrid discovery stubs**: short `SKILL.md` files that tell the agent _when_ to engage Orca and how to load the full guide from the running CLI. Command flags live in the binary so they cannot drift from the app version.
 
+**This build is Orca NP, and its CLI is `orca-np`** (the dev launcher is `orca-np-dev`). Every
+`orca …` example below means `orca-np …`, and every install command names this build's own
+repository, [nplez1/orca](https://github.com/nplez1/orca), so a fresh install and an update
+fetch the same skill content this build bundles. A bare `orca` on the machine is the official
+Orca install, which targets a different app and data directory.
+
 ## Installable Orca skills
 
-Use `npx skills add` with the public Orca repo and the skill name. Default agent setup usually installs `orca-cli`, `computer-use`, and `orchestration`.
+Use `npx skills add` with this build's repository and the skill name. Default agent setup usually installs `orca-cli`, `computer-use`, and `orchestration`.
 
-| Skill                                               | Install                                                                                   | Use it for                                                    |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [`orca-cli`](#orca-cli)                             | `npx skills add https://github.com/stablyai/orca --skill orca-cli --global`               | Worktrees, terminals, files, automations, embedded browser.   |
-| [`orchestration`](#orchestration)                   | `npx skills add https://github.com/stablyai/orca --skill orchestration --global`          | Multi-agent Runs, tasks, supervised workers, messages, gates. |
-| [`computer-use`](#computer-use)                     | `npx skills add https://github.com/stablyai/orca --skill computer-use --global`           | Desktop apps via accessibility trees and safe UI actions.     |
-| [`orca-linear`](#orca-linear)                       | `npx skills add https://github.com/stablyai/orca --skill orca-linear --global`            | Linear ticket read/write through `orca linear`.               |
-| [`orca-emulator`](#orca-emulator)                   | `npx skills add https://github.com/stablyai/orca --skill orca-emulator --global`          | iOS Simulator control.                                        |
-| [`orca-emulator-android`](#orca-emulator-android)   | `npx skills add https://github.com/stablyai/orca --skill orca-emulator-android --global`  | Android emulator/device via adb.                              |
-| [`orca-per-workspace-env`](#orca-per-workspace-env) | `npx skills add https://github.com/stablyai/orca --skill orca-per-workspace-env --global` | Per-workspace environment recipes (`orca.yaml`).              |
+| Skill                                               | Install                                                                                 | Use it for                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`orca-cli`](#orca-cli)                             | `npx skills add https://github.com/nplez1/orca --skill orca-cli --global`               | Worktrees, terminals, files, automations, embedded browser.   |
+| [`orchestration`](#orchestration)                   | `npx skills add https://github.com/nplez1/orca --skill orchestration --global`          | Multi-agent Runs, tasks, supervised workers, messages, gates. |
+| [`computer-use`](#computer-use)                     | `npx skills add https://github.com/nplez1/orca --skill computer-use --global`           | Desktop apps via accessibility trees and safe UI actions.     |
+| [`orca-linear`](#orca-linear)                       | `npx skills add https://github.com/nplez1/orca --skill orca-linear --global`            | Linear ticket read/write through `orca linear`.               |
+| [`orca-emulator`](#orca-emulator)                   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator --global`          | iOS Simulator control.                                        |
+| [`orca-emulator-android`](#orca-emulator-android)   | `npx skills add https://github.com/nplez1/orca --skill orca-emulator-android --global`  | Android emulator/device via adb.                              |
+| [`orca-per-workspace-env`](#orca-per-workspace-env) | `npx skills add https://github.com/nplez1/orca --skill orca-per-workspace-env --global` | Per-workspace environment recipes (`orca.yaml`).              |
 
 ## Hybrid stubs vs the live guide
 
 After `npx skills add`, agents see a short stub that says:
 
-1. Resolve the CLI executable for this session (`ORCA_CLI_COMMAND`, `orca-dev`, Linux `orca-ide`, else `orca`).
+1. Resolve the CLI executable for this session (`ORCA_CLI_COMMAND`, dev `orca-np-dev`, Linux `orca-ide`, else `orca-np` — this build's CLI installs as `orca-np`, never the official install's `orca`).
 2. Load the full guide: `orca skills get <topic>` (or `--full` for the long guide).
 3. Prefer `--json` and do not invent flags from memory.
 
@@ -54,14 +60,14 @@ Add `--json` when an agent needs deterministic output for automation. `skills sh
 When Orca ships a newer skill package than the one installed globally, the app can:
 
 - Show an **update available** nudge for skills Orca installed (and **Needs attention** when a copy is out of date somewhere the updater cannot safely rewrite).
-- Open **Update skills** — list of placements and skip reasons, with a checkbox per skill. Orca's own skills start ticked; a same-named skill installed from somewhere else is marked **Not from Orca** and starts unticked. The selected skills are reinstalled headlessly (no embedded terminal) with **`npx --yes skills@1.7.2 add https://github.com/stablyai/orca/tree/<commit> --skill <name>… --global -y`**, pinned to the commit the running Orca build was made from (so it works on hourly, daily, RC and stable builds alike) and to a known skills CLI version.
+- Open **Update skills** — list of placements and skip reasons, with a checkbox per skill. Orca's own skills start ticked; a same-named skill installed from somewhere else is marked **Not from Orca** and starts unticked. The selected skills are reinstalled headlessly (no embedded terminal) with **`npx --yes skills@1.7.2 add https://github.com/nplez1/orca/tree/<commit> --skill <name>… --global -y`**, pinned to the commit the running Orca build was made from (so it works on hourly, daily, RC and stable builds alike) and to a known skills CLI version.
 - Keep the run in the **background**: closing the dialog does not cancel it. A status-bar segment shows progress (spinner while running, brief success check, persistent failure until you act). Click the segment to reopen the dialog.
 - Surface freshness on **Settings → Agents** for installed skills (global install rail), including **Details** when a row needs review.
 
 Manual equivalent (desktop Settings shows the same pinned form for the running build):
 
 ```bash
-npx skills@1.7.2 add https://github.com/stablyai/orca/tree/<commit> --skill orca-cli --skill orchestration --global
+npx skills@1.7.2 add https://github.com/nplez1/orca/tree/<commit> --skill orca-cli --skill orchestration --global
 ```
 
 On headless hosts (SSH, containers, CI, `orca serve`) with no Settings UI, use the local CLI wrappers — they resolve the same `npx` commands, add non-interactive flags, and do **not** need a running Orca runtime:
@@ -106,7 +112,7 @@ orca skills share --skill frontend --skill testing --bundle-name "Team Toolkit" 
 ## orca-cli
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orca-cli --global
+npx skills add https://github.com/nplez1/orca --skill orca-cli --global
 ```
 
 After install, load the version-matched command guide with `orca skills get orca-cli`. See [Orca CLI](/docs/cli/overview).
@@ -114,7 +120,7 @@ After install, load the version-matched command guide with `orca skills get orca
 ## orchestration
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orchestration --global
+npx skills add https://github.com/nplez1/orca --skill orchestration --global
 ```
 
 Use this when an agent should coordinate other agents through Runs, tasks, supervised workers, and decision gates. See [Orchestration](/docs/cli/orchestration). Always load `orca skills get orchestration --full` before mutating orchestration state — the legacy `orchestration run` command is retired.
@@ -122,7 +128,7 @@ Use this when an agent should coordinate other agents through Runs, tasks, super
 ## computer-use
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill computer-use --global
+npx skills add https://github.com/nplez1/orca --skill computer-use --global
 ```
 
 Use this when an agent needs to inspect and operate local desktop app windows. See [Computer use](/docs/cli/computer-use).
@@ -130,7 +136,7 @@ Use this when an agent needs to inspect and operate local desktop app windows. S
 ## orca-linear
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orca-linear --global
+npx skills add https://github.com/nplez1/orca --skill orca-linear --global
 ```
 
 Agents should load `orca skills get orca-linear` before mutating tickets. Covers `issue --full`, `save-issue`, `list-issues`, relations, completion attach+comment flow, and untrusted-ticket rules. Existing `linear-tickets` installs still resolve. See [CLI reference → Linear](/docs/cli/reference#linear).
@@ -138,7 +144,7 @@ Agents should load `orca skills get orca-linear` before mutating tickets. Covers
 ## orca-emulator
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orca-emulator --global
+npx skills add https://github.com/nplez1/orca --skill orca-emulator --global
 ```
 
 Use this when an agent should control an iOS Simulator from inside Orca through `orca emulator` commands.
@@ -146,7 +152,7 @@ Use this when an agent should control an iOS Simulator from inside Orca through 
 ## orca-emulator-android
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orca-emulator-android --global
+npx skills add https://github.com/nplez1/orca --skill orca-emulator-android --global
 ```
 
 Use for adb-connected Android AVDs/devices: list/boot, tap/swipe/type, hardware buttons, install/launch, permissions, accessibility tree, logcat. Load details with `orca skills get orca-emulator-android`.
@@ -154,7 +160,7 @@ Use for adb-connected Android AVDs/devices: list/boot, tap/swipe/type, hardware 
 ## orca-per-workspace-env
 
 ```bash
-npx skills add https://github.com/stablyai/orca --skill orca-per-workspace-env --global
+npx skills add https://github.com/nplez1/orca --skill orca-per-workspace-env --global
 ```
 
 Use when setting up or debugging per-workspace environment recipes in `orca.yaml`. See [Ways to run Orca](/docs/ways-to-run#4-cloud-vms-per-workspace-environments).

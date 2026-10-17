@@ -281,11 +281,17 @@ export function buildPtyHostEnv(
     }
     delete baseEnv.ORCA_CLI_COMMAND
   }
-  prependOrcaCliDirToChildPath(baseEnv, {
+  const cliLauncher = prependOrcaCliDirToChildPath(baseEnv, {
     isPackaged: opts.isPackaged,
     userDataPath: opts.userDataPath,
     resourcesPath: opts.resourcesPath
   })
+  // Why: this app's skill stubs resolve the CLI from ORCA_CLI_COMMAND first, and a native PTY is
+  // where an agent normally reads them; without it the ladder falls through to a bare `orca` that
+  // belongs to an official install. WSL keeps the bare name its wrappers use.
+  if (cliLauncher && !opts.isWsl) {
+    baseEnv.ORCA_CLI_COMMAND = cliLauncher
+  }
 
   if (
     opts.routeBrowserOpensToClient === true &&

@@ -7,12 +7,14 @@ import type * as CodexCliCommandModule from '../shared/node-cli-command-resoluti
 import { WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL } from '../shared/windows-batch-spawn'
 import { SKILLS_CLI_VERSION } from '../shared/agent-feature-install-commands'
 
+// Why this fork's literal: the pin below is the running build's own commit, which upstream never had.
+const SKILLS_SOURCE = 'https://github.com/nplez1/orca'
 const COMMIT = '0123456789abcdef0123456789abcdef01234567'
 const PINNED_ADD = [
   '--yes',
   `skills@${SKILLS_CLI_VERSION}`,
   'add',
-  `https://github.com/stablyai/orca/tree/${COMMIT}`
+  `${SKILLS_SOURCE}/tree/${COMMIT}`
 ]
 const DETECTED_AGENTS = ['--agent', 'claude-code', '--agent', 'universal']
 
@@ -358,7 +360,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'install', '--skill', 'alpha', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toBe(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
     expect(spawnMock).not.toHaveBeenCalled()
@@ -372,7 +374,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command: `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y`,
+          command: `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y`,
           skills: ['alpha'],
           global: true,
           executed: false
@@ -389,7 +391,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'install', '--skill', 'alpha', '--local', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toBe(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y\n\n` +
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
 
@@ -402,7 +404,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command: `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y`,
+          command: `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y`,
           skills: ['alpha'],
           global: false,
           executed: false
@@ -454,7 +456,7 @@ describe('orca skills CLI', () => {
         '--yes',
         `skills@${SKILLS_CLI_VERSION}`,
         'add',
-        `https://github.com/stablyai/orca/tree/${COMMIT}`,
+        `${SKILLS_SOURCE}/tree/${COMMIT}`,
         '--skill',
         'alpha',
         '--global',
@@ -572,7 +574,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'update', '--skill', 'legacy-alpha', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toBe(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to update now.\n'
     )
     expect(spawnMock).not.toHaveBeenCalled()
@@ -589,7 +591,7 @@ describe('orca skills CLI', () => {
     expect(stdoutText(stdoutSpy)).toBe(
       `${JSON.stringify(
         {
-          command: `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y`,
+          command: `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --agent claude-code --agent universal -y`,
           skills: ['alpha'],
           global: false,
           executed: false
@@ -800,7 +802,7 @@ describe('orca skills CLI', () => {
     const [install, update] = stdoutSpy.mock.calls.map((call) => JSON.parse(String(call[0])))
     // Why: `skills update` follows GitHub HEAD, which runs ahead of this release.
     expect(update.command).toBe(install.command)
-    expect(update.command).toContain(`add https://github.com/stablyai/orca/tree/${COMMIT}`)
+    expect(update.command).toContain(`add ${SKILLS_SOURCE}/tree/${COMMIT}`)
   })
 
   it('honours an explicit --agent list for an update', async () => {
@@ -812,7 +814,7 @@ describe('orca skills CLI', () => {
     )
 
     expect(stdoutText(stdoutSpy)).toContain(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent universal -y`
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent universal -y`
     )
   })
 
@@ -823,7 +825,7 @@ describe('orca skills CLI', () => {
     await main(['skills', 'update', '--skill', 'alpha', '--dry-run'], '/tmp/repo')
 
     expect(stdoutText(stdoutSpy)).toContain(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent universal -y`
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent universal -y`
     )
   })
 
@@ -923,7 +925,7 @@ describe('orca skills CLI', () => {
     )
 
     expect(stdoutText(stdoutSpy)).toBe(
-      `npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
+      `npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n\n` +
         'Rerun without --dry-run to install now.\n'
     )
     expect(spawnMock).not.toHaveBeenCalled()
@@ -941,7 +943,7 @@ describe('orca skills CLI', () => {
 
     // Why: stdout belongs to the child, so this record has to go to stderr.
     expect(stderrSpy).toHaveBeenCalledWith(
-      `Running: npx --yes skills@${SKILLS_CLI_VERSION} add https://github.com/stablyai/orca/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n`
+      `Running: npx --yes skills@${SKILLS_CLI_VERSION} add ${SKILLS_SOURCE}/tree/${COMMIT} --skill alpha --global --agent claude-code --agent universal -y\n`
     )
   })
 

@@ -75,7 +75,16 @@ origin/main
         └── feat/startup-worktree-hydration
 
 nplez1/main  ── this fork's own line: everything above, plus fork-only patches
+                └── nplez1/Hide-hosts
+                └── nplez1/Bundled-Skills-Target
 ```
+
+`nplez1/Bundled-Skills-Target` carries fork issue #99 plus the install half of #94: the published
+skill stubs resolve `orca-np`/`orca-np-dev` instead of a bare `orca`, managed PTYs export
+`ORCA_CLI_COMMAND`, and the install/update rail plus the freshness lock source name `nplez1/orca`
+while still recognizing `stablyai/orca`. It is fork-only by design — upstream publishes the
+upstream names — so it lives in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(skills)` and must land
+on `nplez1/main` before its content reaches any build, because the pin is the build's own commit.
 
 The three-deep chain is real, not cosmetic: `startup-worktree-hydration` needs the
 `WorktreeApi.listCached` method that `worktree-scan-cache-persistence` adds **and** a store action

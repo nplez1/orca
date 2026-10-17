@@ -6,7 +6,8 @@ const COMMIT = 'a'.repeat(40)
 
 describe('skill update round trip', () => {
   it('runs exactly the shared builder’s unattended add, pinned skills CLI included', () => {
-    expect(roundTripAddArgs('stablyai/orca', COMMIT, 'orca-cli')).toEqual(
+    // Why this fork: the builder's source is the build's own repository (local(skills)).
+    expect(roundTripAddArgs('nplez1/orca', COMMIT, 'orca-cli')).toEqual(
       buildAgentFeatureSkillInstallArgs(['orca-cli'], {
         sourceCommit: COMMIT,
         yes: true,

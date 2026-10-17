@@ -5,7 +5,7 @@ import {
   spawnMock,
   wslUncDirectoryExistsAsyncMock
 } from './pty-ipc-mock-registry'
-import { TEST_CODEX_HOME } from './pty-ipc-test-constants'
+import { TEST_CODEX_HOME, BUNDLED_CLI_PATH } from './pty-ipc-test-constants'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { __resetPersistedWindowsPathCacheForTests } from '../pty/windows-environment-path'
@@ -100,6 +100,53 @@ describe('registerPtyHandlers', () => {
         }
       }
     )
+
+    it('exports the CLI launcher this app resolved, so the skill resolver stops at its first rung', async () => {
+      const env = await withBundledCli(() =>
+        spawnAndGetEnv({ ORCA_CLI_COMMAND: '/other-install/bin/orca' })
+      )
+      // Why: the bundled skill stubs read ORCA_CLI_COMMAND before anything else, and an inherited
+      // copy names whichever install launched this one.
+      expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
+    })
+
+    it('names the dev launcher in a dev session', () => {
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      try {
+        const env = buildPtyHostEnv(
+          'dev-cli-pane',
+          {},
+          {
+            isPackaged: false,
+            userDataPath: '/tmp/orca-user-data',
+            selectedCodexHomePath: null,
+            agentStatusHooksEnabled: false
+          }
+        )
+        expect(env.ORCA_CLI_COMMAND).toBe('/tmp/orca-user-data/cli/bin/orca-np-dev')
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
+      }
+    })
+
+    it('keeps the bare registered name in a WSL pane, which the shell wrappers resolve by directory', () => {
+      const env = buildPtyHostEnv(
+        'wsl-cli-pane',
+        {},
+        {
+          isPackaged: true,
+          userDataPath: '/tmp/orca-user-data',
+          selectedCodexHomePath: null,
+          isWsl: true,
+          agentStatusHooksEnabled: false
+        }
+      )
+      expect(env.ORCA_CLI_COMMAND).toBe('orca-np')
+    })
 
     it.each(['pi', 'omp', 'prime-agent'] as const)(
       'prepares delayed %s hooks for the requested harness',

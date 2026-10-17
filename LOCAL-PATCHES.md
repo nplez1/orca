@@ -259,6 +259,68 @@ Scope: a fresh checkout of `nplez1/main` carries the skills; a worktree branched
 gets them on its next sync. The `electron` skill's runtime dependency is `@playwright/cli`
 (`npm i -g @playwright/cli`, which provides the `playwright-cli` binary).
 
+### `local(skills)`: the skill rail, the stubs and the guides name this fork
+
+Upstream publishes skill content and an install rail that both name its own repository, and the
+stubs it ships resolve a bare `orca`. On a fork build that is the wrong install: on this machine
+`orca` is the official app's CLI (its own bundle, its own data directory, its own `~/.orca`), so
+every instruction in the skill that shells out either failed or drove the wrong instance (fork
+issue #99). Four parts, one patch.
+
+**Install rail.** `ORCA_SKILLS_REPOSITORY_URL` is `https://github.com/nplez1/orca`. The rail pins
+`<repo>/tree/<ORCA_BUILD_COMMIT>`, and that commit is a commit of _this_ repository; pointed at
+upstream the pair names a commit upstream never had, which is how a fork build could re-lock a skill
+to a ref that does not exist in the repository the lock claims.
+
+**Lock ownership.** `isOrcaSkillLockSource` accepts **both** owners, `nplez1/orca` and
+`stablyai/orca`. The upstream entry is not compatibility slack: every copy installed before this
+patch is locked to `stablyai/orca`, and dropping it would relabel this app's own skills as a third
+party's same-named copies, so the review dialog would offer them as **Not from Orca** and never
+rewrite them from the fork.
+
+**The stubs' resolver.** The shared block `<!-- shared: resolver -->` in
+`skill-stubs/_shared/cli-resolution.md` is inlined into every `skills/*/SKILL.md`. It now resolves
+`orca-np` (this build) / `orca-np-dev` (dev) / `ORCA_CLI_COMMAND`, keeps the Linux `orca-ide` rung
+and the relay-host exception so a remote shim still works, and states that a bare `orca` is the
+official install. Three guides lose an upstream equivalence that no longer holds for the same
+reason: the `orca-cli` dev-builds paragraph, the `orca-per-workspace-env` serve invocation, and
+`computer-use`'s command naming. `docs/site/content/docs/cli/skills.mdx` re-points every install
+command at this repository and says the CLI is `orca-np`.
+
+The identity sweep does not scan `skills/` or `skill-stubs/` (`local/sync/identity-sweep.mjs`,
+`SCAN_ROOTS`), and its bare-`orca` rule is report-only, so a sync preserves the upstream names by
+design — this entry is the only record that the published bytes are fork-owned.
+
+**Managed sessions export the launcher.** `buildPtyHostEnv` already resolved this app's own CLI
+launcher for the child's PATH and then discarded it. It is now also exported as `ORCA_CLI_COMMAND` —
+the first rung of the resolver — so a managed session stops depending on a bare `orca` in PATH. The
+WSL lane keeps the bare registered name its shell wrappers resolve against `ORCA_WSL_CLI_DIR`, and
+an inherited value is still dropped first.
+
+Anchors: `src/shared/agent-feature-install-commands.ts` (`ORCA_SKILLS_REPOSITORY_URL`),
+`src/shared/skill-freshness.ts` (`ORCA_SKILL_LOCK_SOURCES`), `skill-stubs/_shared/cli-resolution.md`,
+`skill-guides/orca-cli.md`, `skill-guides/orca-per-workspace-env.md`,
+`skill-guides/computer-use.md`, `docs/site/content/docs/cli/skills.mdx`, and
+`src/main/ipc/pty/host-env/assembly.ts` (`buildPtyHostEnv`, at the
+`prependOrcaCliDirToChildPath` call).
+
+Generated from those sources, so never edited directly: `skills/*/SKILL.md` and
+`src/cli/bundled-skill-guides.ts` (`pnpm run generate:bundled-skill-guides`), and
+`resources/skills/current-manifest.json` (`pnpm run generate:skill-bundle-manifest`).
+
+Tests that go red if a sync restores upstream's names: `src/shared/agent-feature-install-commands.test.ts`
+(the literal fork URL and the pinned-commit pair), `src/shared/skill-freshness.test.ts` (both lock
+owners accepted, a lookalike owner rejected), `src/cli/skills.test.ts` and
+`src/main/skills/skill-update-run.test.ts` (the executed rail), and
+`src/main/ipc/pty-spawn-env-terminal-basics.test.ts` plus
+`src/main/ipc/pty-daemon-spawn-agent-home-env.test.ts` (packaged / dev / WSL `ORCA_CLI_COMMAND`).
+`pnpm lint` gates the generated content through `verify:bundled-skill-guides` and
+`verify:skill-bundle-manifest`, so a hand-edited stub or a stale manifest fails there.
+
+Not covered, deliberately: `~/.agents/.skill-lock.json` on an existing machine still records
+`stablyai/orca` until the next update rewrites it, and `src/renderer/src/i18n/locales/*.json` keep a
+`github.com/stablyai/orca` share-card label — translated copy, per the rule in `local(identity)`.
+
 ### `local(agents)`: the fork workflow section in `AGENTS.md`
 
 Anchors: the `# Fork workflow` section appended at the end of `AGENTS.md`, headed
