@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   AI_VAULT_AGENTS,
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
+  isAiVaultScanCancelledError,
   type AiVaultListArgs,
   type AiVaultListResult,
   type AiVaultSession
@@ -29,7 +30,10 @@ export type RuntimeAiVaultHostInfo = {
 }
 
 export type RuntimeAiVaultScanOptions = {
+  /** One page's request bound. */
   timeoutMs?: number
+  /** The whole drain's bound, so a paged listing gets more than one reply's worth of time. */
+  drainTimeoutMs?: number
   /** Stops the page drain when the caller cancels; each page request carries it too. */
   signal?: AbortSignal
 }
@@ -90,7 +94,9 @@ export async function scanRuntimeAiVaultSessions(
   }
   const result = withRuntimeExecutionHost(read.result, executionHostId)
   const issues = [...result.issues]
-  if (read.kind === 'partial') {
+  // Why not for a cancelled read: the caller left, so an "only part loaded" row would report its
+  // own cancellation as a failure. Its rows are dropped by that caller in any case.
+  if (read.kind === 'partial' && !isAiVaultScanCancelledError(read.error)) {
     // Why: the rows already read stay on screen; only the rest is missing, and Refresh retries it.
     issues.push(
       aiVaultPartialListIssue({ executionHostId, path: environmentId, error: read.error })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AiVaultListArgs, AiVaultListResult, AiVaultSession } from './ai-vault-types'
 import {
   AI_VAULT_LIST_CHANGING_SCAN_MESSAGE,
@@ -292,27 +292,42 @@ describe('readAiVaultListPages', () => {
     if (read.kind !== 'partial') {
       throw new Error('expected a partial listing')
     }
-    // A cancelled read is not a partial download to report; the rows are dropped either way.
+    // The caller left, so the rows it read are not offered as a fingerprint-bearing body; callers
+    // that race the signal (the desktop leg) discard this result entirely.
     expect(read.result.sessions).toHaveLength(1)
     expect(read.result.fingerprint).toBeUndefined()
   })
 
-  it('stops at its deadline instead of holding a merge open for more pages', async () => {
-    const requested: number[] = []
-    const read = await readAiVaultListPages({
-      firstPageArgs: FIRST_PAGE_ARGS,
-      deadlineMs: 0,
-      fetchPage: async (args) => {
-        requested.push(args.offset ?? -1)
-        return page(['a'], 1)
-      }
-    })
+  it('stops at its deadline and reports the rows it already read', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    try {
+      const requested: number[] = []
+      const read = await readAiVaultListPages({
+        firstPageArgs: FIRST_PAGE_ARGS,
+        deadlineMs: 1_000,
+        fetchPage: async (args) => {
+          requested.push(args.offset ?? -1)
+          // The first page arrives before the deadline; the second would start after it.
+          vi.setSystemTime(2_000)
+          return page(['a'], 1)
+        }
+      })
 
-    expect(requested).toEqual([])
-    expect(read).toMatchObject({ kind: 'failed', error: new Error(AI_VAULT_LIST_DEADLINE_MESSAGE) })
+      expect(requested).toEqual([0])
+      expect(read.kind).toBe('partial')
+      if (read.kind !== 'partial') {
+        throw new Error('expected a partial listing')
+      }
+      expect(read.result.sessions).toHaveLength(1)
+      expect(read.result.fingerprint).toBeUndefined()
+      expect(read.error).toEqual(new Error(AI_VAULT_LIST_DEADLINE_MESSAGE))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('does not re-force the host when it restarts a listing', async () => {
+  it('drops force and both fingerprints when it restarts a listing', async () => {
     const requests: AiVaultListArgs[] = []
     await readAiVaultListPages({
       firstPageArgs: FIRST_PAGE_ARGS,
@@ -328,9 +343,16 @@ describe('readAiVaultListPages', () => {
       }
     })
 
-    expect(requests[0]).toMatchObject({ force: true })
-    // A restart only needs page 0 of a fresh listing; forcing it would rescan the host again.
+    expect(requests[0]).toMatchObject({
+      force: true,
+      afterFingerprint: FINGERPRINT,
+      syncFromFingerprint: FINGERPRINT
+    })
+    // Why all three: the restart is the fresh listing a forced refresh wanted, and any fingerprint
+    // would let it answer `unchanged` or a delta instead of the rows.
     expect(requests[2]).not.toHaveProperty('force')
+    expect(requests[2]).not.toHaveProperty('afterFingerprint')
+    expect(requests[2]).not.toHaveProperty('syncFromFingerprint')
   })
 
   it('reports a listing that keeps changing instead of retrying forever', async () => {

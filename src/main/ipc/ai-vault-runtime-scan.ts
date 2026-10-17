@@ -16,6 +16,7 @@ export type RuntimeAiVaultHostInfo = {
 
 export type RuntimeAiVaultScanOptions = {
   timeoutMs?: number
+  drainTimeoutMs?: number
   signal?: AbortSignal
 }
 

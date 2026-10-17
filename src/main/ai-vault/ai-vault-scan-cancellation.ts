@@ -7,9 +7,9 @@ export function throwIfAiVaultScanCancelled(signal?: AbortSignal): void {
   throw createAiVaultScanCancelledError()
 }
 
-// Why: the runtime RPC transport has no abort hook, so cancellation can only
-// stop the caller waiting on it — the in-flight request settles on its own
-// timeout instead of holding an 'all'-scope merge open after every waiter left.
+// Why: the caller must not keep waiting for a leg whose every waiter left. The
+// signal also reaches the transport (the page drain aborts its request), and
+// this race is what stops the 'all'-scope merge from being held by it.
 export function abandonRemoteSessionScanOnCancel<T>(
   promise: Promise<T>,
   signal?: AbortSignal

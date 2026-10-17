@@ -129,9 +129,15 @@ export async function readAiVaultListPages(args: {
       restarts += 1
       pages = []
       offset = 0
-      // Why drop force: the restart only needs page 0 of a fresh listing, and a forced page 0
-      // would rescan the host's whole home again for one click.
-      const { force: _force, ...restarted } = pageArgs
+      // Why drop all three: a restart only needs page 0 of a fresh listing. Re-forcing would
+      // rescan the host for one click, and keeping the fingerprints would let the restart answer
+      // `unchanged` or a delta — exactly what a forced refresh exists to get past.
+      const {
+        force: _force,
+        afterFingerprint: _fingerprint,
+        syncFromFingerprint: _sync,
+        ...restarted
+      } = pageArgs
       pageArgs = restarted
       continue
     }

@@ -197,6 +197,36 @@ describe('listAiVaultSessions change sync wiring', () => {
     )
   })
 
+  it('lets the all-hosts view sync from the list the single-host view loaded', async () => {
+    registerAiVaultHandlers({
+      getActiveRuntimeAiVaultHostInfos: () => [
+        { environmentId: 'env-1', executionHostId: 'runtime:env-1' }
+      ],
+      scanRuntimeAiVaultSessions: mocks.scanRuntimeAiVaultSessions
+    })
+    mocks.scanRuntimeAiVaultSessions.mockResolvedValue({
+      ...result([session('runtime:env-1', 'env-session')]),
+      fingerprint
+    })
+
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'runtime:env-1',
+      scopePaths: ['/repo'],
+      force: true
+    })
+    await _internals.listAiVaultSessions({
+      executionHostScope: 'all',
+      scopePaths: ['/repo'],
+      force: true
+    })
+
+    // Why this matters: a 15 MB listing cannot finish inside one leg's drain budget, so the
+    // all-hosts row could only ever be partial unless it diffs against a list already loaded.
+    expect(mocks.scanRuntimeAiVaultSessions.mock.calls[1]?.[1]?.syncFromFingerprint).toBe(
+      fingerprint
+    )
+  })
+
   it('keeps the held list when a host answers with a host issue', async () => {
     registerAiVaultHandlers({
       getActiveRuntimeAiVaultHostInfos: () => [],

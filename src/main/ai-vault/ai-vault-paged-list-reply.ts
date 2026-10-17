@@ -6,6 +6,7 @@ import {
   aiVaultListSyncDelta
 } from './ai-vault-list-sync-store'
 import { aiVaultListSnapshot, type AiVaultListSnapshot } from './session-list-fingerprint'
+import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
 import { pageAiVaultListResult } from './session-list-page-bounds'
 
 /**
@@ -22,13 +23,20 @@ export function aiVaultPagedListReply(args: {
   afterFingerprint?: string | null
   syncFromFingerprint?: string
 }): AiVaultListResult {
-  const listToken = aiVaultListToken(args.result)
+  // Why re-sort the served rows: the scanner sorts before this host stamps ids, and the client
+  // re-sorts the stamped ones after applying a delta — one comparator over the stamped rows is
+  // what keeps a full listing and a synced one in the same order.
+  const served: AiVaultListResult = {
+    ...args.result,
+    sessions: sortAiVaultSessionsByRecency(args.result.sessions)
+  }
+  const listToken = aiVaultListToken(served)
   if (args.offset > 0) {
     // A later page is a different body: it answers no fingerprint question, and the client keeps
     // the fingerprint page 0 carried.
-    return { ...pageAiVaultListResult(args.result, args.offset), listToken }
+    return { ...pageAiVaultListResult(served, args.offset), listToken }
   }
-  const snapshot = aiVaultListSnapshot(args.result)
+  const snapshot = aiVaultListSnapshot(served)
   // Why before retaining: retaining the new listing can evict an older one, and the older one may
   // be exactly the snapshot this reply is asked to diff against.
   const previous = args.syncFromFingerprint
@@ -47,7 +55,7 @@ export function aiVaultPagedListReply(args: {
   // Why force refuses the delta too: a forced refresh is the user's "show me the real list", and a
   // delta can only be applied to whatever this client holds — the held list is what they may be
   // asking to get past.
-  const delta = args.force ? null : deltaFrom(previous, snapshot, args.result)
+  const delta = args.force ? null : deltaFrom(previous, snapshot, served)
   if (delta) {
     // Why not `unchanged` for a matching token: an unchanged reply means "keep the body you have",
     // and a caller that asked for a full body (a retry after a mismatch) has to receive rows.
@@ -59,7 +67,7 @@ export function aiVaultPagedListReply(args: {
       syncDelta: delta
     }
   }
-  const page = pageAiVaultListResult(args.result, args.offset)
+  const page = pageAiVaultListResult(served, args.offset)
   return { ...page, fingerprint: snapshot.fingerprint, listToken }
 }
 

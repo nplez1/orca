@@ -54,7 +54,14 @@ function hostReply(
 function legArgs(
   scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
 ) {
-  return { cacheKey: 'leg', depth: 'unlimited' as const, force: true, hostLabel: 'env-1', scan }
+  return {
+    cacheKey: 'leg',
+    depth: 'unlimited' as const,
+    force: true,
+    hostLabel: 'env-1',
+    syncBasisKey: 'leg|runtime:env-1',
+    scan
+  }
 }
 
 afterEach(() => {
@@ -73,9 +80,19 @@ describe('a host reply applied by the desktop leg', () => {
     expect(first.fingerprint).toMatch(/^[0-9a-f]{64}$/)
 
     const changed = [session('one'), session('two', 'renamed'), session('three')]
-    const syncedScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) =>
-      hostReply(changed, syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {})
+    let sentDelta = false
+    const syncedScan = async (syncFrom: AiVaultHostLegSyncBasis | undefined) => {
+      const reply = hostReply(
+        changed,
+        syncFrom ? { syncFromFingerprint: syncFrom.fingerprint } : {}
+      )
+      sentDelta ||= reply.syncDelta !== undefined
+      return reply
+    }
     const second = await scanHostLegWithCache(legArgs(syncedScan))
+
+    // The host really answered with a diff, not with the whole list.
+    expect(sentDelta).toBe(true)
 
     // The host answered with two upserts and no removals; the leg rebuilt the whole list from them.
     expect(second.sessions.map((row) => row.sessionId)).toEqual(['one', 'three', 'two'])

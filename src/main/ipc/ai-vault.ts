@@ -44,9 +44,9 @@ import {
 import {
   invalidateAiVaultHostLegCache,
   resetAiVaultHostLegCacheForTests,
-  scanHostLegWithCache,
-  type AiVaultHostLegSyncBasis
+  scanHostLegWithCache
 } from './ai-vault-host-leg-cache'
+import { aiVaultLegScopeKey, legListArgs } from './ai-vault-leg-request'
 import { requestedAiVaultSessionDepth } from '../../shared/ai-vault-session-depth'
 import type {
   AiVaultSessionTitlesArgs,
@@ -122,6 +122,8 @@ async function listAiVaultSessions(
         force: args?.force === true,
         afterFingerprint,
         hostLabel: executionHostScope,
+        // The same string the all-hosts view uses for this host, so the two views share a basis.
+        syncBasisKey: aiVaultLegScopeKey(args, executionHostScope),
         // Why always overwrite: a token the caller supplied itself names a list this leg never
         // sent, and letting it through would hand back a delta there is no basis to apply.
         scan: (syncFrom) =>
@@ -134,17 +136,6 @@ async function listAiVaultSessions(
       })
     }
   })
-}
-
-// Why both fields are per leg: the merged 'all' result has no single fingerprint, but each host's
-// own held list still lets that leg answer with a delta.
-function legListArgs(
-  args: AiVaultListArgs | undefined,
-  syncFrom: AiVaultHostLegSyncBasis | undefined
-): AiVaultListArgs | undefined {
-  return args
-    ? { ...args, afterFingerprint: undefined, syncFromFingerprint: syncFrom?.fingerprint }
-    : undefined
 }
 
 async function scanAiVaultSessionsByHostScope(
@@ -170,6 +161,7 @@ async function scanAiVaultSessionsByHostScope(
           scopePaths,
           force: args?.force === true,
           hostLabel: hostInfo.executionHostId,
+          syncBasisKey: aiVaultLegScopeKey(args, hostInfo.executionHostId),
           scan: (syncFrom) =>
             scanRuntimeAiVaultSessions({
               hostInfo,
@@ -177,7 +169,8 @@ async function scanAiVaultSessionsByHostScope(
               listArgs: legListArgs(args, syncFrom),
               options: {
                 signal,
-                timeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScan
+                timeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScan,
+                drainTimeoutMs: AI_VAULT_ALL_HOST_TIMEOUT_MS.runtimeScanDrain
               }
             })
         })

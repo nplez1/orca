@@ -75,6 +75,12 @@ export async function scanHostLegWithCache(args: {
   afterFingerprint?: string | null
   /** The host this leg addresses; names it in an issue row this module has to author itself. */
   hostLabel: string
+  /**
+   * Identity of the listing this leg holds, independent of which view asked for it: the all-hosts
+   * view must be able to sync from the list the single-host view already loaded, or a large
+   * history could never finish loading within its own drain budget.
+   */
+  syncBasisKey: string
   /** Receives the basis to sync from, or undefined when this leg holds no full list yet. */
   scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
 }): Promise<AiVaultListResult> {
@@ -93,7 +99,7 @@ export async function scanHostLegWithCache(args: {
   }
   // Why capture rather than look up afterwards: the basis is what the delta is applied to, and a
   // concurrent scan must not swap it out between the request and the reply.
-  const basis = hostLegSyncBasis(args.cacheKey, args.depth)
+  const basis = hostLegSyncBasis(args.syncBasisKey, args.depth)
   const scanned = await scanWithSyncBasis(args, basis)
   const delta = scanned.syncDelta
   const result = delta && basis ? withAppliedDelta(basis.sessions, delta, scanned) : scanned
@@ -123,7 +129,7 @@ export async function scanHostLegWithCache(args: {
   }
   cachedHostLegs.set(args.cacheKey, {
     depth: args.depth,
-    result: rememberFullHostLeg(args.cacheKey, args.depth, result),
+    result: rememberFullHostLeg(args.syncBasisKey, args.depth, result),
     expiresAt: Date.now() + AI_VAULT_CACHE_TTL_MS
   })
   scheduleHostLegExpiry()

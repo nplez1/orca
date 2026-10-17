@@ -67,6 +67,7 @@ describe('host leg change sync', () => {
       depth: 'unlimited' as const,
       force: false,
       hostLabel: 'runtime:env-1',
+      syncBasisKey: 'leg|runtime:env-1',
       scan
     }
 
@@ -103,6 +104,7 @@ describe('host leg change sync', () => {
       depth: 'unlimited' as const,
       force: false,
       hostLabel: 'runtime:env-1',
+      syncBasisKey: 'leg|runtime:env-1',
       scan
     }
     await scanHostLegWithCache(args)
@@ -148,6 +150,7 @@ describe('host leg change sync', () => {
       depth: 'unlimited',
       force: false,
       hostLabel: 'runtime:env-1',
+      syncBasisKey: 'leg|runtime:env-1',
       scan
     })
 
