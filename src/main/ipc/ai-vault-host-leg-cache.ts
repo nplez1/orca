@@ -81,6 +81,8 @@ export type AiVaultHostLegSyncBasis = {
  * next open while its healthy neighbours stay cached. */
 export async function scanHostLegWithCache(args: {
   cacheKey: string
+  /** The key an unbounded leg is stored under: it answers every scope at every depth. */
+  unboundedCacheKey?: string
   depth: AiVaultSessionDepth
   scopePaths?: readonly string[]
   force: boolean
@@ -98,7 +100,12 @@ export async function scanHostLegWithCache(args: {
 }): Promise<AiVaultListResult> {
   const now = Date.now()
   const startGeneration = cacheGeneration
-  const cached = cachedHostLegs.get(args.cacheKey)
+  const own = cachedHostLegs.get(args.cacheKey)
+  const unbounded =
+    own === undefined && args.unboundedCacheKey !== undefined
+      ? cachedHostLegs.get(args.unboundedCacheKey)
+      : undefined
+  const cached = own ?? (unbounded?.depth === 'unlimited' ? unbounded : undefined)
   if (
     !args.force &&
     cached &&

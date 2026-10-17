@@ -4,6 +4,7 @@ import {
   type ExecutionHostScope
 } from '../../../../shared/execution-host'
 import type { AiVaultSessionLimit } from './ai-vault-session-limit'
+import { aiVaultSessionKeyScopePaths } from './ai-vault-session-limit'
 import {
   aiVaultSessionResultCacheKey,
   cacheAiVaultSessionResult,
@@ -27,7 +28,7 @@ export function aiVaultSessionListArgs(
     includeAntigravityIdeSessions: true,
     limit: request.sessionLimit === 'unlimited' ? undefined : request.sessionLimit,
     unlimited: request.sessionLimit === 'unlimited',
-    scopePaths: request.scopePaths,
+    scopePaths: aiVaultSessionKeyScopePaths(request.scopePaths, request.sessionLimit),
     executionHostScope: request.executionHostScope,
     force: options.force,
     requestToken: options.requestToken,
@@ -42,6 +43,13 @@ export function readCachedAiVaultSessionList(
     key: aiVaultSessionResultCacheKey(
       request.executionHostScope,
       request.scopePaths,
+      request.sessionLimit,
+      request.query
+    ),
+    unboundedKey: aiVaultSessionResultCacheKey(
+      request.executionHostScope,
+      [],
+      'unlimited',
       request.query
     ),
     limit: request.sessionLimit,
@@ -55,9 +63,12 @@ export function cacheAiVaultSessionList(
   options: { replaceHostEntries: boolean }
 ): void {
   cacheAiVaultSessionResult({
+    // The key normalizes the scope for the depth itself, so the same project switch
+    // writes and reads one entry at Unlimited.
     key: aiVaultSessionResultCacheKey(
       request.executionHostScope,
       request.scopePaths,
+      request.sessionLimit,
       request.query
     ),
     executionHostScope: request.executionHostScope,

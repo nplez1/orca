@@ -78,6 +78,10 @@ export function useLinkedIssuePaneActions(): LinkedIssuePaneActions {
     }
     // Why the dialog rather than an inline field: a Jira link needs a site lookup
     // that resolves the issue's title and URL, and that editor already owns it.
+    // Why the workspace repo and not the created-from item's repo: the editor writes a bare
+    // number into `linkedIssue`, which displaces the item, and the pane then reads that number
+    // in the workspace repo — where this picker listed it. Scoping the picker anywhere else
+    // would offer numbers from a repo the link no longer names.
     openModal('edit-meta', {
       worktreeId: worktree.id,
       // Why: the same workspace ID can exist under two hosts, so pin the dialog

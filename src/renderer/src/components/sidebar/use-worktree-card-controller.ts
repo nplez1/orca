@@ -30,6 +30,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     deleteState: foundation.deleteState,
     branch: review.branch,
     issueEntry: review.issueEntry,
+    issueRepoIsOffDevice: review.issueRepoIsOffDevice,
     linearIssueEntry: review.linearIssueEntry,
     linearIssueFallbackEntry: review.linearIssueFallbackEntry,
     prDisplay: review.prDisplay
@@ -63,6 +64,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
   useWorktreeCardLifecycleEffects({
     worktree,
     repo,
+    issueRepo: review.issueRepo,
     isFolder: review.isFolder,
     hostedReviewCacheKey: review.hostedReviewCacheKey,
     cachedBranchFallbackGitHubPRNumber: review.cachedBranchFallbackGitHubPRNumber,

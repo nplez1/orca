@@ -13,6 +13,7 @@ type ReviewDetails = ReturnType<typeof useWorktreeCardReviewDetails>
 export function useWorktreeCardLifecycleEffects({
   worktree,
   repo,
+  issueRepo,
   isFolder,
   hostedReviewCacheKey,
   cachedBranchFallbackGitHubPRNumber,
@@ -36,6 +37,7 @@ export function useWorktreeCardLifecycleEffects({
   Pick<
     ReviewDetails,
     | 'isFolder'
+    | 'issueRepo'
     | 'hostedReviewCacheKey'
     | 'cachedBranchFallbackGitHubPRNumber'
     | 'linkedGitLabMR'
@@ -113,7 +115,7 @@ export function useWorktreeCardLifecycleEffects({
     // Why: per-card decoration lookups from the browser flood the RPC path at paired-web startup; the host is authoritative.
     if (
       isWebClient() ||
-      !repo ||
+      !issueRepo ||
       isFolder ||
       !worktree.linkedIssue ||
       !issueCacheKey ||
@@ -126,10 +128,10 @@ export function useWorktreeCardLifecycleEffects({
 
     // Why: fallback poll behind activity triggers; stopped while hidden to avoid waking idle workspaces.
     return installWindowVisibilityInterval({
-      run: () => void fetchIssue(repo.path, issueNumber, { repoId: repo.id }),
+      run: () => void fetchIssue(issueRepo.path, issueNumber, { repoId: issueRepo.id }),
       intervalMs: 5 * 60_000
     })
-  }, [repo, isFolder, worktree.linkedIssue, fetchIssue, issueCacheKey, showIssue])
+  }, [issueRepo, isFolder, worktree.linkedIssue, fetchIssue, issueCacheKey, showIssue])
 
   useEffect(() => {
     if (
@@ -137,19 +139,19 @@ export function useWorktreeCardLifecycleEffects({
       !hoverDetailsOpen ||
       showIssue ||
       isWebClient() ||
-      !repo ||
+      !issueRepo ||
       isFolder ||
       !worktree.linkedIssue ||
       !issueCacheKey
     ) {
       return
     }
-    void fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })
+    void fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
   }, [
     newCardStyle,
     hoverDetailsOpen,
     showIssue,
-    repo,
+    issueRepo,
     isFolder,
     worktree.linkedIssue,
     fetchIssue,

@@ -103,7 +103,7 @@ export function useAiVaultSessionRefresh(
   const mountedRef = useRef(true)
   const publicationGateRef = useRef<AiVaultSessionPublicationGate>(undefined!)
   publicationGateRef.current ??= new AiVaultSessionPublicationGate()
-  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, hostQuery)}\n${sessionLimit}`
+  const scanScopeKey = `${aiVaultSessionResultCacheKey(executionHostScope, scopePaths, sessionLimit, hostQuery)}\n${sessionLimit}`
   const scopePathsRef = useRef<readonly string[]>(scopePaths)
   scopePathsRef.current = scopePaths
   const hostQueryRef = useRef(hostQuery)
@@ -120,6 +120,7 @@ export function useAiVaultSessionRefresh(
       `${aiVaultSessionResultCacheKey(
         executionHostScopeRef.current,
         scopePathsRef.current,
+        sessionLimitRef.current,
         hostQueryRef.current
       )}\n${sessionLimitRef.current}`,
     []
@@ -128,11 +129,6 @@ export function useAiVaultSessionRefresh(
     async (args: AiVaultRefreshArgs = {}): Promise<void> => {
       const hostScope = executionHostScopeRef.current
       const selectedLimit = sessionLimitRef.current
-      const baseKey = aiVaultSessionResultCacheKey(
-        hostScope,
-        scopePathsRef.current,
-        hostQueryRef.current
-      )
       const cachedResult =
         args.reuseLoadedDepth === true
           ? readCachedAiVaultSessionList({
@@ -143,7 +139,7 @@ export function useAiVaultSessionRefresh(
             })
           : null
       if (cachedResult) {
-        const scanKey = `${baseKey}\n${selectedLimit}`
+        const scanKey = currentScanScopeKey()
         lastAppliedScanRef.current = { scopeKey: scanKey, scannedAt: cachedResult.scannedAt }
         setError(null)
         publicationGateRef.current.publish(cachedResult, (published) => {
@@ -180,7 +176,7 @@ export function useAiVaultSessionRefresh(
         setLoading(true)
       }
       setError(null)
-      const scanKey = `${baseKey}\n${selectedLimit}`
+      const scanKey = currentScanScopeKey()
       const request = {
         scopePaths: scopePathsRef.current,
         executionHostScope: hostScope,

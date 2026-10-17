@@ -181,6 +181,22 @@ describe('mergeAiVaultListResults', () => {
     expect(merged.sessions).toHaveLength(1001)
   })
 
+  // Each leg answers with its scope's rows beside its own page, so the cap the
+  // merge applies cannot be the one place that drops them again.
+  it("keeps a scope's sessions beside the newest page when the merge caps", () => {
+    const sessions = [3, 4, 5].map((index) => ({ ...session(index), cwd: '/repo/other' }))
+    const scoped = { ...session(0), cwd: '/repo/app' }
+    const legs = [{ ...listResult([]), sessions: [...sessions, scoped] }]
+
+    expect(mergeAiVaultListResults(legs, 2).sessions.map((row) => row.id)).toEqual([
+      'session-5',
+      'session-4'
+    ])
+    expect(
+      mergeAiVaultListResults(legs, 2, false, ['/repo/app']).sessions.map((row) => row.id)
+    ).toEqual(['session-5', 'session-4', 'session-0'])
+  })
+
   it('keeps one scope notice per host rather than collapsing them', () => {
     const otherHost: AiVaultScanIssue = { ...SCOPE_TRUNCATION, executionHostId: 'ssh:build-box' }
 

@@ -158,16 +158,17 @@ export class SessionScannerServiceSearch {
         executionHostId: options.executionHostId ?? LOCAL_EXECUTION_HOST_ID,
         ...(query ? { query } : {})
       })?.sessions ?? null
-    const listed = read(scopePaths)
-    if (listed === null) {
+    // The unscoped page comes first: a scope widens it, never replaces it, and an
+    // unbounded page already holds every scope's rows.
+    const unbounded = !Number.isFinite(limit)
+    const capped = read([])
+    if (capped === null) {
       return null
     }
-    // An unbounded read already holds every scope's rows, so the scope pass would
-    // re-read a subset of the same table.
-    const capped = scopePaths.length > 0 && Number.isFinite(limit) ? read([]) : null
-    // The same union the scanner answers with, so a scoped view of the index
-    // cannot be the one listing source that hides everything outside its scope.
-    const sessions = unionScopedSessions(capped ?? [], listed)
+    // The union the scanner applies. The second read shares the first's turn, so a null
+    // here cannot differ from it.
+    const scopeSessions = scopePaths.length > 0 && !unbounded ? (read(scopePaths) ?? []) : []
+    const sessions = unionScopedSessions(capped, scopeSessions)
     return {
       sessions: sessions.map(withCachedPreviews),
       issues: [],

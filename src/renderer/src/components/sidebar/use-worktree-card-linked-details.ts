@@ -22,6 +22,7 @@ export function useWorktreeCardLinkedDetails({
   deleteState,
   branch,
   issueEntry,
+  issueRepoIsOffDevice,
   linearIssueEntry,
   linearIssueFallbackEntry,
   prDisplay
@@ -29,12 +30,21 @@ export function useWorktreeCardLinkedDetails({
   Pick<Foundation, 'newCardStyle' | 'deleteState'> &
   Pick<
     ReviewDetails,
-    'branch' | 'issueEntry' | 'linearIssueEntry' | 'linearIssueFallbackEntry' | 'prDisplay'
+    | 'branch'
+    | 'issueEntry'
+    | 'issueRepoIsOffDevice'
+    | 'linearIssueEntry'
+    | 'linearIssueFallbackEntry'
+    | 'prDisplay'
   >) {
   const issue: IssueInfo | null | undefined = worktree.linkedIssue
-    ? issueEntry !== undefined
-      ? issueEntry.data
-      : undefined
+    ? // Why: a link whose repo is not on this device has no entry and never will, so it must
+      // settle as unavailable instead of spinning on a fetch that cannot be made.
+      issueRepoIsOffDevice
+      ? null
+      : issueEntry !== undefined
+        ? issueEntry.data
+        : undefined
     : null
   const issueDisplay: WorktreeCardIssueDisplay | null =
     issue ??

@@ -5,7 +5,10 @@ import type {
 } from '../../shared/ai-vault-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
-import { aiVaultScanLimit } from '../../shared/ai-vault-session-depth'
+import {
+  requestedAiVaultSessionDepth,
+  truncateAiVaultListResult
+} from '../../shared/ai-vault-session-depth'
 
 export function aiVaultScanIssueResult(args: {
   executionHostId?: ExecutionHostId
@@ -59,9 +62,9 @@ export function restampAiVaultListResult(
 export function mergeAiVaultListResults(
   results: readonly AiVaultListResult[],
   rawLimit: number | undefined,
-  unlimited = false
+  unlimited = false,
+  scopePaths: readonly string[] = []
 ): AiVaultListResult {
-  const limit = aiVaultScanLimit({ limit: rawLimit, unlimited })
   const byId = new Map<string, AiVaultSession>()
   const issues: AiVaultScanIssue[] = []
   for (const result of results) {
@@ -70,14 +73,22 @@ export function mergeAiVaultListResults(
     }
     issues.push(...result.issues)
   }
-  return {
-    sessions: sortAiVaultSessionsByRecency([...byId.values()]).slice(0, limit),
-    issues,
-    // Why: a merge is not a new scan. Reminting here made every all-host cache
-    // hit look fresh to the renderer, which only skipped apply when scannedAt
-    // matched. Keep the latest input stamp so identical legs stay a no-op.
-    scannedAt: latestAiVaultScannedAt(results)
-  }
+  // A scope path is a guarantee every leg already honoured, so the cap must not be
+  // the one place that drops its own sessions: the shared truncation keeps the
+  // newest page and the scope's rows beside it, exactly as one host's list does.
+  return truncateAiVaultListResult(
+    {
+      // Recency order with the shared id tiebreak, so a merged list sorts like one host's.
+      sessions: sortAiVaultSessionsByRecency([...byId.values()]),
+      issues,
+      // Why: a merge is not a new scan. Reminting here made every all-host cache
+      // hit look fresh to the renderer, which only skipped apply when scannedAt
+      // matched. Keep the latest input stamp so identical legs stay a no-op.
+      scannedAt: latestAiVaultScannedAt(results)
+    },
+    requestedAiVaultSessionDepth({ limit: rawLimit, unlimited }),
+    scopePaths
+  )
 }
 
 function latestAiVaultScannedAt(results: readonly AiVaultListResult[]): string {

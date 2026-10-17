@@ -1,4 +1,5 @@
 import type { AiVaultListArgs } from '../../shared/ai-vault-types'
+import { aiVaultAppliedScopePaths } from '../../shared/ai-vault-session-depth'
 import type { AiVaultHostLegSyncBasis } from './ai-vault-host-leg-cache'
 
 /**
@@ -8,7 +9,9 @@ import type { AiVaultHostLegSyncBasis } from './ai-vault-host-leg-cache'
  */
 export function aiVaultLegScopeKey(args: AiVaultListArgs | undefined, hostId: string): string {
   return JSON.stringify({
-    scopePaths: [...new Set(args?.scopePaths ?? [])].sort(),
+    // Why the applied paths: under no bound the answer holds every scope, so keying on the scope
+    // would split one basis into one per project — and switching project would re-download it.
+    scopePaths: [...new Set(aiVaultAppliedScopePaths(args) ?? [])].sort(),
     includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions === true,
     hostId
   })

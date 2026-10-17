@@ -297,6 +297,10 @@ it('answers the list from the index once a pass has completed', async () => {
 it('answers null until a pass has completed, then answers even with no sessions', async () => {
   const { service } = await openListService()
 
+  // A scoped request is gated the same way: an index that cannot answer at all sends
+  // the caller to the scanner rather than to the scope's rows.
+  expect(await service.listSessions(listOptions({ scopePaths: ['/work/app'] }), false)).toBeNull()
+
   // `apply()` queues the first sweep and that sweep reads the filesystem, so
   // nothing can have completed in this turn.
   expect(await service.listSessions(listOptions(), false)).toBeNull()
@@ -345,11 +349,12 @@ it('maps the scan depth onto the index bound and reads the capped page beside th
   const calls = (): unknown[] => args.mock.calls.map(([call]) => call)
 
   await service.listSessions(listOptions({ limit: 3, scopePaths: ['/work/app'] }), false)
-  // Two reads: the scope's own rows, then the capped page every list starts
-  // from, which the scope is added to rather than replaced with.
+  // Two reads: the capped page every list starts from, then the scope's own rows
+  // beside it — the scope is added to the cap, never put in its place. The first
+  // is the unscoped one because it decides null, which falls back to the scanner.
   expect(calls()).toEqual([
-    { limit: 3, scopePaths: ['/work/app'], executionHostId: LOCAL_EXECUTION_HOST_ID },
-    { limit: 3, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID }
+    { limit: 3, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID },
+    { limit: 3, scopePaths: ['/work/app'], executionHostId: LOCAL_EXECUTION_HOST_ID }
   ])
 
   args.mockClear()
@@ -360,15 +365,11 @@ it('maps the scan depth onto the index bound and reads the capped page beside th
   ])
 
   args.mockClear()
-  // Under no bound the scoped read already holds every scope; asking again for
-  // the whole table would be the same rows a second time.
+  // No second read: an unbounded read is the whole table, so the scope's rows are
+  // already in it.
   await service.listSessions(listOptions({ unlimited: true, scopePaths: ['/work/app'] }), false)
   expect(calls()).toEqual([
-    {
-      limit: Number.POSITIVE_INFINITY,
-      scopePaths: ['/work/app'],
-      executionHostId: LOCAL_EXECUTION_HOST_ID
-    }
+    { limit: Number.POSITIVE_INFINITY, scopePaths: [], executionHostId: LOCAL_EXECUTION_HOST_ID }
   ])
 })
 

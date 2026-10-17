@@ -13,6 +13,7 @@ import type {
   AiVaultSessionTitlesResult
 } from '../../../../shared/ai-vault-session-title'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../../shared/ai-vault-types'
+import { aiVaultAppliedScopePaths } from '../../../../shared/ai-vault-session-depth'
 import {
   aiVaultPartialListIssue,
   readAiVaultListPages
@@ -89,12 +90,15 @@ export function createWebAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault'
         firstPageArgs: {
           includeAntigravityIdeSessions: args?.includeAntigravityIdeSessions,
           limit: args?.limit,
+          // Why: the host applies the depth, so a browser that drops it here serves the host's
+          // default cap however the panel's depth is set.
+          unlimited: args?.unlimited,
           force: args?.force,
           ...(requestedScope === executionHostId && args?.afterFingerprint !== undefined
             ? { afterFingerprint: args.afterFingerprint }
             : {}),
           ...(held ? { syncFromFingerprint: held.fingerprint } : {}),
-          scopePaths: args?.scopePaths
+          scopePaths: aiVaultAppliedScopePaths(args)
         },
         fetchPage: (pageArgs) =>
           callRuntimeResult<AiVaultListResult>('aiVault.listSessions', {
