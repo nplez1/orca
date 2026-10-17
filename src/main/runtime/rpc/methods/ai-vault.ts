@@ -34,10 +34,7 @@ import {
   AiVaultPrepareSessionResumeParams,
   AiVaultSessionTitlesParams
 } from '../../../../shared/rpc-contract/ai-vault-params'
-import {
-  aiVaultListToken,
-  aiVaultPagedListReply
-} from '../../../ai-vault/ai-vault-paged-list-reply'
+import { aiVaultPagedListReply } from '../../../ai-vault/ai-vault-paged-list-reply'
 export { AiVaultListSessionsParams, AiVaultPrepareSessionResumeParams, AiVaultSessionTitlesParams }
 
 export const AI_VAULT_METHODS = [
@@ -122,8 +119,7 @@ export const AI_VAULT_METHODS = [
       const stamped = params.executionHostId
         ? restampAiVaultListResult(projected, params.executionHostId)
         : projected
-      // A page past the first is a different body, so a fingerprint comparison there would
-      // answer "unchanged" for rows the caller has never seen.
+      // A client that predates paging gets exactly today's reply, fingerprints and all.
       if (params.paged !== true) {
         return conditionalAiVaultListResult(
           stamped,
@@ -135,9 +131,6 @@ export const AI_VAULT_METHODS = [
         result: stamped,
         offset: params.offset ?? 0,
         force: params.force === true,
-        // Taken before projection: the scan id is the scan's own identity, and stamping the rows
-        // for a runtime host deliberately drops it from the served body.
-        listToken: aiVaultListToken(result),
         ...(params.afterFingerprint !== undefined
           ? { afterFingerprint: params.afterFingerprint }
           : {}),

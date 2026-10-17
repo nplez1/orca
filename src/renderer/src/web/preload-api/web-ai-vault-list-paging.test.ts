@@ -121,6 +121,41 @@ describe('web session listing pages and syncs', () => {
     expect(synced.fingerprint).toBe('b'.repeat(64))
   })
 
+  it('replaces the held list on a forced refresh instead of diffing against it', async () => {
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [session('a')],
+      issues: [],
+      scannedAt: SCANNED_AT,
+      fingerprint: FINGERPRINT
+    })
+    const api = createWebAiVaultApi()
+    await api.listSessions({ ...SCOPE })
+
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [session('b')],
+      issues: [],
+      scannedAt: '2026-07-27T03:00:00.000Z',
+      fingerprint: 'd'.repeat(64)
+    })
+    const forced = await api.listSessions({ ...SCOPE, force: true })
+
+    // The host answers a forced request with a full listing, and the held list becomes that body.
+    expect(forced.sessions.map((row) => row.sessionId)).toEqual(['b'])
+
+    callRuntimeResult.mockResolvedValueOnce({
+      sessions: [],
+      issues: [],
+      scannedAt: '2026-07-27T04:00:00.000Z',
+      fingerprint: 'd'.repeat(64),
+      syncDelta: { upserts: [], removedIds: [] }
+    })
+    await api.listSessions({ ...SCOPE })
+    expect(callRuntimeResult).toHaveBeenLastCalledWith(
+      'aiVault.listSessions',
+      expect.objectContaining({ syncFromFingerprint: 'd'.repeat(64) })
+    )
+  })
+
   it('reuses the held body for an unchanged reply', async () => {
     callRuntimeResult.mockResolvedValueOnce({
       sessions: [session('a')],

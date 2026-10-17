@@ -92,12 +92,13 @@ export async function scanHostLegWithCache(args: {
   // Why capture rather than look up afterwards: the basis is what the delta is applied to, and a
   // concurrent scan must not swap it out between the request and the reply.
   const basis = hostLegSyncBasis(args.cacheKey, args.depth)
-  const scanned = await args.scan(basis)
-  const delta = scanned.syncDelta
-  if (delta && !basis) {
-    // A host diffed against a list this leg never sent; applying it would paint a list nobody holds.
-    throw new Error('The session host answered with changes this computer does not hold.')
+  let scanned = await args.scan(basis)
+  if (scanned.syncDelta && !basis) {
+    // Why re-ask instead of failing: under the 'all' scope a throw here would reject the merged
+    // Promise.all and take every other host's list down with it, so the leg recovers instead.
+    scanned = await args.scan(undefined)
   }
+  const delta = scanned.syncDelta
   const result = delta && basis ? withAppliedDelta(basis.sessions, delta, scanned) : scanned
   // A delete's invalidation landed while this leg was scanning; caching a
   // pre-delete result would resurrect the deleted session for the TTL.

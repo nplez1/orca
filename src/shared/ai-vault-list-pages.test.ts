@@ -215,6 +215,64 @@ describe('readAiVaultListPages', () => {
     expect(read.result.sessions.map((row) => row.sessionId)).toEqual(['a', 'b', 'c'])
   })
 
+  it('restarts onto a delta and lets the caller apply it to its own list', async () => {
+    const requested: number[] = []
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
+        if (requested.length === 1) {
+          return page(['a', 'b'], 2, 'scan-a')
+        }
+        if (requested.length === 2) {
+          return page(['c'], 3, 'scan-b')
+        }
+        // The restarted page 0 comes back as the host's diff against the fingerprint sent.
+        return {
+          sessions: [],
+          issues: [],
+          scannedAt: SCANNED_AT,
+          fingerprint: FINGERPRINT,
+          syncDelta: { upserts: [session('a')], removedIds: [] }
+        }
+      }
+    })
+
+    expect(requested).toEqual([0, 2, 0])
+    expect(read.kind).toBe('complete')
+    if (read.kind !== 'complete') {
+      throw new Error('expected a complete read')
+    }
+    expect(read.result.syncDelta?.upserts).toHaveLength(1)
+    expect(read.result.sessions).toEqual([])
+  })
+
+  it('restarts onto an unchanged reply and passes it through', async () => {
+    const requested: number[] = []
+    const read = await readAiVaultListPages({
+      firstPageArgs: FIRST_PAGE_ARGS,
+      fetchPage: async (args) => {
+        requested.push(args.offset ?? -1)
+        if (requested.length === 1) {
+          return page(['a', 'b'], 2, 'scan-a')
+        }
+        if (requested.length === 2) {
+          return page(['c'], 3, 'scan-b')
+        }
+        return {
+          sessions: [],
+          issues: [],
+          scannedAt: SCANNED_AT,
+          fingerprint: FINGERPRINT,
+          unchanged: true
+        }
+      }
+    })
+
+    expect(requested).toEqual([0, 2, 0])
+    expect(read).toMatchObject({ kind: 'complete', result: { unchanged: true } })
+  })
+
   it('reports a listing that keeps changing instead of retrying forever', async () => {
     let token = 0
     const read = await readAiVaultListPages({

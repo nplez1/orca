@@ -810,7 +810,7 @@ describe('aiVault.listSessions paging and change sync', () => {
     expect(forced.sessions).toHaveLength(1)
   })
 
-  it('gives every page of one listing the same scan token', async () => {
+  it('names the served rows with the page token, across pages and across rescans', async () => {
     const sessions = Array.from({ length: 3 }, (_, index) =>
       largeSession(`sess-${index}`, 600 * 1024)
     )
@@ -823,13 +823,20 @@ describe('aiVault.listSessions paging and change sync', () => {
       offset: first.nextOffset
     })
 
-    expect(first.listToken).toBeDefined()
+    expect(first.listToken).toMatch(/^[0-9a-f]{64}$/)
     expect(second.listToken).toBe(first.listToken)
 
-    // The same scope, rescanned: the token names the scan, so it changes with it.
+    // Why a rescan must keep the token: a drain slower than the host's scan cache outlives it, and
+    // restarting on an unchanged rescan would leave a long history unable to finish loading.
     resetAiVaultSessionListCacheForTests()
     const rescanned = await listResult(dispatcher, { paged: true, unlimited: true })
-    expect(rescanned.listToken).not.toBe(first.listToken)
+    expect(rescanned.listToken).toBe(first.listToken)
+
+    // A served row that is gone is a different list, so its pages cannot be mixed.
+    resetAiVaultSessionListCacheForTests()
+    scanAiVaultSessionsInService.mockResolvedValue(listOf(sessions.slice(0, 2)))
+    const shrunk = await listResult(dispatcher, { paged: true, unlimited: true })
+    expect(shrunk.listToken).not.toBe(first.listToken)
   })
 
   it('prefers a full page over a delta too large for one reply', async () => {

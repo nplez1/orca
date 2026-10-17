@@ -116,18 +116,28 @@ describe('host leg change sync', () => {
     })
   })
 
-  it('refuses a delta it never gave the host a list to diff against', async () => {
+  it('asks again for a full listing when a delta arrives with no list to apply it to', async () => {
     const scan = vi.fn<(basis: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>>()
-    scan.mockResolvedValueOnce({
-      sessions: [],
-      issues: [],
-      scannedAt: SCANNED_AT,
-      fingerprint: SECOND_FINGERPRINT,
-      syncDelta: { upserts: [session('two')], removedIds: [] }
+    scan
+      .mockResolvedValueOnce({
+        sessions: [],
+        issues: [],
+        scannedAt: SCANNED_AT,
+        fingerprint: SECOND_FINGERPRINT,
+        syncDelta: { upserts: [session('two')], removedIds: [] }
+      })
+      .mockResolvedValueOnce(listing([session('one'), session('two')], SECOND_FINGERPRINT))
+
+    const result = await scanHostLegWithCache({
+      cacheKey: 'leg',
+      depth: 'unlimited',
+      force: false,
+      scan
     })
 
-    await expect(
-      scanHostLegWithCache({ cacheKey: 'leg', depth: 'unlimited', force: false, scan })
-    ).rejects.toThrow('does not hold')
+    // Why retry rather than fail: under 'all', a throw here would take every host's list down.
+    expect(scan).toHaveBeenNthCalledWith(1, undefined)
+    expect(scan).toHaveBeenNthCalledWith(2, undefined)
+    expect(result.sessions.map((row) => row.sessionId)).toEqual(['one', 'two'])
   })
 })

@@ -265,8 +265,8 @@ export type AiVaultListResult = {
   /** Rows already returned, to send back as `offset` for the next page. */
   nextOffset?: number
   /**
-   * Identity of the scan a page came from. Every page of one listing must repeat it: a page from a
-   * different scan cannot be appended to the pages already read.
+   * Identity of the listed rows and their order. Every page of one listing must repeat it: a page
+   * sliced from a different list cannot be appended to the pages already read.
    */
   listToken?: string
   /** Only what changed since `syncFromFingerprint`; apply it to the list the caller already holds. */

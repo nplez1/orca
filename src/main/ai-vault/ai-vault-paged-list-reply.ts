@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { AiVaultListResult, AiVaultListSyncDelta } from '../../shared/ai-vault-types'
 import {
   retainAiVaultListSnapshot,
@@ -18,12 +19,10 @@ export function aiVaultPagedListReply(args: {
   result: AiVaultListResult
   offset: number
   force: boolean
-  /** Identity of the scan being sliced; see `aiVaultListToken`. */
-  listToken: string
   afterFingerprint?: string | null
   syncFromFingerprint?: string
 }): AiVaultListResult {
-  const listToken = args.listToken
+  const listToken = aiVaultListToken(args.result)
   if (args.offset > 0) {
     // A later page is a different body: it answers no fingerprint question, and the client keeps
     // the fingerprint page 0 carried.
@@ -60,15 +59,22 @@ export function aiVaultPagedListReply(args: {
 }
 
 /**
- * The scan a page was sliced from. Its rows and their order are fixed by that scan, so two pages
- * sharing this token are slices of one list and a different token means the listing moved.
+ * The listed rows in their order, as one identity. Ids are unique within a listing, so the sequence
+ * names exactly which rows a page offsets into — which is what a page request needs, and nothing
+ * more.
  *
- * Why the scan id: a rescan is what changes the rows behind an offset, and the scanner mints a new
- * id for every scan it runs. The timestamp and count are the fallback for a result that carries
- * none (a caller that did not go through the shared scan cache).
+ * Why not the scan id: what a page is sliced from is the *served* list, and serving filters rows per
+ * request (structured-chat ownership is read live), so one scan can back two different served
+ * lists. Why ids and not the row digests: an unchanged rescan must keep the same token or a drain
+ * slower than the host's scan cache could never finish, and hashing ids is cheap enough to repeat on
+ * every page.
  */
 export function aiVaultListToken(result: AiVaultListResult): string {
-  return result.scanId ?? `${result.scannedAt}\u0000${result.sessions.length}`
+  const hash = createHash('sha256')
+  for (const session of result.sessions) {
+    hash.update(session.id).update('\n')
+  }
+  return hash.digest('hex')
 }
 
 function deltaFrom(
