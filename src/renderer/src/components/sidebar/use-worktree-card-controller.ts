@@ -63,6 +63,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
   useWorktreeCardLifecycleEffects({
     worktree,
     repo,
+    issueRepo: review.issueRepo,
     isFolder: review.isFolder,
     hostedReviewCacheKey: review.hostedReviewCacheKey,
     cachedBranchFallbackGitHubPRNumber: review.cachedBranchFallbackGitHubPRNumber,

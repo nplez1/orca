@@ -8,7 +8,7 @@ export function IssuePaneMessage({
   providerLabel,
   onRetry
 }: {
-  kind: 'loading' | 'unavailable' | 'none'
+  kind: 'loading' | 'unavailable' | 'repoOffDevice' | 'none'
   providerLabel?: string
   onRetry?: () => void
 }): React.JSX.Element {
@@ -36,6 +36,20 @@ export function IssuePaneMessage({
             {translate('auto.components.right.sidebar.IssuePane.retry', 'Retry')}
           </Button>
         ) : null}
+      </div>
+    )
+  }
+
+  if (kind === 'repoOffDevice') {
+    return (
+      <div className="flex flex-1 flex-col items-start gap-3 p-4">
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'auto.components.right.sidebar.IssuePane.repoOffDevice',
+            "The repo this {{value0}} issue lives in isn't set up on this device.",
+            { value0: providerLabel ?? '' }
+          )}
+        </p>
       </div>
     )
   }

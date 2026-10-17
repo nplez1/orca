@@ -6,6 +6,7 @@ import { rightSidebarShowsPullRequestData } from '@/lib/right-sidebar-visibility
 import { issueCacheKey } from './cache-identity'
 import { CACHE_TTL } from './cache-policy'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
+import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 
 export const createStaleWorktreeRefreshActions = (
   get: Parameters<StateCreator<AppState>>[1]
@@ -44,19 +45,23 @@ export const createStaleWorktreeRefreshActions = (
     }
 
     if ((state.worktreeCardProperties ?? []).includes('issue') && worktree.linkedIssue) {
-      const ownerSettings = settingsForGitHubRepoOwner(state.settings, repo)
-      const issueKey = issueCacheKey(
-        repo.path,
-        repo.id,
-        worktree.linkedIssue,
-        ownerSettings,
-        repo.connectionId,
-        repo.executionHostId,
-        true
-      )
-      const issueEntry = state.issueCache[issueKey]
-      if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
-        void get().fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })
+      // Why the link's repo rather than the workspace row: see `linked-issue-repo.ts`.
+      const issueRepo = findLinkedIssueRepo(state.repos, worktree, worktree.linkedIssue)
+      if (issueRepo) {
+        const ownerSettings = settingsForGitHubRepoOwner(state.settings, issueRepo)
+        const issueKey = issueCacheKey(
+          issueRepo.path,
+          issueRepo.id,
+          worktree.linkedIssue,
+          ownerSettings,
+          issueRepo.connectionId,
+          issueRepo.executionHostId,
+          true
+        )
+        const issueEntry = state.issueCache[issueKey]
+        if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
+          void get().fetchIssue(issueRepo.path, worktree.linkedIssue, { repoId: issueRepo.id })
+        }
       }
     }
   }

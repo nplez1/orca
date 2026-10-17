@@ -5,6 +5,7 @@ import { getWorkspaceAttachmentSourceContext } from './workspace-attachment-sour
 import { getWorkspaceReferenceLinearWorkspaceId } from './workspace-reference-details'
 import { getWorktreeGitIdentityDisplay } from '../../../../shared/worktree/git-identity-display'
 import { useAppStore } from '@/store'
+import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
 import { issueCacheKey as getIssueCacheKey } from '@/store/github/cache-identity'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
@@ -49,6 +50,15 @@ export function useWorktreeCardReviewDetails({
     ? hasPathIdentityEnabled && Boolean(folderPathIdentityDisplay)
     : isFolder
   const hostedReviewExactKey = getDetachedWorkspaceReviewRequest(worktree, repo)?.key
+  // Why the link's repo rather than the workspace's: a workspace created from a task on
+  // another host lives in that project's repo, while the issue stays where the task was
+  // listed — the same disagreement that left the Issue pane unreadable. The pane, this key
+  // and the refresh sweeps all resolve it through one helper so the card cannot show a state
+  // the pane contradicts. `repo` stays the workspace row: the PR/checks surfaces below are
+  // about this workspace's own git repo, not about its issue.
+  const issueRepo = useAppStore((s) =>
+    worktree.linkedIssue ? findLinkedIssueRepo(s.repos, worktree, worktree.linkedIssue) : null
+  )
   const hostedReviewCacheKey =
     hostedReviewExactKey ??
     (repo && branch
@@ -75,14 +85,14 @@ export function useWorktreeCardReviewDetails({
         )
       : ''
   const issueCacheKey =
-    repo && worktree.linkedIssue
+    issueRepo && worktree.linkedIssue
       ? getIssueCacheKey(
-          repo.path,
-          repo.id,
+          issueRepo.path,
+          issueRepo.id,
           worktree.linkedIssue,
           settings,
-          repo.connectionId,
-          repo.executionHostId,
+          issueRepo.connectionId,
+          issueRepo.executionHostId,
           true
         )
       : ''
@@ -206,6 +216,7 @@ export function useWorktreeCardReviewDetails({
     showIdentityInNewCard,
     folderMetaRowContent,
     hostedReviewCacheKey,
+    issueRepo,
     issueCacheKey,
     issueEntry,
     linearIssueEntry,

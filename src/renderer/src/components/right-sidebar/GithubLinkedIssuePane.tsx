@@ -7,6 +7,7 @@ import { IssueCommentThread, type IssueCommentView } from './IssueCommentThread'
 import { useGitHubItemDialogDetails } from '@/components/github-item-dialog/load-item-details/use-github-item-dialog-details'
 import { lookupGitHubWorkItemForSource } from '@/lib/github-work-item-source-lookup'
 import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
+import { findLinkedIssueRepo, linkedIssueRepoIsOffDevice } from '@/lib/linked-issue-repo'
 import { useAppStore } from '@/store'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { Worktree } from '../../../../shared/worktree/types'
@@ -29,32 +30,24 @@ function githubCommentView(comment: PRComment): IssueCommentView {
   }
 }
 
-type GithubPaneWorktree = Pick<
-  Worktree,
-  'id' | 'repoId' | 'linkedWorkItem' | 'linkedTaskSourceContext'
->
+type GithubPaneWorktree = Pick<Worktree, 'repoId' | 'linkedWorkItem'>
 
-/** The repo this issue's number belongs to.
+/**
+ * Task-source context to pass alongside this repo row, or null.
  *
- *  A workspace is not always in its issue's repo: a task listed on one host creates the
- *  workspace in the target project's repo on another, and a folder workspace borrows a
- *  synthetic repo id. The issue only exists in the repo the item came from, so reading it
- *  from the workspace repo asked the other host for a repo it does not have and rendered
- *  "Couldn't load this GitHub issue" over a link that was intact.
- *
- *  Two things keep that from becoming a new way to read the wrong issue. The item's repo is
- *  borrowed only when the item *is* the link: `linkedIssue` and `linkedWorkItem` are separate
- *  slots and the former wins, so the pane can show an issue the item does not describe (a PR,
- *  a Linear task, a different number) — that item's repo is not this number's repo. And when
- *  the item's repo is not registered on this device there is no fallback: the workspace repo
- *  would resolve the same number against a different project and show an unrelated issue,
- *  which is worse than the unavailable state it renders instead. */
-function githubPaneRepoId(worktree: GithubPaneWorktree, issueNumber: number): string {
-  const item = worktree.linkedWorkItem
-  if (item?.provider !== 'github' || item.type !== 'issue' || item.number !== issueNumber) {
-    return worktree.repoId
-  }
-  return item.repoId ?? worktree.repoId
+ * The row names the repo path, the repo id and the transport for this read. A source context
+ * that names a different repo is the workspace's creation record, not this link's repo — it
+ * only re-introduces the disagreement that made the pane unreadable (the host is asked for a
+ * repo id only this device has). When it names the same repo it is consistent, and passing it
+ * keeps whatever account the read was created under.
+ */
+function readSourceContext(
+  sourceContext: TaskSourceContext | null,
+  repoId: string
+): TaskSourceContext | null {
+  return sourceContext?.provider === 'github' && sourceContext.repoId === repoId
+    ? sourceContext
+    : null
 }
 
 /** GitHub issue detail for the pane. Reuses the Task view's work-item fetch,
@@ -68,10 +61,13 @@ export function GithubLinkedIssuePane({
   linkedIssue: GithubLinked
   sourceContext: TaskSourceContext | null
 }): React.JSX.Element {
-  const repo = useAppStore((s) => {
-    const repoId = githubPaneRepoId(worktree, linkedIssue.number)
-    return s.repos.find((item) => item.id === repoId) ?? null
-  })
+  const repo = useAppStore((s) => findLinkedIssueRepo(s.repos, worktree, linkedIssue.number))
+  // Why a distinct state: the link names a repo this device does not have, which is a setup
+  // problem, not a failed request — retrying the same read cannot fix it.
+  const repoIsOffDevice = useAppStore((s) =>
+    linkedIssueRepoIsOffDevice(s.repos, worktree, linkedIssue.number)
+  )
+  const scopedSourceContext = repo ? readSourceContext(sourceContext, repo.id) : null
   const linkActions = useLinkedIssuePaneActions()
   const [workItem, setWorkItem] = useState<GitHubWorkItem | null>(null)
   const [loading, setLoading] = useState(false)
@@ -90,8 +86,8 @@ export function GithubLinkedIssuePane({
       repoId: repo.id,
       // Why the repo's owner: the link this pane renders can carry no task-source context, and
       // the source-context fallback would read a runtime-owned repo on this app's IPC instead.
-      target: getGitHubRepoRoutingTarget(useAppStore.getState(), repo.id, sourceContext),
-      sourceContext,
+      target: getGitHubRepoRoutingTarget(useAppStore.getState(), repo.id, scopedSourceContext),
+      sourceContext: scopedSourceContext,
       number: linkedIssue.number,
       type: 'issue'
     })
@@ -114,7 +110,7 @@ export function GithubLinkedIssuePane({
           setLoading(false)
         }
       })
-  }, [linkedIssue.number, repo, sourceContext])
+  }, [linkedIssue.number, repo, scopedSourceContext])
 
   useEffect(() => {
     load()
@@ -134,7 +130,10 @@ export function GithubLinkedIssuePane({
           onLinkAnotherIssue={linkActions.linkAnotherIssue}
           linkActionsDisabledReason={linkActions.linkActionsDisabledReason}
         />
-        <IssuePaneMessage kind="unavailable" providerLabel="GitHub" />
+        <IssuePaneMessage
+          kind={repoIsOffDevice ? 'repoOffDevice' : 'unavailable'}
+          providerLabel="GitHub"
+        />
       </div>
     )
   }
@@ -169,7 +168,7 @@ export function GithubLinkedIssuePane({
           workItem={workItem}
           repoPath={repo.path}
           repoId={repo.id}
-          sourceContext={sourceContext}
+          sourceContext={scopedSourceContext}
         />
       )}
     </div>

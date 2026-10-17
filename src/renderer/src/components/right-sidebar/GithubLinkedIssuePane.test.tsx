@@ -274,8 +274,9 @@ describe('GithubLinkedIssuePane', () => {
   })
 
   // Why no fallback: resolving the same number against the workspace repo would read an
-  // unrelated issue in whatever project that repo is, which is worse than saying so.
-  it("renders unavailable when the issue's repo is not registered here", async () => {
+  // unrelated issue in whatever project that repo is, which is worse than saying so. The copy
+  // names the actual problem, because retrying cannot fix a repo this device does not have.
+  it("says the issue's repo is missing when it is not registered here", async () => {
     render(
       <TooltipProvider delayDuration={0}>
         <GithubLinkedIssuePane
@@ -286,8 +287,79 @@ describe('GithubLinkedIssuePane', () => {
       </TooltipProvider>
     )
 
-    // The i18n mock returns the raw fallback, so match the stable prefix only.
-    await waitFor(() => expect(screen.getByText(/Couldn't load this/u)).toBeTruthy())
+    // The i18n mock returns the raw fallback, so match the stable phrase only.
+    await waitFor(() => expect(screen.getByText(/isn't set up on this device/u)).toBeTruthy())
     expect(mocks.lookup).not.toHaveBeenCalled()
+  })
+
+  // Why: a creation-time source context that names another repo re-introduces the host/repo
+  // disagreement this pane was fixed for — the row is the read's authority, so the stale
+  // context is dropped rather than forwarded.
+  it('drops a source context that names a different repo', async () => {
+    mocks.repoState = {
+      repos: [
+        { id: 'repo-remote', path: '/volumes/remote/repo', executionHostId: 'runtime:env-1' },
+        { id: 'repo-source', path: '/tmp/source' }
+      ],
+      settings: null
+    }
+    mocks.lookup.mockResolvedValue(item('Cross-host issue'))
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane
+          worktree={{ ...worktree, repoId: 'repo-remote', linkedWorkItem: linkedWorkItem }}
+          linkedIssue={linkedIssue}
+          sourceContext={{
+            kind: 'task-source',
+            provider: 'github',
+            projectId: 'github:acme/orca',
+            hostId: 'local',
+            repoId: 'repo-remote'
+          }}
+        />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(screen.getByText('Cross-host issue')).toBeTruthy())
+    expect(mocks.lookup.mock.calls[0]?.[0]).toMatchObject({
+      repoId: 'repo-source',
+      sourceContext: null,
+      target: { kind: 'local' }
+    })
+  })
+
+  it('keeps a source context that names the same repo', async () => {
+    const sourceContext = {
+      kind: 'task-source' as const,
+      provider: 'github' as const,
+      projectId: 'github:acme/orca',
+      hostId: 'local' as const,
+      repoId: 'repo-source'
+    }
+    mocks.repoState = {
+      repos: [
+        { id: 'repo-remote', path: '/volumes/remote/repo', executionHostId: 'runtime:env-1' },
+        { id: 'repo-source', path: '/tmp/source' }
+      ],
+      settings: null
+    }
+    mocks.lookup.mockResolvedValue(item('Cross-host issue'))
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <GithubLinkedIssuePane
+          worktree={{ ...worktree, repoId: 'repo-remote', linkedWorkItem: linkedWorkItem }}
+          linkedIssue={linkedIssue}
+          sourceContext={sourceContext}
+        />
+      </TooltipProvider>
+    )
+
+    await waitFor(() => expect(screen.getByText('Cross-host issue')).toBeTruthy())
+    expect(mocks.lookup.mock.calls[0]?.[0]).toMatchObject({
+      repoId: 'repo-source',
+      sourceContext
+    })
   })
 })

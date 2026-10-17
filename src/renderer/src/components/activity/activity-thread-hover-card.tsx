@@ -115,6 +115,7 @@ function ActivityThreadHoverCardContent({
   useWorktreeCardLifecycleEffects({
     worktree,
     repo: repo ?? undefined,
+    issueRepo: review.issueRepo,
     isFolder: review.isFolder,
     hostedReviewCacheKey: review.hostedReviewCacheKey,
     cachedBranchFallbackGitHubPRNumber: review.cachedBranchFallbackGitHubPRNumber,

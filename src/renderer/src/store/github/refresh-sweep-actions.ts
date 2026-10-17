@@ -7,6 +7,7 @@ import { issueCacheKey, prCacheKey } from './cache-identity'
 import { CACHE_TTL, evictStaleEntries } from './cache-policy'
 import { pruneExpiredPRRefreshStates } from './pr-refresh-state'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
+import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
 
 export const createRefreshSweepActions = (
   set: Parameters<StateCreator<AppState>>[0],
@@ -55,19 +56,26 @@ export const createRefreshSweepActions = (
         }
 
         if (wt.linkedIssue) {
-          const ownerSettings = settingsForGitHubRepoOwner(state.settings, repo)
+          // Why the link's repo: a workspace created from a task on another host lives in that
+          // project's repo while the issue stays where the task was listed, so the workspace
+          // row would key a fetch the card never reads. Same helper as the card and the pane.
+          const issueRepo = findLinkedIssueRepo(state.repos, wt, wt.linkedIssue)
+          if (!issueRepo) {
+            continue
+          }
+          const ownerSettings = settingsForGitHubRepoOwner(state.settings, issueRepo)
           const issueKey = issueCacheKey(
-            repo.path,
-            repo.id,
+            issueRepo.path,
+            issueRepo.id,
             wt.linkedIssue,
             ownerSettings,
-            repo.connectionId,
-            repo.executionHostId,
+            issueRepo.connectionId,
+            issueRepo.executionHostId,
             true
           )
           const issueEntry = state.issueCache[issueKey]
           if (!issueEntry || now - issueEntry.fetchedAt >= CACHE_TTL) {
-            void get().fetchIssue(repo.path, wt.linkedIssue, { repoId: repo.id })
+            void get().fetchIssue(issueRepo.path, wt.linkedIssue, { repoId: issueRepo.id })
           }
         }
       }
