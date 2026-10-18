@@ -494,6 +494,38 @@ pnpm run sync:localization-runtime-catalog
     remote account owner could show an empty Antigravity bar. `remoteOwned` now threads in and gates
     the flag.
   - Also deleted `preserved-branch-removal-completion.ts`, which the merge orphaned.
+- **A divergence-debt audit ran before the release, and the debt it found was paid down
+  (`46f640a501`).** The maintainer's rule is that a merge must not leave debt behind: no fork copy of
+  something upstream now owns, no fork-only rename where upstream's name costs nothing, no two live
+  paths for one job. An Opus audit found 11 items; seven were fixed, four recorded.
+  - **Fork copies of upstream's own modules are gone**: `linear-handler-groups.ts` (upstream's
+    `LINEAR_HANDLER_GROUP` now fits the max-lines budget upstream itself solved by extracting it),
+    `ai-vault-session-ids.ts`, a duplicate `isRuntimeScopeForbiddenError`, duplicated usage-warning
+    constants, and a dead `getDefaultBaseRef` wrapper. Each had a live importer, so the importers
+    moved rather than the code being re-written.
+  - **Two cosmetic renames were undone so the next sync conflicts visibly instead of silently**:
+    `right-panel-comment-focus-timers.ts` and `ui-slice-hydration-status-bar-items.ts` are upstream's
+    files again, with the fork's rows edited in place. The second matters most: the fork had *deleted*
+    upstream's file to add three default-on providers, which means a future upstream default-on
+    provider would have been missed rather than merged.
+  - **One job, one vocabulary**: the Jira priority chips now use upstream's `jira-priority-*` tokens
+    and the fork's parallel `--severity-*` scale is gone from both themes. Hues shifted with it
+    (blocker red-700 → `#e40014`, dark red-300 → `#ff6568`, major orange → amber) because the
+    surviving tokens resolve through `--destructive`/`--status-warning`.
+  - **Two half-ported upstream changes were completed.** `getStatusBarUsageProjection` never carried
+    upstream's `zcodePlanApiKeyConfigured` or its ZCode PATH exemption, so a saved GLM plan key with
+    no CLI on PATH showed no meter; the projection now takes both, and a new test fails if either the
+    ZCode exemption or the `!remoteOwned` Antigravity gate regresses. `orcadCredentialRoot()`
+    hardcoded the upstream home, so the headless server's secret store enumerated and sealed an
+    official Orca's credentials while missing this build's own — it resolves through
+    `HOME_DIRECTORY_NAME` now.
+  - **Recorded rather than changed**: the `aiVaultSearch.contentEnabled` tier rename (a persisted
+    settings key; three earlier syncs paid for it, but changing it is a migration, not a cleanup);
+    `accounts-search-extra-providers.ts` and `worktree-remove-method.ts` still move *upstream's* code
+    out to make room for the fork's, which is the same shape as the projection bug above and should be
+    inverted next time those files are touched; `jira-api-error.ts` keeps a parallel error class; and
+    `dashboard-payload-validation.ts` keeps upstream's bytes declined because the fork's
+    `cardClickAction` validation is load-bearing.
   - Carried as notes, not fixed: upstream's `mkdir -m 700` on the publish directory is still dropped
     (the parent transaction directory is 0700, so it is not exploitable); the qualified
     `preservePRCacheOnReject` leaves the "hosted-review-only write newer than the result" case
