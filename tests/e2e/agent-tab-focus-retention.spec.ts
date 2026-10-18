@@ -102,6 +102,14 @@ test('switching right-sidebar panels keeps keyboard focus in the agent tab', asy
     await activityButton.click()
     await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
   }
+
+  // The strip also docks at the side; the buttons and their click gate are the same.
+  await orcaPage.evaluate(() => window.__store?.getState().setActivityBarPosition('side'))
+  await clickIntoTerminal(orcaPage)
+  const sideActivityButton = orcaPage.locator('button[aria-label^="Checks"]').first()
+  await expect(sideActivityButton).toBeVisible({ timeout: 15_000 })
+  await sideActivityButton.click()
+  await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
 })
 
 test('clicking sidebar chrome keeps keyboard focus in the agent tab', async ({ orcaPage }) => {
