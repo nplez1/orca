@@ -132,7 +132,7 @@ export function ActivityBarButton({
 }: {
   item: ActivityBarItem
   active: boolean
-  onClick: () => void
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   layout: 'top' | 'side'
   statusIndicator?: CheckStatus | null
 }): React.JSX.Element {

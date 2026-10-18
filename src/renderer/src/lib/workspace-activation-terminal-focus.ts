@@ -1,6 +1,5 @@
-import { shouldPreserveEditableFocus } from '@/components/terminal-pane/pane-helpers'
+import { focusAgentTabSurface, isAgentTabFocusClaimed } from '@/lib/agent-tab-focus-policy'
 import { useAppStore } from '@/store'
-import { focusRuntimeTerminalSurface } from '@/runtime/mounted-terminal-tab-registry'
 import type { ActivateAndRevealResult } from '@/lib/worktree-activation'
 
 let cancelPendingFocus: (() => void) | null = null
@@ -58,7 +57,16 @@ export function queueWorkspaceActivationTerminalFocus(
       return
     }
     tabId ??= state.activeTabId
-    if (tabId && focusRuntimeTerminalSurface(tabId, null, worktreeId)) {
+    // Why: the policy owns chat-covered panes and IME refreshes too, so a waking
+    // workspace lands in whichever agent surface actually mounted.
+    if (
+      tabId &&
+      focusAgentTabSurface({
+        worktreeId,
+        tabId,
+        leafId: state.terminalLayoutsByTabId[tabId]?.activeLeafId ?? null
+      })
+    ) {
       cancel()
     }
   }
@@ -72,7 +80,7 @@ export function queueWorkspaceActivationTerminalFocus(
     if (
       active !== initialFocus &&
       !closingDialog?.contains(active) &&
-      shouldPreserveEditableFocus(active)
+      isAgentTabFocusClaimed(active)
     ) {
       cancel()
     }

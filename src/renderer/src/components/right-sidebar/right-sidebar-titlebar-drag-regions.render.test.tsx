@@ -89,17 +89,30 @@ vi.mock('@/store', async () => {
   }
 
   return {
-    useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
-      React.useSyncExternalStore(
-        (listener) => {
-          mockAppState.listeners.add(listener)
-          return () => {
-            mockAppState.listeners.delete(listener)
-          }
-        },
-        () => getSnapshot(selector),
-        () => getSnapshot(selector)
-      )
+    // Why: the agent-tab focus policy reads the live store; this render test has no
+    // workspace selected, so the policy declines instead of reaching for a surface.
+    useAppStore: Object.assign(
+      (selector: (state: Record<string, unknown>) => unknown) =>
+        React.useSyncExternalStore(
+          (listener) => {
+            mockAppState.listeners.add(listener)
+            return () => {
+              mockAppState.listeners.delete(listener)
+            }
+          },
+          () => getSnapshot(selector),
+          () => getSnapshot(selector)
+        ),
+      {
+        getState: () => ({
+          activeView: 'terminal',
+          activeTabType: 'terminal',
+          activeWorktreeId: null,
+          activeTabId: null,
+          terminalLayoutsByTabId: {}
+        })
+      }
+    )
   }
 })
 

@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
+import { restoreAgentTabFocusAfterPanelBackgroundClick } from '@/lib/agent-tab-focus-policy'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import { isPluginPanelTabKey } from '../../../../shared/plugins/plugin-manifest'
 
@@ -24,7 +25,12 @@ export function RightSidebarPanelContent({
   rightSidebarOpen
 }: RightSidebarPanelContentProps): React.JSX.Element {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      // Why: a panel is read-only chrome; a pointer click on its background drops focus
+      // to the page, so the agent tab takes it back.
+      onClick={restoreAgentTabFocusAfterPanelBackgroundClick}
+    >
       <Suspense fallback={null}>
         {effectiveTab === 'explorer' && <FileExplorer />}
         {effectiveTab === 'source-control' && <SourceControl />}

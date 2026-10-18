@@ -28,7 +28,7 @@ export function RightSidebarTopActivityBar({
   topActivityStripRef: (node: HTMLDivElement | null) => void
   topActivityLayout: { visibleItems: ActivityBarItem[]; overflowItems: ActivityBarItem[] }
   effectiveTab: ActiveRightSidebarTab
-  onSelectTab: (tab: ActiveRightSidebarTab) => void
+  onSelectTab: (tab: ActiveRightSidebarTab, fromPointer: boolean) => void
   checksStatus: CheckStatus | null
   closeButton: React.ReactNode
   activityBarPosition: ActivityBarPosition
@@ -56,7 +56,7 @@ export function RightSidebarTopActivityBar({
                         key={item.id}
                         item={item}
                         active={effectiveTab === item.id}
-                        onClick={() => onSelectTab(item.id)}
+                        onClick={(event) => onSelectTab(item.id, event.detail > 0)}
                         layout="top"
                         statusIndicator={item.id === 'checks' ? checksStatus : null}
                       />
@@ -66,7 +66,9 @@ export function RightSidebarTopActivityBar({
                     <TopActivityOverflowMenu
                       items={topActivityLayout.overflowItems}
                       activeTab={effectiveTab}
-                      onSelect={onSelectTab}
+                      // Why: the menu returns focus to its trigger when it unmounts, so this
+                      // path keeps the pre-existing behaviour rather than fighting it.
+                      onSelect={(tab) => onSelectTab(tab, false)}
                       checksStatus={checksStatus}
                     />
                   )}
@@ -113,7 +115,7 @@ export function RightSidebarTopActivityBar({
                     key={item.id}
                     item={item}
                     active={effectiveTab === item.id}
-                    onClick={() => onSelectTab(item.id)}
+                    onClick={(event) => onSelectTab(item.id, event.detail > 0)}
                     layout="top"
                     statusIndicator={item.id === 'checks' ? checksStatus : null}
                   />
@@ -123,7 +125,9 @@ export function RightSidebarTopActivityBar({
                 <TopActivityOverflowMenu
                   items={topActivityLayout.overflowItems}
                   activeTab={effectiveTab}
-                  onSelect={onSelectTab}
+                  // Why: the menu returns focus to its trigger when it unmounts, so this
+                  // path keeps the pre-existing behaviour rather than fighting it.
+                  onSelect={(tab) => onSelectTab(tab, false)}
                   checksStatus={checksStatus}
                 />
               )}

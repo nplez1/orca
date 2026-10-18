@@ -303,6 +303,19 @@ export const PR_E2E_SOURCE_ROUTES = [
       )
   },
   {
+    // Why: the focus restore is one bare handler per surface plus one hook mounted in App —
+    // a unit test can call the handler, but only a real click proves the wiring. The spec
+    // guards the sidebar root, both activity-bar layouts and a popup closing; the panel
+    // body has a render test.
+    id: 'agent-tab.focus-retention',
+    specs: ['tests/e2e/agent-tab-focus-retention.spec.ts'],
+    matches: (file) =>
+      isProductSource(file) &&
+      /^(?:src\/renderer\/src\/App\.tsx|src\/renderer\/src\/lib\/(?:agent-tab-focus-policy|workspace-activation-terminal-focus)\.ts|src\/renderer\/src\/hooks\/use-agent-tab-focus-overlay-close\.ts|src\/renderer\/src\/components\/(?:sidebar\/index\.tsx|right-sidebar\/(?:index|right-sidebar-panel-content|right-sidebar-top-activity-bar|activity-bar-buttons|use-right-sidebar-tab-routing)\.tsx?))$/.test(
+        file
+      )
+  },
+  {
     id: 'quick-open.paired-host-path-search',
     specs: ['tests/e2e/paired-quick-open-large-tree.spec.ts'],
     matches: (file) =>

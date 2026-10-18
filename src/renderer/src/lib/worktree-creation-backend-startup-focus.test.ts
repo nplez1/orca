@@ -4,13 +4,15 @@ import type { PreloadApi } from '../../../preload/api-types'
 
 type CreateTerminalPayload = Parameters<Parameters<PreloadApi['ui']['onCreateTerminal']>[0]>[0]
 
-const { focusRuntimeTerminalSurface } = vi.hoisted(() => ({
-  focusRuntimeTerminalSurface: vi.fn(() => true)
+const { focusRuntimeTerminalSurface, findRegisteredTerminalTab } = vi.hoisted(() => ({
+  focusRuntimeTerminalSurface: vi.fn(() => true),
+  findRegisteredTerminalTab: vi.fn()
 }))
 
 vi.mock('@/runtime/mounted-terminal-tab-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof MountedTerminalTabRegistryModule>()),
-  focusRuntimeTerminalSurface
+  focusRuntimeTerminalSurface,
+  findRegisteredTerminalTab
 }))
 
 import { useAppStore } from '@/store'
@@ -65,6 +67,7 @@ beforeEach(() => {
     }
   })
   registerTerminalPresentationIpcBridge([])
+  findRegisteredTerminalTab.mockReturnValue(null)
 })
 
 afterEach(() => {
@@ -75,6 +78,17 @@ afterEach(() => {
 describe('a local agent create watched to completion', () => {
   it('opens on and focuses the agent tab the host adopted without activating', () => {
     const worktree = makeCreatedAgentWorktree()
+    // Why: the focus policy only asks a mounted tab to focus, so the adopted agent tab
+    // has to be registered for the queued restore to reach it.
+    findRegisteredTerminalTab.mockReturnValue({
+      key: 'registered',
+      tab: {
+        tabId: AGENT_TAB_ID,
+        worktreeId: worktree.id,
+        getManager: () => ({ getActivePane: () => null, getPanes: () => [] }),
+        getContainer: () => null
+      }
+    })
     seedEmptyActivatableWorktree(worktree)
     useAppStore.setState({ activeWorktreeId: null, activeTabId: null })
 
@@ -115,7 +129,13 @@ describe('a local agent create watched to completion', () => {
 
     expect(queueWorkspaceActivationTerminalFocus(worktree.id, activation)).toBe(true)
     frames.shift()?.(0)
-    expect(focusRuntimeTerminalSurface).toHaveBeenCalledWith(AGENT_TAB_ID, null, worktree.id)
+    // Why: the adoption restored the agent tab's layout, so the queued focus names its
+    // active leaf — the split the user comes back to, not just the tab.
+    expect(focusRuntimeTerminalSurface).toHaveBeenCalledWith(
+      AGENT_TAB_ID,
+      AGENT_LEAF_ID,
+      worktree.id
+    )
   })
 })
 

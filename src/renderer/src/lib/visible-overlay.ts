@@ -2,6 +2,15 @@
 const OVERLAY_SELECTOR =
   '[role="dialog"], [role="alertdialog"], [role="listbox"]:not([data-worktree-sidebar]), [role="menu"]'
 
+/** True when a removed DOM node was, or contained, an overlay (a dialog, menu, listbox). */
+export function overlayLeftDom(node: Node): boolean {
+  return (
+    typeof Element !== 'undefined' &&
+    node instanceof Element &&
+    (node.matches(OVERLAY_SELECTOR) || node.querySelector(OVERLAY_SELECTOR) !== null)
+  )
+}
+
 type VisibleOverlayOptions = {
   /** Overlays inside a match are treated as page content, not as a layer above it. */
   ignoreSelector?: string
@@ -20,7 +29,12 @@ type VisibleOverlayOptions = {
  * asks the same question: a live overlay outranks a queued pane focus.
  */
 export function hasVisibleOverlay(options?: VisibleOverlayOptions): boolean {
-  return Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).some((element) => {
+  return visibleOverlayElements(options).length > 0
+}
+
+/** The overlays actually on screen, for callers that need to name the ones a gesture saw. */
+export function visibleOverlayElements(options?: VisibleOverlayOptions): Element[] {
+  return Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).filter((element) => {
     if (!(element instanceof HTMLElement)) {
       return false
     }

@@ -69,7 +69,7 @@ export function useWorktreeListKeyboardNavigation(args: {
         return
       }
 
-      void activateWorktreeFromSidebar(nextWorktree.id, nextWorktree.hostId)
+      activateWorktreeFromSidebar(nextWorktree.id, nextWorktree.hostId)
 
       const rowIndex = findPreferredRenderRowIndexForWorktreeIdentity(
         renderRows,

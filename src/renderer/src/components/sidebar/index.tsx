@@ -21,6 +21,7 @@ import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LocalGitToolchainScanBanner } from './LocalGitToolchainScanBanner'
 import { SeveredTerminalDaemonBanner } from './SeveredTerminalDaemonBanner'
 import { StalledTerminalDaemonBanner } from './StalledTerminalDaemonBanner'
+import { restoreAgentTabFocusAfterChromeClick } from '@/lib/agent-tab-focus-policy'
 
 // Why lazy: the Agents list pulls the whole activity pipeline (virtualizer, markdown
 // previews, thread derivation); users on the workspace view should not load or render any of it.
@@ -155,6 +156,7 @@ function Sidebar({
         ref={sidebarRef}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
         style={leftSidebarStyle}
+        onClickCapture={restoreAgentTabFocusAfterChromeClick}
         {...dropHandlers}
       >
         {sidebarOpen && (

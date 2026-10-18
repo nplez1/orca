@@ -13,7 +13,15 @@ const mocks = vi.hoisted(() => ({
   subscribe: vi.fn()
 }))
 vi.mock('@/runtime/mounted-terminal-tab-registry', () => ({
-  focusRuntimeTerminalSurface: mocks.focus
+  focusRuntimeTerminalSurface: mocks.focus,
+  findRegisteredTerminalTab: () => ({
+    key: 'registered',
+    tab: {
+      tabId: 'tab-1',
+      worktreeId: 'wt-1',
+      getManager: () => ({ getActivePane: () => null, getPanes: () => [] })
+    }
+  })
 }))
 vi.mock('@/store', () => ({
   useAppStore: { getState: mocks.getState, subscribe: mocks.subscribe }
@@ -29,6 +37,7 @@ let state: Pick<
   | 'activeTabType'
   | 'activeTabId'
   | 'activeModal'
+  | 'terminalLayoutsByTabId'
 >
 let frame: FrameRequestCallback | null
 let notifyStore: () => void
@@ -52,7 +61,8 @@ beforeEach(() => {
     activeView: 'terminal',
     activeTabType: 'terminal',
     activeTabId: 'tab-1',
-    activeModal: 'none'
+    activeModal: 'none',
+    terminalLayoutsByTabId: {}
   }
   mocks.getState.mockImplementation(() => state)
   mocks.subscribe.mockImplementation((listener) => {
@@ -151,6 +161,39 @@ describe('workspace activation focus', () => {
     notifyMount()
     flushFrame()
     expect(mocks.focus).not.toHaveBeenCalled()
+  })
+
+  it('stops waiting once another terminal takes focus', () => {
+    queueWorkspaceActivationTerminalFocus('wt-1', { primaryTabId: 'tab-1' })
+    const other = document.createElement('textarea')
+    other.className = 'xterm-helper-textarea'
+    const otherXterm = document.createElement('div')
+    otherXterm.className = 'xterm'
+    otherXterm.append(other)
+    document.body.append(otherXterm)
+    other.focus()
+    mocks.focus.mockClear()
+    notifyMount()
+    flushFrame()
+    expect(mocks.focus).not.toHaveBeenCalled()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('stops waiting once a dialog owns focus', () => {
+    queueWorkspaceActivationTerminalFocus('wt-1', { primaryTabId: 'tab-1' })
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    // Why: a button inside the dialog, not an input — an editable cancelled the wait
+    // before this change, so an input would not exercise the widened claim rule.
+    const action = document.createElement('button')
+    dialog.append(action)
+    document.body.append(dialog)
+    action.focus()
+    mocks.focus.mockClear()
+    notifyMount()
+    flushFrame()
+    expect(mocks.focus).not.toHaveBeenCalled()
+    expect(unsubscribe).toHaveBeenCalledOnce()
   })
 
   it('does not steal focus from an input claimed during restoration', () => {
