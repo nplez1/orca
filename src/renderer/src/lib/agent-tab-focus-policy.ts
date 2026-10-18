@@ -34,8 +34,8 @@ const KEYBOARD_NAVIGATION_SIDEBAR = '[data-worktree-sidebar][data-keyboard-navig
 // Why: a workspace card owns its own restore — activation may be followed by a sleeping
 // workspace publishing its tab, which only the deferral path can wait for.
 const WORKSPACE_CARD_SELECTOR = '[role="option"][data-worktree-id]'
-// Why: a control inside a card (its unread toggle, an agent row, its menu button) is
-// ordinary chrome — only a plain click on the card itself is the activation.
+// Why: a control inside a card (its unread toggle, its menu button) is ordinary chrome —
+// only a plain click on the card itself is the activation.
 const NESTED_CONTROL_SELECTOR =
   'button, a[href], input, select, textarea, [contenteditable="true"], [role="button"], [role="checkbox"], [role="switch"]'
 

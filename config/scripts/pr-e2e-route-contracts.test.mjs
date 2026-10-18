@@ -75,9 +75,11 @@ describe('pr-e2e-pane-close-routing', () => {
       (candidate) => candidate.id === 'agent-tab.focus-retention'
     )
 
-    it('routes the policy, its two roots and the panel body to the focus spec', () => {
+    it('routes the policy, the close hook, its roots and the panel body to the focus spec', () => {
       expect(route, 'the focus route was renamed or removed').toBeDefined()
       for (const file of [
+        'src/renderer/src/App.tsx',
+        'src/renderer/src/hooks/use-agent-tab-focus-overlay-close.ts',
         'src/renderer/src/lib/agent-tab-focus-policy.ts',
         'src/renderer/src/lib/workspace-activation-terminal-focus.ts',
         'src/renderer/src/components/sidebar/index.tsx',
