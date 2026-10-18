@@ -114,12 +114,40 @@ test('switching right-sidebar panels keeps keyboard focus in the agent tab', asy
 
 test('clicking sidebar chrome keeps keyboard focus in the agent tab', async ({ orcaPage }) => {
   await prepareTerminal(orcaPage)
-  // A repo section header is focusable chrome with no typed input: the click collapses
-  // the group, and the caret must not stay behind on the header.
+
+  // A control inside a card stops the click from reaching the card's own handler, so it
+  // is the root's capture listener that has to hear it.
+  const active = await waitForActiveWorktree(orcaPage)
+  const card = orcaPage.locator(`[role="option"][data-worktree-id="${active}"]`)
+  await expect(card).toBeVisible({ timeout: 15_000 })
+  await card.hover()
+  const unreadToggle = card.getByRole('button', { name: /^Mark as (?:read|unread)$/ }).first()
+  await expect(unreadToggle).toBeVisible({ timeout: 10_000 })
+  await unreadToggle.click()
+  await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
+
+  // A repo section header is focusable chrome with no typed input of its own.
   const header = orcaPage.locator('[data-worktree-sidebar] [data-repo-header-id]').first()
   await expect(header).toBeVisible({ timeout: 15_000 })
   await header.click()
+  await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
+})
 
+test('closing a sidebar menu returns keyboard focus to the agent tab', async ({ orcaPage }) => {
+  await prepareTerminal(orcaPage)
+  const active = await waitForActiveWorktree(orcaPage)
+  const card = orcaPage.locator(`[role="option"][data-worktree-id="${active}"]`)
+  await expect(card).toBeVisible({ timeout: 15_000 })
+
+  // A pointer selection: the menu item hands the caret back, not to the card menu.
+  await card.click({ button: 'right' })
+  await orcaPage.getByRole('menuitem', { name: 'Copy Path' }).click()
+  await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
+
+  // Dismissing with Escape is not Tab/Enter/Space navigation, so it returns too.
+  await card.click({ button: 'right' })
+  await expect(orcaPage.getByRole('menu')).toBeVisible({ timeout: 5_000 })
+  await orcaPage.keyboard.press('Escape')
   await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
 })
 

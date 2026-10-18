@@ -34,6 +34,10 @@ const KEYBOARD_NAVIGATION_SIDEBAR = '[data-worktree-sidebar][data-keyboard-navig
 // Why: a workspace card owns its own restore — activation may be followed by a sleeping
 // workspace publishing its tab, which only the deferral path can wait for.
 const WORKSPACE_CARD_SELECTOR = '[role="option"][data-worktree-id]'
+// Why: a control inside a card (its unread toggle, an agent row, its menu button) is
+// ordinary chrome — only a plain click on the card itself is the activation.
+const NESTED_CONTROL_SELECTOR =
+  'button, a[href], input, select, textarea, [contenteditable="true"], [role="button"], [role="checkbox"], [role="switch"]'
 
 /** The parts of a React click event these handlers read. */
 export type ChromeClickEvent = {
@@ -198,10 +202,20 @@ export function restoreAgentTabFocusAfterChromeClick(event: ChromeClickEvent): v
   if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
     return
   }
-  if (event.target instanceof Element && event.target.closest(WORKSPACE_CARD_SELECTOR)) {
+  const card =
+    event.target instanceof Element ? event.target.closest(WORKSPACE_CARD_SELECTOR) : null
+  if (card !== null && !clickedControlInside(event.target, card)) {
     return
   }
-  restoreAgentTabFocusAfterChromeGesture(event.detail)
+  restoreAgentTabFocusAfterGesture(event.detail)
+}
+
+function clickedControlInside(target: EventTarget | null, card: Element): boolean {
+  if (!(target instanceof Element)) {
+    return false
+  }
+  const control = target.closest(NESTED_CONTROL_SELECTOR)
+  return control !== null && card.contains(control)
 }
 
 /** For a click on a right-sidebar panel body; see `restoreAgentTabFocusAfterBackgroundClick`. */
@@ -222,7 +236,7 @@ export function restoreAgentTabFocusAfterPanelBackgroundClick(event: ChromeClick
  * `clickDetail` is the click event's `detail`: pass 1 for a gesture the caller knows
  * was a pointer click, or the event's own value where it has one.
  */
-export function restoreAgentTabFocusAfterChromeGesture(clickDetail: number): void {
+export function restoreAgentTabFocusAfterGesture(clickDetail: number): void {
   // Why: Enter or Space on a focused control synthesises a detail-0 click; a keyboard
   // user keeps their place, and only a pointer gesture hands focus back.
   if (clickDetail <= 0 || typeof requestAnimationFrame !== 'function') {

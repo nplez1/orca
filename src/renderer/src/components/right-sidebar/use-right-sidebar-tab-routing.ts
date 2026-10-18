@@ -3,7 +3,7 @@ import { useAppStore } from '@/store'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import type { PluginPanelsFetchStatus } from '@/store/plugin-panels'
 import { normalizeRightSidebarRoute } from '@/store/right-sidebar-route'
-import { restoreAgentTabFocusAfterChromeGesture } from '@/lib/agent-tab-focus-policy'
+import { restoreAgentTabFocusAfterGesture } from '@/lib/agent-tab-focus-policy'
 import { resolveRightSidebarEffectiveTab } from './right-sidebar-effective-tab'
 import { useInstalledPluginRouteReconciliation } from './use-installed-plugin-route-reconciliation'
 import type { ActivityBarItem } from './activity-bar-buttons'
@@ -92,7 +92,7 @@ export function useRightSidebarTabRouting({
     // Why: the tab strip and the panel body need no typed input, so a pointer click
     // hands focus back to the agent tab instead of stranding it on chrome.
     if (fromPointer) {
-      restoreAgentTabFocusAfterChromeGesture(1)
+      restoreAgentTabFocusAfterGesture(1)
     }
     if (tab === 'explorer') {
       showRightSidebarFiles()

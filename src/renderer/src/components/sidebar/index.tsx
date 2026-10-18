@@ -156,7 +156,7 @@ function Sidebar({
         ref={sidebarRef}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
         style={leftSidebarStyle}
-        onClick={restoreAgentTabFocusAfterChromeClick}
+        onClickCapture={restoreAgentTabFocusAfterChromeClick}
         {...dropHandlers}
       >
         {sidebarOpen && (

@@ -48,7 +48,7 @@ import {
   isAgentTabFocusClaimed,
   restoreAgentTabFocusAfterBackgroundClick,
   restoreAgentTabFocusAfterChromeClick,
-  restoreAgentTabFocusAfterChromeGesture,
+  restoreAgentTabFocusAfterGesture,
   restoreAgentTabFocusAfterPanelBackgroundClick
 } from './agent-tab-focus-policy'
 
@@ -76,7 +76,7 @@ function flushFrames(): void {
 
 /** What a pointer click on chrome does: decide one frame after the gesture commits. */
 function restoreAfterGesture(clickDetail = 1): void {
-  restoreAgentTabFocusAfterChromeGesture(clickDetail)
+  restoreAgentTabFocusAfterGesture(clickDetail)
   flushFrames()
 }
 
@@ -417,6 +417,27 @@ describe('React chrome handlers', () => {
     expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()
   })
 
+  it('restores after a click on a control inside a card', () => {
+    const chrome = document.createElement('div')
+    const card = document.createElement('div')
+    card.setAttribute('role', 'option')
+    card.setAttribute('data-worktree-id', 'wt-b')
+    const toggle = document.createElement('button')
+    card.append(toggle)
+    chrome.append(card)
+    document.body.append(chrome)
+
+    // Why: only a plain click on the card is its activation — its own controls are
+    // ordinary chrome, so they hand the caret back like anything else.
+    clickChrome(restoreAgentTabFocusAfterChromeClick, {
+      currentTarget: chrome,
+      target: toggle,
+      detail: 1
+    })
+
+    expect(document.activeElement).toBe(helper)
+  })
+
   it('ignores a click inside a menu the sidebar portals out', () => {
     const chrome = document.createElement('div')
     const portaledItem = document.createElement('div')
@@ -478,7 +499,7 @@ describe('React chrome handlers', () => {
 
 describe('deferred chrome gestures', () => {
   it('decides after the gesture commits, so a dialog it opened claims focus', () => {
-    restoreAgentTabFocusAfterChromeGesture(1)
+    restoreAgentTabFocusAfterGesture(1)
 
     const dialog = document.createElement('div')
     dialog.setAttribute('role', 'dialog')
@@ -489,7 +510,7 @@ describe('deferred chrome gestures', () => {
   })
 
   it('restores focus one frame after a pointer click on chrome', () => {
-    restoreAgentTabFocusAfterChromeGesture(1)
+    restoreAgentTabFocusAfterGesture(1)
     flushFrames()
 
     expect(document.activeElement).toBe(helper)
@@ -498,7 +519,7 @@ describe('deferred chrome gestures', () => {
   it('leaves a keyboard-activated control its focus', () => {
     // Why: Enter or Space synthesises a detail-0 click; a keyboard user must keep
     // the place they navigated to.
-    restoreAgentTabFocusAfterChromeGesture(0)
+    restoreAgentTabFocusAfterGesture(0)
     flushFrames()
 
     expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()

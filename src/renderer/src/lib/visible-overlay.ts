@@ -2,6 +2,15 @@
 const OVERLAY_SELECTOR =
   '[role="dialog"], [role="alertdialog"], [role="listbox"]:not([data-worktree-sidebar]), [role="menu"]'
 
+/** True when a removed DOM node was, or contained, an overlay (a dialog, menu, listbox). */
+export function overlayLeftDom(node: Node): boolean {
+  return (
+    typeof Element !== 'undefined' &&
+    node instanceof Element &&
+    (node.matches(OVERLAY_SELECTOR) || node.querySelector(OVERLAY_SELECTOR) !== null)
+  )
+}
+
 type VisibleOverlayOptions = {
   /** Overlays inside a match are treated as page content, not as a layer above it. */
   ignoreSelector?: string

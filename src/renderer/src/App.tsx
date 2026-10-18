@@ -11,6 +11,7 @@ import RunningTerminalCloseDialog from './components/terminal-pane/RunningTermin
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
 import { useUnreadDockBadge } from './hooks/useUnreadDockBadge'
 import { AppBackgroundServices } from './app-shell/AppBackgroundServices'
+import { useAgentTabFocusOverlayClose } from './hooks/use-agent-tab-focus-overlay-close'
 import { AppRootSurfaces } from './app-shell/AppRootSurfaces'
 import { AppWorkspaceShell } from './app-shell/AppWorkspaceShell'
 import { WindowControls } from './app-shell/WindowControls'
@@ -50,6 +51,7 @@ function App(): React.JSX.Element {
   useDocumentAppearance()
   useWindowVisibilityEffects()
   useUiHangDiagnostics()
+  useAgentTabFocusOverlayClose()
   useGlobalKeybindings({ layout, floatingWorkspace })
 
   // Why: the same vars are set inline on .app-layout below, but portaled surfaces
