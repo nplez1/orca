@@ -329,7 +329,8 @@ export const electronViteConfig: UserConfig = {
         preserveEntrySignatures: 'strict',
         input: {
           index: resolve('src/renderer/index.html'),
-          popout: resolve('src/renderer/popout.html'),
+          // Why no `popout` entry: the fork deleted that window's plumbing (ledger § Dashboard and
+          // the popout window), so `popout.html` is not in the tree to resolve.
           space: resolve('src/renderer/space.html'),
           web: resolve('src/renderer/web-index.html')
         }
