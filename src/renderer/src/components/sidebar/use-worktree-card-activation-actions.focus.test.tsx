@@ -82,7 +82,7 @@ function Card(): React.JSX.Element {
   return (
     <div role="listbox" data-worktree-sidebar tabIndex={0}>
       <div role="option" data-worktree-id="wt-b" onClick={handleClick}>
-        wt-b
+        <span data-testid="card-title">wt-b</span>
       </div>
     </div>
   )
@@ -134,10 +134,11 @@ describe('workspace card click focus', () => {
     return element
   }
 
+  /** The card's title span: a real click lands on a child, not the row itself. */
   function mountCard(): HTMLElement {
     act(() => root.render(<Card />))
     listbox = requireElement('[role="listbox"]')
-    return requireElement('[data-worktree-id="wt-b"]')
+    return requireElement('[data-testid="card-title"]')
   }
 
   it('returns focus from the sidebar listbox to the activated agent tab', () => {

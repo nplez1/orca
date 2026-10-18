@@ -141,7 +141,6 @@ function Sidebar({
   })
 
   useWorkspaceRevealBodyRedirect(sidebarOpen && sidebarBody === 'agents')
-
   // A collapsed sidebar takes no drops.
   const sidebarRef = React.useCallback(
     (node: HTMLDivElement | null) => {

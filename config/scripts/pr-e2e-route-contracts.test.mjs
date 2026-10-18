@@ -70,6 +70,30 @@ describe('pr-e2e-pane-close-routing', () => {
     'src/renderer/src/store/terminals/terminal-tab-close-providers.ts'
   ]
 
+  describe('agent-tab focus retention PR E2E routing', () => {
+    const route = PR_E2E_SOURCE_ROUTES.find(
+      (candidate) => candidate.id === 'agent-tab.focus-retention'
+    )
+
+    it('routes the policy, its two roots and the panel body to the focus spec', () => {
+      expect(route, 'the focus route was renamed or removed').toBeDefined()
+      for (const file of [
+        'src/renderer/src/lib/agent-tab-focus-policy.ts',
+        'src/renderer/src/lib/workspace-activation-terminal-focus.ts',
+        'src/renderer/src/components/sidebar/index.tsx',
+        'src/renderer/src/components/right-sidebar/index.tsx',
+        'src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx',
+        'src/renderer/src/components/right-sidebar/use-right-sidebar-tab-routing.ts'
+      ]) {
+        expect(existsSync(join(projectDir, file)), file).toBe(true)
+        expect(selectPrE2eSpecs([file]), file).toEqual([
+          'tests/e2e/agent-tab-focus-retention.spec.ts'
+        ])
+      }
+      expect(shouldRunReusablePrE2e(['src/renderer/src/lib/agent-tab-focus-policy.ts'])).toBe(true)
+    })
+  })
+
   const CLOSE_ROUTE = PR_E2E_SOURCE_ROUTES.find(
     (route) => route.id === 'terminal-pane.close-and-retirement'
   )
