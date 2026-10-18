@@ -478,6 +478,28 @@ pnpm run sync:localization-runtime-catalog
     entry in the case upstream added — main's newer hosted-review broadcast found no review, or the
     same number in another repository, and must delete it. It preserves only when the rejecting write
     is not newer than the result.
+- **The Opus review of `db746c211b`+repairs came back ship-ready, and two findings landed as
+  `a37f0a5165`.** `claude/opus` at high reasoning, tool-enabled, over `git show --remerge-diff
+  db746c211b` plus the repair commits, told not to accept these docs as evidence: no blockers.
+  - The legacy AI Vault JSON gate admitted schema 4 as well as 6, on the premise that 4 was the last
+    JSON schema upstream shipped. That premise is false — the file lives in Orca NP's own
+    `appData/orca-np`, so only fork builds wrote it — and 4 and 5 are exactly the two versions whose
+    faults 6 exists to invalidate (a 4 row titles Copilot sessions with the `<current_datetime>`
+    prefix; a 5 row carries `subagent: null` and puts every Pi sub-agent transcript at top level).
+    The gate is now `[6]`, and the discard test covers 4 and 5 by number instead of borrowing the
+    database's own version constant.
+  - The merge ported only half of upstream's `!remoteOwned` guard into
+    `getStatusBarUsageProjection`: `settings` was nulled for a remote owner, but
+    `antigravityUsageConfigured` was still computed from *this* machine's `agy` detection, so a
+    remote account owner could show an empty Antigravity bar. `remoteOwned` now threads in and gates
+    the flag.
+  - Also deleted `preserved-branch-removal-completion.ts`, which the merge orphaned.
+  - Carried as notes, not fixed: upstream's `mkdir -m 700` on the publish directory is still dropped
+    (the parent transaction directory is 0700, so it is not exploitable); the qualified
+    `preservePRCacheOnReject` leaves the "hosted-review-only write newer than the result" case
+    deleting the paired PR entry, which is upstream's rule and is covered by upstream's own test but
+    not pinned by a fork test; two sidebar goldens freeze a pre-merge Cmd+1–9 ordering disagreement
+    between the mounted and unmounted lists rather than a regression this merge introduced.
 - **The five over-cap files were split, not capped** — `ssh-types.ts` (311),
   `agent-hook-listener.ts` (307), `server-state.ts` (301), `CheckRunDetailsPanel.tsx` (434),
   `settings.test.ts` (814). The extracts are `ssh-target-visibility.ts`,
