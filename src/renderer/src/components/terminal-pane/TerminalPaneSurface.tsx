@@ -137,8 +137,8 @@ export function TerminalPaneSurface({
         style={terminalContainerStyle}
         onContextMenuCapture={contextMenu.onContextMenuCapture}
         onMouseDownCapture={(event) => {
-          handlePrimarySelectionMiddleMouseDown(event)
           contextMenu.onMouseDownCapture(event)
+          handlePrimarySelectionMiddleMouseDown(event)
         }}
         onAuxClickCapture={handlePrimarySelectionAuxClick}
         onDragOver={(event) => {

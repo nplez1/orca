@@ -1096,3 +1096,111 @@ future forward-reference chain has to justify itself — reach for the declarati
 dotted-key check is what would have caught the stray top-level `settings.appearance.chat.title` that
 the previous merge's union left beside the nested object, and post-sync's three localization checks
 do not include it.
+
+---
+
+## 2026-10-18 sync (upstream `fc24ac3715`, 628 commits)
+
+The largest delta since the merge strategy started, and the one that moved two subsystems onto
+upstream's shape outright. Merge base `ac015cd3b2`, pre-sync tip `12545ad17e`, 89 conflicted paths
+(`both-rewrote 52, union 29, duplicate-tail 5, rename-prey 2, modify/delete 1`).
+
+### AI Vault parse cache: upstream's SQLite database wins, and the legacy import accepts both lineages
+
+**Paths:** `src/main/ai-vault/session-parse-cache-*.ts`, `src/main/ai-vault-search/**`
+
+**Decision (owner, 2026-10-18).** Upstream replaced the single JSON snapshot file with a per-row
+SQLite database (`session-parse-cache-database.ts`, layout version 4) plus a one-shot legacy importer,
+and deleted the fork's `session-parse-cache-snapshot-serialization.ts` (which had reached JSON schema
+6). Upstream's storage wins and the fork's serializer is deleted — nothing in the merged tree imported
+it. The fork's capability in that seam rides inside the row's `session` JSON: the `subagent` /
+`subagentTranscriptCount` fields on `AiVaultSession`, so no extra column and no second serializer.
+
+The legacy importer's gate is widened to `LEGACY_JSON_SCHEMA_VERSIONS = [4, 6]` — 4 is the last JSON
+schema upstream shipped, 6 the last this fork shipped, so a fork install keeps its cache instead of
+cold-scanning once. **5 is deliberately skipped**: it titled Copilot sessions from injected context,
+and 6 exists to invalidate exactly those rows.
+
+**Do not:** reintroduce a JSON snapshot serializer, keep two caches, or bump the DB layout version on
+the fork's schedule. `SESSION_PARSE_CACHE_SCHEMA_VERSION = 4` versions the *database* layout, whose
+first fork build is this one.
+
+### `setupScriptLaunchMode` is retired; the host still stages its own Setup tab
+
+**Paths:** `src/main/ipc/worktree-remote.ts`, `src/shared/global-settings-*`, `src/main/orca-profiles/host-sync-settings-disposition.ts`
+
+**Decision.** Upstream deleted `setupScriptLaunchMode` from `GlobalSettings` and strips it on load
+(see its `docs/automated-setup-tab-design.md`). The fork's default was `new-tab` — the host spawns a
+dedicated Setup terminal and hands the window no `setup` payload — and that behaviour is what remains:
+`canSpawnSetupWithoutStartup` is now `setup !== undefined`, with no launch-mode read and no
+split-vertical/horizontal branch. The field is gone from the host-sync disposition map too.
+
+`src/renderer/src/lib/worktree-activation.test-fixture.ts::setLegacySetupScriptLaunchMode` and
+`worktree-creation-background-mount.test.ts` keep writing the retired key on purpose: they are the
+regression fixtures proving all three former locations now produce one tab.
+
+### The sidebar row model is upstream's object plan, with the fork's same-branch merge on top
+
+**Paths:** `src/shared/sidebar-list/**`, `src/renderer/src/components/sidebar/worktree-list/**`
+
+**Decision.** `row-types.ts`, `group-keys.ts` and `host-section-rows.ts` moved to
+`src/shared/sidebar-list/`; the positional `buildSidebarRowPlan` is now `planSidebarRows(...)` with a
+`.render(collapsedGroups)` method; `rendered-row-keys.ts` replaces the fork's
+`rendered-sidebar-row-keys.ts` (deleted). The fork's `mergeSameBranchRows` is unchanged and still runs
+on the plan's rendered rows through `useMergedSidebarRows`.
+
+**Do not** re-add a fork-local copy of a moved module. Import the shared path; the modules are shared
+so main, renderer and mobile agree on row identity.
+
+Two known artefacts of the merge, recorded rather than fixed: a merged-away sibling that was its
+section's last child leaves the survivor's `isLastLineageChild` stale (the merge spreads the primary
+row and never recomputes the flag — pre-existing, only visible now that upstream's goldens serialise
+it), and the occurrence plan still lists the merged-away occurrence, so `renderedKeys` and the
+`SECTION project:…` lines disagree by exactly the merged pairs. Consumers of `plan.bySection` must
+tolerate that.
+
+### The web project keeps its own `worktree-path-comparison` copy
+
+**Paths:** `src/main/ipc/worktree-path-comparison.ts`, `config/tsconfig.tc.web.json`
+
+**Decision.** Upstream consolidated path comparison into `src/main/git/worktree-path-comparison.ts`,
+which pulls `./runner` and the whole command-runner graph with it. `src/main/ipc/project-folder-placement.ts`
+is inside the *web* TypeScript project (the renderer imports it), so pointing it at the `git/` copy
+drags fourteen main-process modules into `tsconfig.tc.web.json` and fails the build with TS6307. The
+fork's reduced 118-line copy stays, listed in the web project's `include`, and the two fork-only
+importers keep pointing at it.
+
+### Max-lines: five files split, none capped
+
+`ssh-types.ts` (311), `agent-hook-listener.ts` (307), `server-state.ts` (301),
+`CheckRunDetailsPanel.tsx` (434), `settings.test.ts` (814) all crossed their budget in the merge —
+upstream keeps each at the cap, so the union is what overflows. Per the standing remedy:
+
+- `src/shared/ssh-target-visibility.ts` took `SshTargetVisibilityInput`, `isAutoImportedSshTarget` and
+  `isSshTargetHidden`, re-exported from `ssh-types.ts`.
+- `src/shared/agent-hook-listener/inherited-pane-owner-guard.ts` took the inherited-pane-owner
+  predicate upstream added inline.
+- `server-state.ts::forgetAgentExit` delegates to `forgetAgentExitForPane` in
+  `agent-exit-evidence.ts`; `statusCacheHydrationReady` needs no comment line to explain it.
+- `src/renderer/src/components/editor/check-run-details-status.ts` took the timestamp formatter,
+  the status-label map (and its three `translate` calls, keys unchanged) and `isFailureState`.
+- `src/main/ipc/settings.test.ts`'s two durable-flush preference tests became one `it.each` — they
+  exercise the same path with two keys.
+
+### Checks panel: upstream's constant sticky label
+
+`check-run-details.tsx` was resolved to the stale side of a rename and kept the fork's
+`hasLogTail ? 'View full logs' : 'View full details'` conditional, which upstream had already
+collapsed to the constant "View full details". The stale label was the whole failure: the tests find
+the sticky action by accessible name, so the click never happened and the worktree-override and
+GitLab-job paths looked broken too. **Whichever side changes a user-visible string, the label is what
+the suite navigates by** — a resolution that keeps the older string fails as a navigation error three
+tests downstream.
+
+### PR cache: preserve-on-reject is qualified by the newer write's timestamp
+
+The fork's PR #25 rule ("keep the last good PR cache entry when a refresh loses a race") was merged
+unqualified, so every lost-race reject preserved the entry — including the case upstream added, where
+main's newer hosted-review broadcast found no review or the same number in another repository and must
+delete it. `preservePRCacheOnReject` now preserves only when the rejecting write is **not newer** than
+the result (`entry.fetchedAt < args.fetchedAt`).

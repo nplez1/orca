@@ -140,6 +140,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'usageEmptyStateDismissed',
   'codexTerminalServerIsolationNoticeSeen',
   'codexSharedSettingsNoticeSeen',
+  'claudeDiffPanelNoticeSeen',
   'claudeAccountSignInNoticeSeen',
   'browserDefaultUrl',
   'browserDefaultSearchEngine',

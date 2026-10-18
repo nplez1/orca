@@ -5,6 +5,8 @@ import {
   rebuildAppMenu,
   getNextDefaultOnAppearanceSettingValue
 } from '../menu/register-app-menu'
+// Why no dashboard-popout import: the fork deleted that window (see the ledger's Dashboard section).
+import { zoomWorkspaceSpaceWindowIfFocused } from '../window/workspace-space-window'
 import { recordCrashBreadcrumb } from '../crash-reporting/crash-breadcrumb-store'
 import { mainProcessState as state } from './main-process-state'
 import {
@@ -54,13 +56,19 @@ export async function initializeMainProcessI18nAndMenu(): Promise<void> {
       sendOpenFeatureTour(targetWindow instanceof BrowserWindow ? targetWindow : null)
     },
     onZoomIn: () => {
-      state.mainWindow?.webContents.send('terminal:zoom', 'in')
+      if (!zoomWorkspaceSpaceWindowIfFocused('in')) {
+        state.mainWindow?.webContents.send('terminal:zoom', 'in')
+      }
     },
     onZoomOut: () => {
-      state.mainWindow?.webContents.send('terminal:zoom', 'out')
+      if (!zoomWorkspaceSpaceWindowIfFocused('out')) {
+        state.mainWindow?.webContents.send('terminal:zoom', 'out')
+      }
     },
     onZoomReset: () => {
-      state.mainWindow?.webContents.send('terminal:zoom', 'reset')
+      if (!zoomWorkspaceSpaceWindowIfFocused('reset')) {
+        state.mainWindow?.webContents.send('terminal:zoom', 'reset')
+      }
     },
     onToggleLeftSidebar: () => state.mainWindow?.webContents.send('ui:toggleLeftSidebar'),
     onToggleRightSidebar: () => state.mainWindow?.webContents.send('ui:toggleRightSidebar'),

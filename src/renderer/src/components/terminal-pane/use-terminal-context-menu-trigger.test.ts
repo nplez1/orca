@@ -12,6 +12,7 @@ type TestTerminal = {
   element: HTMLDivElement
   modes: { mouseTrackingMode: 'none' | 'any' }
   options: { mouseEventsRequireAlt: boolean }
+  focus: () => void
 }
 
 function buildPane(mouseTrackingMode: 'none' | 'any'): {
@@ -22,7 +23,8 @@ function buildPane(mouseTrackingMode: 'none' | 'any'): {
   const terminal: TestTerminal = {
     element: document.createElement('div'),
     modes: { mouseTrackingMode },
-    options: { mouseEventsRequireAlt: false }
+    options: { mouseEventsRequireAlt: false },
+    focus: vi.fn()
   }
   container.appendChild(terminal.element)
   document.body.appendChild(container)
@@ -49,9 +51,17 @@ function mouseDown(
   handler: (event: React.MouseEvent<HTMLDivElement>) => void,
   target: EventTarget,
   button: number
-): void {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test-only stub; the handler only reads button/target.
-  handler({ button, target } as unknown as React.MouseEvent<HTMLDivElement>)
+): { preventDefault: () => void } {
+  const preventDefault = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test-only stub; the handler reads button/target/ctrlKey and claims the press with the two DOM methods a real mouse event carries.
+  handler({
+    button,
+    ctrlKey: false,
+    target,
+    preventDefault,
+    stopPropagation: vi.fn()
+  } as unknown as React.MouseEvent<HTMLDivElement>)
+  return { preventDefault }
 }
 
 afterEach(() => {
@@ -63,8 +73,10 @@ describe('useTerminalContextMenuTrigger right-click ownership', () => {
     const { pane, terminal } = buildPane('any')
     const { result } = renderTrigger(pane, true)
 
-    mouseDown(result.current.onMouseDownCapture, terminal.element, 2)
+    const { preventDefault } = mouseDown(result.current.onMouseDownCapture, terminal.element, 2)
 
+    // Why: the claim is what stops xterm encoding the press for the TUI underneath.
+    expect(preventDefault).toHaveBeenCalled()
     expect(terminal.options.mouseEventsRequireAlt).toBe(true)
   })
 
@@ -81,8 +93,9 @@ describe('useTerminalContextMenuTrigger right-click ownership', () => {
     const { pane, terminal } = buildPane('any')
     const { result } = renderTrigger(pane, false)
 
-    mouseDown(result.current.onMouseDownCapture, terminal.element, 2)
+    const { preventDefault } = mouseDown(result.current.onMouseDownCapture, terminal.element, 2)
 
+    expect(preventDefault).not.toHaveBeenCalled()
     expect(terminal.options.mouseEventsRequireAlt).toBe(false)
   })
 

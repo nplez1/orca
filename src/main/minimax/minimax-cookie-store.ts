@@ -7,7 +7,7 @@ import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-f
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
 const MINIMAX_COOKIE_FILE = 'minimax-session-cookie.enc'
-const COOKIE_ENVELOPE_PREFIX = 'orca-minimax-cookie:v1:'
+export const COOKIE_ENVELOPE_PREFIX = 'orca-minimax-cookie:v1:'
 let cachedMiniMaxCookie: string | null = null
 let warnedMiniMaxCookieStatusHardenFailure = false
 
@@ -20,7 +20,7 @@ function getOrcaDir(): string {
   return join(homedir(), HOME_DIRECTORY_NAME)
 }
 
-function getMiniMaxCookiePath(): string {
+export function getMiniMaxCookiePath(): string {
   return join(getOrcaDir(), MINIMAX_COOKIE_FILE)
 }
 

@@ -5,8 +5,8 @@ import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { mergeSameBranchRows, resolveBranchGroupSelection } from './branch-groups'
 import { buildProjectGroupingIndex } from '../../../../../../shared/project-section-grouping'
-import { PINNED_GROUP_KEY } from './group-keys'
-import type { BranchGroupMember, Row, WorktreeRow } from './row-types'
+import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
+import type { BranchGroupMember, Row, WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
 import {
   project,
   projectHostSetups,
@@ -146,7 +146,7 @@ describe('mergeSameBranchRows', () => {
       key: 'project:p1',
       label: 'Project',
       count: 2,
-      tone: 'text-foreground'
+      icon: { kind: 'project' }
     }
     const rows = [header, itemRow({ worktree }), itemRow({ worktree: remoteWorktree })]
 

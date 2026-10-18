@@ -149,15 +149,15 @@ function clearSshTargetTabPtyState(
   | 'tabsByWorktree'
   | 'ptyIdsByTabId'
   | 'lastKnownRelayPtyIdByTabId'
-  | 'pendingCodexPaneRestartIds'
+  | 'pendingPaneAccountRestarts'
   | 'codexRestartNoticeByPtyId'
 > & { changed: boolean } {
   const unboundTabIds = new Set<string>()
   const nextLastKnownRelayPtyIdByTabId = {
     ...state.lastKnownRelayPtyIdByTabId
   }
-  const nextPendingCodexPaneRestartIds = {
-    ...state.pendingCodexPaneRestartIds
+  const nextPendingPaneAccountRestarts = {
+    ...state.pendingPaneAccountRestarts
   }
   const nextCodexRestartNoticeByPtyId = { ...state.codexRestartNoticeByPtyId }
 
@@ -182,7 +182,7 @@ function clearSshTargetTabPtyState(
       unboundTabIds.add(tab.id)
       delete nextLastKnownRelayPtyIdByTabId[tab.id]
       for (const ptyId of ptyIds) {
-        delete nextPendingCodexPaneRestartIds[ptyId]
+        delete nextPendingPaneAccountRestarts[ptyId]
         delete nextCodexRestartNoticeByPtyId[ptyId]
       }
     }
@@ -192,7 +192,7 @@ function clearSshTargetTabPtyState(
     changed: unboundTabIds.size > 0,
     ...unbindTerminalTabPtys(state, unboundTabIds),
     lastKnownRelayPtyIdByTabId: nextLastKnownRelayPtyIdByTabId,
-    pendingCodexPaneRestartIds: nextPendingCodexPaneRestartIds,
+    pendingPaneAccountRestarts: nextPendingPaneAccountRestarts,
     codexRestartNoticeByPtyId: nextCodexRestartNoticeByPtyId
   }
 }

@@ -17,6 +17,7 @@ import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { findWorktreeById, getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import type { OpenFile } from '../types/open-file'
 import { openWorkspaceEditorItem } from '../tabs/workspace-editor-item'
+import { reconcileCheckDetailsReadingCache } from '@/components/editor/check-details-reading-cache'
 
 export function createCheckRunDetailsActions(
   set: EditorSet,
@@ -40,14 +41,24 @@ export function createCheckRunDetailsActions(
         githubRepository: state.githubRepository ?? null,
         gitlabProjectRef: state.gitlabProjectRef ?? null
       }
+      let accepted:
+        | { previous: OpenCheckRunDetailsState | undefined; next: OpenCheckRunDetailsState }
+        | undefined
       set((s) => {
         const existing = s.openFiles.find((f) => f.id === id)
         if (existing) {
           const existingDetails = existing.checkRunDetails
           const incomingIsStale =
+            existing.mode === 'check-details' &&
             existingDetails?.contextKey === contextKey &&
             existingDetails.requestId !== undefined &&
             (state.requestId === undefined || state.requestId < existingDetails.requestId)
+          if (!incomingIsStale) {
+            accepted = {
+              previous: existing.mode === 'check-details' ? existingDetails : undefined,
+              next: checkRunDetails
+            }
+          }
           return {
             openFiles: s.openFiles.map((f) =>
               f.id === id
@@ -67,6 +78,7 @@ export function createCheckRunDetailsActions(
           }
         }
 
+        accepted = { previous: undefined, next: checkRunDetails }
         const newFile: OpenFile = {
           id,
           filePath: id,
@@ -86,15 +98,25 @@ export function createCheckRunDetailsActions(
           activeTabTypeByWorktree: { ...s.activeTabTypeByWorktree, [worktreeId]: 'editor' }
         }
       })
+      if (accepted) {
+        const { previous, next } = accepted
+        reconcileCheckDetailsReadingCache(id, previous, next, () => {
+          const live = get().openFiles.find((file) => file.id === id)
+          return live?.mode === 'check-details' && live.checkRunDetails === next
+        })
+      }
       void openWorkspaceEditorItem(get(), id, worktreeId, label, 'check-details')
     },
 
     // Why: sidebar detail fetches can finish after the full-details tab is open; update the snapshot without stealing focus.
     patchOpenCheckRunDetails: (worktreeId, contextKey, check, state) => {
       const id = buildCheckRunDetailsTabId(worktreeId, check)
+      let accepted:
+        | { previous: OpenCheckRunDetailsState; next: OpenCheckRunDetailsState }
+        | undefined
       set((s) => {
         const existing = s.openFiles.find((f) => f.id === id)
-        if (!existing?.checkRunDetails) {
+        if (existing?.mode !== 'check-details' || !existing.checkRunDetails) {
           return s
         }
         const current = existing.checkRunDetails
@@ -138,12 +160,20 @@ export function createCheckRunDetailsActions(
         ) {
           return s
         }
+        accepted = { previous: current, next: nextCheckRunDetails }
         return {
           openFiles: s.openFiles.map((f) =>
             f.id === id ? { ...f, checkRunDetails: nextCheckRunDetails } : f
           )
         }
       })
+      if (accepted) {
+        const { previous, next } = accepted
+        reconcileCheckDetailsReadingCache(id, previous, next, () => {
+          const live = get().openFiles.find((file) => file.id === id)
+          return live?.mode === 'check-details' && live.checkRunDetails === next
+        })
+      }
     },
 
     reloadOpenCheckRunDetailsTab: async (fileId) => {
@@ -156,7 +186,16 @@ export function createCheckRunDetailsActions(
       const { contextKey, check } = checkRunDetails
       const requestId = createCheckRunDetailsRequestId()
       const patch = (next: CheckRunDetailsTabPatch): void => {
-        get().patchOpenCheckRunDetails(file.worktreeId, contextKey, check, { ...next, requestId })
+        const current = get().openFiles.find(
+          (candidate) => candidate.id === fileId
+        )?.checkRunDetails
+        const details =
+          next.details ?? (current?.contextKey === contextKey ? current.details : null)
+        get().patchOpenCheckRunDetails(file.worktreeId, contextKey, check, {
+          ...next,
+          details,
+          requestId
+        })
       }
       const worktree = findWorktreeById(state.worktreesByRepo, file.worktreeId)
       const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(file.worktreeId)
@@ -171,6 +210,9 @@ export function createCheckRunDetailsActions(
           ),
           errorAction: null
         })
+        return
+      }
+      if (checkRunDetails.loading) {
         return
       }
       patch({ details: checkRunDetails.details, loading: true, error: null, errorAction: null })
@@ -214,13 +256,10 @@ export function createCheckRunDetailsActions(
         patch({
           details: null,
           loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : translate(
-                  'auto.store.slices.editor.checkRunDetailsLoadFailed',
-                  'Failed to load check details.'
-                ),
+          error: translate(
+            'auto.store.slices.editor.checkRunDetailsLoadFailed',
+            'Failed to load check details.'
+          ),
           errorAction: checkDetailsErrorAction(error)
         })
       }

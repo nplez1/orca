@@ -213,7 +213,6 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   terminalCopyTrimsGutter: 'replicated',
   terminalAllowOsc52Clipboard: 'replicated',
   claudeAgentTeamsMode: 'replicated',
-  setupScriptLaunchMode: 'replicated',
   terminalScrollbackRows: 'replicated',
   uiHangDiagnosticsEnabled: 'replicated',
   openLinksInApp: 'replicated',
@@ -344,6 +343,12 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   defaultJiraBoard: 'replicated',
   // Why replicated, like `defaultJiraBoard`: a naming preference for suggested workspace/branch names.
   jiraIssueKeyCasing: 'replicated',
+  // Why replicated: deliberate preferences, not bookkeeping or a machine fact.
+  alwaysForceDeletePreservedBranches: 'replicated',
+  claudeAccountSwitchRunningSessions: 'replicated',
+  nativeChatProviders: 'replicated',
+  // Why hostLocal: a `…Migrated…` marker — copying it would suppress the host's own migration.
+  sshRemoteCliControlExistingHostsMigrated: 'hostLocal',
   claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>
 

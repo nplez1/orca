@@ -8,11 +8,13 @@ import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { GitAdmissionTier } from '../../shared/rpc-contract/git-admission-tier-params'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
+import type { GlobalSettings } from '../../shared/global-settings-types'
 import type {
   CreateWorktreeArgs,
+  CreateWorktreeProgressEvent,
   CreateWorktreeResult,
+  WorktreeCheckoutProgress,
   WorktreeCreateBaseFallback
 } from '../../shared/worktree/create-types'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
@@ -306,11 +308,12 @@ async function spawnLocalStartupAndSetupTerminals(args: {
   /** True when an automation's terminals are provisioned in main (`provisionManagedWorktreeTerminals`). */
   provisionedByHost: boolean
 }): Promise<StagedStartupResult> {
-  const { runtime, worktree, startup, setup, defaultTabs, settings, createdWithAgent } = args
-  const setupLaunchMode = settings.setupScriptLaunchMode ?? 'new-tab'
+  const { runtime, worktree, startup, setup, defaultTabs, createdWithAgent } = args
   const hasDefaultTabs = (defaultTabs?.tabs.length ?? 0) > 0
-  const canSpawnSetupWithoutStartup =
-    setup !== undefined && (!hasDefaultTabs || setupLaunchMode === 'new-tab')
+  // Why no launch-mode input: upstream retired `setupScriptLaunchMode` and stale profiles are
+  // stripped on load. The fork's default was `new-tab` — the host spawns the Setup tab itself, so
+  // the setting is gone but that behaviour stands (ledger § "Worktree create and removal").
+  const canSpawnSetupWithoutStartup = setup !== undefined
   // Why `provisionedByHost && !startup`: with no startup command an automation's terminals (its
   // setup and default tabs) are provisioned in main, so spawning the setup terminal here too would
   // run the setup script twice — and the blank first shell below would activate a background
@@ -418,38 +421,19 @@ async function spawnLocalStartupAndSetupTerminals(args: {
         )
       const setupEnv = { ...setup.envVars, ...observed?.env }
       let setupTerminalHandle: string | undefined
-      if (setupLaunchMode === 'split-vertical' || setupLaunchMode === 'split-horizontal') {
-        if (!startupTerminalHandle) {
-          throw new Error('startup_terminal_missing')
-        }
-        setupTerminalHandle = (
-          await runtime.splitTerminal(
-            startupTerminalHandle,
-            {
-              direction: setupLaunchMode === 'split-horizontal' ? 'horizontal' : 'vertical',
-              command: setupCommand,
-              env: setupEnv,
-              activate: false,
-              surfaceOwner: false
-            },
-            worktree
-          )
-        ).handle
-      } else {
-        setupTerminalHandle = (
-          await runtime.createTerminal(
-            `id:${worktree.id}`,
-            {
-              title: 'Setup',
-              command: setupCommand,
-              env: setupEnv,
-              activate: false,
-              surfaceOwner: false
-            },
-            worktree
-          )
-        ).handle
-      }
+      setupTerminalHandle = (
+        await runtime.createTerminal(
+          `id:${worktree.id}`,
+          {
+            title: 'Setup',
+            command: setupCommand,
+            env: setupEnv,
+            activate: false,
+            surfaceOwner: false
+          },
+          worktree
+        )
+      ).handle
       // Why before arming: an observation failure must not make a spawned runner
       // look like a failed spawn and send the renderer off to re-queue setup.
       didSpawnSetup = true
@@ -984,13 +968,20 @@ export function notifyWorktreeHeadIdentitiesChanged(
 }
 
 // Why: two-phase spinner — fire 'fetching' before pre-create fetch and 'creating' before git worktree add so the renderer can swap its label.
+// `checkout` carries git's checkout meter during 'creating'; null means the checkout finished.
 export function emitCreateWorktreeProgress(
   mainWindow: BrowserWindow,
   phase: 'fetching' | 'creating',
-  creationId?: string
+  creationId?: string,
+  checkout?: WorktreeCheckoutProgress | null
 ): void {
   if (!mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('createWorktree:progress', { creationId, phase })
+    const event: CreateWorktreeProgressEvent = {
+      creationId,
+      phase,
+      ...(checkout !== undefined ? { checkout } : {})
+    }
+    mainWindow.webContents.send('createWorktree:progress', event)
   }
 }
 
@@ -1000,14 +991,26 @@ export function createLocalWorktree(
   store: Store,
   mainWindow: BrowserWindow,
   runtime: OrcaRuntimeService,
-  timing: WorktreeCreateTimingRecorder = createWorktreeCreateTimingRecorder()
+  timing: WorktreeCreateTimingRecorder = createWorktreeCreateTimingRecorder(),
+  onWorkspaceCreated?: (worktreeId: string) => void
 ): Promise<CreateWorktreeResult> {
   // Why a holder fired in `finally`: consuming a prepared checkout leaves the pool one short, so a
   // create that fails after that point — include copy, push target, terminal startup — must still
   // arm the replacement. Fires exactly once, after startup on the success path.
   const rearm: PreparationRearmHolder = { fire: () => {} }
   return worktreeCreateGit
-    .run(() => performLocalWorktreeCreate(args, repo, store, mainWindow, rearm, timing, runtime))
+    .run(() =>
+      performLocalWorktreeCreate(
+        args,
+        repo,
+        store,
+        mainWindow,
+        rearm,
+        timing,
+        runtime,
+        onWorkspaceCreated
+      )
+    )
     .finally(() => {
       // Closes the create's measured window first, so its own re-arm is not counted against it.
       timing.finish()
@@ -1022,7 +1025,8 @@ async function performLocalWorktreeCreate(
   mainWindow: BrowserWindow,
   rearm: PreparationRearmHolder,
   timing: WorktreeCreateTimingRecorder,
-  runtime: OrcaRuntimeService
+  runtime: OrcaRuntimeService,
+  onWorkspaceCreated?: (worktreeId: string) => void
 ): Promise<CreateWorktreeResult> {
   const settings = store.getSettings()
   const worktreePathSettings = getWorktreePathSettings(
@@ -1037,9 +1041,17 @@ async function performLocalWorktreeCreate(
   const localWorktreeGitOptionArgs: [] | [{ wslDistro?: string }] = hasLocalWorktreeGitOptions
     ? [localWorktreeGitOptions]
     : []
+  const creationId = args.creationId
+  // Why: only `git worktree add` reads onCheckoutProgress; a prepared-checkout claim never reports.
   const addProjectGitOptions = (options?: AddWorktreeOptions): AddWorktreeOptions => ({
     ...options,
-    ...localWorktreeGitOptions
+    ...localWorktreeGitOptions,
+    ...(creationId
+      ? {
+          onCheckoutProgress: (checkout: WorktreeCheckoutProgress | null) =>
+            emitCreateWorktreeProgress(mainWindow, 'creating', creationId, checkout)
+        }
+      : {})
   })
 
   const requestedName = args.name
@@ -1617,6 +1629,7 @@ async function performLocalWorktreeCreate(
     const meta = store.setWorktreeMeta(worktreeId, metaUpdates)
     return { worktree: mergeWorktree(repo.id, created, meta) }
   })
+  onWorkspaceCreated?.(worktreeId)
   const { lineage: worktreeLineage, workspaceLineage } = recordWorkspaceLineageForCreatedWorktree(
     store,
     args,

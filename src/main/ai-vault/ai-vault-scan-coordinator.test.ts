@@ -7,7 +7,6 @@ import {
   startLocalAiVaultScanProgress,
   type LocalAiVaultScanProgressHandle
 } from './ai-vault-local-scan-progress'
-import { AiVaultServiceDeadlineError } from './session-scanner-service-request-deadline'
 
 const EMPTY_RESULT = { sessions: [], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' }
 
@@ -17,16 +16,17 @@ describe('AiVaultScanCoordinator', () => {
     const stages: (string | null)[] = []
     onLocalAiVaultScanProgress(({ progress }) => stages.push(progress?.stage ?? null))
     try {
-      const stopped = startLocalAiVaultScanProgress('scope', 'stopped', () => 500)
-      stopped.sent(1)
-      stopped.fail(new AiVaultServiceDeadlineError('scan timed out', 'scan', 1))
+      const earlier = startLocalAiVaultScanProgress('scope', 'earlier', () => 500)
+      // A finish that never reported work publishes no entry, so this one has to have scanned.
+      earlier.work({ stage: 'reading', agents: [], read: { done: 1, total: 1 } })
+      earlier.finish(null)
       let old: LocalAiVaultScanProgressHandle | null = null
       const first = coordinator.run({
         key: 'scope',
         onCreate: (id) => {
           old = startLocalAiVaultScanProgress('scope', id, () => 1_000)
         },
-        onError: (error) => old?.fail(error),
+        onError: () => old?.fail(),
         start: (signal) =>
           new Promise<typeof EMPTY_RESULT>((_resolve, reject) => {
             signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
@@ -46,8 +46,8 @@ describe('AiVaultScanCoordinator', () => {
           })
       })
       await Promise.resolve()
-      expect(localAiVaultScanProgress('scope')).toBeNull()
-      expect(stages.at(-1)).toBeNull()
+      expect(localAiVaultScanProgress('scope')).toMatchObject({ stage: 'finding', startedAt: 2_000 })
+      expect(stages).not.toContain(null)
       finishPreparation?.(EMPTY_RESULT)
       await expect(Promise.all([first, replacement])).resolves.toEqual([EMPTY_RESULT, EMPTY_RESULT])
     } finally {

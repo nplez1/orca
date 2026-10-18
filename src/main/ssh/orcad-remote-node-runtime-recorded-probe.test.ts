@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,15 +17,17 @@ import {
   ensureRemoteOrcadNodeRuntime,
   posixNodeRuntimeExecutable,
   probeRemoteNodeRuntimeCommand,
-  REMOTE_NODE_RUNTIME_MISSING,
   remoteNodeRuntimeDir
 } from './orcad-remote-node-runtime'
+import {
+  REMOTE_NODE_RUNTIME_MISSING,
+  REMOTE_NODE_RUNTIME_VERIFIED_MARKER
+} from './orcad-remote-node-runtime-report'
 import {
   recordedNodeRuntimeProbeCommand,
   recordedRemoteNodeRuntimeProbeCommand,
   REMOTE_NODE_RUNTIME_HASHED_STAT_FILENAME
 } from './orcad-remote-node-runtime-recorded-probe'
-import { REMOTE_NODE_RUNTIME_VERIFIED_MARKER } from './orcad-remote-node-runtime-report'
 import { execCommand } from './ssh-relay-exec-command'
 import type * as ExecCommandModule from './ssh-relay-exec-command'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
@@ -99,9 +109,17 @@ describe.skipIf(process.platform === 'win32')('recorded runtime probe', () => {
     expect(hashCount()).toBe(1)
   })
 
-  it('hashes again after the executable is rewritten in place at the same size', async () => {
+  it('hashes a same-size in-place rewrite after its stat signature changes', async () => {
     await ensure(true)
-    writeFileSync(posixNodeRuntimeExecutable(host, runtimeDir), 'NODE')
+    const executable = posixNodeRuntimeExecutable(host, runtimeDir)
+    const before = statSync(executable)
+    writeFileSync(executable, 'NODE')
+    // Fast writes can share a filesystem timestamp; establish a changed cache signature.
+    utimesSync(executable, before.atime, new Date(before.mtimeMs + 1_000))
+    const after = statSync(executable)
+    expect(after.ino).toBe(before.ino)
+    expect(after.size).toBe(before.size)
+    expect(after.mtimeMs).toBeGreaterThan(before.mtimeMs)
     await ensure(true)
     expect(hashCount()).toBe(2)
   })

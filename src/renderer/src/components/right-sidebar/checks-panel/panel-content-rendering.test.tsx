@@ -6,7 +6,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PRComment } from '../../../../../shared/github/comment-types'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
 import type { ChecksPanelEmptyContentModel } from './empty-content-props'
-import { ChecksPanelReviewHeader } from '../ChecksPanel'
 
 vi.mock('../HostedReviewActions', () => ({ default: () => null }))
 vi.mock('../SourceControlAgentActionDialog', () => ({ SourceControlAgentActionDialog: () => null }))
@@ -192,7 +191,7 @@ describe('checks panel concrete content', () => {
 
     render(
       <TooltipProvider>
-        <ChecksPanelActiveContent model={model} ReviewHeaderComponent={ChecksPanelReviewHeader} />
+        <ChecksPanelActiveContent model={model} />
       </TooltipProvider>
     )
 

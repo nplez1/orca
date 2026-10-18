@@ -43,6 +43,10 @@ async function gitExecFileAsyncUnlocked(
   return withGitSpan(
     { args, ...(options.cwd !== undefined ? { cwd: options.cwd } : {}) },
     async (span) => {
+      if (options.onStderr && options.terminationBarrier) {
+        // Why: checked before admission; that path's streams belong to runProcess.
+        throw new Error('onStderr is not supported with terminationBarrier.')
+      }
       const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
       if (checkoutRoutingReady) {
         await checkoutRoutingReady
@@ -100,6 +104,7 @@ async function gitExecFileAsyncUnlocked(
           terminationBarrier: options.terminationBarrier,
           admissionTier: options.admissionTier,
           onChildTerminated: reportTerminated,
+          ...(options.onStderr ? { onStderr: options.onStderr } : {}),
           ...(timeoutMs === undefined
             ? {}
             : { createTimeoutError: () => new GitCommandTimeoutError(timeoutMs) })

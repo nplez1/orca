@@ -1,10 +1,12 @@
 import { build } from 'esbuild'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename, dirname, join } from 'node:path'
 import { ORCAD_SERVER_ENTRY_FILENAME } from '../../src/shared/orcad-artifacts.ts'
 
 const root = join(import.meta.dirname, '..', '..')
+const { turnedOnDarkBuildDefines } = createRequire(import.meta.url)('../dark-build-switches.cjs')
 
 export const ORCAD_ENTRY_POINT = 'src/main/orcad/main.ts'
 export const ORCAD_LAUNCHER_ENTRY_POINT = 'src/main/orcad/launcher.ts'
@@ -33,7 +35,11 @@ export const ORCAD_COMMONJS_MODULE_OPTIONS = {
   banner: {
     js: 'var __orcadModuleUrl = require("node:url").pathToFileURL(__filename).href;'
   },
-  define: { 'import.meta.url': '__orcadModuleUrl' },
+  define: {
+    'import.meta.url': '__orcadModuleUrl',
+    // Why only when on: an undeclared switch already reads as off, so other builds keep their bytes.
+    ...turnedOnDarkBuildDefines()
+  },
   logOverride: { 'empty-import-meta': 'error' }
 }
 

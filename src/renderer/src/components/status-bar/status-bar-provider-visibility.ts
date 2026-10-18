@@ -57,7 +57,7 @@ type UsageProviderId = ProviderRateLimits['provider']
 // Why: credits count as usage data — DeepSeek/Fireworks publish no window at all,
 // so without this term every window-shaped caller reads them as "no data" and
 // hides a configured, funded account behind the invisible-bar state.
-function hasUsageData(provider: ProviderRateLimits): boolean {
+export function hasUsageData(provider: ProviderRateLimits): boolean {
   return Boolean(
     provider.session ||
     provider.weekly ||
@@ -173,7 +173,7 @@ export function hasUsageProviderSettingsForProvider(
   return false
 }
 
-function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRateLimits {
+export function createPendingProviderSnapshot(providerId: UsageProviderId): ProviderRateLimits {
   return {
     provider: providerId,
     session: null,

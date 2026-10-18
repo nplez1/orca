@@ -37,18 +37,15 @@ import { selectOrcadSlotRuntimeCommand } from './orcad-remote-runtime'
 import { ORCAD_STOP_REQUEST_FILENAME } from '../../shared/orcad-stop-request'
 import { orcadWindowsSlotOpCommand } from './orcad-remote-windows-node'
 import {
+  captureOrcadLaunchSshSessionCommand,
+  recordsOrcadLaunchSshSession,
+  writeOrcadLaunchSshSessionCommand
+} from './orcad-launch-ssh-session'
+import {
   ORCAD_E2E_IDLE_TIMEOUT_ENV,
   ORCAD_MANAGED_ACTIVATION_ROOT_ENV,
   readOrcadE2EIdleTimeoutMs
 } from '../../shared/orcad-idle-exit'
-
-export {
-  ORCAD_LOG_FILENAME,
-  ORCAD_PID_FILENAME,
-  ORCAD_READINESS_FILENAME,
-  ORCAD_READINESS_MAX_BYTES,
-  OrcadRemoteLaunchUnsupportedError
-} from './orcad-remote-host-support'
 
 export type OrcadLaunchSpec = {
   remoteInstallDir: string
@@ -112,7 +109,10 @@ export function orcadLaunchCommand(
     ...(remoteBasename(baseDir, host) === RELAY_REMOTE_DIR ? [baseDir] : []),
     spec.remoteInstallDir
   ]
+  // Why in the launching shell: the detached list below runs in a subshell whose variables are lost.
+  const recordSession = detach === 'nohup' && recordsOrcadLaunchSshSession(host)
   return [
+    ...(recordSession ? [captureOrcadLaunchSshSessionCommand()] : []),
     // Why first: the readiness file carries the pairing offer's device token, so every file this
     // launch creates must be owner-only from birth, not only the ones after the exec.
     'umask 077 &&',
@@ -140,7 +140,11 @@ export function orcadLaunchCommand(
           `exec nohup "$orcad_runtime" ${entry}`,
           `--json --bind ${shellEscape(spec.bindHost)} --port ${String(spec.port)}`,
           `> ${readiness} 2>> ${log} < /dev/null &`,
-          `echo $! > ${pidFile} && cat ${pidFile}`
+          `echo $! > ${pidFile} &&`,
+          ...(recordSession
+            ? [`${writeOrcadLaunchSshSessionCommand(host, spec.userDataDir)} &&`]
+            : []),
+          `cat ${pidFile}`
         ])
   ].join(' ')
 }
@@ -198,7 +202,7 @@ export function readOrcadReadinessCommand(
  * and a `kill -0` that failed for a reason other than "no such process" — a permission
  * error means someone else's process holds that PID, which is evidence of neither. A slot with
  * neither a PID file nor a readiness file (which a launch creates first) answers
- * `NEVER_LAUNCHED`, which only GC reads apart from `UNKNOWN`.
+ * `NEVER_LAUNCHED`: nothing was ever started from it, so like `DEAD` it is proven exit.
  */
 export function orcadLivenessProbeCommand(
   host: RemoteHostPlatform,
@@ -228,25 +232,32 @@ export function orcadLivenessProbeCommand(
   ].join(' ')
 }
 
-export type OrcadLiveness = 'LIVE' | 'DEAD' | 'UNKNOWN'
+export const ORCAD_NEVER_LAUNCHED = 'NEVER_LAUNCHED'
 
+export type OrcadLiveness = 'LIVE' | 'DEAD' | 'UNKNOWN' | typeof ORCAD_NEVER_LAUNCHED
+
+/** The probe's last line; anything but a known word is `UNKNOWN`, never a guess. */
 export function parseOrcadLiveness(output: string): OrcadLiveness {
   const value = output.trim().split('\n').pop()?.trim()
-  return value === 'LIVE' || value === 'DEAD' ? value : 'UNKNOWN'
+  return value === 'LIVE' || value === 'DEAD' || value === ORCAD_NEVER_LAUNCHED ? value : 'UNKNOWN'
 }
 
-export const ORCAD_NEVER_LAUNCHED = 'NEVER_LAUNCHED'
+/**
+ * Proven exit: a dead PID, or a slot nothing was ever started from. `UNKNOWN` proves nothing,
+ * so a reader that would start, replace or remove must not act on it.
+ */
+export function orcadLivenessProvenExited(liveness: OrcadLiveness): boolean {
+  return liveness === 'DEAD' || liveness === ORCAD_NEVER_LAUNCHED
+}
 
 /** GC's reading of a liveness answer: a slot that never launched holds nothing and is removable. */
 export function orcadLivenessAnswerBlocksGc(output: string): boolean {
-  return output.trim().split('\n').pop()?.trim() === ORCAD_NEVER_LAUNCHED
-    ? false
-    : orcadLivenessBlocksGc(parseOrcadLiveness(output))
+  return orcadLivenessBlocksGc(parseOrcadLiveness(output))
 }
 
 /** True when GC must leave this directory alone. Inconclusive counts as in use. */
 export function orcadLivenessBlocksGc(liveness: OrcadLiveness): boolean {
-  return liveness !== 'DEAD'
+  return !orcadLivenessProvenExited(liveness)
 }
 
 export type OrcadReadinessParse =

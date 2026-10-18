@@ -51,6 +51,7 @@ import type {
   StatusRowMutationListener
 } from './server-types'
 import { RevisionedMap } from './revisioned-map'
+import { forgetAgentExitForPane, type AgentExitEvidence } from './agent-exit-evidence'
 
 /** Shared mutable state for the layered hook-server implementation. */
 export abstract class AgentHookServerState {
@@ -74,6 +75,17 @@ export abstract class AgentHookServerState {
     return this.canonicalStatusStoreInstance
   }
   protected readonly canonicalListingOrder = new Map<string, number>()
+  /** When this host proved a pane's agent process ended; outlives the row the exit reconciles. */
+  protected readonly agentExitedAtByPaneKey = new Map<string, AgentExitEvidence>()
+
+  /** A new agent (or a new worker attach) claimed the pane; the previous exit no longer describes it. */
+  forgetAgentExit(paneKey: string): void {
+    const exits = this.agentExitedAtByPaneKey
+    const resolveAlias = (key: string): string => this.resolvePaneKeyAlias(key)
+    if (forgetAgentExitForPane({ exits, paneKey, resolveAlias })) {
+      this.scheduleStatusPersist()
+    }
+  }
   protected readonly canonicalSubjectsByPane = new Map<string, Map<string, AgentStatusSubject>>()
   private statusListingOrder = 0
   protected nextStatusListingOrder = (): number => ++this.statusListingOrder
@@ -93,6 +105,7 @@ export abstract class AgentHookServerState {
   protected onStartupPromptClaim: ((body: unknown) => boolean | 'pending') | null = null
   protected clearStartupPromptClaims: (() => void) | null = null
   protected statusHooksEnabled = true
+  protected statusHookGeneration = 0
   protected onPaneStatusCleared: PaneStatusClearListener | null = null
   protected paneStatusClearListeners = new Set<PaneStatusClearListener>()
   protected statusDropListeners = new Set<StatusDropListener>()
@@ -102,7 +115,6 @@ export abstract class AgentHookServerState {
   protected statusRowMutationListeners = new Set<StatusRowMutationListener>()
   // Hydration and spool replay belong to the owner lifetime, not each transport bind attempt.
   protected ownerStateInitialized = false
-  // Resolves after durable status hydration and spool replay, before listener binding.
   protected statusCacheHydrationReady: Promise<void> = Promise.resolve()
   // Runtime terminal handles are stable across pane remints, unlike tab/leaf keys. This index is
   // deliberately in-memory only and contains no rows of its own.
@@ -183,7 +195,7 @@ export abstract class AgentHookServerState {
   ): EnrichedAgentHookEventPayload | undefined
   protected abstract clearTmuxInnerSubjects(paneKey: string): void
   protected abstract clearTmuxTabSubjects(tabId: string): void
-  protected abstract ingestSpoolRecord(record: SpoolRecord): void
+  protected abstract ingestSpoolRecord(record: SpoolRecord): Promise<void> | void
   protected abstract emitPaneStatusCleared(clear: AgentStatusClearIpcPayload): void
   protected abstract buildStatusChangeNotification(): {
     statuses: AgentHookStatusChangeEntry[]
@@ -297,6 +309,7 @@ export abstract class AgentHookServerState {
       emitStatusRowMutation?: boolean
       preserveTmuxInnerSubjects?: boolean
       statusUnavailable?: true
+      forgetAgentExit?: true
     }
   ): void
   protected abstract deleteStatusEntry(

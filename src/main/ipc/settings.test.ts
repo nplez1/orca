@@ -241,21 +241,23 @@ describe('registerSettingsHandlers', () => {
     )
   })
 
-  it('propagates a failed durable force-delete preference write through settings:set', async () => {
-    store.getSettings.mockReturnValue({ alwaysForceDeleteWorktrees: false })
+  // Why one test: both preferences take the same durable-flush path.
+  it.each([
+    ['alwaysForceDeleteWorktrees', { alwaysForceDeleteWorktrees: true, editorWordWrap: false }],
+    ['alwaysForceDeletePreservedBranches', { alwaysForceDeletePreservedBranches: true }]
+  ] as const)('propagates a failed durable %s write through settings:set', async (key, args) => {
+    store.getSettings.mockReturnValue({ [key]: false })
     store.updateSettingsAndFlush.mockRejectedValue(new Error('Disk full'))
     registerSettingsHandlers(store as never)
     const handler = handleMock.mock.calls.find((call) => call[0] === 'settings:set')?.[1]
     if (typeof handler !== 'function') {
       throw new Error('Missing settings:set handler')
     }
-    await expect(
-      handler(settingsInvokeEvent, { alwaysForceDeleteWorktrees: true, editorWordWrap: false })
-    ).rejects.toThrow('Disk full')
-    expect(store.updateSettingsAndFlush).toHaveBeenCalledWith(
-      { alwaysForceDeleteWorktrees: true, editorWordWrap: false },
-      { notifyListeners: true, originWebContentsId: 1 }
-    )
+    await expect(handler(settingsInvokeEvent, args)).rejects.toThrow('Disk full')
+    expect(store.updateSettingsAndFlush).toHaveBeenCalledWith(args, {
+      notifyListeners: true,
+      originWebContentsId: 1
+    })
   })
 
   it('persists Active Server only through the dedicated preference channel', () => {

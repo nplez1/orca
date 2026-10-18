@@ -15,6 +15,7 @@ export type ReposIpcMocks = {
   mockStore: Record<
     | 'getRepos'
     | 'getSettings'
+    | 'getAllWorktreeMeta'
     | 'addRepo'
     | 'removeProjectForHost'
     | 'getRepo'
@@ -48,6 +49,7 @@ export function createReposIpcMocks(): ReposIpcMocks {
       // Why legacy by default: the project-folder layout needs an explicit mode, so an
       // untouched mock keeps the placement every other assertion here was written against.
       getSettings: vi.fn().mockReturnValue({ workspaceDir: '', nestWorkspaces: true }),
+      getAllWorktreeMeta: vi.fn().mockReturnValue({}),
       addRepo: vi.fn(),
       removeProjectForHost: vi.fn(),
       getRepo: vi.fn(),

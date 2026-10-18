@@ -174,7 +174,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     prCache: props.prCache,
     workspaceStatuses,
     settings,
-    projectGroups,
+    projectGroups: props.visibleProjectGroups ?? projectGroups,
     projectGrouping: props.projectGrouping,
     flashRevealedRow: reveal.flashRevealedRow,
     markRevealScroll: scrollSuppression.markRevealScroll,

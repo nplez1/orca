@@ -71,31 +71,27 @@ export function installOrcaRuntimeOwnedControllers(
     }
   })
 
-  runtime.nestedRepoImport = new RuntimeNestedRepoImport({
+  const repositoryCatalogDeps = {
     getStore: () => runtime.store,
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
-    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
+    invalidateWorktreeScan: (repoId: string) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged()
-  })
+  }
 
-  runtime.repositoryRegistrations = new RuntimeRepositoryRegistrationController({
-    getStore: () => runtime.store,
-    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
-    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
-    notifyReposChanged: () => runtime.notifyReposChanged()
-  })
+  runtime.nestedRepoImport = new RuntimeNestedRepoImport(repositoryCatalogDeps)
 
-  runtime.repositoryClones = new RuntimeRepositoryCloneController({
-    getStore: () => runtime.store,
-    invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
-    invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
-    notifyReposChanged: () => runtime.notifyReposChanged()
-  })
+  runtime.repositoryRegistrations = new RuntimeRepositoryRegistrationController(
+    repositoryCatalogDeps
+  )
+
+  runtime.repositoryClones = new RuntimeRepositoryCloneController(repositoryCatalogDeps)
 
   runtime.repositorySettings = new RuntimeRepositorySettingsController({
     getStore: () => runtime.store,
     resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
     forgetTerminalTopology: (repoId) => runtime.terminalTopologyRevisionByRepoId.delete(repoId),
+    stopProjectTerminals: (repo, deadline) =>
+      runtime.stopTerminalsForProject(repo, { deadline }),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged()
@@ -134,7 +130,8 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
     hasRuntimeOwnedPtyCandidate: (session, worktreeId, tabs) =>
-      runtime.workspaceSessionWorktreeHasRuntimeOwnedPtyCandidate(session, worktreeId, tabs)
+      runtime.workspaceSessionWorktreeHasRuntimeOwnedPtyCandidate(session, worktreeId, tabs),
+    getCachedWorktrees: () => runtime.resolvedWorktrees.peek()?.worktrees ?? null
   })
 
   runtime.aiVault = new RuntimeAiVaultCommands(() => runtime.prepareAiVaultSessionResumeFn)

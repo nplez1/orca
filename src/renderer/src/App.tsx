@@ -9,6 +9,7 @@ import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
 import RunningTerminalCloseDialog from './components/terminal-pane/RunningTerminalCloseDialog'
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
+import ClaudeAccountSwitchDialog from './components/ClaudeAccountSwitchDialog'
 import { useUnreadDockBadge } from './hooks/useUnreadDockBadge'
 import { AppBackgroundServices } from './app-shell/AppBackgroundServices'
 import { useAgentTabFocusOverlayClose } from './hooks/use-agent-tab-focus-overlay-close'
@@ -33,6 +34,7 @@ import { useOnboardingAndFeatureTips } from './app-shell/use-onboarding-and-feat
 import { usePersistedUIWriter } from './app-shell/use-persisted-ui-writer'
 import { useRuntimeGraphSync } from './app-shell/use-runtime-graph-sync'
 import { useWindowVisibilityEffects } from './app-shell/use-window-visibility-effects'
+import { SpaceWindowStatePublisher } from './components/workspace-space/SpaceWindowStatePublisher'
 import { useUiHangDiagnostics } from './lib/ui-hang-diagnostics/use-ui-hang-diagnostics'
 
 function App(): React.JSX.Element {
@@ -97,6 +99,7 @@ function App(): React.JSX.Element {
           <DocPreviewExternalLinkConfirmation />
           <LinkRoutingPreferenceDialogProvider>
             <AppBackgroundServices />
+            <SpaceWindowStatePublisher />
             <AppWorkspaceShell layout={layout} floatingWorkspace={floatingWorkspace} />
             <AppRootSurfaces
               floatingWorkspace={floatingWorkspace}
@@ -109,6 +112,7 @@ function App(): React.JSX.Element {
       </TooltipProvider>
       <SkillFreshnessNudge />
       <WorktreeBaseFallbackDialog />
+      <ClaudeAccountSwitchDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />
       {/* Why: Electron's drag-region hit-test is DOM-order-based (ignores z-index); render last so WindowControls stay clickable. */}

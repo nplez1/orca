@@ -92,9 +92,11 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
   cache: AppState['hostedReviewCache']
   accepted: boolean
   /**
-   * The result lost a race to a newer hosted-review write. The paired PR entry
-   * must be kept, not deleted: the newer write may be a hosted-review-only refresh
-   * (which never writes prCache), so deleting would blank the Checks panel mid-refresh.
+   * The result lost a race to a hosted-review write that is not newer than the result
+   * itself, so the write says nothing about the PR. The paired PR entry must be kept, not
+   * deleted: the write may be a hosted-review-only refresh (which never writes prCache),
+   * so deleting would blank the Checks panel mid-refresh. A write that really is newer
+   * outranks the result and clears the entry with it.
    */
   preservePRCacheOnReject: boolean
 } {
@@ -116,7 +118,14 @@ export function syncHostedReviewCacheFromGitHubPRResult(args: {
       args.requestStartedEntry
     )
   ) {
-    return { cache: args.cache, accepted: false, preservePRCacheOnReject: true }
+    // Why: a write that is newer than this result outranks it, so the paired PR entry it
+    // already replaced must not be resurrected; only a write this result is newer than
+    // lost the race to us, and deleting there blanked the Checks panel instead.
+    return {
+      cache: args.cache,
+      accepted: false,
+      preservePRCacheOnReject: (args.cache[hostedReviewCacheKey]?.fetchedAt ?? 0) < args.fetchedAt
+    }
   }
   const hostedReviewEntry = args.cache[hostedReviewCacheKey]
   if (

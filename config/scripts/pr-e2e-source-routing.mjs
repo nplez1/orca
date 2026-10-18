@@ -20,9 +20,12 @@ const NATIVE_IME_PRODUCT_SOURCE =
 const NATIVE_IME_HARNESS =
   /^(?:config\/scripts\/focus-nested-wayland-terminal\.sh$|config\/scripts\/(?:run-terminal-ibus-hangul-e2e|terminal-ime-engagement-receipt)\.mjs$|tests\/e2e\/terminal-ime-(?:boundary-probe|byte-reader|engagement-receipt)\.ts$|tests\/e2e\/terminal-(?:ibus-hangul|hangul-terminating-digit|macos-2set-korean)-native\.spec\.ts$)/
 
-/** Managed-SSH harness helpers; every managed-SSH spec runs in one job, so any route may claim them. */
+/**
+ * Managed-SSH harness helpers; every managed-SSH spec runs in one job, so any route may claim them.
+ * `pr-e2e-managed-ssh-harness-route.test.mjs` fails when a helper only these specs import is missing.
+ */
 const MANAGED_SSH_HARNESS =
-  /^tests\/e2e\/helpers\/(?:orcad-managed-workspace|orcad-convert-(?:flow|host)|orcad-template-variant|orcad-upgrade-profile|docker-ssh-host-target)\.ts$/
+  /^tests\/e2e\/helpers\/(?:orcad-managed-workspace|orcad-convert-(?:flow|host|teardown)|orcad-template-variant|orcad-upgrade-(?:profile|retained-state)|docker-ssh-host-target|reserve-local-port|ssh-remote-only-browser-fixture|windows-host-orcad-processes)\.ts$/
 
 export const PR_E2E_SOURCE_ROUTES = [
   {
@@ -180,6 +183,15 @@ export const PR_E2E_SOURCE_ROUTES = [
       )
   },
   {
+    id: 'ssh.orcad-desktop-browser-bridge',
+    specs: ['tests/e2e/ssh-orcad-desktop-browser-bridge.spec.ts'],
+    matches: (file) =>
+      isProductSource(file) &&
+      /^src\/(?:shared\/desktop-browser-bridge-protocol\.ts$|main\/(?:runtime\/desktop-browser-bridge\/|browser\/desktop-browser-bridge\/|ipc\/desktop-browser-bridge-|runtime\/rpc\/methods\/desktop-browser-bridge\.ts$))/.test(
+        file
+      )
+  },
+  {
     id: 'ssh.orcad-browser-drop-owner',
     specs: ['tests/e2e/ssh-orcad-browser-drop-owner.spec.ts'],
     matches: (file) =>
@@ -223,6 +235,7 @@ export const PR_E2E_SOURCE_ROUTES = [
   },
   {
     // Why: managed SSH hosts are now the only SSH path, so these specs carry its user journeys.
+    // Connect/Disconnect sources too: the journeys disconnect and reconnect a managed host (#30130).
     id: 'ssh.orcad-journeys',
     specs: [
       'tests/e2e/ssh-orcad-terminal-journeys.spec.ts',
@@ -235,9 +248,26 @@ export const PR_E2E_SOURCE_ROUTES = [
         file
       ) ||
       (isProductSource(file) &&
-        /^src\/(?:main\/ssh\/orcad-managed-|main\/ipc\/ssh-port-forward|renderer\/src\/startup\/(?:ssh-startup-reconnect|startup-ssh-connection-restore)\.ts$|renderer\/src\/runtime\/(?:web-runtime-session|runtime-terminal-artifact-read\.ts$)|renderer\/src\/components\/terminal-pane\/(?:remote-runtime-|terminal-host-(?:workspace-file|file-link-existence)\.ts$))/.test(
+        /^src\/(?:main\/ssh\/orcad-managed-|main\/ipc\/ssh-port-forward|main\/(?:ipc\/(?:ssh-(?:connect-flow|connection-handlers|host-user-disconnect|session-teardown)|runtime-environment-(?:connectivity-handlers|manual-disconnect))|ssh\/ssh-(?:connection-manager|user-disconnect))\.ts$|renderer\/src\/startup\/(?:ssh-startup-reconnect|startup-ssh-connection-restore)\.ts$|renderer\/src\/runtime\/(?:web-runtime-session|web-session-close-|runtime-terminal-artifact-read\.ts$)|renderer\/src\/components\/terminal-pane\/(?:remote-runtime-|terminal-host-(?:workspace-file|file-link-existence)\.ts$))/.test(
           file
         ))
+  },
+  {
+    // Why: hand-kept routes missed #30130 and #30120; scoped to managed-host code to bound lane cost.
+    id: 'ssh.orcad-remote-sources',
+    specs: [
+      'tests/e2e/ssh-orcad-paired-phone-projects.spec.ts',
+      'tests/e2e/ssh-orcad-retained-upgrade-state.spec.ts',
+      'tests/e2e/ssh-orcad-shared-home-machines.spec.ts',
+      'tests/e2e/ssh-orcad-shared-login-migration.spec.ts',
+      'tests/e2e/ssh-orcad-terminal-network-outage.spec.ts',
+      'tests/e2e/ssh-orcad-windows-cli-matrix.spec.ts'
+    ],
+    matches: (file) =>
+      isProductSource(file) &&
+      /^src\/(?:main\/(?:ssh|orcad|managed-server)\/|main\/ipc\/(?:ssh|runtime-environment|orcad-)|cli\/runtime\/(?:launch-)?serve|shared\/(?:remote-runtime|orcad-|protocol-version\.ts$|runtime-capability)|renderer\/src\/store\/repos\/(?:repo-removal|runtime-project-terminal-stop)|renderer\/src\/components\/sidebar\/(?:sleep-|SleepTwin|WorkspaceSleep|use-worktree-sleep|ssh-host-remove|host-rename-remove|HostRemove))/.test(
+        file
+      )
   },
   {
     id: 'browser-network.ssh-docker-route',
@@ -258,7 +288,7 @@ export const PR_E2E_SOURCE_ROUTES = [
     ],
     matches: (file) =>
       isProductSource(file) &&
-      /^(?:config\/scripts\/(?:verify-wsl-e2e-participation|verify-playwright-participation)\.mjs$|src\/main\/(?:wsl[/-]|pty\/.*wsl|providers\/wsl)|src\/shared\/(?:wsl-|windows-terminal-shell)|src\/renderer\/src\/.*(?:terminal-paste|pty-paste)|tests\/e2e\/(?:golden-tab-bar-agent-launch\.spec|terminal-windows-shell-paste-ownership\.spec|helpers\/(?:wsl-golden-stub-agent|golden-stub-agent))|\.github\/(?:actions\/setup-wsl-test-runtime\/|workflows\/windows-wsl-e2e\.yml))/.test(
+      /^(?:config\/scripts\/(?:verify-wsl-e2e-participation|verify-playwright-participation)\.mjs$|src\/main\/(?:wsl[/-]|pty\/.*wsl|providers\/wsl)|src\/shared\/(?:wsl-|windows-terminal-shell)|src\/renderer\/src\/.*(?:terminal-paste|pty-paste)|tests\/e2e\/(?:golden-tab-bar-agent-launch\.spec|terminal-windows-shell-paste-ownership\.spec|terminal-inline-images-windows\.spec|helpers\/(?:wsl-golden-stub-agent|golden-stub-agent))|\.github\/(?:actions\/setup-wsl-test-runtime\/|workflows\/windows-wsl-e2e\.yml))/.test(
         file
       )
   },

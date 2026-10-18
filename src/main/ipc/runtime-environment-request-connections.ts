@@ -11,6 +11,7 @@ import type {
 } from '../../shared/runtime-rpc-envelope'
 import { RemoteRuntimeRequestConnection } from '../../shared/remote-runtime-request-connection'
 import { RemoteRuntimeSharedControlConnection } from '../../shared/remote-runtime-shared-control-connection'
+import { probeAllRemoteRuntimeSocketsNow } from '../../shared/remote-runtime-socket-liveness'
 import type {
   RemoteRuntimeSharedConnectionDiagnostics,
   RemoteRuntimeSharedSubscription
@@ -19,6 +20,10 @@ import { isRuntimeEnvironmentCapabilityPaused } from './runtime-environment-capa
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
 import { publishRuntimeEnvironmentDiagnostics } from './runtime-environment-diagnostics-broadcast'
 import { getHostSettingsReplicationSync } from '../host-sync/host-settings-replication-driver'
+import {
+  clearSharedControlAnswerSource,
+  setSharedControlAnswerSource
+} from './runtime-environment-shared-control-answers'
 import {
   advanceRuntimeEnvironmentTransportGeneration,
   getRuntimeEnvironmentTransportGeneration
@@ -32,6 +37,7 @@ type CachedRuntimeConnection = {
 type CachedSharedControlConnection = {
   pairingKey: string
   connection: RemoteRuntimeSharedControlConnection
+  answeredAt: () => number | null
 }
 
 const requestConnections = new Map<string, CachedRuntimeConnection>()
@@ -165,6 +171,7 @@ export function subscribeRemoteRuntimeSharedControlRequest<TResult>(
 export function closeRemoteRuntimeSharedControlConnection(environmentId: string): void {
   const cached = sharedControlConnections.get(environmentId)
   sharedControlConnections.delete(environmentId)
+  clearSharedControlAnswerSource(environmentId)
   cached?.connection.close()
 }
 
@@ -199,6 +206,9 @@ export function retryRemoteRuntimeSharedControlConnectionsNow(): void {
   for (const { connection } of sharedControlConnections.values()) {
     connection.retryNow()
   }
+  // Why: a socket that still reads OPEN after wake arms no reconnect timer, so retryNow finds
+  // nothing; probing every socket (shared control and per-stream) settles a dead path quickly (#9092).
+  probeAllRemoteRuntimeSocketsNow()
 }
 
 function getSharedControlConnection(
@@ -211,13 +221,19 @@ function getSharedControlConnection(
     advanceRuntimeEnvironmentTransportGeneration(environmentId)
     cached?.connection.close()
     const transportGeneration = getRuntimeEnvironmentTransportGeneration(environmentId)
+    let answeredAt: number | null = null
     cached = {
       pairingKey,
+      answeredAt: () => answeredAt,
       connection: new RemoteRuntimeSharedControlConnection(pairedConnection, {
         environmentId,
         clientCapabilities: ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
         isManuallyDisconnected: () => isRuntimeEnvironmentManuallyDisconnected(environmentId),
         isCapabilityPaused: () => isRuntimeEnvironmentCapabilityPaused(environmentId),
+        // Why wall clock: it advances across a suspend, so a pre-sleep answer reads as stale.
+        onAnswered: () => {
+          answeredAt = Date.now()
+        },
         onDiagnosticsChanged: (diagnostics) => {
           if (getRuntimeEnvironmentTransportGeneration(environmentId) !== transportGeneration) {
             return
@@ -249,6 +265,11 @@ function getSharedControlConnection(
       })
     }
     sharedControlConnections.set(environmentId, cached)
+    const entry = cached
+    // Why ready is enough: a socket reaches ready only on its own server frame, which stamps it.
+    setSharedControlAnswerSource(environmentId, () =>
+      entry.connection.getDiagnostics().state === 'ready' ? entry.answeredAt() : null
+    )
   }
   return cached.connection
 }

@@ -5,19 +5,23 @@ import type { SshConnection } from './ssh-connection'
 import { probeManagedOrcadTunnel } from './orcad-managed-tunnel-resume'
 import { ensureManagedOrcadServing } from './orcad-managed-serving'
 import { OrcadManagedTunnelManager } from './orcad-managed-tunnel-manager'
+import { getRemoteRuntimeSharedControlAnsweredAt } from '../ipc/runtime-environment-shared-control-answers'
 import { getSshConnectionManager, getSshTargetRegistryStore } from './ssh-target-registry'
 import {
   MANAGED_ORCAD_TUNNEL_TARGETING,
   type OrcadTunnelStartChecks
 } from './orcad-managed-tunnel-target'
 
-export { OrcadManagedTunnelManager } from './orcad-managed-tunnel-manager'
-
 const managedTunnels = new OrcadManagedTunnelManager({
   getConnectionManager: getSshConnectionManager,
   getTargetStore: getSshTargetRegistryStore,
   targeting: MANAGED_ORCAD_TUNNEL_TARGETING,
-  ensureServing: (input) => ensureManagedOrcadServing({ ...input, probe: probeManagedOrcadTunnel })
+  ensureServing: (input) =>
+    ensureManagedOrcadServing({
+      ...input,
+      probe: probeManagedOrcadTunnel,
+      answeredAt: getRemoteRuntimeSharedControlAnsweredAt
+    })
 })
 
 export async function ensureOrcadManagedTunnel(

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
 import { normalizeExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
-import type { BranchGroupMember } from './worktree-list/grouping/row-types'
+import type { BranchGroupMember } from '../../../../shared/sidebar-list/row-types'
 
 type WorktreeBranchHostSelectProps = {
   members: readonly BranchGroupMember[]

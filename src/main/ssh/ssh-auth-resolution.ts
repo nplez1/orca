@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { utils, type BaseAgent, type ParsedKey } from 'ssh2'
 import type { SshTarget } from '../../shared/ssh-types'
-import type { SshResolvedConfig } from './ssh-config-parser'
+import type { SshResolvedConfig } from './ssh-g-config-resolution'
 import { createIdentityFilteredAgent } from './ssh-agent-identity-filter'
 import { resolveSshConfigHomePath } from './ssh-config-path-expansion'
 import { isOpenSshConfigBackedTarget } from './system-ssh-args'
@@ -157,7 +157,7 @@ export function resolvePrivateKeys(
   return defaultKey ? [defaultKey] : []
 }
 
-function isUnencryptedPrivateKey(contents: Buffer): boolean {
+export function isUnencryptedPrivateKey(contents: Buffer): boolean {
   const parsed = utils.parseKey(contents) as ParsedKey | ParsedKey[] | Error
   if (parsed instanceof Error) {
     return false

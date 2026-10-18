@@ -74,7 +74,6 @@ describe('AI Vault listing wsl.exe probes', () => {
       // The fork's third argument: no refresh or query for a plain listing.
       {},
       expect.objectContaining({
-        sent: expect.any(Function),
         work: expect.any(Function),
         finish: expect.any(Function),
         fail: expect.any(Function)
@@ -102,7 +101,6 @@ describe('AI Vault listing wsl.exe probes', () => {
       expect.anything(),
       {},
       expect.objectContaining({
-        sent: expect.any(Function),
         work: expect.any(Function),
         finish: expect.any(Function),
         fail: expect.any(Function)

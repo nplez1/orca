@@ -1,5 +1,5 @@
 import React from 'react'
-import { ExternalLink, LoaderCircle, RefreshCw, Settings } from 'lucide-react'
+import { ExternalLink, RefreshCw, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
@@ -17,68 +17,15 @@ import { CheckFailureSummary } from './CheckFailureSummary'
 import { CheckRunJobs } from './CheckRunJobs'
 import { CheckBuildMetadata } from '@/components/check-build-metadata'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { useCheckDetailsReadingPosition } from './use-check-details-reading-position'
 
-function formatCheckTimestamp(value: string | null | undefined): string | null {
-  if (!value) {
-    return null
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return value
-  }
-  return parsed.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  })
-}
-
-type CheckStatusLike = {
-  status: PRCheckDetail['status'] | (string & {}) | null | undefined
-  conclusion: PRCheckDetail['conclusion'] | (string & {}) | null | undefined
-}
-
-function getCheckStatusLabel(check: CheckStatusLike): string {
-  const conclusion = check.conclusion ?? 'pending'
-  switch (conclusion) {
-    case 'success':
-      return translate('auto.components.editor.CheckRunDetailsPanel.8f2d0f5a91', 'Passed')
-    case 'failure':
-      return translate('auto.components.editor.CheckRunDetailsPanel.4c8e1b2d73', 'Failed')
-    case 'cancelled':
-      return translate('auto.components.editor.CheckRunDetailsPanel.91a4c7e2b0', 'Cancelled')
-    case 'timed_out':
-      return translate('auto.components.editor.CheckRunDetailsPanel.2f6d8a1c45', 'Timed out')
-    case 'action_required':
-      return translate(
-        'auto.components.editor.CheckRunDetailsPanel.actionRequired',
-        'Action required'
-      )
-    case 'skipped':
-      return translate('auto.components.editor.CheckRunDetailsPanel.7b3e9d4f12', 'Skipped')
-    case 'neutral':
-      return translate('auto.components.editor.CheckRunDetailsPanel.5a1c8e3d67', 'Neutral')
-    case 'pending':
-      return translate('auto.components.editor.CheckRunDetailsPanel.3d9f2b8e14', 'Pending')
-    default:
-      return isFailureState(conclusion)
-        ? translate('auto.components.editor.CheckRunDetailsPanel.4c8e1b2d73', 'Failed')
-        : translate('auto.components.editor.CheckRunDetailsPanel.3d9f2b8e14', 'Pending')
-  }
-}
-
-function isFailureState(state: string | null | undefined): boolean {
-  return (
-    state === 'failure' ||
-    state === 'failed' ||
-    state === 'action_required' ||
-    state === 'cancelled' ||
-    state === 'stale' ||
-    state === 'startup_failure' ||
-    state === 'timed_out'
-  )
-}
+import {
+  formatCheckTimestamp,
+  getCheckStatusLabel,
+  isFailureState,
+  type CheckStatusLike
+} from './check-run-details-status'
 
 export function CheckRunDetailsPanel({
   check,
@@ -88,7 +35,10 @@ export function CheckRunDetailsPanel({
   errorAction,
   openUrl,
   worktreeId,
-  onRefresh
+  onRefresh,
+  tabId,
+  viewStateScopeId,
+  contextKey
 }: {
   check: PRCheckDetail
   details: PRCheckRunDetails | null
@@ -99,6 +49,9 @@ export function CheckRunDetailsPanel({
   openUrl: string | null | undefined
   worktreeId: string | null
   onRefresh?: () => void
+  tabId?: string
+  viewStateScopeId?: string
+  contextKey?: string
 }): React.JSX.Element {
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const {
@@ -120,6 +73,22 @@ export function CheckRunDetailsPanel({
     check,
     details
   })
+  const { ref: readingRef, owner: positionOwner } = useCheckDetailsReadingPosition(
+    tabId,
+    viewStateScopeId,
+    contextKey
+  )
+  const [showProgress, setShowProgress] = React.useState(false)
+  React.useEffect(() => {
+    if (!loading) {
+      return
+    }
+    const timer = window.setTimeout(() => setShowProgress(true), 200)
+    return () => {
+      window.clearTimeout(timer)
+      setShowProgress(false)
+    }
+  }, [loading, tabId, viewStateScopeId, contextKey])
   const startedAt = formatCheckTimestamp(details?.startedAt)
   const completedAt = formatCheckTimestamp(details?.completedAt)
   const detailsStatusCheck: CheckStatusLike = {
@@ -132,7 +101,7 @@ export function CheckRunDetailsPanel({
       const state = job.conclusion ?? job.status
       return isFailureState(state)
     }) ?? []
-  const jobs = failedJobs.length > 0 ? failedJobs : (details?.jobs ?? [])
+  const jobs = details?.jobs ?? []
   // Why not `title` alone: Jenkins' title is the build display name, which the header and build
   // metadata already carry. A stage list (Jenkins) drops the box outright; other providers keep
   // their output, including a check whose only output is a title.
@@ -222,9 +191,16 @@ export function CheckRunDetailsPanel({
                 size="sm"
                 className="shrink-0"
                 disabled={loading}
+                aria-busy={loading}
                 onClick={onRefresh}
               >
-                <RefreshCw className={`size-3.5${loading ? ' animate-spin' : ''}`} />
+                <span className="flex size-3.5 items-center justify-center">
+                  {loading && showProgress ? (
+                    <LoadingSpinner className="size-3.5" />
+                  ) : (
+                    <RefreshCw className="size-3.5" />
+                  )}
+                </span>
                 {translate('auto.components.editor.CheckRunDetailsPanel.b7f5e2c91a', 'Refresh')}
               </Button>
             )}
@@ -262,93 +238,132 @@ export function CheckRunDetailsPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-sleek">
-        {loading ? (
+      <div className="h-12 shrink-0 overflow-y-auto px-5 py-2 scrollbar-sleek">
+        {error ? (
+          <div role="alert" className="break-words text-xs text-destructive">
+            {error}
+          </div>
+        ) : loading && showProgress ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="break-words text-xs text-muted-foreground"
+          >
+            {translate('githubChecks.refreshingDetails', 'Refreshing check details…')}
+          </div>
+        ) : null}
+      </div>
+      <div
+        ref={readingRef}
+        aria-busy={loading}
+        className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-sleek"
+      >
+        {loading && !details ? (
           <div
             role="status"
             aria-live="polite"
             className="flex items-center gap-2 py-4 text-sm text-muted-foreground"
           >
-            <LoaderCircle className="size-4 animate-spin" />
+            <LoadingSpinner className="size-4" />
             {translate(
               'auto.components.editor.CheckRunDetailsPanel.1f2b980522',
               'Loading check details…'
             )}
           </div>
         ) : (
-          <div className="grid gap-4">
-            {error && (
-              <div role="alert" className="flex flex-col items-start gap-2">
-                <span className="min-w-0 break-words text-sm text-destructive">{error}</span>
-                {errorAction?.kind === 'open-jenkins-settings' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      openSettingsTarget({
-                        pane: 'integrations',
-                        repoId: null,
-                        sectionId: JENKINS_INTEGRATION_SETTINGS_TARGET_ID
-                      })
-                    }
-                  >
-                    <Settings className="size-3.5" />
-                    {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
-                  </Button>
-                )}
+          <div className="grid grid-cols-1 gap-4">
+            {errorAction?.kind === 'open-jenkins-settings' && (
+              <div className="flex flex-col items-start gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    openSettingsTarget({
+                      pane: 'integrations',
+                      repoId: null,
+                      sectionId: JENKINS_INTEGRATION_SETTINGS_TARGET_ID
+                    })
+                  }
+                >
+                  <Settings className="size-3.5" />
+                  {translate('checkDetails.openJenkinsSettings', 'Open Jenkins settings')}
+                </Button>
               </div>
             )}
 
             {details && showsStageList && <CheckFailureSummary details={details} />}
 
-            {hasOutput && (
-              <section className="rounded-md border border-border bg-background">
-                <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                  <div className="text-sm font-medium">
-                    {translate('auto.components.editor.CheckRunDetailsPanel.d098e5529a', 'Output')}
-                  </div>
-                  <CheckRunCopyButton
-                    text={outputClipboardText}
-                    label={translate(
-                      'auto.components.editor.CheckRunDetailsPanel.copyOutput',
-                      'Copy output'
-                    )}
+            {(isFailureState(detailsStatusCheck.conclusion)
+              ? ['jobs', 'output', 'annotations']
+              : ['output', 'annotations', 'jobs']
+            ).map((section) => {
+              if (section === 'jobs') {
+                return hasJobs ? (
+                  <CheckRunJobs
+                    key="jobs"
+                    jobs={jobs}
+                    hasFailedJobs={failedJobs.length > 0}
+                    positionOwner={positionOwner}
                   />
-                </div>
-                <div className="px-3 py-3">
-                  {details?.title && (
-                    <div className="mb-2 text-sm font-medium text-foreground">{details.title}</div>
-                  )}
-                  {details?.summary && (
-                    <CommentMarkdown
-                      content={details.summary}
-                      variant="document"
-                      className="min-w-0 max-w-full overflow-hidden break-words text-sm leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
+                ) : null
+              }
+              if (section === 'annotations') {
+                return hasAnnotations ? (
+                  <CheckRunAnnotations
+                    key="annotations"
+                    annotations={details!.annotations}
+                    worktreeId={worktreeId}
+                  />
+                ) : null
+              }
+              return hasOutput ? (
+                <section key="output" className="rounded-md border border-border bg-background">
+                  <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                    <div className="text-sm font-medium">
+                      {translate(
+                        'auto.components.editor.CheckRunDetailsPanel.d098e5529a',
+                        'Output'
+                      )}
+                    </div>
+                    <CheckRunCopyButton
+                      text={outputClipboardText}
+                      label={translate(
+                        'auto.components.editor.CheckRunDetailsPanel.copyOutput',
+                        'Copy output'
+                      )}
                     />
-                  )}
-                  {details?.text && (
-                    <CommentMarkdown
-                      content={details.text}
-                      variant="document"
-                      className="mt-3 min-w-0 max-w-full overflow-hidden break-words text-sm leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
-                    />
-                  )}
-                </div>
-              </section>
-            )}
+                  </div>
+                  <div className="px-3 py-3">
+                    {details?.title && (
+                      <div className="mb-2 text-sm font-medium text-foreground">
+                        {details.title}
+                      </div>
+                    )}
+                    {details?.summary && (
+                      <CommentMarkdown
+                        content={details.summary}
+                        variant="document"
+                        className="min-w-0 max-w-full overflow-hidden break-words text-sm leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
+                      />
+                    )}
+                    {details?.text && (
+                      <CommentMarkdown
+                        content={details.text}
+                        variant="document"
+                        className="mt-3 min-w-0 max-w-full overflow-hidden break-words text-sm leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
+                      />
+                    )}
+                  </div>
+                </section>
+              ) : null
+            })}
 
             {details?.build && (
               <section className="rounded-md border border-border bg-background px-3 py-3">
                 <CheckBuildMetadata build={details.build} />
               </section>
             )}
-
-            {hasAnnotations && (
-              <CheckRunAnnotations annotations={details!.annotations} worktreeId={worktreeId} />
-            )}
-
-            {hasJobs && <CheckRunJobs jobs={jobs} hasFailedJobs={failedJobs.length > 0} />}
 
             {!error && !hasOutput && !hasAnnotations && !hasJobs && (
               <div className="text-sm text-muted-foreground">

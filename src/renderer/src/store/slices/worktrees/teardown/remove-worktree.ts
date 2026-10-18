@@ -26,10 +26,11 @@ import {
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
 } from '../../../../../../shared/worktree/removal'
-import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
+import { getWorktreeDeleteStateKey } from './worktree-delete-state'
+import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
-import { finalizePreservedBranchRemoval } from './preserved-branch-removal-completion'
 import {
   isRuntimeRepoNotFoundError,
   isRuntimeSelectorNotFoundError
@@ -41,6 +42,7 @@ import { tearDownRemovedWorktreeRendererState } from './removed-worktree-rendere
 import { buildWorktreeRemovalSuccessResult } from './worktree-removal-result'
 import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
+import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -73,9 +75,7 @@ export function createRemoveWorktree(
     } = start
     const sameIdSurvivingHostId =
       catalogSameIdSurvivingHostId ?? options?.sameIdSurvivingHostId ?? null
-    const deleteStateKey = requiredExecutionHostId
-      ? composeWorktreeHostIdentity(requiredExecutionHostId, worktreeId)
-      : worktreeId
+    const deleteStateKey = getWorktreeDeleteStateKey(get(), worktreeId, requiredExecutionHostId)
     set((s) => ({
       deleteStateByWorktreeId: {
         ...s.deleteStateByWorktreeId,
@@ -249,25 +249,51 @@ export function createRemoveWorktree(
       })
       // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
       clearSessionCommitDraftForWorktree(worktreeId)
-      const preservedBranch = finalizePreservedBranchRemoval(removalResult, {
-        worktreeId,
-        hostId,
-        runtimeEnvironmentId: removalRoute?.runtimeEnvironmentId,
-        target,
-        worktreeBeforeRemoval,
-        suppressToast: options?.suppressPreservedBranchToast === true,
-        onForceDelete: (branchName, expectedHead) => {
-          void get().forceDeletePreservedBranch(worktreeId, branchName, expectedHead, {
+      const preservedBranch = removalResult?.preservedBranch
+      const cleanup = preservedBranch
+        ? {
+            worktreeId,
+            branchName: preservedBranch.branchName,
+            expectedHead: preservedBranch.head,
             ...(hostId ? { hostId } : {}),
             ...(removalRoute?.runtimeEnvironmentId
               ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
               : {})
-          })
-        }
+          }
+        : null
+      if (preservedBranch) {
+        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup!), {
+          cleanup: cleanup!,
+          target
+        })
+      }
+      const branchCleanupOptions = {
+        ...(hostId ? { hostId } : {}),
+        ...(removalRoute?.runtimeEnvironmentId
+          ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
+          : {})
+      }
+      const autoDeletedBranch = await completePreservedBranchCleanup({
+        get,
+        worktreeId,
+        removalResult,
+        worktreeBeforeRemoval,
+        branchCleanupOptions,
+        suppressToast: options?.suppressPreservedBranchToast === true
       })
       pruneHostedReviewLinkMutationGenerations([worktreeId])
       return buildWorktreeRemovalSuccessResult({
-        preservedBranch,
+        // Why: an auto-deleted branch is gone, so the removal reports no preserved branch.
+        preservedBranch:
+          preservedBranch && cleanup && !autoDeletedBranch
+            ? {
+                ...preservedBranch,
+                ...(cleanup.hostId ? { hostId: cleanup.hostId } : {}),
+                ...(cleanup.runtimeEnvironmentId
+                  ? { runtimeEnvironmentId: cleanup.runtimeEnvironmentId }
+                  : {})
+              }
+            : null,
         remoteBranchCleanup: removalResult?.remoteBranchCleanup
       })
     } catch (err) {

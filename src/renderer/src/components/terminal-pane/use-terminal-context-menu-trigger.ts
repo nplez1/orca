@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
 import type { TerminalPasteSource } from './terminal-paste-model'
 import { copyTerminalSelection } from './terminal-selection-copy'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 import { suppressTerminalRightClickPtyMouseReport } from './terminal-right-click-pty-mouse-suppression'
+import {
+  claimTerminalRightClickPasteMouseDown,
+  isTerminalRightClickPasteGesture
+} from './terminal-right-click-paste-gesture'
 
 type UseTerminalContextMenuTriggerDeps = {
   managerRef: React.RefObject<PaneManager | null>
@@ -92,40 +96,38 @@ export function useTerminalContextMenuTrigger({
     setOpen(true)
   }
 
-  const onContextMenuCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
+  const findClickedPane = (target: EventTarget | null): ManagedPane | null => {
     const manager = managerRef.current
-    if (!manager) {
-      event.preventDefault()
-      contextPaneIdRef.current = null
-      return
+    if (!manager || !(target instanceof Node)) {
+      return null
     }
-    const target = event.target
-    if (!(target instanceof Node)) {
-      event.preventDefault()
-      contextPaneIdRef.current = null
-      return
-    }
-    const clickedPane = manager.getPanes().find((pane) => pane.container.contains(target)) ?? null
-    openContextMenu(event, clickedPane?.id ?? null, event.currentTarget)
+    return manager.getPanes().find((pane) => pane.container.contains(target)) ?? null
   }
 
-  // Why: xterm encodes the mouse report on mousedown, before contextmenu decides
-  // paste vs copy, so the whole Orca-owned gesture has to be claimed here.
   const onMouseDownCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
-    if (!rightClickToPaste || event.button !== 2) {
+    if (!isTerminalRightClickPasteGesture(event, rightClickToPaste)) {
       return
     }
+    const clickedPane = findClickedPane(event.target)
+    if (!clickedPane) {
+      return
+    }
+    claimTerminalRightClickPasteMouseDown(event, clickedPane.terminal)
+    // Why: the claim only withholds the press; a mouse-tracking TUI still gets the
+    // drag and release, and some read the clipboard on them, so suppress the gesture.
+    if (clickedPane.terminal.modes.mouseTrackingMode !== 'none') {
+      suppressTerminalRightClickPtyMouseReport(clickedPane.terminal)
+    }
+  }
+
+  const onContextMenuCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
     const target = event.target
-    if (!(target instanceof Node)) {
+    if (!managerRef.current || !(target instanceof Node)) {
+      event.preventDefault()
+      contextPaneIdRef.current = null
       return
     }
-    const clickedPane = managerRef.current
-      ?.getPanes()
-      .find((pane) => pane.container.contains(target))
-    if (!clickedPane || clickedPane.terminal.modes.mouseTrackingMode === 'none') {
-      return
-    }
-    suppressTerminalRightClickPtyMouseReport(clickedPane.terminal)
+    openContextMenu(event, findClickedPane(target)?.id ?? null, event.currentTarget)
   }
 
   const onPaneTitleContextMenu = (event: React.MouseEvent<HTMLElement>, paneId: number): void => {

@@ -54,7 +54,7 @@ function getMetadataPath(): string {
   return adoptLegacyHomeStore('bitbucket-credential.json')
 }
 
-function getSecretPath(): string {
+export function getSecretPath(): string {
   return adoptLegacyHomeStore('bitbucket-credential.enc')
 }
 

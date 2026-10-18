@@ -2,10 +2,14 @@ import type { Terminal } from '@xterm/xterm'
 import { copyTerminalSelection } from '@/components/terminal-pane/terminal-selection-copy'
 import { suppressTerminalRightClickPtyMouseReport } from '@/components/terminal-pane/terminal-right-click-pty-mouse-suppression'
 import type { PreviewTerminalPasteSource } from './preview-terminal-paste'
+import {
+  claimTerminalRightClickPasteMouseDown,
+  isTerminalRightClickPasteGesture
+} from '@/components/terminal-pane/terminal-right-click-paste-gesture'
 
 type PreviewRightClickTerminal = Pick<
   Terminal,
-  'element' | 'options' | 'getSelection' | 'clearSelection'
+  'element' | 'options' | 'getSelection' | 'clearSelection' | 'focus'
 > & { modes: Pick<Terminal['modes'], 'mouseTrackingMode'> }
 
 /**
@@ -45,19 +49,21 @@ export function installPreviewTerminalRightClickPaste({
     pasteClipboardText(document.activeElement, 'right-click')
   }
   const onMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 2 || !isRightClickToPasteEnabled()) {
-      return
-    }
     const terminal = getTerminal()
-    if (!terminal || terminal.modes.mouseTrackingMode === 'none') {
+    if (!terminal || !isTerminalRightClickPasteGesture(event, isRightClickToPasteEnabled())) {
       return
     }
-    suppressTerminalRightClickPtyMouseReport(terminal)
+    claimTerminalRightClickPasteMouseDown(event, terminal)
+    // Why: the claim only withholds the press; a mouse-tracking TUI still gets the
+    // drag and release, and some read the clipboard on them, so suppress the gesture.
+    if (terminal.modes.mouseTrackingMode !== 'none') {
+      suppressTerminalRightClickPtyMouseReport(terminal)
+    }
   }
   container.addEventListener('contextmenu', onContextMenu)
-  container.addEventListener('mousedown', onMouseDown, { capture: true })
+  container.addEventListener('mousedown', onMouseDown, true)
   return () => {
+    container.removeEventListener('mousedown', onMouseDown, true)
     container.removeEventListener('contextmenu', onContextMenu)
-    container.removeEventListener('mousedown', onMouseDown, { capture: true })
   }
 }

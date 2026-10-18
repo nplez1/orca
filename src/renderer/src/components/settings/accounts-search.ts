@@ -8,6 +8,7 @@ import {
   getAccountsGrokSearchEntries,
   getAccountsZcodePlanSearchEntries
 } from './accounts-search-extra-providers'
+import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 
 export {
   getAccountsAntigravitySearchEntries,
@@ -31,28 +32,6 @@ export const getAccountsLocationSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.accounts.search.488a7e9206', 'linux'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.9f70aa706c', 'provider'),
       ...translateSearchKeyword('auto.components.settings.accounts.search.e02c136ad0', 'auth')
-    ]
-  }
-])
-
-export const getAccountsClaudeSearchEntries = createLocalizedCatalog(() => [
-  {
-    title: translate('auto.components.settings.accounts.search.75682e1b62', 'Claude Accounts'),
-    description: translate(
-      'auto.components.settings.accounts.search.dd75a73991',
-      'Optional account switching for Claude while preserving shared chat context.'
-    ),
-    keywords: [
-      ...translateSearchKeyword('auto.components.settings.accounts.search.e14049e1a8', 'claude'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.06662af91e', 'account'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.5b3f18ef4a', 'switch'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.8b06729e0f', 'active'),
-      ...translateSearchKeyword(
-        'auto.components.settings.accounts.search.86edc96bc9',
-        'status bar'
-      ),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.c759741d77', 'quota'),
-      ...translateSearchKeyword('auto.components.settings.accounts.search.f2d666a886', 'optional')
     ]
   }
 ])

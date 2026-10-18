@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { adoptLegacyHomeStore } from '../home-directory-migration'
-import { getSecretStore } from '../../shared/secret-store'
+import { writeEncryptedCredential } from '../integration-credential-file'
 import { readCredentialFileProtection } from '../credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import type { JiraSite, JiraSiteSelection } from '../../shared/jira-types'
@@ -30,7 +30,7 @@ function getSiteFilePath(): string {
   return adoptLegacyHomeStore('jira-sites.json')
 }
 
-function getTokenDir(): string {
+export function getTokenDir(): string {
   return adoptLegacyHomeStore('jira-tokens')
 }
 
@@ -161,15 +161,6 @@ export function writeSiteFile(file: JiraSiteFile): void {
   siteFileCache.invalidate()
 }
 
-function writeEncryptedToken(path: string, apiToken: string): void {
-  if (getSecretStore().isEncryptionAvailable()) {
-    writeFileSync(path, getSecretStore().encryptString(apiToken), { mode: 0o600 })
-    return
-  }
-  console.warn('[jira] secret encryption unavailable — storing token in plaintext')
-  writeFileSync(path, apiToken, { encoding: 'utf-8', mode: 0o600 })
-}
-
 export function readToken(siteId: string): string | null {
   return tokenFileCache.read(siteId)
 }
@@ -182,7 +173,7 @@ export function getSiteTokenProtection(siteId: string): SecretAtRestProtection |
 export function saveToken(siteId: string, apiToken: string): void {
   ensureOrcaDir()
   ensureTokenDir()
-  writeEncryptedToken(getTokenPath(siteId), apiToken)
+  writeEncryptedCredential('Jira', getTokenPath(siteId), apiToken)
   // The next action reads the actual file, including any overlapping writer's replacement.
   tokenFileCache.forget(siteId)
 }

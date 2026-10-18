@@ -39,6 +39,7 @@ import {
 } from './worktree-catalog-list-all'
 import { getLocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
 import { readPersistedWorktreeScanCache } from './persisted-worktree-scan-cache'
+import { withoutInFlightWorktreeCreates } from '../../../worktree-create-in-flight'
 
 export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): void {
   const { store } = context
@@ -104,7 +105,10 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
         }
         loggedWorktreeListFailures.delete(`${repo.id}:${repo.path}`)
         const metadata = metadataForRepo(repo)
-        const rows = await withUnregisteredRemovalCheckouts(repo.id, scan.gitWorktrees)
+        const rows = await withUnregisteredRemovalCheckouts(
+          repo.id,
+          withoutInFlightWorktreeCreates(repo.id, scan.gitWorktrees)
+        )
         const worktrees = buildDetectedGitWorktrees(store, repo, rows, metadata)
           .filter((worktree) => worktree.visible)
           .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))
@@ -210,7 +214,10 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
       }
       loggedWorktreeListFailures.delete(`${repo.id}:${repo.path}`)
       const metadata = allMeta ?? readAllWorktreeMetaForRepo(store, repo)
-      const rows = await withUnregisteredRemovalCheckouts(repo.id, scan.gitWorktrees)
+      const rows = await withUnregisteredRemovalCheckouts(
+        repo.id,
+        withoutInFlightWorktreeCreates(repo.id, scan.gitWorktrees)
+      )
       const worktrees = buildDetectedGitWorktrees(store, repo, rows, metadata)
         .filter((worktree) => worktree.visible)
         .map((worktree) => stampAndMergeVisibleDetectedWorktree(store, repo, worktree, metadata))

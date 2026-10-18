@@ -5,6 +5,7 @@ import type {
 } from '../../shared/ai-vault-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { sortAiVaultSessionsByRecency } from '../../shared/ai-vault-session-sort'
+import { dedupeScannedSessions } from './session-root-dedup'
 import {
   requestedAiVaultSessionDepth,
   truncateAiVaultListResult
@@ -65,6 +66,7 @@ export function mergeAiVaultListResults(
   unlimited = false,
   scopePaths: readonly string[] = []
 ): AiVaultListResult {
+  const depth = requestedAiVaultSessionDepth({ limit: rawLimit, unlimited })
   const byId = new Map<string, AiVaultSession>()
   const issues: AiVaultScanIssue[] = []
   for (const result of results) {
@@ -86,7 +88,7 @@ export function mergeAiVaultListResults(
       // matched. Keep the latest input stamp so identical legs stay a no-op.
       scannedAt: latestAiVaultScannedAt(results)
     },
-    requestedAiVaultSessionDepth({ limit: rawLimit, unlimited }),
+    depth,
     scopePaths
   )
 }
@@ -123,19 +125,21 @@ function latestAiVaultScannedAt(results: readonly AiVaultListResult[]): string {
  * filesystem scanner and the index — so which of them answered cannot change
  * which sessions a scope's list contains.
  */
-export function unionScopedSessions<T extends AiVaultSession>(
-  cappedSessions: T[],
-  scopeSessions: readonly T[]
-): T[] {
+export function unionScopedSessions(
+  cappedSessions: AiVaultSession[],
+  scopeSessions: readonly AiVaultSession[]
+): AiVaultSession[] {
   if (scopeSessions.length === 0) {
     return cappedSessions
   }
-  const byId = new Map<string, T>()
+  const byId = new Map<string, AiVaultSession>()
   for (const session of cappedSessions) {
     byId.set(session.id, session)
   }
   for (const session of scopeSessions) {
     byId.set(session.id, session)
   }
-  return sortAiVaultSessionsByRecency([...byId.values()])
+  // Alias-deduped first: a rollout's copy in another Codex home is a second row under
+  // a second id, which the id union above cannot collapse.
+  return sortAiVaultSessionsByRecency(dedupeScannedSessions([...byId.values()]))
 }

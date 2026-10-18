@@ -11,12 +11,12 @@ import {
   composeWorktreeHostIdentity,
   getWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
-import { PINNED_GROUP_KEY } from './group-keys'
+import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
 import {
   getProjectGroupingForRepo,
   type ProjectGroupingIndex
 } from '../../../../../../shared/project-section-grouping'
-import type { BranchGroupMember, Row, WorktreeRow } from './row-types'
+import type { BranchGroupMember, Row, WorktreeRow } from '../../../../../../shared/sidebar-list/row-types'
 
 // `|` is legal inside a branch, so the section and branch need a separator that
 // cannot appear in either.

@@ -138,7 +138,7 @@ export function AiVaultPanelHeader({
               'Refresh Session History'
             )}
             onClick={onRefresh}
-            disabled={loading}
+            disabled={searching && loading}
             aria-busy={loading}
             className="size-6"
           >

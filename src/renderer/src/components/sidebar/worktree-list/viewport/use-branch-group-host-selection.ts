@@ -2,8 +2,8 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { activateWorktreeFromSidebar } from '@/lib/sidebar-worktree-activation'
-import type { HostSectionRow } from '../../host-section-rows'
-import type { BranchGroupMember } from '../grouping/row-types'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
+import type { BranchGroupMember } from '../../../../../../shared/sidebar-list/row-types'
 
 type BranchGroupHostTarget = { member: BranchGroupMember; rowKey: string }
 

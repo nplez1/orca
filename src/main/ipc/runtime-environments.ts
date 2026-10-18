@@ -6,7 +6,7 @@ import {
 import { app, ipcMain } from 'electron'
 import { listEnvironments } from '../../shared/runtime-environment-store'
 import type { Store } from '../persistence'
-import { recordRemoteLayoutFrame } from '../remote-layout-snapshot'
+import { recordRemoteLayoutFrame } from '../remote-layout-snapshot/remote-layout-snapshot-recorder'
 import {
   isRuntimeEnvironmentManuallyDisconnected,
   registerRuntimeEnvironmentConnectivityHandlers,
@@ -17,12 +17,14 @@ import {
   getRuntimeEnvironmentStatusOwner
 } from './runtime-environment-request-connections'
 import { registerRuntimeEnvironmentRecoveryHandler } from './runtime-environment-recovery-handler'
+import { registerRuntimeEnvironmentRepairHandler } from './runtime-environment-repair-handler'
 import { advanceRuntimeEnvironmentTransportGeneration } from './runtime-environment-transport-generation'
 import { resetSharedControlSupport } from './runtime-environment-transport-routing'
 import { RUNTIME_ENVIRONMENT_HANDLER_CHANNELS } from './runtime-environment-handler-channels'
 import { registerOrcadRuntimeLifecycleHandlers } from './orcad-runtime-lifecycle-handlers'
 import { registerOrcadRuntimeConversionHandlers } from './orcad-runtime-conversion-handlers'
 import { registerOrcadDeltaMoveHandlers } from './orcad-delta-move-handlers'
+import { registerOrcadLeaveBehindHandlers } from './orcad-leave-behind-handlers'
 import { registerOrcadRuntimeMaintenanceHandlers } from './orcad-runtime-maintenance-handlers'
 import { clearPublishedManagedServer } from './ssh-renderer-broadcast'
 import { clearManagedServerNotes } from './runtime-environment-managed-tunnel'
@@ -34,6 +36,7 @@ import { advanceRuntimeEnvironmentCapabilityIncarnation } from './runtime-enviro
 import { retireMobileDesktopRelayEnvironment } from './runtime-environment-mobile-relay-hosts'
 import { watchRuntimeEnvironmentPreference } from './runtime-environment-preference'
 import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
+import { resetDesktopBrowserBridgeEnvironment } from './desktop-browser-bridge-reconcile'
 
 const remoteRuntimeSubscriptions = new Map<string, RetainedRemoteRuntimeSubscription>()
 const getUserDataPath = (): string => app.getPath('userData')
@@ -76,6 +79,7 @@ export function invalidateRuntimeEnvironmentTransport(environmentId: string): Pr
   closeRemoteRuntimeRequestConnection(environmentId)
   closeSubscriptionsForEnvironment(environmentId)
   retireMobileDesktopRelayEnvironment(environmentId)
+  resetDesktopBrowserBridgeEnvironment(environmentId)
   reactivateRuntimeEnvironmentStatus(environmentId)
   return retirePairedRuntimeBrowserClientHostEnvironment(
     environmentId,
@@ -134,6 +138,10 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
     getSettings: () => store.getSettings()
   })
   registerRuntimeEnvironmentRecoveryHandler()
+  registerRuntimeEnvironmentRepairHandler({
+    getUserDataPath,
+    invalidateTransport: invalidateRuntimeEnvironmentTransport
+  })
   registerRuntimeEnvironmentPassiveHandlers(getUserDataPath)
   for (const environment of listEnvironments(getUserDataPath())) {
     if (
@@ -150,6 +158,7 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
   registerOrcadRuntimeLifecycleHandlers({ getUserDataPath })
   registerOrcadRuntimeConversionHandlers(getUserDataPath)
   registerOrcadDeltaMoveHandlers(getUserDataPath)
+  registerOrcadLeaveBehindHandlers()
   registerOrcadRuntimeMaintenanceHandlers({
     getUserDataPath,
     getActiveEnvironmentId: () => store.getSettings().activeRuntimeEnvironmentId,

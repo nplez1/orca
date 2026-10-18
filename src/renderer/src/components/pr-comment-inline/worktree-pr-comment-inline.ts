@@ -4,7 +4,7 @@ import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-typ
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { useAppStore } from '@/store'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
-import { getGitHubPRCacheKey, getGitHubRepoCacheKey } from '@/store/slices/github-cache-key'
+import { getGitHubPRCacheKey, getGitHubRepoCacheKey } from '../../../../shared/github/github-cache-key'
 import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
 import { isGitHubPRSuppressed } from '../../../../shared/worktree/github-pr-suppression'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'

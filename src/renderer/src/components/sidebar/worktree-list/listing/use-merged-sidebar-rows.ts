@@ -6,12 +6,12 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../../../shared/execution-host'
 import { buildProjectGroupingIndex } from '../../../../../../shared/project-section-grouping'
 import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
-import type { buildSidebarRowPlan } from '../grouping/build-rows'
+import type { planSidebarRows } from '../../../../../../shared/sidebar-list/sidebar-row-plan'
 import { mergeSameBranchRows } from '../grouping/branch-groups'
-import type { Row, WorktreeGroupBy } from '../grouping/row-types'
+import type { Row, WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 
 type MergedSidebarRowsArgs = {
-  rowPlan: ReturnType<typeof buildSidebarRowPlan>
+  rowPlan: ReturnType<typeof planSidebarRows>
   rowCollapsedGroups: Set<string>
   groupBy: WorktreeGroupBy
   workspaceHostScope: AppState['workspaceHostScope']

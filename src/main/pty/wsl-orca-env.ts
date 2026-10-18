@@ -120,6 +120,7 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     `${ORCA_IMAGE_PROTOCOL_ENV}/u`,
     // Why /u: a flag, not a path; wsl.exe imports nothing unless WSLENV names it.
     `${PI_CLIPBOARD_OSC52_ENV}/u`,
+    'CLAUDE_CODE_FORCE_TERMINAL_IMAGES/u',
     'ORCA_OMP_FRESH_CONFIG/p',
     ...worktreeSetupWslenvEntries(env)
   ]

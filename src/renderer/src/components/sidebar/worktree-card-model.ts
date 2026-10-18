@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Repo } from '../../../../shared/repo-types'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { WorkspaceStatus, Worktree } from '../../../../shared/worktree/types'
-import type { BranchGroupMember } from './worktree-list/grouping/row-types'
+import type { BranchGroupMember } from '../../../../shared/sidebar-list/row-types'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 
 export type WorktreeRenameRequest = {

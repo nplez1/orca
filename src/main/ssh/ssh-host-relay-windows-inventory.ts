@@ -9,7 +9,10 @@
  */
 import { RELAY_REMOTE_DIR } from './relay-protocol'
 import { commandWithNodePath } from './ssh-remote-commands'
-import { powerShellLiteral, powerShellNativeArg } from './ssh-remote-powershell'
+import {
+  quotePowerShellLiteral as powerShellLiteral,
+  quotePowerShellNativeArgument as powerShellNativeArg
+} from '../../shared/powershell-native-argument'
 import { windowsRelayPipePathsForSocketName } from './ssh-relay-endpoints'
 import { RELAY_INSTALL_MODEL, remoteInstallVersionDirRegex } from './remote-install-model'
 import { joinRemotePath, type RemoteHostPlatform } from './ssh-remote-platform'
@@ -135,9 +138,9 @@ export const WINDOWS_PIPE_ACCESS_JS = [
   'var net=require("net");var pipes=process.argv.slice(1);var out={};var i=0;',
   'function next(){if(i>=pipes.length){process.stdout.write(JSON.stringify(out));return}',
   'var p=pipes[i++];var s=net.connect(p);var done=false;',
-  'function fin(v){if(done)return;done=true;out[p]=v;try{s.destroy()}catch(e){}next()}',
+  'function fin(v){if(done)return;done=true;clearTimeout(timer);out[p]=v;try{s.destroy()}catch(e){}next()}',
   's.on("connect",function(){fin("ok")});s.on("error",function(e){fin(e.code||"unknown")});',
-  'setTimeout(function(){fin("timeout")},2000)}next()'
+  'var timer=setTimeout(function(){fin("timeout")},2000)}next()'
 ].join('')
 
 export function windowsPipeAccessCommand(

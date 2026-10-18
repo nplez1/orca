@@ -1,4 +1,5 @@
 import { readAgentProcessIdentity } from './agent-process-presence'
+import { isInheritedPaneOwnerEvent } from './agent-hook-listener/inherited-pane-owner-guard'
 import { normalizeAgentStatusPayload, type AgentMainAgentStatus } from './agent-status-types'
 import type { AgentHookSource } from './agent-hook-relay'
 import { extractAgentProviderSession } from './agent-session-resume'
@@ -153,6 +154,10 @@ export function normalizeHookPayload(
     return null
   }
   const previousStatus = state.lastStatusByPaneKey.get(paneKey)
+  // Reject before provider folds mutate the pane's prompt, tool and child caches.
+  if (isInheritedPaneOwnerEvent({ previousStatus, worktreeId, source })) {
+    return null
+  }
   // Why: only a MANUAL completion claims anything, so only it may write compact-scoped state. An
   // auto compact runs inside a turn that resumes and emits its own Stop; running the ownership
   // guard for it would burn the pane's consumed-compact slot on an event that maps to nothing.
@@ -196,7 +201,9 @@ export function normalizeHookPayload(
   // Why: presence needs the agent's own process; without it the hook cannot speak for liveness.
   const agentProcess =
     source === 'claude' ? readAgentProcessIdentity(record.agentProcess) : undefined
-  const agentPresence = agentProcess ? { agent: source, process: agentProcess } : undefined
+  const agentPresence = agentProcess
+    ? { agent: source, process: agentProcess, sessionOwner: true as const }
+    : undefined
   const sessionEndReason = readString(hookPayloadRecord, 'reason')
   if (
     eventName === 'SessionEnd' &&

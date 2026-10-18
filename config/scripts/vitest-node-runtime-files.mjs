@@ -16,13 +16,16 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/ai-vault-search/session-search-instance.test.ts',
   'src/main/ai-vault-search/session-search-list-latency.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
-  // Disk checkpoints require Node's iterable writeFile semantics.
-  'src/main/ai-vault/session-parse-cache-checkpoint.test.ts',
-  'src/main/ai-vault/session-parse-cache-save-lane.test.ts',
+  // The parse cache persists through node:sqlite.
+  'src/main/ai-vault/session-parse-cache-antigravity-upgrade.test.ts',
+  'src/main/ai-vault/session-parse-cache-devin-upgrade.test.ts',
+  'src/main/ai-vault/session-parse-cache-large-scan.test.ts',
   'src/main/ai-vault/session-parse-cache-metadata-checkpoint.test.ts',
+  'src/main/ai-vault/session-parse-cache-persistence.test.ts',
   // Electron main bridges streams with Node's implementation.
   'src/main/host/electron-http-client.test.ts',
   'src/main/daemon/daemon-init-provider-installation.test.ts',
+  'src/main/orcad/orcad-daemon-teardown-linux.test.ts',
   'src/renderer/src/components/terminal-pane/pty-input-write-queue.test.ts',
   'src/renderer/src/lib/react-commit-cascade-observer.test.ts',
   'src/renderer/src/lib/react-commit-cascade-telemetry.test.ts',
@@ -51,6 +54,8 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/runtime/terminal-tail-redraw-wall-time.test.ts',
   'src/main/agent-hooks/server-transport-interference.test.ts',
   'src/main/plugins/plugin-worker-supervision.integration.test.ts',
+  // Reconciliation loads the real native Parcel watcher; Bun can abort on Linux ARM.
+  'src/main/plugins/plugin-service-reconciliation.test.ts',
   'src/main/usage/usage-scan-worker-event-loop.test.ts',
   // Asserts Node's spawn-failure close signal and that a dead worker closes its children's pipes.
   'src/main/worker-thread-child-process/worker-thread-child-process.test.ts',
@@ -109,10 +114,12 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/hermes/hermes-config-remote-adapter.test.ts',
   'src/main/ipc/orca-profiles-switch-persistence.test.ts',
   'src/main/ipc/settings-delayed-response.test.ts',
+  'src/main/ipc/session-window-view-save.test.ts',
+  'src/main/ipc/renderer-shutdown-checkpoint-sleep-records.test.ts',
   'src/main/runtime/structured-agent-session-startup-tab-restore.test.ts',
   'src/main/runtime/structured-agent-session-windowless-layout-host.test.ts',
   'src/shared/remote-runtime-shared-control-connection.test.ts',
-  'src/main/runtime/relay/relay-control-client.test.ts',
+  'src/main/runtime/mobile-cloud-relay/relay-control-client.test.ts',
   'src/main/ipc/filesystem-watcher-ignore-real.test.ts',
   'src/main/ipc/runtime-environment-preference.test.ts',
   'src/main/ipc/runtime-environment-transport-routing-tailscale-hint.test.ts',

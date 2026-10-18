@@ -20,6 +20,7 @@ vi.mock('../telemetry/client', () => ({ track: trackMock }))
 vi.mock('../telemetry/cohort-classifier', () => ({ getCohortAtEmit: getCohortAtEmitMock }))
 
 import { AgentHookServer, _internals } from './server'
+import { RelayAgentHookServer } from '../../wsl-guest/agent-hook-server'
 import { makePaneKey } from '../../shared/stable-pane-id'
 
 const PANE = makePaneKey('tab-lifecycle', '11111111-1111-4111-8111-111111111111')
@@ -37,6 +38,54 @@ afterEach(() => {
 })
 
 describe('AgentHookServer startup failure lifecycle', () => {
+  it.each(['main', 'relay'] as const)(
+    'shares one %s listener across concurrent startup requests',
+    async (host) => {
+      const directory = mkdtempSync(join(tmpdir(), 'orca-concurrent-hook-start-'))
+      const server =
+        host === 'main'
+          ? new AgentHookServer()
+          : new RelayAgentHookServer({ endpointDir: directory, forward: () => undefined })
+      try {
+        await Promise.all([server.start(), server.start()])
+        expect(createServerMock).toHaveBeenCalledTimes(1)
+      } finally {
+        server.stop()
+        for (const result of createServerMock.mock.results) {
+          if (result.type === 'return') {
+            result.value.close()
+          }
+        }
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.each(['main', 'relay'] as const)(
+    'does not revive a stopped %s startup and permits its replacement',
+    async (host) => {
+      const directory = mkdtempSync(join(tmpdir(), 'orca-stopped-hook-start-'))
+      const server =
+        host === 'main'
+          ? new AgentHookServer()
+          : new RelayAgentHookServer({ endpointDir: directory, forward: () => undefined })
+      try {
+        const interrupted = server.start()
+        server.stop()
+        await Promise.all([interrupted, server.start()])
+        expect(createServerMock).toHaveBeenCalledTimes(1)
+      } finally {
+        server.stop()
+        for (const result of createServerMock.mock.results) {
+          if (result.type === 'return') {
+            result.value.close()
+          }
+        }
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+  )
+
   it('rolls back only transport on bind failure and preserves owner state through retry', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-hook-start-failure-'))
     const persisted = new AgentHookServer()
@@ -167,13 +216,22 @@ describe('AgentHookServer startup failure lifecycle', () => {
 
   it('resolves cache hydration before a delayed listener bind', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-hook-hydration-ready-'))
+    // Why the event map: the listener resolves on the server's 'listening' event, so the fake has to
+    // hold the handlers `once` registered; firing the recorded one is what "listen completed" means.
+    const listeners = new Map<string, () => void>()
     let onListening: (() => void) | undefined
     const delayedServer = {
-      once: vi.fn(() => delayedServer),
-      off: vi.fn(() => delayedServer),
+      once: vi.fn((event: string, handler: () => void) => {
+        listeners.set(event, handler)
+        return delayedServer
+      }),
+      off: vi.fn((event: string) => {
+        listeners.delete(event)
+        return delayedServer
+      }),
       on: vi.fn(() => delayedServer),
-      listen: vi.fn((_port: number, _host: string, callback: () => void) => {
-        onListening = callback
+      listen: vi.fn(() => {
+        onListening = () => listeners.get('listening')?.()
         return delayedServer
       }),
       address: vi.fn(() => ({ port: 4321 })),

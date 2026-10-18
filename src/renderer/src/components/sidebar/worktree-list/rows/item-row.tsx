@@ -8,9 +8,9 @@ import {
   getWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
 import WorktreeCard, { type ActiveSurfaceVariant } from '../../WorktreeCard'
-import { PINNED_GROUP_KEY } from '../grouping/group-keys'
+import { PINNED_GROUP_KEY } from '../../../../../../shared/sidebar-list/group-keys'
 import { resolveBranchGroupSelection } from '../grouping/branch-groups'
-import type { WorktreeGroupBy } from '../grouping/row-types'
+import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 import {
   getFolderBackedRepoWorktreeCardContentIndent,
   getFolderBackedRepoWorktreeCardSurfaceInset,

@@ -510,6 +510,8 @@ describe('Linear workspace file cross-process visibility', () => {
       [{ id: 'ws-alpha', token: 'token-alpha', credentialRevision: 3 }],
       'ws-alpha'
     )
+    // A revision update must change metadata even within one filesystem clock tick.
+    utimesSync(join(tempHome, HOME_DIRECTORY_NAME, 'linear-workspaces.json'), 1, 1)
     const linear = await loadClientModule()
     const signal = new AbortController().signal
     const captured = linear.getClients('ws-alpha', signal)[0]

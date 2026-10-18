@@ -94,7 +94,6 @@ describe('listAiVaultSessions host routing', () => {
       // The fork's third argument: no refresh or query for a plain listing.
       {},
       expect.objectContaining({
-        sent: expect.any(Function),
         work: expect.any(Function),
         finish: expect.any(Function),
         fail: expect.any(Function)

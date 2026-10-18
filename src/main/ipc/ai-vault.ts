@@ -192,7 +192,7 @@ async function scanAiVaultSessionsByHostScope(
       [...scannedResults, ...runtimeResults],
       args?.limit,
       args?.unlimited,
-      args?.scopePaths ?? []
+      scopePaths
     )
   }
 

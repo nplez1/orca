@@ -5,7 +5,7 @@ import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-f
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 
 const ZCODE_PLAN_API_KEY_FILE = 'zcode-plan-api-key.enc'
-const API_KEY_ENVELOPE_PREFIX = 'orca-zcode-plan-api-key:v1:'
+export const API_KEY_ENVELOPE_PREFIX = 'orca-zcode-plan-api-key:v1:'
 let cachedZcodePlanApiKey: string | null = null
 let warnedZcodePlanApiKeyStatusHardenFailure = false
 
@@ -14,7 +14,7 @@ type ZcodePlanApiKeyEnvelope = {
   payload: Buffer
 }
 
-function getZcodePlanApiKeyPath(): string {
+export function getZcodePlanApiKeyPath(): string {
   return adoptLegacyHomeStore(ZCODE_PLAN_API_KEY_FILE)
 }
 

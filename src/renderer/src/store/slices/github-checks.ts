@@ -1,8 +1,8 @@
 import type { AppState } from '../types'
 import type { PRCheckDetail } from '../../../../shared/github/check-types'
 import type { GitHubOwnerRepo, PRInfo } from '../../../../shared/github/pull-request-types'
-import { getGitHubPRCacheKey } from './github-cache-key'
 import { getHostedReviewCacheKey } from './hosted-review-cache-identity'
+import { getGitHubPRCacheKey } from '../../../../shared/github/github-cache-key'
 import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { derivePRCheckStatus } from '../../../../shared/pr-check-status'
 

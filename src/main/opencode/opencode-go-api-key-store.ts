@@ -12,3 +12,4 @@ export const getOpenCodeGoApiKeyProtection = store.protection
 export const saveOpenCodeGoApiKey = store.save
 export const readOpenCodeGoApiKey = store.read
 export const clearOpenCodeGoApiKey = store.clear
+export const openCodeGoApiKeyEnvelopeFile = store.envelopeFile

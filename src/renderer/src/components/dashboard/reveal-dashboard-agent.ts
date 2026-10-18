@@ -1,6 +1,4 @@
-import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
-import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
-import { activateTerminalTabOnOwner } from '@/lib/terminal-tab-owner-activation'
+import { revealTerminalPane } from '@/lib/reveal-terminal-pane'
 import type { DashboardRevealAgentArgs } from '../../../../shared/dashboard-snapshot'
 
 /**
@@ -12,14 +10,10 @@ import type { DashboardRevealAgentArgs } from '../../../../shared/dashboard-snap
  * call revealed a workspace with nothing in it (#16731).
  */
 export function revealDashboardAgent(args: DashboardRevealAgentArgs): boolean {
-  const activated = activateAndRevealWorkspace(
-    args.worktreeId,
-    args.executionHostId ? { executionHostId: args.executionHostId } : undefined
-  )
-  if (activated === false) {
-    return false
-  }
-  activateTabAndFocusPane(args.tabId, args.leafId, { flashFocusedPane: true })
-  activateTerminalTabOnOwner(args.worktreeId, args.tabId, args.leafId)
-  return true
+  return revealTerminalPane({
+    worktreeId: args.worktreeId,
+    tabId: args.tabId,
+    leafId: args.leafId,
+    executionHostId: args.executionHostId ?? null
+  })
 }

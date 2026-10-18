@@ -14,8 +14,8 @@ import {
   getProviderAccountsOwnerKey,
   watchProviderAccounts
 } from '@/runtime/runtime-provider-accounts-client'
+import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 import {
-  getAccountsClaudeSearchEntries,
   getAccountsCodexSearchEntries,
   getAccountsCopilotSearchEntries,
   getAccountsDeepSeekSearchEntries,
@@ -293,7 +293,7 @@ export function AccountsPane({
     recordFeatureInteraction
   })
   const runClaudeAccountAction = createClaudeAccountActionRunner({
-    settings,
+    accountOwner,
     isCurrentAccountOwner,
     accountRuntime,
     isRemoteAccountScope,

@@ -159,8 +159,7 @@ export function createAiVaultServicePendingCall(
     onAbort: null,
     cancelled: false,
     sent: false,
-    startRetried: false,
-    progressUnits: 0
+    startRetried: false
   }
   if (signal) {
     call.onAbort = () => cancel(call)
@@ -294,8 +293,6 @@ export type AiVaultServicePendingCall = {
   /** Whether the child received the request; an unsent call gets no reply. */
   sent: boolean
   startRetried: boolean
-  /** Highest progress counter the child reported for this scan. */
-  progressUnits: number
   scanListener?: AiVaultServiceScanListener
 }
 

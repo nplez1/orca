@@ -40,8 +40,18 @@ function keyDownOn(target: EventTarget, key: string): void {
 async function closeOverlay(overlay: HTMLElement): Promise<void> {
   await act(async () => {
     overlay.remove()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await drainQueuedTasks()
   })
+}
+
+/**
+ * Why: the hook decides from its own queued 0ms task, which the removal's observer
+ * microtask only schedules after the first tick — one tick left the decision pending
+ * past the assertion, so the test raced the code it was testing.
+ */
+async function drainQueuedTasks(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 let root: Root
@@ -59,7 +69,7 @@ afterEach(async () => {
   // Why: the hook decides from a queued task; let it run inside this test so it cannot
   // land after the next test has reset the spy.
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await drainQueuedTasks()
   })
   act(() => root.unmount())
   document.body.replaceChildren()

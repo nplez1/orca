@@ -3,10 +3,13 @@ import { ORCAD_MANAGED_ACTIVATION_ROOT_ENV } from '../../shared/orcad-idle-exit'
 
 import {
   ORCAD_READINESS_FILENAME,
+  OrcadRemoteLaunchUnsupportedError
+} from './orcad-remote-host-support'
+import {
   orcadLaunchCommand,
   orcadLivenessBlocksGc,
+  orcadLivenessProvenExited,
   orcadLivenessProbeCommand,
-  OrcadRemoteLaunchUnsupportedError,
   parseOrcadLiveness,
   parseOrcadReadinessOutput
 } from './orcad-remote-launch'
@@ -100,11 +103,21 @@ describe('liveness', () => {
   it.each([
     ['LIVE', 'LIVE', true],
     ['DEAD', 'DEAD', false],
+    ['NEVER_LAUNCHED', 'NEVER_LAUNCHED', false],
     ['', 'UNKNOWN', true],
     ['garbage', 'UNKNOWN', true]
   ])('parses %s and blocks GC = %s', (output, expected, blocks) => {
     expect(parseOrcadLiveness(output)).toBe(expected)
     expect(orcadLivenessBlocksGc(parseOrcadLiveness(output))).toBe(blocks)
+  })
+
+  it.each([
+    ['DEAD', true],
+    ['NEVER_LAUNCHED', true],
+    ['LIVE', false],
+    ['UNKNOWN', false]
+  ] as const)('%s is proven exit = %s', (liveness, exited) => {
+    expect(orcadLivenessProvenExited(liveness)).toBe(exited)
   })
 })
 
