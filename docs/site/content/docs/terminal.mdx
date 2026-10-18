@@ -16,6 +16,18 @@ Many terminal UIs (Zellij, tmux, Neovim, fzf, Grok) copy via **OSC 52** instead 
 
 Toggle: [Settings → Terminal → Allow TUI Clipboard Writes (OSC 52)](/docs/settings).
 
+Some tools copy with the machine's own clipboard command instead of OSC 52 (`pbcopy`, `wl-copy`, `xclip`).
+That is right on the computer running them, but wrong once a [paired client](/docs/remote-servers) is the one
+watching: the text lands on the server's clipboard, the client's clipboard keeps its old contents, and the
+app still reports success. Orca therefore exports `PI_CLIPBOARD_OSC52=1` into the terminals it spawns
+(local, daemon-hosted, and WSL), so **pi** copies over OSC 52 as well as its own clipboard — pi otherwise
+infers a remote viewer only from SSH/mosh variables, which a paired session does not set.
+
+Three limits are worth knowing. OSC 52 writes above the terminal's cap (roughly 96 KiB of text) are refused,
+so a copy that large still reaches only the server. The local copy still happens, so on a local pane the same
+text can appear twice in clipboard history. And with **Allow TUI Clipboard Writes (OSC 52)** off, Orca shows
+its blocked-clipboard toast once per session on the next pi copy, even though that local copy succeeded.
+
 ## Search
 
 `Cmd-F` opens find-in-scrollback. Match highlighting, case, regex, and match navigation are all supported.
