@@ -519,6 +519,16 @@ pnpm run sync:localization-runtime-catalog
     hardcoded the upstream home, so the headless server's secret store enumerated and sealed an
     official Orca's credentials while missing this build's own — it resolves through
     `HOME_DIRECTORY_NAME` now.
+  - **Left open, by name**, so the next release does not have to rediscover them:
+    1. `task-page-jira-priority-badge.tsx`'s docstring says `data-severity` separates the tiers; it does
+       not — nothing in `src/renderer` selects on it, and the linked-issue pane has no surface wash at
+       all, so there the label is the only separator. Wording fix, no behaviour.
+    2. `getJiraPrioritySeverity` trims the priority name and upstream's `getJiraPriorityTone` does not,
+       so a name of `" Blocker "` earns a tier and a wash but a grey chip. Upstream's list cell has the
+       same asymmetry; fix both sides or neither.
+    3. The `orcadCredentialRoot()` commit message (`3074852b7c`'s follow-up) overstates the old bug: the
+       credential *targets* always resolved the fork's home, so the defect was the headless server's
+       sealing key living beside an official Orca's key state, not that it sealed that app's secrets.
   - **Recorded rather than changed**: the `aiVaultSearch.contentEnabled` tier rename (a persisted
     settings key; three earlier syncs paid for it, but changing it is a migration, not a cleanup);
     `accounts-search-extra-providers.ts` and `worktree-remove-method.ts` still move *upstream's* code
