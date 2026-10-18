@@ -44,8 +44,8 @@ vi.mock('@/components/task-page-jira-issue-list', () => ({
 }))
 
 vi.mock('@/components/JiraIssueWorkspace', () => ({
-  default: (props: { issueWorkspaceAttachmentIndex: unknown; onOpenOrStartWorkspace: unknown }) => {
-    spies.sheet(props.onOpenOrStartWorkspace, props.issueWorkspaceAttachmentIndex)
+  default: (props: { issueWorkspaceAttachmentIndex: unknown; onUse: unknown }) => {
+    spies.sheet(props.onUse, props.issueWorkspaceAttachmentIndex)
     return null
   }
 }))

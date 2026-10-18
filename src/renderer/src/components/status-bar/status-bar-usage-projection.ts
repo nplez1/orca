@@ -49,7 +49,6 @@ export function getStatusBarUsageProjection({
 
   // Why: a bar is earned by a live snapshot or durable Settings setup; detection-gating hides per-CLI bars when the agent isn't on PATH.
   // Why: Antigravity has no persisted credential, so a checked status item + detected CLI is the durable "show its slot" signal.
-  // Why: Antigravity visibility also requires geminiCliOAuthEnabled because its usage snapshot mirrors the Gemini fetch.
   const antigravityUsageConfigured =
     !remoteOwned &&
     statusBarItems.includes('antigravity') &&
@@ -65,7 +64,8 @@ export function getStatusBarUsageProjection({
     cursorAuthConfigured: rateLimits.cursorAuthConfigured,
     deepseekApiKeyConfigured: rateLimits.deepseekApiKeyConfigured,
     fireworksApiKeyConfigured: rateLimits.fireworksApiKeyConfigured,
-    copilotTokenConfigured: rateLimits.copilotTokenConfigured
+    copilotTokenConfigured: rateLimits.copilotTokenConfigured,
+    zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured
   }
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
@@ -117,7 +117,9 @@ export function getStatusBarUsageProjection({
   const showZcode =
     visibleZcode !== null &&
     statusBarItems.includes('zcode') &&
-    isStatusBarItemAvailable('zcode', detectedAgentIds)
+    // Why: a saved GLM Coding Plan key is a durable setup without the CLI on PATH, mirroring the
+    // Antigravity rule below.
+    (rateLimits.zcodePlanApiKeyConfigured || isStatusBarItemAvailable('zcode', detectedAgentIds))
   // Why: OpenCode Go is web/cookie-auth, not a CLI on PATH, so detection-gating doesn't apply.
   const visibleOpencodeGo = getVisibleUsageProvider('opencode-go', opencodeGo, usageSettings)
   const showOpencodeGo = visibleOpencodeGo !== null && statusBarItems.includes('opencode-go')

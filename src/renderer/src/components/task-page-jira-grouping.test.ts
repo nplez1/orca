@@ -228,27 +228,27 @@ describe('Jira issue status grouping', () => {
     )
 
     const blockerRow = screen.getByText('Blocker issue').closest('[role="button"]')
-    expect(blockerRow?.className).toContain('bg-severity-blocker/10')
-    expect(blockerRow?.className).toContain('hover:bg-severity-blocker/15')
+    expect(blockerRow?.className).toContain('bg-jira-priority-high/10')
+    expect(blockerRow?.className).toContain('hover:bg-jira-priority-high/15')
 
     const majorRow = screen.getByText('Major issue').closest('[role="button"]')
-    expect(majorRow?.className).not.toContain('bg-severity-blocker/10')
+    expect(majorRow?.className).not.toContain('bg-jira-priority-high/10')
     expect(majorRow?.className).toContain('hover:bg-accent')
 
     // Critical shares the blocker's red chip but must not inherit the surface wash — the
     // wash is the only thing telling the two tiers apart.
     const criticalRow = screen.getByText('Critical issue').closest('[role="button"]')
-    expect(criticalRow?.className).not.toContain('bg-severity-blocker/10')
+    expect(criticalRow?.className).not.toContain('bg-jira-priority-high/10')
     expect(criticalRow?.className).toContain('hover:bg-accent')
 
     const chip = (name: string): Element | null =>
       screen.getAllByText(name)[0]?.closest('[data-severity]') ?? null
     expect(chip('Blocker')?.getAttribute('data-severity')).toBe('blocker')
-    expect(chip('Blocker')?.className).toContain('text-severity-blocker')
+    expect(chip('Blocker')?.className).toContain('text-jira-priority-high')
     expect(chip('Critical')?.getAttribute('data-severity')).toBe('critical')
-    expect(chip('Critical')?.className).toContain('text-severity-blocker')
+    expect(chip('Critical')?.className).toContain('text-jira-priority-high')
     expect(chip('Major')?.getAttribute('data-severity')).toBe('major')
-    expect(chip('Major')?.className).toContain('text-severity-major')
+    expect(chip('Major')?.className).toContain('text-jira-priority-medium')
     expect(chip('No priority')?.getAttribute('data-severity')).toBe('standard')
   })
 

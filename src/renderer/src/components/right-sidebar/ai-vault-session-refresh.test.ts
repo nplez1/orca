@@ -4,15 +4,15 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
-import type {
-  AiVaultListArgs,
-  AiVaultListResult,
-  AiVaultSession
+import {
+  isAiVaultScanCancelledError,
+  type AiVaultListArgs,
+  type AiVaultListResult,
+  type AiVaultSession
 } from '../../../../shared/ai-vault-types'
 import type { ExecutionHostScope } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
 import {
-  isAiVaultScanCancellation,
   resetAiVaultForcedRescanThrottleForTest,
   useAiVaultSessionRefresh
 } from './ai-vault-session-refresh'
@@ -48,10 +48,10 @@ async function fireWindowFocused(): Promise<void> {
 
 const initialAppState = useAppStore.getInitialState()
 
-describe('isAiVaultScanCancellation', () => {
+describe('isAiVaultScanCancelledError', () => {
   it('recognises a cancellation through the IPC error wrapper', () => {
     expect(
-      isAiVaultScanCancellation(
+      isAiVaultScanCancelledError(
         new Error(
           "Error invoking remote method 'aiVault:listSessions': Error: Agent Session History scan was cancelled"
         )
@@ -62,12 +62,12 @@ describe('isAiVaultScanCancellation', () => {
   it('recognises an in-process AbortError', () => {
     const error = new Error('aborted')
     error.name = 'AbortError'
-    expect(isAiVaultScanCancellation(error)).toBe(true)
+    expect(isAiVaultScanCancelledError(error)).toBe(true)
   })
 
   it('leaves a real scan failure reportable', () => {
-    expect(isAiVaultScanCancellation(new Error('SSH relay is not ready'))).toBe(false)
-    expect(isAiVaultScanCancellation('nope')).toBe(false)
+    expect(isAiVaultScanCancelledError(new Error('SSH relay is not ready'))).toBe(false)
+    expect(isAiVaultScanCancelledError('nope')).toBe(false)
   })
 })
 

@@ -55,7 +55,6 @@ export function installOrcaRuntimeOwnedControllers(
       teardownFolderWorkspacePtys(
         {
           runtime,
-          getSshProvider: runtime.getSshProviderFn,
           getLocalProvider: () => runtime.getLocalProvider(),
           onPtyStopped: runtime.onPtyStopped
         },
@@ -90,8 +89,7 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
     forgetTerminalTopology: (repoId) => runtime.terminalTopologyRevisionByRepoId.delete(repoId),
-    stopProjectTerminals: (repo, deadline) =>
-      runtime.stopTerminalsForProject(repo, { deadline }),
+    stopProjectTerminals: (repo, deadline) => runtime.stopTerminalsForProject(repo, { deadline }),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged()

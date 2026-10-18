@@ -118,13 +118,13 @@ describe('JiraIssueWorkspace refresh signal', () => {
     mocks.jiraListPriorities.mockResolvedValue([])
     mocks.jiraListTransitions.mockResolvedValue([])
 
-    const onOpenOrStartWorkspace = vi.fn()
+    const onUse = vi.fn()
     const onClose = vi.fn()
     const view = render(
       <JiraIssueWorkspace
         issue={selectedIssue}
         issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
-        onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+        onUse={onUse}
         onClose={onClose}
         sourceContext={REFRESH_SOURCE}
         refreshSignal={0}
@@ -136,7 +136,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
       <JiraIssueWorkspace
         issue={selectedIssue}
         issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
-        onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+        onUse={onUse}
         onClose={onClose}
         sourceContext={REFRESH_SOURCE}
         refreshSignal={1}
@@ -145,7 +145,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
 
     await waitFor(() => expect(screen.getByTestId('issue-status').textContent).toBe('In Progress'))
     expect(onClose).not.toHaveBeenCalled()
-    expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
+    expect(onUse).not.toHaveBeenCalled()
     expect(mocks.patchJiraIssue).toHaveBeenCalledWith('ABC-1', movedIssue, {
       sourceContext: REFRESH_SOURCE
     })
@@ -168,7 +168,7 @@ describe('JiraIssueWorkspace refresh signal', () => {
       <JiraIssueWorkspace
         issue={selectedIssue}
         issueWorkspaceAttachmentIndex={EMPTY_ATTACHMENT_INDEX}
-        onOpenOrStartWorkspace={vi.fn()}
+        onUse={vi.fn()}
         onClose={vi.fn()}
         refreshSignal={0}
         sourceContext={REFRESH_SOURCE}

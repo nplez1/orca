@@ -1,7 +1,7 @@
 import type { CommandHandler } from './dispatch'
 import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
 import { JIRA_HANDLER_GROUP } from './jira-handler-group'
-import { LINEAR_HANDLER_GROUPS } from './linear-handler-groups'
+import { LINEAR_HANDLER_GROUP } from './linear-handler-group'
 import { REFERENCE_HANDLER_GROUP } from './reference-handler-group'
 
 export type HandlerGroup = {
@@ -16,6 +16,7 @@ export type HandlerGroup = {
 // real exports by handler-group-manifest.test.ts, so drift fails CI, not dispatch.
 export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   JIRA_HANDLER_GROUP,
+  LINEAR_HANDLER_GROUP,
   REFERENCE_HANDLER_GROUP,
   {
     name: 'core',
@@ -251,7 +252,6 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     ],
     load: async () => (await import('./handlers/managed-server.js')).MANAGED_SERVER_HANDLERS
   },
-  ...LINEAR_HANDLER_GROUPS,
   {
     name: 'vm',
     keys: ['vm recipe doctor', 'vm recipe extend'],

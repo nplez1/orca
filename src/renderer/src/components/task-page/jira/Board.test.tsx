@@ -491,8 +491,8 @@ describe('TaskPageJiraBoard', () => {
     renderBoard()
 
     const card = await screen.findByRole('button', { name: /ABC-5 title/ })
-    expect(card.className).toContain('bg-severity-blocker/10')
-    expect(card.className).toContain('border-severity-blocker/40')
+    expect(card.className).toContain('bg-jira-priority-high/10')
+    expect(card.className).toContain('border-jira-priority-high/40')
     expect(screen.getAllByText('Blocker').length).toBeGreaterThan(0)
   })
 

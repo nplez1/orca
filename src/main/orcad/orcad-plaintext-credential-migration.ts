@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import type { SecretStore } from '../../shared/secret-store'
 import { classifyUnenvelopedCredential } from '../../shared/secret-at-rest-protection'
 import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-file'
@@ -46,7 +47,10 @@ function encFilesIn(dir: string): string[] {
 
 /** Where every integration store keeps its files, whatever ORCA_USER_DATA says. */
 export function orcadCredentialRoot(): string {
-  return join(homedir(), '.orca')
+  // Why this name: every store below resolves through HOME_DIRECTORY_NAME, so hardcoding the upstream
+  // home would root the headless server's secret store in the other app's directory — enumerating and
+  // sealing an official Orca's credentials while missing this build's own.
+  return join(homedir(), HOME_DIRECTORY_NAME)
 }
 
 export function listPlaintextCredentialTargets(): PlaintextCredentialTarget[] {
@@ -98,7 +102,7 @@ function sealTarget(store: SecretStore, target: PlaintextCredentialTarget): bool
   if (store.decryptString(sealed) !== text) {
     throw new Error('sealed value did not read back')
   }
-  // Why compare before the rename: the desktop app may share ~/.orca and save concurrently.
+  // Why compare before the rename: the desktop app may share the same home and save concurrently.
   const published = writeCredentialFileAtomic(target.path, sealed, unchanged)
   if (published) {
     hardenExistingSecureFile(target.path)

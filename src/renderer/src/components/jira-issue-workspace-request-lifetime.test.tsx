@@ -167,7 +167,7 @@ async function render(selected: JiraIssue | null): Promise<void> {
         issue={selected}
         issueWorkspaceAttachmentIndex={buildJiraIssueWorkspaceAttachmentIndex([])}
         sourceContext={sourceContext}
-        onOpenOrStartWorkspace={() => {}}
+        onUse={() => {}}
         onClose={() => {}}
       />
     )
@@ -363,7 +363,7 @@ describe('Jira issue workspace request lifetime', () => {
             issue={issue()}
             issueWorkspaceAttachmentIndex={buildJiraIssueWorkspaceAttachmentIndex([])}
             sourceContext={sourceContext}
-            onOpenOrStartWorkspace={() => {}}
+            onUse={() => {}}
             onClose={() => {}}
           />
         </StrictMode>

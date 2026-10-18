@@ -117,7 +117,7 @@ function renderSheet(selectedIssue: JiraIssue): void {
     <JiraIssueWorkspace
       issue={selectedIssue}
       issueWorkspaceAttachmentIndex={attachmentIndex}
-      onOpenOrStartWorkspace={vi.fn()}
+      onUse={vi.fn()}
       onClose={vi.fn()}
       sourceContext={SHEET_SOURCE}
     />

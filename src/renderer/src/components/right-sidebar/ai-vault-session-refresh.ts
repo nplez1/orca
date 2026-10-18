@@ -26,8 +26,13 @@ import {
   cacheAiVaultSessionList,
   readCachedAiVaultSessionList
 } from './ai-vault-session-list-request'
+// Why one wrapped import: two single-line statements for one module is an `import/no-duplicates`
+// finding, and the file is at its 300-code-line budget, so a line has to go elsewhere for the wrap.
+import {
+  getAgentSessionIdsKey,
+  resetAgentSessionIdsRefreshKeys
+} from './ai-vault-agent-session-refresh-key'
 import { createBrowserUuid } from '@/lib/browser-uuid'
-import { getAgentSessionIdsKey, resetAiVaultSessionIdsKeyForTest } from './ai-vault-session-ids'
 
 // In-app session creation bypasses the cache so the new session appears promptly.
 // Keep the budget at module scope so tab remounts cannot amplify full scans.
@@ -49,13 +54,9 @@ export function claimAiVaultForcedRescan(userRequested = false): boolean {
 
 export function resetAiVaultForcedRescanThrottleForTest(): void {
   lastForcedRescanAt = 0
-  resetAiVaultSessionIdsKeyForTest()
+  resetAgentSessionIdsRefreshKeys()
   resetAiVaultSessionResultCacheForTest()
 }
-
-// Desktop IPC reports cancellation as a result, but the web/runtime RPC path
-// still rejects, so both shapes have to be recognised.
-export const isAiVaultScanCancellation = isAiVaultScanCancelledError
 
 type AiVaultRefreshArgs = { force?: boolean; background?: boolean; reuseLoadedDepth?: boolean }
 
@@ -252,8 +253,11 @@ export function useAiVaultSessionRefresh(
           scanKey === currentScanScopeKey()
         ) {
           setTerminalScopeKey(scanKey)
-          if (!isAiVaultScanCancellation(err)) {
-            setFailure({ scopeKey: scanKey, cause: err instanceof Error ? err.message : String(err) })
+          if (!isAiVaultScanCancelledError(err)) {
+            setFailure({
+              scopeKey: scanKey,
+              cause: err instanceof Error ? err.message : String(err)
+            })
           }
         }
       } finally {

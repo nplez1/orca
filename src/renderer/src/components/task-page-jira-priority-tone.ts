@@ -25,11 +25,13 @@ export function getJiraPrioritySeverity(priority: JiraPriorityLike): JiraPriorit
 }
 
 const SEVERITY_TONE: Record<JiraPrioritySeverity, string> = {
-  blocker: 'border-severity-blocker/25 bg-severity-blocker/10 text-severity-blocker',
+  // Reuse the Jira priority palette every other priority surface reads, so a snapshot
+  // and a board card cannot disagree about what "high" looks like.
+  blocker: 'border-jira-priority-high/25 bg-jira-priority-high/10 text-jira-priority-high',
   // Critical shares blocker's red chip; the whole-surface wash is the only difference,
   // so the two stay separable without inventing a fourth hue.
-  critical: 'border-severity-blocker/25 bg-severity-blocker/10 text-severity-blocker',
-  major: 'border-severity-major/25 bg-severity-major/10 text-severity-major',
+  critical: 'border-jira-priority-high/25 bg-jira-priority-high/10 text-jira-priority-high',
+  major: 'border-jira-priority-medium/25 bg-jira-priority-medium/10 text-jira-priority-medium',
   standard: 'border-border/50 bg-muted/40 text-muted-foreground'
 }
 
@@ -58,9 +60,9 @@ export function getJiraPrioritySurfaceTone(priority: JiraPriorityLike): JiraPrio
     return { base: '', border: '', hover: 'hover:bg-accent', selected: 'bg-accent' }
   }
   return {
-    base: 'bg-severity-blocker/10',
-    border: 'border-severity-blocker/40',
-    hover: 'hover:bg-severity-blocker/15',
-    selected: 'bg-severity-blocker/15'
+    base: 'bg-jira-priority-high/10',
+    border: 'border-jira-priority-high/40',
+    hover: 'hover:bg-jira-priority-high/15',
+    selected: 'bg-jira-priority-high/15'
   }
 }

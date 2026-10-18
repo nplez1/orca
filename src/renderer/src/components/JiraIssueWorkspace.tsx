@@ -25,8 +25,6 @@ import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state
 
 const EMPTY_ATTACHMENT_INDEX: JiraIssueWorkspaceAttachmentIndex = new Map()
 
-type JiraIssueWorkspaceOpenHandler = (issue: JiraIssue, source?: TaskSourceContext | null) => void
-
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   /** Workspaces already attached to Jira issues, so the primary action can show the
@@ -45,33 +43,14 @@ type JiraIssueWorkspaceProps = {
   /** Reports a committed sprint move to the surface hosting this sheet, so the lists
    *  the issue appears in reload — sprint membership is board state, not an issue field. */
   onSprintChange?: () => void
-} &
-  // Why the union: the fork's callers pass `onOpenOrStartWorkspace`, upstream's tests
-  // and fixtures pass `onUse`; requiring exactly one keeps the primary button from
-  // ever rendering with a silently inert handler.
-  (
-    | { onOpenOrStartWorkspace: JiraIssueWorkspaceOpenHandler; onUse?: never }
-    | { onOpenOrStartWorkspace?: never; onUse: JiraIssueWorkspaceOpenHandler }
-  )
-
-// Why a helper: the prop union above guarantees one handler, but destructuring a
-// union cannot narrow the two optionals, so the coalescing lives here with a
-// non-silent failure for anything that slips past the type.
-function resolveOpenOrStartWorkspace(
-  onOpenOrStartWorkspace: JiraIssueWorkspaceOpenHandler | undefined,
-  onUse: JiraIssueWorkspaceOpenHandler | undefined
-): JiraIssueWorkspaceOpenHandler {
-  const handler = onOpenOrStartWorkspace ?? onUse
-  if (!handler) {
-    throw new Error('JiraIssueWorkspace requires onOpenOrStartWorkspace or onUse')
-  }
-  return handler
+  /** Opens the issue's attached workspace, or starts one; the second argument is the
+   *  detail's own source, which Cmd-J can point at another host than the task source. */
+  onUse: (issue: JiraIssue, source?: TaskSourceContext | null) => void
 }
 
 export default function JiraIssueWorkspace({
   issue,
   issueWorkspaceAttachmentIndex = EMPTY_ATTACHMENT_INDEX,
-  onOpenOrStartWorkspace,
   onUse,
   onClose,
   sourceContext,
@@ -79,13 +58,12 @@ export default function JiraIssueWorkspace({
   refreshSignal = 0,
   onSprintChange
 }: JiraIssueWorkspaceProps): React.JSX.Element {
-  const openOrStartWorkspace = resolveOpenOrStartWorkspace(onOpenOrStartWorkspace, onUse)
   // Why the bound source: the label resolves `sourceContext` (the detail source, which
   // Cmd-J can set to another host than the task source), so the click must hand the
   // handler the same source or the two can name different workspaces for one link.
   const handleOpenOrStart = useCallback(
-    (target: JiraIssue) => openOrStartWorkspace(target, sourceContext),
-    [openOrStartWorkspace, sourceContext]
+    (target: JiraIssue) => onUse(target, sourceContext),
+    [onUse, sourceContext]
   )
   const jiraStatus = useAppStore((s) => s.jiraStatus)
   const providerSettings: RuntimeJiraSettings = sourceContext

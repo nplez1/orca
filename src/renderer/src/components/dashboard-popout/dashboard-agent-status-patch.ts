@@ -28,7 +28,7 @@ function patchedSubagents(
   }))
 }
 
-/** Applies an already bounded hook event inside the renderer. */
+/** Applies an already bounded hook event inside the pop-out renderer. */
 export function patchDashboardSnapshotFromAgentStatus(
   snapshot: DashboardSnapshot,
   event: AgentStatusIpcPayload

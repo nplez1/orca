@@ -6,6 +6,7 @@ import {
   type UsagePercentageDisplay
 } from '../../../../shared/usage-percentage-display'
 import { translate } from '@/i18n/i18n'
+import { barColor } from './provider-extra-usage-section'
 import { formatUsagePercentageLabel } from './usage-percentage-label'
 
 // ---------------------------------------------------------------------------
@@ -74,21 +75,6 @@ export function getWindowSections(
 // inverts the color scheme (light bg in dark mode). These rich tooltips use
 // `text-background` for primary text and `text-background/50` for secondary
 // to stay readable inside the inverted tooltip container.
-
-// Why: urgency color tracks % used even when fill represents % remaining;
-// low usage stays neutral so persistent chrome stays quiet.
-export const USAGE_WARNING_PERCENT = 60
-export const USAGE_URGENT_PERCENT = 80
-
-export function barColor(usedPct: number): string {
-  if (usedPct < USAGE_WARNING_PERCENT) {
-    return 'bg-muted-foreground/40'
-  }
-  if (usedPct < USAGE_URGENT_PERCENT) {
-    return 'bg-yellow-500'
-  }
-  return 'bg-red-500'
-}
 
 export function ProviderRateLimitWindowSection({
   window,

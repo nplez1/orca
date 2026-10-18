@@ -12,9 +12,9 @@ import {
 } from '@/lib/comment-body-submit-state'
 import { applyMarkdownAction, type MarkdownAction } from '@/lib/comment-markdown-actions'
 import {
-  clearCommentComposerFocusTimer,
-  scheduleCommentComposerFocusTimer
-} from '@/lib/comment-composer-focus-timer'
+  clearRightPanelCommentFocusTimer,
+  scheduleRightPanelCommentFocusTimer
+} from './right-panel-comment-focus-timers'
 import { translate } from '@/i18n/i18n'
 
 export type RightPanelCommentSubmitResult = { ok: true } | { ok: false; error: string }
@@ -59,11 +59,11 @@ export function RightPanelCommentComposer({
 
   useEffect(() => {
     if (!autoFocus) {
-      clearCommentComposerFocusTimer(autoFocusTimerRef)
+      clearRightPanelCommentFocusTimer(autoFocusTimerRef)
       return
     }
-    scheduleCommentComposerFocusTimer(autoFocusTimerRef, () => textareaRef.current?.focus())
-    return () => clearCommentComposerFocusTimer(autoFocusTimerRef)
+    scheduleRightPanelCommentFocusTimer(autoFocusTimerRef, () => textareaRef.current?.focus())
+    return () => clearRightPanelCommentFocusTimer(autoFocusTimerRef)
   }, [autoFocus])
 
   const setTextareaRef = useCallback((node: HTMLTextAreaElement | null) => {
@@ -71,7 +71,7 @@ export function RightPanelCommentComposer({
     if (node === null) {
       // Why: markdown toolbar selection restoration is scoped to this textarea;
       // clearing here prevents stale focus after the composer unmounts.
-      clearCommentComposerFocusTimer(selectionTimerRef)
+      clearRightPanelCommentFocusTimer(selectionTimerRef)
     }
   }, [])
 
@@ -87,7 +87,7 @@ export function RightPanelCommentComposer({
       }
       const next = applyMarkdownAction(body, textarea.selectionStart, textarea.selectionEnd, action)
       setBody(next.value)
-      scheduleCommentComposerFocusTimer(selectionTimerRef, () => {
+      scheduleRightPanelCommentFocusTimer(selectionTimerRef, () => {
         if (!textarea.isConnected) {
           return
         }

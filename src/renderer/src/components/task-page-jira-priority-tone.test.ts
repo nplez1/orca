@@ -39,10 +39,10 @@ describe('Jira priority severity', () => {
     expect(getJiraPrioritySeverity(priority('  bLoCkEr  '))).toBe('blocker')
   })
 
-  it('shares the red chip between blocker and critical, and gives major the orange one', () => {
-    expect(getJiraPriorityTone(priority('Blocker'))).toContain('text-severity-blocker')
-    expect(getJiraPriorityTone(priority('Critical'))).toContain('text-severity-blocker')
-    expect(getJiraPriorityTone(priority('Major'))).toContain('text-severity-major')
+  it('shares the red chip between blocker and critical, and gives major the medium one', () => {
+    expect(getJiraPriorityTone(priority('Blocker'))).toContain('text-jira-priority-high')
+    expect(getJiraPriorityTone(priority('Critical'))).toContain('text-jira-priority-high')
+    expect(getJiraPriorityTone(priority('Major'))).toContain('text-jira-priority-medium')
     // The wash is the only thing separating a blocker from a critical, so the chips match.
     expect(getJiraPriorityTone(priority('Blocker'))).toBe(getJiraPriorityTone(priority('Critical')))
     expect(getJiraPriorityTone(priority('Minor'))).toBe(
@@ -57,10 +57,10 @@ describe('Jira priority severity', () => {
 describe('Jira priority task surface', () => {
   it('washes the whole surface only for a blocker, keeping the wash on hover and selection', () => {
     expect(getJiraPrioritySurfaceTone(priority('Blocker'))).toEqual({
-      base: 'bg-severity-blocker/10',
-      border: 'border-severity-blocker/40',
-      hover: 'hover:bg-severity-blocker/15',
-      selected: 'bg-severity-blocker/15'
+      base: 'bg-jira-priority-high/10',
+      border: 'border-jira-priority-high/40',
+      hover: 'hover:bg-jira-priority-high/15',
+      selected: 'bg-jira-priority-high/15'
     })
   })
 

@@ -141,8 +141,6 @@
   --color-jira-priority-low: var(--jira-priority-low);
   --color-status-warning-background: var(--status-warning-background);
   --color-status-warning-border: var(--status-warning-border);
-  --color-severity-blocker: var(--severity-blocker);
-  --color-severity-major: var(--severity-major);
   --color-callout-note: var(--callout-note);
   --color-callout-important: var(--callout-important);
   --color-workspace-status-done: var(--workspace-status-done);
@@ -236,11 +234,6 @@
   --agent-question: var(--color-orange-600);
   /* Legible weight for text/glyphs on a tinted --agent-question surface. */
   --agent-question-text: var(--color-orange-700);
-  /* Jira priority severity. Blocker and Critical share the red chip; the whole-surface
-     wash is what tells a blocker apart, so --severity-blocker drives both the chip and
-     the inset tint. Major is the orange tier. */
-  --severity-blocker: var(--color-red-700);
-  --severity-major: var(--color-orange-600);
   /* Workspace PR-state tones: same hue in both themes so a status keeps its
      identity when the theme flips. */
   --workspace-status-done: #c7a594;
@@ -354,8 +347,6 @@
   --ai-action-accent: var(--color-violet-400);
   --agent-question: var(--color-orange-500);
   --agent-question-text: var(--color-orange-300);
-  --severity-blocker: var(--color-red-300);
-  --severity-major: var(--color-orange-400);
   --workspace-status-done: #c7a594;
   --workspace-status-review: #16a34a;
   --workspace-status-progress: #d4a300;

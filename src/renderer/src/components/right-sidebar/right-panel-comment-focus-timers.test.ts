@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  clearCommentComposerFocusTimer,
-  scheduleCommentComposerFocusTimer,
-  type CommentComposerFocusTimerRef
-} from './comment-composer-focus-timer'
+  clearRightPanelCommentFocusTimer,
+  scheduleRightPanelCommentFocusTimer,
+  type RightPanelCommentFocusTimerRef
+} from './right-panel-comment-focus-timers'
 
-function createTimerRef(): CommentComposerFocusTimerRef {
+function createTimerRef(): RightPanelCommentFocusTimerRef {
   return { current: null }
 }
 
-describe('comment composer focus timers', () => {
+describe('right panel comment focus timers', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
@@ -19,8 +19,8 @@ describe('comment composer focus timers', () => {
     const timerRef = createTimerRef()
     const callback = vi.fn()
 
-    scheduleCommentComposerFocusTimer(timerRef, callback)
-    clearCommentComposerFocusTimer(timerRef)
+    scheduleRightPanelCommentFocusTimer(timerRef, callback)
+    clearRightPanelCommentFocusTimer(timerRef)
     vi.runOnlyPendingTimers()
 
     expect(timerRef.current).toBeNull()
@@ -33,8 +33,8 @@ describe('comment composer focus timers', () => {
     const staleCallback = vi.fn()
     const nextCallback = vi.fn()
 
-    scheduleCommentComposerFocusTimer(timerRef, staleCallback)
-    scheduleCommentComposerFocusTimer(timerRef, nextCallback)
+    scheduleRightPanelCommentFocusTimer(timerRef, staleCallback)
+    scheduleRightPanelCommentFocusTimer(timerRef, nextCallback)
     vi.runOnlyPendingTimers()
 
     expect(staleCallback).not.toHaveBeenCalled()

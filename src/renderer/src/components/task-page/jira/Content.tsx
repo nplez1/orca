@@ -176,7 +176,7 @@ export function TaskPageJiraContent({
       <JiraIssueWorkspace
         issue={selectedJiraIssue}
         issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
-        onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
+        onUse={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailOwnerSource}
         sprintBoard={defaultJiraBoard}
@@ -332,7 +332,7 @@ export function TaskPageJiraContent({
       <JiraIssueWorkspace
         issue={selectedJiraIssue}
         issueWorkspaceAttachmentIndex={jiraIssueAttachmentIndex}
-        onOpenOrStartWorkspace={handleOpenOrUseJiraItem}
+        onUse={handleOpenOrUseJiraItem}
         onClose={closeTaskDetailPage}
         sourceContext={jiraDetailOwnerSource}
         sprintBoard={defaultJiraBoard}
