@@ -521,6 +521,14 @@ pnpm run sync:localization-runtime-catalog
   - The previously recorded reds still reproduce unchanged: the AI Vault stale-lineage case
     (`session-search-file-write.test.ts`, see the 2026-10-16 entry) and the workspace path index
     admission test, which passes in isolation and fails only under full-suite load.
+  - **`check:code-quality:changed` reports one finding, and it is an install artefact.**
+    `mobile/src/host-screen/host-worktree-child-navigation.test.tsx:76`
+    (`no-redundant-type-constituents` on `ReturnType<typeof create> | undefined`) only appears because
+    `mobile/node_modules` is not installed in this worktree: `@types/react-test-renderer` is a mobile
+    devDependency, so `create` degrades to `any` and the union looks redundant. The file is upstream's,
+    byte-identical to `upstream/main`, and dropping the `| undefined` to satisfy a missing type package
+    would break the typed build. This is the mirror image of the trap the 2026-10-16 entry records —
+    there the mobile graph resolving to nothing made oxlint exit 0, here it invents a finding.
 
 - **2026-10-16 — merge of upstream `ac015cd3b2` (60 commits) into the release line, from
   `e27bc2efbf`** (merge base `e8c7b32a90`, merge `ae9db02137`, backup
