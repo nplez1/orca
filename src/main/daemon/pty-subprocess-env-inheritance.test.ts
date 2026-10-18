@@ -550,6 +550,16 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('token')
   })
 
+  it('advertises OSC 52 clipboard support to pi for daemon-hosted panes', async () => {
+    const proc = mockPtyProcess()
+    spawnMock.mockReturnValue(proc)
+
+    await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
+
+    const spawnEnv = spawnMock.mock.calls.at(-1)![2].env
+    expect(spawnEnv.PI_CLIPBOARD_OSC52).toBe('1')
+  })
+
   it('passes custom env to spawned process', async () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)

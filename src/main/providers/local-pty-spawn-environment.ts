@@ -4,6 +4,10 @@ import {
   ORCA_IMAGE_PROTOCOL_ENV,
   ORCA_IMAGE_PROTOCOL_VALUE
 } from '../../shared/terminal-image-protocol'
+import {
+  PI_CLIPBOARD_OSC52_ENV,
+  PI_CLIPBOARD_OSC52_VALUE
+} from '../../shared/pi-clipboard-osc52-env'
 import { removeAppImageRuntimeEnv } from '../pty/appimage-terminal-env'
 import { removeChromiumDisabledSessionBus } from '../pty/chromium-session-bus-env'
 import { stripInheritedBuildModeEnv } from '../pty/build-mode-env'
@@ -35,6 +39,8 @@ export function buildLocalPtySpawnEnvironment(args: {
     TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
     // Why: supports-hyperlinks rejects TERM_PROGRAM=Orca, so tools drop OSC 8 links; force it since xterm.js parses them.
     FORCE_HYPERLINK: '1',
+    // Why: pi needs this to copy over OSC 52 for a paired client (see pi-clipboard-osc52-env).
+    [PI_CLIPBOARD_OSC52_ENV]: PI_CLIPBOARD_OSC52_VALUE,
     [ORCA_IMAGE_PROTOCOL_ENV]: ORCA_IMAGE_PROTOCOL_VALUE
   } satisfies Record<string, string>
   removeUnspecifiedPaneIdentityEnv(spawnEnv, spawn.env)

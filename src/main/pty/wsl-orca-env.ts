@@ -10,6 +10,7 @@ import {
 } from '../../shared/setup-agent-sequencing'
 import { getShellReadyWrapperRoot } from '../providers/local-pty-shell-ready-wrapper-root'
 import { ORCA_IMAGE_PROTOCOL_ENV } from '../../shared/terminal-image-protocol'
+import { PI_CLIPBOARD_OSC52_ENV } from '../../shared/pi-clipboard-osc52-env'
 import {
   RUNTIME_SOURCE_ID_ENV,
   RUNTIME_SOURCE_INCARNATION_ENV,
@@ -117,6 +118,8 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     `ORCA_OMP_STATUS_EXTENSION/${env.ORCA_OMP_STATUS_EXTENSION?.startsWith('/') ? 'u' : 'p'}`,
     ...(env.ORCA_PI_SOURCE_AGENT_DIR?.startsWith('/') ? ['ORCA_PI_SOURCE_AGENT_DIR/u'] : []),
     `${ORCA_IMAGE_PROTOCOL_ENV}/u`,
+    // Why /u: a flag, not a path; wsl.exe imports nothing unless WSLENV names it.
+    `${PI_CLIPBOARD_OSC52_ENV}/u`,
     'ORCA_OMP_FRESH_CONFIG/p',
     ...worktreeSetupWslenvEntries(env)
   ]
