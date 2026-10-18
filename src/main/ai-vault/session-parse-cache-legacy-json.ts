@@ -11,10 +11,13 @@ import type { PersistedSessionParseCacheEntry } from './session-parse-cache-stor
 
 // The limit the old writer kept the file within.
 const LEGACY_MAX_BYTES = 64 * 1024 * 1024
-// 4 = the last JSON schema upstream shipped; 6 = the last one this fork shipped, so an upgrading
-// fork build keeps its cache instead of cold-scanning. 5 is skipped on purpose: it titled Copilot
-// sessions from injected context, and 6 exists to invalidate exactly those rows.
-const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [4, 6]
+// Only schema 6 is admitted, because this file's directory is Orca NP's own — every build that ever
+// wrote it was a fork build, so upstream's JSON schemas never appear here. 4 and 5 are rejected on
+// purpose, each for the fault 6 exists to fix: a 4 row carries the `<current_datetime>` prefix as a
+// Copilot session title, and a 5 row carries `subagent: null`, which would leave every Pi sub-agent
+// transcript at top level. Rows are matched on mtime + size, so a replayed-wrong row is wrong until
+// the transcript changes.
+const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [6]
 
 /**
  * Runs when the database opens, before any lookup or write can reach it, so a

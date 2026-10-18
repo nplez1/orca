@@ -8,6 +8,8 @@ import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provide
 export type StatusBarUsageProjectionInputs = {
   rateLimits: RateLimitState
   settings: GlobalSettings | null
+  /** True when another host owns this usage; this viewer's own setup says nothing about it. */
+  remoteOwned: boolean
   statusBarItems: StatusBarItem[]
   detectedAgentIds: TuiAgent[] | null
   usageEmptyStateDismissed: boolean
@@ -24,6 +26,7 @@ export type StatusBarUsageProjection = {
 export function getStatusBarUsageProjection({
   rateLimits,
   settings,
+  remoteOwned,
   statusBarItems,
   detectedAgentIds,
   usageEmptyStateDismissed
@@ -48,6 +51,7 @@ export function getStatusBarUsageProjection({
   // Why: Antigravity has no persisted credential, so a checked status item + detected CLI is the durable "show its slot" signal.
   // Why: Antigravity visibility also requires geminiCliOAuthEnabled because its usage snapshot mirrors the Gemini fetch.
   const antigravityUsageConfigured =
+    !remoteOwned &&
     statusBarItems.includes('antigravity') &&
     isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // Why: thread non-GlobalSettings durability flags so bars stay visible across reloads and snapshot refreshes.

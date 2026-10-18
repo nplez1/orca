@@ -12,10 +12,7 @@ import {
   initSessionParseCachePersistence,
   resetSessionParseCachePersistenceForTests
 } from './session-parse-cache-persistence'
-import {
-  SESSION_PARSE_CACHE_SCHEMA_VERSION,
-  SessionParseCacheDatabase
-} from './session-parse-cache-database'
+import { SessionParseCacheDatabase } from './session-parse-cache-database'
 import { scanAiVaultSessions } from './session-scanner'
 import {
   createSessionParseStats,
@@ -340,7 +337,9 @@ describe('session parse cache persistence', () => {
     await writeFile(
       cacheFile,
       JSON.stringify({
-        schemaVersion: SESSION_PARSE_CACHE_SCHEMA_VERSION,
+        // 6 is the last JSON schema a fork build wrote; only that one is admitted, because this
+        // directory is Orca NP's own and no other build ever wrote the file.
+        schemaVersion: 6,
         appVersion: 'old',
         entries: [[transcript, legacyRow]]
       })
@@ -360,7 +359,10 @@ describe('session parse cache persistence', () => {
     expect(stats).toMatchObject({ reused: 1, fullParses: 0 })
   })
 
-  it('discards an old JSON file from another schema version', async () => {
+  // 4 carries the `<current_datetime>` prefix as a Copilot title; 5 carries `subagent: null`, which
+  // would put every sub-agent transcript at top level. Both are superseded fork schemas, not ones a
+  // current build should replay, and the database's own version number means something else.
+  it.each([4, 5])('discards an old JSON file from retired schema %i', async (schemaVersion) => {
     const root = await makeTempDir()
     const cacheFile = join(root, 'session-parse-cache.json')
     const transcript = await writeTranscript(root)
@@ -368,7 +370,7 @@ describe('session parse cache persistence', () => {
     await writeFile(
       cacheFile,
       JSON.stringify({
-        schemaVersion: SESSION_PARSE_CACHE_SCHEMA_VERSION - 1,
+        schemaVersion,
         appVersion: 'old',
         entries: [
           [

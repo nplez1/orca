@@ -109,6 +109,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     rateLimits,
     // Why: a remote owner's bars come from its snapshot alone; this viewer's setup says nothing about that host.
     settings: remoteOwned ? null : settings,
+    remoteOwned,
     statusBarItems,
     detectedAgentIds,
     usageEmptyStateDismissed
