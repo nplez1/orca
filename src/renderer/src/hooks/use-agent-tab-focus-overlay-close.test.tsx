@@ -36,7 +36,7 @@ function keyDownOn(target: EventTarget, key: string): void {
   target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
 }
 
-/** Remove the overlay and let the observer's microtask, then the queued retry, settle. */
+/** Remove the overlay and let the observer's microtask and the queued check settle. */
 async function closeOverlay(overlay: HTMLElement): Promise<void> {
   await act(async () => {
     overlay.remove()
@@ -56,8 +56,8 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  // Why: the hook queues a second attempt from a timeout; let it fire inside this test
-  // so it cannot land after the next test has reset the spy.
+  // Why: the hook decides from a queued task; let it run inside this test so it cannot
+  // land after the next test has reset the spy.
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
