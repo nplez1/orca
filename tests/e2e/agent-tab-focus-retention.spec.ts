@@ -104,6 +104,17 @@ test('switching right-sidebar panels keeps keyboard focus in the agent tab', asy
   }
 })
 
+test('clicking sidebar chrome keeps keyboard focus in the agent tab', async ({ orcaPage }) => {
+  await prepareTerminal(orcaPage)
+  // A repo section header is focusable chrome with no typed input: the click collapses
+  // the group, and the caret must not stay behind on the header.
+  const header = orcaPage.locator('[data-worktree-sidebar] [data-repo-header-id]').first()
+  await expect(header).toBeVisible({ timeout: 15_000 })
+  await header.click()
+
+  await expect.poll(() => activeAgentTabHasFocus(orcaPage), { timeout: 5_000 }).toBe(true)
+})
+
 test('a keyboard-activated panel tab keeps its own focus', async ({ orcaPage }) => {
   await prepareTerminal(orcaPage)
   await orcaPage.evaluate(() => window.__store?.getState().setRightSidebarOpen(true))

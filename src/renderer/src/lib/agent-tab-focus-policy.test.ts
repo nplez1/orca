@@ -47,7 +47,9 @@ import {
   focusAgentTabSurface,
   isAgentTabFocusClaimed,
   restoreAgentTabFocusAfterBackgroundClick,
-  restoreAgentTabFocusAfterChromeGesture
+  restoreAgentTabFocusAfterChromeClick,
+  restoreAgentTabFocusAfterChromeGesture,
+  restoreAgentTabFocusAfterPanelBackgroundClick
 } from './agent-tab-focus-policy'
 
 type FakePane = { container: HTMLElement }
@@ -367,6 +369,110 @@ describe('focusAgentTabSurface', () => {
 
     flushFrames()
     expect(document.activeElement).toBe(composer)
+  })
+})
+
+function clickChrome(
+  handler: (event: {
+    currentTarget: EventTarget | null
+    target: EventTarget | null
+    detail: number
+  }) => void,
+  event: { currentTarget: EventTarget | null; target: EventTarget | null; detail: number }
+): void {
+  handler(event)
+  flushFrames()
+}
+
+describe('React chrome handlers', () => {
+  it('restores focus after a pointer click on sidebar chrome', () => {
+    const chrome = document.createElement('div')
+    const header = document.createElement('span')
+    chrome.append(header)
+    document.body.append(chrome)
+
+    clickChrome(restoreAgentTabFocusAfterChromeClick, {
+      currentTarget: chrome,
+      target: header,
+      detail: 1
+    })
+
+    expect(document.activeElement).toBe(helper)
+  })
+
+  it('leaves a workspace card click to the deferral path', () => {
+    const chrome = document.createElement('div')
+    const card = document.createElement('div')
+    card.setAttribute('role', 'option')
+    card.setAttribute('data-worktree-id', 'wt-b')
+    chrome.append(card)
+    document.body.append(chrome)
+
+    clickChrome(restoreAgentTabFocusAfterChromeClick, {
+      currentTarget: chrome,
+      target: card,
+      detail: 1
+    })
+
+    expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+  })
+
+  it('ignores a click inside a menu the sidebar portals out', () => {
+    const chrome = document.createElement('div')
+    const portaledItem = document.createElement('div')
+    document.body.append(chrome, portaledItem)
+
+    // React bubbles a portaled child's click to the sidebar root, but the target is
+    // not a descendant of the sidebar in the DOM.
+    clickChrome(restoreAgentTabFocusAfterChromeClick, {
+      currentTarget: chrome,
+      target: portaledItem,
+      detail: 1
+    })
+
+    expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+  })
+
+  it('ignores a click inside a menu the panel portals out', () => {
+    const panel = document.createElement('div')
+    const portaledItem = document.createElement('div')
+    document.body.append(panel, portaledItem)
+
+    clickChrome(restoreAgentTabFocusAfterPanelBackgroundClick, {
+      currentTarget: panel,
+      target: portaledItem,
+      detail: 1
+    })
+
+    expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+  })
+
+  it('restores after a pointer click on a panel background', () => {
+    const panel = document.createElement('div')
+    document.body.append(panel)
+
+    clickChrome(restoreAgentTabFocusAfterPanelBackgroundClick, {
+      currentTarget: panel,
+      target: panel,
+      detail: 1
+    })
+
+    expect(document.activeElement).toBe(helper)
+  })
+
+  it('leaves a keyboard-activated chrome click alone', () => {
+    const chrome = document.createElement('div')
+    const header = document.createElement('span')
+    chrome.append(header)
+    document.body.append(chrome)
+
+    clickChrome(restoreAgentTabFocusAfterChromeClick, {
+      currentTarget: chrome,
+      target: header,
+      detail: 0
+    })
+
+    expect(mocks.focusRuntimeTerminalSurface).not.toHaveBeenCalled()
   })
 })
 

@@ -8,6 +8,7 @@ import {
 } from '@/runtime/mounted-terminal-tab-registry'
 import { hasVisibleOverlay } from '@/lib/visible-overlay'
 import { useAppStore } from '@/store'
+import { isEventTargetInsideCurrentTarget } from '@/components/sidebar/worktree-card-dom-events'
 
 /**
  * One policy for where keyboard focus belongs after a pointer gesture.
@@ -30,6 +31,16 @@ export const keepKeyboardFocusOptOut = {
 }
 
 const KEYBOARD_NAVIGATION_SIDEBAR = '[data-worktree-sidebar][data-keyboard-navigation]'
+// Why: a workspace card owns its own restore — activation may be followed by a sleeping
+// workspace publishing its tab, which only the deferral path can wait for.
+const WORKSPACE_CARD_SELECTOR = '[role="option"][data-worktree-id]'
+
+/** The parts of a React click event these handlers read. */
+export type ChromeClickEvent = {
+  currentTarget: EventTarget | null
+  target: EventTarget | null
+  detail: number
+}
 
 export type AgentTabFocusTarget = {
   worktreeId: string
@@ -176,6 +187,31 @@ function restoreAgentTabFocusUnlessClaimed(): boolean {
     return false
   }
   return focusAgentTabSurface(target)
+}
+
+/**
+ * For a click on sidebar chrome. Cards and portaled menus/dialogs the sidebar owns are
+ * not chrome clicks: a card defers to `queueWorkspaceActivationTerminalFocus`, and a
+ * menu walks focus back to its trigger when it closes.
+ */
+export function restoreAgentTabFocusAfterChromeClick(event: ChromeClickEvent): void {
+  if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
+    return
+  }
+  if (event.target instanceof Element && event.target.closest(WORKSPACE_CARD_SELECTOR)) {
+    return
+  }
+  restoreAgentTabFocusAfterChromeGesture(event.detail)
+}
+
+/** For a click on a right-sidebar panel body; see `restoreAgentTabFocusAfterBackgroundClick`. */
+export function restoreAgentTabFocusAfterPanelBackgroundClick(event: ChromeClickEvent): void {
+  // Why: React click events bubble through portals, so a menu the panel owns must not
+  // read as a click on the panel background.
+  if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
+    return
+  }
+  restoreAgentTabFocusAfterBackgroundClick(event.detail)
 }
 
 /**
