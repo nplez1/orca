@@ -34,7 +34,8 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
     hasRetainedFailed,
     agentStatusPaneIdsByTabId,
     stalePaneIdsByTabId,
-    terminalPaneIdsByTabId
+    terminalPaneIdsByTabId,
+    permissionYieldingAgentTypes
   } = useAppStore(useShallow((s) => selectWorktreeAgentActivitySummary(s, worktreeId)))
   // Why the optional read: several suites mock @/store with a hand-built partial
   // state, so a missing slice must read as "not setting up", not throw.
@@ -54,6 +55,7 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
         stalePaneIdsByTabId,
         terminalPaneIdsByTabId,
         terminalLayoutRootsByTabId,
+        permissionYieldingAgentTypes,
         hasPermission,
         hasLiveWorking,
         hasLiveMonitoring,
@@ -74,6 +76,7 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
       stalePaneIdsByTabId,
       terminalPaneIdsByTabId,
       terminalLayoutRootsByTabId,
+      permissionYieldingAgentTypes,
       hasPermission,
       hasLiveWorking,
       hasLiveMonitoring,

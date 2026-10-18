@@ -1,10 +1,12 @@
 import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
 import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
+import { unplacedWorkingAgentTypes } from '@/lib/unplaced-working-agent-types'
 import type { RetainedAgentEntry } from '@/store/slices/agent-status'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
   type AgentStatusEntry,
-  type AgentStatusOrchestrationContext
+  type AgentStatusOrchestrationContext,
+  type AgentType
 } from '../../../../shared/agent-status-types'
 import {
   makePaneKey,
@@ -139,6 +141,29 @@ function markCompletedWorkerParentPaneKeysSeen(args: {
   }
 }
 
+/**
+ * Agent types whose permission title yields to a re-keyed pane's own fresh working row. See
+ * `unplacedWorkingAgentTypes` for why the rule is this narrow.
+ */
+function yieldingPermissionAgentTypes(args: {
+  entries: readonly AgentStatusEntry[]
+  currentTabsById: ReadonlyMap<string, TerminalTab>
+  now: number
+  runtimeAgentOrchestrationByPaneKey?: Record<string, AgentStatusOrchestrationContext>
+}): ReadonlySet<AgentType> {
+  // Why: an orchestration worker reports before its tab exists by design, so its missing tab says
+  // nothing about a re-keyed pane and must not cost a worker pane its question.
+  const ownRows = args.entries.filter(
+    (entry) =>
+      !entryWithRuntimeOrchestration(entry, args.runtimeAgentOrchestrationByPaneKey).orchestration
+  )
+  return unplacedWorkingAgentTypes({
+    entries: ownRows,
+    hasTab: (tabId) => args.currentTabsById.has(tabId),
+    now: args.now
+  })
+}
+
 export function buildWorktreeAgentRows(args: {
   tabs: TerminalTab[]
   entries: AgentStatusEntry[]
@@ -205,7 +230,18 @@ export function buildWorktreeAgentRows(args: {
     seenPaneKeys
   })
 
-  rows.push(...buildTitleDerivedAgentRows({ ...args, seenPaneKeys }))
+  rows.push(
+    ...buildTitleDerivedAgentRows({
+      ...args,
+      seenPaneKeys,
+      permissionYieldingAgentTypes: yieldingPermissionAgentTypes({
+        entries: args.entries,
+        currentTabsById,
+        now: args.now,
+        runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+      })
+    })
+  )
 
   // Why: orchestration workers can be attributed to a worktree by main before
   // their tab is present in this renderer. Keep those live rows visible in the

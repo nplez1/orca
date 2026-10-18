@@ -59,6 +59,50 @@ describe('getWorktreeStatus', () => {
     expect(status).toBe('permission')
   })
 
+  it('ignores a leftover permission title for an agent that has an unplaced working row', () => {
+    // Why: a mirrored pane re-keyed on restore keeps the `π !` marker it was launched with,
+    // while its explicit row still reports working for this worktree under the old pane key.
+    // The title alone must not pin the card to permission.
+    const status = getWorktreeStatus(
+      [{ id: 'tab-1', title: 'π ! main - orca' }],
+      [],
+      livePtyMap('tab-1'),
+      { 'tab-1': { 0: 'π ! main - orca' } },
+      { permissionYieldingAgentTypes: new Set(['pi']) }
+    )
+
+    // The title stopped claiming a question; the row that reports the work still supplies
+    // `working` to the card (see the resolveWorktreeStatus case below).
+    expect(status).toBe('active')
+  })
+
+  it('still reports permission when another agent type owns the unplaced row', () => {
+    // Why: yielding is per agent type; one agent running says nothing about another that waits.
+    const status = getWorktreeStatus(
+      [{ id: 'tab-1', title: 'π ! main - orca' }],
+      [],
+      livePtyMap('tab-1'),
+      { 'tab-1': { 0: 'π ! main - orca' } },
+      { permissionYieldingAgentTypes: new Set(['claude']) }
+    )
+
+    expect(status).toBe('permission')
+  })
+
+  it('still reports permission while the worktree agent is monitoring', () => {
+    // Why: only a working row contradicts a wait; a monitoring row says nothing about
+    // whether some other pane is blocked on the user.
+    const status = getWorktreeStatus(
+      [{ id: 'tab-1', title: 'π ! main - orca' }],
+      [],
+      livePtyMap('tab-1'),
+      { 'tab-1': { 0: 'π ! main - orca' } },
+      { liveAgentStatus: 'monitoring' }
+    )
+
+    expect(status).toBe('permission')
+  })
+
   it('returns inactive when neither tabs nor browser state are live', () => {
     expect(getWorktreeStatus([], [], {})).toBe('inactive')
   })
@@ -252,6 +296,41 @@ describe('resolveWorktreeStatus', () => {
     })
 
     expect(status).toBe('working')
+  })
+
+  it('keeps a re-keyed pane working instead of pinning its card to permission', () => {
+    // Why: this is the card path. The leftover `π !` marker must not outrank the fresh working
+    // row the agent still reports under the tab this renderer lost.
+    const status = resolveWorktreeStatus({
+      tabs: [{ id: 'tab-1', title: 'π ! main - orca' }],
+      browserTabs: [],
+      ptyIdsByTabId: livePtyMap('tab-1'),
+      runtimePaneTitlesByTabId: { 'tab-1': { 0: 'π ! main - orca' } },
+      permissionYieldingAgentTypes: new Set(['pi']),
+      hasPermission: false,
+      hasLiveWorking: true,
+      hasLiveDone: false,
+      hasRetainedDone: false
+    })
+
+    expect(status).toBe('working')
+  })
+
+  it('keeps permission when another agent type owns the unplaced working row', () => {
+    // Why: one agent running must not hide a second agent's question.
+    const status = resolveWorktreeStatus({
+      tabs: [{ id: 'tab-1', title: 'π ! main - orca' }],
+      browserTabs: [],
+      ptyIdsByTabId: livePtyMap('tab-1'),
+      runtimePaneTitlesByTabId: { 'tab-1': { 0: 'π ! main - orca' } },
+      permissionYieldingAgentTypes: new Set(['claude']),
+      hasPermission: false,
+      hasLiveWorking: true,
+      hasLiveDone: false,
+      hasRetainedDone: false
+    })
+
+    expect(status).toBe('permission')
   })
 
   it('reports passive monitoring below active work and permission', () => {

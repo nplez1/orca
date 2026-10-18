@@ -43,7 +43,8 @@ export function selectWorktreeActivityStatuses(
       hasRetainedFailed,
       agentStatusPaneIdsByTabId,
       stalePaneIdsByTabId,
-      terminalPaneIdsByTabId
+      terminalPaneIdsByTabId,
+      permissionYieldingAgentTypes
     } = selectWorktreeAgentActivitySummary(statusInputs, worktreeId)
     statuses.set(
       worktreeId,
@@ -56,6 +57,7 @@ export function selectWorktreeActivityStatuses(
         stalePaneIdsByTabId,
         terminalPaneIdsByTabId,
         terminalLayoutRootsByTabId: selectTerminalLayoutRootsForWorktree(statusInputs, worktreeId),
+        permissionYieldingAgentTypes,
         hasPermission,
         hasLiveWorking,
         hasLiveMonitoring,
