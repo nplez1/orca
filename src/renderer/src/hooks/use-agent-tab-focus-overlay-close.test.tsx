@@ -94,13 +94,35 @@ describe('overlay close returns focus to the agent tab', () => {
   it('leaves the focus a dismissing click landed on', async () => {
     const overlay = mountOverlay()
     const row = document.createElement('button')
+    const label = document.createElement('span')
+    row.append(label)
     document.body.append(row)
-    pointerDownOn(row)
+    // A real click lands on the innermost element and Chromium focuses the row.
+    pointerDownOn(label)
     row.focus()
 
     await closeOverlay(overlay)
 
     // A panel row takes its own keyboard focus; the page-focus rule keeps it there.
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('leaves focus that lands after the overlay is gone', async () => {
+    const overlay = mountOverlay()
+    const row = document.createElement('button')
+    document.body.append(row)
+    pointerDownOn(row)
+    // A synchronously closed popup unmounts before mousedown moves the focus: the removal
+    // is observed first, and only then does the click land on the row.
+    overlay.remove()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    row.focus()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
     expect(restore).not.toHaveBeenCalled()
   })
 
@@ -147,10 +169,22 @@ describe('overlay close returns focus to the agent tab', () => {
     expect(restore).not.toHaveBeenCalled()
   })
 
-  it('leaves Space on a control its own focus', async () => {
+  it('leaves Space on a control its own focus, even after an earlier gesture', async () => {
     const overlay = mountOverlay()
     const item = overlay.querySelector('button')
+    pointerDownOn(overlay)
     keyDownOn(item ?? overlay, ' ')
+
+    await closeOverlay(overlay)
+
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('leaves Tab navigation alone', async () => {
+    const overlay = mountOverlay()
+    pointerDownOn(overlay)
+    // The caret moved on with the keyboard, so an overlay leaving later must not pull it.
+    keyDownOn(document, 'Tab')
 
     await closeOverlay(overlay)
 
