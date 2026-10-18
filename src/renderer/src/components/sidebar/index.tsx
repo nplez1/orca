@@ -21,6 +21,8 @@ import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { LocalGitToolchainScanBanner } from './LocalGitToolchainScanBanner'
 import { SeveredTerminalDaemonBanner } from './SeveredTerminalDaemonBanner'
 import { StalledTerminalDaemonBanner } from './StalledTerminalDaemonBanner'
+import { restoreAgentTabFocusAfterChromeGesture } from '@/lib/agent-tab-focus-policy'
+import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 
 // Why lazy: the Agents list pulls the whole activity pipeline (virtualizer, markdown
 // previews, thread derivation); users on the workspace view should not load or render any of it.
@@ -34,6 +36,9 @@ const ForgetSshWorkspaceDialog = lazyWithRetry(() => import('./ForgetSshWorkspac
 
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
+// Why: a workspace card owns its own restore — activation may be followed by a
+// sleeping workspace publishing its tab, which only the deferral path can wait for.
+const WORKSPACE_CARD_SELECTOR = '[role="option"][data-worktree-id]'
 // Why: straddle the sidebar/terminal seam so the divider sits on the border-l
 // instead of leaving a blank strip between the hover target and the edge.
 export const WORKTREE_SIDEBAR_RESIZE_HANDLE_CLASS_NAME =
@@ -140,6 +145,20 @@ function Sidebar({
   })
 
   useWorkspaceRevealBodyRedirect(sidebarOpen && sidebarBody === 'agents')
+  const handleChromeClick = React.useCallback((event: React.MouseEvent<HTMLDivElement>): void => {
+    // Why: React click events bubble through portals, so a menu or dialog the sidebar
+    // owns would otherwise read as a click on sidebar chrome — and the menu walks focus
+    // back to its trigger when it closes.
+    if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
+      return
+    }
+    if (event.target instanceof Element && event.target.closest(WORKSPACE_CARD_SELECTOR)) {
+      return
+    }
+    // Why: a pointer click on sidebar chrome (a section header, a toolbar button, the
+    // listbox container) must not leave the caret there.
+    restoreAgentTabFocusAfterChromeGesture(event.detail)
+  }, [])
   // A collapsed sidebar takes no drops.
   const sidebarRef = React.useCallback(
     (node: HTMLDivElement | null) => {
@@ -155,6 +174,7 @@ function Sidebar({
         ref={sidebarRef}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
         style={leftSidebarStyle}
+        onClick={handleChromeClick}
         {...dropHandlers}
       >
         {sidebarOpen && (

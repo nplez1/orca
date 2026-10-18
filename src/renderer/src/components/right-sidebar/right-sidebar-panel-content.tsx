@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
+import { restoreAgentTabFocusAfterBackgroundClick } from '@/lib/agent-tab-focus-policy'
+import { isEventTargetInsideCurrentTarget } from '../sidebar/worktree-card-dom-events'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import { isPluginPanelTabKey } from '../../../../shared/plugins/plugin-manifest'
 
@@ -24,7 +26,19 @@ export function RightSidebarPanelContent({
   rightSidebarOpen
 }: RightSidebarPanelContentProps): React.JSX.Element {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      onClick={(event) => {
+        // Why: React click events bubble through portals, so a menu the panel owns must
+        // not read as a click on the panel background.
+        if (!isEventTargetInsideCurrentTarget(event.currentTarget, event.target)) {
+          return
+        }
+        // Why: a panel is read-only chrome; a pointer click on its background drops
+        // focus to the page, so the agent tab takes it back.
+        restoreAgentTabFocusAfterBackgroundClick(event.detail)
+      }}
+    >
       <Suspense fallback={null}>
         {effectiveTab === 'explorer' && <FileExplorer />}
         {effectiveTab === 'source-control' && <SourceControl />}

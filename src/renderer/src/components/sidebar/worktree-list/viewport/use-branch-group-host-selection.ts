@@ -53,7 +53,7 @@ export function useBranchGroupHostSelection(args: {
         return
       }
       onImmediateActivate(target.member.worktree.id, target.rowKey)
-      void activateWorktreeFromSidebar(target.member.worktree.id, target.member.hostId)
+      activateWorktreeFromSidebar(target.member.worktree.id, target.member.hostId)
     },
     [setBranchGroupHost, onImmediateActivate]
   )

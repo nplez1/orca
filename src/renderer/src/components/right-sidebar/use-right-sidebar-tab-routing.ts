@@ -3,13 +3,15 @@ import { useAppStore } from '@/store'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import type { PluginPanelsFetchStatus } from '@/store/plugin-panels'
 import { normalizeRightSidebarRoute } from '@/store/right-sidebar-route'
+import { restoreAgentTabFocusAfterChromeGesture } from '@/lib/agent-tab-focus-policy'
 import { resolveRightSidebarEffectiveTab } from './right-sidebar-effective-tab'
 import { useInstalledPluginRouteReconciliation } from './use-installed-plugin-route-reconciliation'
 import type { ActivityBarItem } from './activity-bar-buttons'
 
 export type RightSidebarTabRouting = {
   effectiveTab: ActiveRightSidebarTab
-  selectActivityTab: (tab: ActiveRightSidebarTab) => void
+  /** `fromPointer` is false for a keyboard-activated tab, which keeps its own focus. */
+  selectActivityTab: (tab: ActiveRightSidebarTab, fromPointer: boolean) => void
 }
 
 export function useRightSidebarTabRouting({
@@ -83,9 +85,14 @@ export function useRightSidebarTabRouting({
     }
     rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = effectiveTab
   }, [activeFolderWorkspaceKey, effectiveTab, visibleItems])
-  const selectActivityTab = (tab: ActiveRightSidebarTab): void => {
+  const selectActivityTab = (tab: ActiveRightSidebarTab, fromPointer: boolean): void => {
     if (activeFolderWorkspaceKey) {
       rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = tab
+    }
+    // Why: the tab strip and the panel body need no typed input, so a pointer click
+    // hands focus back to the agent tab instead of stranding it on chrome.
+    if (fromPointer) {
+      restoreAgentTabFocusAfterChromeGesture(1)
     }
     if (tab === 'explorer') {
       showRightSidebarFiles()

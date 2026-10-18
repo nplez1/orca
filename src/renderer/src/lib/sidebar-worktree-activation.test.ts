@@ -14,16 +14,16 @@ import { activateWorktreeFromSidebar } from './sidebar-worktree-activation'
 
 describe('sidebar worktree activation', () => {
   beforeEach(() => {
-    mocks.activateAndRevealWorktree.mockClear()
-    mocks.activateAndRevealFolderWorkspace.mockClear()
+    mocks.activateAndRevealWorktree.mockReset()
+    mocks.activateAndRevealFolderWorkspace.mockReset()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('activates a clicked worktree without sidebar reveal', async () => {
-    await activateWorktreeFromSidebar('wt-live')
+  it('activates a clicked worktree without sidebar reveal', () => {
+    activateWorktreeFromSidebar('wt-live')
 
     expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith('wt-live', {
       navigationIntent: 'user-open',
@@ -32,8 +32,8 @@ describe('sidebar worktree activation', () => {
     expect(mocks.activateAndRevealFolderWorkspace).not.toHaveBeenCalled()
   })
 
-  it('does not defer non-VM slept worktree selection behind terminal wake work', async () => {
-    await activateWorktreeFromSidebar('wt-slept')
+  it('does not defer non-VM slept worktree selection behind terminal wake work', () => {
+    activateWorktreeFromSidebar('wt-slept')
 
     // Why: setActiveWorktree already defers terminal prep where needed. The
     // sidebar click itself must switch app state immediately.
@@ -44,7 +44,7 @@ describe('sidebar worktree activation', () => {
     })
   })
 
-  it('switches immediately while an ephemeral runtime wake is pending', async () => {
+  it('returns the activation while an ephemeral runtime wake is still pending', () => {
     let resolveResume: ((value: null) => void) | undefined
     const resumeWorkspace = vi.fn(
       () =>
@@ -55,9 +55,13 @@ describe('sidebar worktree activation', () => {
     vi.stubGlobal('window', {
       api: { ephemeralVm: { resumeWorkspace } }
     })
+    mocks.activateAndRevealWorktree.mockReturnValue({ primaryTabId: 'tab-vm' })
 
+    // Why: the sidebar's queued focus needs the activation result in the same gesture,
+    // so the wake must not be awaited.
     const activation = activateWorktreeFromSidebar('wt-vm')
 
+    expect(activation).toEqual({ primaryTabId: 'tab-vm' })
     expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith('wt-vm', {
       navigationIntent: 'user-open',
       revealInSidebar: false
@@ -65,11 +69,10 @@ describe('sidebar worktree activation', () => {
     expect(resumeWorkspace).toHaveBeenCalledWith({ workspaceId: 'wt-vm' })
 
     resolveResume?.(null)
-    await activation
   })
 
-  it('routes folder workspace activation through the guarded folder path', async () => {
-    await activateWorktreeFromSidebar('folder:folder-workspace-1')
+  it('routes folder workspace activation through the guarded folder path', () => {
+    activateWorktreeFromSidebar('folder:folder-workspace-1')
 
     expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenCalledWith('folder-workspace-1', {
       navigationIntent: 'user-open'

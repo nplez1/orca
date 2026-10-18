@@ -105,7 +105,7 @@ function RightSidebarInner(): React.JSX.Element {
       key={item.id}
       item={item}
       active={effectiveTab === item.id}
-      onClick={() => selectActivityTab(item.id)}
+      onClick={(event) => selectActivityTab(item.id, event.detail > 0)}
       layout="side"
       statusIndicator={item.id === 'checks' ? checksStatus : null}
     />

@@ -3,6 +3,7 @@ import React, { useCallback, useLayoutEffect, useRef } from 'react'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-diagnostics'
 import { activateWorktreeFromSidebar } from '@/lib/sidebar-worktree-activation'
+import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import type { WorktreeCardProps } from './worktree-card-model'
 import type { useWorktreeCardFoundation } from './use-worktree-card-foundation'
@@ -88,10 +89,16 @@ export function useWorktreeCardActivationActions({
         sshDisconnected: isSshDisconnected
       })
       onImmediateActivate?.(worktree.id, activationRowKey)
-      void activateWorktreeFromSidebar(
+      const activation = activateWorktreeFromSidebar(
         worktree.id,
         worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : undefined)
       )
+      // Why: the pointer gesture moved focus onto the sidebar listbox, and a
+      // sleeping workspace publishes its tab only after activation — the shared
+      // deferral path is what hands focus to the agent tab once it exists.
+      if (activation) {
+        queueWorkspaceActivationTerminalFocus(worktree.id, activation)
+      }
       onActivate?.()
     },
     [

@@ -4,6 +4,7 @@ import { WorkspaceTabDragLayer } from '@/components/tab-group/WorkspaceTabDragLa
 import { WorkspacePaneOverlayLayers } from '@/components/WorkspacePaneOverlayLayers'
 import { isTerminalImeInputContextRefreshing } from '@/components/terminal-pane/terminal-ime-input-context-refresh'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/duplicate-browser-tab-options'
+import { keepKeyboardFocusOptOut } from '@/lib/agent-tab-focus-policy'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { FloatingTerminalEmptyState } from './FloatingTerminalEmptyState'
 import { renderFloatingTerminalOrchestrationCard } from './FloatingTerminalOrchestrationCard'
@@ -82,6 +83,9 @@ export function renderFloatingTerminalPanelSurface({
     <div
       ref={setPanelNode}
       data-floating-terminal-panel
+      // Why: the floating workspace is another agent context, so the focus policy
+      // leaves its caret alone.
+      {...keepKeyboardFocusOptOut}
       aria-hidden={!open}
       tabIndex={-1}
       className={`fixed z-[45] flex min-h-[280px] min-w-[420px] rounded-lg bg-transparent text-card-foreground shadow-[0_4px_12px_rgba(0,0,0,0.16),0_24px_64px_rgba(0,0,0,0.32)] outline-none dark:shadow-[0_8px_20px_rgba(0,0,0,0.35),0_28px_72px_rgba(0,0,0,0.58)] ${open ? 'opacity-100' : 'invisible pointer-events-none opacity-0'}`}
