@@ -6,6 +6,7 @@ import {
 } from './github-checks'
 import type { AppState } from '../types'
 import type { PRCheckDetail } from '../../../../shared/github/check-types'
+import { getHostedReviewCacheKey } from './hosted-review-cache-identity'
 
 describe('deriveCheckStatusFromChecks', () => {
   it('treats an action_required check as failure so it is not a silent pass', () => {
@@ -127,5 +128,183 @@ describe('syncPRChecksStatus', () => {
     )
 
     expect(result).toBeNull()
+  })
+
+  it('mirrors the panel verdict into the GitHub hosted-review entry the sidebar card reads', () => {
+    const hostedKey = getHostedReviewCacheKey(
+      '/repo',
+      'main',
+      undefined,
+      'repo-id',
+      undefined,
+      undefined,
+      false
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: syncPRChecksStatus reads only the prCache and hostedReviewCache maps built here.
+    const state = {
+      prCache: {
+        'repo-id::main': {
+          fetchedAt: 0,
+          data: { number: 42, checksStatus: 'pending' as const, headSha: 'head' }
+        }
+      },
+      hostedReviewCache: {
+        [hostedKey]: {
+          fetchedAt: 5,
+          data: {
+            provider: 'github' as const,
+            number: 42,
+            status: 'pending' as const,
+            headSha: 'head'
+          }
+        }
+      }
+    } as unknown as AppState
+
+    const result = syncPRChecksStatus(
+      state,
+      '/repo',
+      'repo-id',
+      'main',
+      [{ name: 'build', status: 'completed', conclusion: 'success', url: null }],
+      'head'
+    )
+
+    expect(result?.prCache?.['repo-id::main']?.data?.checksStatus).toBe('success')
+    expect(result?.hostedReviewCache?.[hostedKey]?.data?.status).toBe('success')
+    // The entry's freshness is the hosted-review refresh's business, not this write's.
+    expect(result?.hostedReviewCache?.[hostedKey]?.fetchedAt).toBe(5)
+  })
+
+  it('leaves a GitHub hosted-review entry for a different review alone', () => {
+    const hostedKey = getHostedReviewCacheKey(
+      '/repo',
+      'main',
+      undefined,
+      'repo-id',
+      undefined,
+      undefined,
+      false
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: syncPRChecksStatus reads only the prCache and hostedReviewCache maps built here.
+    const state = {
+      prCache: {
+        'repo-id::main': {
+          fetchedAt: 0,
+          data: { number: 42, checksStatus: 'pending' as const, headSha: 'head' }
+        }
+      },
+      hostedReviewCache: {
+        [hostedKey]: {
+          fetchedAt: 5,
+          data: {
+            provider: 'github' as const,
+            number: 99,
+            status: 'pending' as const,
+            headSha: 'head'
+          }
+        }
+      }
+    } as unknown as AppState
+
+    const result = syncPRChecksStatus(
+      state,
+      '/repo',
+      'repo-id',
+      'main',
+      [{ name: 'build', status: 'completed', conclusion: 'success', url: null }],
+      'head'
+    )
+
+    expect(result?.prCache?.['repo-id::main']?.data?.checksStatus).toBe('success')
+    expect(result?.hostedReviewCache).toBeUndefined()
+  })
+
+  it('leaves a hosted-review entry for a different head alone', () => {
+    const hostedKey = getHostedReviewCacheKey(
+      '/repo',
+      'main',
+      undefined,
+      'repo-id',
+      undefined,
+      undefined,
+      false
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: syncPRChecksStatus reads only the prCache and hostedReviewCache maps built here.
+    const state = {
+      prCache: {
+        'repo-id::main': {
+          fetchedAt: 0,
+          data: { number: 42, checksStatus: 'pending' as const, headSha: 'new-head' }
+        }
+      },
+      hostedReviewCache: {
+        [hostedKey]: {
+          fetchedAt: 5,
+          data: {
+            provider: 'github' as const,
+            number: 42,
+            status: 'pending' as const,
+            headSha: 'old-head'
+          }
+        }
+      }
+    } as unknown as AppState
+
+    const result = syncPRChecksStatus(
+      state,
+      '/repo',
+      'repo-id',
+      'main',
+      [{ name: 'build', status: 'completed', conclusion: 'success', url: null }],
+      'new-head'
+    )
+
+    expect(result?.prCache?.['repo-id::main']?.data?.checksStatus).toBe('success')
+    expect(result?.hostedReviewCache).toBeUndefined()
+  })
+
+  it('leaves a GitLab hosted-review entry alone', () => {
+    const hostedKey = getHostedReviewCacheKey(
+      '/repo',
+      'main',
+      undefined,
+      'repo-id',
+      undefined,
+      undefined,
+      false
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: syncPRChecksStatus reads only the prCache and hostedReviewCache maps built here.
+    const state = {
+      prCache: {
+        'repo-id::main': {
+          fetchedAt: 0,
+          data: { number: 42, checksStatus: 'pending' as const, headSha: 'head' }
+        }
+      },
+      hostedReviewCache: {
+        [hostedKey]: {
+          fetchedAt: 5,
+          data: {
+            provider: 'gitlab' as const,
+            number: 42,
+            status: 'pending' as const,
+            headSha: 'head'
+          }
+        }
+      }
+    } as unknown as AppState
+
+    const result = syncPRChecksStatus(
+      state,
+      '/repo',
+      'repo-id',
+      'main',
+      [{ name: 'build', status: 'completed', conclusion: 'success', url: null }],
+      'head'
+    )
+
+    expect(result?.prCache?.['repo-id::main']?.data?.checksStatus).toBe('success')
+    expect(result?.hostedReviewCache).toBeUndefined()
   })
 })
