@@ -6,6 +6,7 @@ import {
   SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV
 } from '../../shared/setup-agent-sequencing'
 import { addOrcaWslInteropEnv, stampWslOrchestrationCompatibilityHost } from './wsl-orca-env'
+import { createDaemonPtyEnvironment } from '../daemon/pty-subprocess/spawn-environment'
 
 describe('addOrcaWslInteropEnv', () => {
   it('marks the Orca terminal handle for Windows to WSL env import', () => {
@@ -216,6 +217,15 @@ describe('addOrcaWslInteropEnv', () => {
     const env: Record<string, string> = { ORCA_IMAGE_PROTOCOL: 'kitty' }
     addOrcaWslInteropEnv(env)
     expect(env.WSLENV).toContain('ORCA_IMAGE_PROTOCOL/u')
+  })
+
+  it('crosses the pi OSC 52 clipboard hint a daemon pane env carries into the guest', () => {
+    // Why compose instead of hand-building: the passthrough only fires when the spawn env already
+    // carries the flag, so dropping either half has to fail this case.
+    const env = createDaemonPtyEnvironment({ sessionId: 'test', cols: 80, rows: 24 })
+    addOrcaWslInteropEnv(env)
+    expect(env.PI_CLIPBOARD_OSC52).toBe('1')
+    expect(env.WSLENV).toContain('PI_CLIPBOARD_OSC52/u')
   })
 
   it('marks the WSL hook relay version for import on relay spawn envs', () => {

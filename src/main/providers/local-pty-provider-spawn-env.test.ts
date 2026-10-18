@@ -203,6 +203,14 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.CUSTOM_VAR).toBe('custom-value')
     })
 
+    it('advertises OSC 52 clipboard support to pi so a paired client receives the copy', async () => {
+      await provider.spawn({ cols: 80, rows: 24 })
+
+      // Pi's only remote-clipboard signal: when a paired client watches the pane the host
+      // clipboard is the wrong one, and no SSH variable tells pi that.
+      expect(spawnMock.mock.calls.at(-1)![2].env.PI_CLIPBOARD_OSC52).toBe('1')
+    })
+
     it('re-reads buildSpawnEnv after a reentrant configuration change', async () => {
       const initialBuildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => env)
       const configuredBuildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => env)

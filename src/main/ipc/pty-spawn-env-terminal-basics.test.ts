@@ -457,6 +457,10 @@ describe('registerPtyHandlers', () => {
       const env = await spawnAndGetEnv()
       expect(env.ORCA_IMAGE_PROTOCOL).toBe('kitty')
     })
+    it('hints OSC 52 clipboard support to pi so a paired client receives the copy', async () => {
+      const env = await spawnAndGetEnv()
+      expect(env.PI_CLIPBOARD_OSC52).toBe('1')
+    })
     it('keeps indexed Git prompt guards in a local agent terminal env', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, undefined, undefined, 'claude')
       expect(env.GIT_TERMINAL_PROMPT).toBe('0')
