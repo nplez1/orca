@@ -97,8 +97,13 @@ export async function loadJenkinsCheckDetails(
   if (!url || parseJenkinsBuildLocation(url) === null) {
     return null
   }
-  // Why the widened type: a web client has no Jenkins namespace, and its fallback proxy resolves
-  // every call to undefined rather than throwing.
+  // Why the namespace check: a web client has no Jenkins namespace and its fallback proxy resolves
+  // every call to undefined, but a partial `window.api` (an embedder, or a test harness that stubs
+  // only what it exercises) has no proxy at all — and the TypeError that raised reached callers as a
+  // failed details load rather than as "not Jenkins".
+  if (!('jenkins' in window.api)) {
+    return null
+  }
   const result: JenkinsBuildDetailsResult | undefined = await callWithTimeout(
     window.api.jenkins.buildDetails({
       url,

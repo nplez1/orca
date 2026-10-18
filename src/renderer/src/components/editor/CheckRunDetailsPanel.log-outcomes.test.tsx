@@ -165,7 +165,11 @@ describe('synthetic outcome payloads through real sidebar and header actions', (
       )
       expect(scrollTopCache.size).toBe(1)
       expect([...scrollTopCache.keys()].some((key) => key.includes('::intent:'))).toBe(false)
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      // Why awaited: the refresh probes the Jenkins credential path before it reaches the provider
+      // fetch, so the call lands a microtask after the click rather than inside it.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      })
       await act(async () => pending.resolve(readingDetails(undefined, 'available')))
       expect(screen.getByTestId('outcome-pane').querySelector('pre')?.scrollTop).toBe(0)
       expect(marker).not.toHaveBeenCalled()
@@ -285,7 +289,11 @@ describe('synthetic outcome payloads through real sidebar and header actions', (
       })
       expect(copy).toHaveBeenCalledExactlyOnceWith(first.jobs[1].logTail)
       expect(fetch).not.toHaveBeenCalled()
-      fireEvent.click(within(panel).getByRole('button', { name: 'Refresh' }))
+      // Why awaited: the refresh probes the Jenkins credential path before it reaches the provider
+      // fetch, so the call lands a microtask after the click rather than inside it.
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Refresh' }))
+      })
       expect(fetch).toHaveBeenCalledTimes(1)
       expect(fetch).toHaveBeenCalledWith(
         '/repo',
@@ -383,7 +391,11 @@ describe('synthetic outcome payloads through real sidebar and header actions', (
           setWithLRU(scrollTopCache, `ordinary-${index}`, index)
         }
       }
-      fireEvent.click(within(panel).getByRole('button', { name: 'Refresh' }))
+      // Why awaited: the refresh probes the Jenkins credential path before it reaches the provider
+      // fetch, so the call lands a microtask after the click rather than inside it.
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Refresh' }))
+      })
       expect(panel.querySelector('pre')).toBeNull()
       await act(async () => pending.resolve(next))
       expect(marker).toHaveBeenCalledTimes(interaction === 'untouched' ? 1 : 0)
