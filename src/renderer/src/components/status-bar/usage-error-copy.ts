@@ -98,7 +98,8 @@ function getDelegatedCliRefreshProvider(
   return p.provider === 'grok' || p.provider === 'kimi' ? p.provider : null
 }
 
-/** System Default's login expired on the server: Claude refreshes it the next time it runs. */
+/** System Default's stored login cannot renew itself — no refresh token, or one the endpoint
+ *  refused — so only a Claude run fixes it. */
 export function isClaudeUsageWaitingForClaude(p: ProviderRateLimits): boolean {
   return (
     p.provider === 'claude' &&
@@ -127,7 +128,8 @@ export function getProviderUsageStatusLabel(p: ProviderRateLimits): string {
           'auto.components.status.bar.tooltip.0d8d7cfe15',
           'Waiting for Claude session'
         )
-      // Why: Orca never refreshes a Claude login; only an older host that still does reports the other kinds.
+      // Why: Orca exchanges a stored refresh token itself, so a login only waits on Claude when
+      // it has no refresh token left, or one the endpoint refused.
       case 'stale-token':
         return isClaudeUsageWaitingForClaude(p)
           ? translate(
@@ -135,6 +137,8 @@ export function getProviderUsageStatusLabel(p: ProviderRateLimits): string {
               'Updates when Claude runs'
             )
           : translate('auto.components.status.bar.tooltip.claude.expired.label', 'Sign-in expired')
+      // Why: the host could not reach the token endpoint, or an older host still defers the
+      // refresh; either way the next poll tries again.
       case 'refreshable-credentials-without-token':
       case 'delegated-refresh-required':
         return translate('auto.components.status.bar.tooltip.1804cd8c3f', 'Refreshing sign-in')
@@ -143,7 +147,8 @@ export function getProviderUsageStatusLabel(p: ProviderRateLimits): string {
       case 'cli-unavailable':
       case 'usage-unavailable':
         return translate('auto.components.status.bar.tooltip.f8b8dbed85', 'Usage unavailable')
-      // Why: the host reports this only for a selected account whose own profile has no login.
+      // Why: a selected account whose login is gone or refused — System Default keeps the calm
+      // copy above, since it has no account to re-select.
       case 'missing-credentials':
         return translate('accounts.claude.usageSignInLabel', 'Sign in again')
       case 'missing-scope':

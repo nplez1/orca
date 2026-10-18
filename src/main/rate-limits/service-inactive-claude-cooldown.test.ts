@@ -44,6 +44,12 @@ vi.mock('./claude-pty', () => ({
     throw new Error('Usage fixture must not launch Claude')
   })
 }))
+// Why also the raw Keychain reader: a 401 starts a token exchange, which re-reads the item; this
+// fixture's item is a stand-in on disk and must never reach the real `security` binary.
+vi.mock('../macos-keychain/generic-password', () => ({
+  readKeychainPassword: vi.fn(async () => null),
+  writeKeychainPassword: vi.fn(async () => {})
+}))
 vi.mock('../claude-accounts/keychain', () => ({
   readActiveClaudeKeychainCredentialsStrict: vi.fn(async (configDir: string) => {
     const { readFile } = await import('node:fs/promises')
@@ -51,7 +57,11 @@ vi.mock('../claude-accounts/keychain', () => ({
     if (!configDir.startsWith(fixture.userData)) {
       throw new Error('Usage fixture must read its own account folder')
     }
-    return readFile(join(configDir, '.credentials.json'), 'utf8')
+    return {
+      contents: await readFile(join(configDir, '.credentials.json'), 'utf8'),
+      service: 'Claude Code-credentials-fixture',
+      account: 'fixture'
+    }
   })
 }))
 vi.mock('./grok-auth', () => ({ readGrokAuthSession: () => ({ status: 'missing' }) }))
@@ -393,7 +403,11 @@ it.each([401, 503])(
       status: 'error',
       updatedAt: originalAt,
       session: { usedPercent: 21 },
-      usageMetadata: { failureKind: status === 401 ? 'stale-token' : 'server' }
+      // Why not stale-token: a 401 here starts a refresh, and this fixture's Keychain item cannot
+      // be re-read by the exchange, so the host reports a login it will retry rather than a dead one.
+      usageMetadata: {
+        failureKind: status === 401 ? 'refreshable-credentials-without-token' : 'server'
+      }
     })
     expect(cached('A')?.usageMetadata?.retryAtMs).toBeUndefined()
     fixture.now += 61000

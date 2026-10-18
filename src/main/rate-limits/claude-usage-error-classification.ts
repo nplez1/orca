@@ -3,59 +3,35 @@ import { ClaudeUsageRequestError, OAuthUsageError } from './claude-oauth-usage-e
 
 export type ClaudeUsageErrorClassification = {
   failureKind: UsageRateLimitFailureKind
-  shouldAttemptCliFallback: boolean
-  shouldAttemptDelegatedRefresh: boolean
-  terminal: boolean
+  /** The usage endpoint refused the token: exchanging the stored refresh token may repair it. */
+  shouldAttemptCredentialRefresh: boolean
 }
 
 export function classifyClaudeOAuthUsageError(error: unknown): ClaudeUsageErrorClassification {
   if (error instanceof OAuthUsageError) {
     if (error.status === 429) {
-      return terminal('rate-limited')
+      return { failureKind: 'rate-limited', shouldAttemptCredentialRefresh: false }
     }
     if (error.status === 401) {
       return recoverableAuth('stale-token')
     }
     if (error.status === 403) {
       return error.message.includes('user:profile')
-        ? terminal('missing-scope')
+        ? { failureKind: 'missing-scope', shouldAttemptCredentialRefresh: false }
         : recoverableAuth('stale-token')
     }
     if (error.status >= 500) {
-      return fallbackOnly('server')
+      return { failureKind: 'server', shouldAttemptCredentialRefresh: false }
     }
-    return terminal('usage-unavailable')
+    return { failureKind: 'usage-unavailable', shouldAttemptCredentialRefresh: false }
   }
 
   if (error instanceof ClaudeUsageRequestError) {
-    return fallbackOnly(error.failureKind)
+    return { failureKind: error.failureKind, shouldAttemptCredentialRefresh: false }
   }
-  return fallbackOnly('unknown')
+  return { failureKind: 'unknown', shouldAttemptCredentialRefresh: false }
 }
 
 function recoverableAuth(failureKind: UsageRateLimitFailureKind): ClaudeUsageErrorClassification {
-  return {
-    failureKind,
-    shouldAttemptCliFallback: true,
-    shouldAttemptDelegatedRefresh: true,
-    terminal: false
-  }
-}
-
-function fallbackOnly(failureKind: UsageRateLimitFailureKind): ClaudeUsageErrorClassification {
-  return {
-    failureKind,
-    shouldAttemptCliFallback: true,
-    shouldAttemptDelegatedRefresh: false,
-    terminal: false
-  }
-}
-
-function terminal(failureKind: UsageRateLimitFailureKind): ClaudeUsageErrorClassification {
-  return {
-    failureKind,
-    shouldAttemptCliFallback: false,
-    shouldAttemptDelegatedRefresh: false,
-    terminal: true
-  }
+  return { failureKind, shouldAttemptCredentialRefresh: true }
 }

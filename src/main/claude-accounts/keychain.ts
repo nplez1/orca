@@ -5,17 +5,29 @@ import { basename, dirname, join } from 'node:path'
 import { readKeychainPassword } from '../macos-keychain/generic-password'
 
 const ACTIVE_CLAUDE_SERVICE = 'Claude Code-credentials'
+
+/** A login and the exact item it was read from, so a rotated refresh token can be written back. */
+export type ClaudeKeychainCredentialsRead = {
+  contents: string
+  service: string
+  account: string
+}
+
 export async function readActiveClaudeKeychainCredentialsStrict(
   configDir?: string
-): Promise<string | null> {
+): Promise<ClaudeKeychainCredentialsRead | null> {
+  const account = getKeychainUser()
   if (!configDir) {
-    return readKeychainPassword(claudeKeychainService(), getKeychainUser())
+    const service = claudeKeychainService()
+    const contents = await readKeychainPassword(service, account)
+    return contents ? { contents, service, account } : null
   }
   // Keep both lexical and canonical profile aliases scoped; never try System Default.
   for (const dir of claudeConfigDirKeychainAliases(configDir)) {
-    const credentials = await readKeychainPassword(claudeKeychainService(dir), getKeychainUser())
-    if (credentials) {
-      return credentials
+    const service = claudeKeychainService(dir)
+    const contents = await readKeychainPassword(service, account)
+    if (contents) {
+      return { contents, service, account }
     }
   }
   return null

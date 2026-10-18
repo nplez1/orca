@@ -3,49 +3,38 @@ import { classifyClaudeOAuthUsageError } from './claude-usage-error-classificati
 import { ClaudeUsageRequestError, OAuthUsageError } from './claude-oauth-usage-error'
 
 describe('classifyClaudeOAuthUsageError', () => {
-  it('treats OAuth unauthorized as stale-token repair/fallback', () => {
+  it('treats OAuth unauthorized as a token the stored refresh token may repair', () => {
     expect(
       classifyClaudeOAuthUsageError(new OAuthUsageError('Invalid OAuth token', 401, true))
-    ).toMatchObject({
-      failureKind: 'stale-token',
-      shouldAttemptDelegatedRefresh: true,
-      shouldAttemptCliFallback: true,
-      terminal: false
-    })
+    ).toMatchObject({ failureKind: 'stale-token', shouldAttemptCredentialRefresh: true })
   })
 
-  it('keeps usage rate limits terminal', () => {
+  it('treats a non-scope 403 as the same refused token', () => {
+    expect(
+      classifyClaudeOAuthUsageError(new OAuthUsageError('Access denied', 403, true))
+    ).toMatchObject({ failureKind: 'stale-token', shouldAttemptCredentialRefresh: true })
+  })
+
+  it('never spends a refresh token on a rate limit', () => {
     expect(
       classifyClaudeOAuthUsageError(new OAuthUsageError('Claude usage is rate limited', 429, true))
-    ).toMatchObject({
-      failureKind: 'rate-limited',
-      shouldAttemptDelegatedRefresh: false,
-      shouldAttemptCliFallback: false,
-      terminal: true
-    })
+    ).toMatchObject({ failureKind: 'rate-limited', shouldAttemptCredentialRefresh: false })
   })
 
-  it('classifies missing OAuth scope as actionable terminal state', () => {
+  it('classifies missing OAuth scope as an actionable state no refresh can fix', () => {
     expect(
       classifyClaudeOAuthUsageError(
         new OAuthUsageError("missing required scope 'user:profile'", 403, true)
       )
-    ).toMatchObject({
-      failureKind: 'missing-scope',
-      terminal: true
-    })
+    ).toMatchObject({ failureKind: 'missing-scope', shouldAttemptCredentialRefresh: false })
   })
 
-  it('allows CLI fallback for network-shaped failures', () => {
+  it('treats network-shaped failures as retryable without touching the login', () => {
     expect(
       classifyClaudeOAuthUsageError(
         new ClaudeUsageRequestError(new Error('fetch failed: ENOTFOUND'))
       )
-    ).toMatchObject({
-      failureKind: 'network',
-      shouldAttemptCliFallback: true,
-      shouldAttemptDelegatedRefresh: false
-    })
+    ).toMatchObject({ failureKind: 'network', shouldAttemptCredentialRefresh: false })
   })
 
   it("classifies Electron's proxy failure as network and a malformed body as parse", () => {
