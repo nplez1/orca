@@ -303,14 +303,14 @@ export const PR_E2E_SOURCE_ROUTES = [
       )
   },
   {
-    // Why: this lane exists because the focus restore is one bare onClick on each root —
-    // a unit test can call the handler, but only a real click proves the wiring. The
-    // roots are named here, not just the policy, so dropping the binding fails CI.
+    // Why: the focus restore is one bare onClick per surface — a unit test can call the
+    // handler, but only a real click proves the wiring. The spec guards the sidebar root
+    // and the activity tab strip (both layouts); the panel body has a render test.
     id: 'agent-tab.focus-retention',
     specs: ['tests/e2e/agent-tab-focus-retention.spec.ts'],
     matches: (file) =>
       isProductSource(file) &&
-      /^(?:src\/renderer\/src\/lib\/(?:agent-tab-focus-policy|workspace-activation-terminal-focus)\.ts|src\/renderer\/src\/components\/(?:sidebar\/index|right-sidebar\/(?:index|right-sidebar-panel-content|use-right-sidebar-tab-routing))\.tsx?)$/.test(
+      /^(?:src\/renderer\/src\/lib\/(?:agent-tab-focus-policy|workspace-activation-terminal-focus)\.ts|src\/renderer\/src\/components\/(?:sidebar\/index|right-sidebar\/(?:index|right-sidebar-panel-content|right-sidebar-top-activity-bar|activity-bar-buttons|use-right-sidebar-tab-routing))\.tsx?)$/.test(
         file
       )
   },

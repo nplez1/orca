@@ -83,6 +83,8 @@ describe('pr-e2e-pane-close-routing', () => {
         'src/renderer/src/components/sidebar/index.tsx',
         'src/renderer/src/components/right-sidebar/index.tsx',
         'src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx',
+        'src/renderer/src/components/right-sidebar/right-sidebar-top-activity-bar.tsx',
+        'src/renderer/src/components/right-sidebar/activity-bar-buttons.tsx',
         'src/renderer/src/components/right-sidebar/use-right-sidebar-tab-routing.ts'
       ]) {
         expect(existsSync(join(projectDir, file)), file).toBe(true)
@@ -91,6 +93,8 @@ describe('pr-e2e-pane-close-routing', () => {
         ])
       }
       expect(shouldRunReusablePrE2e(['src/renderer/src/lib/agent-tab-focus-policy.ts'])).toBe(true)
+      // Why: a unit test beside the policy is not what this lane guards.
+      expect(selectPrE2eSpecs(['src/renderer/src/lib/agent-tab-focus-policy.test.ts'])).toEqual([])
     })
   })
 

@@ -18,6 +18,8 @@ vi.mock('@/lib/lazy-with-retry', () => ({
 
 import { RightSidebarPanelContent } from './right-sidebar-panel-content'
 
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+
 let root: Root
 let container: HTMLDivElement
 
