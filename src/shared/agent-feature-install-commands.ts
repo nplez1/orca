@@ -1,6 +1,9 @@
 import { isUsableSkillsCliAgentKey } from './skills-cli-agent-keys'
 
-export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/stablyai/orca'
+// Why this fork's repository: the pin below names the running build's own commit, which only exists
+// here, and this fork is the only place its own skill content (NP CLI names) is published from.
+// Pointed at upstream the pair is incoherent — a nplez1/orca commit that stablyai/orca never had.
+export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/nplez1/orca'
 
 // Why: one skills CLI for every install rail. 1.5.x cannot fetch a commit, and a bare
 // `npx skills` can reuse a stale cached copy or another binary (#18687).

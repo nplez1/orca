@@ -2,13 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAgentFeatureSkillInstallArgs,
   buildAgentFeatureSkillInstallCommand,
+  ORCA_SKILLS_REPOSITORY_URL,
   SKILLS_CLI_VERSION
 } from './agent-feature-install-commands'
 
 const sourceCommit = '0123456789abcdef0123456789abcdef01234567'
-const source = `https://github.com/stablyai/orca/tree/${sourceCommit}`
+const source = `${ORCA_SKILLS_REPOSITORY_URL}/tree/${sourceCommit}`
 
 describe('agent feature skill commands', () => {
+  it('installs from this fork, where the pinned commit exists', () => {
+    // Why a literal: the pin above names the running build's own commit, which upstream never had,
+    // so a sync that restores upstream's repository here must turn this red rather than ship.
+    expect(ORCA_SKILLS_REPOSITORY_URL).toBe('https://github.com/nplez1/orca')
+    expect(buildAgentFeatureSkillInstallArgs(['orca-cli'], { sourceCommit })[2]).toBe(
+      `https://github.com/nplez1/orca/tree/${sourceCommit}`
+    )
+  })
   it('pins the skills CLI and the source to the build commit', () => {
     expect(buildAgentFeatureSkillInstallArgs(['orca-cli'], { sourceCommit }).slice(0, 3)).toEqual([
       `skills@${SKILLS_CLI_VERSION}`,

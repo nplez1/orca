@@ -2,7 +2,7 @@
 name: orca-cli
 description: >-
   Operate Orca-managed worktrees, folder contexts, terminals, repos, automations, artifacts,
-  skill sharing, worktree comments, and Orca's embedded browser through the `orca` CLI. Use
+  skill sharing, worktree comments, and Orca's embedded browser through the `orca-np` CLI. Use
   when the user says "$orca-cli", "Orca worktree", "child worktree", "spawn codex/claude in a
   worktree", "read/wait/send Orca terminal", "handoff" / "handover" / "give this to another
   agent", "Orca browser", "orca artifacts", or "share skills". Prefer it over raw git
@@ -12,13 +12,17 @@ description: >-
 
 # Orca CLI
 
-Use `orca` when Orca's running editor/runtime is the source of truth. Use plain shell tools when Orca state does not matter.
+Use the CLI you resolved in the stub when Orca's running editor/runtime is the source of truth. Use plain shell tools when Orca state does not matter.
 
 ## Start Here
 
 `ORCA` is a placeholder for the executable you resolved in the stub; substitute it before running.
 
-**Dev builds (`pnpm dev`):** after `pnpm build:cli` the dev CLI is `orca-dev`, and `./config/scripts/orca-dev.mjs` invokes it worktree-locally without depending on the /usr/local/bin symlink. Plain `orca` targets any installed production Orca.
+**This build is Orca NP:** its CLI registers as `orca-np`, never as the official install's `orca`.
+**Dev builds (`pnpm dev`):** the dev launcher is `orca-np-dev`, and `./config/scripts/orca-dev.mjs`
+(`pnpm exec orca-dev` from the repo root) runs the same CLI worktree-locally without depending on
+the /usr/local/bin symlink. A bare `orca` is the official Orca install, which targets a different
+app and data directory.
 
 Prefer `--json` for agent-driven calls. If the CLI is missing, say so explicitly instead of inspecting source files first.
 

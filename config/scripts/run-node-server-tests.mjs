@@ -82,7 +82,8 @@ if (artifact) {
   )
   process.stdout.write(`${JSON.stringify({ target, ...response })}\n`)
 
-  const source = `https://github.com/stablyai/orca/tree/${resolveBuildSourceCommit()}`
+  // Why this fork's literal: the pin is the build's own commit, which upstream never had.
+  const source = `https://github.com/nplez1/orca/tree/${resolveBuildSourceCommit()}`
   const cli = runProcessSync({
     program: runtimePath,
     args: [

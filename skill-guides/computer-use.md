@@ -1,7 +1,7 @@
 ---
 name: computer-use
 description: >-
-  Drives the GUI of a visible local app window through `orca computer`: accessibility
+  Drives the GUI of a visible local app window through `orca-np computer`: accessibility
   tree, clicks, typing, menus, dialogs, and screenshots in native apps and external
   browser windows (Chrome, Edge, Safari) or webviews. Prefer a programmatic path
   (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task.
@@ -11,7 +11,7 @@ description: >-
 
 # Computer Use
 
-Use this skill to drive a visible app window through `orca computer`. Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task; use this skill only when a visible window needs GUI control those cannot reach. Do not use it for Orca's embedded browser (`orca-cli`).
+Use this skill to drive a visible app window through `ORCA computer`. Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task; use this skill only when a visible window needs GUI control those cannot reach. Do not use it for Orca's embedded browser (`orca-cli`).
 
 ## Preconditions
 
@@ -136,7 +136,7 @@ Slack: the accessibility tree may be shallow while the screenshot contains usefu
 
 ## Errors
 
-- `app_not_found`: run `list-apps` and retry with the bundle ID. If the target is a web app such as Gmail, choose the desktop browser app/window that contains it; do not retry `ORCA computer ... --app Gmail` unchanged because `orca computer` app selectors refer to desktop apps, not website names.
+- `app_not_found`: run `list-apps` and retry with the bundle ID. If the target is a web app such as Gmail, choose the desktop browser app/window that contains it; do not retry `ORCA computer ... --app Gmail` unchanged because `ORCA computer` app selectors refer to desktop apps, not website names.
 - `app_blocked`: stop; the target is intentionally blocked from computer-use.
 - `window_not_found` / `window_stale`: run `list-windows`, choose a current selector, then rerun `get-app-state`.
 - `window_not_focused`: retry once with `--restore-window`; if the message says restore was already requested, stop retrying restore and bring the app forward manually or check permissions. For editable fields prefer `set-value`, then inspect before assuming keyboard input worked.

@@ -12,8 +12,9 @@ description: >-
 # Per-Workspace Environments
 
 `ORCA` is a placeholder for the executable you resolved in the stub; substitute it before running.
-Inside the lifecycle scripts the placeholder does not apply: `orca serve` written there runs on
-the remote machine's own binary.
+Inside the lifecycle scripts the placeholder does not apply: a `serve` command written there runs on
+the remote machine's own binary (`orca-np serve` on an Orca NP host, `pnpm exec orca-dev serve` in
+a build made from this repo).
 
 ## Autonomy envelope
 
@@ -501,8 +502,9 @@ orca serve \
 ```
 
 In an environment built from source, run it as `pnpm exec orca-dev serve …` from the repo root;
-`orca-dev` is the in-repo entrypoint. Plain `orca serve …` is the same command when the built CLI is
-on that machine's PATH, and the flags and output are identical either way. There is no `--host` flag,
+`orca-dev` is the in-repo entrypoint, and `orca-np-dev` is the dev launcher a running dev build
+installs. The resolved production command is `orca-np serve …` — never bare `orca`, which is the
+official Orca install. The flags and output are identical on every entrypoint. There is no `--host` flag,
 and `--project-root` must be an absolute directory on the remote.
 
 `pairingCode` embeds whatever you passed as `--pairing-address`, so pass the externally reachable
