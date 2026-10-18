@@ -1,7 +1,8 @@
 import type { JiraPriority } from '../../../shared/jira-types'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import { getJiraPrioritySeverity, getJiraPriorityTone } from './task-page-jira-priority-tone'
+import { getJiraPrioritySeverity } from './task-page-jira-priority-tone'
+import { getJiraPriorityTone } from './task-page-jira-status-tone'
 
 /**
  * The severity chip for a Jira issue.
@@ -21,7 +22,8 @@ export function TaskPageJiraPriorityBadge({
       data-severity={getJiraPrioritySeverity(priority)}
       className={cn(
         'inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium',
-        getJiraPriorityTone(priority),
+        // Why upstream's function: one priority palette for the list cells and the board card.
+        getJiraPriorityTone(priority?.name),
         className
       )}
     >

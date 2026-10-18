@@ -118,7 +118,7 @@ export function getStatusBarUsageProjection({
     visibleZcode !== null &&
     statusBarItems.includes('zcode') &&
     // Why: a saved GLM Coding Plan key is a durable setup without the CLI on PATH, mirroring the
-    // Antigravity rule below.
+    // Antigravity exemption above.
     (rateLimits.zcodePlanApiKeyConfigured || isStatusBarItemAvailable('zcode', detectedAgentIds))
   // Why: OpenCode Go is web/cookie-auth, not a CLI on PATH, so detection-gating doesn't apply.
   const visibleOpencodeGo = getVisibleUsageProvider('opencode-go', opencodeGo, usageSettings)

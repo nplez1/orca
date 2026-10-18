@@ -24,21 +24,10 @@ export function getJiraPrioritySeverity(priority: JiraPriorityLike): JiraPriorit
   return MAJOR_PRIORITY_NAMES.has(name) ? 'major' : 'standard'
 }
 
-const SEVERITY_TONE: Record<JiraPrioritySeverity, string> = {
-  // Reuse the Jira priority palette every other priority surface reads, so a snapshot
-  // and a board card cannot disagree about what "high" looks like.
-  blocker: 'border-jira-priority-high/25 bg-jira-priority-high/10 text-jira-priority-high',
-  // Critical shares blocker's red chip; the whole-surface wash is the only difference,
-  // so the two stay separable without inventing a fourth hue.
-  critical: 'border-jira-priority-high/25 bg-jira-priority-high/10 text-jira-priority-high',
-  major: 'border-jira-priority-medium/25 bg-jira-priority-medium/10 text-jira-priority-medium',
-  standard: 'border-border/50 bg-muted/40 text-muted-foreground'
-}
-
-/** Tone for the priority pill on a task row or board card. */
-export function getJiraPriorityTone(priority: JiraPriorityLike): string {
-  return SEVERITY_TONE[getJiraPrioritySeverity(priority)]
-}
+// Why no chip palette here: `getJiraPriorityTone` in `task-page-jira-status-tone.ts` is the one
+// every priority surface reads, so a board card and the issue-list cell cannot disagree about what
+// "Major" looks like. This module owns only what upstream has no equivalent for: the severity tier
+// and the blocker-only surface wash.
 
 export type JiraPrioritySurfaceTone = {
   /** Wash for the whole task surface; empty for every tier except blocker. */

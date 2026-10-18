@@ -248,7 +248,9 @@ describe('Jira issue status grouping', () => {
     expect(chip('Critical')?.getAttribute('data-severity')).toBe('critical')
     expect(chip('Critical')?.className).toContain('text-jira-priority-high')
     expect(chip('Major')?.getAttribute('data-severity')).toBe('major')
-    expect(chip('Major')?.className).toContain('text-jira-priority-medium')
+    // Why high and not medium: the chip reads the shared priority palette the issue-list cells
+    // use, and that palette puts major in the high tier — one vocabulary for both surfaces.
+    expect(chip('Major')?.className).toContain('text-jira-priority-high')
     expect(chip('No priority')?.getAttribute('data-severity')).toBe('standard')
   })
 

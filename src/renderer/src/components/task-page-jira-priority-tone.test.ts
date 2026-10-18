@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getJiraPrioritySeverity,
-  getJiraPrioritySurfaceTone,
-  getJiraPriorityTone
-} from './task-page-jira-priority-tone'
+import { getJiraPrioritySeverity, getJiraPrioritySurfaceTone } from './task-page-jira-priority-tone'
 
 function priority(name: string): { id: string; name: string } {
   return { id: `priority-${name}`, name }
@@ -39,18 +35,11 @@ describe('Jira priority severity', () => {
     expect(getJiraPrioritySeverity(priority('  bLoCkEr  '))).toBe('blocker')
   })
 
-  it('shares the red chip between blocker and critical, and gives major the medium one', () => {
-    expect(getJiraPriorityTone(priority('Blocker'))).toContain('text-jira-priority-high')
-    expect(getJiraPriorityTone(priority('Critical'))).toContain('text-jira-priority-high')
-    expect(getJiraPriorityTone(priority('Major'))).toContain('text-jira-priority-medium')
-    // The wash is the only thing separating a blocker from a critical, so the chips match.
-    expect(getJiraPriorityTone(priority('Blocker'))).toBe(getJiraPriorityTone(priority('Critical')))
-    expect(getJiraPriorityTone(priority('Minor'))).toBe(
-      'border-border/50 bg-muted/40 text-muted-foreground'
-    )
-    expect(getJiraPriorityTone(undefined)).toBe(
-      'border-border/50 bg-muted/40 text-muted-foreground'
-    )
+  it('keeps the blocker-only surface wash on the same palette as the chip', () => {
+    expect(getJiraPrioritySurfaceTone(priority('Blocker')).base).toBe('bg-jira-priority-high/10')
+    expect(getJiraPrioritySurfaceTone(priority('Critical')).base).toBe('')
+    expect(getJiraPrioritySurfaceTone(priority('Major')).base).toBe('')
+    expect(getJiraPrioritySurfaceTone(undefined).base).toBe('')
   })
 })
 
