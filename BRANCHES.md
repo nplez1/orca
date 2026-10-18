@@ -1,23 +1,20 @@
 # Branch tracker
 
-Last updated **2026-10-16** — `nplez1/main` merged upstream main @ `ac015cd3b2` (60 commits) into
-the release line from `e27bc2efbf` (merge `ae9db02137`, backup `backup/nplez1-main-pre-sync`,
-rollback tag `archive/pre-sync-e27bc2efbf`). 31 conflicted paths, and the convergence was three
-seams rather than one product line: the **AI Vault scan gained a parameter on both sides**
-(upstream's progress handle and the fork's `refresh`/`query` request share the same third argument,
-so the merged signature carries both), the **fork's provider wiring moved onto upstream's extracted
-`createProviderAccountServices`** (DeepSeek/Fireworks/Copilot resolvers and the disabled-provider
-gate, because that module is what the desktop and orcad both build the usage service from), and the
-**credential stores converged on the `SecretStore` port**, upstream's shape with the fork's
-sealed-envelope rule, wording and home-directory identity. See
-[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) for the decisions. The breaks
-no conflict marker showed, all repaired: the scan signal passed twice, the fork's provider fields
-missing from upstream's consolidated `AccountsPane.test.tsx`, three row fixtures still setting a
-field upstream removed, and upstream's own new test resolving to a fork helper's name. One
-`max-lines` overflow was split rather than capped, and the full lint chain — wider than post-sync's
-checks — was red on three ratchets, one of them this sync's. See
-[UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md) for how a sync is done and
-[LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what this one cost.
+Last updated **2026-10-18** — `nplez1/main` merged upstream main @ `fc24ac3715` (628 commits) into
+the release line from `12545ad17e` (merge `db746c211b`, rollback tag
+`archive/pre-sync-12545ad17e`). 89 conflicted paths, and the convergence was three seams rather than
+one product line: the **AI Vault parse cache moved onto upstream's SQLite database** (the fork's
+JSON snapshot serializer is deleted, and the one-shot legacy importer accepts the last JSON schema
+each line shipped, 4 and 6, so a fork install keeps its cache), the **sidebar row model became
+upstream's object plan with its shared modules moved into `src/shared/sidebar-list/`** (the fork's
+`mergeSameBranchRows` is unchanged and runs on the rendered rows), and **`setupScriptLaunchMode` was
+deleted outright**, leaving the fork's `new-tab` behaviour as the only shape. See
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-18 sync" for the
+decisions and [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for what this one cost.
+
+The PR branches below were cut from older release lines, so every one of them now needs its own
+catch-up against this merge before it can be opened — `local/open-pr.mjs` refuses a head that does
+not descend from its base, and a branch whose base moved needs the new base folded in first.
 
 **Branch measurements could not be re-taken in this worktree.** The PR-bound branches are not
 fetched here, so `node local/branch-status.mjs` reports every one as `MISSING locally` and the

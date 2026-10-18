@@ -426,6 +426,102 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-18 — merge of upstream `fc24ac3715` (628 commits) into the release line, from
+  `12545ad17e`** (merge base `ac015cd3b2`, merge `db746c211b`, rollback tag
+  `archive/pre-sync-12545ad17e`). The line was fast-forwarded to `12545ad17e` first, so PRs #129,
+  #130 and #132 ship in this release. Upstream's window is the largest since this merge strategy
+  started: the AI Vault parse cache moved from one JSON file to a per-row SQLite database, the
+  sidebar row model became an object plan with its shared modules moved into
+  `src/shared/sidebar-list/`, `setupScriptLaunchMode` was deleted outright, the workspace-space
+  window replaced the dashboard popout on upstream's side of the zoom routing, and the checks
+  panel, PR cache, agent-hook status and repository controllers were all reworked.
+
+  The merge produced **89 conflicted paths** — `both-rewrote 52, union 29, duplicate-tail 5,
+  rename-replay 2, modify/delete 1` — exactly the set the dry run named. Every decision is in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-18 sync"; the
+  ones a reviewer will want first:
+
+  - **The AI Vault parse cache became upstream's.** Upstream deleted the JSON snapshot serializer
+    the fork had extended to schema 6 and replaced the store with a SQLite database (layout version
+    4) plus a one-shot legacy importer. The serializer is deleted, nothing imported it, and the
+    fork's `subagent` fields ride inside the row's `session` JSON. The importer's gate is widened to
+    `[4, 6]` — the last JSON schema each line shipped — so a fork install keeps its cache instead of
+    cold-scanning once; schema 5 is skipped because 6 exists to invalidate its Copilot titles.
+  - **`setupScriptLaunchMode` is gone, and the fork's behaviour is what survives it.** Upstream
+    deleted the setting and strips it on load; the fork's default was `new-tab`, so the host still
+    spawns a dedicated Setup terminal and hands the window no `setup` payload — now with no
+    launch-mode read and no split branch. The two renderer fixtures keep writing the retired key on
+    purpose: they prove all three former locations produce one tab.
+  - **The sidebar's shared row modules moved, and the fork's merge rides on the plan.** `row-types`,
+    `group-keys` and `host-section-rows` now live in `src/shared/sidebar-list/`, `buildSidebarRowPlan`
+    is `planSidebarRows(...)` with `.render(collapsedGroups)`, and `rendered-row-keys.ts` replaces the
+    fork's `rendered-sidebar-row-keys.ts` (deleted). `mergeSameBranchRows` is byte-identical and still
+    runs on the rendered rows. Five row-model goldens changed because the merge now lands in upstream's
+    serialised shape — reviewed line by line, not blanket-updated.
+  - **The web project keeps its own `worktree-path-comparison` copy.** Upstream consolidated it into
+    `src/main/git/`, which drags `./runner` and the command-runner graph along; because
+    `src/main/ipc/project-folder-placement.ts` is inside `tsconfig.tc.web.json`, pointing it at the
+    consolidated copy fails the build with fourteen TS6307s. The fork's reduced copy stays listed in
+    that project's `include`.
+  - **The dashboard popout stays deleted.** Upstream kept editing the popout's zoom routing
+    (`zoomDashboardPopoutIfFocused`, `closeDashboardPopout`) while the fork had deleted the window
+    itself, so both `main-process-i18n-menu.ts` and `createMainWindow.ts` take upstream's new
+    workspace-space call and only that — the ledger's § "Dashboard and the popout window" already
+    ruled out restoring it to carry a fix.
+  - **The checks panel's sticky label was the whole regression.** `check-run-details.tsx` was resolved
+    to the stale side of a rename and kept the fork's `hasLogTail ? 'View full logs' : 'View full
+    details'` conditional, which upstream had already collapsed to a constant. The tests find that
+    action by accessible name, so a stale label failed as three different "lost feature" errors
+    (worktree override, GitLab job id, sticky surface) that had nothing wrong with them.
+  - **The PR cache's preserve-on-reject is now qualified.** PR #25's rule ("keep the last good PR
+    cache entry when a refresh loses a race") had been merged unqualified, so it also preserved the
+    entry in the case upstream added — main's newer hosted-review broadcast found no review, or the
+    same number in another repository, and must delete it. It preserves only when the rejecting write
+    is not newer than the result.
+- **The five over-cap files were split, not capped** — `ssh-types.ts` (311),
+  `agent-hook-listener.ts` (307), `server-state.ts` (301), `CheckRunDetailsPanel.tsx` (434),
+  `settings.test.ts` (814). The extracts are `ssh-target-visibility.ts`,
+  `agent-hook-listener/inherited-pane-owner-guard.ts`, `forgetAgentExitForPane` in
+  `agent-exit-evidence.ts`, `editor/check-run-details-status.ts`, and one parameterised `it.each`
+  where the file had two copies of the same durable-flush test. No disable, no baseline bump.
+- **Auto-merged breaks the typechecker caught** — the typecheck ran after every cluster, and found:
+  three module paths the renames orphaned (`@/store/slices/github-cache-key`,
+  `grouping/row-types`, `grouping/build-rows`), a duplicate `...LINEAR_HANDLER_GROUPS` entry in
+  `handler-group-manifest.ts` that made every CLI suite fail to load (duplicate command key, 57
+  files), a `GlobalSettings` field the disposition map did not carry
+  (`alwaysForceDeletePreservedBranches`, `claudeAccountSwitchRunningSessions`, `nativeChatProviders`,
+  `sshRemoteCliControlExistingHostsMigrated`), the fork's three usage providers dropped from
+  `owner-usage-rate-limits.ts`'s exhaustive record, and two files still importing the
+  `worktree-path-comparison` path upstream removed.
+- **Deletions reviewed, none of them a lost feature.** `post-sync`'s deleted-export scan names five
+  exports of three files that existed at the merge base: `codex-account-restart-startup.ts` (upstream
+  deleted it and its importers), `worktree-activation-test-harness.ts` (superseded by
+  `worktree-activation.test-fixture.ts`, whose `setLegacySetupScriptLaunchMode` keeps the retired-key
+  regression) and `tests/e2e/helpers/setup-split-and-sleep-journeys.ts` (the setup-split journeys the
+  retired launch mode took with it). `pnpm tc` is clean, so nothing references them.
+- **Left failing, and proved not ours.** Ten files, in three classes, none of which this merge's
+  resolution touches:
+  - *macOS path semantics.* `src/main/cli/packaged-cli-assets.test.ts` is the documented one from the
+    2026-10-16 sync — the darwin launcher's `app_realpath` uses `cd -P`, resolving `/var` to
+    `/private/var` while the test builds its path from the unresolved `os.tmpdir()`. The same
+    signature takes `config/scripts/macos-terminal-host-bundle.test.mjs` (a `yaml` decoy read as
+    "outside the helper") and all four `src/main/orcad/orcad-forked-child-paths.test.ts` cases (that
+    file is upstream's, and `src/main/orcad/**` had no conflicted path in this merge).
+  - *Host toolchain, not the tree.* `config/scripts/pr-auxiliary-preflight-admission.test.mjs` (8 of
+    194) fails on `bash: MOBILE_CI_ARGS[@]: unbound variable` — macOS ships bash 3.2, where an empty
+    array under `set -u` is an error. `config/scripts/process-host-dev-rebuild.test.ts` (6 of 8) and
+    `config/scripts/main-entry-facade.test.ts` time out or mismatch inside the dev-rebuild/build
+    harness. `src/main/ssh/ssh-relay-endpoint-incumbent-shell.integration.test.ts` and
+    `tests/e2e/cursor-quota-transport.unit.test.ts` time out per test (46s and 62s).
+  - *No Electron window in this harness.* `browser-session-ua-wire-identity.electron.test.ts` (5),
+    `browser-session-ua-wire-identity-cross-context.electron.test.ts` (2) and
+    `browser-route-persisted-worker-egress.electron.test.ts` (1) each fail at exactly their per-test
+    timeout (40s/60s/180s) with no assertion reached; all three are upstream's, under
+    `src/main/browser/`, which had no conflicted path here.
+  - The previously recorded reds still reproduce unchanged: the AI Vault stale-lineage case
+    (`session-search-file-write.test.ts`, see the 2026-10-16 entry) and the workspace path index
+    admission test, which passes in isolation and fails only under full-suite load.
+
 - **2026-10-16 — merge of upstream `ac015cd3b2` (60 commits) into the release line, from
   `e27bc2efbf`** (merge base `e8c7b32a90`, merge `ae9db02137`, backup
   `backup/nplez1-main-pre-sync`, rollback tag `archive/pre-sync-e27bc2efbf`). The line was
