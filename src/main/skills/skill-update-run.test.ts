@@ -60,7 +60,8 @@ describe('SkillUpdateRunner', () => {
       '--yes',
       `skills@${SKILLS_CLI_VERSION}`,
       'add',
-      'https://github.com/stablyai/orca/tree/0123456789abcdef0123456789abcdef01234567',
+      // Why the fork: the pin is this build's own commit, which upstream never had.
+      'https://github.com/nplez1/orca/tree/0123456789abcdef0123456789abcdef01234567',
       '--skill',
       'orca-cli',
       '--skill',

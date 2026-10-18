@@ -19,19 +19,31 @@ handles device scoping, helper lifecycle, and worktree context.
 
 ## Resolve the CLI for this session
 
-Choose the executable once and reuse it for every later command:
+This skill drives **Orca NP**, whose own CLI installs as `orca-np`. Choose the executable once and
+reuse it for every later command:
 
-- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca exports this
-  for managed WSL sessions.
-- Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-dev`.
-- Otherwise, on Linux outside an Orca-managed terminal, use `orca-ide`. Never run bare
-  `orca` there — outside Orca's terminals it normally resolves to the
-  GNOME Orca screen reader (`/usr/bin/orca`) and starts speech on the user's machine.
-- Otherwise, use `orca`.
+- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca NP exports this for the
+  sessions it manages, normally as an absolute path to its own launcher. Substitute it directly,
+  quoted — these paths contain spaces (`/Applications/Orca NP.app/…`, `…/Application Support/…`) —
+  with double quotes in POSIX shells, `& "…"` in PowerShell, and `"…"` in cmd.exe.
+- Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-np-dev`, the
+  dev launcher the running build installed. Inside the repo, `pnpm exec orca-dev` reaches the
+  same CLI.
+- Otherwise, use `orca-np`.
+
+One case needs a different executable, and it has to be established rather than guessed from what
+happens to be on `PATH`: an Orca host that deployed its own CLI shim to this machine — an
+Orca-managed remote or SSH session — names that shim plain `orca`, so use `orca` there. Nothing you
+merely find on `PATH` establishes it: outside this app's managed sessions a bare `orca` is the
+official Orca install, which targets a different app and data directory, and on Linux it is normally
+the GNOME Orca screen reader (`/usr/bin/orca`), which starts speech on the user's machine. `orca-ide`
+is the official Linux install too.
 
 Below, `ORCA` is a placeholder for the executable you resolved. Substitute it before
-running anything; do not create a shell variable or run `ORCA` literally. This works the
-same way in POSIX shells, PowerShell, and cmd.exe.
+running anything — quoted as above when it is a path — and do not create a shell variable or run
+`ORCA` literally. The quoting rule above is the only thing that differs between POSIX shells,
+PowerShell, and cmd.exe (and a path is safer run directly than through `cmd /c`, which strips the
+outer pair of quotes).
 
 If the selected executable cannot run, report its exact error and stop. Do not fall through
 to another executable, which could silently target a different Orca build.

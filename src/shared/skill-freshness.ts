@@ -61,7 +61,10 @@ export type SkillFreshnessInstallation = {
   errorCategory: string | null
 }
 
-const ORCA_SKILL_LOCK_SOURCE = 'stablyai/orca'
+// Why both owners: a copy installed before this fork re-pointed the rail is recorded as
+// stablyai/orca, and it must still read as Orca-owned — otherwise the review dialog offers it as a
+// third party's same-named skill and never rewrites it from the fork.
+const ORCA_SKILL_LOCK_SOURCES: ReadonlySet<string> = new Set(['stablyai/orca', 'nplez1/orca'])
 
 /** Whether the skills.sh lock says this name was installed from Orca's repository. */
 export function isOrcaSkillLockSource(source: string | null): boolean {
@@ -74,7 +77,7 @@ export function isOrcaSkillLockSource(source: string | null): boolean {
     .replace(/^https:\/\/github\.com\//, '')
     .replace(/\/+$/, '')
     .replace(/\.git$/, '')
-  return normalized === ORCA_SKILL_LOCK_SOURCE
+  return ORCA_SKILL_LOCK_SOURCES.has(normalized)
 }
 
 // Why: Orca's updater only ever passes --global, so a project's or a plugin's own copy is

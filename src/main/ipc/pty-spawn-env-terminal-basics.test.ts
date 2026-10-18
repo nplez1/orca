@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { withFreshOmpLaunch } from '../../shared/omp-fresh-launch'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -5,7 +6,8 @@ import {
   spawnMock,
   wslUncDirectoryExistsAsyncMock
 } from './pty-ipc-mock-registry'
-import { TEST_CODEX_HOME } from './pty-ipc-test-constants'
+import { TEST_CODEX_HOME, BUNDLED_CLI_PATH } from './pty-ipc-test-constants'
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { __resetPersistedWindowsPathCacheForTests } from '../pty/windows-environment-path'
@@ -100,6 +102,73 @@ describe('registerPtyHandlers', () => {
         }
       }
     )
+
+    it('exports the CLI launcher this app resolved, so the skill resolver stops at its first rung', async () => {
+      // Why pinned: BUNDLED_CLI_PATH is the darwin launcher, and the packaged Linux/Windows lanes
+      // resolve a different one — an unpinned test would only pass on the macOS CI host.
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      try {
+        const env = await withBundledCli(() =>
+          spawnAndGetEnv({ ORCA_CLI_COMMAND: '/other-install/bin/orca' })
+        )
+        // Why: the bundled skill stubs read ORCA_CLI_COMMAND before anything else, and an inherited
+        // copy names whichever install launched this one.
+        expect(env.ORCA_CLI_COMMAND).toBe(BUNDLED_CLI_PATH)
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
+      }
+    })
+
+    it('names the dev launcher in a dev session', () => {
+      const originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+      try {
+        const env = buildPtyHostEnv(
+          'dev-cli-pane',
+          {},
+          {
+            isPackaged: false,
+            userDataPath: '/tmp/orca-user-data',
+            selectedCodexHomePath: null,
+            agentStatusHooksEnabled: false
+          }
+        )
+        expect(env.ORCA_CLI_COMMAND).toBe(join('/tmp/orca-user-data', 'cli', 'bin', 'orca-np-dev'))
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          configurable: true,
+          value: originalPlatform
+        })
+      }
+    })
+
+    it('keeps the bare registered name in a WSL pane, whatever launcher the host resolved', () => {
+      // Why a headless-host launcher hook: that is the one lane that writes ORCA_CLI_COMMAND after
+      // the WSL branch, so this fails if the restore is dropped instead of passing vacuously.
+      installFakeAppEnvironment({ getCliLauncherPath: () => '/host/bin/orca-np' })
+      try {
+        const env = buildPtyHostEnv(
+          'wsl-cli-pane',
+          {},
+          {
+            isPackaged: true,
+            userDataPath: '/tmp/orca-user-data',
+            selectedCodexHomePath: null,
+            isWsl: true,
+            agentStatusHooksEnabled: false
+          }
+        )
+        // Why: the shell wrappers resolve `$ORCA_WSL_CLI_DIR/$ORCA_CLI_COMMAND`, so a host path here
+        // is a file the guest cannot execute.
+        expect(env.ORCA_CLI_COMMAND).toBe('orca-np')
+      } finally {
+        installFakeAppEnvironment()
+      }
+    })
 
     it.each(['pi', 'omp', 'prime-agent'] as const)(
       'prepares delayed %s hooks for the requested harness',

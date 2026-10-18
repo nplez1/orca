@@ -11,7 +11,11 @@ import { wslHookRelayManager } from '../../../agent-hooks/wsl-hook-relay-manager
 import { wslInteropHealthMonitor } from '../../../wsl/wsl-interop-health'
 import { piTitlebarExtensionService } from '../../../pi/titlebar-extension-service'
 import { prependOrcaCliDirToChildPath } from '../../../cli/orca-cli-child-path'
-import { getManagedWslCliDir, getWslCliCommandName } from '../../../cli/wsl-managed-cli'
+import {
+  getManagedWslCliDir,
+  getManagedWslCliLauncherName,
+  getWslCliCommandName
+} from '../../../cli/wsl-managed-cli'
 import { stripLegacyTerminalShimEnv } from '../../../pty/legacy-terminal-shim-dir'
 import { mergePersistedWindowsPath } from '../../../pty/windows-environment-path'
 import { resolveCodexShellLaunchPreflightCommand } from '../../../pty/codex-shell-launch-preflight'
@@ -265,12 +269,15 @@ export function buildPtyHostEnv(
 
   // Why: an inherited copy (e.g. Orca launched from a WSL pane) names another launch's CLI.
   delete baseEnv.ORCA_WSL_CLI_DIR
-  // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so `orca` targets the live dev instance.
+  // Why: the name a managed WSL shell resolves under `ORCA_WSL_CLI_DIR`, never a host path. Taken
+  // from the same function that names the launcher it is resolved against.
+  const wslCliCommandName = getManagedWslCliLauncherName(opts.isPackaged)
+  // Why: WSL shells need the managed userData root for shell-ready wrappers; dev-mode terminals need the same export so the CLI targets the live dev instance.
   if (opts.isWsl) {
     wslInteropHealthMonitor.noteActivity(opts.wslDistro ?? null)
     baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
-    // Why: managed WSL registration uses `orca-np`; exposing that literal scopes agent guidance to WSL without a bare-orca shim.
-    baseEnv.ORCA_CLI_COMMAND = opts.isPackaged ? 'orca-np' : 'orca-np-dev'
+    // Why: managed WSL registration uses `orca-np`; exposing that name scopes agent guidance to WSL without a bare-orca shim.
+    baseEnv.ORCA_CLI_COMMAND = wslCliCommandName
     const managedCliDir = getManagedWslCliDir(opts)
     if (managedCliDir) {
       baseEnv.ORCA_WSL_CLI_DIR = managedCliDir
@@ -281,11 +288,21 @@ export function buildPtyHostEnv(
     }
     delete baseEnv.ORCA_CLI_COMMAND
   }
-  prependOrcaCliDirToChildPath(baseEnv, {
+  const cliLauncher = prependOrcaCliDirToChildPath(baseEnv, {
     isPackaged: opts.isPackaged,
     userDataPath: opts.userDataPath,
     resourcesPath: opts.resourcesPath
   })
+  // Why: this app's skill stubs resolve the CLI from ORCA_CLI_COMMAND first, and a native PTY is
+  // where an agent normally reads them; without it the ladder falls through to a bare `orca` that
+  // belongs to an official install.
+  if (opts.isWsl) {
+    // Why restore after the call: a headless host's launcher hook exports a host path here, which a
+    // WSL shell cannot execute — and the wrappers resolve a bare name, not a path.
+    baseEnv.ORCA_CLI_COMMAND = wslCliCommandName
+  } else if (cliLauncher) {
+    baseEnv.ORCA_CLI_COMMAND = cliLauncher
+  }
 
   if (
     opts.routeBrowserOpensToClient === true &&

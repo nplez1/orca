@@ -22,12 +22,14 @@ const PARENTS = {
   'feat/startup-worktree-hydration': 'fix/terminal-session-reconnect',
   // Cut from this fork's own line, not origin/main: it is a fork PR, and the two branches
   // called `main` here are different lines (see BRANCHES.md).
-  'nplez1/Hide-hosts': 'nplez1/main'
+  'nplez1/Hide-hosts': 'nplez1/main',
+  'nplez1/Bundled-Skills-Target': 'nplez1/main'
 }
 
 const BRANCHES = [
   'nplez1/main',
   'nplez1/Hide-hosts',
+  'nplez1/Bundled-Skills-Target',
   'fix/cli-symlink-world-readable',
   'fix/copilot-background-work',
   'fix/repo-catalog-connection-fence',
