@@ -159,10 +159,12 @@ folded here.
   window, a dropped paired client) leaves a lease behind, which costs memory and one fold
   that runs to completion with no reader. A viewer whose open _failed_ owes the host nothing,
   so its close is spent against that failure rather than against the next lease in line — a
-  close that took another viewer's lease would end their fold early. The seen cursor is
-  recorded on every close and never moves backwards. One caveat: after a host restarts, a
-  close from a client that still believes it holds a lease is charged to another viewer's
-  lease there, which can end that viewer's fold early.
+  close that took another viewer's lease would end their fold early. The place a reader
+  reached is never lost to absorption either: the highest count any absorbed close reported
+  rides along with the next close this pane sends to that host, and the cursor never moves
+  backwards. One caveat: after a host restarts, a close from a client that still believes it
+  holds a lease is charged to another viewer's lease there, which can end that viewer's fold
+  early.
 - **An SSH read is capped, never truncated.** Over 24 MB the fold fails with a message
   rather than parsing a shortened file: dropped head events would renumber every entry the
   ledger's cursor counts. Only a hook-reported path is used, because on that host there is

@@ -43,6 +43,12 @@ type PaneHostState = {
    * another viewer — and stop that viewer's fold on the host.
    */
   unleasedViewers: number
+  /**
+   * The furthest point an absorbed close reported, carried into the next close this pane
+   * sends. The host owns the cursor, so a close spent against a failed open would otherwise
+   * drop its viewer's place on the timeline.
+   */
+  pendingSeen: number
   latest?: SessionSummarySnapshot
   pollFailures: number
 }
@@ -88,15 +94,17 @@ export class SessionSummaryHostFoldSubscription {
     }
     if (state.unleasedViewers > 0) {
       // This viewer's own open failed: it owes the host nothing, and must not spend a lease
-      // that another viewer is reading through.
+      // that another viewer is reading through. Its place is still owed to the host, so it
+      // rides along with the next close this pane sends.
       state.unleasedViewers -= 1
+      state.pendingSeen = Math.max(state.pendingSeen, args.seenTimelineCount)
     } else if (state.leases > 0) {
       state.leases -= 1
-      this.sendClose(args)
+      this.sendClose({ ...args, seenTimelineCount: this.takeSeen(state, args.seenTimelineCount) })
     } else {
       const waiting = [...state.inflight.values()].find((open) => open.queuedClose === null)
       if (waiting) {
-        waiting.queuedClose = args.seenTimelineCount
+        waiting.queuedClose = Math.max(waiting.queuedClose ?? 0, args.seenTimelineCount)
       }
     }
     if (args.lastViewer) {
@@ -126,6 +134,7 @@ export class SessionSummaryHostFoldSubscription {
       inflight: new Map(),
       leases: 0,
       unleasedViewers: 0,
+      pendingSeen: 0,
       pollFailures: 0
     }
     this.panes.set(paneKey, created)
@@ -158,15 +167,22 @@ export class SessionSummaryHostFoldSubscription {
         this.sendClose({
           paneKey: args.paneKey,
           environmentId: args.environmentId,
-          seenTimelineCount: queued
+          seenTimelineCount: this.takeSeen(state, queued)
         })
       }
       this.accept(args.paneKey, state, token, snapshot)
     } catch (error) {
-      // No lease was taken, so this viewer's close owes the host nothing. Remember that, or it
-      // would spend a lease another viewer is reading through.
+      // No lease was taken, so this viewer's close owes the host nothing — remembering that
+      // keeps it from spending a lease another viewer is reading through.
+      const pending = state.inflight.get(seq)
       state.inflight.delete(seq)
-      state.unleasedViewers += 1
+      if (pending?.queuedClose == null) {
+        state.unleasedViewers += 1
+      } else {
+        // The queued close was already paid against this open, so it settles here. Its place
+        // on the timeline still belongs to the host.
+        state.pendingSeen = Math.max(state.pendingSeen, pending.queuedClose)
+      }
       this.fail(args.paneKey, state, token, error)
     }
   }
@@ -231,6 +247,13 @@ export class SessionSummaryHostFoldSubscription {
       error instanceof Error ? error : new Error(String(error)),
       state.latest ?? null
     )
+  }
+
+  /** The count to report: this close's, or a place an absorbed close could not deliver. */
+  private takeSeen(state: PaneHostState, seenTimelineCount: number): number {
+    const merged = Math.max(seenTimelineCount, state.pendingSeen)
+    state.pendingSeen = 0
+    return merged
   }
 
   private sendClose(args: {
