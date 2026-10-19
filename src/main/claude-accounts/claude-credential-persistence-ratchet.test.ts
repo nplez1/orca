@@ -67,10 +67,16 @@ const fsAllowances: Record<string, readonly string[]> = {
   // The BROWSER stand-in a hidden sign-in hands its link through; holds no login.
   'claude-accounts/claude-sign-in-browser.ts': ['rm', 'writeFile'],
   // The guest helper answers the host on stdout.
-  'claude-accounts/claude-profile-wsl-entry.ts': ['write']
+  'claude-accounts/claude-profile-wsl-entry.ts': ['write'],
+  // The one surface that writes a login back: the token exchange persists the rotated pair.
+  'claude-accounts/claude-oauth-credential-store.ts': [
+    'writeFileAtomically',
+    'writeFileAtomicallyIfUnchanged',
+    'writeFileRotation'
+  ]
 }
 const mutation =
-  /^(?:write(?:File|Json|Sync|v|.*Credentials|.*Keychain)?$|write(?:File|Json)|appendFile|copyFile|cp(?:Sync)?$|rename(?:Sync)?$|unlink(?:Sync)?$|rm(?:dir)?(?:Sync)?$|truncate(?:Sync)?$|createWriteStream|symlink(?:Sync)?$|link(?:Sync)?$|chmod(?:Sync)?$|mkdir(?:Sync)?$|mkdtemp(?:Sync)?$|open(?:Sync)?$|delete.*Keychain|refreshClaudeOauth)/
+  /^(?:write(?:File|Json|Sync|v|.*Credentials|.*Keychain)?$|write(?:File|Json)|appendFile|copyFile|cp(?:Sync)?$|rename(?:Sync)?$|unlink(?:Sync)?$|rm(?:dir)?(?:Sync)?$|truncate(?:Sync)?$|createWriteStream|symlink(?:Sync)?$|link(?:Sync)?$|chmod(?:Sync)?$|mkdir(?:Sync)?$|mkdtemp(?:Sync)?$|open(?:Sync)?$|delete.*Keychain)/
 
 function persistencePrimitives(text: string): string[] {
   const found = new Set<string>()
@@ -86,9 +92,41 @@ function persistencePrimitives(text: string): string[] {
 const WRITE_CALL =
   /\b(?:write\w*|append\w*|copy\w*|cp(?:Sync)?|rename\w*|link\w*|symlink\w*|createWriteStream)\s*\(/g
 // The one runner that takes `security` argv from its callers; each caller must spell the verb.
+// It also owns the write verb, so no caller has to spell `add-generic-password` itself.
 const SECURITY_RUNNER = 'main/macos-keychain/generic-password.ts'
-// Removing an account deletes the Keychain items Claude made for its folder; nothing adds one.
+// Removing an account deletes the Keychain items Claude made for its folder; nothing else deletes.
 const KEYCHAIN_DELETE_OWNER = 'main/claude-accounts/claude-account-folder.ts'
+/**
+ * The one file allowed to exchange a stored refresh token and write the rotated pair back.
+ *
+ * A Claude refresh token is single-use, so persisting the rotation is part of the exchange, not a
+ * separate credential write: backing out the write would strand the login Orca just rotated. The
+ * exchange only ever runs against the source it was read from, and only after the usage endpoint
+ * refused that token.
+ */
+const TOKEN_REFRESH_OWNER = 'main/claude-accounts/claude-oauth-token-refresh.ts'
+/** The one file that writes a rotated login back to the item or file it came from. */
+const CREDENTIAL_STORE_OWNER = 'main/claude-accounts/claude-oauth-credential-store.ts'
+/** The store's only Keychain writes: the shared helper, and the routine that applies it. */
+const CREDENTIAL_STORE_KEYCHAIN_WRITES = new Set(['writeKeychainPassword', 'writeKeychainRotation'])
+/** The runner defines these three and nothing else; a fourth helper is a review. */
+const SECURITY_RUNNER_KEYCHAIN_HELPERS = new Set([
+  'writeKeychainPassword',
+  'readKeychainPassword',
+  'deleteKeychainPassword'
+])
+/**
+ * Only the usage fetch may start an exchange, and only the exchange may write the result. Both are
+ * ordinary exported code, so the census below reads the whole source tree: a timer or a background
+ * sweep reaching either one would spend a single-use refresh token for no reason.
+ */
+const CREDENTIAL_EXCHANGE_SYMBOL = 'refreshClaudeOAuthCredentials'
+const CREDENTIAL_ROTATION_SYMBOL = 'writeClaudeOAuthCredentialRotation'
+const CREDENTIAL_EXCHANGE_OWNERS = new Set([
+  'main/rate-limits/claude-active-usage-fetch.ts',
+  TOKEN_REFRESH_OWNER
+])
+const CREDENTIAL_ROTATION_OWNERS = new Set([TOKEN_REFRESH_OWNER, CREDENTIAL_STORE_OWNER])
 
 /** Names bound, directly or through another such name, to the credentials file's path. */
 function credentialFileNames(text: string): Set<string> {
@@ -152,15 +190,24 @@ function credentialMutations(text: string, file = ''): string[] {
   }
   // Argv (`['add-generic-password', …]`) and shell (`security add-generic-password`) forms.
   if (
-    /add-generic-password/.test(text) ||
+    (file !== SECURITY_RUNNER && /add-generic-password/.test(text)) ||
     (file !== KEYCHAIN_DELETE_OWNER && /delete-generic-password/.test(text))
   ) {
     found.push('keychain write')
   }
-  if (/\b(?:write|delete|store|save)\w*Keychain\w*\b/.test(text)) {
+  // Only the runner may name a keychain helper, and the token exchange may call exactly the write
+  // it needs: `writeKeychainPassword`. Anything else is a review, not a silent pass.
+  for (const [helper] of text.matchAll(/\b(?:write|delete|store|save)\w*Keychain\w*\b/g)) {
+    if (file === SECURITY_RUNNER && SECURITY_RUNNER_KEYCHAIN_HELPERS.has(helper)) {
+      continue
+    }
+    if (file === CREDENTIAL_STORE_OWNER && CREDENTIAL_STORE_KEYCHAIN_WRITES.has(helper)) {
+      continue
+    }
     found.push('keychain helper')
+    break
   }
-  if (/oauth\/token|grant_type|\brefresh_token\b/.test(text)) {
+  if (file !== TOKEN_REFRESH_OWNER && /oauth\/token|grant_type|\brefresh_token\b/.test(text)) {
     found.push('token refresh')
   }
   // A statement that names the credentials file together with anything that writes, copies,
@@ -275,7 +322,7 @@ it.each([
   expect(credentialMutations(source)).toEqual([])
 })
 
-it('lets only account removal delete a Keychain item, and nothing add one', () => {
+it('lets only account removal delete a Keychain item, and only the store update one', () => {
   const remove = "execSecurityCommand(['delete-generic-password', '-s', service])"
   expect(credentialMutations(remove, KEYCHAIN_DELETE_OWNER)).toEqual([])
   expect(credentialMutations(remove, 'main/claude-accounts/service.ts')).not.toEqual([])
@@ -285,4 +332,44 @@ it('lets only account removal delete a Keychain item, and nothing add one', () =
       KEYCHAIN_DELETE_OWNER
     )
   ).not.toEqual([])
+})
+
+it('scopes the one allowed token exchange to the refresh owner and nowhere else', () => {
+  const exchange =
+    "await getMainHttpClient().fetch('https://platform.claude.com/v1/oauth/token', { body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: token }) })"
+  expect(credentialMutations(exchange, TOKEN_REFRESH_OWNER)).toEqual([])
+  expect(
+    credentialMutations(exchange, 'main/rate-limits/claude-active-usage-fetch.ts')
+  ).not.toEqual([])
+  const helper = 'await writeKeychainPassword(service, account, contents)'
+  expect(credentialMutations(helper, CREDENTIAL_STORE_OWNER)).toEqual([])
+  expect(credentialMutations(helper, SECURITY_RUNNER)).toEqual([])
+  expect(credentialMutations(helper, 'main/rate-limits/claude-fetcher.ts')).not.toEqual([])
+  // The store may make the two writes it needs and nothing else.
+  expect(
+    credentialMutations('await writeKeychainRotation(item, token)', CREDENTIAL_STORE_OWNER)
+  ).toEqual([])
+  expect(
+    credentialMutations('await deleteKeychainPassword(service, account)', CREDENTIAL_STORE_OWNER)
+  ).not.toEqual([])
+  const argv = "execSecurityCommand(['add-generic-password', '-U', '-s', service, '-X', token])"
+  expect(credentialMutations(argv, SECURITY_RUNNER)).toEqual([])
+  expect(credentialMutations(argv, TOKEN_REFRESH_OWNER)).not.toEqual([])
+})
+
+it('lets only the usage fetch start an exchange, and only the exchange write its result', () => {
+  const source = join(__dirname, '../..')
+  const violations = files(source).flatMap((file) => {
+    const name = relative(source, file).replaceAll('\\', '/')
+    const text = stripComments(readFileSync(file, 'utf8'))
+    return [
+      ...(text.includes(CREDENTIAL_EXCHANGE_SYMBOL) && !CREDENTIAL_EXCHANGE_OWNERS.has(name)
+        ? [`${name}: starts a credential exchange`]
+        : []),
+      ...(text.includes(CREDENTIAL_ROTATION_SYMBOL) && !CREDENTIAL_ROTATION_OWNERS.has(name)
+        ? [`${name}: writes a credential rotation`]
+        : [])
+    ]
+  })
+  expect(violations).toEqual([])
 })

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
 import { readActiveClaudeKeychainCredentialsStrict } from '../claude-accounts/keychain'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth/runtime-auth-types'
+import type { ClaudeOAuthCredentialTarget } from '../claude-accounts/claude-oauth-credential-store'
 import { readUserClaudeConfigDir } from '../claude-accounts/claude-profile-paths'
 import { getClaudeProfileRouter } from '../claude-accounts/claude-profile-installed-router'
 
@@ -17,6 +18,8 @@ export type ClaudeOAuthCredentialReadResult = {
   token: string | null
   hasRefreshableCredentials: boolean
   source: ClaudeOAuthCredentialSource
+  /** Where this login lives: the only credential a refresh may write back to. */
+  refreshTarget?: ClaudeOAuthCredentialTarget
   keychainUnavailable?: boolean
   unavailable?: boolean
 }
@@ -36,7 +39,8 @@ const schema = z.object({
 })
 export function parseClaudeOAuthCredentialsJson(
   raw: string,
-  source: ClaudeOAuthCredentialSource
+  source: ClaudeOAuthCredentialSource,
+  target?: ClaudeOAuthCredentialTarget
 ): ClaudeOAuthCredentialReadResult {
   try {
     const oauth = schema.parse(JSON.parse(raw)).claudeAiOauth
@@ -44,7 +48,8 @@ export function parseClaudeOAuthCredentialsJson(
     return {
       token: oauth?.accessToken || null,
       hasRefreshableCredentials: Boolean(oauth?.refreshToken),
-      source
+      source,
+      ...(target ? { refreshTarget: target } : {})
     }
   } catch {
     return { ...emptyClaudeOAuthCredentialReadResult(), unavailable: true }
@@ -58,9 +63,13 @@ export async function readClaudeCredentialsFromStrictKeychain(
   source: ClaudeOAuthCredentialSource
 ): Promise<ClaudeOAuthCredentialReadResult> {
   try {
-    const contents = await readActiveClaudeKeychainCredentialsStrict(configDir)
-    return contents
-      ? parseClaudeOAuthCredentialsJson(contents, source)
+    const item = await readActiveClaudeKeychainCredentialsStrict(configDir)
+    return item
+      ? parseClaudeOAuthCredentialsJson(item.contents, source, {
+          kind: 'keychain',
+          service: item.service,
+          account: item.account
+        })
       : emptyClaudeOAuthCredentialReadResult()
   } catch {
     return {
@@ -102,16 +111,15 @@ export async function readClaudeOAuthCredentials(
   if (keychain.token) {
     return keychain
   }
+  const credentialsPath = path.join(
+    options?.credentialsFileConfigDir ?? path.join(homedir(), '.claude'),
+    '.credentials.json'
+  )
   try {
     return parseClaudeOAuthCredentialsJson(
-      await readFile(
-        path.join(
-          options?.credentialsFileConfigDir ?? path.join(homedir(), '.claude'),
-          '.credentials.json'
-        ),
-        'utf8'
-      ),
-      'credentials-file'
+      await readFile(credentialsPath, 'utf8'),
+      'credentials-file',
+      { kind: 'file', path: credentialsPath }
     )
   } catch (error) {
     return isDefinitiveAbsence(error) ? keychain : { ...keychain, unavailable: true }

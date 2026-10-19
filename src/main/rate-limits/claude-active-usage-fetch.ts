@@ -1,7 +1,12 @@
-import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import type { ProviderRateLimits, UsageRateLimitMetadata } from '../../shared/rate-limit-types'
+import {
+  refreshClaudeOAuthCredentials,
+  type ClaudeOAuthRefreshOutcome
+} from '../claude-accounts/claude-oauth-token-refresh'
 import {
   readClaudeOAuthCredentials,
-  resolveClaudeOAuthCredentialReadOptions
+  resolveClaudeOAuthCredentialReadOptions,
+  type ClaudeOAuthCredentialReadResult
 } from './claude-oauth-credentials'
 import { fetchClaudeOAuthUsage } from './claude-oauth-usage-request'
 import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
@@ -10,7 +15,14 @@ import type { ClaudeRateLimitFetchOptions } from './claude-usage-fetch-options'
 import { abortedClaudeRateLimitResult, makeClaudeUsageResult } from './claude-usage-result'
 import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-routing'
 
-/** Usage observes the account; only a user-started Claude process may refresh its login. */
+const SIGN_IN_AGAIN = 'Sign in again to use this account.'
+
+/**
+ * Usage observes the account and never refreshes on a timer.
+ *
+ * A server-rejected token is the one signal that a stored refresh token is worth spending, and
+ * the exchange is the only way usage recovers on a machine where Claude itself never runs.
+ */
 export async function fetchActiveClaudeRateLimits(
   options?: ClaudeRateLimitFetchOptions
 ): Promise<ProviderRateLimits> {
@@ -45,42 +57,132 @@ export async function fetchActiveClaudeRateLimits(
       attemptedSources: []
     })
   }
-  if (!credentials.token) {
-    return makeClaudeUsageResult(
-      'error',
-      credentials.unavailable
-        ? 'Claude usage is unavailable.'
-        : 'Sign in again to use this account.',
-      {
-        ...metadata,
-        failureKind: credentials.unavailable ? 'keychain-unavailable' : 'missing-credentials',
-        attemptedSources: []
-      }
-    )
+  if (credentials.unavailable) {
+    return makeClaudeUsageResult('error', 'Claude usage is unavailable.', {
+      ...metadata,
+      failureKind: 'keychain-unavailable',
+      attemptedSources: []
+    })
   }
+  if (credentials.token) {
+    return readClaudeUsage(credentials.token, credentials, metadata, options)
+  }
+  if (!credentials.hasRefreshableCredentials) {
+    return makeClaudeUsageResult('error', SIGN_IN_AGAIN, {
+      ...metadata,
+      failureKind: 'missing-credentials',
+      attemptedSources: []
+    })
+  }
+  // Why: a stored refresh token is the login; exchange it before asking for a sign-in.
+  const outcome = await refreshStoredClaudeLogin(credentials, null)
+  if (options?.signal?.aborted) {
+    return abortedClaudeRateLimitResult()
+  }
+  if (outcome.status !== 'refreshed') {
+    return refreshFailureResult(outcome, metadata)
+  }
+  return readClaudeUsage(outcome.accessToken, credentials, metadata, options, outcome.exchanged)
+}
+
+/** Fetch usage, and on a refused token spend the stored refresh token before reporting failure. */
+async function readClaudeUsage(
+  token: string,
+  credentials: ClaudeOAuthCredentialReadResult,
+  metadata: UsageRateLimitMetadata,
+  options: ClaudeRateLimitFetchOptions | undefined,
+  refreshedAlready = false
+): Promise<ProviderRateLimits> {
   try {
-    return await fetchClaudeOAuthUsage(credentials.token, options?.signal)
+    return await fetchClaudeOAuthUsage(token, options?.signal)
   } catch (error) {
-    const { failureKind } = classifyClaudeOAuthUsageError(error)
-    // Why: the 429 wait gates the poll, and both messages tell the user why usage is missing.
-    const retryAfterMs = error instanceof OAuthUsageError ? error.retryAfterMs : null
-    return makeClaudeUsageResult(
-      'error',
-      failureKind === 'stale-token'
-        ? // Why: Claude refreshes its own login when it next runs; System Default has no "account".
-          metadata.authProvenance === 'system'
-          ? 'Claude usage updates the next time Claude runs.'
-          : 'Claude usage has expired. Start Claude in this account to refresh it.'
-        : (failureKind === 'rate-limited' || failureKind === 'missing-scope') &&
-            error instanceof OAuthUsageError
-          ? error.message
-          : 'Claude usage is unavailable.',
-      {
-        ...metadata,
-        failureKind,
-        attemptedSources: ['oauth'],
-        ...(retryAfterMs ? { retryAtMs: Date.now() + retryAfterMs } : {})
-      }
-    )
+    const classification = classifyClaudeOAuthUsageError(error)
+    if (!classification.shouldAttemptCredentialRefresh) {
+      return usageFailureResult(error, classification.failureKind, metadata)
+    }
+    // Why: a token this poll already spent is not spent again.
+    if (refreshedAlready) {
+      return signInRequiredResult(metadata)
+    }
+    const outcome = await refreshStoredClaudeLogin(credentials, token)
+    if (options?.signal?.aborted) {
+      return abortedClaudeRateLimitResult()
+    }
+    if (outcome.status !== 'refreshed') {
+      return refreshFailureResult(outcome, metadata)
+    }
+    return readClaudeUsage(outcome.accessToken, credentials, metadata, options, outcome.exchanged)
   }
+}
+
+function refreshStoredClaudeLogin(
+  credentials: ClaudeOAuthCredentialReadResult,
+  refusedAccessToken: string | null
+): Promise<ClaudeOAuthRefreshOutcome> {
+  return credentials.refreshTarget
+    ? refreshClaudeOAuthCredentials(credentials.refreshTarget, refusedAccessToken)
+    : Promise.resolve({ status: 'no-refresh-token' })
+}
+
+/** The stored login cannot renew itself any more: say whose move it is. */
+function signInRequiredResult(metadata: UsageRateLimitMetadata): ProviderRateLimits {
+  // Why the split: System Default has no account to re-select, so the only cure is Claude itself,
+  // which is the calm copy the status bar already renders for it.
+  return metadata.authProvenance === 'system'
+    ? makeClaudeUsageResult('error', 'Claude usage updates the next time Claude runs.', {
+        ...metadata,
+        failureKind: 'stale-token',
+        attemptedSources: ['oauth']
+      })
+    : makeClaudeUsageResult('error', SIGN_IN_AGAIN, {
+        ...metadata,
+        failureKind: 'missing-credentials',
+        attemptedSources: ['oauth']
+      })
+}
+
+/** The refresh did not produce a token: say whose move it is. */
+function refreshFailureResult(
+  outcome: Exclude<ClaudeOAuthRefreshOutcome, { status: 'refreshed' }>,
+  metadata: UsageRateLimitMetadata
+): ProviderRateLimits {
+  // Why: the endpoint refused the stored grant, so no retry can recover this login.
+  if (outcome.status === 'rejected') {
+    return signInRequiredResult(metadata)
+  }
+  // Why: a throttle or outage leaves the same login worth retrying on the next poll.
+  if (outcome.status === 'unavailable') {
+    return makeClaudeUsageResult('error', 'Claude usage is waiting for its sign-in to refresh.', {
+      ...metadata,
+      failureKind: 'refreshable-credentials-without-token',
+      attemptedSources: ['oauth']
+    })
+  }
+  return makeClaudeUsageResult(
+    'error',
+    metadata.authProvenance === 'system'
+      ? 'Claude usage updates the next time Claude runs.'
+      : 'Claude usage has expired. Start Claude in this account to refresh it.',
+    { ...metadata, failureKind: 'stale-token', attemptedSources: ['oauth'] }
+  )
+}
+
+function usageFailureResult(
+  error: unknown,
+  failureKind: ReturnType<typeof classifyClaudeOAuthUsageError>['failureKind'],
+  metadata: UsageRateLimitMetadata
+): ProviderRateLimits {
+  // Why: the 429 wait gates the poll, and both messages tell the user why usage is missing.
+  const retryAfterMs = error instanceof OAuthUsageError ? error.retryAfterMs : null
+  const message =
+    (failureKind === 'rate-limited' || failureKind === 'missing-scope') &&
+    error instanceof OAuthUsageError
+      ? error.message
+      : 'Claude usage is unavailable.'
+  return makeClaudeUsageResult('error', message, {
+    ...metadata,
+    failureKind,
+    attemptedSources: ['oauth'],
+    ...(retryAfterMs ? { retryAtMs: Date.now() + retryAfterMs } : {})
+  })
 }

@@ -1,11 +1,17 @@
 import type * as Keychain from '../claude-accounts/keychain'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-const calls = vi.hoisted(() => ({ keychain: vi.fn(), usage: vi.fn(), keychainService: vi.fn() }))
+const calls = vi.hoisted(() => ({
+  keychain: vi.fn(),
+  keychainWrite: vi.fn(),
+  usage: vi.fn(),
+  keychainService: vi.fn()
+}))
 vi.mock('../macos-keychain/generic-password', () => ({
-  readKeychainPassword: calls.keychainService
+  readKeychainPassword: calls.keychainService,
+  writeKeychainPassword: calls.keychainWrite
 }))
 vi.mock('../claude-accounts/keychain', () => ({
   readActiveClaudeKeychainCredentialsStrict: calls.keychain
@@ -69,25 +75,134 @@ function systemDefault() {
     }
   }
 }
-it('lets the server decide a locally expired token and never refreshes it', async () => {
+it('exchanges the stored refresh token once and retries the usage fetch', async () => {
   const f = profile()
   const file = join(f.home, '.credentials.json')
   writeFileSync(
     file,
     JSON.stringify({
-      claudeAiOauth: { accessToken: 'expired-fake', refreshToken: 'must-not-be-used', expiresAt: 1 }
+      claudeAiOauth: { accessToken: 'expired-fake', refreshToken: 'refresh-a', expiresAt: 1 }
     })
   )
-  vi.stubGlobal('fetch', () => {
-    throw new Error('No refresh endpoint')
+  calls.usage
+    .mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+    .mockResolvedValueOnce({ provider: 'claude', status: 'ok' })
+  vi.stubGlobal(
+    'fetch',
+    async () =>
+      new Response(
+        JSON.stringify({
+          access_token: 'rotated-fake',
+          refresh_token: 'refresh-b',
+          expires_in: 3600
+        })
+      )
+  )
+  expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({ status: 'ok' })
+  expect(calls.usage.mock.calls.map(([token]) => token)).toEqual(['expired-fake', 'rotated-fake'])
+  expect(JSON.parse(readFileSync(file, 'utf8')).claudeAiOauth).toMatchObject({
+    accessToken: 'rotated-fake',
+    refreshToken: 'refresh-b'
   })
-  calls.usage.mockRejectedValue(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+})
+
+it('exchanges a stored refresh token when only that is left of the login', async () => {
+  const f = profile()
+  writeFileSync(
+    join(f.home, '.credentials.json'),
+    JSON.stringify({ claudeAiOauth: { refreshToken: 'refresh-only' } })
+  )
+  calls.usage.mockResolvedValueOnce({ provider: 'claude', status: 'ok' })
+  vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ access_token: 'rotated-only' })))
+
+  expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({ status: 'ok' })
+  expect(calls.usage.mock.calls.map(([token]) => token)).toEqual(['rotated-only'])
+})
+
+it('asks for a sign-in when the endpoint refuses the stored grant', async () => {
+  const f = profile()
+  writeFileSync(
+    join(f.home, '.credentials.json'),
+    JSON.stringify({
+      claudeAiOauth: { accessToken: 'expired-fake', refreshToken: 'refused-grant' }
+    })
+  )
+  calls.usage.mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+  vi.stubGlobal(
+    'fetch',
+    async () =>
+      new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_grant' } }), {
+        status: 400
+      })
+  )
+
   expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({
     status: 'error',
-    error: 'Claude usage has expired. Start Claude in this account to refresh it.',
+    error: 'Sign in again to use this account.',
+    usageMetadata: { failureKind: 'missing-credentials' }
+  })
+})
+
+it('reports a system-default login with a dead grant as waiting for Claude', async () => {
+  const system = systemDefault()
+  writeFileSync(
+    join(system.home, '.credentials.json'),
+    JSON.stringify({ claudeAiOauth: { accessToken: 'expired', refreshToken: 'dead-grant' } })
+  )
+  calls.usage.mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+  vi.stubGlobal(
+    'fetch',
+    async () => new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })
+  )
+
+  expect(await fetchActiveClaudeRateLimits(system.options)).toMatchObject({
+    status: 'error',
+    error: 'Claude usage updates the next time Claude runs.',
     usageMetadata: { failureKind: 'stale-token' }
   })
-  expect(calls.usage.mock.calls.map(([token]) => token)).toEqual(['expired-fake'])
+})
+
+it('does not exchange twice when the token it just minted is refused too', async () => {
+  const f = profile()
+  writeFileSync(
+    join(f.home, '.credentials.json'),
+    JSON.stringify({ claudeAiOauth: { accessToken: 'expired', refreshToken: 'double-grant' } })
+  )
+  calls.usage
+    .mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+    .mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+  const tokenFetch = vi.fn(
+    async () => new Response(JSON.stringify({ access_token: 'minted', refresh_token: 'double-2' }))
+  )
+  vi.stubGlobal('fetch', tokenFetch)
+
+  expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({
+    status: 'error',
+    error: 'Sign in again to use this account.',
+    usageMetadata: { failureKind: 'missing-credentials' }
+  })
+  expect(calls.usage).toHaveBeenCalledTimes(2)
+  expect(tokenFetch).toHaveBeenCalledTimes(1)
+})
+
+it('keeps a throttled exchange as a login that is still refreshing', async () => {
+  const f = profile()
+  writeFileSync(
+    join(f.home, '.credentials.json'),
+    JSON.stringify({
+      claudeAiOauth: { accessToken: 'expired-fake', refreshToken: 'throttled-grant' }
+    })
+  )
+  calls.usage.mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
+  vi.stubGlobal('fetch', async () => new Response('{}', { status: 429 }))
+
+  expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({
+    status: 'error',
+    usageMetadata: { failureKind: 'refreshable-credentials-without-token' }
+  })
+})
+
+it('leaves a login with no refresh token to Claude, as before', async () => {
   const system = systemDefault()
   writeFileSync(
     join(system.home, '.credentials.json'),
@@ -95,6 +210,7 @@ it('lets the server decide a locally expired token and never refreshes it', asyn
   )
   calls.usage.mockResolvedValueOnce({ provider: 'claude', status: 'ok' })
   expect(await fetchActiveClaudeRateLimits(system.options)).toMatchObject({ status: 'ok' })
+  calls.usage.mockRejectedValueOnce(new OAuthUsageError('Invalid OAuth token.', 401, true, null))
   expect(await fetchActiveClaudeRateLimits(system.options)).toMatchObject({
     error: 'Claude usage updates the next time Claude runs.',
     usageMetadata: { failureKind: 'stale-token' }
