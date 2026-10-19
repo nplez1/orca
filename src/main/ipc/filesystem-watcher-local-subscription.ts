@@ -4,11 +4,14 @@ import type { LocalWatcherInstallToken } from './filesystem-watcher-lifecycle-st
 import { watcherLifecycleState } from './filesystem-watcher-lifecycle-state'
 import { getLocalWatcherRoot } from './filesystem-watcher-paths'
 import {
+  addCancelledInstallWaiter,
   addInFlightLocalInstallListener,
   addLocalWatchListener,
   clearLocalCapacityRetry,
+  forgetCancelledInstallWaiter,
   rememberUnwatchableRoot,
   registerWatcherSenderCleanup,
+  takeCancelledInstallWaiter,
   takeLocalCapacityRetryListeners
 } from './filesystem-watcher-listener-lifecycle'
 import { scheduleLocalCapacityRetry } from './filesystem-watcher-local-capacity'
@@ -20,6 +23,7 @@ import { scheduleLocalWatcherTeardown } from './filesystem-watcher-local-teardow
 // ── Subscribe / Unsubscribe ──────────────────────────────────────────
 
 const LOCAL_PATH_INDEX_CONSUMER_ID = 'workspace-path-index'
+const cancelledInstallWaiters = watcherLifecycleState.cancelledLocalInstallWaiters
 
 export async function subscribeLocalWatcher(
   worktreePath: string,
@@ -157,11 +161,20 @@ async function subscribeWhileRemovalAllowed(
         addInFlightLocalInstallListener(inFlight, listener)
       }
     }
+    const waitToken =
+      canJoinInstall || sender === undefined
+        ? null
+        : addCancelledInstallWaiter(cancelledInstallWaiters, rootKey, sender)
     const result = await pendingInstall
+    const stillWanted =
+      waitToken === null ||
+      (sender !== undefined &&
+        takeCancelledInstallWaiter(cancelledInstallWaiters, rootKey, sender.id, waitToken))
     const liveCapacityListeners = capacityRetryListeners.filter((listener) =>
       isCurrentWatcherSender(listener, retrySignals.get(listener.id)!)
     )
     const senderIsCurrent =
+      stillWanted &&
       sender !== undefined &&
       senderSignal !== undefined &&
       isCurrentWatcherSender(sender, senderSignal)
@@ -263,6 +276,7 @@ async function subscribeWhileRemovalAllowed(
 
 export function unsubscribeLocalWatcher(worktreePath: string, senderId: number): void {
   const { key: rootKey } = getLocalWatcherRoot(worktreePath)
+  forgetCancelledInstallWaiter(cancelledInstallWaiters, rootKey, senderId)
   const suspended = watcherLifecycleState.suspendedLocalWatcherListeners.get(rootKey)
   suspended?.listeners.delete(senderId)
   if (suspended?.listeners.size === 0) {

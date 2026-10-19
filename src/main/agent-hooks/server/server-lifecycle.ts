@@ -274,6 +274,8 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
       clearTimeout(timer)
     }
     this.assistantMessageRetryTimers.clear()
+    this.hookSilenceRechecks.clear()
+    this.programStatusFacetRepublishes.clear()
     this.clearAllTranscriptPolls()
     this.claudeOwedNotificationExpiry.clearAll()
     this.endpointDir = null
@@ -296,6 +298,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.retiredPaneFencesByKey.clear()
     this.connectionTimestampWatermarkById.clear()
     this.evidenceObservedAtByPaneKey.clear()
+    this.programStatusFacets.clear()
     this.activeHookTurnCompletedAtByPaneKey.clear()
     this.legacyPaneKeyAliases.clear()
     this.paneKeyAliasPersistenceListener = null

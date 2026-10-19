@@ -98,10 +98,14 @@ export class WebRuntimeClient {
     }
   }
 
+  get connectionEpoch(): number {
+    return this.transport.requestRegistry.connectionEpoch
+  }
+
   call(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number; signal?: AbortSignal }
+    options?: { timeoutMs?: number; signal?: AbortSignal; expectedConnectionEpoch?: number }
   ): Promise<RuntimeRpcResponse<unknown>> {
     return method === 'status.get' && this.statusOwner
       ? this.statusOwner.refresh(options)

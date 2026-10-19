@@ -24,7 +24,7 @@ import {
 } from './ai-vault-local-scan-progress'
 import {
   aiVaultAppliedScopePaths,
-  aiVaultSessionDepthCovers,
+  aiVaultCachedDepthServes,
   requestedAiVaultSessionDepth,
   truncateAiVaultListResult,
   type AiVaultSessionDepth
@@ -110,9 +110,16 @@ function localCacheHit(
   key: string,
   unboundedKey: string | null,
   depth: AiVaultSessionDepth,
+  scopePaths: readonly string[] | undefined,
   now: number
 ): CachedAiVaultList | null {
-  if (!cached || cached.expiresAt <= now || !aiVaultSessionDepthCovers(cached.depth, depth)) {
+  if (!cached || cached.expiresAt <= now) {
+    return null
+  }
+  // Why the unbounded bypass: an unbounded scan holds every scope at every depth, so a scoped
+  // bounded request is answered from it rather than re-read (the renderer's result cache is the
+  // one place that must keep the requested depth, because it stores the truncated answer).
+  if (cached.depth !== 'unlimited' && !aiVaultCachedDepthServes(cached.depth, depth, scopePaths)) {
     return null
   }
   if (cached.key === key) {
@@ -145,7 +152,9 @@ export async function listAiVaultSessions(
   // Why: opening this panel repeatedly should not re-parse hundreds of JSONL
   // transcripts; explicit refreshes bypass the cache and preempt stale scans.
   const cached =
-    args?.force === true ? null : localCacheHit(cachedList, key, unboundedKey, depth, now)
+    args?.force === true
+      ? null
+      : localCacheHit(cachedList, key, unboundedKey, depth, args?.scopePaths, now)
   if (cached) {
     return truncateAiVaultListResult(cached.result, depth, args?.scopePaths)
   }
@@ -199,7 +208,7 @@ export async function listAiVaultSessions(
           args?.force === true ||
           current?.key !== key ||
           current.expiresAt <= Date.now() ||
-          !aiVaultSessionDepthCovers(current.depth, depth)
+          !aiVaultCachedDepthServes(current.depth, depth, args?.scopePaths)
         ) {
           cachedList = {
             key,

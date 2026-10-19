@@ -28,7 +28,7 @@ vi.mock('./ephemeral-vm-runtime-ssh', () => ({
   connectRuntimeOwnedSshTarget: mocks.connectRuntimeOwnedSshTarget,
   disconnectRuntimeOwnedSshTarget: mocks.disconnectRuntimeOwnedSshTarget
 }))
-vi.mock('./ssh/ssh-target-registry', () => ({
+vi.mock('./ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: mocks.getSshConnectionManager
 }))
 

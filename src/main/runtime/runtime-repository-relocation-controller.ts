@@ -11,7 +11,7 @@ import type { Repo } from '../../shared/repo-types'
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-worktree-contracts'
 import type { RuntimeRepoRelocationResult } from '../../shared/repo-relocation-contracts'
 import { gitExecFileAsync } from '../git/runner'
-import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import {
   isCheckoutOutsideProjectFolder,
   isSameVolume,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   AI_VAULT_AGENTS,
   type AiVaultAgent,
@@ -18,7 +18,66 @@ import type { AiVaultSessionLimit } from './ai-vault-session-limit'
 
 type AiVaultViewOptionsUpdate = (current: AiVaultViewOptions) => AiVaultViewOptions
 
-export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unknown> | null): {
+// Why one copy: the sidebar and the /resume dialog can both be mounted, and each writing its own
+// copy would undo the other's change. It is read again once no panel is mounted.
+let mountedOptions: AiVaultViewOptions | null = null
+const listeners = new Set<() => void>()
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      mountedOptions = null
+    }
+  }
+}
+
+function getOptions(): AiVaultViewOptions {
+  mountedOptions ??= readAiVaultViewOptions()
+  return mountedOptions
+}
+
+function updateOptions(update: AiVaultViewOptionsUpdate): void {
+  const current = getOptions()
+  const candidate = update(current)
+  if (candidate === current) {
+    return
+  }
+  // Why: setters map valid state to valid state, so persist the candidate directly.
+  // Re-normalizing here would re-allocate disabledAgents on every sort/group change and
+  // needlessly recompute the session filter; writeAiVaultViewOptions still normalizes what it stores.
+  mountedOptions = candidate
+  writeAiVaultViewOptions(candidate)
+  for (const listener of listeners) {
+    listener()
+  }
+}
+
+function withAgentEnabled(
+  disabledAgents: AiVaultAgent[],
+  agent: AiVaultAgent,
+  enabled: boolean
+): AiVaultAgent[] {
+  if (enabled === !disabledAgents.includes(agent)) {
+    return disabledAgents
+  }
+  // Why: allow zero enabled agents so Clear + re-check one agent is a two-step filter.
+  return enabled ? disabledAgents.filter((entry) => entry !== agent) : [...disabledAgents, agent]
+}
+
+function updateDisabledAgents(update: (disabledAgents: AiVaultAgent[]) => AiVaultAgent[]): void {
+  updateOptions((current) => {
+    const disabledAgents = update(current.disabledAgents)
+    return disabledAgents === current.disabledAgents ? current : { ...current, disabledAgents }
+  })
+}
+
+/** `localAgents` gives the panel its own agent filter, starting with those agents; it is never saved. */
+export function usePersistedAiVaultViewOptions(
+  localAgents?: readonly AiVaultAgent[],
+  disabledTuiAgents?: Iterable<unknown> | null
+): {
   agents: AiVaultAgent[]
   availableAgents: AiVaultAgent[]
   sort: AiVaultSort
@@ -34,44 +93,29 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
   setShowSubagentSessions: (show: boolean) => void
   setSessionLimit: (limit: AiVaultSessionLimit) => void
   setAgentEnabled: (agent: AiVaultAgent, enabled: boolean) => void
-  setAllAgentsEnabled: (enabled: boolean, scope: readonly AiVaultAgent[]) => void
+  setAllAgentsEnabled: (enabled: boolean, scope?: readonly AiVaultAgent[]) => void
   resetViewOptions: () => void
 } {
-  const [options, setOptions] = useState<AiVaultViewOptions>(() => readAiVaultViewOptions())
-  // Why: menu actions may batch before a render, so every persistence write must build on
-  // the immediately preceding action instead of the last rendered options.
-  const optionsRef = useRef(options)
-
-  const updateOptions = useCallback((update: AiVaultViewOptionsUpdate) => {
-    const current = optionsRef.current
-    const candidate = update(current)
-    if (candidate === current) {
-      return
-    }
-    // Why: setters map valid state to valid state, so persist the candidate directly.
-    // Re-normalizing here would re-allocate disabledAgents on every sort/group change and
-    // needlessly recompute the session filter; writeAiVaultViewOptions still normalizes what it stores.
-    optionsRef.current = candidate
-    setOptions(candidate)
-    writeAiVaultViewOptions(candidate)
-  }, [])
+  // Why: menu actions may batch before a render, so every write builds on the module copy,
+  // which the preceding action already updated, instead of the last rendered options.
+  const options = useSyncExternalStore(subscribe, getOptions)
 
   const setSort = useCallback(
     (sort: AiVaultSort) =>
       updateOptions((current) => (current.sort === sort ? current : { ...current, sort })),
-    [updateOptions]
+    []
   )
   const setSearchSort = useCallback(
     (searchSort: AiVaultSearchSort) =>
       updateOptions((current) =>
         current.searchSort === searchSort ? current : { ...current, searchSort }
       ),
-    [updateOptions]
+    []
   )
   const setGroup = useCallback(
     (group: AiVaultGroup) =>
       updateOptions((current) => (current.group === group ? current : { ...current, group })),
-    [updateOptions]
+    []
   )
   const setHideEmptySessions = useCallback(
     (hideEmptySessions: boolean) =>
@@ -80,7 +124,7 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
           ? current
           : { ...current, hideEmptySessions }
       ),
-    [updateOptions]
+    []
   )
   const setShowSubagentSessions = useCallback(
     (showSubagentSessions: boolean) =>
@@ -89,35 +133,35 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
           ? current
           : { ...current, showSubagentSessions }
       ),
-    [updateOptions]
+    []
   )
   const setSessionLimit = useCallback(
     (sessionLimit: AiVaultSessionLimit) =>
       updateOptions((current) =>
         current.sessionLimit === sessionLimit ? current : { ...current, sessionLimit }
       ),
-    [updateOptions]
+    []
+  )
+  const [localDisabledAgents, setLocalDisabledAgents] = useState(() =>
+    localAgents ? AI_VAULT_AGENTS.filter((agent) => !localAgents.includes(agent)) : null
+  )
+  const local = localDisabledAgents !== null
+  const updateAgents = useCallback(
+    (update: (disabledAgents: AiVaultAgent[]) => AiVaultAgent[]) =>
+      local
+        ? setLocalDisabledAgents((current) => current && update(current))
+        : updateDisabledAgents(update),
+    [local]
   )
   const setAgentEnabled = useCallback(
-    (agent: AiVaultAgent, enabled: boolean) => {
-      updateOptions((current) => {
-        const isDisabled = current.disabledAgents.includes(agent)
-        if (enabled === !isDisabled) {
-          return current
-        }
-        // Why: allow zero enabled agents so Clear + re-check one agent is a two-step filter.
-        const disabledAgents = enabled
-          ? current.disabledAgents.filter((entry) => entry !== agent)
-          : [...current.disabledAgents, agent]
-        return { ...current, disabledAgents }
-      })
-    },
-    [updateOptions]
+    (agent: AiVaultAgent, enabled: boolean) =>
+      updateAgents((disabled) => withAgentEnabled(disabled, agent, enabled)),
+    [updateAgents]
   )
   const setAllAgentsEnabled = useCallback(
-    (enabled: boolean, scope: readonly AiVaultAgent[]) => {
-      updateOptions((current) => {
-        const selectedAgents = new Set(enabledAiVaultAgents(current.disabledAgents))
+    (enabled: boolean, scope: readonly AiVaultAgent[] = AI_VAULT_AGENTS) =>
+      updateAgents((disabledAgents) => {
+        const selectedAgents = new Set(enabledAiVaultAgents(disabledAgents))
         for (const agent of scope) {
           if (enabled) {
             selectedAgents.add(agent)
@@ -125,27 +169,26 @@ export function usePersistedAiVaultViewOptions(disabledTuiAgents?: Iterable<unkn
             selectedAgents.delete(agent)
           }
         }
-        const disabledAgents = AI_VAULT_AGENTS.filter((agent) => !selectedAgents.has(agent))
-        if (
-          disabledAgents.length === current.disabledAgents.length &&
-          disabledAgents.every((agent, index) => agent === current.disabledAgents[index])
-        ) {
-          return current
-        }
-        return { ...current, disabledAgents }
-      })
-    },
-    [updateOptions]
+        const next = AI_VAULT_AGENTS.filter((agent) => !selectedAgents.has(agent))
+        const unchanged =
+          next.length === disabledAgents.length &&
+          next.every((agent, index) => agent === disabledAgents[index])
+        return unchanged ? disabledAgents : next
+      }),
+    [updateAgents]
   )
-  const resetViewOptions = useCallback(
-    () => updateOptions(() => createDefaultAiVaultViewOptions()),
-    [updateOptions]
-  )
+  const resetViewOptions = useCallback(() => {
+    updateOptions((current) => ({
+      ...createDefaultAiVaultViewOptions(),
+      ...(local ? { disabledAgents: current.disabledAgents } : {})
+    }))
+    if (local) {
+      setLocalDisabledAgents([])
+    }
+  }, [local])
 
-  const agents = useMemo(
-    () => enabledAiVaultAgents(options.disabledAgents),
-    [options.disabledAgents]
-  )
+  const disabledAgents = localDisabledAgents ?? options.disabledAgents
+  const agents = useMemo(() => enabledAiVaultAgents(disabledAgents), [disabledAgents])
   const availableAgents = useMemo(
     () => filterEnabledTuiAgents(AI_VAULT_AGENTS, disabledTuiAgents),
     [disabledTuiAgents]

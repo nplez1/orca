@@ -1,6 +1,5 @@
 import {
   AGENT_MODEL_MAX_LENGTH,
-  AGENT_STATUS_MAX_SUBAGENTS,
   AGENT_STATUS_TOOL_INPUT_MAX_LENGTH,
   AGENT_TYPE_MAX_LENGTH,
   type AgentStatusState,
@@ -103,9 +102,6 @@ export function upsertAgentDescendant(
     existing.providerSession = providerSession ?? existing.providerSession
     existing.state = fields.state
     existing.lastEventAt = now
-    return
-  }
-  if (roster.size >= AGENT_STATUS_MAX_SUBAGENTS) {
     return
   }
   roster.set(normalizedId, {

@@ -4,7 +4,7 @@ import { JiraUserPicker, splitJiraUserPickerOptions } from '@/components/jira-us
 import { getJiraSelfUser } from '@/components/jira-self-user'
 import { useJiraSourceConnection } from '@/components/new-workspace/use-jira-source-connection'
 import { useAppStore } from '@/store'
-import { compareBaseSensitivityLocaleText } from '@/lib/locale-text-collators'
+import { compareBaseSensitivityLocaleText } from '../../../shared/locale-text-collators'
 import { jiraListAssignableUsersForTarget } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import {

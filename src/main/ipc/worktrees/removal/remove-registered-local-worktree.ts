@@ -22,7 +22,7 @@ import {
   removeWorktreeLinkedPaths
 } from '../../worktree-symlinks'
 import { removeStaleWorktreeMaterializationStagingDirectories } from '../../worktree-materialization-staging'
-import { invalidateAuthorizedRootsCacheForRepo } from '../../filesystem-auth'
+import { invalidateAuthorizedRootsCacheForRepo } from '../../registered-worktree-roots-scoped-invalidation'
 import { runWorktreeChangeInvalidators } from '../../worktree-change-invalidators'
 import {
   formatWorktreeRemovalError,

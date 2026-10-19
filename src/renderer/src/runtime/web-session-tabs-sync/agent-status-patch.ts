@@ -158,7 +158,10 @@ export function buildMirroredAgentStatusPatch(
                 : entry.lastAssistantMessageIsToolOutput
           }
         : entry
-    nextByPaneKey.set(entry.paneKey, nextEntry)
+    nextByPaneKey.set(
+      entry.paneKey,
+      nextEntry === entry ? entry : withHostProgramStatus(nextEntry, entry.programStatus)
+    )
   }
 
   let nextAgentStatusByPaneKey = state.agentStatusByPaneKey
@@ -255,4 +258,13 @@ export function buildMirroredAgentStatusPatch(
     agentStatusEpoch: aggregateRelevantChange ? state.agentStatusEpoch + 1 : state.agentStatusEpoch,
     sortEpoch: sortRelevantChange ? state.sortEpoch + 1 : state.sortEpoch
   }
+}
+
+// Why host-only: client OSC writes have no facet channel, so the host's facet is the current one.
+function withHostProgramStatus(
+  entry: AgentStatusEntry,
+  programStatus: AgentStatusEntry['programStatus']
+): AgentStatusEntry {
+  const { programStatus: _clientFacet, ...rest } = entry
+  return programStatus ? { ...rest, programStatus } : rest
 }

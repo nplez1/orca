@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url'
 import type { FileDocument } from '../../shared/filesystem-entry-types'
 import { authorizeExternalPath } from '../ipc/filesystem-auth'
 import { ensureFloatingWorkspaceDirectory } from '../ipc/floating-workspace-directory'
-import { fileDocumentFromFilePath, isMarkdownDocumentName } from '../ipc/markdown-documents'
+import {
+  fileDocumentFromFilePath,
+  isMarkdownDocumentName
+} from '../../shared/markdown-document-paths'
 
 export function isOsOpenedDocumentName(name: string): boolean {
   const extension = path.extname(name).toLowerCase()

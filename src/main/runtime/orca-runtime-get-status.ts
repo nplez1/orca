@@ -8,7 +8,7 @@ import {
 import { isBrowserIdentityModeStoreInitialized } from '../browser/browser-identity-mode-store'
 import { servesLocalWslMigrationSource } from '../orcad/orcad-migration-wsl-destination'
 import { ORCAD_MIGRATION_LOCAL_WSL_SOURCE_RUNTIME_CAPABILITY } from '../../shared/orcad-runtime-capabilities'
-import { advertisedOrcadMigrationBlobCapabilities } from '../../shared/orcad-migration-blob-transfer'
+import { advertisedOrcadMigrationBlobCapabilities } from '../../shared/orcad-migration/orcad-migration-blob-transfer'
 import type { RuntimeCapability } from '../../shared/protocol-version'
 import {
   BROWSER_CERTIFICATE_TRUST_RUNTIME_CAPABILITY,
@@ -29,12 +29,10 @@ import {
   BROWSER_UNAVAILABLE_ERROR_CODE,
   browserUnavailableMessage
 } from '../../shared/runtime-types'
-import { MOBILE_WEB_BUNDLE_CAPABILITY } from '../../shared/mobile-web-bundle/mobile-web-bundle-capability'
 import {
   RUNTIME_WORKSPACE_PATH_SEARCH_CAPABILITY_DESCRIPTOR,
   WORKSPACE_PATH_SEARCH_CAPABILITY_DOCUMENT_KEY
 } from '../../shared/workspace-path-search-capability'
-import { loadBundledMobileWebBundle } from './bundled-mobile-web-bundle'
 import { runtimeTerminalDegradation } from './native-terminal-availability'
 import { isWindowsProcessStartTimeAvailable } from '../windows/windows-process-table'
 import type { RuntimeWorktreeLifecycleEvent } from './orca-runtime-core'
@@ -51,12 +49,11 @@ import type {
 } from '../../shared/runtime-client-events'
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import { wakeFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade-wake'
+import { hostModeRuntimeCapabilities } from './runtime-host-mode-capabilities'
 import { runWorktreeChangeInvalidators } from '../ipc/worktree-change-invalidators'
 import { MACHINE_NAME_PUBLISH_WAIT_MS } from './runtime-machine-name'
 import { getManagedServerActions } from './managed-server-actions-registry'
 import type { WorktreeSortOrderUpdate } from '../../shared/worktree/sort-order-update'
-import { isDesktopBrowserBridgeHostEnabled } from './desktop-browser-bridge/desktop-browser-bridge-registry'
-import { DESKTOP_BROWSER_BRIDGE_RUNTIME_CAPABILITY } from '../../shared/desktop-browser-bridge-protocol'
 
 type RuntimeStatusHost = {
   getAvailableAuthoritativeWindow(): unknown
@@ -143,15 +140,7 @@ export abstract class OrcaRuntimeWithGetStatus extends OrcaRuntimeWithGetRuntime
     if (getManagedServerActions()) {
       capabilities.push(MANAGED_SERVER_RUNTIME_CAPABILITY)
     }
-    if (isDesktopBrowserBridgeHostEnabled()) {
-      capabilities.push(DESKTOP_BROWSER_BRIDGE_RUNTIME_CAPABILITY)
-    }
-    // Why not a static capability: dev trees and `orca serve` installs may carry no
-    // out/mobile-web, and advertising a bundle this install cannot produce would promise a
-    // download that only ever answers mobile_web_bundle_unavailable.
-    if (loadBundledMobileWebBundle()) {
-      capabilities.push(MOBILE_WEB_BUNDLE_CAPABILITY)
-    }
+    capabilities.push(...hostModeRuntimeCapabilities())
     // Why the cause and not one fixed sentence: the operator can only act on the reason
     // that actually applies, and a host that says "set ORCA_BROWSER_EXECUTABLE" to someone
     // who already set it sends them to fix a thing that is not broken.

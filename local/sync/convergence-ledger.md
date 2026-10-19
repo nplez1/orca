@@ -1097,6 +1097,15 @@ dotted-key check is what would have caught the stray top-level `settings.appeara
 the previous merge's union left beside the nested object, and post-sync's three localization checks
 do not include it.
 
+**2026-10-19 addendum.** Upstream added a seeded reader — `resolveOwnerWithLegacyFallback` — whose
+legacy branch returns the focused runtime from an object literal, so every function returning its
+result is a focus read by discovery. Two fork surfaces became readers through it:
+`SessionSummaryPane.tsx` and `session-summary-subject.ts` (2 each, via the worktree owner resolver).
+Recorded, with the cause and the date, rather than re-routed mid-sync: the pane genuinely asks the
+worktree owner resolver for the active workspace's host, and an unstamped legacy row has no named
+owner to resolve — switching to `getKnownExecutionHostIdForWorktree` there would turn the pane's host
+into `null` for those rows. The owner-routing follow-up (#124) still owns the reduction.
+
 ---
 
 ## 2026-10-18 sync (upstream `fc24ac3715`, 628 commits)
@@ -1204,3 +1213,106 @@ unqualified, so every lost-race reject preserved the entry — including the cas
 main's newer hosted-review broadcast found no review or the same number in another repository and must
 delete it. `preservePRCacheOnReject` now preserves only when the rejecting write is **not newer** than
 the result (`entry.fetchedAt < args.fetchedAt`).
+
+## 2026-10-19 sync (upstream `83c768d1b4`, 170 commits)
+
+Merge base `fc24ac3715`, pre-sync tip `cc42fb3b93`, rollback tag `archive/pre-sync-cc42fb3b93`.
+**52 conflicted paths** — `both-rewrote 34, union 10, rename-replay 3, duplicate-tail 2, modify/delete 2,
+duplicate-members 1`. Upstream's delta is mostly a module reorganisation (the SSH tree split into
+`ssh/connection/`, `ssh/targets/`, `ssh/config/`; the runtime-environment and filesystem-watcher
+modules split; `locale-text-collators` and `markdown-document-paths` moved to `shared/`), plus a new
+workspace-unread host capability and the AI Vault scope-aware cache-depth rule.
+
+### AI Vault: the unbounded bypass belongs to the scan caches, not the answer cache
+
+**Paths:** `src/shared/ai-vault-session-depth.ts`, `src/main/ai-vault/cached-session-list.ts`,
+`src/main/ipc/ai-vault-host-leg-cache.ts`,
+`src/renderer/src/components/right-sidebar/ai-vault-session-result-cache.ts`
+
+**Decision (owner, 2026-10-19).** Upstream added `aiVaultCachedDepthServes(cached, requested,
+scopePaths)`: a scoped request reuses only a scan of its **own** depth, because a scoped scan budgets
+in-scope rows per source, so a deeper scan holds rows a shallower one would not have kept. The fork's
+`unbounded` fallback ("an unbounded entry answers a bounded request") survives **in the two
+main-process scan caches only** — `localCacheHit` in `cached-session-list.ts` and both gates in
+`ai-vault-host-leg-cache.ts` read `cached.depth === 'unlimited' || aiVaultCachedDepthServes(...)`. The
+renderer's result cache is strict: it stores the **truncated** answer it handed the UI, so reusing a
+deeper (or unbounded) scan there would show rows the requested depth excludes.
+
+The two sides are not interchangeable, and the tests pin both: the fork's
+`serves a scoped bounded {local,all-host,runtime} list from the unbounded one already loaded` (main
+process) and upstream's `rescans a scoped view at a lowered depth instead of reusing the deeper scan`
+(renderer) cannot both pass under one rule. An unscoped bounded request still rides an unbounded
+entry everywhere, because `aiVaultSessionDepthCovers` covers it.
+
+`aiVaultAppliedScopePaths` (the fork's "an unbounded read depends on no scope") stays for keys,
+requests and the scan call. **Do not** collapse the two rules into one helper again: a shared
+`aiVaultCacheEntryServes` was tried in this sync and broke whichever side it was not written for.
+
+### `codex-subagent-roster` is gone; upstream's cap removal lands on `agent-descendant-roster`
+
+**Paths:** `src/shared/agent-descendant-roster.ts`, `src/shared/codex-subagent-roster.ts`,
+`src/shared/agent-status-types.ts`
+
+**Decision.** The fork renamed the module in an earlier sync; upstream kept editing the old name and
+removed its child cap (`AGENT_STATUS_MAX_SUBAGENTS` and the `roster.size >=` early return). The
+deletion stands and upstream's removal is ported into the renamed module and its test, including the
+`posts every running child` expectation. The constant is deleted from `agent-status-types.ts` and must
+not come back — nothing references it any more (the fork's Pi async-subagent test takes upstream's
+uncapped assertion).
+
+### The SSH tree, the watcher and the RPC error helper moved; fork-owned files followed
+
+**Paths:** `src/main/ssh/**`, `src/main/ipc/ephemeral-vm.ts`, `src/main/ipc/session-summary.ts`,
+`src/main/session-summary/**`, `src/main/runtime/runtime-repository-relocation-controller.ts`
+
+**Decision.** Upstream split `ssh/` into subdirectories and `filesystem-watcher.ts` into
+`filesystem-watcher-handlers.ts` + `filesystem-watcher-shutdown.ts`, moved
+`invalidateAuthorizedRootsCache` into `registered-worktree-roots-cache.ts`, and moved
+`hasRuntimeRpcErrorCode` into `shared/runtime-rpc-error-code.ts` (which `runtime-rpc-client` still
+re-exports, so the fork's Jira pages keep their import). `ssh-connection-utils.ts` is deleted: its
+`shellEscape` was byte-identical to `quotePosixShell` in `shared/shell-argument-quoting.ts`, which is
+what the remote-transcript reader now uses. `captured-output.ts` became `captured-git-output.ts`; the
+fork's duplicate copy was deleted rather than kept beside it.
+
+**Do not:** re-add a `captured-output.ts` or an `ssh-connection-utils.ts` copy. A merge that keeps both
+spellings of one module typechecks only until the duplicate import is reached — this sync hit exactly
+that in `git-exec-file.ts`.
+
+### AI Vault view options: upstream's shared store, the fork's two extras
+
+**Paths:** `src/renderer/src/components/right-sidebar/use-persisted-ai-vault-view-options.ts`,
+`AiVaultPanel.tsx`
+
+**Decision.** Upstream rewrote the hook around a module-level store (`useSyncExternalStore` +
+`subscribe`/`updateOptions`) so the sidebar and the `/resume` dialog cannot undo each other, and added
+a `localAgents` argument for the dialog's own agent filter. The fork's `disabledTuiAgents` →
+`availableAgents` filter and its `showSubagentSessions` option ride on top. The signature is
+`usePersistedAiVaultViewOptions(localAgents?, disabledTuiAgents?)` — upstream's argument stays first
+because its dialog passes it positionally — and the panel passes both.
+
+`setAllAgentsEnabled(enabled, scope = AI_VAULT_AGENTS)` keeps the fork's scope-aware bulk toggle with
+`AI_VAULT_AGENTS` as the default, so upstream's one-argument dialog call still means "every agent".
+`withAllAgentsEnabled` is deleted; `withAgentEnabled` remains for the single-agent path.
+
+**Do not:** drop the `local` branch in `updateAgents` (the dialog's filter is never persisted), or
+re-add `options.disabledAgents` to the agent list — a local filter must win over the stored one.
+
+### Max-lines: two extractions, and the refresh hook's recorded debt is gone
+
+`orca-runtime-get-status.ts` overflowed by 5 lines on the union — `hostModeRuntimeCapabilities()` moved
+to `runtime-host-mode-capabilities.ts` (the desktop-bridge, host-raised-unread and mobile-bundle
+capabilities: the ones that follow *how* the host runs, not what its build contains).
+`ai-vault-session-refresh.ts` had been **red at the tip before this merge** (303 lines, recorded in
+LOCAL-PATCHES.md as deliberate debt); the forced-rescan throttle moved to
+`ai-vault-forced-rescan-throttle.ts` with `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as
+its new edges, and the two external importers follow it. `index-project-setup.test.ts` reuses
+`ORCA_PROJECT` for the four identical inline project literals.
+
+**Do not:** bump a cap or add a baseline entry for any of the three.
+
+### `@types/node` follows upstream down to 24.19.2
+
+Upstream pinned `@types/node` back to `^24.19.2` (the fork was on `^25.6.0`). Those typings declare
+`process.emit("message", message, sendHandle)` with a **required** third argument, so the AI Vault
+service harness emits `process.emit('message', message, undefined)` like every other harness in the
+repo. A two-argument emit typechecks against 25.x and fails against 24.x — that is the whole symptom.

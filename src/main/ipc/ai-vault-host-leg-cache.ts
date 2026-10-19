@@ -8,7 +8,7 @@ import type {
 import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
 import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../../shared/ai-vault-types'
 import {
-  aiVaultSessionDepthCovers,
+  aiVaultCachedDepthServes,
   truncateAiVaultListResult,
   type AiVaultSessionDepth
 } from '../../shared/ai-vault-session-depth'
@@ -110,7 +110,10 @@ export async function scanHostLegWithCache(args: {
     !args.force &&
     cached &&
     cached.expiresAt > now &&
-    aiVaultSessionDepthCovers(cached.depth, args.depth) &&
+    // Why the unbounded bypass: an unbounded leg is stored without a scope and holds every
+    // scope's rows, so it answers a scoped request the same way its own unbounded read did.
+    (cached.depth === 'unlimited' ||
+      aiVaultCachedDepthServes(cached.depth, args.depth, args.scopePaths)) &&
     (!cached.result.unchanged ||
       (cached.depth === args.depth && cached.result.fingerprint === args.afterFingerprint))
   ) {
@@ -140,7 +143,8 @@ export async function scanHostLegWithCache(args: {
     !args.force &&
     current &&
     current.expiresAt > Date.now() &&
-    aiVaultSessionDepthCovers(current.depth, args.depth) &&
+    (current.depth === 'unlimited' ||
+      aiVaultCachedDepthServes(current.depth, args.depth, args.scopePaths)) &&
     (!current.result.unchanged ||
       (current.depth === args.depth && current.result.fingerprint === args.afterFingerprint))
   ) {

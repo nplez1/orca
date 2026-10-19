@@ -2,10 +2,8 @@ import { paneIdentity } from './runtime-terminal-pane-identity'
 import { shouldSeedWorktreePrimaryTerminal } from '../../shared/worktree-first-surface'
 import { randomUUID } from 'node:crypto'
 import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-lookup'
-import {
-  getWorktreeCreationLayout,
-  resolveWorktreeCreateDisplayNameRequest
-} from '../ipc/worktree-logic'
+import { getWorktreeCreationLayout } from '../ipc/worktree-logic'
+import { resolveWorktreeCreateDisplayNameRequest } from '../ipc/worktree-display-name'
 import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import type { CreateWorktreeResult } from '../../shared/worktree/create-types'
 import type { Repo } from '../../shared/repo-types'

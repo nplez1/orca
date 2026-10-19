@@ -1,6 +1,14 @@
 # Branch tracker
 
-Last updated **2026-10-18** — `nplez1/main` merged upstream main @ `fc24ac3715` (628 commits) into
+Last updated **2026-10-19** — `nplez1/main` merged upstream main @ `83c768d1b4` (170 commits) from
+`cc42fb3b93` (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). 52 conflicted
+paths, mostly upstream's own module reorganisation: the SSH tree split into
+`ssh/connection/`, `ssh/targets/` and `ssh/config/`, the filesystem-watcher and runtime-environment
+modules split, and the locale/markdown helpers moved to `shared/`. Fork-owned files that nobody
+conflicted on had to follow those renames — see [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log for
+the full list of what the merge broke without a conflict marker.
+
+Before that, on **2026-10-18** — `nplez1/main` merged upstream main @ `fc24ac3715` (628 commits) into
 the release line from `12545ad17e` (merge `db746c211b`, rollback tag
 `archive/pre-sync-12545ad17e`). 89 conflicted paths, and the convergence was three seams rather than
 one product line: the **AI Vault parse cache moved onto upstream's SQLite database** (the fork's

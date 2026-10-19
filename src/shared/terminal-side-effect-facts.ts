@@ -5,6 +5,7 @@
  * renderer store handler owns notification/unread policy.
  */
 
+import type { AgentIdleStatus } from './agent-title-status'
 import type { ParsedAgentStatusPayload } from './agent-status-types'
 import type { TerminalGitHubPRLink } from './terminal-github-pr-link-detector'
 
@@ -26,7 +27,12 @@ export type TerminalSideEffectFact =
     }
   | { kind: 'bell' }
   | { kind: 'agent-working' }
-  | { kind: 'agent-idle'; title: string; staleWorkingTitleClear?: boolean }
+  | {
+      kind: 'agent-idle'
+      title: string
+      staleWorkingTitleClear?: boolean
+      status?: AgentIdleStatus
+    }
   | { kind: 'agent-exited' }
   /** OSC 133;D — foreground shell command exited (exit code best-effort). */
   | { kind: 'command-finished'; exitCode: number | null }

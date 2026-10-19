@@ -125,8 +125,8 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
   // Why: Pi resumes from an existing transcript; OMP resumes directly by session id (#8962).
   const payloadLine =
     kind !== 'omp'
-      ? '    payload: { hook_event_name: hookEventName, ...(ompRuntime ? metadata : getPersistedSessionMetadata(metadata)), ...(final ? {} : subagentPayload()), ...extra },'
-      : '    payload: { hook_event_name: hookEventName, ...metadata, ...(final ? {} : subagentPayload()), ...extra },'
+      ? '    payload: { hook_event_name: hookEventName, ...(ompRuntime ? metadata : getPersistedSessionMetadata(metadata)), ...subagents, ...extra },'
+      : '    payload: { hook_event_name: hookEventName, ...metadata, ...subagents, ...extra },'
 
   // Why: keep this string self-contained — it runs inside the pi process,
   // so it cannot import from Orca's main bundle. fs/http coords come from
@@ -257,7 +257,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     // what it is doing — recorded on the attempt, because a failed delivery is what it has to answer.
     '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKeyOf(coords), latest)',
     '  const url = `http://127.0.0.1:${coords.port}${resolveHookPath(ompRuntime)}`',
-    '  const body = JSON.stringify({',
+    '  const bodyWith = (subagents: Record<string, unknown>): string => JSON.stringify({',
     '    paneKey,',
     "    launchToken: process.env.ORCA_AGENT_LAUNCH_TOKEN || '',",
     "    tabId: process.env.ORCA_TAB_ID || '',",
@@ -266,6 +266,8 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '    version: coords.version,',
     payloadLine,
     '  })',
+    '  const bareBody = bodyWith({})',
+    '  const body = final ? bareBody : bodyWith(subagentPayload(HOOK_BODY_BUDGET_BYTES - Buffer.byteLength(bareBody)))',
     "  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null",
     '  let timeout: ReturnType<typeof setTimeout> | undefined',
     '  const timeoutPromise = new Promise<never>((_resolve, reject) => {',

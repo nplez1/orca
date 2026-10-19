@@ -12,10 +12,8 @@ import {
 } from '../../../../shared/ai-vault-types'
 import type { ExecutionHostScope } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
-import {
-  resetAiVaultForcedRescanThrottleForTest,
-  useAiVaultSessionRefresh
-} from './ai-vault-session-refresh'
+import { useAiVaultSessionRefresh } from './ai-vault-session-refresh'
+import { resetAiVaultForcedRescanThrottleForTest } from './ai-vault-forced-rescan-throttle'
 import { DEFAULT_AI_VAULT_SESSION_LIMIT, type AiVaultSessionLimit } from './ai-vault-session-limit'
 import { withNonSecureContextCrypto } from '@/lib/non-secure-context-crypto-stub'
 
@@ -268,6 +266,19 @@ describe('useAiVaultSessionRefresh refocus behavior', () => {
 
     expect(listSessionsMock).toHaveBeenCalledTimes(2)
     expect(lastCallArgs()).toMatchObject({ limit: 1000, force: false })
+  })
+
+  // A deeper scan keeps every scoped row, so reusing it would ignore the lowered depth.
+  it('rescans a scoped view at a lowered depth instead of reusing the deeper scan', async () => {
+    listSessionsMock.mockResolvedValue({ ...EMPTY_RESULT, sessions: [makeVaultSession(1)] })
+    await renderHook(['/repo'], 'ssh:dev-box', 'unlimited')
+    await flushMicrotasks()
+
+    await rerenderHook(['/repo'], 'ssh:dev-box', 250)
+    await flushMicrotasks()
+
+    expect(listSessionsMock).toHaveBeenCalledTimes(2)
+    expect(lastCallArgs()).toMatchObject({ limit: 250, scopePaths: ['/repo'] })
   })
 
   it('reuses a loaded larger depth when lowering and raising within its coverage', async () => {

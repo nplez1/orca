@@ -26,7 +26,7 @@ import { readJcodeTurnPrompt } from './providers/jcode-turn-prompt'
 import { normalizeAntigravityEvent } from './providers/antigravity-events'
 import { normalizeAmpEvent } from './providers/amp-events'
 import { normalizeClaudeEvent } from './providers/claude-events'
-import { normalizeCodexEvent } from './providers/codex-events'
+import { codexHookEventForEndedTurn, normalizeCodexEvent } from './providers/codex-events'
 import { normalizeGeminiEvent } from './providers/gemini-events'
 import { normalizeOpenCodeFamilyEvent } from './providers/opencode-family-events'
 import { normalizeCursorEvent } from './providers/cursor-events'
@@ -51,6 +51,8 @@ export type ProviderDispatchResult = {
   hasTranscriptPromptEvidence: boolean
   /** The event fired inside a descendant, so nothing on it describes the pane's own turn. */
   descendantScoped?: true
+  /** The event the payload was normalized as, which a provider may restate (Codex ended turns). */
+  eventName: unknown
 }
 
 /** Exhaustive provider routing with provider-specific transcript locality and attribution. */
@@ -65,8 +67,11 @@ export function normalizeProviderEvent(input: {
   extractedPrompt: ExtractedPromptText
   previousOpenCodeMainAgent?: AgentMainAgentStatus
 }): ProviderDispatchResult {
-  const { state, source, eventName, promptText, paneKey, hookPayload, envelope, extractedPrompt } =
-    input
+  const { state, source, promptText, paneKey, hookPayload, envelope, extractedPrompt } = input
+  const eventName =
+    source === 'codex'
+      ? codexHookEventForEndedTurn(state, paneKey, input.eventName, hookPayload)
+      : input.eventName
   let resolvedPromptText = promptText
   let promptInteractionKey: string | undefined
   let hasTranscriptPromptEvidence = false
@@ -89,7 +94,8 @@ export function normalizeProviderEvent(input: {
       // Why: a child's prompt is not the pane's turn label, and its tool events are not a user submit.
       resolvedPromptText: '',
       hasTranscriptPromptEvidence: false,
-      descendantScoped: true
+      descendantScoped: true,
+      eventName
     }
   }
   if (!ownsDescendants) {
@@ -265,6 +271,7 @@ export function normalizeProviderEvent(input: {
     payload: gateDescendants ? gatePaneStateOnDescendants(state, paneKey, payload) : payload,
     resolvedPromptText,
     promptInteractionKey,
-    hasTranscriptPromptEvidence
+    hasTranscriptPromptEvidence,
+    eventName
   }
 }

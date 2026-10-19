@@ -55,23 +55,34 @@ it('serves a second project from the Unlimited listing already cached', () => {
   cacheAiVaultSessionList(request('/repo/app', 'unlimited'), loaded, { replaceHostEntries: false })
 
   expect(readCachedAiVaultSessionList(request('/repo/other', 'unlimited'))).not.toBeNull()
-  // Unlimited holds every depth, so narrowing to a preset is served from it too.
-  expect(readCachedAiVaultSessionList(request('/repo/app', 250))).not.toBeNull()
+  // Why not a preset too: a scoped scan budgets in-scope rows per source, so a deeper (or
+  // unbounded) scan holds rows a 250 scan would not have kept. Only an equal depth answers a
+  // scoped request; an unscoped preset still rides the unbounded entry.
+  expect(readCachedAiVaultSessionList(request('/repo/app', 250))).toBeNull()
+  expect(
+    readCachedAiVaultSessionList({
+      executionHostScope: 'local',
+      scopePaths: [],
+      sessionLimit: 250
+    })
+  ).not.toBeNull()
 })
 
-it('still stores a fresher bounded list after the unbounded one answered it', () => {
+it('still stores a fresher bounded list beside the unbounded entry', () => {
   const loaded = { sessions: [session('old')], issues: [], scannedAt: '2026-08-01T00:00:00.000Z' }
   cacheAiVaultSessionList(request('/repo/app', 'unlimited'), loaded, { replaceHostEntries: false })
-  // Served from the unbounded entry, which must not leave a copy behind on this key.
-  expect(readCachedAiVaultSessionList(request('/repo/app', 250))?.scannedAt).toBe(
-    '2026-08-01T00:00:00.000Z'
-  )
+  // A scoped preset must not be answered (or shadowed) by the unbounded entry, so the bounded
+  // write lands on its own key and the unbounded copy is still there for an unbounded read.
+  expect(readCachedAiVaultSessionList(request('/repo/app', 250))).toBeNull()
 
   const fresh = { sessions: [session('new')], issues: [], scannedAt: '2026-08-01T00:00:09.000Z' }
   cacheAiVaultSessionList(request('/repo/app', 250), fresh, { replaceHostEntries: false })
 
   expect(readCachedAiVaultSessionList(request('/repo/app', 250))?.scannedAt).toBe(
     '2026-08-01T00:00:09.000Z'
+  )
+  expect(readCachedAiVaultSessionList(request('/repo/app', 'unlimited'))?.scannedAt).toBe(
+    '2026-08-01T00:00:00.000Z'
   )
 })
 

@@ -13,7 +13,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { Readable } from 'node:stream'
-import { shellEscape } from '../ssh/ssh-connection-utils'
+import { quotePosixShell } from '../../shared/shell-argument-quoting'
 
 /** The subset of an SSH exec channel this reader consumes. */
 export type RemoteTranscriptChannel = Readable & { close(): void }
@@ -68,7 +68,7 @@ export function createSshTranscriptFetcher(
         channel: await deps.openChannel({
           targetId,
           // Quoted: the path comes from the host's own hook, not from this process.
-          command: `cat ${shellEscape(remotePath)}`,
+          command: `cat ${quotePosixShell(remotePath)}`,
           signal
         }),
         localPath,

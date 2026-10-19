@@ -16,47 +16,22 @@ import { AiVaultSessionPublicationGate } from './ai-vault-session-publication-ga
 import { EMPTY_AI_VAULT_SESSIONS } from './ai-vault-session-identity'
 import { useAppliedAiVaultScan } from './ai-vault-applied-scan'
 import { useAiVaultSessionHostRefreshEvents } from './ai-vault-host-scope'
-import {
-  aiVaultSessionResultCacheKey,
-  resetAiVaultSessionResultCacheForTest
-} from './ai-vault-session-result-cache'
+import { aiVaultSessionResultCacheKey } from './ai-vault-session-result-cache'
 import {
   refreshAiVaultSessionList,
   type AiVaultConditionalSnapshot,
   cacheAiVaultSessionList,
   readCachedAiVaultSessionList
 } from './ai-vault-session-list-request'
-// Why one wrapped import: two single-line statements for one module is an `import/no-duplicates`
-// finding, and the file is at its 300-code-line budget, so a line has to go elsewhere for the wrap.
-import {
-  getAgentSessionIdsKey,
-  resetAgentSessionIdsRefreshKeys
-} from './ai-vault-agent-session-refresh-key'
+import { getAgentSessionIdsKey } from './ai-vault-agent-session-refresh-key'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import {
+  claimAiVaultForcedRescan,
+  forcedRescanRetryDelayMs,
+  markForcedRescanSpent
+} from './ai-vault-forced-rescan-throttle'
 
-// In-app session creation bypasses the cache so the new session appears promptly.
-// Keep the budget at module scope so tab remounts cannot amplify full scans.
-const FORCED_RESCAN_MIN_INTERVAL_MS = 30_000
-let lastForcedRescanAt = 0
 type ConditionalSnapshot = AiVaultConditionalSnapshot & { scopeKey: string }
-
-/** Takes the shared forced-rescan budget when it is free. Every caller outside the panel that forces
- *  a scan must take it too, or it would amplify full scans the same way. A user's explicit request
- *  takes it even when spent, as the panel's Refresh does, so no automatic rescan follows it. */
-export function claimAiVaultForcedRescan(userRequested = false): boolean {
-  const now = Date.now()
-  if (!userRequested && lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS > now) {
-    return false
-  }
-  lastForcedRescanAt = now
-  return true
-}
-
-export function resetAiVaultForcedRescanThrottleForTest(): void {
-  lastForcedRescanAt = 0
-  resetAgentSessionIdsRefreshKeys()
-  resetAiVaultSessionResultCacheForTest()
-}
 
 type AiVaultRefreshArgs = { force?: boolean; background?: boolean; reuseLoadedDepth?: boolean }
 
@@ -179,7 +154,7 @@ export function useAiVaultSessionRefresh(
       // A manual force scan counts against the throttle so an auto rescan right
       // after the button press doesn't trigger a second full scan.
       if (args.force === true) {
-        lastForcedRescanAt = Date.now()
+        markForcedRescanSpent()
       }
       // Background (refocus) refreshes usually resolve from the main-process
       // cache; suppressing the loading flag avoids a spinner flash on every
@@ -291,7 +266,7 @@ export function useAiVaultSessionRefresh(
       void refresh({ background: true, force: true })
       return
     }
-    const waitMs = lastForcedRescanAt + FORCED_RESCAN_MIN_INTERVAL_MS - Date.now()
+    const waitMs = forcedRescanRetryDelayMs()
     if (forcedRescanTimerRef.current !== null) {
       return
     }

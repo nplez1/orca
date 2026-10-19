@@ -89,7 +89,9 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
     forgetTerminalTopology: (repoId) => runtime.terminalTopologyRevisionByRepoId.delete(repoId),
-    stopProjectTerminals: (repo, deadline) => runtime.stopTerminalsForProject(repo, { deadline }),
+    // Why the whole options object: the controller decides whether a removal also closes the
+    // project's native chats, and forwarding only the deadline silently skipped that close.
+    stopProjectTerminals: (repo, options) => runtime.stopTerminalsForProject(repo, options),
     invalidateResolvedWorktrees: () => runtime.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => runtime.invalidateWorktreeScanCacheForRepo(repoId),
     notifyReposChanged: () => runtime.notifyReposChanged()

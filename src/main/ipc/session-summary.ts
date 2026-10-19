@@ -8,8 +8,8 @@ import {
   isSessionSummaryCloseRequest,
   isSessionSummaryOpenRequest
 } from '../../shared/session-summary-types'
-import { callRuntimeEnvironment } from './runtime-environment-transport-routing'
-import { getSshConnectionManager } from '../ssh/ssh-target-registry'
+import { callRuntimeEnvironment } from './runtime-environments/runtime-environment-transport-routing'
+import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
 import { createAgentCliSessionFoldBrain } from '../session-summary/session-summary-agent-cli-fold-brain'
 import { createSessionSummaryEventReader } from '../session-summary/session-summary-event-reader'
 import {

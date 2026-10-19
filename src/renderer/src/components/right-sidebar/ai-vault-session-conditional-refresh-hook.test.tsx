@@ -11,10 +11,8 @@ import {
   markInputQuietSchedulerInput,
   resetInputQuietSchedulerForTest
 } from '@/lib/input-quiet-scheduler'
-import {
-  resetAiVaultForcedRescanThrottleForTest,
-  useAiVaultSessionRefresh
-} from './ai-vault-session-refresh'
+import { useAiVaultSessionRefresh } from './ai-vault-session-refresh'
+import { resetAiVaultForcedRescanThrottleForTest } from './ai-vault-forced-rescan-throttle'
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({

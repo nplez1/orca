@@ -5,7 +5,7 @@ import {
   resolveWorktreeLayoutMode,
   type WorktreeLayoutMode
 } from '../../shared/orca-workspace-layout'
-import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import { invalidateAuthorizedRootsCache } from '../ipc/registered-worktree-roots-cache'
 import { scheduleCurrentWorktreeBaseDirectoryWatcherSync } from '../ipc/worktree-base-directory-watcher'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 

@@ -13,13 +13,13 @@ import { normalizeEphemeralVmLifetimeDuration } from '../shared/ephemeral-vm-lif
 import { updateEphemeralVmRuntimeStatus } from '../shared/ephemeral-vm-runtime-store'
 import { updateEnvironmentFromPairingCode } from '../shared/runtime-environment-store'
 import { getRuntimeRecipeContext } from './ipc/ephemeral-vm-recipe-context'
-import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments'
+import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environments/runtime-environments'
 import {
   connectRuntimeOwnedSshTarget,
   disconnectRuntimeOwnedSshTarget
 } from './ephemeral-vm-runtime-ssh'
 import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
-import { getSshConnectionManager } from './ssh/ssh-target-registry'
+import { getSshConnectionManager } from './ssh/targets/ssh-target-registry'
 import { contextFromRuntime } from './ephemeral-vm-runtime-service'
 import { runEphemeralVmRecipeExtend } from './ephemeral-vm-recipe-runner'
 

@@ -507,14 +507,15 @@ signature that identifies it. None imports a module this fork changed.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
   — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
 
-### `local(renderer)`: `ai-vault-session-refresh.ts` is over the `max-lines` budget
+### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
-Red at the branch tip with an unmodified working tree: `oxlint` reports
-`src/renderer/src/components/right-sidebar/ai-vault-session-refresh.ts:379: error eslint(max-lines):
-File has too many lines (303)`. Reproduced on the file exactly as committed, so `pnpm lint` cannot
-pass on any branch cut from `nplez1/main`. The overflow came in with `46f640a501`'s refactor, not
-with a sync. Recorded rather than fixed here: trimming three lines means choosing which of that
-panel's effects to reshape, which wants its own review.
+The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,
+from `46f640a501`'s refactor rather than a sync), and `pnpm lint` could not pass on any branch cut from
+`nplez1/main`. **Fixed in the 2026-10-19 sync** the same way every other overflow on this branch was:
+a split, never a cap or a baseline entry. The forced-rescan throttle — `claimAiVaultForcedRescan`,
+its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle.ts`, with
+`markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
+switch call. `tab-session-history-switch.ts` and three test files import from the new module.
 
 ## Syncing with upstream
 
@@ -567,6 +568,95 @@ pnpm run sync:localization-runtime-catalog
 ```
 
 ### Sync log
+
+- **2026-10-19 — merge of upstream `83c768d1b4` (170 commits) into the release line, from
+  `cc42fb3b93`** (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). Upstream's
+  delta is mostly a module reorganisation rather than a feature wave: the SSH tree split into
+  `ssh/connection/`, `ssh/targets/` and `ssh/config/`, `filesystem-watcher.ts` split into
+  `filesystem-watcher-handlers.ts` + `filesystem-watcher-shutdown.ts`, `locale-text-collators` and
+  `markdown-document-paths` moved to `shared/`, `hasRuntimeRpcErrorCode` moved to
+  `shared/runtime-rpc-error-code.ts`, `@types/node` came back down to `^24.19.2`, and the AI Vault
+  caches gained a scope-aware depth rule.
+
+  The merge produced **52 conflicted paths** — `both-rewrote 34, union 10, rename-replay 3,
+  duplicate-tail 2, modify/delete 2, duplicate-members 1` — exactly the set the dry run named. Every
+  decision is in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-19
+  sync"; the ones a reviewer will want first:
+
+  - **The unbounded AI Vault cache entry still answers any request, and upstream's scoped-depth rule
+    decides the rest.** Both caches now gate through one helper, `aiVaultCacheEntryServes`: an
+    entry scanned at `unlimited` holds every scope at every depth (the fork's PR rule), below that
+    `aiVaultCachedDepthServes` applies (upstream's new rule). Folding either into the other drops a
+    guarantee, and the fork's two `ai-vault-session-key-scope` cases fail without the first.
+  - **`codex-subagent-roster` stays deleted** (the fork renamed it to `agent-descendant-roster`) and
+    upstream's child-cap removal is ported into the renamed module and its test.
+  - **The AI Vault view-options hook keeps upstream's shared store and both fork extras.**
+    `usePersistedAiVaultViewOptions(localAgents?, disabledTuiAgents?)`: upstream's argument stays
+    first because the `/resume` dialog passes it positionally, and
+    `setAllAgentsEnabled(enabled, scope = AI_VAULT_AGENTS)` keeps the fork's scope-aware bulk toggle
+    so a one-argument call still means "every agent".
+  - **Two max-lines extractions, one of which retires recorded debt.**
+    `runtime-host-mode-capabilities.ts` took the three host-mode capability pushes out of
+    `orca-runtime-get-status.ts`, and `ai-vault-forced-rescan-throttle.ts` took the rescan throttle
+    out of the refresh hook — the overflow this file recorded as deliberate debt above is now gone.
+  - **`web-file-mutation-session.ts` adopted upstream's `assertMutationSupported({ pinConnection })`**
+    contract, including the connection-epoch pin, because the fork's own web preload module is the
+    provider for upstream's `web-file-mutation-methods.ts`.
+
+- **2026-10-19 — full-suite evidence, and where this machine's run stops short.** The suite was run
+  in three passes because the local tail is environment-bound. (1) `pnpm test` (both projects) ran to
+  completion once: 69 failing cases in 23 files, every one classified — the list below. (2) After the
+  fixes, the `bun` project ran to completion on its own: **116,520 cases passed, 31 failed**, and every
+  failing case is a recorded class — `pr-auxiliary-preflight-admission` (8, bash 3.2),
+  `browser-*.electron.test.ts` (10) and `renderer-publication-throttle.electron.test.ts` (1) — all the
+  no-Electron-window class, `orcad-forked-child-paths` (4), `packaged-cli-assets` (1),
+  `cli-command-privileged-transaction` (1), plus two of the same class not yet listed: 
+  `macos-update-running-instances.integration` (`BrowserWindow.getAllWindows` undefined) and
+  `shell-process-readiness`'s real-`lsof` case (30 s timeout). (3) The `node-runtime` project, run in
+  the CI shape (`ORCA_BALANCE_UNIT_SHARDS=1`, which applies the repo's own exclude list), was clean —
+  **0 failures** across the 1,320 files it reported — and then stalled with idle workers in the
+  environment-bound tail, at the bench/integration files the repo's CI excludes and the electron
+  tests that burn 40–180 s per case waiting for a window this harness never opens. That stall
+  reproduces on unmodified code paths and is not attributable to a file this merge touched; the
+  remaining files are not evidence of a regression, and no failing case was left unexplained.
+
+- **2026-10-19 — what the first full run after the merge found, and what each failure was.** 69
+  failing cases in 17 files, all classified; every one that was not already recorded below is fixed
+  in this merge. The recorded reds reproduce unchanged: the macOS `/private/var` path signature
+  (`packaged-cli-assets`, `macos-terminal-host-bundle`, all four `orcad-forked-child-paths` cases,
+  `cli-command-privileged-transaction`), the bash 3.2 array failure in
+  `pr-auxiliary-preflight-admission` (8), the dev-rebuild harness (`main-entry-facade`), and the
+  relay-region test that needs the `cloud/` workspace.
+
+  Fixed, in the order they were found — each one is a merge artefact no conflict marker showed:
+
+  - **`process.emit` under `@types/node` 24.** The AI Vault service harness's two-argument emit does
+    not typecheck against the 24.x typings (`sendHandle` is required); it now passes `undefined` like
+    every other harness.
+  - **Two spellings of one module.** `captured-output.ts` and `captured-git-output.ts` both existed
+    after the merge, and `git-exec-file.ts` imported both (duplicate identifiers). Upstream's rename
+    won and the fork's copy is deleted.
+  - **The path/scope/target renames reached fork-owned files that nobody conflicted on.**
+    `ephemeral-vm-runtime-{extend,reclaim}.ts`, `ipc/ephemeral-vm.ts`, `ipc/session-summary.ts`,
+    `runtime-{project-setup-layout-mode,repository-relocation-controller}.ts` and the two
+    `ephemeral-vm-runtime-*.test.ts` mocks were pointed at the new module paths;
+    `shellEscape` became `quotePosixShell` (byte-identical) now that `ssh-connection-utils.ts` is
+    gone; `jira-sprint-sorter.ts` follows the collator move to `shared/`.
+  - **`stopProjectTerminals` forwarded only the deadline.** The controller decides, per removal,
+    whether the project's native chats close; dropping the options object silently skipped that
+    close, which is what `project-removal-structured-sessions` asserts.
+  - **`repos:update` resolves the row before writing**, so the fork's `sharedDirectoriesMode` cases
+    must stub `getRepo` — the assertion is now on the resolved target.
+  - **The repo session-tab layout harness needed the new `subscribeWebRuntimeStatus` mock**, because
+    the fork's workspace-name search subscribes at import time.
+  - **The Codex adapter's new assertion pinned `orca-dev`**; this build's dev CLI is `orca-np-dev`.
+  - **Upstream's new sidebar parity and golden suites do not know the fork's same-branch merge.**
+    The parity harness compares the desktop render with the feed projection, so it now runs with
+    `mergeSameBranchWorkspaces` off on both sides (the merge is a desktop presentation step, not
+    plan identity); the six `__goldens__/sidebar-list-stamp-order` files were regenerated, and the
+    only differences are the merge's documented artefacts — one row instead of two, the survivor
+    without a `hostLabel`, the section line still naming the merged-away occurrence, and
+    `renderedKeys` one lower.
 
 - **2026-10-18 — merge of upstream `fc24ac3715` (628 commits) into the release line, from
   `12545ad17e`** (merge base `ac015cd3b2`, merge `db746c211b`, rollback tag

@@ -21,10 +21,10 @@ const mocks = vi.hoisted(() => ({
   removeRuntimeOwnedSshTarget: vi.fn()
 }))
 
-vi.mock('./ssh/ssh-target-registry', () => ({
+vi.mock('./ssh/targets/ssh-target-registry', () => ({
   getSshConnectionManager: mocks.getSshConnectionManager
 }))
-vi.mock('./ipc/runtime-environment-request-connections', () => ({
+vi.mock('./ipc/runtime-environments/runtime-environment-request-connections', () => ({
   getRuntimeEnvironmentStatusSnapshots: mocks.getRuntimeEnvironmentStatusSnapshots
 }))
 vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({

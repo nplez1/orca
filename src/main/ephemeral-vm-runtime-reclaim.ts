@@ -16,8 +16,8 @@ import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm-runtime-en
 import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
 import { removeRuntimeOwnedSshTarget } from './ephemeral-vm-runtime-ssh'
 import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm-runtime-ssh-cleanup'
-import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environment-request-connections'
-import { getSshConnectionManager } from './ssh/ssh-target-registry'
+import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/runtime-environment-request-connections'
+import { getSshConnectionManager } from './ssh/targets/ssh-target-registry'
 
 /** Cadence of the reclaim sweep: a provider deadline is coarse, so a minute is prompt enough. */
 export const EPHEMERAL_VM_RECLAIM_SWEEP_INTERVAL_MS = 60_000

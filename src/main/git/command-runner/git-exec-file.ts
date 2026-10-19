@@ -7,7 +7,6 @@ import {
 } from '../../../shared/git-fetch-head-lock'
 import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
 import { resolveCommand, type ResolvedCommand } from './wsl-command-resolution'
-import { readCapturedGitBuffer, readCapturedGitString } from './captured-output'
 import { annotateWslHostFailure } from './wsl-host-failure'
 import type { GitAdmissionTier, GitExecOptions } from './git-exec-options'
 import { execFileCapture, execFileCaptureToTermination } from './exec-file-capture'
@@ -30,6 +29,8 @@ import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
 import { classifyGitCommand } from '../../../shared/git-command-classification'
 import { createAbortError } from './abort-error'
+import { readCapturedGitBuffer, readCapturedGitString } from './captured-git-output'
+import { runUnlessGitCwdKnownMissing } from './missing-git-spawn-cwd'
 
 /**
  * Async git command execution. Drop-in replacement for
@@ -183,21 +184,24 @@ export function gitExecFileAsync(
   options: GitExecOptions
 ): Promise<{ stdout: string; stderr: string }> {
   const command = resolveGitFetchHeadCommand(args, options.cwd)
-  return command.needsLock
-    ? runWithGitFetchHeadLock(
-        command.cwd,
-        options.signal,
-        () => gitExecFileAsyncUnlocked(args, options),
-        command.gitDir
-      )
-    : gitExecFileAsyncUnlocked(args, options)
+  // Why outside the lock and span: a known-missing folder starts no process, so it records no git.exec.
+  return runUnlessGitCwdKnownMissing(options, () =>
+    command.needsLock
+      ? runWithGitFetchHeadLock(
+          command.cwd,
+          options.signal,
+          () => gitExecFileAsyncUnlocked(args, options),
+          command.gitDir
+        )
+      : gitExecFileAsyncUnlocked(args, options)
+  )
 }
 
 /**
  * Async git command execution that returns a Buffer.
  * Used for reading binary blobs (git show).
  */
-export async function gitExecFileAsyncBuffer(
+async function gitExecFileAsyncBufferInSpan(
   args: string[],
   options: {
     cwd: string
@@ -273,6 +277,13 @@ export async function gitExecFileAsyncBuffer(
 
 // Why: sync git blocks the main thread; a dead network drive can hang git for minutes without a timeout (issue #7225's 127s freeze).
 const GIT_EXEC_SYNC_TIMEOUT_MS = 15_000
+
+export function gitExecFileAsyncBuffer(
+  args: string[],
+  options: Parameters<typeof gitExecFileAsyncBufferInSpan>[1]
+): Promise<{ stdout: Buffer }> {
+  return runUnlessGitCwdKnownMissing(options, () => gitExecFileAsyncBufferInSpan(args, options))
+}
 
 /**
  * Sync git command execution. Drop-in replacement for

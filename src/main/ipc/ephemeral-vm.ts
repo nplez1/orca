@@ -37,7 +37,7 @@ import type { PluginService } from '../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../plugins/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../ephemeral-vm-provisioned-root-source'
 import { startEphemeralVmRuntimeReclaim } from '../ephemeral-vm-runtime-reclaim'
-import { getCurrentMainWindow } from './ssh-ipc-context'
+import { getCurrentMainWindow } from './ssh/ssh-ipc-context'
 
 const activeProvisionControllers = new Map<string, AbortController>()
 
