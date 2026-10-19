@@ -104,6 +104,9 @@ export type AiVaultSessionSubagentInfo = {
   parentSessionId: string
   agentType: string | null
   status: AiVaultSubagentRunStatus | null
+  /** The AGENT the parent belongs to, when the link crossed agents (a pi session spawning a claude
+   *  conversation). Absent for the on-disk `subagents/` lineage, where the parent is the same one. */
+  parentAgent?: string
 }
 
 export type AiVaultSession = {

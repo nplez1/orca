@@ -1,5 +1,6 @@
 import { readAgentProcessIdentity } from './agent-process-presence'
 import { isInheritedPaneOwnerEvent } from './agent-hook-listener/inherited-pane-owner-guard'
+import { admitNestedAgentPost } from './agent-hook-listener/pi-claude-child-events'
 import { normalizeAgentStatusPayload, type AgentMainAgentStatus } from './agent-status-types'
 import type { AgentHookSource } from './agent-hook-relay'
 import { extractAgentProviderSession } from './agent-session-resume'
@@ -28,14 +29,9 @@ import {
   trackOpenCodePaneLaunchToken
 } from './agent-hook-listener/opencode-session-registry'
 import { claudeRowHasUnlistedLiveWork } from './agent-hook-listener/providers/claude-pane-hold-evidence'
+import { claudeSessionExitEvent } from './agent-hook-listener/claude-session-exit'
 import { readString } from './agent-hook-listener/tool-input-preview'
 /** Canonical transport-agnostic normalization entry shared by main and relay listeners. */
-const CLAUDE_EXIT_SESSION_END_REASONS = new Set([
-  'prompt_input_exit',
-  'logout',
-  'other',
-  'bypass_permissions_disabled'
-])
 
 export function normalizeHookPayload(
   state: HookListenerState,
@@ -154,6 +150,25 @@ export function normalizeHookPayload(
     return null
   }
   const previousStatus = state.lastStatusByPaneKey.get(paneKey)
+  // Why first: a pane can host two nested agents — a pi session nested inside its own, and the
+  // claude CLI child that run started — and neither may reach a provider fold as the pane's agent.
+  const nested = admitNestedAgentPost({
+    state,
+    source,
+    paneKey,
+    eventName,
+    hookPayload: hookPayloadRecord,
+    providerSession,
+    previousStatus,
+    paneSource: previousStatus?.source ?? source,
+    coords: { tabId, worktreeId, launchToken }
+  })
+  // Why a refusal is safe here: it is gated on a live child run of THIS pane, so it can only last
+  // as long as that run — a lost `session_start` costs the new session its posts until the child it
+  // is unrelated to finishes, not forever.
+  if (nested.kind !== 'pass') {
+    return nested.kind === 'refuse' ? null : nested.event
+  }
   // Reject before provider folds mutate the pane's prompt, tool and child caches.
   if (isInheritedPaneOwnerEvent({ previousStatus, worktreeId, source })) {
     return null
@@ -204,34 +219,20 @@ export function normalizeHookPayload(
   const agentPresence = agentProcess
     ? { agent: source, process: agentProcess, sessionOwner: true as const }
     : undefined
-  const sessionEndReason = readString(hookPayloadRecord, 'reason')
-  if (
-    eventName === 'SessionEnd' &&
-    agentPresence &&
-    !readString(hookPayloadRecord, 'agent_id') &&
-    // Why: only reasons that end the process; /clear and /resume keep it running, and an unknown
-    // reason is left to the process check rather than guessed.
-    sessionEndReason !== undefined &&
-    CLAUDE_EXIT_SESSION_END_REASONS.has(sessionEndReason)
-  ) {
-    const payload =
-      previousStatus?.payload ??
-      normalizeAgentStatusPayload({ state: 'done', prompt: '', agentType: source })
-    if (!payload) {
-      return null
-    }
-    return {
-      paneKey,
-      source,
-      launchToken,
-      tabId,
-      worktreeId,
-      connectionId: null,
-      providerSession: providerSession ?? undefined,
-      hookEventName: 'SessionEnd',
-      agentPresence: { ...agentPresence, ended: true as const },
-      payload
-    }
+  const claudeExit = claudeSessionExitEvent({
+    eventName,
+    hookPayload: hookPayloadRecord,
+    agentPresence,
+    previousStatus,
+    source,
+    paneKey,
+    tabId,
+    worktreeId,
+    launchToken,
+    providerSession
+  })
+  if (claudeExit !== undefined) {
+    return claudeExit
   }
 
   const promptText = extractedPrompt.text

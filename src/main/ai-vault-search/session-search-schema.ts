@@ -16,7 +16,10 @@ import {
 // injected `<current_datetime>` context, which unchanged files would otherwise keep.
 // Schema 8 adds sub-agent lineage, which the list needs for every row it renders:
 // a schema 7 index would answer every listing with `subagent: null`.
-export const SESSION_SEARCH_SCHEMA_VERSION = 8
+// Schema 9 adds the parent's AGENT beside that lineage. A link can cross agents — a pi session
+// spawning a claude conversation — and a list filtered to one agent has to tell that apart from a
+// parent that is merely not loaded, or it counts a real session as hidden.
+export const SESSION_SEARCH_SCHEMA_VERSION = 9
 
 // unicode61 keeps `_ . - /` inside tokens so paths and identifiers match exactly;
 // the `identifiers` column carries the split form (see session-search-identifier-split).
@@ -63,7 +66,9 @@ CREATE TABLE IF NOT EXISTS sessions(
   -- Sub-agent lineage. A list served from the index has to nest a child under
   -- its parent exactly as a scanned row does, so these cannot stay on-demand.
   subagent_parent_session_id TEXT,
-  subagent_agent_type TEXT
+  subagent_agent_type TEXT,
+  -- The agent that owns the parent session, when the link crosses agents.
+  subagent_parent_agent TEXT
 );
 CREATE INDEX IF NOT EXISTS sessions_agent ON sessions(agent);
 CREATE INDEX IF NOT EXISTS sessions_updated_at ON sessions(updated_at);

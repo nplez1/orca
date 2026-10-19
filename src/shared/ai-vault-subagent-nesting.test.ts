@@ -106,6 +106,96 @@ describe('nestAiVaultSubagentSessions', () => {
     expect(nesting.hiddenChildCount).toBe(0)
   })
 
+  it('nests a child whose parent belongs to a different agent', () => {
+    // The case this exists for: a Claude conversation spawned by a pi session names that pi
+    // session, so no Claude row carries the id and the same-agent reading cannot resolve it.
+    const piParent = session({ sessionId: 'spawner', agent: 'pi' })
+    const claudeChild = session({
+      sessionId: 'child-conversation',
+      agent: 'claude',
+      subagent: { parentSessionId: 'spawner', agentType: null, status: null }
+    })
+
+    const nesting = nestAiVaultSubagentSessions([piParent, claudeChild])
+
+    expect(ids(nesting.roots)).toEqual(['spawner'])
+    expect(ids(nesting.childrenByParentId.get(aiVaultSubagentParentKey(piParent)) ?? [])).toEqual([
+      'child-conversation'
+    ])
+    expect(nesting.hiddenChildCount).toBe(0)
+  })
+
+  it('shows a cross-agent child as a root when its parent is not in the list', () => {
+    // Why: the usual filter is by agent, and a Claude-only view removes the pi parent — hiding the
+    // conversation there would lose a real, resumable session.
+    const orphan = session({
+      sessionId: 'child-conversation',
+      agent: 'claude',
+      subagent: {
+        parentSessionId: 'filtered-out',
+        agentType: null,
+        status: null,
+        parentAgent: 'pi'
+      }
+    })
+
+    const nesting = nestAiVaultSubagentSessions([orphan])
+
+    expect(ids(nesting.roots)).toEqual(['child-conversation'])
+    expect(nesting.hiddenChildCount).toBe(0)
+  })
+
+  it('will not pick a cross-agent parent when two rows share the id', () => {
+    const claudeChild = session({
+      sessionId: 'child-conversation',
+      agent: 'claude',
+      subagent: { parentSessionId: 'shared-id', agentType: null, status: null }
+    })
+
+    const nesting = nestAiVaultSubagentSessions([
+      session({ sessionId: 'shared-id', agent: 'pi' }),
+      session({ sessionId: 'shared-id', agent: 'codex' }),
+      claudeChild
+    ])
+
+    expect(nesting.hiddenChildCount).toBe(1)
+    expect(nesting.childrenByParentId.size).toBe(0)
+  })
+
+  it('shows a marked child as a root when the id is ambiguous', () => {
+    // Why: two rows sharing the id means the link cannot be resolved, and a marked (cross-agent)
+    // child is a real conversation — losing it from the list is worse than showing it unnested.
+    const markedChild = session({
+      sessionId: 'child-conversation',
+      agent: 'claude',
+      subagent: { parentSessionId: 'shared-id', agentType: null, status: null, parentAgent: 'pi' }
+    })
+
+    const nesting = nestAiVaultSubagentSessions([
+      session({ sessionId: 'shared-id', agent: 'pi' }),
+      session({ sessionId: 'shared-id', agent: 'codex' }),
+      markedChild
+    ])
+
+    expect(ids(nesting.roots)).toEqual(['shared-id', 'shared-id', 'child-conversation'])
+    expect(nesting.hiddenChildCount).toBe(0)
+  })
+
+  it('does not cross hosts to find a parent', () => {
+    const claudeChild = session({
+      sessionId: 'child-conversation',
+      agent: 'claude',
+      subagent: { parentSessionId: 'spawner', agentType: null, status: null }
+    })
+
+    const nesting = nestAiVaultSubagentSessions([
+      session({ sessionId: 'spawner', agent: 'pi', executionHostId: 'ssh:dev-box' }),
+      claudeChild
+    ])
+
+    expect(nesting.hiddenChildCount).toBe(1)
+  })
+
   it('hides both halves of a parent cycle instead of expanding forever', () => {
     const nesting = nestAiVaultSubagentSessions([child('a', 'b'), child('b', 'a')])
 

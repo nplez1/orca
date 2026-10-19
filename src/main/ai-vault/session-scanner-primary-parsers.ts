@@ -24,6 +24,7 @@ import {
   updateTimeline
 } from './session-scanner-accumulator'
 import { countSubagentTranscripts } from './session-scanner-subagent-transcripts'
+import { readClaudePiParentMarker } from './session-scanner-claude-pi-parent-marker'
 import {
   asRecord,
   claudeUsageTotal,
@@ -189,12 +190,22 @@ export async function finalizeClaudeSessionParseState(
   // already covered by the undefined-executionHostId branch.
   const ownsTranscriptDisk =
     !options.executionHostId || options.executionHostId === LOCAL_EXECUTION_HOST_ID
+  // Qoder and CodeBuddy finalize through here too, but only a `claude --print`
+  // child of a pi session is written a pi-parent marker.
+  const piParentSubagent =
+    ownsTranscriptDisk && snapshot.accumulator.agent === 'claude'
+      ? await readClaudePiParentMarker(snapshot.accumulator.filePath)
+      : null
   if (ownsTranscriptDisk) {
     snapshot.accumulator.subagentTranscriptCount = await countSubagentTranscripts(
       snapshot.accumulator.filePath
     )
   }
-  return finalizeSession(snapshot.accumulator, platform, options)
+  const session = finalizeSession(snapshot.accumulator, platform, options)
+  if (!session || !piParentSubagent) {
+    return session
+  }
+  return { ...session, subagent: piParentSubagent }
 }
 
 export function createClaudeSessionResumeState(

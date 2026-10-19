@@ -232,6 +232,15 @@ describe('Pi session status ownership', () => {
   const postedHookNames = (fetchMock: AgentStatusExtensionHarness['fetchMock']): unknown[] =>
     postedPayloads(fetchMock).map((payload) => payload.hook_event_name)
 
+  /** The drained live set a session-ending shutdown posts is the session-change suite's subject;
+   *  these cases are about which session owns the pane. */
+  const DRAIN = 'subagent_async_state'
+  const withoutDrainPosts = (names: unknown[]): unknown[] => names.filter((name) => name !== DRAIN)
+  const withoutDrainPayloads = (
+    fetchMock: AgentStatusExtensionHarness['fetchMock']
+  ): { hook_event_name?: unknown; session_id?: unknown }[] =>
+    postedPayloads(fetchMock).filter((payload) => payload.hook_event_name !== DRAIN)
+
   it('refuses an in-process child of the pane session, then still reports the pane', async () => {
     // existsSync: pi publishes session identity only for a transcript that exists on disk.
     const harness = createAgentStatusExtensionHarness({ kind: 'pi', existsSync: () => true })
@@ -310,8 +319,11 @@ describe('Pi session status ownership', () => {
     await harness.callHook('session_start', { reason: 'fork', previousSessionFile: rootFile }, next)
     await harness.callHook('agent_end', {}, next)
     await settle()
-    expect(postedHookNames(harness.fetchMock)).toEqual(['session_start', 'agent_end'])
-    expect(postedPayloads(harness.fetchMock)[0].session_id).toBe('next')
+    expect(withoutDrainPosts(postedHookNames(harness.fetchMock))).toEqual([
+      'session_start',
+      'agent_end'
+    ])
+    expect(withoutDrainPayloads(harness.fetchMock)[0].session_id).toBe('next')
   })
 
   it('refuses a nested child and an unpersisted session while the pane has a file', async () => {
@@ -352,8 +364,11 @@ describe('Pi session status ownership', () => {
       await harness.callHook('session_start', { reason }, next)
       await harness.callHook('agent_end', {}, next)
       await settle()
-      expect(postedHookNames(harness.fetchMock)).toEqual(['session_start', 'agent_end'])
-      expect(postedPayloads(harness.fetchMock)[0].session_id).toBe('next')
+      expect(withoutDrainPosts(postedHookNames(harness.fetchMock))).toEqual([
+        'session_start',
+        'agent_end'
+      ])
+      expect(withoutDrainPayloads(harness.fetchMock)[0].session_id).toBe('next')
     }
   )
 
@@ -392,8 +407,11 @@ describe('Pi session status ownership', () => {
     )
     await harness.callHook('agent_end', {}, resumed)
     await settle()
-    expect(postedHookNames(harness.fetchMock)).toEqual(['session_start', 'agent_end'])
-    expect(postedPayloads(harness.fetchMock)[1].session_id).toBe('child')
+    expect(withoutDrainPosts(postedHookNames(harness.fetchMock))).toEqual([
+      'session_start',
+      'agent_end'
+    ])
+    expect(withoutDrainPayloads(harness.fetchMock)[1].session_id).toBe('child')
   })
 
   it('keeps a persisted child off an unpersisted pane, which has no file to key on', async () => {

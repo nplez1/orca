@@ -44,6 +44,7 @@ type IndexedSessionRow = {
   subagent_transcript_count: number
   subagent_parent_session_id: string | null
   subagent_agent_type: string | null
+  subagent_parent_agent: string | null
   resume_command: string
 }
 
@@ -75,7 +76,8 @@ export type IndexedSessionList = {
 
 const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch, model,
   created_at, updated_at, modified_at, message_count, total_tokens, queued_message_count,
-  subagent_transcript_count, subagent_parent_session_id, subagent_agent_type, resume_command`
+  subagent_transcript_count, subagent_parent_session_id, subagent_agent_type,
+  subagent_parent_agent, resume_command`
 
 /**
  * The columns the panel's own filter searches, minus preview text.
@@ -194,7 +196,8 @@ function indexedRowToSession(
       ? {
           parentSessionId: row.subagent_parent_session_id,
           agentType: row.subagent_agent_type,
-          status: null
+          status: null,
+          ...(row.subagent_parent_agent ? { parentAgent: row.subagent_parent_agent } : {})
         }
       : null
   }

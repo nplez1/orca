@@ -85,6 +85,10 @@ export type HookListenerState = {
   copilotBackgroundWorkByPaneKey: Map<string, CopilotBackgroundWorkState>
   /** Live descendants for every provider that does not own a roster of its own. */
   descendantRosterByPaneKey: Map<string, AgentDescendantRoster>
+  /** Children whose row is gone, by the provider conversation they reported on, with when it went.
+   *  A child's own process can outlive its row (a spooled hook, a retirement that beat it), and a
+   *  post from it would otherwise be read as the pane's own agent. */
+  retiredPiClaudeChildrenByPaneKey: Map<string, Map<string, number>>
   /** What the LEAD session last said, before descendants gated it — so draining the
    *  last child republishes the lead's verdict instead of the gated one. Deliberately
    *  NOT a state claim (see `paneHasStateClaims`): it only refines a republish that an
@@ -146,6 +150,7 @@ export function createHookListenerState(
     lastLaunchTokenByPaneKey: new Map(),
     copilotBackgroundWorkByPaneKey: new Map(),
     descendantRosterByPaneKey: new Map(),
+    retiredPiClaudeChildrenByPaneKey: new Map(),
     descendantLeadStateByPaneKey: new Map()
   }
   legacyStatusAdapterByState.set(state, adapter)
@@ -241,6 +246,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
   state.copilotBackgroundWorkByPaneKey.delete(paneKey)
   state.descendantRosterByPaneKey.delete(paneKey)
+  state.retiredPiClaudeChildrenByPaneKey.delete(paneKey)
   state.descendantLeadStateByPaneKey.delete(paneKey)
 }
 

@@ -78,7 +78,10 @@ const aiVaultSessionSchema = z.object({
     .object({
       parentSessionId: z.string(),
       agentType: z.string().nullable(),
-      status: z.enum(['running', 'completed', 'failed', 'stopped']).nullable()
+      status: z.enum(['running', 'completed', 'failed', 'stopped']).nullable(),
+      // Why optional: only a link recorded by a scan-side marker crosses agents, and an older
+      // peer answering this list has no such field.
+      parentAgent: z.string().min(1).max(64).optional()
     })
     .nullable()
     .default(null)

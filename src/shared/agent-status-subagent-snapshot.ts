@@ -19,6 +19,14 @@ export type AgentSubagentSnapshot = {
   /** Provider model used by this child, when exposed by its lifecycle event. */
   model?: string
   description?: string
+  /** The tool this child is running now, as its own lane reported it. Absent for a child whose
+   *  lane names only its lifecycle — every CLI child on the hook lane is one. */
+  toolName?: string
+  toolInput?: string
+  /** The child's OWN provider conversation, when the child runs as a separate agent process
+   *  (a `claude --print` started by a pi subagent). It is the only key that can join that
+   *  process's hook stream back to this row. */
+  providerSession?: string
   state: AgentSubagentState
   /** Timestamp (ms) when this subagent was first observed. */
   startedAt: number
@@ -56,7 +64,10 @@ function normalizeSubagentSnapshot(
       typeof obj.startedAt === 'number' && Number.isFinite(obj.startedAt) ? obj.startedAt : 0,
     agentType: normalizeOptionalField(obj.agentType, AGENT_TYPE_MAX_LENGTH),
     model: normalizeOptionalField(obj.model, AGENT_MODEL_MAX_LENGTH),
-    description: normalizeOptionalField(obj.description, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH)
+    description: normalizeOptionalField(obj.description, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH),
+    toolName: normalizeOptionalField(obj.toolName, AGENT_TYPE_MAX_LENGTH),
+    toolInput: normalizeOptionalField(obj.toolInput, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH),
+    providerSession: normalizeOptionalField(obj.providerSession, AGENT_SUBAGENT_ID_MAX_LENGTH)
   }
 }
 
@@ -110,10 +121,27 @@ export function agentSubagentsEqual(
       x.startedAt !== y.startedAt ||
       x.agentType !== y.agentType ||
       x.model !== y.model ||
-      x.description !== y.description
+      x.description !== y.description ||
+      x.toolName !== y.toolName ||
+      x.toolInput !== y.toolInput ||
+      x.providerSession !== y.providerSession
     ) {
       return false
     }
   }
   return true
+}
+
+/** The tool line a child's row shows for this snapshot, as `tool: input`, or undefined.
+ *  Lives beside the fields it reads so a lane that starts publishing a tool cannot leave the row
+ *  builder guessing which of the two shapes it meant. */
+export function agentSubagentToolOperation(
+  snapshot: Pick<AgentSubagentSnapshot, 'toolName' | 'toolInput'>
+): { toolName: string; input?: string } | undefined {
+  if (snapshot.toolName === undefined) {
+    return undefined
+  }
+  return snapshot.toolInput !== undefined
+    ? { toolName: snapshot.toolName, input: snapshot.toolInput }
+    : { toolName: snapshot.toolName }
 }

@@ -56,8 +56,9 @@ function seed(db: SyncDatabase, row: SeededSession): void {
   db.prepare(
     `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,model,
        created_at,updated_at,modified_at,message_count,total_tokens,queued_message_count,
-       subagent_transcript_count,subagent_parent_session_id,subagent_agent_type,resume_command)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       subagent_transcript_count,subagent_parent_session_id,subagent_agent_type,
+       subagent_parent_agent,resume_command)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).run(
     row.id,
     row.agent ?? 'claude',
@@ -78,6 +79,7 @@ function seed(db: SyncDatabase, row: SeededSession): void {
     row.subagentTranscriptCount ?? 0,
     row.subagent?.parentSessionId ?? null,
     row.subagent?.agentType ?? null,
+    row.subagent?.parentAgent ?? null,
     row.resumeCommand ?? ''
   )
 }
@@ -200,6 +202,29 @@ describe('subagent lineage', () => {
       parentSessionId: 'parent',
       agentType: 'Explore',
       status: null
+    })
+  })
+
+  it('carries the parent’s agent when the link crosses agents', async () => {
+    // Why: a list filtered to one agent removes the parent, and without this the child would be
+    // counted hidden instead of shown — so it has to survive the index round trip.
+    const db = await openIndex()
+    seed(db, {
+      id: 1,
+      sessionId: 'child',
+      subagent: {
+        parentSessionId: 'parent',
+        agentType: null,
+        status: null,
+        parentAgent: 'pi'
+      }
+    })
+
+    expect(list(db).sessions[0]?.subagent).toEqual({
+      parentSessionId: 'parent',
+      agentType: null,
+      status: null,
+      parentAgent: 'pi'
     })
   })
 
