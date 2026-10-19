@@ -297,3 +297,62 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
     expect(h.closed.sort()).toEqual([0, 2])
   })
 })
+
+describe('SessionSummaryHostFoldSubscription failed opens', () => {
+  // A viewer whose open failed owes the host nothing. If its close spent the next lease in
+  // line it would end another viewer's fold on the host — #135's symptom, from the inside.
+  it('does not spend another viewer\u2019s lease for an open that failed', async () => {
+    let fail = true
+    let polls = 0
+    const closed: number[] = []
+    const subscription = new SessionSummaryHostFoldSubscription({
+      hostFold: {
+        open: async () => {
+          if (fail) {
+            fail = false
+            throw new Error('relay blip')
+          }
+          return snapshot(true)
+        },
+        peek: async () => {
+          polls += 1
+          return snapshot(true)
+        },
+        close: async ({ seenTimelineCount }) => {
+          closed.push(seenTimelineCount)
+        }
+      },
+      pollIntervalMs: 1,
+      onSnapshot: () => {},
+      onError: () => {}
+    })
+    const args = { paneKey: 'tab-1:leaf-1', environmentId: 'env-1', foldParams: null }
+
+    // Window A's open fails; window B's is accepted.
+    subscription.open(args)
+    await wait(5)
+    subscription.open(args)
+    await wait(10)
+    // A closes: no lease of its own, and B's must survive.
+    subscription.close({
+      paneKey: args.paneKey,
+      environmentId: args.environmentId,
+      seenTimelineCount: 1,
+      lastViewer: false
+    })
+    await wait(10)
+
+    expect(closed).toEqual([])
+    expect(polls).toBeGreaterThan(0)
+
+    // B closes: now the one real lease is returned.
+    subscription.close({
+      paneKey: args.paneKey,
+      environmentId: args.environmentId,
+      seenTimelineCount: 2,
+      lastViewer: true
+    })
+    await wait(5)
+    expect(closed).toEqual([2])
+  })
+})

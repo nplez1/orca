@@ -524,6 +524,8 @@ describe('SessionSummaryService host routing', () => {
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
     await waitFor(() => h.updates.length > 1)
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+    // The first viewer is gone but the second is still reading: the host keeps being polled.
+    await waitFor(() => h.hostFoldCalls.filter((c) => c.startsWith('peek:')).length > 0)
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 3 })
 
     expect(h.hostFoldCalls.filter((c) => c.startsWith('open:'))).toHaveLength(2)

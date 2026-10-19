@@ -36,6 +36,13 @@ type PaneHostState = {
   inflight: Map<number, InflightOpen>
   /** Opens the host accepted and no close has been sent for. */
   leases: number
+  /**
+   * Viewers whose open never became a lease, so their close is spent here.
+   *
+   * Without it a failed open's close would spend the next lease in line — which belongs to
+   * another viewer — and stop that viewer's fold on the host.
+   */
+  unleasedViewers: number
   latest?: SessionSummarySnapshot
   pollFailures: number
 }
@@ -79,7 +86,11 @@ export class SessionSummaryHostFoldSubscription {
       // Nothing was ever opened here: nothing to close, and nothing to stop.
       return
     }
-    if (state.leases > 0) {
+    if (state.unleasedViewers > 0) {
+      // This viewer's own open failed: it owes the host nothing, and must not spend a lease
+      // that another viewer is reading through.
+      state.unleasedViewers -= 1
+    } else if (state.leases > 0) {
       state.leases -= 1
       this.sendClose(args)
     } else {
@@ -114,6 +125,7 @@ export class SessionSummaryHostFoldSubscription {
       environmentId,
       inflight: new Map(),
       leases: 0,
+      unleasedViewers: 0,
       pollFailures: 0
     }
     this.panes.set(paneKey, created)
@@ -151,8 +163,10 @@ export class SessionSummaryHostFoldSubscription {
       }
       this.accept(args.paneKey, state, token, snapshot)
     } catch (error) {
-      // No lease was taken, so the close this open owed is nobody's: there is nothing to send.
+      // No lease was taken, so this viewer's close owes the host nothing. Remember that, or it
+      // would spend a lease another viewer is reading through.
       state.inflight.delete(seq)
+      state.unleasedViewers += 1
       this.fail(args.paneKey, state, token, error)
     }
   }
