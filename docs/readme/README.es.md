@@ -36,7 +36,11 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 ### Tareas, issues y Jira
 
 - **Vista de tablero de Jira** — elige un tablero predeterminado y la pestaña de Jira muestra columnas, el sprint activo y el backlog, con arrastrar y soltar entre columnas, un cuadro de filtro y colores por prioridad.
-- **Issue vinculado en la barra lateral derecha** — un workspace creado desde un issue de Jira, Linear o GitHub recibe una pestaña Issue con estado, responsable, prioridad, etiquetas, descripción y un botón Abrir. Los issues de Jira también permiten desvincular/revincular, tienen un cuadro de comentarios en Markdown en vivo y muestran correctamente las descripciones de Jira autoalojado (Server/Data Center).
+- **Soltar en un carril se mantiene** — al soltar un elemento de Jira en un carril se resuelve la transición, se piden los campos que exige la pantalla de esa transición, y la tarjeta se mueve antes de que Jira lo confirme, revirtiendo solo si Jira lo rechaza.
+- **Sprints, story points y campos personalizados** — mueve un elemento del backlog a un sprint desde su fila o el cajón del issue, define o borra los story points junto al estado, la prioridad y el responsable, y edita los campos personalizados de tipo selector de usuarios (Dev, QE) desde el detalle del issue. Un cambio de sprint hecho en el issue abierto recarga el tablero.
+- **«Me» coincide con todos los campos de rol** — un issue donde eres el Dev o el QE, no solo el responsable, aparece ahora bajo el filtro Me del tablero.
+- **Selector de responsable con búsqueda** — contigo y con tu equipo fijados arriba.
+- **Issue vinculado en la barra lateral derecha** — un workspace creado desde un issue de Jira, Linear o GitHub recibe una pestaña Issue con estado, responsable, prioridad, etiquetas, descripción y un botón Abrir. Los issues de Jira también permiten desvincular/revincular, tienen un cuadro de comentarios en Markdown en vivo y muestran correctamente las descripciones de Jira autoalojado (Server/Data Center). Un issue de GitHub se lee del repo del que vino, así que un workspace en otro proyecto lo carga igualmente; cuando ese repo no está en esta máquina, la pestaña lo indica en lugar de fallar.
 - **Vincula un workspace a un issue de Jira** con la clave o la URL desde su diálogo de detalles; la página de Tareas muestra un chip de workspace asociado y abre el workspace existente en lugar de crear un duplicado.
 
 ### Revisión de pull requests y CI
@@ -44,22 +48,27 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 - **Comentarios de PR de GitHub en línea** — los comentarios aparecen bajo su línea en el editor, con responder, resolver y contraer (solo se muestran cuando tu checkout coincide con el commit head del PR).
 - **Estado de fusión de un vistazo** — el icono del PR conserva el color de CI y añade un punto para aprobaciones pendientes, conflictos o bloqueos, con el motivo en el tooltip. Funciona con GitHub, GitLab, Bitbucket, Azure DevOps y Gitea.
 - **Veredictos de revisión en el panel de Checks** — Aprobado / Cambios solicitados con los nombres de los revisores, y el panel se actualiza cuando cambia la CI en vez de esperar a cambiar de pestaña.
+- **Panel de Checks en vivo** — mientras una ejecución está en curso, un panel abierto se refresca cada 10s en vez de esperar al ciclo de revisión, y espacia a 20s y luego a 30s mientras nada cambia; su veredicto actualiza la tarjeta de la barra lateral y los iconos de la barra de actividades (GitHub).
 - **Detalles de builds de Jenkins** — expande un check de Jenkins para ver sus etapas, cuál está en ejecución o ha fallado, y los datos de la build.
 - **Fusión como admin de PRs que requieren revisión** — si tu cuenta puede saltarse la protección de rama, se ofrece Merge tras una confirmación que indica qué se omite.
 
 ### Agentes
 
-- **Resúmenes de sesión** — un informe escrito de una sesión de agente (actividad, objetivo, plan, bloqueos, cronología) en la barra lateral derecha, con su propio ajuste de agente/modelo. También cubre sesiones de Pi, Copilot, OpenCode y Cursor.
-- **Estado de agentes más preciso** — las filas de Pi ya no se quedan en «Working» ni pasan a «Done» cuando termina un sub-agente auxiliar; Copilot CLI ya no pide tu atención por prompts autoaprobados; un sub-agente de Grok que espera tu respuesta mantiene su fila en espera.
+- **Resúmenes de sesión** — un informe escrito de una sesión de agente (actividad, objetivo, plan, bloqueos, cronología) en la barra lateral derecha, con su propio ajuste de agente/modelo. También cubre sesiones de Pi, Copilot, OpenCode y Cursor; una sesión en un host emparejado se resume en ese host, y una en un destino SSH se resume a partir de su transcripción en streaming.
+- **Estado de agentes más preciso** — las filas de Pi ya no se quedan en «Working» ni pasan a «Done» cuando termina un sub-agente auxiliar; Copilot CLI ya no pide tu atención por prompts autoaprobados; un sub-agente de Grok que espera tu respuesta mantiene su fila en espera; y un panel restaurado en otro cliente descarta el aviso de «necesita información» que dejó su diálogo. Además, un sub-agente de Claude que una sesión de Pi lanza por la CLI `claude` se queda en la fila de esa sesión de Pi (requiere un plugin pi-subagents actualizado).
+- **Los prompts de Copilot se leen de la pantalla** — una aprobación de shell o de URL y el diálogo «Copilot needs information» se muestran como prompts en vez de un spinner, mientras un permiso que el CLI aprobó por su cuenta pasa desapercibido.
+- **El foco se queda en la pestaña del agente** — al hacer clic en una tarjeta de la barra lateral, en una pestaña de actividad de la barra lateral derecha o en el fondo del panel, el teclado vuelve a la pestaña del agente, y al cerrar un menú o un diálogo el cursor también regresa, así que la siguiente pulsación sigue significando lo que significaba.
+- **El portapapeles sigue al lector** — una copia desde un panel de Pi observado desde un cliente emparejado aterriza en el portapapeles de ese cliente además del del host.
 - **Agente predeterminado con un clic** — el botón `+` de la barra de pestañas lanza tu agente predeterminado; mantenlo pulsado o usa la flecha para abrir el menú completo.
 - **Agent Dashboard como página** — se abre en la ventana principal con atrás/adelante, y al hacer clic en una tarjeta se abre el workspace de ese agente.
-- **Historial de sesiones de agentes** — «All» ahora lista todas las sesiones, las sesiones de sub-agentes se anidan bajo su sesión padre, y la indexación de transcripciones hace buscables las transcripciones existentes.
-- **Seguimiento de uso para más proveedores** — presupuestos de créditos de IA de Copilot Enterprise, saldo de DeepSeek y gasto de Fireworks.ai en la barra de estado, además de un interruptor por proveedor que detiene el sondeo y la lectura de credenciales.
+- **Historial de sesiones de agentes** — «All» ahora lista todas las sesiones, las sesiones de sub-agentes se anidan bajo su sesión padre, y la indexación de transcripciones hace buscables las transcripciones existentes. El historial de un host emparejado se carga por páginas y solo refresca lo que cambió, así que un historial remoto grande llega en lugar de fallar.
+- **Seguimiento de uso para más proveedores** — presupuestos de créditos de IA de Copilot Enterprise, saldo de DeepSeek y gasto de Fireworks.ai en la barra de estado, además de un interruptor por proveedor que detiene el sondeo y la lectura de credenciales. Una sesión de Claude caducada se renueva con el refresh token guardado en lugar de quedarse en «Se actualiza cuando Claude se ejecuta», y el inicio de sesión renovado se vuelve a escribir donde Claude lo guarda.
 
 ### Workspaces y organización
 
 - **Una carpeta por proyecto** — el checkout principal y todos sus worktrees viven juntos en una carpeta con un `AGENTS.md` compartido; `orca repo relocate` mueve allí los checkouts existentes.
-- **Workspaces agrupados entre máquinas** — la misma rama en dos hosts se convierte en una sola tarjeta con un menú desplegable de host.
+- **Workspaces agrupados entre máquinas** — la misma rama en dos hosts se convierte en una sola tarjeta con un menú desplegable de host. Un workspace en un host emparejado lee su issue y su PR de GitHub desde ese host, y su punto de estado deja de girar cuando terminan los agentes del host.
+- **Los clientes emparejados se mantienen al día** — los proyectos y workspaces que un host añade o elimina, incluidos los creados en la propia ventana de ese host o desde su CLI, llegan a sus clientes emparejados sin necesidad de una recarga manual.
 - **Filtro de estado** — oculta los estados elegidos de la barra lateral y de Cmd+J mientras el tablero sigue mostrándolo todo.
 - **Indicador «Setting up…»** mientras se ejecuta el script de configuración de un repo, también en workspaces iniciados sin agente.
 - **Modos de directorios compartidos** — enlace simbólico, clon APFS, copia u omitir para los directorios compartidos entre worktrees.
@@ -67,6 +76,13 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 - **Oculta los hosts SSH importados automáticamente** de los selectores y la barra de estado; los hosts ocultos siguen listados en Ajustes.
 - **Filtro de archivos más rápido y honesto** — el filtro por nombre de Explore busca en todo el workspace desde un índice precalculado, y avisa cuando los resultados son parciales en lugar de decir «no files match».
 - **Replicación de ajustes entre hosts** _(base preparada)_ — los ajustes y las credenciales de proveedores de una máquina pueden replicarse a los hosts emparejados.
+
+### Entornos efímeros
+
+Añadidos a las recetas de entorno por workspace de upstream (Ajustes → Experimental → VM en la nube):
+
+- **Cuenta atrás de la concesión y Extend** — una receta que publica cuándo el proveedor se lleva el host recibe una cuenta atrás en la tarjeta del workspace y en Ajustes, y, si además declara cómo ampliarla, una acción Extend limitada a las duraciones que indique. Pasado el plazo, la tarjeta y Ajustes muestran la concesión como caducada; cuando han pasado otros 15 minutos y la conexión de Orca con el host ha fallado, Orca quita el workspace de su lista y la máquina del proveedor queda sujeta a su propio vencimiento o a «Limpiar» en Ajustes.
+- **Elementos de menú contextual declarados en la receta** — hasta 20 acciones que declara una receta tienen su propia entrada en el menú contextual de ese workspace y se ejecutan con el host, el nombre y la ruta del workspace. Al estar declaradas en `orca.yaml`, quedan cubiertas por la aprobación de la receta, y una receta que no declara ninguna no añade entradas.
 
 ### Fiabilidad
 
@@ -81,6 +97,7 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 - **Versiones y actualizaciones propias** — las builds se etiquetan `v<versión de upstream>-np.<n>` y el actualizador integrado sigue las [versiones de este repositorio](https://github.com/nplez1/orca/releases), no las de upstream.
 - **Firma** — las builds de macOS están firmadas y notarizadas; el instalador de Windows no está firmado, así que SmartScreen avisa una vez al instalar.
 - **Sin telemetría** — las notas de la versión indican que las builds no envían diagnósticos ni datos de uso.
+- **Los skills apuntan a esta app** — los skills incluidos y los stubs publicados llaman a `orca-np` (y a `orca-np-dev` en desarrollo) en lugar de caer en el `orca` de una instalación oficial.
 - **Perfil nuevo** — Orca NP no puede leer los repos, credenciales ni dispositivos emparejados de una instalación oficial de Orca; esa separación es deliberada, así que empareja tu teléfono con Orca NP por separado.
 - **Sigue a upstream** — `main` de upstream se fusiona con regularidad (el procedimiento está en [`UPSTREAM-SYNC-RUNBOOK.md`](../../UPSTREAM-SYNC-RUNBOOK.md)), así que el fork también recibe las funciones y correcciones de upstream.
 
