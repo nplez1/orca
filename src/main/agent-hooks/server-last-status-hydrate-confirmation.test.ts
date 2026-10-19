@@ -237,6 +237,48 @@ describe('Last-status persistence', () => {
     }
   })
 
+  it('accepts the re-announce a still-working Pi pane posts at the endpoint a restart published', async () => {
+    const launchToken = 'launch-pane-1'
+    const statusPost = {
+      hook_event_name: 'tool_execution_start',
+      tool_name: 'bash',
+      session_id: 'session-1'
+    }
+    const firstServer = new AgentHookServer()
+    await firstServer.start({ env: 'production', userDataPath })
+    const endpointBeforeRestart = firstServer.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN
+    await postHookEvent(
+      firstServer,
+      buildBody({ ...statusPost, agentType: 'pi' }, { launchToken }),
+      '/hook/pi'
+    )
+    firstServer.flushStatusPersistSync()
+    firstServer.stop()
+
+    const server = new AgentHookServer()
+    await server.start({ env: 'production', userDataPath })
+    try {
+      // Why: a restart mints a new hook token, which is the only thing the pane's own process can
+      // observe about it — the extension republishes its last snapshot when that token changes.
+      expect(server.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN).not.toBe(endpointBeforeRestart)
+      expect(server.getStatusSnapshot()[0]).toMatchObject({
+        state: 'working',
+        restoredUnconfirmed: true
+      })
+
+      await postHookEvent(
+        server,
+        buildBody({ ...statusPost, agentType: 'pi' }, { launchToken }),
+        '/hook/pi'
+      )
+
+      expect(server.getStatusSnapshot()[0]).toMatchObject({ state: 'working', toolName: 'bash' })
+      expect(server.getStatusSnapshot()[0]?.restoredUnconfirmed).toBeUndefined()
+    } finally {
+      server.stop()
+    }
+  })
+
   it('refuses interrupt inference on an unconfirmed hydrated row', async () => {
     const firstServer = new AgentHookServer()
     await firstServer.start({ env: 'production', userDataPath })
