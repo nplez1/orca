@@ -36,7 +36,11 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 ### Tasks, issues, and Jira
 
 - **Jira board view** — pick a default board and the Jira tab shows columns, the active sprint, and the backlog, with drag-to-move between columns, a filter box, and priority colors.
-- **Linked issue in the right sidebar** — a workspace created from a Jira, Linear, or GitHub issue gets an Issue tab with status, assignee, priority, labels, description, and an Open button. Jira issues also get unlink/re-link, a live Markdown comment box, and correct rendering of self-hosted Jira (Server/Data Center) descriptions.
+- **Lane drops that stick** — dropping a Jira item on a lane resolves the transition, asks for the fields that transition's screen requires, and moves the card before Jira confirms it, rolling back only if Jira refuses.
+- **Sprints, story points, and custom fields** — move a backlog item onto a sprint from its row or the issue drawer, set or clear story points beside status, priority, and assignee, and edit custom user-picker fields (Dev, QE) from the issue detail. A sprint change made in the open issue reloads the board.
+- **"Me" matches every role field** — an issue where you are the Dev or the QE, not only the assignee, now appears under the board's Me filter.
+- **Searchable assignee picker** — with you and your team pinned to the top.
+- **Linked issue in the right sidebar** — a workspace created from a Jira, Linear, or GitHub issue gets an Issue tab with status, assignee, priority, labels, description, and an Open button. Jira issues also get unlink/re-link, a live Markdown comment box, and correct rendering of self-hosted Jira (Server/Data Center) descriptions. The issue is read from the repo the work item came from, so a workspace in another project keeps its link, and one whose repo is not on this machine says so instead of failing.
 - **Link a workspace to a Jira issue** by key or URL from its details dialog; the Tasks page shows an attached-workspace chip and opens the existing workspace instead of creating a duplicate.
 
 ### Pull request review and CI
@@ -44,22 +48,27 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Inline GitHub PR comments** — comments appear under their line in the editor, with reply, resolve, and collapse (shown only when your checkout matches the PR's head commit).
 - **Merge readiness at a glance** — the PR icon keeps its CI color and adds a dot for outstanding approvals, conflicts, or blocks, with the reason in the tooltip. Works across GitHub, GitLab, Bitbucket, Azure DevOps, and Gitea.
 - **Review verdicts in the Checks panel** — Approved / Changes requested with reviewer names, and the panel updates when CI changes instead of waiting for a tab switch.
+- **A live Checks panel** — while a run is in flight an open panel re-reads every 10s instead of waiting out the review cadence, then eases to 30s so a long or stuck run cannot poll forever, and its verdict reaches the icons the sidebar card and activity bar read (GitHub).
 - **Jenkins build details** — expand a Jenkins check to see its stages, which one is running or failed, and the build facts.
 - **Admin merge for review-gated PRs** — if your account may bypass branch protection, Merge is offered after a confirmation that names what gets skipped.
 
 ### Agents
 
-- **Session summaries** — a written brief of an agent session (activity, goal, plan, blockers, timeline) in the right sidebar, with its own agent/model setting. Covers Pi, Copilot, OpenCode, and Cursor sessions as well.
-- **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting.
+- **Session summaries** — a written brief of an agent session (activity, goal, plan, blockers, timeline) in the right sidebar, with its own agent/model setting. Covers Pi, Copilot, OpenCode, and Cursor sessions as well, and a session on a paired host or an SSH target is briefed where its transcript lives.
+- **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting; and a pane restored on another client drops the needs-input marker its dialog left behind and a Claude child a pi session dispatches through the CLI stays on that pi parent's row.
+- **Copilot's prompts are read from the screen** — a shell or URL approval and the "Copilot needs information" dialog show as prompts instead of a spinner, while a permission the CLI approved on its own stays quiet.
+- **Focus stays in the agent tab** — clicking a sidebar card, a right-sidebar activity tab, or the panel background hands the keyboard back to the agent tab, and closing a menu or dialog returns the caret too, so the next keystroke still means what it did.
+- **Clipboard follows the reader** — a copy from a pi pane watched from a paired client lands in that client's clipboard, not the host's.
 - **One-click default agent** — the `+` button in the tab bar launches your default agent; hold it or use the chevron for the full menu.
 - **Agent Dashboard as a page** — opens in the main window with back/forward, and clicking a card opens that agent's workspace.
-- **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable.
-- **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads.
+- **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable. A paired host's history is paged and diffed, so a large remote history loads instead of failing.
+- **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads. An expired Claude login is refreshed from the stored refresh token rather than sitting at "Updates when Claude runs".
 
 ### Workspaces and layout
 
 - **One folder per project** — the main checkout and all its worktrees live together under one folder with a shared `AGENTS.md`; `orca repo relocate` moves existing checkouts into it.
-- **Grouped workspaces across machines** — the same branch on two hosts becomes one card with a host dropdown.
+- **Grouped workspaces across machines** — the same branch on two hosts becomes one card with a host dropdown, and its GitHub panels and agent status follow the host the card is showing.
+- **Paired clients stay in step** — projects and workspaces a host adds or removes, including ones created in that host's own window or from its CLI, reach its paired clients without an unrelated action having to force a refetch.
 - **Status filter** — hide chosen statuses from the sidebar and Cmd+J while the board still shows everything.
 - **"Setting up…" indicator** while a repo's setup script runs, including for workspaces started without an agent.
 - **Shared-directory modes** — symlink, APFS clone, copy, or skip for directories shared between worktrees.
@@ -68,11 +77,18 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Faster, honest file filter** — the Explore filename filter searches the whole workspace from a prebuilt index and says so when results are partial instead of "no files match".
 - **Host settings replication** _(groundwork)_ — one machine's settings and provider credentials can be replicated to paired hosts.
 
+### Ephemeral environments
+
+- **A machine per worktree** — an `orca.yaml` environment recipe can allocate a disposable host when a workspace is created and release it when the workspace is deleted. The recipe's scripts run on your machine and Orca only reads the JSON they print, so any provisioning system works.
+- **Lease countdown and Extend** — a recipe that publishes when the provider takes the host away gets a countdown on the workspace card and in Settings, an Extend action limited to the lifetimes that recipe will sell, and a host that stops retrying its relay past the deadline and reports the lease as the reason.
+- **Recipe-declared context-menu items** — up to 20 actions declared in `orca.yaml` (the file Orca hashes for approval) run a script with the workspace's host, name, and path; a recipe that declares none renders nothing extra.
+
 ### Reliability
 
 - Git hooks and ssh-agent auth work when the packaged app is launched from the Dock, because git now sees the exports from your shell profile.
 - macOS computer-use permissions no longer split across two helper identities.
 - Right-click paste into Copilot CLI pastes once, not twice.
+- Editing Jira fields on a paired host saves instead of silently doing nothing.
 - An opt-in "Log UI hangs" diagnostic writes stall records, with focus, sleep, and CPU context, to help track down beachballs.
 
 ### Running it
@@ -81,6 +97,7 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Own releases and updates** — builds are tagged `v<upstream version>-np.<n>` and the in-app updater follows [this repository's releases](https://github.com/nplez1/orca/releases), not upstream's.
 - **Signing** — macOS builds are signed and notarized; the Windows installer is unsigned, so SmartScreen warns once on install.
 - **No telemetry** — the release notes state that builds send no diagnostics or usage data.
+- **Skills point at this app** — the skill rail and the published stubs resolve `orca-np` (and `orca-np-dev` in development), and call a bare `orca` the official install, so a managed session cannot drive the wrong app.
 - **Fresh profile** — Orca NP cannot read an official Orca install's repos, credentials, or paired devices; that separation is deliberate, so pair your phone with Orca NP separately.
 - **Tracks upstream** — upstream `main` is merged in regularly (the procedure is in [`UPSTREAM-SYNC-RUNBOOK.md`](UPSTREAM-SYNC-RUNBOOK.md)), so the fork receives upstream features and fixes too.
 
