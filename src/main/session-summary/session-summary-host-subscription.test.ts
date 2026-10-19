@@ -400,9 +400,11 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
 
   // The open a close was queued on then failed. That open settles its close, and the place it
   // reported rides on the next close this pane sends — the absorbed count is deliberately the
-  // higher of the two, so a carry that was dropped would show up as 7 instead of 12. A second
-  // open is left in flight throughout, because a pane with nobody left to carry a place drops
-  // it instead (asserted by the final 3).
+  // higher of the two, so a dropped carry would show up as 7 instead of 12.
+  //
+  // Two closes follow back to back with a second lease still held, so the place can only be
+  // kept from being reported twice by `takeSeen` zeroing it: without that, the second close
+  // would repeat the 12. (The idle-pane drop is asserted by the phantom-slot test below.)
   it('carries an absorbed close\u2019s place into the next host close and then resets', async () => {
     const pending: {
       resolve: (value: SessionSummarySnapshot) => void
@@ -439,7 +441,7 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
     await wait(4)
     expect(closed).toEqual([10])
 
-    // A close queued on an open that will fail; a second open stays in flight behind it.
+    // A close queued on an open that will fail, while another open stays in flight behind it.
     subscription.open(args)
     close(12)
     subscription.open(args)
@@ -449,16 +451,17 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
     pending[2].resolve(snapshot(false))
     await wait(4)
 
-    close(7)
-    await wait(4)
-    // Absorbed 12 beats this close's 7 …
-    expect(closed).toEqual([10, 12])
-
-    // … and is not reported twice: the close of 7 spent it, so this next close reports only
-    // itself.
+    // A second lease, so the pane never goes idle between the two closes below.
     subscription.open(args)
     pending[3].resolve(snapshot(false))
     await wait(4)
+
+    // Absorbed 12 beats this close's 7 …
+    close(7)
+    await wait(4)
+    expect(closed).toEqual([10, 12])
+
+    // … and is reported only once: the close of 7 spent it, so this one reports itself.
     close(3, true)
     await wait(4)
     expect(closed).toEqual([10, 12, 3])
