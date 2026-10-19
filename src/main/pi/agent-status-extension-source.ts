@@ -219,12 +219,6 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  cancelPostRetry()',
     // Why: a new turn supersedes a same-session completion even when /reload preserved its delivery.
     "  if (hookEventName === 'before_agent_start' || hookEventName === 'agent_start') retireTurnCompletionPosts(metadata)",
-    // Why: from the turn's first event until it completes, a restarted Orca has nothing else to
-    // observe this pane by, so the endpoint watch runs for exactly that window.
-    '  if (ENDPOINT_WATCH_EVENTS.includes(hookEventName)) startEndpointWatch()',
-    // Why: a completion settles the watch unless child work still holds the row open (see the
-    // factory's `watchStillWorking`); the queue is the one place every completion passes through.
-    "  if (hookEventName === 'agent_end') settleEndpointWatch()",
     '// Model changes must not erase an unacknowledged completion in the latest-only slot.',
     "  const previousCompletion = postQueue.latestPost?.hookEventName === 'agent_end' && !postQueue.latestPost.delivered && postQueue.latestPost.metadata.session_id === metadata.session_id",
     '  postQueue.pendingPost = {',
@@ -253,9 +247,9 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  const coords = resolveHookCoords()',
     '  const paneKey = process.env.ORCA_PANE_KEY',
     '  if (!coords.port || !coords.token || !paneKey) return',
-    // Why: the endpoint watch republishes this snapshot, so it is remembered on the attempt — a
-    // delivery that fails is exactly the case it has to retry.
-    '  postQueue.watchSnapshot = final ? null : { hookEventName, extra, metadata, ompRuntime }',
+    // Why: the endpoint watch republishes this snapshot, and reads it as the pane's own statement of
+    // what it is doing — recorded on the attempt, because a failed delivery is what it has to answer.
+    '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, final, endpointKeyOf(coords))',
     '  const url = `http://127.0.0.1:${coords.port}${resolveHookPath(ompRuntime)}`',
     '  const body = JSON.stringify({',
     '    paneKey,',
@@ -289,13 +283,11 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '      timeoutPromise,',
     '    ])',
     "    if (!response.ok) throw new Error('Orca hook HTTP ' + response.status)",
-    // Why: the endpoint that accepted this is the one the pane reports to until Orca restarts.
-    '    postQueue.watchEndpointKey = endpointKeyOf(coords)',
     '  } catch (error) {',
     '    // Why: status reporting must never fail the pi run just because Orca',
     '    // is unavailable or the loopback request failed (e.g. Orca restart).',
     '    if (!isWslRuntime()) throw error',
-    '    await postViaWindowsCurl(body, ompRuntime)',
+    '    await postViaWindowsCurl(body, ompRuntime, coords)',
     '  } finally {',
     '    if (timeout) clearTimeout(timeout)',
     '  }',

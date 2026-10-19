@@ -14,6 +14,8 @@ type PostedPayload = {
   hook_event_name: string
   session_id?: string
   session_file?: string
+  /** Only a prompt-bearing event carries one; a republished snapshot must not. */
+  prompt?: string
   subagents?: PostedChild[]
   subagent_runs?: { id: string }[]
 }

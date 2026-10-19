@@ -496,26 +496,42 @@ while it was down. But Orca mints a new hook token on every start (`server-lifec
 `randomUUID()`), so a restart always publishes a new endpoint — and the endpoint file is the one
 piece of that Orca a running agent can read for itself, which it already does on every post.
 
-While a turn is in flight or a child still holds the pane, the Pi/OMP/Prime status extension
-(`agent-status-post-queue-source.ts`, `agent-status-restart-watch-source.ts`):
+While the pane is working, the Pi/OMP/Prime status extension (`agent-status-post-queue-source.ts`)
+keeps, per delivery attempt, the payload it tried and the endpoint key it tried it against. A 2s
+watch compares that key with the endpoint now on disk and, when it differs (or nothing has been
+attempted yet), republishes the last attempted payload at the endpoint Orca is serving. The row a
+restart restored therefore becomes a fresh, confirmed observation within a couple of seconds rather
+than waiting for the agent's next turn.
 
-- keeps the last posted snapshot and the endpoint key that accepted it;
-- re-reads the hook coordinates every 2s — armed by a turn's own events, gated on
-  `ORCA_AGENT_HOOK_ENDPOINT`, so a pane launched without that file arms no timer and an idle pane
-  arms none either;
-- republishes that snapshot when the endpoint it delivered to is no longer the one Orca serves, or
-  when nothing has been delivered yet. The row a restart restored therefore becomes a fresh,
-  confirmed observation within a couple of seconds instead of waiting for the agent's next turn.
+Three rules keep it honest and bounded:
 
-The scope is the silent window a restart can actually invalidate: a long tool call or a held
-subagent posts nothing for minutes, and the pane still reads `working` in the meantime. A posted
-completion settles the watch unless child work still holds the row open, and every session boundary
-stops it, so no timer outlives the work it was watching.
+- **The attempt decides, not the registration.** A pi-subagents or OMP task child re-runs the
+  factory inside the same process without ever posting, so registration state is the wrong place to
+  read "what is this pane doing". The watch reads the last attempted payload instead, and stays
+  armed while that payload shows work in flight: the turn has not ended, or the completion it
+  carried still listed live children (`subagent_runs` / `subagents`). A child finishing after the
+  lead settled retires the last of those and the watch stops on its own re-check, which is also why
+  no missed stop can leave an idle pane polling.
+- **The key compared is the one attempted.** A repeated failure at one endpoint — the WSL `curl.exe`
+  bridge, a host that answers 404 because status hooks are off — cannot spin. On WSL the bridge
+  tries the launch coordinates first and the endpoint file second, so a stale guest endpoint still
+  falls back to the host, while a restarted host is reachable through the file it just wrote.
+- **Only a session end clears it.** A posted completion does not, because child work can outlive the
+  turn; `resetEndpointWatch()` runs where a session ends (`session_shutdown` for `quit`, the generic
+  non-pi handler, `closeOutRun`) and leaves `/reload` and a same-file resume watching, since that
+  session keeps running. The watch is also gated on `ORCA_AGENT_HOOK_ENDPOINT`: a pane launched
+  without that file could never notice a restart, so it arms no timer at all.
 
-This is only the agent-side half, and only the in-process extension family has a process that
-outlives the restart with a way to notice it. Hook-script agents (Claude, Codex, Grok, …) post per
-event from a fresh process and cannot re-announce; their restored non-done rows keep the
-`restoredUnconfirmed` treatment, and go live again on their next event.
+Known gap: the new Orca's prompt cache starts empty and pi rows are not seeded from hydration (only
+Claude's are), so a republished non-prompt snapshot resolves the row's prompt to empty. That already
+happened on the first post after any restart; the fix only makes it happen sooner, and the next
+prompt-bearing post restores it.
+
+This is only the agent-side half, and today only the Pi-family extension does it. Claude, Codex and
+Grok post per event from a fresh hook process and cannot re-announce, so their restored non-done
+rows keep the `restoredUnconfirmed` treatment and go live again on their next event. OpenCode's
+plugin is in-process and reads the same endpoint file, so it could adopt the same watch; it does
+not yet.
 
 ## What does not change
 
