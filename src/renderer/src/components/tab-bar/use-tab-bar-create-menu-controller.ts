@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import { launchDefaultAgentInNewTab as launchDefaultAgent } from './launch-default-agent-in-new-tab'
+import { launchDefaultAgentInNewTab } from './launch-default-agent-in-new-tab'
 import { useNewTabMenuFocusHandoff } from './new-tab-menu-focus-handoff'
 import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
 import { useAppStore } from '../../store'
@@ -31,7 +31,7 @@ export type TabBarCreateMenuController = {
   handleSelectCreateMenuOption: (option: TabCreateMenuOption) => void
   launchAgentFromNewTabEntry: (option: TabAgentLaunchOption) => void
   /** The split new-tab button's action: the agent the user's Chat UI setting picks a surface for. */
-  launchDefaultAgentInNewTab: (agent: TuiAgent) => void
+  launchDefaultAgentFromSplitButton: (agent: TuiAgent) => void
   runPendingNewTabMenuFocusAfterClose: () => void
   clearPendingNewTabMenuFocusOnUnmount: (node: HTMLDivElement | null) => void
   queueNewActiveTerminalFocusAfterNewTabMenuClose: () => void
@@ -193,8 +193,8 @@ export function useTabBarCreateMenuController({
       launchAgentRow(option.row)
     }
   }
-  const launchDefaultAgentInNewTab = (agent: TuiAgent): void => {
-    launchDefaultAgent(agent, {
+  const launchDefaultAgentFromSplitButton = (agent: TuiAgent): void => {
+    launchDefaultAgentInNewTab(agent, {
       worktreeId,
       groupId: resolvedGroupId,
       onLocalTerminal: queueTerminalTabFocusAfterNewTabMenuClose,
@@ -225,7 +225,7 @@ export function useTabBarCreateMenuController({
     windowsShellEntries,
     handleSelectCreateMenuOption,
     launchAgentFromNewTabEntry,
-    launchDefaultAgentInNewTab,
+    launchDefaultAgentFromSplitButton,
     runPendingNewTabMenuFocusAfterClose,
     clearPendingNewTabMenuFocusOnUnmount,
     queueNewActiveTerminalFocusAfterNewTabMenuClose,

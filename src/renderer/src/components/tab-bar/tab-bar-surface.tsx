@@ -86,7 +86,7 @@ export function renderTabBarSurface({
     windowsShellEntries,
     handleSelectCreateMenuOption,
     launchAgentFromNewTabEntry,
-    launchDefaultAgentInNewTab,
+    launchDefaultAgentFromSplitButton,
     runPendingNewTabMenuFocusAfterClose,
     queueNewActiveTerminalFocusAfterNewTabMenuClose,
     queueFocusAfterNewTabMenuClose,
@@ -95,7 +95,7 @@ export function renderTabBarSurface({
   const { orderedItems, sortableIds, dropIndicatorByVisibleId } = itemProjection
   const clientHostedBrowserRows = props.clientHostedBrowserRows ?? EMPTY_CLIENT_HOSTED_ROWS
   const launchDefaultAgent = (agent: TuiAgent): void => {
-    launchDefaultAgentInNewTab(agent)
+    launchDefaultAgentFromSplitButton(agent)
     runPendingNewTabMenuFocusAfterClose()
   }
   const {
