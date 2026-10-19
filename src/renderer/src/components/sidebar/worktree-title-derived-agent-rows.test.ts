@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyAgentRowLineage } from '@/components/dashboard/agent-row-lineage'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
@@ -41,6 +42,22 @@ function makeSingleLayout(leafId: string): TerminalLayoutSnapshot {
     root: { type: 'leaf', leafId },
     activeLeafId: leafId,
     expandedLeafId: null
+  }
+}
+
+/** A status row still keyed to the tab a re-keyed mirrored pane was launched under. */
+function makeReKeyedEntry(paneKey: string, updatedAt: number): AgentStatusEntry {
+  return {
+    paneKey,
+    worktreeId: 'wt-1',
+    state: 'working',
+    stateStartedAt: updatedAt - 1000,
+    updatedAt,
+    stateHistory: [],
+    prompt: 'convergence decision audit',
+    agentType: 'pi',
+    toolName: 'bash',
+    interrupted: false
   }
 }
 
@@ -742,5 +759,101 @@ describe('split-pane runtime title attribution', () => {
       [makePaneKey('tab-1', LEAF_ID_2), 'codex', 'idle'],
       [makePaneKey('tab-1', LEAF_ID_3), 'gemini', 'working']
     ])
+  })
+
+  it('does not invent a needs-input row over a fresh working row it cannot place', () => {
+    // Why: a mirrored pane re-keyed on restore keeps the `π !` marker it was launched with,
+    // while its live row stays keyed to the tab this renderer no longer has. The row that does
+    // report the work is the honest one; the leftover title must not add a contradicting row.
+    const now = 10_000
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1')],
+      entries: [makeReKeyedEntry(makePaneKey('re-keyed-tab', LEAF_ID_1), now - 500)],
+      retained: [],
+      runtimePaneTitlesByTabId: { 'tab-1': { 1: 'π ! homelab' } },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now
+    })
+
+    expect(rows.map((row) => [row.state, row.entry.lastAssistantMessage])).toEqual([
+      ['working', undefined]
+    ])
+  })
+
+  it('keeps a needs-input row when the working row it would defer to has gone stale', () => {
+    // Why: the deference is to fresh explicit evidence only — a 30-minute-old row cannot
+    // outvote a title that may be describing a dialog opened since.
+    const now = 10_000
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1')],
+      entries: [makeReKeyedEntry(makePaneKey('re-keyed-tab', LEAF_ID_1), now - 31 * 60 * 1000)],
+      retained: [],
+      runtimePaneTitlesByTabId: { 'tab-1': { 1: 'π ! homelab' } },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now
+    })
+
+    expect(rows.some((row) => row.state === 'waiting')).toBe(true)
+  })
+
+  it('keeps a needs-input row when the unplaced working row belongs to another agent type', () => {
+    // Why: yielding is per type. A running Claude pane must not silence a Pi pane's question.
+    const now = 10_000
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1')],
+      entries: [
+        {
+          ...makeReKeyedEntry(makePaneKey('re-keyed-tab', LEAF_ID_1), now - 500),
+          agentType: 'claude'
+        }
+      ],
+      retained: [],
+      runtimePaneTitlesByTabId: { 'tab-1': { 1: 'π ! homelab' } },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now
+    })
+
+    expect(rows.some((row) => row.state === 'waiting')).toBe(true)
+  })
+
+  it('keeps a needs-input row when the unplaced working row is a dispatched worker', () => {
+    // Why: a worker reports before its tab exists by design, so its missing tab is not the
+    // signature of a re-keyed pane and must not cost a real dialog its row.
+    const now = 10_000
+    const reKeyed = makeReKeyedEntry(makePaneKey('re-keyed-tab', LEAF_ID_1), now - 500)
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1')],
+      entries: [{ ...reKeyed, orchestration: { taskId: 'task-1', dispatchId: 'dispatch-1' } }],
+      retained: [],
+      runtimePaneTitlesByTabId: { 'tab-1': { 1: 'π ! homelab' } },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now
+    })
+
+    expect(rows.some((row) => row.state === 'waiting')).toBe(true)
+  })
+
+  it('keeps a needs-input row when two unplaced working rows could own the title', () => {
+    // Why: with two candidates under lost tabs, either pane could own the marker, so the
+    // contradiction is unresolved and the question must stand.
+    const now = 10_000
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1')],
+      entries: [
+        makeReKeyedEntry(makePaneKey('re-keyed-tab-a', LEAF_ID_1), now - 500),
+        makeReKeyedEntry(makePaneKey('re-keyed-tab-b', LEAF_ID_2), now - 500)
+      ],
+      retained: [],
+      runtimePaneTitlesByTabId: { 'tab-1': { 1: 'π ! homelab' } },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now
+    })
+
+    expect(rows.some((row) => row.state === 'waiting')).toBe(true)
   })
 })

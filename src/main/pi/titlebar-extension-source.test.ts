@@ -371,8 +371,95 @@ describe('getPiTitlebarExtensionSource', () => {
     expect(harness.lastTitle()).toMatch(BRAILLE_RE)
   })
 
+  it('recovers the spinner when a tool finishes under a marker its close never lifted', async () => {
+    const harness = createHarness()
+
+    await harness.callHook('agent_start')
+    await harness.callHook('ui_prompt_start')
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+
+    // Why: a dialog that is really on screen blocks this agent's tool loop, so a finished tool
+    // proves the close was lost rather than that the pane is still waiting on the user.
+    await harness.callHook('tool_execution_start', { toolCallId: 'a' })
+    await harness.callHook('tool_execution_end', { toolCallId: 'a' })
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+
+    // Why: the re-assert must stop with the marker, or the next frame would paint `!` again.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('returns an idle pane to its plain title when a tool releases a lost marker', async () => {
+    const harness = createHarness()
+
+    await harness.callHook('ui_prompt_start')
+    await harness.callHook('tool_execution_start', { toolCallId: 'a' })
+    await harness.callHook('tool_execution_end', { toolCallId: 'a' })
+
+    expect(harness.lastTitle()).toBe(IDLE_TITLE)
+    expect(vi.getTimerCount()).toBe(0)
+
+    // Why: the release is idempotent — later tool completions find no marker to clear.
+    const titleCount = harness.titles.length
+    await harness.callHook('tool_execution_end', { toolCallId: 'a' })
+    expect(harness.titles.length).toBe(titleCount)
+  })
+
+  it('leaves the marker alone while the dialog is still up', async () => {
+    const harness = createHarness()
+
+    await harness.callHook('ui_prompt_start')
+    // Why: no tool can finish behind a blocking dialog, so nothing here releases the marker.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+  })
+
+  it('keeps the marker while a sibling tool is still running', async () => {
+    // Why: pi runs one assistant message's tool calls in parallel, so the dialog can be open
+    // inside one tool while another finishes. Only a batch that drains proves the wait ended.
+    const harness = createHarness()
+
+    await harness.callHook('agent_start')
+    await harness.callHook('tool_execution_start', { toolCallId: 'a' })
+    await harness.callHook('tool_execution_start', { toolCallId: 'b' })
+    await harness.callHook('ui_prompt_start')
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+
+    await harness.callHook('tool_execution_end', { toolCallId: 'b' })
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+
+    await harness.callHook('tool_execution_end', { toolCallId: 'a' })
+    expect(harness.lastTitle()).toMatch(BRAILLE_RE)
+  })
+
+  it('needs an observed start before an end can release the marker', async () => {
+    // Why: a close this process never tracked describes nothing it can trust — a replayed or
+    // coalesced end must not lift a marker that may still be on screen.
+    const harness = createHarness()
+
+    await harness.callHook('ui_prompt_start')
+    await harness.callHook('tool_execution_end', { toolName: 'ask_user_question' })
+
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+  })
+
+  it('ignores nested tool calls when deciding the batch drained', async () => {
+    // Why: a nested ctx.executeTool call belongs to the tool that started it; its end says
+    // nothing about whether that parent is still parked on a dialog.
+    const harness = createHarness()
+
+    await harness.callHook('ui_prompt_start')
+    await harness.callHook('tool_execution_start', { toolCallId: 'a/1', parentToolCallId: 'a' })
+    await harness.callHook('tool_execution_end', { toolCallId: 'a/1', parentToolCallId: 'a' })
+
+    expect(harness.lastTitle()).toBe(PROMPT_TITLE)
+  })
+
   it('leaves the marker to OMP approval events instead of painting it', () => {
     expect(createHarness({ kind: 'omp' }).handlers.ui_prompt_start).toBeUndefined()
+    expect(createHarness({ kind: 'omp' }).handlers.tool_execution_start).toBeUndefined()
+    expect(createHarness({ kind: 'omp' }).handlers.tool_execution_end).toBeUndefined()
   })
 
   it('still caps idle maintenance while a dialog holds the title', async () => {

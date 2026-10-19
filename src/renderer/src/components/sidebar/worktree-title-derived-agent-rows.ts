@@ -48,6 +48,8 @@ export function buildTitleDerivedAgentRows(args: {
   paneForegroundAgentByPaneKey?: Record<string, TitleDerivedPaneForeground>
   seenPaneKeys: Set<string>
   now: number
+  /** Agent types whose permission title must yield to a re-keyed pane's own working row. */
+  permissionYieldingAgentTypes?: ReadonlySet<AgentType>
 }): DashboardAgentRow[] {
   const rows: DashboardAgentRow[] = []
   const runtimePaneTitlesByTabId = args.runtimePaneTitlesByTabId ?? EMPTY_RUNTIME_TITLES
@@ -102,7 +104,8 @@ export function buildTitleDerivedAgentRows(args: {
           ownerAgentType: resolveTitleDerivedPaneOwner(tab, layout, leafId),
           paneForegroundAgentByPaneKey,
           now: args.now,
-          runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+          runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey,
+          permissionYieldingAgentTypes: args.permissionYieldingAgentTypes
         })
         if (!row || args.seenPaneKeys.has(row.paneKey)) {
           continue
@@ -124,7 +127,8 @@ export function buildTitleDerivedAgentRows(args: {
       ownerAgentType: resolveTitleDerivedPaneOwner(tab, layout, leafId),
       paneForegroundAgentByPaneKey,
       now: args.now,
-      runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+      runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey,
+      permissionYieldingAgentTypes: args.permissionYieldingAgentTypes
     })
     if (!row || args.seenPaneKeys.has(row.paneKey)) {
       continue
@@ -148,6 +152,7 @@ function buildTitleDerivedAgentRow(args: {
   paneForegroundAgentByPaneKey: Record<string, TitleDerivedPaneForeground>
   now: number
   runtimeAgentOrchestrationByPaneKey?: Record<string, AgentStatusOrchestrationContext>
+  permissionYieldingAgentTypes?: ReadonlySet<AgentType>
 }): DashboardAgentRow | null {
   // Why launchAgent, not ownerAgentType: this only rewrites a title within its own identity
   // group (OMP wraps Pi and emits Pi frames), which stays correct in a split. Pane ownership
@@ -188,6 +193,12 @@ function buildTitleDerivedAgentRow(args: {
     foreground: args.paneForegroundAgentByPaneKey[paneKey]
   })
   if (!agentType) {
+    return null
+  }
+  // Why: a stale permission marker on a re-keyed pane would otherwise invent a second row
+  // contradicting the fetch that already reports this agent working. Keyed by the row's own
+  // identity, so a different agent asking in the same worktree still gets its row.
+  if (titleStatus === 'permission' && args.permissionYieldingAgentTypes?.has(agentType)) {
     return null
   }
   // Why: the title sets activity only; a plain title on a process-identified pane is idle.
