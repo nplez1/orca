@@ -284,6 +284,7 @@ describe('SessionSummaryService host routing', () => {
   type HostHarness = Harness & {
     hostReads: { host: SessionSummaryTranscriptHost }[]
     hostFoldCalls: string[]
+    receivedFoldParams: unknown[]
     setHostSnapshot: (snapshot: SessionSummarySnapshot | null) => void
   }
 
@@ -293,6 +294,7 @@ describe('SessionSummaryService host routing', () => {
     hostSnapshot?: SessionSummarySnapshot
     foldFails?: Error
     entry?: SessionSummaryStatusEntry | undefined
+    resolveFoldParams?: () => { agentId: 'claude'; model: string } | null
   }): HostHarness {
     const currentEntry: SessionSummaryStatusEntry | undefined =
       'entry' in args
@@ -308,6 +310,7 @@ describe('SessionSummaryService host routing', () => {
     let hostSnapshot = args.hostSnapshot ?? null
     const hostReads: { host: SessionSummaryTranscriptHost }[] = []
     const hostFoldCalls: string[] = []
+    const receivedFoldParams: unknown[] = []
     const updates: SessionSummarySnapshot[] = []
     const service = new SessionSummaryService({
       store: args.store,
@@ -320,8 +323,9 @@ describe('SessionSummaryService host routing', () => {
         complete: async () => JSON.stringify({ inProgress: 'folding' })
       }),
       hostFold: {
-        open: async ({ environmentId, paneKey }) => {
+        open: async ({ environmentId, paneKey, foldParams }) => {
           hostFoldCalls.push(`open:${environmentId}:${paneKey}`)
+          receivedFoldParams.push(foldParams)
           if (args.foldFails) {
             throw args.foldFails
           }
@@ -336,6 +340,7 @@ describe('SessionSummaryService host routing', () => {
         }
       },
       hostPollIntervalMs: 5,
+      ...(args.resolveFoldParams ? { resolveFoldParams: args.resolveFoldParams } : {}),
       now: () => 1000
     })
     service.onUpdate((snapshot) => updates.push(snapshot))
@@ -344,6 +349,7 @@ describe('SessionSummaryService host routing', () => {
       updates,
       hostReads,
       hostFoldCalls,
+      receivedFoldParams,
       brainPrompts: [],
       setEvents: () => {},
       setEntry: () => {},
@@ -436,6 +442,22 @@ describe('SessionSummaryService host routing', () => {
     expect(h.updates.some((u) => u.status === 'unavailable')).toBe(false)
   })
 
+  // The host spawns the agent, so it cannot know this window's Settings → Agents choice:
+  // the request has to carry it, or every paired-host fold fails on a null config.
+  it('sends the resolved fold params with a host open when the request has none', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      hostSnapshot: hostSnapshotFor('tab:leaf', 'folding'),
+      resolveFoldParams: () => ({ agentId: 'claude', model: 'sonnet' })
+    })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.hostFoldCalls.some((c) => c.startsWith('open:')))
+
+    expect(h.receivedFoldParams[0]).toEqual({ agentId: 'claude', model: 'sonnet' })
+  })
+
   it('keeps polling a paired host fold until it settles', async () => {
     const { store } = testStore()
     const h = hostHarness({
@@ -468,6 +490,41 @@ describe('SessionSummaryService host routing', () => {
     await new Promise((resolve) => setTimeout(resolve, 40))
 
     expect(h.hostFoldCalls.length).toBe(seen)
+  })
+
+  // A cleared status row is normal after a reconnect. It yields a null identity, which
+  // differs from every stored one — deleting a perfectly good ledger on reopen.
+  it('keeps a good ledger when the status row is missing on reopen', async () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: events(3) })
+    h.service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => h.updates.some((u) => u.status === 'ready'))
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 1 })
+
+    // Entry `undefined` models the cleared row; the stored ledger must survive.
+    const reopened = hostHarness({ store, events: events(3), entry: undefined })
+
+    const snapshot = reopened.service.open({ paneKey: 'tab:leaf' })
+    expect(snapshot.ledger?.foldedThrough).toBe(3)
+    expect(store.get('tab:leaf')?.ledger.foldedThrough).toBe(3)
+  })
+
+  // Two viewers of one host pane: the first to close must not end the other's fold.
+  it('does not cancel a fold another viewer still holds', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      hostSnapshot: hostSnapshotFor('tab:leaf', 'folding')
+    })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+
+    // The second viewer is still watching, so the host was never told to stop.
+    expect(h.hostFoldCalls.some((c) => c.startsWith('close:'))).toBe(false)
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+    expect(h.hostFoldCalls.at(-1)).toBe('close:env-1:tab:leaf:2')
   })
 
   it('reports a paired host that cannot answer instead of failing silently', async () => {

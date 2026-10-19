@@ -52,9 +52,9 @@ export function createSessionSummaryEventReader(
       // Why fail instead of truncating: a shortened transcript renumbers every event,
       // and the ledger's cursor would then point at different messages.
       throw new Error(
-        `This session's transcript is ${formatMegabytes(fetched.bytes)}, above the ${formatMegabytes(
+        `This session's transcript is over ${formatMegabytes(
           REMOTE_TRANSCRIPT_MAX_BYTES
-        )} limit for reading one from a remote host.`
+        )}, which is too large to read from a remote host.`
       )
     }
     try {

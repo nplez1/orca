@@ -184,7 +184,7 @@ describe('createSessionSummaryEventReader', () => {
         host: sshHost,
         signal: new AbortController().signal
       })
-    ).rejects.toThrow(/60 MB.*limit/)
+    ).rejects.toThrow(/over 24 MB.*too large/)
   })
 
   it('reports a deleted remote transcript as absent', async () => {

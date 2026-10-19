@@ -146,6 +146,29 @@ describe('SessionSummaryPane', () => {
     expect(markup).toContain('No readable transcript')
   })
 
+  // A fold that produced a ledger but found nothing notable: an empty body under an
+  // "Up to date" header reads as a broken pane.
+  it('says nothing is notable when the ledger has no sections filled', () => {
+    mocks.paneKey = PANE_KEY
+    mocks.snapshot = readySnapshot({
+      ledger: {
+        goal: null,
+        plan: [],
+        inProgress: null,
+        done: [],
+        blockers: [],
+        decisions: [],
+        timeline: [],
+        foldedThrough: 4,
+        foldedAt: 1
+      }
+    })
+
+    const markup = renderToStaticMarkup(<SessionSummaryPane isVisible />)
+
+    expect(markup).toContain('Nothing notable in this session yet.')
+  })
+
   it('names a host that cannot produce a brief instead of asking the user to focus', () => {
     mocks.paneKey = PANE_KEY
     mocks.snapshot = readySnapshot({ ledger: null, status: 'unsupported-host' })

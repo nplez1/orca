@@ -15,7 +15,9 @@ export type SessionSummaryHeaderState = {
 export function resolveSessionSummaryHeaderState(
   snapshot: SessionSummarySnapshot | null
 ): SessionSummaryHeaderState {
-  if (snapshot?.fold.running) {
+  // Why status too: while a paired host is asked, the local fold flag is idle until its
+  // answer lands, and falling through said "Up to date" over a skeleton.
+  if (snapshot?.fold.running || snapshot?.status === 'folding') {
     return { hint: translate('activity.sessionSummary.updating', 'Updating…'), folding: true }
   }
   // Why: without a ledger there is nothing on screen, so the hint has to name

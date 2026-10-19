@@ -73,9 +73,8 @@ export type SessionSummaryFoldProgress = {
 }
 
 /**
- * `unsupported-host` is an incapacity, not a failure: the session's transcript lives
- * on a host this app cannot read (a paired server, whose runtime file methods are
- * worktree-relative), so no fold can run for it here.
+ * `unsupported-host` is an incapacity, not a failure: the workspace runs on a host kind
+ * this build cannot parse (a newer one), so it neither reads a transcript nor folds here.
  */
 export type SessionSummaryStatus =
   | 'unavailable'

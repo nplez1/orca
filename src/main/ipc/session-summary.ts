@@ -16,6 +16,7 @@ import {
   createSessionSummaryHostFoldClient,
   type SessionSummaryHostFoldClient
 } from '../session-summary/session-summary-host-fold-client'
+import { registerHostSessionSummaryService } from '../session-summary/session-summary-host-service'
 import { createSshTranscriptFetcher } from '../session-summary/session-summary-remote-transcript'
 import {
   resolveSessionSummaryFoldParams,
@@ -54,6 +55,8 @@ export function createSessionSummaryService(
         cwd: join(tmpdir(), 'orca-session-summary')
       }),
     hostFold: overrides.hostFold ?? runtimeHostFoldClient(userDataPath),
+    // The host fold spawns the agent on that host, so this window's choice travels with it.
+    resolveFoldParams: () => resolveSessionSummaryFoldParams(getSettings()),
     now: () => Date.now()
   })
 }
@@ -92,6 +95,9 @@ export function registerSessionSummaryHandlers(
   getSettings: () => SessionSummaryFoldSettings,
   service = createSessionSummaryService(getSettings)
 ): void {
+  // One service per process: a paired client asking this desktop to fold a pane must land
+  // on the same instance its own windows use, not a second copy of the cache.
+  registerHostSessionSummaryService(service)
   ipcMain.removeHandler('sessionSummary:open')
   ipcMain.removeHandler('sessionSummary:close')
   service.onUpdate((snapshot: SessionSummarySnapshot) => {

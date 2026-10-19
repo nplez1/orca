@@ -49,6 +49,16 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(state).toEqual({ hint: 'No readable transcript', folding: false })
   })
 
+  // #135: while a paired host is asked, the local fold flag is idle. Falling through to
+  // "Up to date" over a skeleton is exactly the empty state the issue reported.
+  it('reads a folding status as in flight before the fold reports anything', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({ status: 'folding', fold: { running: false, completedChunks: 0, totalChunks: 0 } })
+    )
+
+    expect(state).toEqual({ hint: 'Updating…', folding: true })
+  })
+
   it('names an unplaceable host instead of claiming to be up to date', () => {
     const state = resolveSessionSummaryHeaderState(snapshot({ status: 'unsupported-host' }))
 

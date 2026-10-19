@@ -8,9 +8,8 @@
 // Streamed rather than collected: `execCommand` keeps only the tail of its output
 // (`MAX_EXEC_OUTPUT_CHARS`), which would silently drop the head of a large transcript
 // and renumber every event the ledger's cursor counts.
-import { randomUUID } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { Readable } from 'node:stream'
@@ -55,13 +54,16 @@ export function createSshTranscriptFetcher(
   const tmpRoot = deps.tmpRoot ?? join(tmpdir(), 'orca-session-summary-remote')
 
   return async ({ targetId, remotePath, signal }) => {
-    const dir = join(tmpRoot, randomUUID())
-    await mkdir(dir, { recursive: true, mode: 0o700 })
+    signal.throwIfAborted()
+    // Why mkdtemp: a predictable name under a shared temp root is pre-creatable by another
+    // local user, and this file holds a transcript.
+    await mkdir(tmpRoot, { recursive: true, mode: 0o700 })
+    const dir = await mkdtemp(join(tmpRoot, 'transcript-'))
     const dispose = async (): Promise<void> => {
       await rm(dir, { recursive: true, force: true }).catch(() => {})
     }
     // Why the remote basename: parsers derive a session id from the file name.
-    const localPath = join(dir, basename(remotePath) || 'transcript.jsonl')
+    const localPath = join(dir, localTranscriptName(remotePath))
     try {
       const result = await streamRemoteFile({
         channel: await deps.openChannel({
@@ -95,6 +97,7 @@ async function streamRemoteFile(args: {
   signal: AbortSignal
 }): Promise<RemoteTranscriptFetch> {
   const { channel, localPath, maxBytes, timeoutMs, signal } = args
+  signal.throwIfAborted()
   const sink = createWriteStream(localPath, { mode: 0o600 })
   let bytes = 0
   let overflow = false
@@ -147,6 +150,8 @@ async function streamRemoteFile(args: {
     }
     const timer = setTimeout(() => fail(new Error('remote transcript read timed out')), timeoutMs)
     signal.addEventListener('abort', onAbort, { once: true })
+    // An unwritable target throws out of the write stream, not out of this scope.
+    sink.on('error', fail)
     channel.on('data', onData)
     channel.on('error', fail)
     channel.on('close', onClose)
@@ -155,12 +160,29 @@ async function streamRemoteFile(args: {
   if (overflow) {
     return { kind: 'too-large', bytes }
   }
-  // Nothing came back and the command failed: the file is not there to read.
+  // Nothing came back: the file is not there to read (or the shell never ran).
   if (bytes === 0) {
     return { kind: 'missing' }
   }
-  if (exitCode !== null && exitCode !== 0) {
-    throw new Error(`reading the transcript on the host failed (exit ${exitCode})`)
+  // Why demand a clean exit: a dropped connection or a killed process closes the channel
+  // with no status, and parsing what arrived would fold a truncated transcript as if it
+  // were the whole one — leaving the ledger's cursor pointing at the wrong messages.
+  if (exitCode !== 0) {
+    throw new Error(
+      exitCode === null
+        ? 'reading the transcript on the host did not complete'
+        : `reading the transcript on the host failed (exit ${exitCode})`
+    )
   }
   return { kind: 'file', path: localPath, dispose: async () => {} }
+}
+
+// Why: the name is host-supplied and this copy is created on the client, which may be
+// Windows — where `:` and `?` are not legal filename characters at all.
+// oxlint-disable-next-line no-control-regex -- SAFETY: control characters are exactly what a filename cannot contain.
+const UNSAFE_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/g
+
+function localTranscriptName(remotePath: string): string {
+  const name = basename(remotePath).replace(UNSAFE_FILENAME_CHARS, '_')
+  return name && name !== '.' && name !== '..' ? name : 'transcript.jsonl'
 }

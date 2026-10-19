@@ -58,7 +58,10 @@ export function createSessionSummaryHostFoldClient(deps: {
         await call(
           environmentId,
           'sessionSummary.openOnHost',
-          SessionSummaryOpenOnHostParams.parse({ paneKey, foldParams })
+          SessionSummaryOpenOnHostParams.parse({
+            paneKey,
+            foldParams: portableFoldParams(foldParams)
+          })
         )
       ),
     peek: async ({ environmentId, paneKey }) =>
@@ -77,6 +80,25 @@ export function createSessionSummaryHostFoldClient(deps: {
       )
     }
   }
+}
+
+/**
+ * The fold configuration as it can mean something on another machine.
+ *
+ * `agentCommandOverride` is a command line this desktop is configured to run — a path, an
+ * install-specific flag set. Spawned on the host it would ENOENT or run something else, so
+ * the host resolves the binary for `agentId` itself. `customAgentCommand` is sent as-is:
+ * it names an agent, which is the user's own choice to make portable.
+ */
+function portableFoldParams(
+  params: ResolvedSourceControlAiGenerationParams | null
+): Record<string, unknown> | null {
+  if (!params) {
+    return null
+  }
+  const portable = { ...params }
+  delete portable.agentCommandOverride
+  return portable
 }
 
 /** The host runs this same service, so its snapshot is the same shape; reject anything else. */

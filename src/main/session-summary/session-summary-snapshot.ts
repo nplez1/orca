@@ -10,7 +10,7 @@ import type {
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
-import { emptySessionSummaryLedger } from './session-summary-ledger'
+import { emptySessionSummaryLedger, hasProducedLedger } from './session-summary-ledger'
 
 // The subset of a status row the summary needs; optional throughout because
 // hook rows arrive from hosts of varying vintage (see agent-status-types.ts).
@@ -60,7 +60,9 @@ export function buildLocalSessionSummarySnapshot(args: {
   fold: SessionSummarySnapshot['fold']
   error?: string
 }): SessionSummarySnapshot {
-  const ledger = args.ledger
+  // Why: a cache written before this rule can still hold an empty ledger, and relaying it
+  // is what let a blank body read as "Up to date".
+  const ledger = args.ledger && hasProducedLedger(args.ledger) ? args.ledger : null
   return {
     paneKey: args.paneKey,
     status: args.status ?? (ledger ? 'ready' : 'unavailable'),

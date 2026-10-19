@@ -37,6 +37,12 @@ export type { SessionSummaryStatusEntry }
 export type SessionSummaryServiceDeps = SessionSummaryFoldRunnerDeps & {
   /** Present on the desktop; absent on a host, which folds its own sessions directly. */
   hostFold?: SessionSummaryHostFoldClient
+  /**
+   * The agent/model this window would fold with, from its own settings. A host fold is
+   * spawned by that host, so the choice has to travel with the request — the host has no
+   * idea what this desktop is configured for.
+   */
+  resolveFoldParams?: () => ResolvedSourceControlAiGenerationParams | null
   /** How often a host-owned fold is polled, in ms. Injected so tests need not wait. */
   hostPollIntervalMs?: number
 }
@@ -55,6 +61,8 @@ type PaneRuntime = {
 export class SessionSummaryService {
   private readonly folds = new Map<string, AbortController>()
   private readonly runtimes = new Map<string, PaneRuntime>()
+  /** How many viewers hold each pane — two windows, or two paired clients on a host. */
+  private readonly openRefs = new Map<string, number>()
   private readonly listeners = new Set<(snapshot: SessionSummarySnapshot) => void>()
   private readonly hostFolds: SessionSummaryHostFoldSubscription | null
 
@@ -133,6 +141,7 @@ export class SessionSummaryService {
     runtime.status = this.initialStatus(host, hasSource)
     runtime.foldParams = request.foldParams ?? runtime.foldParams
     this.runtimes.set(paneKey, runtime)
+    this.openRefs.set(paneKey, (this.openRefs.get(paneKey) ?? 0) + 1)
     this.resetStaleLedger(paneKey, host, entry)
 
     if (runtime.status !== 'folding') {
@@ -172,7 +181,9 @@ export class SessionSummaryService {
       return
     }
     const stored = this.deps.store.get(paneKey)
-    if (!stored) {
+    // Why require an entry: this client clears status rows on reconnect, and an absent row
+    // yields a null identity that differs from every stored one — deleting a good ledger.
+    if (!stored || !entry) {
       return
     }
     if (this.identityChanged(stored.identity, sessionSummaryIdentityOf(entry))) {
@@ -183,6 +194,15 @@ export class SessionSummaryService {
   /** Cancels in-flight fold work and advances the last-seen cursor to what was viewed. */
   close(request: SessionSummaryCloseRequest): void {
     const paneKey = request.paneKey
+    // Why refcount: a second viewer of the same pane (a paired client on a host, or another
+    // window) is still reading. Aborting here would end its fold and move its place in the
+    // timeline on its behalf.
+    const remaining = (this.openRefs.get(paneKey) ?? 1) - 1
+    if (remaining > 0) {
+      this.openRefs.set(paneKey, remaining)
+      return
+    }
+    this.openRefs.delete(paneKey)
     const runtime = this.runtimes.get(paneKey)
     this.folds.get(paneKey)?.abort()
     this.folds.delete(paneKey)
@@ -266,10 +286,13 @@ export class SessionSummaryService {
       this.emit(paneKey)
       return
     }
+    // Why mark the fold running: until the host answers, an idle fold reads as
+    // "Up to date" over a skeleton, which is the empty state #135 is about.
+    runtime.fold = { running: true, completedChunks: 0, totalChunks: 0 }
     this.hostFolds.open({
       paneKey,
       environmentId,
-      foldParams: runtime.foldParams,
+      foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null,
       lastSnapshot: runtime.hostSnapshot ?? null
     })
   }

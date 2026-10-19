@@ -1,6 +1,5 @@
-// Where a session's transcript can be read. The fold brain always runs locally
-// (it spawns the user's configured agent CLI), so a remote session only needs its
-// transcript brought here — never a remote fold. See docs/reference/session-summary.md.
+// Where a session's transcript is read from: this machine, an SSH target, or a paired
+// Orca server that folds the session itself. See docs/reference/session-summary.md.
 import {
   parseExecutionHostId,
   toSshExecutionHostId,
@@ -12,7 +11,7 @@ export type SessionSummaryTranscriptHost =
   | { kind: 'local' }
   /** An SSH target: the path is read over the connection Orca already holds. */
   | { kind: 'ssh'; hostId: ExecutionHostId; targetId: string }
-  /** A paired Orca server: the path is read in chunks over `sessionSummary.readTranscript`. */
+  /** A paired Orca server: it reads the path itself and runs the fold. */
   | { kind: 'runtime'; hostId: ExecutionHostId; environmentId: string }
   /**
    * A host id this build cannot parse — a newer host kind, which is not local, so

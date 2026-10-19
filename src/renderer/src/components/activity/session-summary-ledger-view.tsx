@@ -8,6 +8,31 @@ import {
   type SessionSummaryTimelineKind
 } from '../../../../shared/session-summary-types'
 
+const EMPTY_LEDGER_SECTIONS = [
+  'inProgress',
+  'goal',
+  'plan',
+  'done',
+  'blockers',
+  'decisions',
+  'timeline'
+] as const
+
+type LedgerSection = (typeof EMPTY_LEDGER_SECTIONS)[number]
+
+function isLedgerSectionFilled(ledger: SessionSummaryLedger, section: LedgerSection): boolean {
+  switch (section) {
+    case 'inProgress':
+      return Boolean(ledger.inProgress)
+    case 'goal':
+      return Boolean(ledger.goal)
+    case 'timeline':
+      return ledger.timeline.length > 0
+    default:
+      return ledger[section].length > 0
+  }
+}
+
 const TIMELINE_KIND_LABELS: Record<SessionSummaryTimelineKind, string> = {
   milestone: 'Milestone',
   decision: 'Decision',
@@ -70,6 +95,15 @@ function LedgerContent({
 }): React.JSX.Element {
   const newEntries = ledger.timeline.slice(seenThrough)
   const earlierEntries = ledger.timeline.slice(0, seenThrough)
+  // Why: a fold that found nothing worth reporting still produced a ledger; an empty body
+  // under an "Up to date" header reads as a broken pane.
+  if (!EMPTY_LEDGER_SECTIONS.some((section) => isLedgerSectionFilled(ledger, section))) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {translate('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
+      </p>
+    )
+  }
   return (
     <div className="space-y-3">
       {ledger.inProgress ? (
@@ -164,7 +198,7 @@ export function SessionSummaryLedgerView({
           {translate('activity.sessionSummary.failed', 'Could not summarize this session.')}
         </p>
         {snapshot.error ? (
-          <p className="mt-1 break-words text-[11px] text-muted-foreground/80">{snapshot.error}</p>
+          <p className="mt-1 break-words text-xs text-muted-foreground">{snapshot.error}</p>
         ) : null}
       </>
     )

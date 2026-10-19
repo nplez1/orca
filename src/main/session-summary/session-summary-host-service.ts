@@ -33,10 +33,10 @@ const FOLD_PARAMS_STRING_FIELDS = [
 export function parseSessionSummaryFoldParams(
   value: unknown
 ): ResolvedSourceControlAiGenerationParams | null {
-  if (typeof value !== 'object' || value === null) {
+  if (!isRecord(value)) {
     return null
   }
-  const record = value as Record<string, unknown>
+  const record = value
   const agentId = record.agentId
   if (typeof agentId !== 'string' || (!isTuiAgent(agentId) && !isCustomAgentId(agentId))) {
     return null
@@ -54,10 +54,30 @@ export function parseSessionSummaryFoldParams(
   return params
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+let registered: SessionSummaryService | null = null
 let cached: { userDataPath: string; service: SessionSummaryService } | null = null
 
-/** This host's summary service, one per user-data path. */
+/**
+ * Adopts the service this process already runs for its own windows.
+ *
+ * Why: a desktop is also a paired host (`main-process-runtime-launch.ts` serves the same
+ * methods), and two services would keep separate in-memory copies of the one
+ * `session-summaries.json` and rewrite each other's edits, while folding the same pane
+ * twice. Registering the IPC instance keeps one owner per process.
+ */
+export function registerHostSessionSummaryService(service: SessionSummaryService): void {
+  registered = service
+}
+
+/** This host's summary service: the registered one, or a headless host's own. */
 export function sessionSummaryHostService(): SessionSummaryService {
+  if (registered) {
+    return registered
+  }
   const userDataPath = getAppEnvironment().getPath('userData')
   if (cached?.userDataPath === userDataPath) {
     return cached.service

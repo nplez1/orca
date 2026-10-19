@@ -20,21 +20,17 @@ afterEach(async () => {
   await Promise.all(created.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
-/** A channel that emits `chunks`, then closes — the shape an SSH exec produces. */
+/** A channel that emits `chunks`, then closes with a clean exit — a successful `cat`. */
 function channel(chunks: string[]): RemoteTranscriptChannel {
-  const stream = Readable.from(chunks.map((chunk) => Buffer.from(chunk, 'utf8')))
-  let closed = false
-  return Object.assign(stream, {
-    close: () => {
-      closed = true
-      stream.destroy()
-    },
-    wasClosed: () => closed
-  }) as RemoteTranscriptChannel & { wasClosed: () => boolean }
+  return codedChannel(chunks, 0)
 }
 
 /** A channel that ends with an exit status, the way an SSH exec reports one. */
 function codedChannel(chunks: string[], code: number): RemoteTranscriptChannel {
+  return closingChannel(chunks, code)
+}
+
+function closingChannel(chunks: string[], code: number | null): RemoteTranscriptChannel {
   // Why emitClose false: the automatic close would arrive without the exit status.
   const stream = new Readable({ emitClose: false, read() {} })
   setTimeout(() => {
@@ -42,7 +38,7 @@ function codedChannel(chunks: string[], code: number): RemoteTranscriptChannel {
       stream.push(Buffer.from(chunk, 'utf8'))
     }
     stream.push(null)
-    stream.emit('close', code)
+    stream.emit('close', code ?? undefined)
   }, 1)
   return Object.assign(stream, { close: () => stream.destroy() }) as RemoteTranscriptChannel
 }
@@ -163,6 +159,43 @@ describe('createSshTranscriptFetcher', () => {
         signal: new AbortController().signal
       })
     ).rejects.toThrow('failed (exit 2)')
+  })
+
+  // A dropped connection closes the channel with no exit status at all. What arrived is
+  // not the whole transcript, so it must fail rather than fold a truncated file.
+  it('rejects a channel that closed without an exit status', async () => {
+    const fetch = createSshTranscriptFetcher({
+      tmpRoot: await tmpRoot(),
+      openChannel: async () => closingChannel(['partial'], null)
+    })
+
+    await expect(
+      fetch({
+        targetId: 'target-1',
+        remotePath: '/sessions/sess-1.jsonl',
+        signal: new AbortController().signal
+      })
+    ).rejects.toThrow('did not complete')
+  })
+
+  it('keeps a remote name that is illegal on Windows out of the local path', async () => {
+    const fetch = createSshTranscriptFetcher({
+      tmpRoot: await tmpRoot(),
+      openChannel: async () => channel(['x\n'])
+    })
+
+    const result = await fetch({
+      targetId: 'target-1',
+      remotePath: '/sessions/we:ird?.jsonl',
+      signal: new AbortController().signal
+    })
+
+    expect(result.kind).toBe('file')
+    if (result.kind === 'file') {
+      expect(result.path).not.toContain(':')
+      expect(result.path.endsWith('we_ird_.jsonl')).toBe(true)
+      await result.dispose()
+    }
   })
 
   it('surfaces a missing connection as a rejection, not as an empty transcript', async () => {
