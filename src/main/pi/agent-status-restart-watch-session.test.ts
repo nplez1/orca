@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { posts, startAsync } from './agent-status-subagent-event-fixtures'
+import { complete, posts, startAsync } from './agent-status-subagent-event-fixtures'
 import {
   curlArgv,
   curlUrl,
@@ -84,6 +84,36 @@ it('is not ended by a completion retried after the next turn already started', a
   // new turn's state instead of nothing at all.
   expect(harness.fetchMock.mock.calls.length).toBe(before + 1)
   expect(posts(harness).at(-1)).toMatchObject({ hook_event_name: 'tool_execution_start' })
+})
+
+it('stops watching a completion a reset promoted with nothing newer queued', async () => {
+  const harness = harnessWithEndpoint('5001', 'first')
+  startAsync(harness, 'run-1', 'reviewer')
+  // Why: the delivery is still in flight when the child finishes, so the lead's completion is
+  // queued behind it and a /reload promotes that completion rather than any newer post.
+  let releaseInFlight: (() => void) | undefined
+  harness.fetchMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        releaseInFlight = () => resolve({ ok: true })
+      })
+  )
+  await harness.callHook('agent_start', {}, idle)
+  complete(harness, 'run-1')
+  await harness.callHook('agent_settled', {}, idle)
+  await harness.reloadPi()
+  releaseInFlight?.()
+  await vi.advanceTimersByTimeAsync(0)
+  harness.fetchMock.mockResolvedValue({ ok: true })
+  await vi.advanceTimersByTimeAsync(STRETCHED_RETRY_MS)
+  // Why: the promoted completion is the newest thing that exists, so its empty roster must land —
+  // otherwise the pane keeps polling, and a restart would hear the child still running.
+  expect(vi.getTimerCount()).toBe(0)
+  const before = harness.fetchMock.mock.calls.length
+
+  restartOrca(harness, '5002', 'second')
+  await vi.advanceTimersByTimeAsync(WATCH_MS * 3)
+  expect(harness.fetchMock.mock.calls.length).toBe(before)
 })
 
 it('stops watching when the session ends', async () => {
