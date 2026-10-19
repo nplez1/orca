@@ -66,6 +66,11 @@ export class SessionSummaryHostFoldSubscription {
     foldParams: ResolvedSourceControlAiGenerationParams | null
   }): void {
     const state = this.stateFor(args.paneKey, args.environmentId)
+    if (state.leases === 0 && state.unleasedViewers === 0 && state.inflight.size === 0) {
+      // Nobody is left to deliver a carried place to, and the pane may now hold a different
+      // conversation: reporting it later would mark that one read with nobody reading it.
+      state.pendingSeen = 0
+    }
     const seq = state.nextSeq
     state.nextSeq += 1
     state.token += 1
@@ -249,7 +254,7 @@ export class SessionSummaryHostFoldSubscription {
     )
   }
 
-  /** The count to report: this close's, or a place an absorbed close could not deliver. */
+  /** Whichever is further: this close's count, or a place an absorbed close could not deliver. */
   private takeSeen(state: PaneHostState, seenTimelineCount: number): number {
     const merged = Math.max(seenTimelineCount, state.pendingSeen)
     state.pendingSeen = 0

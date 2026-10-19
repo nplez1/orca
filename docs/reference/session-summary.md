@@ -159,10 +159,12 @@ folded here.
   window, a dropped paired client) leaves a lease behind, which costs memory and one fold
   that runs to completion with no reader. A viewer whose open _failed_ owes the host nothing,
   so its close is spent against that failure rather than against the next lease in line — a
-  close that took another viewer's lease would end their fold early. The place a reader
-  reached is never lost to absorption either: the highest count any absorbed close reported
-  rides along with the next close this pane sends to that host, and the cursor never moves
-  backwards. One caveat: after a host restarts, a close from a client that still believes it
+  close that took another viewer's lease would end their fold early. An absorbed close hands
+  its place forward: the highest count it reported rides along with the next close this pane
+  sends to that host, and the cursor never moves backwards. A place with no later close to
+  ride on — or one whose own close failed with nobody else reading — is dropped, and a pane
+  that goes fully idle drops it too rather than reporting it against whatever session takes
+  the pane next. One caveat: after a host restarts, a close from a client that still believes it
   holds a lease is charged to another viewer's lease there, which can end that viewer's fold
   early.
 - **An SSH read is capped, never truncated.** Over 24 MB the fold fails with a message

@@ -358,20 +358,18 @@ describe('SessionSummaryHostFoldSubscription failed opens', () => {
 })
 
 describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
-  // The open a close was queued on then failed: that open settles the close, and the viewer's
-  // place on the timeline must still reach the host with the next close — without inventing
-  // an unleased slot that would swallow the next real lease.
-  it('carries an absorbed close\u2019s place to the next host close', async () => {
+  type Scripted = { paneKey: string; environmentId: string; foldParams: null }
+  const args: Scripted = { paneKey: 'tab-1:leaf-1', environmentId: 'env-1', foldParams: null }
+
+  function scripted(openResults: ('ok' | 'fail')[]) {
     let attempt = 0
     const closed: number[] = []
     const subscription = new SessionSummaryHostFoldSubscription({
       hostFold: {
         open: async () => {
+          const outcome = openResults[attempt] ?? 'ok'
           attempt += 1
-          if (attempt === 1) {
-            return snapshot(false)
-          }
-          if (attempt === 2) {
+          if (outcome === 'fail') {
             throw new Error('relay blip')
           }
           return snapshot(false)
@@ -385,101 +383,128 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
       onSnapshot: () => {},
       onError: () => {}
     })
-    const args = { paneKey: 'tab-1:leaf-1', environmentId: 'env-1', foldParams: null }
+    return { subscription, closed }
+  }
 
-    // First viewer gets a lease and uses it.
-    subscription.open(args)
-    await wait(5)
+  const close = (
+    subscription: SessionSummaryHostFoldSubscription,
+    seenTimelineCount: number,
+    lastViewer = false
+  ): void =>
     subscription.close({
       paneKey: args.paneKey,
       environmentId: args.environmentId,
-      seenTimelineCount: 10,
-      lastViewer: false
+      seenTimelineCount,
+      lastViewer
     })
-    await wait(5)
+
+  // The open a close was queued on then failed. That open settles its close, and the place it
+  // reported rides on the next close this pane sends — the absorbed count is deliberately the
+  // higher of the two, so a carry that was dropped would show up as 7 instead of 12. A second
+  // open is left in flight throughout, because a pane with nobody left to carry a place drops
+  // it instead (asserted by the final 3).
+  it('carries an absorbed close\u2019s place into the next host close and then resets', async () => {
+    const pending: {
+      resolve: (value: SessionSummarySnapshot) => void
+      reject: (error: Error) => void
+    }[] = []
+    const closed: number[] = []
+    const subscription = new SessionSummaryHostFoldSubscription({
+      hostFold: {
+        open: () =>
+          new Promise<SessionSummarySnapshot>((resolve, reject) => {
+            pending.push({ resolve, reject })
+          }),
+        peek: async () => snapshot(false),
+        close: async ({ seenTimelineCount }) => {
+          closed.push(seenTimelineCount)
+        }
+      },
+      pollIntervalMs: 1,
+      onSnapshot: () => {},
+      onError: () => {}
+    })
+    const close = (seenTimelineCount: number, lastViewer = false): void =>
+      subscription.close({
+        paneKey: args.paneKey,
+        environmentId: args.environmentId,
+        seenTimelineCount,
+        lastViewer
+      })
+
+    subscription.open(args)
+    pending[0].resolve(snapshot(false))
+    await wait(4)
+    close(10)
+    await wait(4)
     expect(closed).toEqual([10])
 
-    // Second viewer closes before its own open fails.
+    // A close queued on an open that will fail; a second open stays in flight behind it.
     subscription.open(args)
-    subscription.close({
-      paneKey: args.paneKey,
-      environmentId: args.environmentId,
-      seenTimelineCount: 4,
-      lastViewer: false
-    })
-    await wait(5)
-
-    // Third viewer opens (accepted) and closes: the absorbed place rides along, furthest wins.
+    close(12)
     subscription.open(args)
-    await wait(5)
-    subscription.close({
-      paneKey: args.paneKey,
-      environmentId: args.environmentId,
-      seenTimelineCount: 7,
-      lastViewer: true
-    })
-    await wait(5)
+    await wait(4)
+    pending[1].reject(new Error('relay blip'))
+    await wait(4)
+    pending[2].resolve(snapshot(false))
+    await wait(4)
 
-    expect(closed).toEqual([10, 7])
+    close(7)
+    await wait(4)
+    // Absorbed 12 beats this close's 7 …
+    expect(closed).toEqual([10, 12])
+
+    // … and is not reported twice: the pane went idle in between, so a later close of its own
+    // reports only itself.
+    subscription.open(args)
+    pending[3].resolve(snapshot(false))
+    await wait(4)
+    close(3, true)
+    await wait(4)
+    expect(closed).toEqual([10, 12, 3])
+  })
+
+  // The other absorption path: the viewer's open fails with nothing queued, and its close
+  // arrives after another viewer has taken a lease.
+  it('carries the place of a viewer who closes after their open failed', async () => {
+    const h = scripted(['ok', 'fail', 'ok'])
+    h.subscription.open(args)
+    await wait(4)
+    close(h.subscription, 1)
+    await wait(4)
+
+    h.subscription.open(args)
+    await wait(4) // fails: this viewer owes the host nothing
+
+    h.subscription.open(args)
+    await wait(4)
+    close(h.subscription, 2) // the failed viewer's place, absorbed
+    await wait(4)
+    close(h.subscription, 1, true) // the lease holder's own count is the lower one
+    await wait(4)
+
+    expect(h.closed).toEqual([1, 2])
   })
 
   // A close queued on an open that then fails must not leave a phantom unleased slot behind:
   // the next real lease's close has to reach the host.
   it('does not leave a phantom slot when a queued close fails', async () => {
-    let attempt = 0
-    const closed: number[] = []
-    const subscription = new SessionSummaryHostFoldSubscription({
-      hostFold: {
-        open: async () => {
-          attempt += 1
-          if (attempt === 2) {
-            throw new Error('relay blip')
-          }
-          return snapshot(false)
-        },
-        peek: async () => snapshot(false),
-        close: async ({ seenTimelineCount }) => {
-          closed.push(seenTimelineCount)
-        }
-      },
-      pollIntervalMs: 1,
-      onSnapshot: () => {},
-      onError: () => {}
-    })
-    const args = { paneKey: 'tab-1:leaf-1', environmentId: 'env-1', foldParams: null }
+    const h = scripted(['ok', 'fail', 'ok'])
+    h.subscription.open(args)
+    await wait(4)
+    close(h.subscription, 1)
+    await wait(4)
 
-    // A first viewer whose lease is already returned, so the next close has nothing to spend.
-    subscription.open(args)
-    await wait(5)
-    subscription.close({
-      paneKey: args.paneKey,
-      environmentId: args.environmentId,
-      seenTimelineCount: 1,
-      lastViewer: false
-    })
-    await wait(5)
-
-    // A close that queues on the open which is about to fail.
-    subscription.open(args)
-    subscription.close({
-      paneKey: args.paneKey,
-      environmentId: args.environmentId,
-      seenTimelineCount: 2,
-      lastViewer: false
-    })
+    h.subscription.open(args)
+    close(h.subscription, 2)
     await wait(10)
 
-    subscription.open(args)
-    await wait(5)
-    subscription.close({
-      paneKey: args.paneKey,
-      environmentId: args.environmentId,
-      seenTimelineCount: 9,
-      lastViewer: true
-    })
-    await wait(5)
+    h.subscription.open(args)
+    await wait(4)
+    close(h.subscription, 9, true)
+    await wait(4)
 
     // Exactly one close per accepted open, and none swallowed by a phantom slot.
-    expect(closed).toEqual([1, 9])
+    expect(h.closed).toEqual([1, 9])
   })
 })

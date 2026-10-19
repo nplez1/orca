@@ -197,9 +197,6 @@ export class SessionSummaryService {
   close(request: SessionSummaryCloseRequest): void {
     const paneKey = request.paneKey
     const runtime = this.runtimes.get(paneKey)
-    // A host-owned pane's lease is the host's: forward every close, so its count matches the
-    // opens it acknowledged. Only acknowledged opens — a rejected or undelivered open holds
-    // no lease there, and closing it would take another client's.
     // Forwarded on every close; the subscription turns them into exactly one host close per
     // accepted open, which is what ends that fold.
     if (runtime?.host.kind === 'runtime' && this.hostFolds) {
