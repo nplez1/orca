@@ -35,9 +35,6 @@ import {
 
 export type { SessionSummaryStatusEntry }
 
-const LEASE_TTL_MS = 10 * 60_000
-const LEASE_SWEEP_INTERVAL_MS = 60_000
-
 export type SessionSummaryServiceDeps = SessionSummaryFoldRunnerDeps & {
   /** Present on the desktop; absent on a host, which folds its own sessions directly. */
   hostFold?: SessionSummaryHostFoldClient
@@ -49,9 +46,6 @@ export type SessionSummaryServiceDeps = SessionSummaryFoldRunnerDeps & {
   resolveFoldParams?: () => ResolvedSourceControlAiGenerationParams | null
   /** How often a host-owned fold is polled, in ms. Injected so tests need not wait. */
   hostPollIntervalMs?: number
-  /** A lease no viewer renews for this long is released. */
-  leaseTtlMs?: number
-  leaseSweepIntervalMs?: number
 }
 
 type PaneRuntime = {
@@ -63,26 +57,18 @@ type PaneRuntime = {
   foldParams: ResolvedSourceControlAiGenerationParams | null
   /** A host-owned pane's last snapshot: that host's ledger, seen cursor and progress. */
   hostSnapshot?: SessionSummarySnapshot
+  /** The host took a lease for this pane, so a close is ours to send. */
+  hostAcknowledged?: boolean
 }
 
 export class SessionSummaryService {
   private readonly folds = new Map<string, AbortController>()
   private readonly runtimes = new Map<string, PaneRuntime>()
-  private readonly leases: SessionSummaryPaneLeases
-  private readonly leaseSweep: ReturnType<typeof setInterval> | null
+  private readonly leases = new SessionSummaryPaneLeases()
   private readonly listeners = new Set<(snapshot: SessionSummarySnapshot) => void>()
   private readonly hostFolds: SessionSummaryHostFoldSubscription | null
 
   constructor(private readonly deps: SessionSummaryServiceDeps) {
-    this.leases = new SessionSummaryPaneLeases({
-      now: deps.now,
-      ttlMs: deps.leaseTtlMs ?? LEASE_TTL_MS
-    })
-    this.leaseSweep = setInterval(
-      () => this.expireStaleLeases(),
-      deps.leaseSweepIntervalMs ?? LEASE_SWEEP_INTERVAL_MS
-    )
-    this.leaseSweep.unref?.()
     this.hostFolds = deps.hostFold
       ? new SessionSummaryHostFoldSubscription({
           hostFold: deps.hostFold,
@@ -159,7 +145,7 @@ export class SessionSummaryService {
     // choice must not survive into this window's next fold of the same pane.
     runtime.foldParams = request.foldParams ?? null
     this.runtimes.set(paneKey, runtime)
-    this.touchLease(paneKey)
+    this.leases.touch(paneKey)
     this.resetStaleLedger(paneKey, host, entry)
 
     if (runtime.status !== 'folding') {
@@ -213,19 +199,24 @@ export class SessionSummaryService {
   close(request: SessionSummaryCloseRequest): void {
     const paneKey = request.paneKey
     const runtime = this.runtimes.get(paneKey)
-    // A host-owned pane's lease is the host's: forward every close, so its count matches
-    // the opens this desktop sent. Suppressing some here would strand the host's count.
-    if (runtime?.host.kind === 'runtime' && this.hostFolds) {
+    // A host-owned pane's lease is the host's: forward every close, so its count matches the
+    // opens it acknowledged. Only acknowledged opens — a rejected or undelivered open holds
+    // no lease there, and closing it would take another client's.
+    if (runtime?.host.kind === 'runtime' && runtime.hostAcknowledged && this.hostFolds) {
       this.hostFolds.close({
         paneKey,
         environmentId: runtime.host.environmentId,
         seenTimelineCount: request.seenTimelineCount
       })
+      runtime.hostAcknowledged = false
     }
+    // Recorded on every close, whoever else still holds the pane: the reader who reached
+    // furthest keeps their place even if another viewer never returns its lease.
     this.advanceSeenCursor(paneKey, request.seenTimelineCount, runtime)
     // Why refcount: a second viewer of the same pane is still reading. Aborting here would
-    // end its fold and move its place in the timeline on its behalf.
+    // end its fold, stop its polling, and move its place in the timeline on its behalf.
     if (this.leases.release(paneKey) > 0) {
+      // Another viewer is still reading: leave its fold and its polling alone.
       return
     }
     this.releasePane(paneKey)
@@ -260,16 +251,6 @@ export class SessionSummaryService {
     this.folds.get(paneKey)?.abort()
     this.folds.delete(paneKey)
     this.runtimes.delete(paneKey)
-  }
-
-  private touchLease(paneKey: string): void {
-    this.leases.touch(paneKey)
-  }
-
-  private expireStaleLeases(): void {
-    for (const paneKey of this.leases.takeStale()) {
-      this.releasePane(paneKey)
-    }
   }
 
   private identityChanged(
@@ -343,6 +324,7 @@ export class SessionSummaryService {
     }
     runtime.hostSnapshot = snapshot
     runtime.status = snapshot.status
+    runtime.hostAcknowledged = true
     this.emit(paneKey)
   }
 

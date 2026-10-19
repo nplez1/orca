@@ -1,27 +1,40 @@
-// Which viewers hold a pane's summary, and which of them has stopped reporting.
+// Which viewers hold a pane's summary.
 //
 // A viewer is a lease: `open` takes one, `close` returns it. Two viewers of one pane — two
 // windows, or two paired clients on a host — must not cancel each other's fold, so a fold
-// outlives the first close. A viewer that dies without closing (a window torn down, a
-// dropped paired client) never returns its lease, so an unrenewed one expires rather than
-// pinning a fold for the life of the process.
+// outlives the first close.
+//
+// Leases are never expired on a timer. A timer cannot tell a reader who has watched for an
+// hour from a window that died, and expiring the first would drop its place in the timeline
+// and (on a host) its seen cursor with it. What a stale lease actually costs is memory and a
+// fold that runs to completion with no reader — both bounded — because the seen cursor is
+// recorded on every close, whoever else still holds the pane.
 export type SessionSummaryPaneLeasesDeps = {
-  now: () => number
-  ttlMs: number
+  /** Oldest leases are dropped past this, so a long session cannot grow them forever. */
+  maxPanes?: number
 }
 
-export class SessionSummaryPaneLeases {
-  private readonly leases = new Map<string, { count: number; touchedAt: number }>()
+const DEFAULT_MAX_PANES = 512
 
-  constructor(private readonly deps: SessionSummaryPaneLeasesDeps) {}
+export class SessionSummaryPaneLeases {
+  private readonly leases = new Map<string, number>()
+
+  constructor(private readonly deps: SessionSummaryPaneLeasesDeps = {}) {}
 
   /** Takes a lease for a viewer opening this pane. */
   touch(paneKey: string): void {
-    const existing = this.leases.get(paneKey)
-    this.leases.set(paneKey, {
-      count: (existing?.count ?? 0) + 1,
-      touchedAt: this.deps.now()
-    })
+    // Re-insert at the end so the map order is least-recently-opened first.
+    const existing = this.leases.get(paneKey) ?? 0
+    this.leases.delete(paneKey)
+    this.leases.set(paneKey, existing + 1)
+    const max = this.deps.maxPanes ?? DEFAULT_MAX_PANES
+    while (this.leases.size > max) {
+      const oldest = this.leases.keys().next()
+      if (oldest.done) {
+        break
+      }
+      this.leases.delete(oldest.value)
+    }
   }
 
   /** Returns one lease; the remaining count, or 0 when nothing holds the pane. */
@@ -30,25 +43,13 @@ export class SessionSummaryPaneLeases {
     if (!existing) {
       return 0
     }
-    const remaining = existing.count - 1
+    const remaining = existing - 1
     if (remaining > 0) {
-      this.leases.set(paneKey, { count: remaining, touchedAt: this.deps.now() })
+      this.leases.set(paneKey, remaining)
       return remaining
     }
     this.leases.delete(paneKey)
     return 0
-  }
-
-  /** Panes whose leases nobody renewed in time. */
-  takeStale(): string[] {
-    const now = this.deps.now()
-    const stale = [...this.leases]
-      .filter(([, lease]) => now - lease.touchedAt >= this.deps.ttlMs)
-      .map(([paneKey]) => paneKey)
-    for (const paneKey of stale) {
-      this.leases.delete(paneKey)
-    }
-    return stale
   }
 
   /** Forgets the pane outright, whoever still claimed it. */
@@ -57,6 +58,6 @@ export class SessionSummaryPaneLeases {
   }
 
   count(paneKey: string): number {
-    return this.leases.get(paneKey)?.count ?? 0
+    return this.leases.get(paneKey) ?? 0
   }
 }
