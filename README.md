@@ -40,7 +40,7 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Sprints, story points, and custom fields** — move a backlog item onto a sprint from its row or the issue drawer, set or clear story points beside status, priority, and assignee, and edit custom user-picker fields (Dev, QE) from the issue detail. A sprint change made in the open issue reloads the board.
 - **"Me" matches every role field** — an issue where you are the Dev or the QE, not only the assignee, now appears under the board's Me filter.
 - **Searchable assignee picker** — with you and your team pinned to the top.
-- **Linked issue in the right sidebar** — a workspace created from a Jira, Linear, or GitHub issue gets an Issue tab with status, assignee, priority, labels, description, and an Open button. Jira issues also get unlink/re-link, a live Markdown comment box, and correct rendering of self-hosted Jira (Server/Data Center) descriptions. A GitHub issue is read from the repo it came from, so a workspace in another project still loads it, and one whose repo is not on this machine says so instead of failing.
+- **Linked issue in the right sidebar** — a workspace created from a Jira, Linear, or GitHub issue gets an Issue tab with status, assignee, priority, labels, description, and an Open button. Jira issues also get unlink/re-link, a live Markdown comment box, and correct rendering of self-hosted Jira (Server/Data Center) descriptions. A GitHub issue is read from the repo it came from, so a workspace in another project still loads it, and when that repo is not on this machine, the tab says so instead of failing.
 - **Link a workspace to a Jira issue** by key or URL from its details dialog; the Tasks page shows an attached-workspace chip and opens the existing workspace instead of creating a duplicate.
 
 ### Pull request review and CI
@@ -48,27 +48,27 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 - **Inline GitHub PR comments** — comments appear under their line in the editor, with reply, resolve, and collapse (shown only when your checkout matches the PR's head commit).
 - **Merge readiness at a glance** — the PR icon keeps its CI color and adds a dot for outstanding approvals, conflicts, or blocks, with the reason in the tooltip. Works across GitHub, GitLab, Bitbucket, Azure DevOps, and Gitea.
 - **Review verdicts in the Checks panel** — Approved / Changes requested with reviewer names, and the panel updates when CI changes instead of waiting for a tab switch.
-- **A live Checks panel** — while a run is in flight an open panel re-reads every 10s instead of waiting out the review cadence, easing through 20s to 30s while the rows stop changing so a long or stuck run is not re-read every 10s, and its verdict reaches the icons the sidebar card and activity bar read (GitHub).
+- **A live Checks panel** — while a run is in flight an open panel refreshes every 10s instead of waiting out the review cadence, slowing to 20s and then 30s while nothing changes, and its verdict updates the sidebar card and activity-bar icons (GitHub).
 - **Jenkins build details** — expand a Jenkins check to see its stages, which one is running or failed, and the build facts.
 - **Admin merge for review-gated PRs** — if your account may bypass branch protection, Merge is offered after a confirmation that names what gets skipped.
 
 ### Agents
 
 - **Session summaries** — a written brief of an agent session (activity, goal, plan, blockers, timeline) in the right sidebar, with its own agent/model setting. Covers Pi, Copilot, OpenCode, and Cursor sessions as well; a session on a paired host is briefed on that host, and one on an SSH target is briefed from its streamed transcript.
-- **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting; a pane restored on another client drops the needs-input marker its dialog left behind; and a Claude child a pi session dispatches through the CLI, with an up-to-date pi-subagents plugin, stays on that pi parent's row.
+- **More accurate agent status** — Pi rows no longer stick on "Working" or turn "Done" when a helper sub-agent finishes; Copilot CLI no longer raises "needs you" for auto-approved prompts; a Grok sub-agent waiting on you keeps its row waiting; a pane restored on another client drops the needs-input marker its dialog left behind; and a Claude sub-agent a pi session launches through the `claude` CLI stays on the pi session's row (needs a current pi-subagents plugin).
 - **Copilot's prompts are read from the screen** — a shell or URL approval and the "Copilot needs information" dialog show as prompts instead of a spinner, while a permission the CLI approved on its own stays quiet.
 - **Focus stays in the agent tab** — clicking a sidebar card, a right-sidebar activity tab, or the panel background hands the keyboard back to the agent tab, and closing a menu or dialog returns the caret too, so the next keystroke still means what it did.
 - **Clipboard follows the reader** — a copy from a pi pane watched from a paired client lands in that client's clipboard as well as the host's.
 - **One-click default agent** — the `+` button in the tab bar launches your default agent; hold it or use the chevron for the full menu.
 - **Agent Dashboard as a page** — opens in the main window with back/forward, and clicking a card opens that agent's workspace.
-- **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable. A paired host's history is paged and diffed, so a large remote history loads instead of failing.
-- **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads. An expired Claude login is refreshed from the stored refresh token rather than sitting at "Updates when Claude runs".
+- **Agent session history** — "All" really lists every session, sub-agent sessions nest under their parent, and transcript indexing makes existing transcripts searchable. A paired host's history loads in pages and refreshes only what changed, so a large remote history arrives instead of failing.
+- **Usage tracking for more providers** — Copilot enterprise AI-credit budgets, DeepSeek balance, and Fireworks.ai spend in the status bar, plus a per-provider off switch that stops polling and credential reads. An expired Claude login is refreshed from the stored refresh token rather than sitting at "Updates when Claude runs", and the renewed login is saved back where Claude keeps it.
 
 ### Workspaces and layout
 
 - **One folder per project** — the main checkout and all its worktrees live together under one folder with a shared `AGENTS.md`; `orca repo relocate` moves existing checkouts into it.
 - **Grouped workspaces across machines** — the same branch on two hosts becomes one card with a host dropdown. A workspace on a paired host reads its GitHub issue and PR from that host, and its status dot stops spinning once the host's agents finish.
-- **Paired clients stay in step** — projects and workspaces a host adds or removes, including ones created in that host's own window or from its CLI, reach its paired clients without an unrelated action having to force a refetch.
+- **Paired clients stay in step** — projects and workspaces a host adds or removes, including ones created in that host's own window or from its CLI, reach its paired clients without a manual refresh.
 - **Status filter** — hide chosen statuses from the sidebar and Cmd+J while the board still shows everything.
 - **"Setting up…" indicator** while a repo's setup script runs, including for workspaces started without an agent.
 - **Shared-directory modes** — symlink, APFS clone, copy, or skip for directories shared between worktrees.
@@ -81,7 +81,7 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 
 Additions to upstream's per-workspace environment recipes (Settings → Experimental → Cloud VM):
 
-- **Lease countdown and Extend** — a recipe that publishes when the provider takes the host away gets a countdown on the workspace card and in Settings, and an Extend action offering only the lifetimes that recipe declares. Past the deadline the host reports the expired lease instead of retrying its relay; after a grace period, Orca removes the workspace and releases the host.
+- **Lease countdown and Extend** — a recipe that publishes when the provider takes the host away gets a countdown on the workspace card and in Settings, and an Extend action offering only the lifetimes that recipe declares. Past the deadline Orca reports the expired lease instead of retrying the connection; once the host has stopped answering past a grace period, Orca removes the workspace from its list, and the provider's machine is left to its own expiry or to Cleanup in Settings.
 - **Recipe-declared context-menu items** — up to 20 actions a recipe declares get their own entries in that workspace's context menu and run with the workspace's host, name, and path. They are declared in `orca.yaml`, so they are covered by the recipe's approval, and a recipe that declares none adds no entries.
 
 ### Reliability
