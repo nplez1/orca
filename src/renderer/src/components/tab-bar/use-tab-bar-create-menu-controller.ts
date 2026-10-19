@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { useEffect, useMemo, useState } from 'react'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import { launchDefaultAgentInNewTab as launchDefaultAgent } from './launch-default-agent-in-new-tab'
+import { useNewTabMenuFocusHandoff } from './new-tab-menu-focus-handoff'
 import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
 import { useAppStore } from '../../store'
 import type { TabAgentLaunchOption } from './tab-agent-launch-options'
@@ -17,8 +19,6 @@ import type {
   getProjectRuntimeShellMenuMode,
   resolveWindowsPowerShellImplementationSetting
 } from './use-tab-bar-runtime-model'
-const NEW_TAB_MENU_TERMINAL_FOCUS_RETRY_MS = 50
-const NEW_TAB_MENU_TERMINAL_FOCUS_TIMEOUT_MS = 5000
 export type TabBarCreateMenuController = {
   agentMenu: NewTabAgentMenuModel
   agentLaunchOptions: TabAgentLaunchOption[]
@@ -30,6 +30,8 @@ export type TabBarCreateMenuController = {
   windowsShellEntries: WindowsShellMenuEntry[] | undefined
   handleSelectCreateMenuOption: (option: TabCreateMenuOption) => void
   launchAgentFromNewTabEntry: (option: TabAgentLaunchOption) => void
+  /** The split new-tab button's action: the agent the user's Chat UI setting picks a surface for. */
+  launchDefaultAgentInNewTab: (agent: TuiAgent) => void
   runPendingNewTabMenuFocusAfterClose: () => void
   clearPendingNewTabMenuFocusOnUnmount: (node: HTMLDivElement | null) => void
   queueNewActiveTerminalFocusAfterNewTabMenuClose: () => void
@@ -95,62 +97,13 @@ export function useTabBarCreateMenuController({
     agentMenu.state === 'settled' ? agentMenu.rows : [],
     commandOverrides
   )
-  const pendingNewTabMenuFocusRef = useRef<(() => void) | null>(null)
-  const pendingNewTabMenuFocusAnimationRef = useRef<number | null>(null)
-  const pendingNewTabMenuFocusRetryRef = useRef<number | null>(null)
-  const clearPendingNewTabMenuFocusAnimation = (): void => {
-    if (pendingNewTabMenuFocusAnimationRef.current === null) {
-      return
-    }
-    cancelAnimationFrame(pendingNewTabMenuFocusAnimationRef.current)
-    pendingNewTabMenuFocusAnimationRef.current = null
-  }
-  const clearPendingNewTabMenuFocusRetry = (): void => {
-    if (pendingNewTabMenuFocusRetryRef.current === null) {
-      return
-    }
-    window.clearTimeout(pendingNewTabMenuFocusRetryRef.current)
-    pendingNewTabMenuFocusRetryRef.current = null
-  }
-  const focusNewActiveTerminalWhenReady = (
-    previousActiveTabId: string | null,
-    expiresAt: number,
-    now: number
-  ): void => {
-    const state = useAppStore.getState()
-    if (
-      (state.activeTabType === 'terminal' || state.activeTabType === 'simulator') &&
-      state.activeTabId &&
-      state.activeTabId !== previousActiveTabId
-    ) {
-      focusTerminalTabSurface(state.activeTabId)
-      return
-    }
-    if (now >= expiresAt) {
-      return
-    }
-    pendingNewTabMenuFocusRetryRef.current = window.setTimeout(() => {
-      pendingNewTabMenuFocusRetryRef.current = null
-      focusNewActiveTerminalWhenReady(previousActiveTabId, expiresAt, Date.now())
-    }, NEW_TAB_MENU_TERMINAL_FOCUS_RETRY_MS)
-  }
-  const queueNewActiveTerminalFocusAfterNewTabMenuClose = (): void => {
-    const previousActiveTabId = useAppStore.getState().activeTabId
-    pendingNewTabMenuFocusRef.current = () => {
-      // Why: paired web/SSH tab creation is async; await the host snapshot's new terminal instead of the pre-existing active tab.
-      focusNewActiveTerminalWhenReady(
-        previousActiveTabId,
-        Date.now() + NEW_TAB_MENU_TERMINAL_FOCUS_TIMEOUT_MS,
-        Date.now()
-      )
-    }
-  }
-  const queueTerminalTabFocusAfterNewTabMenuClose = (tabId: string): void => {
-    pendingNewTabMenuFocusRef.current = () => focusTerminalTabSurface(tabId)
-  }
-  const queueFocusAfterNewTabMenuClose = (focus: () => void): void => {
-    pendingNewTabMenuFocusRef.current = focus
-  }
+  const {
+    queueNewActiveTerminalFocusAfterNewTabMenuClose,
+    queueTerminalTabFocusAfterNewTabMenuClose,
+    queueFocusAfterNewTabMenuClose,
+    runPendingNewTabMenuFocusAfterClose,
+    clearPendingNewTabMenuFocusOnUnmount
+  } = useNewTabMenuFocusHandoff()
   const windowsShellEntries = useMemo(() => {
     return buildWindowsShellMenuEntries({
       showWindowsShellMenu,
@@ -240,32 +193,14 @@ export function useTabBarCreateMenuController({
       launchAgentRow(option.row)
     }
   }
-  const runPendingNewTabMenuFocusAfterClose = (): void => {
-    const pendingFocus = pendingNewTabMenuFocusRef.current
-    pendingNewTabMenuFocusRef.current = null
-    clearPendingNewTabMenuFocusAnimation()
-    clearPendingNewTabMenuFocusRetry()
-    if (pendingFocus) {
-      pendingNewTabMenuFocusAnimationRef.current = requestAnimationFrame(() => {
-        pendingNewTabMenuFocusAnimationRef.current = null
-        pendingFocus()
-      })
-    }
+  const launchDefaultAgentInNewTab = (agent: TuiAgent): void => {
+    launchDefaultAgent(agent, {
+      worktreeId,
+      groupId: resolvedGroupId,
+      onLocalTerminal: queueTerminalTabFocusAfterNewTabMenuClose,
+      onHostTerminal: queueNewActiveTerminalFocusAfterNewTabMenuClose
+    })
   }
-  const clearPendingNewTabMenuFocusOnUnmountRef = useRef<
-    ((node: HTMLDivElement | null) => void) | null
-  >(null)
-  if (clearPendingNewTabMenuFocusOnUnmountRef.current === null) {
-    clearPendingNewTabMenuFocusOnUnmountRef.current = (node: HTMLDivElement | null): void => {
-      if (node !== null) {
-        return
-      }
-      // Why: cancel the delayed focus handoff via this root ref cleanup, avoiding an otherwise cleanup-only React Effect.
-      clearPendingNewTabMenuFocusAnimation()
-      clearPendingNewTabMenuFocusRetry()
-    }
-  }
-  const clearPendingNewTabMenuFocusOnUnmount = clearPendingNewTabMenuFocusOnUnmountRef.current
   useEffect(() => {
     if (!newTabMenuOpen) {
       return
@@ -290,6 +225,7 @@ export function useTabBarCreateMenuController({
     windowsShellEntries,
     handleSelectCreateMenuOption,
     launchAgentFromNewTabEntry,
+    launchDefaultAgentInNewTab,
     runPendingNewTabMenuFocusAfterClose,
     clearPendingNewTabMenuFocusOnUnmount,
     queueNewActiveTerminalFocusAfterNewTabMenuClose,

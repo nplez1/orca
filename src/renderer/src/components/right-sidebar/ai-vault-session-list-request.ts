@@ -46,12 +46,6 @@ export function readCachedAiVaultSessionList(
       request.sessionLimit,
       request.query
     ),
-    unboundedKey: aiVaultSessionResultCacheKey(
-      request.executionHostScope,
-      [],
-      'unlimited',
-      request.query
-    ),
     limit: request.sessionLimit,
     scopePaths: request.scopePaths
   })

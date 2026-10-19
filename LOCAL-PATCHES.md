@@ -583,11 +583,15 @@ pnpm run sync:localization-runtime-catalog
   decision is in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-19
   sync"; the ones a reviewer will want first:
 
-  - **The unbounded AI Vault cache entry still answers any request, and upstream's scoped-depth rule
-    decides the rest.** Both caches now gate through one helper, `aiVaultCacheEntryServes`: an
-    entry scanned at `unlimited` holds every scope at every depth (the fork's PR rule), below that
-    `aiVaultCachedDepthServes` applies (upstream's new rule). Folding either into the other drops a
-    guarantee, and the fork's two `ai-vault-session-key-scope` cases fail without the first.
+  - **The unbounded AI Vault bypass belongs to the two main-process scan caches, not the answer
+    cache.** `localCacheHit` (`cached-session-list.ts`) and both gates in `ai-vault-host-leg-cache.ts`
+    read `cached.depth === 'unlimited' || aiVaultCachedDepthServes(...)`, so a scoped bounded request
+    is answered from an unbounded scan (the fork's rule, pinned by its three
+    `serves a scoped bounded … list from the unbounded one already loaded` cases). The renderer's
+    result cache is strict — upstream's rule, pinned by its `rescans a scoped view at a lowered depth`
+    case — and its dead unbounded fallback is deleted rather than left to invite a "fix". A shared
+    helper for both was written and removed during the merge: it cannot satisfy both suites, and the
+    ledger records why not.
   - **`codex-subagent-roster` stays deleted** (the fork renamed it to `agent-descendant-roster`) and
     upstream's child-cap removal is ported into the renamed module and its test.
   - **The AI Vault view-options hook keeps upstream's shared store and both fork extras.**
@@ -621,7 +625,7 @@ pnpm run sync:localization-runtime-catalog
   remaining files are not evidence of a regression, and no failing case was left unexplained.
 
 - **2026-10-19 — what the first full run after the merge found, and what each failure was.** 69
-  failing cases in 17 files, all classified; every one that was not already recorded below is fixed
+  failing cases in 23 files, all classified; every one that was not already recorded below is fixed
   in this merge. The recorded reds reproduce unchanged: the macOS `/private/var` path signature
   (`packaged-cli-assets`, `macos-terminal-host-bundle`, all four `orcad-forked-child-paths` cases,
   `cli-command-privileged-transaction`), the bash 3.2 array failure in
@@ -653,10 +657,15 @@ pnpm run sync:localization-runtime-catalog
   - **Upstream's new sidebar parity and golden suites do not know the fork's same-branch merge.**
     The parity harness compares the desktop render with the feed projection, so it now runs with
     `mergeSameBranchWorkspaces` off on both sides (the merge is a desktop presentation step, not
-    plan identity); the six `__goldens__/sidebar-list-stamp-order` files were regenerated, and the
-    only differences are the merge's documented artefacts — one row instead of two, the survivor
-    without a `hostLabel`, the section line still naming the merged-away occurrence, and
-    `renderedKeys` one lower.
+    plan identity). The six
+    `__goldens__/sidebar-list-stamp-order` files were regenerated, and the differences are the
+    merge's artefacts, all of them effects of two cards collapsing into one: one row instead of two,
+    the survivor without a `hostLabel`, the section line still naming the merged-away occurrence,
+    `renderedKeys` one lower, and — **not yet explained and worth a follow-up** — `cmd1-9 mounted`
+    renumbers while `cmd1-9 unmounted` does not (so ⌘3 is `lab` in the mounted list and `orca-ssh`
+    in the unmounted one), and a header still says `count=2` over a single row. Both predate this
+    merge (the merge only changed which collision upstream's goldens capture); they are recorded here
+    rather than fixed, and the header count and the ⌘-index divergence are the named next step.
 
 - **2026-10-18 — merge of upstream `fc24ac3715` (628 commits) into the release line, from
   `12545ad17e`** (merge base `ac015cd3b2`, merge `db746c211b`, rollback tag

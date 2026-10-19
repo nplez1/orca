@@ -2,7 +2,8 @@ import { deriveCliWriterTopology } from './cli-writer-observation'
 import { transitionHookPresence } from '../../../shared/agent-hook-presence-transition'
 import {
   reconcileRemoteCodexState,
-  markCodexLeadTurnInterrupted
+  markCodexLeadTurnInterrupted,
+  withPreservedCodexRootContext
 } from '../../../shared/agent-hook-listener/providers/codex-state'
 import {
   resolveAgentStatusIdentity,
@@ -201,16 +202,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
       ? previousCodexRoot?.payload.model
       : undefined
     // Why: an SSH relay restart forgets root-only fields; child hooks must not erase durable resume/model identity.
-    const rootContextPreservingPayload =
-      preservedProviderSession || preservedRootModel
-        ? {
-            ...stateReconciledPayload,
-            ...(preservedProviderSession ? { providerSession: preservedProviderSession } : {}),
-            payload: preservedRootModel
-              ? { ...stateReconciledPayload.payload, model: preservedRootModel }
-              : stateReconciledPayload.payload
-          }
-        : stateReconciledPayload
+    const rootContextPreservingPayload = withPreservedCodexRootContext(stateReconciledPayload, {
+      providerSession: preservedProviderSession,
+      model: preservedRootModel
+    })
     const identityResolvedPayload =
       identity.agentType === rootContextPreservingPayload.payload.agentType
         ? rootContextPreservingPayload

@@ -32,31 +32,18 @@ export function aiVaultSessionResultCacheKey(
 
 export function readCachedAiVaultSessionResult(args: {
   key: string
-  /** The key an unbounded request would have: its entry answers every scope. */
-  unboundedKey?: string
   limit: AiVaultSessionLimit
   scopePaths: readonly string[]
 }): AiVaultListResult | null {
-  const own = cachedSessionResults.get(args.key)
-  // An unbounded entry holds every scope at every depth, but it is stored without one.
-  const unbounded =
-    own === undefined && args.unboundedKey !== undefined
-      ? cachedSessionResults.get(args.unboundedKey)
-      : undefined
-  const answersUnbounded = unbounded !== undefined && unbounded.limit === 'unlimited'
-  const cached = own ?? (answersUnbounded ? unbounded : undefined)
+  // Why no unbounded fallback here: an unlimited answer keys WITHOUT a scope, so an unlimited
+  // request finds it as its own entry, and a scoped one is refused by the depth rule below — the
+  // scan caches own the "an unbounded scan answers a bounded request" rule, not this one.
+  const cached = cachedSessionResults.get(args.key)
   if (!cached || !aiVaultCachedDepthServes(cached.limit, args.limit, args.scopePaths)) {
     return null
   }
-  // Bump the entry that answered. Copying it onto this request's key would outrank the
-  // fresher list that key is about to store.
-  if (own === undefined && answersUnbounded && args.unboundedKey !== undefined) {
-    cachedSessionResults.delete(args.unboundedKey)
-    cachedSessionResults.set(args.unboundedKey, cached)
-  } else {
-    cachedSessionResults.delete(args.key)
-    cachedSessionResults.set(args.key, cached)
-  }
+  cachedSessionResults.delete(args.key)
+  cachedSessionResults.set(args.key, cached)
   return truncateAiVaultListResult(cached.result, args.limit, args.scopePaths)
 }
 

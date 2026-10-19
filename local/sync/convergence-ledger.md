@@ -1248,6 +1248,19 @@ entry everywhere, because `aiVaultSessionDepthCovers` covers it.
 requests and the scan call. **Do not** collapse the two rules into one helper again: a shared
 `aiVaultCacheEntryServes` was tried in this sync and broke whichever side it was not written for.
 
+**Accepted cost, recorded by the review.** Because main still answers a scoped lowered-depth request
+from an unbounded scan, a user who switches from Unlimited to a preset in a *scoped* view can see the
+deeper view's in-scope rows until that entry expires — up to 60 s locally (`AI_VAULT_CACHE_TTL_MS`)
+or 15 s for a host leg. It can only ever show *more* rows than the preset would have produced, never
+fewer, and the renderer's own cache stays strict. Narrowing it means giving the fork's three
+"unbounded list answers a scoped request" cases up, which is a product decision rather than a sync
+one.
+
+The renderer's result cache has no unbounded fallback at all any more: an unlimited answer keys
+without a scope, so an unlimited request finds it as its own entry, and a scoped request is refused by
+the depth rule. Its dead `unboundedKey` branch (and the "bump" branch that existed only for it) were
+deleted after the review flagged the comment that invited their return.
+
 ### `codex-subagent-roster` is gone; upstream's cap removal lands on `agent-descendant-roster`
 
 **Paths:** `src/shared/agent-descendant-roster.ts`, `src/shared/codex-subagent-roster.ts`,

@@ -153,6 +153,23 @@ export function seedCodexStateFromSnapshot(
 }
 
 /** Sync the Codex lead record when the server infers an interrupt, so delayed child events cannot restore stale working state. */
+/** A remote restatement of a codex root drops the session/model the stored root already held. */
+export function withPreservedCodexRootContext<
+  T extends { providerSession?: unknown; payload: { model?: unknown } }
+>(
+  payload: T,
+  preserved: { providerSession?: T['providerSession']; model?: T['payload']['model'] }
+): T {
+  if (!preserved.providerSession && !preserved.model) {
+    return payload
+  }
+  return {
+    ...payload,
+    ...(preserved.providerSession ? { providerSession: preserved.providerSession } : {}),
+    payload: preserved.model ? { ...payload.payload, model: preserved.model } : payload.payload
+  }
+}
+
 export function markCodexLeadTurnInterrupted(state: HookListenerState, paneKey: string): void {
   const lead = state.codexLeadStateByPaneKey.get(paneKey)
   setCodexMainAgentTurnState(state, paneKey, {
