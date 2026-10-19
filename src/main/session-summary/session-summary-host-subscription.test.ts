@@ -454,8 +454,8 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
     // Absorbed 12 beats this close's 7 …
     expect(closed).toEqual([10, 12])
 
-    // … and is not reported twice: the pane went idle in between, so a later close of its own
-    // reports only itself.
+    // … and is not reported twice: the close of 7 spent it, so this next close reports only
+    // itself.
     subscription.open(args)
     pending[3].resolve(snapshot(false))
     await wait(4)
@@ -495,8 +495,10 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
     close(h.subscription, 1)
     await wait(4)
 
+    // The queued count is deliberately larger than the close below, so a place that outlived
+    // the idle pane would be reported as 20 instead of 9.
     h.subscription.open(args)
-    close(h.subscription, 2)
+    close(h.subscription, 20)
     await wait(10)
 
     h.subscription.open(args)

@@ -162,7 +162,7 @@ folded here.
   close that took another viewer's lease would end their fold early. An absorbed close hands
   its place forward: the highest count it reported rides along with the next close this pane
   sends to that host, and the cursor never moves backwards. A place with no later close to
-  ride on — or one whose own close failed with nobody else reading — is dropped, and a pane
+  ride on — or one whose open failed with nobody else reading — is dropped, and a pane
   that goes fully idle drops it too rather than reporting it against whatever session takes
   the pane next. One caveat: after a host restarts, a close from a client that still believes it
   holds a lease is charged to another viewer's lease there, which can end that viewer's fold
