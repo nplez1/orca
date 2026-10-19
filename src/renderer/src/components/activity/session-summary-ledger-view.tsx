@@ -1,10 +1,11 @@
 import React from 'react'
 import { translate } from '@/i18n/i18n'
-import type {
-  SessionSummaryLedger,
-  SessionSummarySnapshot,
-  SessionSummaryTimelineEntry,
-  SessionSummaryTimelineKind
+import {
+  SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
+  type SessionSummaryLedger,
+  type SessionSummarySnapshot,
+  type SessionSummaryTimelineEntry,
+  type SessionSummaryTimelineKind
 } from '../../../../shared/session-summary-types'
 
 const TIMELINE_KIND_LABELS: Record<SessionSummaryTimelineKind, string> = {
@@ -146,11 +147,35 @@ export function SessionSummaryLedgerView({
     return <LedgerContent ledger={snapshot.ledger} seenThrough={snapshot.seenThrough} />
   }
   if (snapshot?.status === 'failed') {
+    // An out-of-date paired host is a remedy, not a failure of this session.
+    if (snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'activity.sessionSummary.hostOutdated',
+            'This host runs an older Orca. Update Orca there to summarize its sessions.'
+          )}
+        </p>
+      )
+    }
+    return (
+      <>
+        <p className="text-xs text-muted-foreground">
+          {translate('activity.sessionSummary.failed', 'Could not summarize this session.')}
+        </p>
+        {snapshot.error ? (
+          <p className="mt-1 break-words text-[11px] text-muted-foreground/80">{snapshot.error}</p>
+        ) : null}
+      </>
+    )
+  }
+  if (snapshot?.status === 'unsupported-host') {
     return (
       <p className="text-xs text-muted-foreground">
-        {translate('activity.sessionSummary.failed', 'Could not summarize this session.', {
-          error: snapshot.error ?? ''
-        })}
+        {translate(
+          'activity.sessionSummary.unsupportedHost',
+          'Session summaries are not available for a workspace on this host.'
+        )}
       </p>
     )
   }

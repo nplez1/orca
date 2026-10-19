@@ -72,7 +72,17 @@ export type SessionSummaryFoldProgress = {
   totalChunks: number
 }
 
-export type SessionSummaryStatus = 'unavailable' | 'folding' | 'ready' | 'failed'
+/**
+ * `unsupported-host` is an incapacity, not a failure: the session's transcript lives
+ * on a host this app cannot read (a paired server, whose runtime file methods are
+ * worktree-relative), so no fold can run for it here.
+ */
+export type SessionSummaryStatus =
+  | 'unavailable'
+  | 'unsupported-host'
+  | 'folding'
+  | 'ready'
+  | 'failed'
 
 export type SessionSummarySnapshot = {
   paneKey: string
@@ -87,6 +97,12 @@ export type SessionSummarySnapshot = {
 
 export type SessionSummaryOpenRequest = {
   paneKey: string
+  /**
+   * The execution host owning the pane's workspace, so the fold reads the transcript
+   * where it lives. Absent means the local host — what a caller that knows nothing
+   * about host routing sends, and what an older client sends.
+   */
+  executionHostId?: string
   /** Fold-brain configuration, resolved from the user's text-generation settings. */
   foldParams?: ResolvedSourceControlAiGenerationParams | null
 }
@@ -100,12 +116,23 @@ export type SessionSummaryCloseRequest = {
 export const SESSION_SUMMARY_TEXT_MAX_LENGTH = 600
 export const SESSION_SUMMARY_LIST_MAX_ITEMS = 12
 
+/**
+ * The error a paired host answers with when it predates the host-fold methods.
+ * A server updates on its own schedule, so this names the remedy instead of
+ * reporting a fold that failed.
+ */
+export const SESSION_SUMMARY_HOST_OUTDATED_MESSAGE = 'host-outdated'
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
 export function isSessionSummaryOpenRequest(value: unknown): value is SessionSummaryOpenRequest {
-  return isRecord(value) && typeof value.paneKey === 'string'
+  if (!isRecord(value) || typeof value.paneKey !== 'string') {
+    return false
+  }
+  // Optional, so a request from a client that predates host-aware folding stays valid.
+  return value.executionHostId === undefined || typeof value.executionHostId === 'string'
 }
 
 export function isSessionSummaryCloseRequest(value: unknown): value is SessionSummaryCloseRequest {

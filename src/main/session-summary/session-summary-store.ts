@@ -1,9 +1,11 @@
 // The ledger is a cache: corrupt, stale, or missing is never data loss, just a
 // rebuild. One JSON file keyed by paneKey, written on fold completion / view
 // close only — never on the status path (docs/reference/agent-status-store.md).
-import { app } from 'electron'
+//
+// Electron-free: a paired Orca host serves this store too, so the path is always
+// passed in rather than resolved from `app`.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -44,10 +46,6 @@ export class SessionSummaryStore {
     this.load()
   }
 
-  static fromUserData(userDataPath = app.getPath('userData')): SessionSummaryStore {
-    return new SessionSummaryStore(join(userDataPath, 'session-summaries.json'))
-  }
-
   get(paneKey: string): SessionSummaryStoreEntry | null {
     return this.entries[paneKey] ?? null
   }
@@ -63,6 +61,15 @@ export class SessionSummaryStore {
         delete this.entries[key]
       }
     }
+    this.save()
+  }
+
+  /** Drops a pane's cache entirely — a new session took the pane, or it never folded. */
+  delete(paneKey: string): void {
+    if (!(paneKey in this.entries)) {
+      return
+    }
+    delete this.entries[paneKey]
     this.save()
   }
 

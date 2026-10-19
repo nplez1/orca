@@ -5,6 +5,7 @@ import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import { SessionSummaryStore } from './session-summary-store'
 import { SessionSummaryService, type SessionSummaryStatusEntry } from './session-summary-service'
 import type { SessionFoldBrain, SessionSummarySourceEvent } from './session-summary-fold'
+import type { SessionSummaryTranscriptHost } from './session-summary-transcript-host'
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -161,7 +162,60 @@ describe('SessionSummaryService', () => {
     service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(updates.some((u) => u.status === 'failed')).toBe(false)
-    expect(store.get('tab:leaf')?.seenThrough).toBe(0)
+    // Nothing folded, so there is nothing to remember — see the next test.
+    expect(store.get('tab:leaf')).toBeNull()
+  })
+
+  // #135: close() used to write an entry around an empty ledger, so the next visit
+  // read a non-null ledger as "Up to date" and rendered a blank body.
+  it('does not turn a session that never folded into an up-to-date summary', async () => {
+    const { store } = testStore()
+    const { service, updates } = harness(store, null)
+    service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => updates.some((u) => u.status === 'unavailable'))
+    service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
+
+    updates.length = 0
+    const reopened = service.open({ paneKey: 'tab:leaf' })
+
+    // The decisive part: no ledger to show, so the header cannot claim "Up to date".
+    expect(reopened.ledger).toBeNull()
+    await waitFor(() => updates.some((u) => u.status === 'unavailable' && !u.ledger))
+    expect(reopened.seenThrough).toBe(0)
+  })
+
+  it('does not record a failed first fold as a summary', async () => {
+    const { store } = testStore()
+    const { service, updates, setBrainReply } = harness(store, events(5))
+    setBrainReply(() => 'not json at all')
+    service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => updates.some((u) => u.status === 'failed'))
+    service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
+
+    expect(store.get('tab:leaf')).toBeNull()
+    updates.length = 0
+    // Reopening retries instead of claiming a summary of nothing.
+    expect(service.open({ paneKey: 'tab:leaf' }).status).toBe('folding')
+  })
+
+  it('clears the previous ledger when a new session takes the pane', async () => {
+    const { store } = testStore()
+    const { service, updates, setEntry, setEvents } = harness(store, events(5))
+    service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
+
+    setEntry({
+      agentType: 'claude',
+      providerSession: { key: 'session_id', id: 'sess-2', transcriptPath: '/tmp/sess-2.jsonl' }
+    })
+    setEvents(null)
+    updates.length = 0
+    const reopened = service.open({ paneKey: 'tab:leaf' })
+
+    // The previous conversation's brief must not stand in for the new one.
+    expect(reopened.ledger).toBeNull()
+    await waitFor(() => updates.some((u) => u.status === 'unavailable'))
+    expect(store.get('tab:leaf')).toBeNull()
   })
 
   it('resumes from foldedThrough on reopen and keeps the seen cursor', async () => {
@@ -223,5 +277,219 @@ describe('SessionSummaryService', () => {
     const failed = updates.find((u) => u.status === 'failed')
     expect(failed?.ledger?.foldedThrough).toBe(5)
     expect(failed?.error).toContain('JSON')
+  })
+})
+
+describe('SessionSummaryService host routing', () => {
+  type HostHarness = Harness & {
+    hostReads: { host: SessionSummaryTranscriptHost }[]
+    hostFoldCalls: string[]
+    setHostSnapshot: (snapshot: SessionSummarySnapshot | null) => void
+  }
+
+  function hostHarness(args: {
+    store: SessionSummaryStore
+    events: SessionSummarySourceEvent[] | null
+    hostSnapshot?: SessionSummarySnapshot
+    foldFails?: Error
+    entry?: SessionSummaryStatusEntry | undefined
+  }): HostHarness {
+    const currentEntry: SessionSummaryStatusEntry | undefined =
+      'entry' in args
+        ? args.entry
+        : {
+            agentType: 'pi',
+            providerSession: {
+              key: 'session_id',
+              id: 'sess-1',
+              transcriptPath: '/remote/sess-1.jsonl'
+            }
+          }
+    let hostSnapshot = args.hostSnapshot ?? null
+    const hostReads: { host: SessionSummaryTranscriptHost }[] = []
+    const hostFoldCalls: string[] = []
+    const updates: SessionSummarySnapshot[] = []
+    const service = new SessionSummaryService({
+      store: args.store,
+      readEvents: async ({ host }) => {
+        hostReads.push({ host })
+        return args.events
+      },
+      getAgentStatusEntry: () => currentEntry,
+      createBrain: () => ({
+        complete: async () => JSON.stringify({ inProgress: 'folding' })
+      }),
+      hostFold: {
+        open: async ({ environmentId, paneKey }) => {
+          hostFoldCalls.push(`open:${environmentId}:${paneKey}`)
+          if (args.foldFails) {
+            throw args.foldFails
+          }
+          return hostSnapshot ?? hostSnapshotFor(paneKey, 'folding')
+        },
+        peek: async ({ environmentId, paneKey }) => {
+          hostFoldCalls.push(`peek:${environmentId}:${paneKey}`)
+          return hostSnapshot ?? hostSnapshotFor(paneKey, 'folding')
+        },
+        close: async ({ environmentId, paneKey, seenTimelineCount }) => {
+          hostFoldCalls.push(`close:${environmentId}:${paneKey}:${seenTimelineCount}`)
+        }
+      },
+      hostPollIntervalMs: 5,
+      now: () => 1000
+    })
+    service.onUpdate((snapshot) => updates.push(snapshot))
+    return {
+      service,
+      updates,
+      hostReads,
+      hostFoldCalls,
+      brainPrompts: [],
+      setEvents: () => {},
+      setEntry: () => {},
+      setBrainReply: () => {},
+      setHostSnapshot: (next) => {
+        hostSnapshot = next
+      }
+    }
+  }
+
+  function hostSnapshotFor(paneKey: string, status: 'folding' | 'ready'): SessionSummarySnapshot {
+    return {
+      paneKey,
+      status,
+      facts: null,
+      ledger:
+        status === 'ready'
+          ? {
+              goal: 'Summmarized on the host',
+              plan: [],
+              inProgress: null,
+              done: [],
+              blockers: [],
+              decisions: [],
+              timeline: [],
+              foldedThrough: 3,
+              foldedAt: 1
+            }
+          : null,
+      seenThrough: 0,
+      fold: { running: status === 'folding', completedChunks: 0, totalChunks: 0 }
+    }
+  }
+
+  it('reads a local session on this machine', async () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: events(2) })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'local' })
+
+    expect(h.hostReads[0]?.host).toEqual({ kind: 'local' })
+  })
+
+  // The row's connection is the host that wrote the transcript, whatever the client's
+  // workspace says: a path only reads on the machine that produced it.
+  it('reads an SSH session from the connection its status row names', async () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: events(2) })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'ssh:other-target' })
+
+    expect(h.hostReads[0]?.host.kind).toBe('ssh')
+  })
+
+  // #135: a paired host folds its own sessions — the same code that would run if the
+  // user were working on that machine — and the desktop only relays its snapshots.
+  it('folds a paired host session on that host and relays its snapshots', async () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: events(2) })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.hostFoldCalls.some((c) => c.startsWith('peek:')))
+    h.setHostSnapshot(hostSnapshotFor('tab:leaf', 'ready'))
+    await waitFor(() => h.updates.some((u) => u.status === 'ready'))
+
+    expect(h.hostFoldCalls[0]).toBe('open:env-1:tab:leaf')
+    expect(h.updates.find((u) => u.status === 'ready')?.ledger?.foldedThrough).toBe(3)
+    // The transcript is read on the host, never here.
+    expect(h.hostReads).toHaveLength(0)
+    expect(store.get('tab:leaf')).toBeNull()
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 4 })
+    expect(h.hostFoldCalls.at(-1)).toBe('close:env-1:tab:leaf:4')
+  })
+
+  // The remote half of #135: this client clears connection rows on reconnect, so a pane
+  // with no local row must still be summarized — the host keeps the rows for its own
+  // sessions, and asking it is what makes the tab work on a paired host at all.
+  it('summarizes a paired host pane even when this client has no status row for it', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      entry: undefined,
+      hostSnapshot: hostSnapshotFor('tab:leaf', 'ready')
+    })
+
+    const opened = h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.updates.some((u) => u.status === 'ready'))
+
+    expect(opened.status).toBe('folding')
+    expect(h.hostFoldCalls[0]).toBe('open:env-1:tab:leaf')
+    expect(h.updates.find((u) => u.status === 'ready')?.ledger?.foldedThrough).toBe(3)
+    expect(h.updates.some((u) => u.status === 'unavailable')).toBe(false)
+  })
+
+  it('keeps polling a paired host fold until it settles', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      hostSnapshot: hostSnapshotFor('tab:leaf', 'folding')
+    })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.hostFoldCalls.filter((c) => c.startsWith('peek:')).length >= 2)
+    h.setHostSnapshot(hostSnapshotFor('tab:leaf', 'ready'))
+    await waitFor(() => h.updates.some((u) => u.status === 'ready'))
+
+    // Settled: polling stops instead of running for the life of the pane.
+    const seen = h.hostFoldCalls.length
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect(h.hostFoldCalls.length).toBe(seen)
+  })
+
+  it('stops polling when the pane closes', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      hostSnapshot: hostSnapshotFor('tab:leaf', 'folding')
+    })
+    h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.hostFoldCalls.some((c) => c.startsWith('peek:')))
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
+    const seen = h.hostFoldCalls.length
+    await new Promise((resolve) => setTimeout(resolve, 40))
+
+    expect(h.hostFoldCalls.length).toBe(seen)
+  })
+
+  it('reports a paired host that cannot answer instead of failing silently', async () => {
+    const { store } = testStore()
+    const h = hostHarness({
+      store,
+      events: null,
+      foldFails: new Error('host-outdated')
+    })
+    const opened = h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+
+    expect(opened.status).toBe('folding')
+    await waitFor(() => h.updates.some((u) => u.status === 'failed'))
+    expect(h.updates.find((u) => u.status === 'failed')?.error).toBe('host-outdated')
+  })
+
+  it('names a host it cannot place rather than reading a path here', async () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: events(2) })
+    const opened = h.service.open({ paneKey: 'tab:leaf', executionHostId: 'future-host:abc' })
+
+    expect(opened.status).toBe('unsupported-host')
+    expect(h.hostReads).toHaveLength(0)
   })
 })

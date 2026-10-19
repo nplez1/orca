@@ -27,6 +27,17 @@ export function emptySessionSummaryLedger(): SessionSummaryLedger {
   }
 }
 
+/**
+ * Whether a fold ever produced this ledger.
+ *
+ * An empty ledger is not a summary of nothing — it is the absence of one. Recording it
+ * makes the next visit read `ready` and say "Up to date" over a blank body, so every
+ * write path checks this first.
+ */
+export function hasProducedLedger(ledger: SessionSummaryLedger): boolean {
+  return ledger.foldedAt !== null || ledger.foldedThrough > 0 || ledger.timeline.length > 0
+}
+
 function normalizeText(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null

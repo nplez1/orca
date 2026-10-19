@@ -110,11 +110,60 @@ replaces the moment it can run. Two rules matter there:
 - **A cached list is refreshable.** The pane offers *Refresh models*, which drops the cached
   probe for the selected agent and lists again; without it, a model the CLI started
   reporting would stay unreachable for the life of the install.
-- **Storage is host-keyed; resolution is local.** The fold spawns the agent CLI on the local
-  machine and reads the transcript from the local filesystem
-  (`session-summary-agent-cli-fold-brain.ts`), so a remote host's model list would offer
-  models that spawn cannot run. The list is stored under the host-keyed slots so a future
-  host-aware fold needs no migration, but the pane reads the local slot.
+- **Storage is host-keyed; resolution is local.** The pane's model list describes the agent
+  CLIs this window can spawn, and it is stored under the host-keyed slots so a host-aware
+  resolver needs no migration. It still reads the local slot: a fold the desktop runs uses a
+  local CLI, and a fold a paired host runs uses a CLI installed *there*, with the agent and
+  model named by the request (see "Which host folds").
+
+## Which host folds
+
+The fold runs wherever the session's transcript lives, so accessing a session remotely
+behaves like working on that machine directly.
+
+| Workspace host | Transcript read | Fold (agent CLI) | Ledger, chunk cache, seen cursor |
+| --- | --- | --- | --- |
+| `local` | local filesystem | this window | local `session-summaries.json` |
+| `ssh:<target>` | `cat` over the SSH connection Orca already holds, streamed to a copy | this window | local `session-summaries.json` |
+| `runtime:<env>` | the paired host's own filesystem | **the paired host** | the paired host's `session-summaries.json` |
+
+Why it splits that way: a paired Orca server is this same codebase served without Electron
+(`orcad-entry.ts`), so it runs its own `SessionSummaryService` and the desktop only relays
+its snapshots — `sessionSummary.openOnHost`, `sessionSummary.snapshotOnHost`,
+`sessionSummary.closeOnHost` (`src/main/runtime/rpc/methods/session-summary.ts`). A plain SSH
+target runs no Orca server at all, only the relay CLI, so its transcript is fetched and
+folded here.
+
+- **The client polls a host fold; it does not hold a call open.** A fold of a long session
+  outlives a relay idle window, and "still running?" plus "what is the ledger now?" is all
+  the pane needs. A reconnect resumes polling the same host state.
+- **The request carries the chosen agent.** `foldParams` is resolved from the requesting
+  client's Settings → Agents and sent with the open, so a host never spawns an agent the
+  reader did not choose. A host without that CLI installed fails the fold with its own
+  error rather than substituting one.
+- **A paired host that predates these methods** answers `method_not_found`, which the pane
+  reports as "Update Orca there to summarize its sessions" — a remedy, not a failed fold.
+  Older servers are the normal case, since they update on their own schedule.
+- **An SSH read is capped, never truncated.** Over 24 MB the fold fails with a message
+  rather than parsing a shortened file: dropped head events would renumber every entry the
+  ledger's cursor counts. Only a hook-reported path is used, because on that host there is
+  no root search and no synthesizable Copilot session directory.
+
+### States the pane can be in
+
+| Status | Meaning |
+| --- | --- |
+| `folding` | a fold is in flight here or on the host |
+| `ready` | a ledger exists and is on screen |
+| `unavailable` | no readable transcript, or a readable one with no messages yet |
+| `failed` | the fold, the transcript read, or the host call failed; `error` says which |
+| `unsupported-host` | a host id this build cannot place, so nothing is read or folded |
+
+A ledger that no fold ever produced is never written (`hasProducedLedger`). `close()` used to
+record one anyway, which made the next visit read a non-null ledger as **"Up to date" over a
+blank body** — the empty state that should mean "here is the brief" (fork issue #135). For
+the same reason a readable transcript with no new events is `ready`, not `unavailable`: it
+is not a session that has no transcript.
 
 ## Adding a right-sidebar tab
 

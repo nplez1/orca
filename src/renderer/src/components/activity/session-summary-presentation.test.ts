@@ -49,6 +49,24 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(state).toEqual({ hint: 'No readable transcript', folding: false })
   })
 
+  it('names an unplaceable host instead of claiming to be up to date', () => {
+    const state = resolveSessionSummaryHeaderState(snapshot({ status: 'unsupported-host' }))
+
+    expect(state).toEqual({
+      hint: 'Session summaries are not available on this host',
+      folding: false
+    })
+  })
+
+  // A paired host that predates host folding: the remedy, not a failed session.
+  it('offers an update rather than a failure for an out-of-date host', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({ status: 'failed', error: 'host-outdated' })
+    )
+
+    expect(state).toEqual({ hint: 'Update Orca on this host to summarize', folding: false })
+  })
+
   it('names the failure instead of claiming to be up to date', () => {
     const state = resolveSessionSummaryHeaderState(snapshot({ status: 'failed' }))
 
