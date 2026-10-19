@@ -1,9 +1,15 @@
 // A fold that runs on the paired host owning the session, and the polling that keeps the
 // pane current with it.
 //
-// Polling rather than a held-open call or a stream: a fold of a long session outlives a
-// relay idle window, "still running? / what is the ledger now?" is all the pane needs, and
-// a reconnecting client resumes against the same host state with no teardown to get wrong.
+// This module owns every paired-host lease. An open the host accepts is a lease owed one
+// close, and the count lives here because opens answer asynchronously: a viewer can close a
+// pane before its open has been answered, and a close that arrives too early must not be
+// dropped (the lease would live on and its fold would never stop) nor sent (the host may yet
+// reject the open, and closing a lease that does not exist takes another client's).
+//
+// Polling rather than a held-open call or a stream: a fold of a long session outlives a relay
+// idle window, "still running? / what is the ledger now?" is all the pane needs, and a
+// reconnecting client resumes against the same host state with nothing to tear down.
 import type { SessionSummaryHostFoldClient } from './session-summary-host-fold-client'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
@@ -14,23 +20,29 @@ const MAX_POLL_RETRIES = 1
 export type SessionSummaryHostSubscriptionDeps = {
   hostFold: SessionSummaryHostFoldClient
   pollIntervalMs?: number
-  /** The host answered with a newer snapshot; `opened` when it accepted an open. */
-  onSnapshot: (paneKey: string, snapshot: SessionSummarySnapshot, opened: boolean) => void
+  /** The host answered with a newer snapshot for the pane's current view. */
+  onSnapshot: (paneKey: string, snapshot: SessionSummarySnapshot) => void
   /** The open or a poll failed; `snapshot` is passed through when one was already shown. */
   onError: (paneKey: string, error: Error, snapshot: SessionSummarySnapshot | null) => void
 }
 
+type InflightOpen = { environmentId: string; queuedClose: number | null }
+
+type PaneHostState = {
+  /** Never reset: a late answer from a closed chain must not match a later open's number. */
+  nextSeq: number
+  token: number
+  environmentId: string
+  inflight: Map<number, InflightOpen>
+  /** Opens the host accepted and no close has been sent for. */
+  leases: number
+  latest?: SessionSummarySnapshot
+  pollFailures: number
+}
+
 export class SessionSummaryHostFoldSubscription {
+  private readonly panes = new Map<string, PaneHostState>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
-  /** Per-pane chain generation: an older chain stops instead of polling twice. */
-  private readonly tokens = new Map<string, number>()
-  private readonly latest = new Map<string, SessionSummarySnapshot>()
-  private readonly pollFailures = new Map<string, number>()
-  /** Panes whose open has not been answered yet, with a close waiting behind it. */
-  private readonly opening = new Map<
-    string,
-    { environmentId: string; pendingClose: number | null }
-  >()
 
   constructor(private readonly deps: SessionSummaryHostSubscriptionDeps) {}
 
@@ -39,35 +51,73 @@ export class SessionSummaryHostFoldSubscription {
     paneKey: string
     environmentId: string
     foldParams: ResolvedSourceControlAiGenerationParams | null
-    lastSnapshot: SessionSummarySnapshot | null
   }): void {
-    const token = this.bumpToken(args.paneKey)
+    const state = this.stateFor(args.paneKey, args.environmentId)
+    const seq = state.nextSeq
+    state.nextSeq += 1
+    state.token += 1
+    state.inflight.set(seq, { environmentId: args.environmentId, queuedClose: null })
     this.clearTimer(args.paneKey)
-    // Why remember the open: a close that arrives before the host answered must not be
-    // dropped (its lease would live on), and must not be sent either (the host may reject
-    // the open, in which case no lease exists to close).
-    this.opening.set(args.paneKey, { environmentId: args.environmentId, pendingClose: null })
-    void this.runOpen(args, token)
+    void this.runOpen(args, state, seq, state.token)
   }
 
+  /**
+   * Tells the host what the viewer saw, and stops watching when they were the last one.
+   *
+   * Every open the host accepted owes exactly one close, so this goes to the host whenever a
+   * lease is outstanding. A close with no lease yet waits behind the oldest unanswered open,
+   * because that is the lease it is owed.
+   */
+  close(args: {
+    paneKey: string
+    environmentId: string
+    seenTimelineCount: number
+    lastViewer: boolean
+  }): void {
+    const state = this.panes.get(args.paneKey)
+    if (!state) {
+      // Nothing was ever opened here: nothing to close, and nothing to stop.
+      return
+    }
+    if (state.leases > 0) {
+      state.leases -= 1
+      this.sendClose(args)
+    } else {
+      const waiting = [...state.inflight.values()].find((open) => open.queuedClose === null)
+      if (waiting) {
+        waiting.queuedClose = args.seenTimelineCount
+      }
+    }
+    if (args.lastViewer) {
+      this.cancel(args.paneKey)
+    }
+  }
+
+  /** Stops watching the pane, without touching the leases the host holds. */
   cancel(paneKey: string): void {
-    this.bumpToken(paneKey)
+    const state = this.panes.get(paneKey)
+    if (state) {
+      state.token += 1
+    }
     this.clearTimer(paneKey)
   }
 
-  /** Forgets the pane entirely, telling the host what the viewer actually saw. */
-  close(args: { paneKey: string; environmentId: string; seenTimelineCount: number }): void {
-    const opening = this.opening.get(args.paneKey)
-    if (opening && opening.pendingClose === null) {
-      opening.pendingClose = args.seenTimelineCount
-      return
+  private stateFor(paneKey: string, environmentId: string): PaneHostState {
+    const existing = this.panes.get(paneKey)
+    if (existing) {
+      existing.environmentId = environmentId
+      return existing
     }
-    this.opening.delete(args.paneKey)
-    this.cancel(args.paneKey)
-    this.tokens.delete(args.paneKey)
-    this.latest.delete(args.paneKey)
-    this.pollFailures.delete(args.paneKey)
-    void this.deps.hostFold.close(args).catch(() => {})
+    const created: PaneHostState = {
+      nextSeq: 1,
+      token: 1,
+      environmentId,
+      inflight: new Map(),
+      leases: 0,
+      pollFailures: 0
+    }
+    this.panes.set(paneKey, created)
+    return created
   }
 
   private async runOpen(
@@ -75,8 +125,9 @@ export class SessionSummaryHostFoldSubscription {
       paneKey: string
       environmentId: string
       foldParams: ResolvedSourceControlAiGenerationParams | null
-      lastSnapshot: SessionSummarySnapshot | null
     },
+    state: PaneHostState,
+    seq: number,
     token: number
   ): Promise<void> {
     try {
@@ -85,43 +136,44 @@ export class SessionSummaryHostFoldSubscription {
         paneKey: args.paneKey,
         foldParams: args.foldParams
       })
-      const pendingClose = this.takePendingClose(args.paneKey)
-      this.accept(args.paneKey, token, snapshot, args.environmentId, true)
-      if (pendingClose !== null && this.tokens.get(args.paneKey) === token) {
-        void this.deps.hostFold
-          .close({
-            paneKey: args.paneKey,
-            environmentId: args.environmentId,
-            seenTimelineCount: pendingClose
-          })
-          .catch(() => {})
-        this.cancel(args.paneKey)
+      const queued = state.inflight.get(seq)?.queuedClose ?? null
+      state.inflight.delete(seq)
+      // Why count before checking currency: the host took this lease whatever this pane is
+      // showing now, and a lease nobody accounts for is a fold nobody can stop.
+      state.leases += 1
+      if (queued !== null) {
+        state.leases -= 1
+        this.sendClose({
+          paneKey: args.paneKey,
+          environmentId: args.environmentId,
+          seenTimelineCount: queued
+        })
       }
+      this.accept(args.paneKey, state, token, snapshot)
     } catch (error) {
-      // No lease was taken, so there is nothing to close.
-      this.opening.delete(args.paneKey)
-      this.fail(args.paneKey, token, error, args.lastSnapshot)
+      // No lease was taken, so the close this open owed is nobody's: there is nothing to send.
+      state.inflight.delete(seq)
+      this.fail(args.paneKey, state, token, error)
     }
   }
 
   private accept(
     paneKey: string,
+    state: PaneHostState,
     token: number,
-    snapshot: SessionSummarySnapshot,
-    environmentId: string,
-    opened: boolean
+    snapshot: SessionSummarySnapshot
   ): void {
-    if (this.tokens.get(paneKey) !== token) {
+    if (state.token !== token) {
       return
     }
-    this.latest.set(paneKey, snapshot)
-    this.pollFailures.delete(paneKey)
-    this.deps.onSnapshot(paneKey, snapshot, opened)
-    this.schedule(paneKey, token, environmentId)
+    state.latest = snapshot
+    state.pollFailures = 0
+    this.deps.onSnapshot(paneKey, snapshot)
+    this.schedule(paneKey, state, token)
   }
 
-  private schedule(paneKey: string, token: number, environmentId: string): void {
-    if (!this.latest.get(paneKey)?.fold.running) {
+  private schedule(paneKey: string, state: PaneHostState, token: number): void {
+    if (!state.latest?.fold.running) {
       return
     }
     this.clearTimer(paneKey)
@@ -129,53 +181,56 @@ export class SessionSummaryHostFoldSubscription {
       paneKey,
       setTimeout(() => {
         this.timers.delete(paneKey)
-        void this.poll(paneKey, token, environmentId)
+        void this.poll(paneKey, state, token)
       }, this.deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS)
     )
   }
 
-  private async poll(paneKey: string, token: number, environmentId: string): Promise<void> {
-    if (this.tokens.get(paneKey) !== token) {
+  private async poll(paneKey: string, state: PaneHostState, token: number): Promise<void> {
+    if (state.token !== token) {
       return
     }
     try {
-      const snapshot = await this.deps.hostFold.peek({ environmentId, paneKey })
-      this.accept(paneKey, token, snapshot, environmentId, false)
+      const snapshot = await this.deps.hostFold.peek({
+        environmentId: state.environmentId,
+        paneKey
+      })
+      this.accept(paneKey, state, token, snapshot)
     } catch (error) {
       // Why one retry: a relay blip must not freeze a stale brief under "Up to date".
-      const failures = (this.pollFailures.get(paneKey) ?? 0) + 1
-      if (failures <= MAX_POLL_RETRIES && this.tokens.get(paneKey) === token) {
-        this.pollFailures.set(paneKey, failures)
-        this.schedule(paneKey, token, environmentId)
+      state.pollFailures += 1
+      if (state.pollFailures <= MAX_POLL_RETRIES && state.token === token) {
+        this.schedule(paneKey, state, token)
         return
       }
-      this.fail(paneKey, token, error, this.latest.get(paneKey) ?? null)
+      this.fail(paneKey, state, token, error)
     }
   }
 
-  private fail(
-    paneKey: string,
-    token: number,
-    error: unknown,
-    snapshot: SessionSummarySnapshot | null
-  ): void {
-    if (this.tokens.get(paneKey) !== token) {
+  private fail(paneKey: string, state: PaneHostState, token: number, error: unknown): void {
+    if (state.token !== token) {
       return
     }
     this.clearTimer(paneKey)
-    this.deps.onError(paneKey, error instanceof Error ? error : new Error(String(error)), snapshot)
+    this.deps.onError(
+      paneKey,
+      error instanceof Error ? error : new Error(String(error)),
+      state.latest ?? null
+    )
   }
 
-  private takePendingClose(paneKey: string): number | null {
-    const opening = this.opening.get(paneKey)
-    this.opening.delete(paneKey)
-    return opening?.pendingClose ?? null
-  }
-
-  private bumpToken(paneKey: string): number {
-    const token = (this.tokens.get(paneKey) ?? 0) + 1
-    this.tokens.set(paneKey, token)
-    return token
+  private sendClose(args: {
+    paneKey: string
+    environmentId: string
+    seenTimelineCount: number
+  }): void {
+    void this.deps.hostFold
+      .close({
+        paneKey: args.paneKey,
+        environmentId: args.environmentId,
+        seenTimelineCount: args.seenTimelineCount
+      })
+      .catch(() => {})
   }
 
   private clearTimer(paneKey: string): void {

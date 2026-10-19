@@ -57,8 +57,6 @@ type PaneRuntime = {
   foldParams: ResolvedSourceControlAiGenerationParams | null
   /** A host-owned pane's last snapshot: that host's ledger, seen cursor and progress. */
   hostSnapshot?: SessionSummarySnapshot
-  /** Leases the host took for this pane; each open it acknowledged owes one close. */
-  hostLeases?: number
 }
 
 export class SessionSummaryService {
@@ -75,8 +73,7 @@ export class SessionSummaryService {
           ...(deps.hostPollIntervalMs === undefined
             ? {}
             : { pollIntervalMs: deps.hostPollIntervalMs }),
-          onSnapshot: (paneKey, snapshot, opened) =>
-            this.applyHostSnapshot(paneKey, snapshot, opened),
+          onSnapshot: (paneKey, snapshot) => this.applyHostSnapshot(paneKey, snapshot),
           onError: (paneKey, error, snapshot) => this.failHostFold(paneKey, error, snapshot)
         })
       : null
@@ -203,13 +200,16 @@ export class SessionSummaryService {
     // A host-owned pane's lease is the host's: forward every close, so its count matches the
     // opens it acknowledged. Only acknowledged opens — a rejected or undelivered open holds
     // no lease there, and closing it would take another client's.
-    if (runtime?.host.kind === 'runtime' && (runtime.hostLeases ?? 0) > 0 && this.hostFolds) {
+    // Every open this desktop sent may be a lease the host holds, so the host gets one close
+    // per open; it decides when that ends its fold. A close the host's own count cannot
+    // cover waits behind an unanswered open inside the subscription.
+    if (runtime?.host.kind === 'runtime' && this.hostFolds) {
       this.hostFolds.close({
         paneKey,
         environmentId: runtime.host.environmentId,
-        seenTimelineCount: request.seenTimelineCount
+        seenTimelineCount: request.seenTimelineCount,
+        lastViewer: this.leases.count(paneKey) <= 1
       })
-      runtime.hostLeases = (runtime.hostLeases ?? 0) - 1
     }
     // Recorded on every close, whoever else still holds the pane: the reader who reached
     // furthest keeps their place even if another viewer never returns its lease.
@@ -249,6 +249,8 @@ export class SessionSummaryService {
   /** Drops every lease on the pane and stops its work. */
   private releasePane(paneKey: string): void {
     this.leases.drop(paneKey)
+    // Stops the host polling too: the last viewer is gone, so nothing needs those answers.
+    this.hostFolds?.cancel(paneKey)
     this.folds.get(paneKey)?.abort()
     this.folds.delete(paneKey)
     this.runtimes.delete(paneKey)
@@ -313,25 +315,17 @@ export class SessionSummaryService {
     this.hostFolds.open({
       paneKey,
       environmentId,
-      foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null,
-      lastSnapshot: runtime.hostSnapshot ?? null
+      foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null
     })
   }
 
-  private applyHostSnapshot(
-    paneKey: string,
-    snapshot: SessionSummarySnapshot,
-    opened: boolean
-  ): void {
+  private applyHostSnapshot(paneKey: string, snapshot: SessionSummarySnapshot): void {
     const runtime = this.runtimes.get(paneKey)
     if (!runtime) {
       return
     }
     runtime.hostSnapshot = snapshot
     runtime.status = snapshot.status
-    if (opened) {
-      runtime.hostLeases = (runtime.hostLeases ?? 0) + 1
-    }
     this.emit(paneKey)
   }
 
