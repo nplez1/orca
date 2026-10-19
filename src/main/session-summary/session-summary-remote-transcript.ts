@@ -9,7 +9,7 @@
 // (`MAX_EXEC_OUTPUT_CHARS`), which would silently drop the head of a large transcript
 // and renumber every event the ledger's cursor counts.
 import { createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { Readable } from 'node:stream'
@@ -51,14 +51,13 @@ export function createSshTranscriptFetcher(
 }) => Promise<RemoteTranscriptFetch> {
   const maxBytes = deps.maxBytes ?? REMOTE_TRANSCRIPT_MAX_BYTES
   const timeoutMs = deps.timeoutMs ?? REMOTE_TRANSCRIPT_TIMEOUT_MS
-  const tmpRoot = deps.tmpRoot ?? join(tmpdir(), 'orca-session-summary-remote')
+  const parentDir = deps.tmpRoot ?? tmpdir()
 
   return async ({ targetId, remotePath, signal }) => {
     signal.throwIfAborted()
-    // Why mkdtemp: a predictable name under a shared temp root is pre-creatable by another
-    // local user, and this file holds a transcript.
-    await mkdir(tmpRoot, { recursive: true, mode: 0o700 })
-    const dir = await mkdtemp(join(tmpRoot, 'transcript-'))
+    // Why mkdtemp with a random suffix: a fixed name under a shared /tmp is pre-creatable
+    // by another local user, and this file holds a transcript.
+    const dir = await mkdtemp(join(parentDir, 'orca-session-summary-'))
     const dispose = async (): Promise<void> => {
       await rm(dir, { recursive: true, force: true }).catch(() => {})
     }
@@ -97,13 +96,16 @@ async function streamRemoteFile(args: {
   signal: AbortSignal
 }): Promise<RemoteTranscriptFetch> {
   const { channel, localPath, maxBytes, timeoutMs, signal } = args
-  signal.throwIfAborted()
+  if (signal.aborted) {
+    // Why close: `cat` would otherwise sit blocked on a full window with no reader.
+    channel.close()
+    throw new Error('remote transcript read canceled')
+  }
   const sink = createWriteStream(localPath, { mode: 0o600 })
   let bytes = 0
   let overflow = false
-  let exitCode: number | null = null
 
-  await new Promise<void>((resolve, reject) => {
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
     let settled = false
     const settle = (fn: () => void): void => {
       if (settled) {
@@ -133,7 +135,7 @@ async function streamRemoteFile(args: {
         settle(() => {
           channel.close()
           sink.destroy()
-          resolve()
+          resolve(null)
         })
         return
       }
@@ -143,9 +145,11 @@ async function streamRemoteFile(args: {
     // data ends, and a partial copy that read a non-zero exit must never be parsed as
     // the whole transcript.
     const onClose = (code?: number | null): void => {
-      exitCode = typeof code === 'number' ? code : null
+      const status = typeof code === 'number' ? code : null
       settle(() => {
-        sink.end(() => resolve())
+        // Why the callback's error: a failed final flush (a full disk) otherwise resolves
+        // as a complete transcript, which is the truncation this reader exists to refuse.
+        sink.end((error?: Error | null) => (error ? reject(error) : resolve(status)))
       })
     }
     const timer = setTimeout(() => fail(new Error('remote transcript read timed out')), timeoutMs)

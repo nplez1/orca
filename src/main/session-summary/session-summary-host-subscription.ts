@@ -9,6 +9,7 @@ import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
 
 const DEFAULT_POLL_INTERVAL_MS = 600
+const MAX_POLL_RETRIES = 1
 
 export type SessionSummaryHostSubscriptionDeps = {
   hostFold: SessionSummaryHostFoldClient
@@ -24,6 +25,7 @@ export class SessionSummaryHostFoldSubscription {
   /** Per-pane chain generation: an older chain stops instead of polling twice. */
   private readonly tokens = new Map<string, number>()
   private readonly latest = new Map<string, SessionSummarySnapshot>()
+  private readonly pollFailures = new Map<string, number>()
 
   constructor(private readonly deps: SessionSummaryHostSubscriptionDeps) {}
 
@@ -49,6 +51,7 @@ export class SessionSummaryHostFoldSubscription {
     this.cancel(args.paneKey)
     this.tokens.delete(args.paneKey)
     this.latest.delete(args.paneKey)
+    this.pollFailures.delete(args.paneKey)
     void this.deps.hostFold.close(args).catch(() => {})
   }
 
@@ -83,6 +86,7 @@ export class SessionSummaryHostFoldSubscription {
       return
     }
     this.latest.set(paneKey, snapshot)
+    this.pollFailures.delete(paneKey)
     this.deps.onSnapshot(paneKey, snapshot)
     this.schedule(paneKey, token, environmentId)
   }
@@ -109,6 +113,13 @@ export class SessionSummaryHostFoldSubscription {
       const snapshot = await this.deps.hostFold.peek({ environmentId, paneKey })
       this.accept(paneKey, token, snapshot, environmentId)
     } catch (error) {
+      // Why one retry: a relay blip must not freeze a stale brief under "Up to date".
+      const failures = (this.pollFailures.get(paneKey) ?? 0) + 1
+      if (failures <= MAX_POLL_RETRIES && this.tokens.get(paneKey) === token) {
+        this.pollFailures.set(paneKey, failures)
+        this.schedule(paneKey, token, environmentId)
+        return
+      }
       this.fail(paneKey, token, error, this.latest.get(paneKey) ?? null)
     }
   }

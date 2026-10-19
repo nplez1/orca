@@ -52,6 +52,22 @@ export function resolveSessionSummaryHeaderState(
     }
   }
   const backlogCount = snapshot?.facts?.backlogCount ?? 0
+  // Why here and not above: with a ledger on screen the failure has to win over an
+  // "Up to date" body, but a real backlog is still the more useful thing to say.
+  if (snapshot?.status === 'failed' && backlogCount === 0) {
+    return {
+      hint: isHostOutdated(snapshot)
+        ? translate(
+            'activity.sessionSummary.hostOutdatedHint',
+            'Update Orca on this host to summarize'
+          )
+        : translate(
+            'activity.sessionSummary.staleHint',
+            "Couldn't refresh — showing the last summary"
+          ),
+      folding: false
+    }
+  }
   if (backlogCount > 0) {
     return {
       hint: translate('activity.sessionSummary.backlogHint', '{{count}} events to catch up on', {

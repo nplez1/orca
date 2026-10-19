@@ -77,6 +77,39 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(state).toEqual({ hint: 'Update Orca on this host to summarize', folding: false })
   })
 
+  // The failure must win over a stale brief: with a ledger on screen and no backlog, the
+  // old code fell through to "Up to date" over the last good summary.
+  it('reads a failed refresh as stale rather than up to date', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({
+        status: 'failed',
+        ledger: {
+          goal: null,
+          plan: [],
+          inProgress: 'wiring',
+          done: [],
+          blockers: [],
+          decisions: [],
+          timeline: [],
+          foldedThrough: 4,
+          foldedAt: 1
+        },
+        facts: {
+          paneKey: 'pane-1',
+          prompt: 'Refactor',
+          messageCount: 4,
+          foldedThrough: 4,
+          backlogCount: 0
+        }
+      })
+    )
+
+    expect(state).toEqual({
+      hint: "Couldn't refresh — showing the last summary",
+      folding: false
+    })
+  })
+
   it('names the failure instead of claiming to be up to date', () => {
     const state = resolveSessionSummaryHeaderState(snapshot({ status: 'failed' }))
 

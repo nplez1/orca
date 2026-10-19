@@ -509,8 +509,9 @@ describe('SessionSummaryService host routing', () => {
     expect(store.get('tab:leaf')?.ledger.foldedThrough).toBe(3)
   })
 
-  // Two viewers of one host pane: the first to close must not end the other's fold.
-  it('does not cancel a fold another viewer still holds', async () => {
+  // Every open this desktop sends is matched by one close: the host counts viewers itself,
+  // so suppressing a close here would strand its count and its fold.
+  it('forwards one close per open to a paired host', async () => {
     const { store } = testStore()
     const h = hostHarness({
       store,
@@ -520,11 +521,60 @@ describe('SessionSummaryService host routing', () => {
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 3 })
 
-    // The second viewer is still watching, so the host was never told to stop.
-    expect(h.hostFoldCalls.some((c) => c.startsWith('close:'))).toBe(false)
+    expect(h.hostFoldCalls.filter((c) => c.startsWith('open:'))).toHaveLength(2)
+    expect(h.hostFoldCalls.filter((c) => c.startsWith('close:'))).toEqual([
+      'close:env-1:tab:leaf:2',
+      'close:env-1:tab:leaf:3'
+    ])
+  })
+
+  // Two viewers of one pane on the host itself: the first to close must not end the other's
+  // fold, and the cursor must keep the furthest either of them reached.
+  it('does not cancel a fold another viewer still holds', () => {
+    const { store } = testStore()
+    const h = hostHarness({ store, events: null })
+    h.service.open({ paneKey: 'tab:leaf' })
+    h.service.open({ paneKey: 'tab:leaf' })
+    const folding = h.service.peek('tab:leaf')
+
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
-    expect(h.hostFoldCalls.at(-1)).toBe('close:env-1:tab:leaf:2')
+
+    // Still one viewer: the fold is untouched.
+    expect(h.service.peek('tab:leaf').fold.running).toBe(folding.fold.running)
+    h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+    expect(store.get('tab:leaf')).toBeNull()
+  })
+
+  // A closed window or a disconnected paired client cannot send its close. Without an
+  // expiry the fold would outlive every reader and the cursor would freeze for good.
+  it('expires a viewer that stopped reporting', async () => {
+    const { store } = testStore()
+    let clock = 1_000
+    const updates: SessionSummarySnapshot[] = []
+    const service = new SessionSummaryService({
+      store,
+      readEvents: async () => new Promise(() => {}),
+      getAgentStatusEntry: () => ({
+        agentType: 'pi',
+        providerSession: { key: 'session_id', id: 'sess-1', transcriptPath: '/r/s.jsonl' }
+      }),
+      createBrain: () => ({ complete: async () => new Promise(() => {}) }),
+      leaseTtlMs: 50,
+      leaseSweepIntervalMs: 5,
+      now: () => clock
+    })
+    service.onUpdate((snapshot) => updates.push(snapshot))
+    service.open({ paneKey: 'tab:leaf' })
+    expect(service.peek('tab:leaf').fold.running).toBe(true)
+
+    clock += 100
+    await waitFor(() => service.peek('tab:leaf').fold.running === false)
+
+    // Released: no ledger was ever produced, so the pane reports the truth again.
+    expect(service.peek('tab:leaf').ledger).toBeNull()
+    expect(store.get('tab:leaf')).toBeNull()
   })
 
   it('reports a paired host that cannot answer instead of failing silently', async () => {

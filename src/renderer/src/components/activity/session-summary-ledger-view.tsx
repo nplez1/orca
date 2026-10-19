@@ -28,8 +28,14 @@ function isLedgerSectionFilled(ledger: SessionSummaryLedger, section: LedgerSect
       return Boolean(ledger.goal)
     case 'timeline':
       return ledger.timeline.length > 0
-    default:
-      return ledger[section].length > 0
+    case 'plan':
+      return ledger.plan.length > 0
+    case 'done':
+      return ledger.done.length > 0
+    case 'blockers':
+      return ledger.blockers.length > 0
+    case 'decisions':
+      return ledger.decisions.length > 0
   }
 }
 

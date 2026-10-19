@@ -21,11 +21,16 @@ export const SESSION_SUMMARY_RPC_METHODS = [
     name: 'sessionSummary.openOnHost',
     permission: 'workspace',
     params: SessionSummaryOpenOnHostParams,
-    handler: async (params) =>
-      sessionSummaryHostService().open({
-        paneKey: params.paneKey,
-        foldParams: parseSessionSummaryFoldParams(params.foldParams ?? null)
-      })
+    handler: async (params) => {
+      // Why reject rather than fall back: the requesting client resolved this from its own
+      // Settings → Agents. Substituting this host's choice would spawn an agent the reader
+      // never picked for a session's own text — so an unusable selection fails the fold.
+      const foldParams = parseSessionSummaryFoldParams(params.foldParams ?? null)
+      if (!foldParams) {
+        throw new Error('The requesting window did not name a usable summarization agent.')
+      }
+      return sessionSummaryHostService().open({ paneKey: params.paneKey, foldParams })
+    }
   }),
   defineMethod({
     name: 'sessionSummary.snapshotOnHost',
