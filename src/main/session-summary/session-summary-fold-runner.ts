@@ -125,7 +125,8 @@ export async function runSessionSummaryFold(args: {
     if (signal.aborted) {
       return // Pane closed: cancel-on-close, nothing to report.
     }
-    // Completed chunk extracts survive the failure so a retry resumes, not restarts.
+    // Completed chunk extracts survive a failure — but only once a fold has produced a
+    // ledger, since an unproduced one is never written. A first fold's chunks are lost.
     const failedIdentity = sessionSummaryIdentityOf(deps.getAgentStatusEntry(paneKey))
     const failedStored = storedEntry(deps, paneKey, failedIdentity)
     persist(deps, paneKey, failedIdentity, failedStored, failedStored.messageCount)

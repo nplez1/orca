@@ -40,10 +40,8 @@ function closingChannel(chunks: string[], code: number | null): RemoteTranscript
     stream.push(null)
     stream.emit('close', code ?? undefined)
   }, 1)
-  // SAFETY: a Readable plus this channel's one extra method is exactly the subset the
-  // reader consumes; the assertion only adds `close`.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: see above.
-  return Object.assign(stream, { close: () => stream.destroy() }) as RemoteTranscriptChannel
+  // Object.assign already yields the channel shape the reader consumes.
+  return Object.assign(stream, { close: () => stream.destroy() })
 }
 
 describe('createSshTranscriptFetcher', () => {

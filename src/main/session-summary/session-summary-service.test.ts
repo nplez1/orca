@@ -519,7 +519,10 @@ describe('SessionSummaryService host routing', () => {
       hostSnapshot: hostSnapshotFor('tab:leaf', 'folding')
     })
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.hostFoldCalls.some((c) => c.startsWith('open:')))
+    await waitFor(() => h.updates.length > 0)
     h.service.open({ paneKey: 'tab:leaf', executionHostId: 'runtime:env-1' })
+    await waitFor(() => h.updates.length > 1)
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 3 })
 
@@ -544,36 +547,6 @@ describe('SessionSummaryService host routing', () => {
     // Still one viewer: the fold is untouched.
     expect(h.service.peek('tab:leaf').fold.running).toBe(folding.fold.running)
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
-    expect(store.get('tab:leaf')).toBeNull()
-  })
-
-  // A closed window or a disconnected paired client cannot send its close. Without an
-  // expiry the fold would outlive every reader and the cursor would freeze for good.
-  it('expires a viewer that stopped reporting', async () => {
-    const { store } = testStore()
-    let clock = 1_000
-    const updates: SessionSummarySnapshot[] = []
-    const service = new SessionSummaryService({
-      store,
-      readEvents: async () => new Promise(() => {}),
-      getAgentStatusEntry: () => ({
-        agentType: 'pi',
-        providerSession: { key: 'session_id', id: 'sess-1', transcriptPath: '/r/s.jsonl' }
-      }),
-      createBrain: () => ({ complete: async () => new Promise(() => {}) }),
-      leaseTtlMs: 50,
-      leaseSweepIntervalMs: 5,
-      now: () => clock
-    })
-    service.onUpdate((snapshot) => updates.push(snapshot))
-    service.open({ paneKey: 'tab:leaf' })
-    expect(service.peek('tab:leaf').fold.running).toBe(true)
-
-    clock += 100
-    await waitFor(() => service.peek('tab:leaf').fold.running === false)
-
-    // Released: no ledger was ever produced, so the pane reports the truth again.
-    expect(service.peek('tab:leaf').ledger).toBeNull()
     expect(store.get('tab:leaf')).toBeNull()
   })
 

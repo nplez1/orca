@@ -101,17 +101,28 @@ function portableFoldParams(
   return portable
 }
 
-/** The host runs this same service, so its snapshot is the same shape; reject anything else. */
+/**
+ * The host runs this same service, so its snapshot is the same shape; reject anything else.
+ *
+ * Why check `fold.running` specifically: the poll loop reads it on every tick, and a missing
+ * or non-boolean value there would decide "settled" by accident.
+ */
 function asSnapshot(value: unknown): SessionSummarySnapshot {
   if (
     typeof value !== 'object' ||
     value === null ||
     !('paneKey' in value) ||
     typeof value.paneKey !== 'string' ||
-    !('fold' in value)
+    !('status' in value) ||
+    typeof value.status !== 'string' ||
+    !('fold' in value) ||
+    typeof value.fold !== 'object' ||
+    value.fold === null ||
+    !('running' in value.fold) ||
+    typeof value.fold.running !== 'boolean'
   ) {
     throw new Error('host returned an invalid session summary snapshot')
   }
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the three fields above are the only ones the service branches on, and a host running this same code returns this same type; anything else throws instead of reaching the pane.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fields above are the ones the polling loop and the pane branch on; a host running this same code returns this same type, and anything else throws here rather than reaching the pane.
   return value as SessionSummarySnapshot
 }

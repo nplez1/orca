@@ -21344,7 +21344,10 @@
       "hostOutdated": "This host runs an older Orca. Update Orca there to summarize its sessions.",
       "unsupportedHost": "Session summaries are not available for a workspace on this host.",
       "hostOutdatedHint": "Update Orca on this host to summarize",
-      "unsupportedHostHint": "Session summaries are not available on this host"
+      "unsupportedHostHint": "Session summaries are not available on this host",
+      "nothingYet": "Nothing notable in this session yet.",
+      "staleHint": "Couldn't refresh — showing the last summary",
+      "stale": "Couldn't refresh — showing the last summary."
     }
   }
 }

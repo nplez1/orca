@@ -14,8 +14,8 @@ const MAX_POLL_RETRIES = 1
 export type SessionSummaryHostSubscriptionDeps = {
   hostFold: SessionSummaryHostFoldClient
   pollIntervalMs?: number
-  /** The host answered with a newer snapshot (first open, or a poll). */
-  onSnapshot: (paneKey: string, snapshot: SessionSummarySnapshot) => void
+  /** The host answered with a newer snapshot; `opened` when it accepted an open. */
+  onSnapshot: (paneKey: string, snapshot: SessionSummarySnapshot, opened: boolean) => void
   /** The open or a poll failed; `snapshot` is passed through when one was already shown. */
   onError: (paneKey: string, error: Error, snapshot: SessionSummarySnapshot | null) => void
 }
@@ -26,6 +26,11 @@ export class SessionSummaryHostFoldSubscription {
   private readonly tokens = new Map<string, number>()
   private readonly latest = new Map<string, SessionSummarySnapshot>()
   private readonly pollFailures = new Map<string, number>()
+  /** Panes whose open has not been answered yet, with a close waiting behind it. */
+  private readonly opening = new Map<
+    string,
+    { environmentId: string; pendingClose: number | null }
+  >()
 
   constructor(private readonly deps: SessionSummaryHostSubscriptionDeps) {}
 
@@ -38,6 +43,10 @@ export class SessionSummaryHostFoldSubscription {
   }): void {
     const token = this.bumpToken(args.paneKey)
     this.clearTimer(args.paneKey)
+    // Why remember the open: a close that arrives before the host answered must not be
+    // dropped (its lease would live on), and must not be sent either (the host may reject
+    // the open, in which case no lease exists to close).
+    this.opening.set(args.paneKey, { environmentId: args.environmentId, pendingClose: null })
     void this.runOpen(args, token)
   }
 
@@ -48,6 +57,12 @@ export class SessionSummaryHostFoldSubscription {
 
   /** Forgets the pane entirely, telling the host what the viewer actually saw. */
   close(args: { paneKey: string; environmentId: string; seenTimelineCount: number }): void {
+    const opening = this.opening.get(args.paneKey)
+    if (opening && opening.pendingClose === null) {
+      opening.pendingClose = args.seenTimelineCount
+      return
+    }
+    this.opening.delete(args.paneKey)
     this.cancel(args.paneKey)
     this.tokens.delete(args.paneKey)
     this.latest.delete(args.paneKey)
@@ -70,8 +85,21 @@ export class SessionSummaryHostFoldSubscription {
         paneKey: args.paneKey,
         foldParams: args.foldParams
       })
-      this.accept(args.paneKey, token, snapshot, args.environmentId)
+      const pendingClose = this.takePendingClose(args.paneKey)
+      this.accept(args.paneKey, token, snapshot, args.environmentId, true)
+      if (pendingClose !== null && this.tokens.get(args.paneKey) === token) {
+        void this.deps.hostFold
+          .close({
+            paneKey: args.paneKey,
+            environmentId: args.environmentId,
+            seenTimelineCount: pendingClose
+          })
+          .catch(() => {})
+        this.cancel(args.paneKey)
+      }
     } catch (error) {
+      // No lease was taken, so there is nothing to close.
+      this.opening.delete(args.paneKey)
       this.fail(args.paneKey, token, error, args.lastSnapshot)
     }
   }
@@ -80,14 +108,15 @@ export class SessionSummaryHostFoldSubscription {
     paneKey: string,
     token: number,
     snapshot: SessionSummarySnapshot,
-    environmentId: string
+    environmentId: string,
+    opened: boolean
   ): void {
     if (this.tokens.get(paneKey) !== token) {
       return
     }
     this.latest.set(paneKey, snapshot)
     this.pollFailures.delete(paneKey)
-    this.deps.onSnapshot(paneKey, snapshot)
+    this.deps.onSnapshot(paneKey, snapshot, opened)
     this.schedule(paneKey, token, environmentId)
   }
 
@@ -111,7 +140,7 @@ export class SessionSummaryHostFoldSubscription {
     }
     try {
       const snapshot = await this.deps.hostFold.peek({ environmentId, paneKey })
-      this.accept(paneKey, token, snapshot, environmentId)
+      this.accept(paneKey, token, snapshot, environmentId, false)
     } catch (error) {
       // Why one retry: a relay blip must not freeze a stale brief under "Up to date".
       const failures = (this.pollFailures.get(paneKey) ?? 0) + 1
@@ -135,6 +164,12 @@ export class SessionSummaryHostFoldSubscription {
     }
     this.clearTimer(paneKey)
     this.deps.onError(paneKey, error instanceof Error ? error : new Error(String(error)), snapshot)
+  }
+
+  private takePendingClose(paneKey: string): number | null {
+    const opening = this.opening.get(paneKey)
+    this.opening.delete(paneKey)
+    return opening?.pendingClose ?? null
   }
 
   private bumpToken(paneKey: string): number {

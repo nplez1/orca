@@ -184,7 +184,26 @@ export function SessionSummaryLedgerView({
   snapshot: SessionSummarySnapshot | null
 }): React.JSX.Element {
   if (snapshot?.ledger) {
-    return <LedgerContent ledger={snapshot.ledger} seenThrough={snapshot.seenThrough} />
+    return (
+      <>
+        {/* Why: with a brief on screen the header counts a backlog, so a failed refresh
+            would otherwise never surface anywhere in the pane. */}
+        {snapshot.status === 'failed' ? (
+          <p className="mb-2 text-xs text-muted-foreground">
+            {snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE
+              ? translate(
+                  'activity.sessionSummary.hostOutdated',
+                  'This host runs an older Orca. Update Orca there to summarize its sessions.'
+                )
+              : translate(
+                  'activity.sessionSummary.stale',
+                  "Couldn't refresh — showing the last summary."
+                )}
+          </p>
+        ) : null}
+        <LedgerContent ledger={snapshot.ledger} seenThrough={snapshot.seenThrough} />
+      </>
+    )
   }
   if (snapshot?.status === 'failed') {
     // An out-of-date paired host is a remedy, not a failure of this session.

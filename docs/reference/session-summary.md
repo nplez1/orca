@@ -77,6 +77,8 @@ agent-generic (`parseAgentSessionFile` dispatches on `candidate.agent`), so noth
   deterministically. Completed extracts are cached, so a fold that is cancelled or fails
   resumes instead of restarting.
 - **Atomic.** A failed or unparseable chunk keeps the last good ledger and retries next time.
+  Completed chunk extracts are kept for that retry only once a fold has produced a ledger —
+  an unproduced one is never stored, so a first fold's chunks are lost with it.
 - **Delta-first.** Timeline entries are append-only and counted, so a per-session last-seen
   cursor produces the "Since you last looked" section.
 
@@ -144,6 +146,16 @@ folded here.
 - **A paired host that predates these methods** answers `method_not_found`, which the pane
   reports as "Update Orca there to summarize its sessions" — a remedy, not a failed fold.
   Older servers are the normal case, since they update on their own schedule.
+- **A request without a usable agent is rejected, not defaulted.** The host folds with the
+  agent and model the request names; when it cannot parse them it fails the open rather than
+  substituting its own settings, because a summary is the user's own transcript. A host that
+  lacks that CLI fails the fold with its own error for the same reason.
+- **Viewers lease the pane; a lease is never expired on a timer.** `open` takes one and
+  `close` returns it, so two viewers — two windows, or two paired clients on a host — do not
+  cancel each other's fold. A viewer that dies without closing (a torn-down window, a dropped
+  paired client) leaves a lease behind, which costs memory and one fold that runs to
+  completion with no reader. It cannot cost correctness: the seen cursor is recorded on
+  every close, whoever else still holds the pane, and never moves backwards.
 - **An SSH read is capped, never truncated.** Over 24 MB the fold fails with a message
   rather than parsing a shortened file: dropped head events would renumber every entry the
   ledger's cursor counts. Only a hook-reported path is used, because on that host there is
@@ -158,6 +170,11 @@ folded here.
 | `unavailable` | no readable transcript, or a readable one with no messages yet |
 | `failed` | the fold, the transcript read, or the host call failed; `error` says which |
 | `unsupported-host` | a host id this build cannot place, so nothing is read or folded |
+
+A failed refresh over an existing brief still shows that brief: the header reads
+"Couldn't refresh — showing the last summary" unless a real backlog is waiting, and the body
+says it above the ledger. A poll of a host fold that fails is retried once first, so a relay
+blip does not freeze a stale brief.
 
 A ledger that no fold ever produced is never written (`hasProducedLedger`). `close()` used to
 record one anyway, which made the next visit read a non-null ledger as **"Up to date" over a

@@ -8,7 +8,7 @@ import { probeGitAvailability } from '../git/git-availability'
 import { gitExecFileAsync } from '../git/runner'
 import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-listing'
 
-export function resolveServerBrowsePath(pathValue: string): string {
+function resolveServerBrowsePath(pathValue: string): string {
   const trimmed = pathValue.trim() || '~'
   if (trimmed.includes('\0')) {
     throw new Error('Path cannot contain null bytes')
