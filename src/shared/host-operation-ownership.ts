@@ -57,6 +57,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   repo: 'host',
   runtime: 'host',
   session: 'host',
+  sessionSummary: 'host',
   settings: 'scope-picked',
   shell: 'client',
   sidebarInputs: 'host',

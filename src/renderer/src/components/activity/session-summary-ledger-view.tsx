@@ -1,11 +1,43 @@
 import React from 'react'
 import { translate } from '@/i18n/i18n'
-import type {
-  SessionSummaryLedger,
-  SessionSummarySnapshot,
-  SessionSummaryTimelineEntry,
-  SessionSummaryTimelineKind
+import {
+  SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
+  type SessionSummaryLedger,
+  type SessionSummarySnapshot,
+  type SessionSummaryTimelineEntry,
+  type SessionSummaryTimelineKind
 } from '../../../../shared/session-summary-types'
+
+const EMPTY_LEDGER_SECTIONS = [
+  'inProgress',
+  'goal',
+  'plan',
+  'done',
+  'blockers',
+  'decisions',
+  'timeline'
+] as const
+
+type LedgerSection = (typeof EMPTY_LEDGER_SECTIONS)[number]
+
+function isLedgerSectionFilled(ledger: SessionSummaryLedger, section: LedgerSection): boolean {
+  switch (section) {
+    case 'inProgress':
+      return Boolean(ledger.inProgress)
+    case 'goal':
+      return Boolean(ledger.goal)
+    case 'timeline':
+      return ledger.timeline.length > 0
+    case 'plan':
+      return ledger.plan.length > 0
+    case 'done':
+      return ledger.done.length > 0
+    case 'blockers':
+      return ledger.blockers.length > 0
+    case 'decisions':
+      return ledger.decisions.length > 0
+  }
+}
 
 const TIMELINE_KIND_LABELS: Record<SessionSummaryTimelineKind, string> = {
   milestone: 'Milestone',
@@ -69,6 +101,15 @@ function LedgerContent({
 }): React.JSX.Element {
   const newEntries = ledger.timeline.slice(seenThrough)
   const earlierEntries = ledger.timeline.slice(0, seenThrough)
+  // Why: a fold that found nothing worth reporting still produced a ledger; an empty body
+  // under an "Up to date" header reads as a broken pane.
+  if (!EMPTY_LEDGER_SECTIONS.some((section) => isLedgerSectionFilled(ledger, section))) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {translate('activity.sessionSummary.nothingYet', 'Nothing notable in this session yet.')}
+      </p>
+    )
+  }
   return (
     <div className="space-y-3">
       {ledger.inProgress ? (
@@ -143,14 +184,57 @@ export function SessionSummaryLedgerView({
   snapshot: SessionSummarySnapshot | null
 }): React.JSX.Element {
   if (snapshot?.ledger) {
-    return <LedgerContent ledger={snapshot.ledger} seenThrough={snapshot.seenThrough} />
+    return (
+      <>
+        {/* Why: with a brief on screen the header counts a backlog, so a failed refresh
+            would otherwise never surface anywhere in the pane. */}
+        {snapshot.status === 'failed' ? (
+          <p className="mb-2 text-xs text-muted-foreground">
+            {snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE
+              ? translate(
+                  'activity.sessionSummary.hostOutdated',
+                  'This host runs an older Orca. Update Orca there to summarize its sessions.'
+                )
+              : translate(
+                  'activity.sessionSummary.stale',
+                  "Couldn't refresh — showing the last summary."
+                )}
+          </p>
+        ) : null}
+        <LedgerContent ledger={snapshot.ledger} seenThrough={snapshot.seenThrough} />
+      </>
+    )
   }
   if (snapshot?.status === 'failed') {
+    // An out-of-date paired host is a remedy, not a failure of this session.
+    if (snapshot.error === SESSION_SUMMARY_HOST_OUTDATED_MESSAGE) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'activity.sessionSummary.hostOutdated',
+            'This host runs an older Orca. Update Orca there to summarize its sessions.'
+          )}
+        </p>
+      )
+    }
+    return (
+      <>
+        <p className="text-xs text-muted-foreground">
+          {translate('activity.sessionSummary.failed', 'Could not summarize this session.')}
+        </p>
+        {snapshot.error ? (
+          <p className="mt-1 break-words text-xs text-muted-foreground">{snapshot.error}</p>
+        ) : null}
+      </>
+    )
+  }
+  if (snapshot?.status === 'unsupported-host') {
     return (
       <p className="text-xs text-muted-foreground">
-        {translate('activity.sessionSummary.failed', 'Could not summarize this session.', {
-          error: snapshot.error ?? ''
-        })}
+        {translate(
+          'activity.sessionSummary.unsupportedHost',
+          'Session summaries are not available for a workspace on this host.'
+        )}
       </p>
     )
   }

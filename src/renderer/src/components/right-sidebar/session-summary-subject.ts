@@ -1,6 +1,9 @@
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { isSessionSummaryHostSupported } from '../../../../shared/session-summary-host'
 import { getFocusedAgentPaneKeyForWorktree } from '@/components/sidebar/focused-agent-row-highlight'
+import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 
 /** Exactly what resolving the pane's subject reads, so tests can build a partial state. */
 export type SessionSummarySubjectState = Pick<
@@ -38,6 +41,26 @@ export function selectSessionSummaryPaneKey(
 export function useSessionSummaryPaneKey(): string | null {
   const worktreeId = useAppStore((state) => state.activeWorktreeId)
   return useAppStore((state) => selectSessionSummaryPaneKey(state, worktreeId))
+}
+
+/**
+ * The host the active workspace runs on.
+ *
+ * The pane needs it for two things main cannot answer for the pane itself: a session on
+ * a paired Orca server is folded *there*, and a paired host's status rows carry no
+ * connection, so the request is the only thing that says the session is not local.
+ */
+export function useSessionSummaryExecutionHostId(): ExecutionHostId | null {
+  const worktreeId = useAppStore((state) => state.activeWorktreeId)
+  return useAppStore((state) =>
+    worktreeId ? getExecutionHostIdForWorktree(state, worktreeId) : null
+  )
+}
+
+/** Whether the pane's workspace host can produce a brief at all. */
+export function useSessionSummaryHostSupported(): boolean {
+  const hostId = useSessionSummaryExecutionHostId()
+  return isSessionSummaryHostSupported(hostId)
 }
 
 /** Whether this window can fold at all: the desktop bridge owns it, and a paired web

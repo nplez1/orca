@@ -49,6 +49,67 @@ describe('resolveSessionSummaryHeaderState', () => {
     expect(state).toEqual({ hint: 'No readable transcript', folding: false })
   })
 
+  // #135: while a paired host is asked, the local fold flag is idle. Falling through to
+  // "Up to date" over a skeleton is exactly the empty state the issue reported.
+  it('reads a folding status as in flight before the fold reports anything', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({ status: 'folding', fold: { running: false, completedChunks: 0, totalChunks: 0 } })
+    )
+
+    expect(state).toEqual({ hint: 'Updating…', folding: true })
+  })
+
+  it('names an unplaceable host instead of claiming to be up to date', () => {
+    const state = resolveSessionSummaryHeaderState(snapshot({ status: 'unsupported-host' }))
+
+    expect(state).toEqual({
+      hint: 'Session summaries are not available on this host',
+      folding: false
+    })
+  })
+
+  // A paired host that predates host folding: the remedy, not a failed session.
+  it('offers an update rather than a failure for an out-of-date host', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({ status: 'failed', error: 'host-outdated' })
+    )
+
+    expect(state).toEqual({ hint: 'Update Orca on this host to summarize', folding: false })
+  })
+
+  // The failure must win over a stale brief: with a ledger on screen and no backlog, the
+  // old code fell through to "Up to date" over the last good summary.
+  it('reads a failed refresh as stale rather than up to date', () => {
+    const state = resolveSessionSummaryHeaderState(
+      snapshot({
+        status: 'failed',
+        ledger: {
+          goal: null,
+          plan: [],
+          inProgress: 'wiring',
+          done: [],
+          blockers: [],
+          decisions: [],
+          timeline: [],
+          foldedThrough: 4,
+          foldedAt: 1
+        },
+        facts: {
+          paneKey: 'pane-1',
+          prompt: 'Refactor',
+          messageCount: 4,
+          foldedThrough: 4,
+          backlogCount: 0
+        }
+      })
+    )
+
+    expect(state).toEqual({
+      hint: "Couldn't refresh — showing the last summary",
+      folding: false
+    })
+  })
+
   it('names the failure instead of claiming to be up to date', () => {
     const state = resolveSessionSummaryHeaderState(snapshot({ status: 'failed' }))
 

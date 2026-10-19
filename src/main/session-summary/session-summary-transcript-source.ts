@@ -65,7 +65,36 @@ export async function readSessionSummaryTranscriptEvents(args: {
   if (!source) {
     return null
   }
-  const filePath = source.path
+  return readSessionSummaryEventsFromFile({
+    filePath: source.path,
+    parser: source.parser,
+    signal
+  })
+}
+
+/**
+ * The parser that decodes an agent's transcript by content alone.
+ *
+ * Used when the file is not on this machine: the remote path comes from that host's
+ * own hook, so no root search applies, and Copilot's synthesized session directory
+ * is skipped because the remote home directory is not knowable here.
+ */
+export function resolveRemoteTranscriptParser(agentType: AgentType): AiVaultAgent | null {
+  const transcriptAgent = resolveNativeChatTranscriptAgent(agentType)
+  if (transcriptAgent) {
+    return CANDIDATE_AGENTS[transcriptAgent]
+  }
+  const parser = HOOK_RESOLVED_TRANSCRIPT_AGENTS[agentType]
+  return parser && parser !== 'copilot' ? parser : null
+}
+
+/** Decode one transcript file into ordered fold events. */
+export async function readSessionSummaryEventsFromFile(args: {
+  filePath: string
+  parser: AiVaultAgent
+  signal: AbortSignal
+}): Promise<SessionSummarySourceEvent[] | null> {
+  const { filePath, parser, signal } = args
   const stats = await stat(filePath)
   if (!stats.isFile()) {
     return null
@@ -77,7 +106,7 @@ export async function readSessionSummaryTranscriptEvents(args: {
     sizeBytes: stats.size
   }
   const candidate: SessionFileCandidate = {
-    agent: source.parser,
+    agent: parser,
     file,
     codexHome: null
   }

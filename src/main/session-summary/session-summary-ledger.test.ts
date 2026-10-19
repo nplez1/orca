@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applySessionSummaryDelta,
   emptySessionSummaryLedger,
+  hasProducedLedger,
   mergeSessionSummaryDeltas,
   normalizeSessionSummaryDelta
 } from './session-summary-ledger'
@@ -99,5 +100,26 @@ describe('applySessionSummaryDelta', () => {
     expect(base.timeline).toHaveLength(1)
     expect(next.foldedThrough).toBe(7)
     expect(next.foldedAt).toBe(100)
+  })
+})
+
+describe('hasProducedLedger', () => {
+  it('is false for a ledger no fold ever wrote', () => {
+    expect(hasProducedLedger(emptySessionSummaryLedger())).toBe(false)
+  })
+
+  it('is true once a fold has advanced the cursor', () => {
+    expect(
+      hasProducedLedger({ ...emptySessionSummaryLedger(), foldedThrough: 3, foldedAt: 1 })
+    ).toBe(true)
+  })
+
+  it('is true when a fold kept a timeline but no cursor', () => {
+    expect(
+      hasProducedLedger({
+        ...emptySessionSummaryLedger(),
+        timeline: [{ id: '1', kind: 'milestone', text: 'x', sourceIndex: 0 }]
+      })
+    ).toBe(true)
   })
 })

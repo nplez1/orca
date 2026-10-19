@@ -500,6 +500,11 @@ import {
 } from './repo-params'
 import { BrowserTarget } from './rpc-param-primitives'
 import { ClientCapabilitiesUpdate } from './runtime-client-capabilities-params'
+import {
+  SessionSummaryCloseOnHostParams,
+  SessionSummaryOpenOnHostParams,
+  SessionSummarySnapshotOnHostParams
+} from './session-summary-params'
 import { SessionTabsUnsubscribeAllParams } from './session-tabs-params'
 import {
   ActivateTab,
@@ -1265,6 +1270,9 @@ export const RPC_PARAMS_BY_METHOD = {
   'session.tabs.unsubscribe': SessionTabsUnsubscribe,
   'session.tabs.unsubscribeAll': SessionTabsUnsubscribeAllParams,
   'session.tabs.updatePaneLayout': UpdatePaneLayout,
+  'sessionSummary.closeOnHost': SessionSummaryCloseOnHostParams,
+  'sessionSummary.openOnHost': SessionSummaryOpenOnHostParams,
+  'sessionSummary.snapshotOnHost': SessionSummarySnapshotOnHostParams,
   'settings.get': null,
   'settings.getAgentLaunch': null,
   'settings.getTerminalQuickCommands': null,

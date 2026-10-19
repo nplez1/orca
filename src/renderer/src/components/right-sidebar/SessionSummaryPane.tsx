@@ -6,16 +6,23 @@ import { SessionSummaryLedgerView } from '@/components/activity/session-summary-
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
 import { useAppStore } from '@/store'
-import { useSessionSummaryPaneKey, hasSessionSummaryBridge } from './session-summary-subject'
+import {
+  useSessionSummaryExecutionHostId,
+  useSessionSummaryHostSupported,
+  useSessionSummaryPaneKey,
+  hasSessionSummaryBridge
+} from './session-summary-subject'
 
 function SessionSummarySubjectBody({
   paneKey,
+  executionHostId,
   isOpen
 }: {
   paneKey: string
+  executionHostId: string | null
   isOpen: boolean
 }): React.JSX.Element {
-  const snapshot = useSessionSummary(paneKey, isOpen)
+  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId)
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 
   return (
@@ -56,6 +63,8 @@ export default function SessionSummaryPane({
   isVisible: boolean
 }): React.JSX.Element {
   const paneKey = useSessionSummaryPaneKey()
+  const executionHostId = useSessionSummaryExecutionHostId()
+  const hostSupported = useSessionSummaryHostSupported()
   // A new agent session can start inside the pane the user is already focused on, so the
   // key includes its identity: the service resets the ledger on open(), and without this the
   // pane would keep briefing the previous conversation.
@@ -82,8 +91,21 @@ export default function SessionSummaryPane({
         <SessionSummarySubjectBody
           key={`${paneKey}:${sessionId}`}
           paneKey={paneKey}
+          executionHostId={executionHostId}
           isOpen={isVisible}
         />
+      ) : !hostSupported ? (
+        // Why: this is not "nothing is focused" — the workspace's host is one this build
+        // cannot place, so telling the reader to focus an agent would be wrong.
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'activity.sessionSummary.unsupportedHost',
+              'Session summaries are not available for a workspace on this host.'
+            )}
+          </p>
+        </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <Info className="size-6 text-muted-foreground/60" aria-hidden="true" />

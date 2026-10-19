@@ -7,10 +7,10 @@ so a user returning to a long-running agent does not have to re-read the termina
 
 ## Where it is surfaced
 
-| Surface | File | Reachable |
-| --- | --- | --- |
-| Right-sidebar **Summary** tab (`RightSidebarTab` value `summary`) | `src/renderer/src/components/right-sidebar/SessionSummaryPane.tsx` | yes |
-| Collapsed strip in the Activity thread detail pane | `src/renderer/src/components/activity/session-summary-panel.tsx` | **no** — see below |
+| Surface                                                           | File                                                               | Reachable          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------ |
+| Right-sidebar **Summary** tab (`RightSidebarTab` value `summary`) | `src/renderer/src/components/right-sidebar/SessionSummaryPane.tsx` | yes                |
+| Collapsed strip in the Activity thread detail pane                | `src/renderer/src/components/activity/session-summary-panel.tsx`   | **no** — see below |
 
 The Activity strip is dead UI today: `ActivityThreadDetailPane` is rendered only by
 `ActivityPrototypePage`, which renders only while `activeView === 'activity'`, and the one
@@ -55,7 +55,7 @@ found a different way:
 - **Native-chat agents** (Claude/OpenClaude, Codex, Grok, OMP) go through
   `native-chat/session-file-resolver.ts`, which takes the hook's `transcript_path` when it is
   host-readable and otherwise searches the agent's own roots by session id.
-- **Pi and Prime Agent** post `session_file` on every hook, so the reported path *is* the
+- **Pi and Prime Agent** post `session_file` on every hook, so the reported path _is_ the
   transcript; `agent-session-resume.ts` only returns their provider session at all when that
   path exists.
 - **Copilot** reports no path, but its `session_id` is the name of its session directory:
@@ -77,6 +77,8 @@ agent-generic (`parseAgentSessionFile` dispatches on `candidate.agent`), so noth
   deterministically. Completed extracts are cached, so a fold that is cancelled or fails
   resumes instead of restarting.
 - **Atomic.** A failed or unparseable chunk keeps the last good ledger and retries next time.
+  Completed chunk extracts are kept for that retry only once a fold has produced a ledger —
+  an unproduced one is never stored, so a first fold's chunks are lost with it.
 - **Delta-first.** Timeline entries are append-only and counted, so a per-session last-seen
   cursor produces the "Since you last looked" section.
 
@@ -107,14 +109,89 @@ replaces the moment it can run. Two rules matter there:
   `sessionSummary` bridge, so the activity bar omits the tab and the pane says so.
 - **Only a real probe is cached.** A result whose `catalogOrigin` is `spec` is the built-in
   list, and caching it would retire the probe for that agent forever.
-- **A cached list is refreshable.** The pane offers *Refresh models*, which drops the cached
+- **A cached list is refreshable.** The pane offers _Refresh models_, which drops the cached
   probe for the selected agent and lists again; without it, a model the CLI started
   reporting would stay unreachable for the life of the install.
-- **Storage is host-keyed; resolution is local.** The fold spawns the agent CLI on the local
-  machine and reads the transcript from the local filesystem
-  (`session-summary-agent-cli-fold-brain.ts`), so a remote host's model list would offer
-  models that spawn cannot run. The list is stored under the host-keyed slots so a future
-  host-aware fold needs no migration, but the pane reads the local slot.
+- **Storage is host-keyed; resolution is local.** The pane's model list describes the agent
+  CLIs this window can spawn, and it is stored under the host-keyed slots so a host-aware
+  resolver needs no migration. It still reads the local slot: a fold the desktop runs uses a
+  local CLI, and a fold a paired host runs uses a CLI installed _there_, with the agent and
+  model named by the request (see "Which host folds").
+
+## Which host folds
+
+The fold runs wherever the session's transcript lives, so accessing a session remotely
+behaves like working on that machine directly.
+
+| Workspace host  | Transcript read                                                      | Fold (agent CLI)    | Ledger, chunk cache, seen cursor           |
+| --------------- | -------------------------------------------------------------------- | ------------------- | ------------------------------------------ |
+| `local`         | local filesystem                                                     | this window         | local `session-summaries.json`             |
+| `ssh:<target>`  | `cat` over the SSH connection Orca already holds, streamed to a copy | this window         | local `session-summaries.json`             |
+| `runtime:<env>` | the paired host's own filesystem                                     | **the paired host** | the paired host's `session-summaries.json` |
+
+Why it splits that way: a paired Orca server is this same codebase served without Electron
+(`orcad-entry.ts`), so it runs its own `SessionSummaryService` and the desktop only relays
+its snapshots — `sessionSummary.openOnHost`, `sessionSummary.snapshotOnHost`,
+`sessionSummary.closeOnHost` (`src/main/runtime/rpc/methods/session-summary.ts`). A plain SSH
+target runs no Orca server at all, only the relay CLI, so its transcript is fetched and
+folded here.
+
+- **The client polls a host fold; it does not hold a call open.** A fold of a long session
+  outlives a relay idle window, and "still running?" plus "what is the ledger now?" is all
+  the pane needs. A reconnect resumes polling the same host state.
+- **The request carries the chosen agent.** `foldParams` is resolved from the requesting
+  client's Settings → Agents and sent with the open, so a host never spawns an agent the
+  reader did not choose. A host without that CLI installed fails the fold with its own
+  error rather than substituting one.
+- **A paired host that predates these methods** answers `method_not_found`, which the pane
+  reports as "Update Orca there to summarize its sessions" — a remedy, not a failed fold.
+  Older servers are the normal case, since they update on their own schedule.
+- **A request without a usable agent is rejected, not defaulted.** The host folds with the
+  agent and model the request names; when it cannot parse them it fails the open rather than
+  substituting its own settings, because a summary is the user's own transcript. A host that
+  lacks that CLI fails the fold with its own error for the same reason.
+- **Viewers lease the pane, and a lease is never expired on a timer.** `open` takes one and
+  `close` returns it, so two viewers — two windows, or two paired clients on a host — do not
+  cancel each other's fold. For a paired host the lease count lives with the client-side
+  subscription, because an open answers asynchronously: a close that arrives before the host
+  answered waits behind that open instead of being dropped (its lease would live on) or sent
+  early (it could take another client's). A viewer that dies without closing (a torn-down
+  window, a dropped paired client) leaves a lease behind, which costs memory and one fold
+  that runs to completion with no reader. A viewer whose open _failed_ owes the host nothing,
+  so its close is spent against that failure rather than against the next lease in line — a
+  close that took another viewer's lease would end their fold early. An absorbed close hands
+  its place forward: the highest count it reported rides along with the next close this pane
+  sends to that host, and the cursor never moves backwards. A place with no later close to
+  ride on — or one whose open failed with nobody else reading — is dropped, and a pane
+  that goes fully idle drops it too rather than reporting it against whatever session takes
+  the pane next. One caveat: after a host restarts, a close from a client that still believes it
+  holds a lease is charged to another viewer's lease there, which can end that viewer's fold
+  early.
+- **An SSH read is capped, never truncated.** Over 24 MB the fold fails with a message
+  rather than parsing a shortened file: dropped head events would renumber every entry the
+  ledger's cursor counts. Only a hook-reported path is used, because on that host there is
+  no root search and no synthesizable Copilot session directory.
+
+### States the pane can be in
+
+| Status             | Meaning                                                                    |
+| ------------------ | -------------------------------------------------------------------------- |
+| `folding`          | a fold is in flight here or on the host                                    |
+| `ready`            | a ledger exists and is on screen                                           |
+| `unavailable`      | no readable transcript, or a readable one with no messages yet             |
+| `failed`           | the fold, the transcript read, or the host call failed; `error` says which |
+| `unsupported-host` | a host id this build cannot place, so nothing is read or folded            |
+
+A failed refresh over an existing brief still shows that brief: the header reads
+"Couldn't refresh — showing the last summary" unless a real backlog is waiting, and the body
+says it above the ledger. A poll of a host fold that fails is retried once first, so a relay
+blip does not freeze a stale brief.
+
+A ledger that no fold ever produced is never written (`hasProducedLedger`). `close()` used to
+record one anyway, which made the next visit read a non-null ledger as **"Up to date" over a
+blank body** — the empty state that should mean "here is the brief" (fork issue #135). For
+the same reason a readable transcript with no new events is `ready`, not `unavailable`: it
+is not a session that has no transcript.
 
 ## Adding a right-sidebar tab
 
