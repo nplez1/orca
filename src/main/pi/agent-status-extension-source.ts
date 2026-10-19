@@ -247,14 +247,15 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  extra: Record<string, unknown>,',
     '  metadata: Record<string, unknown>,',
     '  ompRuntime: boolean,',
-    '  final: boolean',
+    '  final: boolean,',
+    '  latest: boolean',
     '): Promise<void> {',
     '  const coords = resolveHookCoords()',
     '  const paneKey = process.env.ORCA_PANE_KEY',
     '  if (!coords.port || !coords.token || !paneKey) return',
     // Why: the endpoint watch republishes this snapshot, and reads it as the pane's own statement of
     // what it is doing — recorded on the attempt, because a failed delivery is what it has to answer.
-    '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKeyOf(coords))',
+    '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKeyOf(coords), latest)',
     '  const url = `http://127.0.0.1:${coords.port}${resolveHookPath(ompRuntime)}`',
     '  const body = JSON.stringify({',
     '    paneKey,',

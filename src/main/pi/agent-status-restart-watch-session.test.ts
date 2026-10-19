@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { startAsync } from './agent-status-subagent-event-fixtures'
+import { posts, startAsync } from './agent-status-subagent-event-fixtures'
 import {
   curlArgv,
   curlUrl,
@@ -11,6 +11,9 @@ import {
   WSL_CURL_PATH,
   working
 } from './agent-status-restart-harness'
+
+/** Long enough for every scheduled retry of a failed final to have fired. */
+const STRETCHED_RETRY_MS = 5_000
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -57,6 +60,31 @@ it.each(['omp', 'prime-agent'] as const)(
     expect(harness.fetchMock.mock.calls.length).toBe(before + 1)
   }
 )
+
+it('is not ended by a completion retried after the next turn already started', async () => {
+  const harness = harnessWithEndpoint('5001', 'first')
+  await harness.callHook('agent_start', {}, idle)
+  await vi.advanceTimersByTimeAsync(0)
+  // Why: the completion's delivery fails while Orca is down; a /reload promotes it to a final that
+  // keeps retrying, and by then the next turn's start has already been posted.
+  harness.fetchMock.mockRejectedValue(new Error('Orca is going down'))
+  await harness.callHook('agent_settled', {}, idle)
+  await vi.advanceTimersByTimeAsync(0)
+  await harness.reloadPi()
+  await harness.callHook('before_agent_start', { prompt: 'next' }, working)
+  await harness.callHook('tool_execution_start', { toolName: 'bash' }, working)
+  harness.fetchMock.mockResolvedValue({ ok: true })
+  await vi.advanceTimersByTimeAsync(STRETCHED_RETRY_MS)
+
+  const before = harness.fetchMock.mock.calls.length
+
+  restartOrca(harness, '5002', 'second')
+  await vi.advanceTimersByTimeAsync(WATCH_MS)
+  // Why: the retried completion belonged to the turn before this one, so a restarted Orca hears the
+  // new turn's state instead of nothing at all.
+  expect(harness.fetchMock.mock.calls.length).toBe(before + 1)
+  expect(posts(harness).at(-1)).toMatchObject({ hook_event_name: 'tool_execution_start' })
+})
 
 it('stops watching when the session ends', async () => {
   const harness = harnessWithEndpoint('5001', 'first')
