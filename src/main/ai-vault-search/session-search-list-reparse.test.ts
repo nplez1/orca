@@ -31,9 +31,12 @@ function sessionRow(): unknown {
 }
 
 it('keeps current search rows when a cold history list rereads the same transcript', () => {
-  replayTranscriptRead({ messages })
+  // `pi`, not the fixture's default `claude`: a covered claude re-read has to write,
+  // because its pi-parent marker can appear while the transcript itself stands still.
+  const candidate = { ...syntheticCandidate(), agent: 'pi' as const }
+  replayTranscriptRead({ candidate, messages })
   const before = sessionRow()
-  replayTranscriptRead({ messages })
+  replayTranscriptRead({ candidate, messages })
   expect(sessionRow()).toEqual(before)
   expect(index.db.prepare('SELECT count(*) AS n FROM messages').get()).toEqual({ n: 2 })
 })
@@ -83,9 +86,10 @@ it('still replaces a different file with identical size and timestamp', () => {
 })
 
 it('rereads a row indexed without a file identity once the stat supplies one', () => {
-  replayTranscriptRead({ messages })
+  const candidate = { ...syntheticCandidate(), agent: 'pi' as const }
+  replayTranscriptRead({ candidate, messages })
   const before = sessionRow()
-  const identified = syntheticCandidate({ dev: 1, ino: 10 })
+  const identified = { ...candidate, file: { ...candidate.file, dev: 1, ino: 10 } }
   replayTranscriptRead({ candidate: identified, messages })
   expect(sessionRow()).not.toEqual(before)
   const repaired = sessionRow()

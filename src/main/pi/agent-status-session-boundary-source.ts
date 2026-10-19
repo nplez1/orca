@@ -28,7 +28,10 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    if (keepsSession) {',
     "      piAsyncSubagentAdoptHeldRuns(piAsyncSubagentRegistration, typeof sessionMetadata.session_file === 'string' ? sessionMetadata.session_file : null)",
     '    } else {',
-    '      piAsyncSubagentDropHeldRuns(piAsyncSubagentRegistration)',
+    '      // Why the whole session and not just the held runs: the final post this session emits',
+    '      // still reports its live child set, and a host reading that set would refresh a run the',
+    '      // ended session no longer owns instead of draining it.',
+    '      piAsyncSubagentForgetSession(piAsyncSubagentRegistration)',
     '    }',
     '  })',
     '',
@@ -60,6 +63,11 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    }',
     // Also a Pi too old to give a reason: its children would otherwise hold the pane for good.
     '    closeOutRun(sessionMetadata.session_file)',
+    '    // Why this post is not optional: `closeOutRun` only posts when the turn was unsettled, and a',
+    '    // session ending from idle has nothing pending — so without this, the emptied live set would',
+    '    // never reach the host, and the roster a host fences on would outlive the session. Enqueued',
+    '    // here, after the reset, so it is delivered.',
+    "    post('subagent_async_state')",
     // Why: pi-subagents can still emit here until Pi invalidates this registration.
     '    lifecycleState.onEvent = undefined',
     '  })',

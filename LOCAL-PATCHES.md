@@ -201,6 +201,117 @@ Anchors:
 Bounded by the lane's quiet window, not by a scope reset: an owning provider's roster has no reset
 for this lane to read, so a question nothing ever retracts cannot hold the row forever.
 
+### `local(agents)`: a claude CLI child is not a second session
+
+A pi session can dispatch a subagent through the `claude` CLI (`pi-subagents` → `claude --print`).
+That child inherits the pane's `ORCA_*` environment, so it posts the managed Claude hook stream into
+the parent's pane under its own `session_id`, and it writes its own conversation as a root transcript
+under `~/.claude/projects/`. Upstream has no such topology, so nothing joined the two.
+
+Two things broke, and both are fixed by giving the pair a shared key.
+
+**The child row vanished mid-run.** `pi-subagents` drives a claude child from an in-process pi
+session of its own, and that runner session's tool activity reaches the pane it inherited. A pi post
+carries the FULL live child set of the session that posted it, and the runner has no children — so
+taking that field literally replaced the pane's roster with nothing while the child was still
+working. Measured, not inferred: a capture of the hook traffic shows the parent's posts naming run-1
+and the runner's posts arriving with an empty set, which is exactly when the row goes; a pi-native
+child's row survives the whole run.
+
+The host refuses such a post, and publishes nothing from it — a runner's post may not touch the
+pane's turn clock, its prompt or tool cache, or its lead verdict. Four things keep that refusal from
+becoming a lockout. It applies only while the pane still holds a live child run, since a runner
+session exists only then. The roster is pruned before it is read, so a run whose end never arrived
+cannot hold the fence past the reaper's window. A session-ending shutdown now posts its (emptied)
+live set unconditionally: `closeOutRun` alone posts only for an unsettled turn, and a `/new` from
+idle has nothing pending — so without that post the drained set never reached the host at all.
+`piAsyncSubagentForgetSession` parks the session's runs rather than deleting them, so the ending post
+reads an empty set while a resume into the same file finds its children again.
+pi's transport coalesces to one pending post, so a `session_start` can be lost; with those in place
+the next post from the new session is adopted once the child it is unrelated to ends, not never.
+`session_start` still hands the pane over immediately, as before.
+
+A child's own stream that arrives after its row has gone is refused too, for five minutes and only
+on the conversation it reported: a spooled hook, or a retirement that beat the process, would
+otherwise be read as the pane's own agent — ending its presence on a `SessionEnd`, relabelling it on
+a `Stop`.
+
+**The child's own stream was refused, so the row had nothing to say.** `isInheritedPaneOwnerEvent`
+correctly refuses a second agent in an active pane, which meant the child's tool, model and wait
+never reached a row. The join key is the child's Claude conversation: the plugin pins it with
+`--session-id`, publishes it on `subagents:session` before the first hook fires, the pi lane carries
+it as `provider_session` on the wire, and the roster keeps it per child. A claude post whose
+`session_id` matches a live child is routed to that row and nowhere else.
+
+That envelope is deliberately narrow, because the server reads a turn edge out of
+`(source, hookEventName)`: it reports the PANE's provider, carries no hook event name, and sets
+`toolAgentId` to the child's run id — the child marker that path already honours. Without all three,
+the child's `SessionStart`/`UserPromptSubmit` would reset the pane's turn clock, clear an
+acknowledged attention badge, and re-open manual unread. It never carries the child's process as the
+pane's owner, never replaces the pane's resume identity, never settles the parent, and its
+`SessionEnd` finishes the row instead of ending the pane.
+
+The durable half is a marker beside the transcript, because the session list is a filesystem scan
+that knows nothing about hooks: `<uuid>.pi-parent.json` records the parent pi session. A Claude row
+with one carries `subagent.parentSessionId`, so the existing pi-style nesting shows it under its
+parent instead of beside it. The marker's suffix, type and path rule live in
+`src/shared/pi-claude-parent-marker.ts` because the writer and the scanner read it from opposite ends,
+and it records the parent's AGENT: a list filtered to one agent removes the pi parent, and without
+that field the child would be counted hidden instead of shown. A cross-agent child whose parent row
+is absent from the list is therefore a top-level row, not a hidden one. That field has to survive
+every path a listed row takes, so the search index carries it in its own column — a schema bump that
+drops and rebuilds the index, which is a cache over the transcripts.
+
+A child's own `SessionEnd` does not end its row: that process exiting is not the RUN ending, and the
+runner that started it is still posting. The row is pi's to retire, and the reaper covers a lost end.
+
+Anchors:
+
+- `src/shared/agent-hook-listener/nested-pi-session-guard.ts`, and
+  `agent-hook-listener/pi-claude-child-events.ts` — the roster lookup, the claude event → child fact
+  mapping, `buildPiClaudeChildEvent`, and `admitNestedAgentPost`, which decides both cases in one
+  place before any provider fold runs. Called from `agent-hook-listener.ts`.
+- `src/shared/agent-descendant-roster.ts` — `providerSession`, the tool line,
+  `findAgentDescendantByProviderSession`, and the `waiting` state a live-set re-upsert must not
+  overwrite; `agent-status-subagent-snapshot.ts` carries the same fields so a hydrated row keeps them.
+- `src/main/pi/agent-status-async-subagent-{source,session-source}.ts` — the `subagents:session`
+  binding, `provider_session`/`model` on the wire (optional, so an older peer ignores them), and the
+  session-end drain `agent-status-session-boundary-source.ts` calls.
+- `src/main/agent-hooks/server/pi-claude-child-parent-marker.ts` — the marker, written once per
+  (transcript, run), best-effort, and only when the post's own conversation name matches the
+  transcript it points at. The field is stripped from the row afterwards: it is never persisted.
+- AI Vault: `session-scanner-claude-pi-parent-marker.ts` reads the marker and
+  `session-scanner-primary-parsers.ts` sets `subagent` from it; `contentDependencyPath` puts the
+  marker's stat in the parse-cache key, which is what lets a row cached before the marker existed
+  pick the link up on a later scan. `SELF_CONTAINED_TRANSCRIPT_AGENTS.claude` becomes false — a
+  claude parse now reads a sibling file — which also turns `session-search-file-write.test.ts`'s
+  "clears a stale lineage" case green; it was recorded as proved-not-ours in the 2026-10-16 entry
+  and is no longer part of the known red set.
+- `src/shared/ai-vault-subagent-nesting.ts` resolves a child's parent against its own agent and host
+  first, then — only when exactly one row on that host carries the id under another agent — across
+  agents, which is what a claude child naming a pi parent needs.
+- Tests: `nested-pi-session-guard.test.ts` (including the `/new` drain and the reaped-run takeover),
+  `pi-claude-child-events.test.ts` (including the runner's last posts after a child `SessionEnd`),
+  `agent-hooks/server-pi-claude-child.test.ts` (the whole server path: one row, unchanged turn
+  clock, unchanged resume id, marker on disk, field not persisted),
+  `pi-claude-child-parent-marker.test.ts`, `ai-vault-subagent-nesting.test.ts`, the marker test in
+  `ai-vault/session-scanner-claude-pi-parent-marker.test.ts`, the roster cases in
+  `agent-descendant-roster.test.ts`, and the `subagents:session` cases in
+  `pi/agent-status-async-subagent.test.ts`.
+
+Known gaps, recorded rather than chased:
+
+- A relay forwards events it cannot scan, so a relayed host writes no marker and its session list
+  keeps today's behaviour. A paired Orca server writes its own, because it runs its own hook server
+  beside the transcript.
+- The marker is read only where the transcript is on the scanning machine's disk
+  (`ownsTranscriptDisk`); an SSH host's list is unchanged until it scans that file itself.
+- A same-agent child whose parent is not in the loaded window is still counted hidden rather than
+  shown (the long-standing policy); only a CROSS-agent link is shown as a root when its parent is
+  absent, because that absence is usually the agent filter rather than the window.
+- After an Orca restart a child is unattributed until the parent's next post republishes
+  `provider_session`, because rosters are not restored from disk.
+
 ### `local(agents)`: monitoring is reserved for Claude session-cron callbacks
 
 Upstream's lead-status fold reads _any_ live non-agent child work as `workingMode: 'monitoring'`,
@@ -373,6 +484,37 @@ producing a command with no deadline), and the `## Opening a PR` example derives
 
 Scope: same as `local(skills)` — a fresh worktree cut from `nplez1/main` carries it; a worktree
 branched before this commit does not.
+
+### `local(test)`: five more environment-bound reds, recorded from the np.37 full run
+
+The full suite on this machine (macOS, external volume, other agents' runs contending) leaves 26
+failing cases in 11 files. Six are the ones already recorded above (the `/private/var` path
+signature, the macOS bash 3.2 arrays, the dev-rebuild timeouts, the missing `cloud/` workspace).
+The five below are the same class and were classified here rather than chased, each with the
+signature that identifies it. None imports a module this fork changed.
+
+- `src/main/cli/packaged-cli-assets.test.ts`, `src/main/orcad/orcad-forked-child-paths.test.ts`,
+  `config/scripts/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
+  while the code under test reports the resolved `/private/var/folders/…`.
+- `src/main/cli/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
+  at /var/folders/…/protected/orca": the same symlink resolution against a temp dir it just created.
+- `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
+  `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
+  rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
+  assume; neither file is imported by anything this fork touches.
+- `src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts` — "Timed out waiting for PTY
+  output", the PTY/subprocess class recorded above.
+- `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
+  — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
+
+### `local(renderer)`: `ai-vault-session-refresh.ts` is over the `max-lines` budget
+
+Red at the branch tip with an unmodified working tree: `oxlint` reports
+`src/renderer/src/components/right-sidebar/ai-vault-session-refresh.ts:379: error eslint(max-lines):
+File has too many lines (303)`. Reproduced on the file exactly as committed, so `pnpm lint` cannot
+pass on any branch cut from `nplez1/main`. The overflow came in with `46f640a501`'s refactor, not
+with a sync. Recorded rather than fixed here: trimming three lines means choosing which of that
+panel's effects to reshape, which wants its own review.
 
 ## Syncing with upstream
 

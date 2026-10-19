@@ -32,6 +32,12 @@ type TrackedAgentDescendant = {
   agentType?: string
   description?: string
   model?: string
+  /** The tool this child is running now. Absent once it has none, or when its lane names only
+   *  its lifecycle. */
+  toolName?: string
+  toolInput?: string
+  /** The child's own provider conversation, when it runs as a separate agent process. */
+  providerSession?: string
   state: 'working' | 'waiting'
   startedAt: number
   /** When this child was last named by one of its provider's events. The reaper's clock:
@@ -57,6 +63,11 @@ export function upsertAgentDescendant(
     agentType?: string
     description?: string
     model?: string
+    toolName?: string
+    toolInput?: string
+    /** The child's tool call ended: drop the tool line rather than leaving the last one standing. */
+    clearTool?: boolean
+    providerSession?: string
     state: 'working' | 'waiting'
   },
   now: number
@@ -68,11 +79,28 @@ export function upsertAgentDescendant(
   const agentType = normalizeOptionalField(fields.agentType, AGENT_TYPE_MAX_LENGTH)
   const description = normalizeOptionalField(fields.description, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH)
   const model = normalizeOptionalField(fields.model, AGENT_MODEL_MAX_LENGTH)
+  const toolName = normalizeOptionalField(fields.toolName, AGENT_TYPE_MAX_LENGTH)
+  const toolInput = normalizeOptionalField(fields.toolInput, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH)
+  const providerSession = normalizeOptionalField(
+    fields.providerSession,
+    AGENT_DESCENDANT_ID_MAX_LENGTH
+  )
   const existing = roster.get(normalizedId)
   if (existing) {
     existing.agentType = agentType ?? existing.agentType
     existing.description = description ?? existing.description
     existing.model = model ?? existing.model
+    // Why merging, not replacing: the live-set path re-upserts every child from a payload that
+    // names only its id, type and description, so a replacing write would erase the tool another
+    // lane reported a moment earlier. Only an explicit clear drops it.
+    if (fields.clearTool === true) {
+      existing.toolName = undefined
+      existing.toolInput = undefined
+    } else {
+      existing.toolName = toolName ?? existing.toolName
+      existing.toolInput = toolInput ?? existing.toolInput
+    }
+    existing.providerSession = providerSession ?? existing.providerSession
     existing.state = fields.state
     existing.lastEventAt = now
     return
@@ -84,6 +112,9 @@ export function upsertAgentDescendant(
     agentType,
     description,
     model,
+    toolName,
+    toolInput,
+    providerSession,
     state: fields.state,
     startedAt: now,
     lastEventAt: now
@@ -100,6 +131,7 @@ export function replaceAgentDescendants(
     agentType?: string
     description?: string
     model?: string
+    providerSession?: string
   }[],
   now: number
 ): void {
@@ -110,7 +142,11 @@ export function replaceAgentDescendants(
       continue
     }
     live.add(normalizedId)
-    upsertAgentDescendant(roster, normalizedId, { ...child, state: 'working' }, now)
+    // Why: the live set is a liveness claim, not a state report. A child blocked on a human answer
+    // is still live, and re-stamping it `working` from the parent's next post would drop the pane's
+    // only actionable state until the child's own lane spoke again.
+    const state = roster.get(normalizedId)?.state === 'waiting' ? 'waiting' : 'working'
+    upsertAgentDescendant(roster, normalizedId, { ...child, state }, now)
   }
   for (const id of Array.from(roster.keys())) {
     if (!live.has(id)) {
@@ -173,6 +209,9 @@ export function seedAgentDescendantRoster(
         agentType: snapshot.agentType,
         description: snapshot.description,
         model: snapshot.model,
+        toolName: snapshot.toolName,
+        toolInput: snapshot.toolInput,
+        providerSession: snapshot.providerSession,
         state: snapshot.state
       },
       snapshot.startedAt
@@ -197,11 +236,34 @@ export function agentDescendantRosterToSnapshots(
     agentType: tracked.agentType,
     description: tracked.description,
     model: tracked.model,
+    toolName: tracked.toolName,
+    toolInput: tracked.toolInput,
+    providerSession: tracked.providerSession,
     state: tracked.state,
     startedAt: tracked.startedAt
   }))
   snapshots.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id))
   return snapshots
+}
+
+/** The live child whose OWN provider conversation this is, if the pane has one.
+ *  A child that runs as a separate agent process (a `claude --print` a pi subagent started)
+ *  reports its own hook stream on the pane it inherited, and its conversation id is the only
+ *  thing that stream shares with the run that launched it. */
+export function findAgentDescendantByProviderSession(
+  roster: AgentDescendantRoster | undefined,
+  providerSession: string | undefined
+): { id: string; providerSession: string } | null {
+  const wanted = providerSession?.trim()
+  if (!roster || !wanted) {
+    return null
+  }
+  for (const [id, tracked] of roster) {
+    if (tracked.providerSession === wanted) {
+      return { id, providerSession: wanted }
+    }
+  }
+  return null
 }
 
 /** The roster as child-work evidence for the shared fold. Every tracked child is a spawned

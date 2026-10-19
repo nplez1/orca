@@ -66,7 +66,7 @@ describe('Pi session changes', () => {
       await harness.callHook('session_start', { reason }, session('B'))
       await vi.advanceTimersByTimeAsync(0)
 
-      const [completion, nextSession] = posts(harness).slice(-2)
+      const [completion, drain, nextSession] = posts(harness).slice(-3)
       // Why: that completion already ended the run, so the session change has nothing left to close
       // out and adds no `session_boundary` completion of its own.
       expect(completion).toMatchObject({
@@ -75,6 +75,14 @@ describe('Pi session changes', () => {
         session_file: '/sessions/A.jsonl'
       })
       expect(completion).not.toHaveProperty('session_boundary')
+      // Why this post exists: the session that just ended reports an empty live set, which is what
+      // drains the receiver's roster. Without it a roster fenced on the pane would outlive the
+      // session, because a session ending from idle posts no completion of its own.
+      expect(drain).toMatchObject({
+        hook_event_name: 'subagent_async_state',
+        session_id: 'A',
+        subagent_runs: []
+      })
       // Why: the closed-out session's live set is dropped, so its children never ride the next
       // session's post — the receiver replaces its child list with every post it receives.
       expect(nextSession).toMatchObject({
@@ -92,7 +100,10 @@ describe('Pi session changes', () => {
     await harness.callHook('session_shutdown')
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(posts(harness).at(-1)).toMatchObject({ hook_event_name: 'agent_end', session_id: 'A' })
+    expect(posts(harness).slice(-2)).toMatchObject([
+      { hook_event_name: 'agent_end', session_id: 'A' },
+      { hook_event_name: 'subagent_async_state', session_id: 'A', subagent_runs: [] }
+    ])
   })
 
   it('posts nothing on quit, even with children still running', async () => {
@@ -282,6 +293,22 @@ describe('Pi session changes', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('does not bring back a run that finished while its session was away', async () => {
+    const harness = createPi()
+    await holdRunOpen(harness)
+    await harness.replacePiSession('new')
+    await harness.callHook('session_start', { reason: 'new' }, session('B'))
+    // The run finishes while its own session is parked; its completion arrives under B.
+    complete(harness, 'run-a')
+    await vi.advanceTimersByTimeAsync(0)
+
+    await harness.replacePiSession('resume', '/sessions/A.jsonl')
+    await harness.callHook('session_start', { reason: 'resume' }, session('A'))
+    await vi.advanceTimersByTimeAsync(0)
+    // A parked run that has since finished must not come back with the session.
+    expect(postedSubagentRunIds(harness).at(-1)).toEqual([])
+  })
+
   it('does not bring back a child whose runner had already exited', async () => {
     const harness = createPi()
     await holdRunOpen(harness)
@@ -425,11 +452,12 @@ describe('Pi session changes', () => {
     // Why: the run is closed out once, under the session that ran it — a second close-out finds no
     // turn left to end, and a child that is merely still running is not a completion.
     expect(agentEndCount(harness)).toBe(1)
-    expect(posts(harness).at(-1)).toMatchObject({
-      hook_event_name: 'agent_end',
-      session_id: 'A',
-      session_boundary: true
-    })
+    // Why: only the drained live set follows a completion. A child that is merely still running is
+    // not a completion, and a second close-out has nothing left to end.
+    expect(posts(harness).slice(-1)).toMatchObject([
+      { hook_event_name: 'subagent_async_state', subagent_runs: [] }
+    ])
+    expect(posts(harness).filter((post) => post.hook_event_name === 'agent_end')).toHaveLength(1)
   })
 
   it('restores a session’s children once, not on every later resume', async () => {

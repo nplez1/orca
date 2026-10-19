@@ -38,10 +38,20 @@ export function applyDescendantEventToPane(
   const now = Date.now()
   if (facts.kind === 'live-set') {
     const roster = getOrCreateDescendantRoster(state, paneKey)
+    rememberRetiredDescendants(
+      state,
+      paneKey,
+      roster,
+      new Set(facts.children.map((c) => c.id)),
+      now
+    )
     replaceAgentDescendants(roster, facts.children, now)
   } else if (facts.id) {
     if (facts.ended) {
-      finishAgentDescendant(state.descendantRosterByPaneKey.get(paneKey) ?? new Map(), facts.id)
+      const roster = state.descendantRosterByPaneKey.get(paneKey) ?? new Map()
+      const tracked = roster.get(facts.id.trim())
+      rememberRetiredDescendant(state, paneKey, tracked?.providerSession, now)
+      finishAgentDescendant(roster, facts.id)
     } else {
       upsertAgentDescendant(
         getOrCreateDescendantRoster(state, paneKey),
@@ -50,6 +60,10 @@ export function applyDescendantEventToPane(
           agentType: facts.agentType,
           description: facts.description,
           model: facts.model,
+          providerSession: facts.providerSession,
+          toolName: facts.toolName,
+          toolInput: facts.toolInput,
+          ...(facts.toolEnded === true ? { clearTool: true } : {}),
           state: facts.waiting === true ? 'waiting' : 'working'
         },
         now
@@ -97,7 +111,10 @@ export function applyDescendantEventToPane(
   return normalizeAgentStatusPayload({
     state: effectiveState,
     prompt: state.lastPromptByPaneKey.get(paneKey) ?? '',
-    agentType: source,
+    // Why the pane's own type rather than the reporter's: this is the first descendant lane whose
+    // reporter can be a DIFFERENT provider from the lead (a claude CLI child of a pi run), and
+    // stamping the reporter's would relabel the pane's row as the child the event was about.
+    agentType: state.lastStatusByPaneKey.get(paneKey)?.payload.agentType ?? source,
     toolName: cachedTool.toolName,
     toolInput: cachedTool.toolInput,
     interactivePrompt: cachedTool.interactivePrompt,
@@ -120,13 +137,84 @@ function retractDescendantHoldRow(state: HookListenerState, paneKey: string): vo
 /** Fold the live child set an event carried into the pane's roster. Returns nothing: the
  *  event's own payload is still normalized and gated as usual, so this only updates what that
  *  gate reads — which is how an add the transport coalesced away is repaired by the next event. */
+/** How long a retired child's conversation is still recognised. Long enough for a spooled hook
+ *  written before the retirement to be replayed, short enough that it never catches a new run —
+ *  a conversation id is never reused. */
+const RETIRED_DESCENDANT_MEMORY_MS = 5 * 60_000
+
+/** Remember the conversations of children about to leave the roster. */
+function rememberRetiredDescendants(
+  state: HookListenerState,
+  paneKey: string,
+  roster: AgentDescendantRoster,
+  kept: ReadonlySet<string>,
+  now: number
+): void {
+  const retired = Array.from(roster, ([id, tracked]) => ({ id, tracked })).filter(
+    (entry) => !kept.has(entry.id) && entry.tracked.providerSession !== undefined
+  )
+  if (retired.length === 0) {
+    return
+  }
+  let byConversation = state.retiredPiClaudeChildrenByPaneKey.get(paneKey)
+  if (!byConversation) {
+    byConversation = new Map()
+    state.retiredPiClaudeChildrenByPaneKey.set(paneKey, byConversation)
+  }
+  for (const entry of retired) {
+    const conversation = entry.tracked.providerSession
+    if (conversation) {
+      byConversation.set(conversation, now)
+    }
+  }
+  for (const [conversation, at] of byConversation) {
+    if (now - at > RETIRED_DESCENDANT_MEMORY_MS) {
+      byConversation.delete(conversation)
+    }
+  }
+}
+
+/** Whether a conversation belonged to a child of this pane whose row has gone. */
+/** Remember one child's conversation as retired, for the same short window as a roster departure. */
+function rememberRetiredDescendant(
+  state: HookListenerState,
+  paneKey: string,
+  providerSession: string | undefined,
+  now: number
+): void {
+  if (!providerSession) {
+    return
+  }
+  let byConversation = state.retiredPiClaudeChildrenByPaneKey.get(paneKey)
+  if (!byConversation) {
+    byConversation = new Map()
+    state.retiredPiClaudeChildrenByPaneKey.set(paneKey, byConversation)
+  }
+  byConversation.set(providerSession, now)
+}
+
+export function isRetiredPiClaudeChild(
+  state: HookListenerState,
+  paneKey: string,
+  providerSession: string | undefined
+): boolean {
+  const conversation = providerSession?.trim()
+  if (!conversation) {
+    return false
+  }
+  const retired = state.retiredPiClaudeChildrenByPaneKey.get(paneKey)?.get(conversation)
+  return retired !== undefined && Date.now() - retired <= RETIRED_DESCENDANT_MEMORY_MS
+}
+
 export function applyDescendantLiveSet(
   state: HookListenerState,
   paneKey: string,
   children: readonly DescendantEntry[],
   now = Date.now()
 ): void {
-  replaceAgentDescendants(getOrCreateDescendantRoster(state, paneKey), children, now)
+  const roster = getOrCreateDescendantRoster(state, paneKey)
+  rememberRetiredDescendants(state, paneKey, roster, new Set(children.map((c) => c.id)), now)
+  replaceAgentDescendants(roster, children, now)
   dropEmptyDescendantRoster(state, paneKey, now)
 }
 
@@ -178,6 +266,11 @@ function dropEmptyDescendantRoster(state: HookListenerState, paneKey: string, no
   const roster = state.descendantRosterByPaneKey.get(paneKey)
   if (!roster) {
     return
+  }
+  // Why remember first: the reaper's own departures are the ones no post will ever mention again,
+  // and a child's process outliving its row is exactly what the retired window covers.
+  for (const tracked of roster.values()) {
+    rememberRetiredDescendant(state, paneKey, tracked.providerSession, now)
   }
   pruneStaleAgentDescendants(roster, now)
   if (roster.size === 0) {

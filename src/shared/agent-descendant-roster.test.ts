@@ -7,7 +7,9 @@ import {
 import {
   codexRosterChildWorkLiveness,
   agentDescendantRosterToSnapshots,
+  findAgentDescendantByProviderSession,
   finishAgentDescendant,
+  replaceAgentDescendants,
   setAgentDescendantModel,
   upsertAgentDescendant,
   type AgentDescendantRoster
@@ -126,5 +128,59 @@ describe('Codex subagent roster', () => {
 
       expect(roster.get('child-1')?.model).toHaveLength(AGENT_MODEL_MAX_LENGTH)
     })
+  })
+})
+
+describe('a descendant that runs its own agent process', () => {
+  it('keeps the provider conversation and finds the child by it', () => {
+    const roster: AgentDescendantRoster = new Map()
+    upsertAgentDescendant(
+      roster,
+      'run-1',
+      {
+        agentType: 'general-purpose',
+        providerSession: 'claude-conversation',
+        state: 'working'
+      },
+      10
+    )
+    expect(findAgentDescendantByProviderSession(roster, 'claude-conversation')).toEqual({
+      id: 'run-1',
+      providerSession: 'claude-conversation'
+    })
+    expect(findAgentDescendantByProviderSession(roster, 'someone-else')).toBeNull()
+    expect(findAgentDescendantByProviderSession(roster, undefined)).toBeNull()
+    expect(agentDescendantRosterToSnapshots(roster)?.[0].providerSession).toBe(
+      'claude-conversation'
+    )
+  })
+
+  it('keeps its tool line when the live set re-upserts it without one', () => {
+    const roster: AgentDescendantRoster = new Map()
+    upsertAgentDescendant(
+      roster,
+      'run-1',
+      { toolName: 'Bash', toolInput: 'pnpm test', state: 'working' },
+      10
+    )
+    // The pi lane republishes the whole live set on every post, and that payload knows nothing
+    // about tools — a replacing write would blank the line the child's own lane just reported.
+    replaceAgentDescendants(roster, [{ id: 'run-1', agentType: 'general-purpose' }], 20)
+    expect(agentDescendantRosterToSnapshots(roster)?.[0]).toMatchObject({
+      toolName: 'Bash',
+      toolInput: 'pnpm test'
+    })
+  })
+
+  it('drops the tool line when its call ends', () => {
+    const roster: AgentDescendantRoster = new Map()
+    upsertAgentDescendant(
+      roster,
+      'run-1',
+      { toolName: 'Bash', toolInput: 'pnpm test', state: 'working' },
+      10
+    )
+    upsertAgentDescendant(roster, 'run-1', { clearTool: true, state: 'working' }, 20)
+    expect(agentDescendantRosterToSnapshots(roster)?.[0].toolName).toBeUndefined()
   })
 })

@@ -22,6 +22,7 @@ import { isStaleGrokTurnEnd } from './server-grok-status-rules'
 import { resolveCancelVerdictLatch } from './server-cancel-verdict-latch'
 import { AgentHookServerStatusApplication } from './server-status-application'
 import { claimsPaneAfterExit } from './agent-exit-evidence'
+import { writePiClaudeChildParentMarker } from './pi-claude-child-parent-marker'
 
 export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusApplication {
   protected readonly claudeOwedNotificationExpiry = new ClaudeOwedNotificationExpiryTimers(
@@ -58,7 +59,12 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
     if (!transitioned) {
       return undefined
     }
-    const { authorityRestartId, ...payload } = { ...incoming, ...transitioned }
+    const { authorityRestartId, ...transitionedPayload } = { ...incoming, ...transitioned }
+    // Why the strip: the marker beside the transcript is the durable half of this link, and a
+    // transcript path on every row would ride the persisted snapshot and the renderer fanout for
+    // no reader.
+    const childParent = transitionedPayload.piClaudeChildParent
+    const { piClaudeChildParent: _childParent, ...payload } = transitionedPayload
     if (!this.canWriteLegacyStatusRow(payload)) {
       return undefined
     }
@@ -84,6 +90,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
       | EnrichedAgentHookEventPayload
       | undefined
     const rowBefore = mutationBefore ?? previous
+    // Why here, after the two guards above: this row already knows which pi session owns the pane
+    // and the event already carries the child's own transcript, so the link is recorded as soon as
+    // the event is admissible — no later fold can drop it.
+    writePiClaudeChildParentMarker(childParent, payload.paneKey, previous, Date.now())
     const terminalHandle =
       payload.terminalHandle ??
       (previous?.terminalHandle && this.sameTerminalOwner(previous, payload)

@@ -44,6 +44,15 @@ export type AgentHookEventPayload = {
   toolAgentType?: string
   /** Provider-owned conversation/session id needed to resume a sleeping agent. */
   providerSession?: AgentProviderSessionMetadata
+  /** This event belongs to a claude CLI child of the pane's own pi subagent run, not to the pane's
+   *  agent: `runId` is the child row it describes, `providerSession` its own conversation, and
+   *  `transcriptPath` where that conversation is written. Main uses it to record the parent link
+   *  beside the transcript so the session list can nest it; never persisted on the row. */
+  piClaudeChildParent?: {
+    runId: string
+    providerSession: string
+    transcriptPath: string
+  }
   /** Session identity update with no turn-state transition; refreshes durable resume metadata without a fake status row. */
   providerSessionOnly?: boolean
   /** True when this event is a relay cache replay rather than a live hook. */

@@ -13,7 +13,8 @@ import type { SessionSearchStore } from './session-search-store'
 
 // File-read assumptions are checked by session-search-transcript-dependencies.test.ts.
 export const SELF_CONTAINED_TRANSCRIPT_AGENTS = {
-  claude: true,
+  // A sibling `.pi-parent.json` names the pi session that spawned this child.
+  claude: false,
   qoder: true,
   codebuddy: true,
   codex: false, // session_index.jsonl supplies titles.

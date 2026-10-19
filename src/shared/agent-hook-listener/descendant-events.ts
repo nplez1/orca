@@ -15,6 +15,8 @@ export type DescendantEntry = {
   agentType?: string
   description?: string
   model?: string
+  /** The child's own provider conversation, when it runs as a separate agent process. */
+  providerSession?: string
 }
 
 /** What one hook event says about the DESCENDANTS of the pane's lead session.
@@ -40,6 +42,11 @@ export type DescendantEventFacts =
       /** The child is blocked on a human answer. A descendant's wait is the pane's actionable
        *  state, so it surfaces even when the provider never names which child is waiting. */
       waiting?: boolean
+      /** The tool this child is running now, as its own lane reported it. */
+      toolName?: string
+      toolInput?: string
+      /** That tool call finished, so the row must stop naming it. */
+      toolEnded?: boolean
     } & Partial<DescendantEntry>)
   | { kind: 'live-set'; children: readonly DescendantEntry[] }
 
@@ -94,7 +101,8 @@ function readPiDescendantLiveSet(hookPayload: Record<string, unknown>): Descenda
         id,
         agentType: readFirstString(run, ['agent_type', 'agentType']),
         description: readString(run, 'description'),
-        model: readString(run, 'model')
+        model: readString(run, 'model'),
+        providerSession: readFirstString(run, ['provider_session', 'providerSession'])
       })
     }
   }

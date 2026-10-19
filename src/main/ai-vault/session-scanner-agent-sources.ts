@@ -12,6 +12,7 @@ import {
   isClineSessionMetadataPath
 } from './session-scanner-cline-parser'
 import { cursorChatMetaPath } from './session-scanner-cursor-chat-meta'
+import { claudePiParentMarkerPath } from './session-scanner-claude-pi-parent-marker'
 import { devinSessionsDbDependencyPath } from './session-scanner-devin-db'
 import { resolveKimiSessionsDir } from './session-scanner-kimi-paths'
 import { resolveMuseSessionsDir } from './session-scanner-muse-paths'
@@ -118,7 +119,12 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
     // sessionId and aren't independently resumable, so they'd just duplicate the
     // parent as untitled rows; prune the subtree and read them on demand under
     // their parent instead.
-    directoryPredicate: (name) => name !== SUBAGENT_DIR_NAME
+    directoryPredicate: (name) => name !== SUBAGENT_DIR_NAME,
+    // Why: the pi-parent marker that nests a spawned `claude --print` child is
+    // written seconds after its transcript starts. Tracking its stat is what lets
+    // a row cached before it existed pick the link up on a later scan; the
+    // unchanged transcript key alone would keep serving `subagent: null`.
+    contentDependencyPath: claudePiParentMarkerPath
   },
   qoder: {
     rootDirs: (options, wslHomeDirs) =>

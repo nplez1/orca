@@ -25,6 +25,9 @@ const EW_COMPLETE = 'subagent:async-complete'
 /** Upstream's roster also binds this for its own runner-exit grace, so a pi pane carries one
  *  roster subscription plus the fork bus's own. */
 const RUNNER_EXIT = 'subagent:process-terminal'
+/** The plugin's own event once a run's Claude conversation exists — the only id a host can join
+ *  that child's separate hook stream back with. */
+const FORK_SESSION = 'subagents:session'
 const START_CHANNELS = [FORK_CREATED, FORK_STARTED, EW_STARTED]
 const END_CHANNELS = [FORK_COMPLETED, FORK_FAILED, EW_COMPLETE]
 
@@ -537,5 +540,48 @@ describe('pi async subagent runs reach the pane as descendants (STA-6378)', () =
       // Upstream's roster binds the runner-exit channel for every kind; only the fork's bus is pi-only.
       expect(harness.piEventListenerCount(RUNNER_EXIT)).toBe(1)
     }
+  })
+
+  it('publishes the child’s own Claude conversation once the run has one', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'delegate the review' }, sessionCtx('s1'))
+    await drive(harness, 'agent_start', {}, sessionCtx('s1'))
+    await emit(harness, FORK_STARTED, {
+      id: 'run-1',
+      type: 'general-purpose',
+      description: 'review the diff'
+    })
+    // The spawn event cannot carry it: the runner builds its session after the run is reported.
+    expect(harness.accepted.at(-1)?.subagents?.[0]?.providerSession).toBeUndefined()
+
+    await emit(harness, FORK_SESSION, {
+      id: 'run-1',
+      type: 'general-purpose',
+      description: 'review the diff',
+      model: 'sonnet',
+      providerSession: 'claude-conversation-1'
+    })
+
+    // Merged into the run the spawn reported, not a second row beside it.
+    expect(harness.accepted.at(-1)?.subagents).toEqual([
+      expect.objectContaining({
+        id: 'run-1',
+        agentType: 'general-purpose',
+        description: 'review the diff',
+        model: 'sonnet',
+        providerSession: 'claude-conversation-1'
+      })
+    ])
+  })
+
+  it('never invents a row from a conversation event for a run this session did not spawn', async () => {
+    const harness = createHarness()
+    await drive(harness, 'before_agent_start', { prompt: 'delegate the review' }, sessionCtx('s1'))
+    await emit(harness, FORK_SESSION, {
+      id: 'somebody-elses-run',
+      providerSession: 'claude-conversation-1'
+    })
+    // A row nothing can retire would ride every post: the live set refreshes the reaper's clock.
+    expect(harness.accepted.at(-1)?.subagents ?? []).toEqual([])
   })
 })

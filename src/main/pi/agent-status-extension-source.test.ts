@@ -521,7 +521,13 @@ describe('getPiAgentStatusExtensionSource', () => {
     // alive. agent_end is the only extension event that proves done, so the handler
     // exists solely to release a dialog Pi tore down without a close.
     await harness.callHook('session_shutdown')
-    expect(harness.fetchMock).not.toHaveBeenCalled()
+    // The only thing a shutdown reports is the live set it is leaving, so the receiver's child list
+    // is emptied. A completion is what this handler must never fabricate.
+    const posted = harness.fetchMock.mock.calls.map((call) => {
+      const body: { payload?: { hook_event_name?: string } } = JSON.parse(String(call[1]?.body))
+      return body.payload?.hook_event_name
+    })
+    expect(posted).toEqual(['subagent_async_state'])
   })
 
   it('bounds stalled delivery to one active request and the latest pending status', async () => {
