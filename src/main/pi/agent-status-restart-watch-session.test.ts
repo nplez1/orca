@@ -116,6 +116,41 @@ it('stops watching a completion a reset promoted with nothing newer queued', asy
   expect(harness.fetchMock.mock.calls.length).toBe(before)
 })
 
+it('is not ended by a completion a reset promoted over a newer turn start', async () => {
+  const harness = harnessWithEndpoint('5001', 'first')
+  await harness.callHook('agent_start', {}, idle)
+  await vi.advanceTimersByTimeAsync(0)
+  // Why: the completion is in flight when the next turn starts, and a child registering itself
+  // resets the queue — promoting that completion and dropping the turn start it never delivered.
+  let failInFlight: (() => void) | undefined
+  harness.fetchMock.mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        failInFlight = () => reject(new Error('Orca is going down'))
+      })
+  )
+  await harness.callHook('agent_settled', {}, idle)
+  await harness.callHook('before_agent_start', { prompt: 'next' }, working)
+  await harness.callHook('agent_start', {}, working)
+  harness.registerTaskChild()
+  failInFlight?.()
+  await vi.advanceTimersByTimeAsync(0)
+  // Why: the promoted completion's first retry runs before that running turn posts again, so the
+  // retry is the only thing on hand — and it must not re-end the turn.
+  harness.fetchMock.mockRejectedValue(new Error('Orca is down'))
+  await vi.advanceTimersByTimeAsync(300)
+  await harness.callHook('tool_execution_start', { toolName: 'bash' }, working)
+  await vi.advanceTimersByTimeAsync(STRETCHED_RETRY_MS)
+  harness.fetchMock.mockResolvedValue({ ok: true })
+  const before = harness.fetchMock.mock.calls.length
+
+  restartOrca(harness, '5002', 'second')
+  await vi.advanceTimersByTimeAsync(WATCH_MS)
+  // Why: the restarted Orca must hear the turn that is running, not silence and not the completion.
+  expect(harness.fetchMock.mock.calls.length).toBe(before + 1)
+  expect(posts(harness).at(-1)?.hook_event_name).not.toBe('agent_end')
+})
+
 it('stops watching when the session ends', async () => {
   const harness = harnessWithEndpoint('5001', 'first')
   await harness.callHook('agent_start', {}, working)

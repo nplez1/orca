@@ -4,15 +4,15 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
   return [
     'type HookSnapshot = { hookEventName: string; extra: Record<string, unknown>; metadata: Record<string, unknown>; ompRuntime: boolean }',
     'type HookPost = HookSnapshot & { revision: number; attempts: number; delivered: boolean; final?: boolean }',
-    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null; watchTimer: ReturnType<typeof setTimeout> | null; watchAttemptedKey: string | null; watchSnapshot: HookSnapshot | null; turnEnded: boolean }',
+    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null; watchTimer: ReturnType<typeof setTimeout> | null; watchAttemptedKey: string | null; watchSnapshot: HookSnapshot | null; turnEnded: boolean; newestEnqueued: number }',
     ...(kind === 'pi'
       ? [
           'declare global { var __orcaPiStatusPostQueue: HookPostQueue | undefined }',
           // Why: old delivery continuations and a reloaded registration must serialize through one queue.
-          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true }'
+          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0 }'
         ]
       : [
-          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true }'
+          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchAttemptedKey: null, watchSnapshot: null, turnEnded: true, newestEnqueued: 0 }'
         ]),
     '',
     'function cancelPostRetry(): void {',
@@ -27,6 +27,9 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '',
     'function resetPostQueue(): void {',
     '  cancelPostRetry()',
+    '  // Why: the slot it is about to clear is the only evidence that something newer than the posts',
+    '  // it promotes had been enqueued.',
+    '  if (postQueue.latestPost) postQueue.newestEnqueued = postQueue.latestPost.revision',
     '  postQueue.postRevision++',
     // Why: preserve the original object so an in-flight acknowledgment also retires its final queue entry.
     '  for (const post of [postQueue.activePost, postQueue.pendingPost, postQueue.latestPost]) {',
@@ -105,7 +108,14 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '// bumps the counter itself, so a completion it promoted must not read as superseded.',
     'function isNewestEnqueue(next) {',
     '  if (next.revision === postQueue.postRevision) return true',
-    '  return next.final === true && postQueue.latestPost === null',
+    '  // Why: a reset promotes a completion it never delivered, and that is the newest post only when',
+    '  // nothing newer had been enqueued before the reset — otherwise a retry of it would re-end a',
+    '  // turn that has already started.',
+    '  return (',
+    '    next.final === true &&',
+    '    postQueue.latestPost === null &&',
+    '    next.revision >= postQueue.newestEnqueued',
+    '  )',
     '}',
     '',
     'function noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKey, latest) {',
