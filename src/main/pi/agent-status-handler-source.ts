@@ -12,6 +12,7 @@ import {
   getPiSubagentRosterEventSourceLines,
   getPiSubagentRosterSetupSourceLines
 } from './agent-status-subagent-roster-source'
+import { getPiAgentStatusRestartWatchSourceLines } from './agent-status-restart-watch-source'
 import {
   getAgentStatusRunCloseOutSourceLines,
   getAgentStatusSessionBoundaryHandlerSourceLines,
@@ -235,6 +236,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '    pendingAgentEndContext = null',
     '  }',
     ...getPiSubagentRosterEventSourceLines(),
+    ...getPiAgentStatusRestartWatchSourceLines(),
     // The one answer to "do children still hold this pane"; an exited runner holds through its grace.
     '  function isHeldByChildren(): boolean {',
     '    return lifecycleState.active.size > 0',

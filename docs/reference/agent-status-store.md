@@ -489,6 +489,34 @@ headless `orca serve` never saw it (#16095). Now an agent whose rule file says
 
 The titles stay for display; remote clients read them.
 
+## A restart is the agent's cue to re-announce
+
+Hydration restores only what Orca last knew, and nothing on the host can observe what happened
+while it was down. But Orca mints a new hook token on every start (`server-lifecycle.ts`,
+`randomUUID()`), so a restart always publishes a new endpoint — and the endpoint file is the one
+piece of that Orca a running agent can read for itself, which it already does on every post.
+
+While a turn is in flight or a child still holds the pane, the Pi/OMP/Prime status extension
+(`agent-status-post-queue-source.ts`, `agent-status-restart-watch-source.ts`):
+
+- keeps the last posted snapshot and the endpoint key that accepted it;
+- re-reads the hook coordinates every 2s — armed by a turn's own events, gated on
+  `ORCA_AGENT_HOOK_ENDPOINT`, so a pane launched without that file arms no timer and an idle pane
+  arms none either;
+- republishes that snapshot when the endpoint it delivered to is no longer the one Orca serves, or
+  when nothing has been delivered yet. The row a restart restored therefore becomes a fresh,
+  confirmed observation within a couple of seconds instead of waiting for the agent's next turn.
+
+The scope is the silent window a restart can actually invalidate: a long tool call or a held
+subagent posts nothing for minutes, and the pane still reads `working` in the meantime. A posted
+completion settles the watch unless child work still holds the row open, and every session boundary
+stops it, so no timer outlives the work it was watching.
+
+This is only the agent-side half, and only the in-process extension family has a process that
+outlives the restart with a way to notice it. Hook-script agents (Claude, Codex, Grok, …) post per
+event from a fresh process and cannot re-announce; their restored non-done rows keep the
+`restoredUnconfirmed` treatment, and go live again on their next event.
+
 ## What does not change
 
 - The hook scripts, the OSC 9999 wire format, and the relay protocol.

@@ -2,16 +2,17 @@ import type { PiAgentKind } from '../../shared/pi-agent-kind'
 
 export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[] {
   return [
-    'type HookPost = { hookEventName: string; extra: Record<string, unknown>; metadata: Record<string, unknown>; ompRuntime: boolean; revision: number; attempts: number; delivered: boolean; final?: boolean }',
-    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null }',
+    'type HookSnapshot = { hookEventName: string; extra: Record<string, unknown>; metadata: Record<string, unknown>; ompRuntime: boolean }',
+    'type HookPost = HookSnapshot & { revision: number; attempts: number; delivered: boolean; final?: boolean }',
+    'type HookPostQueue = { activePost: HookPost | null; pendingPost: HookPost | null; latestPost: HookPost | null; finalPosts: HookPost[]; finalRetryTimer: ReturnType<typeof setTimeout> | null; postRevision: number; retryTimer: ReturnType<typeof setTimeout> | null; watchTimer: ReturnType<typeof setTimeout> | null; watchEndpointKey: string | null; watchSnapshot: HookSnapshot | null; watchStillWorking: (() => boolean) | null }',
     ...(kind === 'pi'
       ? [
           'declare global { var __orcaPiStatusPostQueue: HookPostQueue | undefined }',
           // Why: old delivery continuations and a reloaded registration must serialize through one queue.
-          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null }'
+          'const postQueue: HookPostQueue = globalThis.__orcaPiStatusPostQueue ??= { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchEndpointKey: null, watchSnapshot: null, watchStillWorking: null }'
         ]
       : [
-          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null }'
+          'const postQueue: HookPostQueue = { activePost: null, pendingPost: null, latestPost: null, finalPosts: [], finalRetryTimer: null, postRevision: 0, retryTimer: null, watchTimer: null, watchEndpointKey: null, watchSnapshot: null, watchStillWorking: null }'
         ]),
     '',
     'function cancelPostRetry(): void {',
@@ -26,6 +27,9 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '',
     'function resetPostQueue(): void {',
     '  cancelPostRetry()',
+    '  stopEndpointWatch()',
+    '  postQueue.watchEndpointKey = null',
+    '  postQueue.watchSnapshot = null',
     '  postQueue.postRevision++',
     // Why: preserve the original object so an in-flight acknowledgment also retires its final queue entry.
     '  for (const post of [postQueue.activePost, postQueue.pendingPost, postQueue.latestPost]) {',
@@ -48,6 +52,62 @@ export function getPiAgentStatusPostQueueSourceLines(kind: PiAgentKind): string[
     '    clearTimeout(postQueue.finalRetryTimer)',
     '    postQueue.finalRetryTimer = null',
     '  }',
+    '}',
+    '',
+    // Why: Orca mints a new hook token on every start, so the endpoint a pane last delivered to is how
+    // a running agent notices the Orca it reports to was restarted. That Orca restored this pane\'s last
+    // row from disk and cannot observe the agent again until it posts, and a turn can stay silent for a
+    // long tool call or a subagent. So while work is in flight the agent speaks first and republishes the
+    // state Orca already had, at the endpoint Orca is serving now.
+    'const ENDPOINT_WATCH_MS = 2000',
+    // Why: every event that only happens while a turn is live. A /reload mid-turn re-arms on the
+    // next one, and the idle-only events (session_start, model_select) arm nothing.
+    "const ENDPOINT_WATCH_EVENTS = ['before_agent_start', 'agent_start', 'tool_execution_start', 'tool_execution_end', 'message_end', 'subagent_async_state']",
+    '',
+    'function endpointKeyOf(coords: { port?: string; token?: string; env?: string; version?: string }): string {',
+    "  return [coords.port, coords.token, coords.env, coords.version].join('|')",
+    '}',
+    '',
+    "// Why: work in flight is the only window a restart can silently invalidate. An idle pane's row is",
+    '// already `done`, so keeping a timer armed there would watch for nothing.',
+    '// Why the endpoint-file gate: only a pane that can re-read its hook coordinates from disk can',
+    '// ever notice a restart, so a pane launched without that file arms nothing at all.',
+    'function startEndpointWatch(): void {',
+    '  if (postQueue.watchTimer !== null || !process.env.ORCA_AGENT_HOOK_ENDPOINT) return',
+    '  postQueue.watchTimer = setTimeout(watchEndpoint, ENDPOINT_WATCH_MS)',
+    "  if (typeof postQueue.watchTimer.unref === 'function') postQueue.watchTimer.unref()",
+    '}',
+    '',
+    'function stopEndpointWatch(): void {',
+    '  if (postQueue.watchTimer !== null) clearTimeout(postQueue.watchTimer)',
+    '  postQueue.watchTimer = null',
+    '}',
+    '',
+    '// Why: a turn that ended is not the same as a settled pane — child work still holds the row open.',
+    'function settleEndpointWatch(): void {',
+    '  const stillWorking = postQueue.watchStillWorking',
+    '  if (stillWorking && stillWorking()) return',
+    '  stopEndpointWatch()',
+    '}',
+    '',
+    'function republishWatchSnapshot(): void {',
+    '  const snapshot = postQueue.watchSnapshot',
+    '  if (!snapshot || postQueue.activePost) return',
+    '  postQueue.pendingPost = { revision: ++postQueue.postRevision, attempts: 0, delivered: false, hookEventName: snapshot.hookEventName, extra: snapshot.extra, metadata: snapshot.metadata, ompRuntime: snapshot.ompRuntime }',
+    '  postQueue.latestPost = postQueue.pendingPost',
+    '  drainPosts()',
+    '}',
+    '',
+    'function watchEndpoint(): void {',
+    '  postQueue.watchTimer = null',
+    '  try {',
+    '    const key = endpointKeyOf(resolveHookCoords())',
+    '    // Why: a null key means nothing has been delivered yet, so keep trying until one lands.',
+    '    if (postQueue.watchEndpointKey !== key) republishWatchSnapshot()',
+    '  } catch {',
+    '    // Why: status reporting must never break the pi run, including from a timer callback.',
+    '  }',
+    '  startEndpointWatch()',
     '}',
     '',
     'function drainPosts(): void {',
