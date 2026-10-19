@@ -81,7 +81,7 @@ O Orca NP é o [stablyai/orca](https://github.com/stablyai/orca) mais uma série
 
 Adições às receitas de ambiente por workspace do upstream (Settings → Experimental → Cloud VM):
 
-- **Contagem regressiva da concessão e Extend** — uma receita que informa quando o provedor retira o host ganha uma contagem regressiva no card do workspace e em Configurações, e uma ação Extend limitada aos prazos que aquela receita declara. Após o prazo, o Orca informa a concessão expirada em vez de repetir a conexão; quando o host para de responder depois de um período de tolerância, o Orca remove o workspace da lista, e a máquina do provedor fica com o próprio vencimento ou com a limpeza em Configurações.
+- **Contagem regressiva da concessão e Extend** — uma receita que informa quando o provedor retira o host ganha uma contagem regressiva no card do workspace e em Configurações, e, se ela também declarar como estender, uma ação Extend limitada aos prazos que ela lista. Após o prazo, o card e as Configurações mostram a concessão como expirada; quando 15 minutos tiverem passado e a conexão do Orca com o host tiver falhado, o Orca remove o workspace da lista, e a máquina do provedor fica com o próprio vencimento ou com a limpeza em Configurações.
 - **Itens de menu de contexto declarados na receita** — até 20 ações que uma receita declara ganham as suas próprias entradas no menu de contexto desse workspace e executam com o host, o nome e o caminho do workspace. São declaradas em `orca.yaml`, então ficam cobertas pela aprovação da receita, e uma receita que não declara nenhuma não acrescenta entradas.
 
 ### Confiabilidade

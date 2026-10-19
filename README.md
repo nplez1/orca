@@ -81,7 +81,7 @@ Orca NP is [stablyai/orca](https://github.com/stablyai/orca) plus a series of fo
 
 Additions to upstream's per-workspace environment recipes (Settings → Experimental → Cloud VM):
 
-- **Lease countdown and Extend** — a recipe that publishes when the provider takes the host away gets a countdown on the workspace card and in Settings, and an Extend action offering only the lifetimes that recipe declares. Past the deadline Orca reports the expired lease instead of retrying the connection; once the host has stopped answering past a grace period, Orca removes the workspace from its list, and the provider's machine is left to its own expiry or to Cleanup in Settings.
+- **Lease countdown and Extend** — a recipe that publishes when the provider takes the host away gets a countdown on the workspace card and in Settings, and, when it also declares how to extend, an Extend action limited to the lifetimes it lists. Past the deadline the card and Settings show the lease as expired; once 15 minutes have gone by and Orca's connection to the host has failed, Orca removes the workspace from its list, and the provider's machine is left to its own expiry or to Cleanup in Settings.
 - **Recipe-declared context-menu items** — up to 20 actions a recipe declares get their own entries in that workspace's context menu and run with the workspace's host, name, and path. They are declared in `orca.yaml`, so they are covered by the recipe's approval, and a recipe that declares none adds no entries.
 
 ### Reliability

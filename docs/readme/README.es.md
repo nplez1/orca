@@ -62,7 +62,7 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 - **Agente predeterminado con un clic** — el botón `+` de la barra de pestañas lanza tu agente predeterminado; mantenlo pulsado o usa la flecha para abrir el menú completo.
 - **Agent Dashboard como página** — se abre en la ventana principal con atrás/adelante, y al hacer clic en una tarjeta se abre el workspace de ese agente.
 - **Historial de sesiones de agentes** — «All» ahora lista todas las sesiones, las sesiones de sub-agentes se anidan bajo su sesión padre, y la indexación de transcripciones hace buscables las transcripciones existentes. El historial de un host emparejado se carga por páginas y solo refresca lo que cambió, así que un historial remoto grande llega en lugar de fallar.
-- **Seguimiento de uso para más proveedores** — presupuestos de créditos de IA de Copilot Enterprise, saldo de DeepSeek y gasto de Fireworks.ai en la barra de estado, además de un interruptor por proveedor que detiene el sondeo y la lectura de credenciales. Una sesión de Claude caducada se renueva con el refresh token guardado en lugar de quedarse en «Updates when Claude runs», y el inicio de sesión renovado se guarda donde Claude lo guarda.
+- **Seguimiento de uso para más proveedores** — presupuestos de créditos de IA de Copilot Enterprise, saldo de DeepSeek y gasto de Fireworks.ai en la barra de estado, además de un interruptor por proveedor que detiene el sondeo y la lectura de credenciales. Una sesión de Claude caducada se renueva con el refresh token guardado en lugar de quedarse en «Se actualiza cuando Claude se ejecuta», y el inicio de sesión renovado se guarda donde Claude lo guarda.
 
 ### Workspaces y organización
 
@@ -81,7 +81,7 @@ Orca NP es [stablyai/orca](https://github.com/stablyai/orca) más una serie de f
 
 Añadidos a las recetas de entorno por workspace de upstream (Ajustes → Experimental → VM en la nube):
 
-- **Cuenta atrás de la concesión y Extend** — una receta que publica cuándo el proveedor se lleva el host recibe una cuenta atrás en la tarjeta del workspace y en Ajustes, y una acción Extend limitada a las duraciones que esa receta ofrezca. Pasado el plazo, Orca informa de la concesión caducada en vez de reintentar la conexión; cuando el host deja de responder tras un periodo de gracia, Orca quita el workspace de su lista y la máquina del proveedor queda a su propio vencimiento o a la limpieza en Ajustes.
+- **Cuenta atrás de la concesión y Extend** — una receta que publica cuándo el proveedor se lleva el host recibe una cuenta atrás en la tarjeta del workspace y en Ajustes, y, si además declara cómo ampliarla, una acción Extend limitada a las duraciones que indique. Pasado el plazo, la tarjeta y Ajustes muestran la concesión como caducada; cuando han pasado 15 minutos y la conexión de Orca con el host ha fallado, Orca quita el workspace de su lista y la máquina del proveedor queda a su propio vencimiento o a «Limpiar» en Ajustes.
 - **Elementos de menú contextual declarados en la receta** — hasta 20 acciones que declara una receta tienen su propia entrada en el menú contextual de ese workspace y se ejecutan con el host, el nombre y la ruta del workspace. Al estar declaradas en `orca.yaml`, quedan cubiertas por la aprobación de la receta, y una receta que no declara ninguna no añade entradas.
 
 ### Fiabilidad

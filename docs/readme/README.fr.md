@@ -36,7 +36,7 @@ Orca NP, c'est [stablyai/orca](https://github.com/stablyai/orca) plus une série
 ### Tâches, issues et Jira
 
 - **Vue tableau Jira** — choisissez un tableau par défaut et l'onglet Jira affiche les colonnes, le sprint actif et le backlog, avec glisser-déposer entre colonnes, un champ de filtre et des couleurs de priorité.
-- **Un dépôt dans une colonne qui tient** — déposer une issue Jira dans une colonne résout la transition, demande les champs exigés par l'écran de cette transition et déplace la carte avant que Jira ne confirme, en annulant seulement si Jira refuse.
+- **Un glisser-déposer qui tient** — déposer une issue Jira dans une colonne résout la transition, demande les champs exigés par l'écran de cette transition et déplace la carte avant que Jira ne confirme, en annulant seulement si Jira refuse.
 - **Sprints, story points et champs personnalisés** — déplacez un élément de backlog sur un sprint depuis sa ligne ou le tiroir d'issue, définissez ou effacez les story points à côté du statut, de la priorité et de l'assigné, et modifiez les champs personnalisés de sélection d'utilisateur (Dev, QE) depuis le détail de l'issue. Un changement de sprint effectué dans l'issue ouverte recharge le tableau.
 - **« Me » correspond à tous les champs de rôle** — une issue où vous êtes le Dev ou le QE, et pas seulement l'assigné, apparaît désormais sous le filtre Me du tableau.
 - **Sélecteur d'assigné avec recherche** — vous et votre équipe restez épinglés en tête.
@@ -62,7 +62,7 @@ Orca NP, c'est [stablyai/orca](https://github.com/stablyai/orca) plus une série
 - **Agent par défaut en un clic** — le bouton `+` de la barre d'onglets lance votre agent par défaut ; maintenez-le ou utilisez le chevron pour le menu complet.
 - **Agent Dashboard en page** — s'ouvre dans la fenêtre principale avec précédent/suivant, et un clic sur une carte ouvre le workspace de cet agent.
 - **Historique des sessions d'agents** — « All » liste enfin toutes les sessions, les sessions de sous-agents s'imbriquent sous leur parent, et l'indexation des transcriptions rend les transcriptions existantes recherchables. L'historique d'un hôte appairé se charge par pages et ne rafraîchit que ce qui a changé, si bien qu'un gros historique distant arrive au lieu d'échouer.
-- **Suivi d'usage pour plus de fournisseurs** — budgets de crédits IA Copilot Enterprise, solde DeepSeek et dépenses Fireworks.ai dans la barre d'état, plus un interrupteur par fournisseur qui arrête le polling et la lecture des identifiants. Une connexion Claude expirée est rafraîchie depuis le jeton de rafraîchissement stocké au lieu de rester sur « Updates when Claude runs », et la connexion renouvelée est réécrite là où Claude la conserve.
+- **Suivi d'usage pour plus de fournisseurs** — budgets de crédits IA Copilot Enterprise, solde DeepSeek et dépenses Fireworks.ai dans la barre d'état, plus un interrupteur par fournisseur qui arrête le polling et la lecture des identifiants. Une connexion Claude expirée est rafraîchie depuis le jeton de rafraîchissement stocké au lieu de rester sur « Se met à jour quand Claude s'exécute », et la connexion renouvelée est réécrite là où Claude la conserve.
 
 ### Workspaces et organisation
 
@@ -81,7 +81,7 @@ Orca NP, c'est [stablyai/orca](https://github.com/stablyai/orca) plus une série
 
 Ajouts aux recettes d'environnement par workspace d'upstream (Paramètres → Expérimental → VM cloud) :
 
-- **Compte à rebours du bail et Extend** — une recette qui indique quand le fournisseur reprend l'hôte reçoit un compte à rebours sur la carte du workspace et dans les Paramètres, et une action Extend limitée aux durées que cette recette déclare. Passé le délai, Orca signale le bail expiré au lieu de retenter la connexion ; quand l'hôte cesse de répondre après un délai de grâce, Orca retire le workspace de sa liste, et la machine du fournisseur reste soumise à sa propre expiration ou au nettoyage dans les Paramètres.
+- **Compte à rebours du bail et Extend** — une recette qui indique quand le fournisseur reprend l'hôte reçoit un compte à rebours sur la carte du workspace et dans les Paramètres et, si elle déclare aussi comment le prolonger, une action Extend limitée aux durées qu'elle liste. Passé le délai, la carte et les Paramètres affichent le bail comme expiré ; quand 15 minutes ont passé et que la connexion d'Orca avec l'hôte a échoué, Orca retire le workspace de sa liste, et la machine du fournisseur reste soumise à sa propre expiration ou au nettoyage dans les Paramètres.
 - **Éléments de menu contextuel déclarés par la recette** — jusqu'à 20 actions qu'une recette déclare ont leurs propres entrées dans le menu contextuel de ce workspace et s'exécutent avec l'hôte, le nom et le chemin du workspace. Elles sont déclarées dans `orca.yaml`, donc couvertes par l'approbation de la recette, et une recette qui n'en déclare aucune n'ajoute aucune entrée.
 
 ### Fiabilité
