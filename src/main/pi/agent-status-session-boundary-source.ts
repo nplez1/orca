@@ -40,7 +40,7 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     '    if (isOmpRuntime()) {',
     '      clearRunnerExitCheck()',
     '      resetPostQueue()',
-    '      resetEndpointWatch()',
+    '      if (ownsPaneRoster) resetEndpointWatch()',
     '      return',
     '    }',
     // Why: pi tears an open dialog down without resolving its promise, so no ui_prompt_end follows.
@@ -60,8 +60,9 @@ function getPiSessionShutdownHandlerSourceLines(): string[] {
     "    if (keepsSession || reason === 'quit') {",
     // Why: this registration's queue outlives it and would deliver stale posts after the next one's.
     '      resetPostQueue()',
-    // Why: a session that keeps running (/reload, same-file resume) keeps watching; a quit does not.
-    "      if (reason === 'quit') resetEndpointWatch()",
+    // Why: a session that keeps running (/reload, same-file resume) keeps watching; a quit does not,
+    // and only the registration that owns the pane's roster speaks for the pane.
+    "      if (reason === 'quit' && ownsPaneRoster) resetEndpointWatch()",
     '      return',
     '    }',
     // Also a Pi too old to give a reason: its children would otherwise hold the pane for good.
@@ -83,7 +84,9 @@ export function getAgentStatusSessionBoundaryHandlerSourceLines(kind: PiAgentKin
   return [
     ...(kind !== 'pi'
       ? [
-          "  pi.on('session_shutdown', () => { resetSubagentRoster(); resetPostQueue(); resetEndpointWatch(); clearPendingAgentEndCheck() })"
+          // Why the guard: an OMP task child registers this handler too, and the queue it would reset
+          // describes the lead's pane — a child's shutdown is not the pane's.
+          "  pi.on('session_shutdown', () => { resetSubagentRoster(); resetPostQueue(); if (ownsPaneRoster) resetEndpointWatch(); clearPendingAgentEndCheck() })"
         ]
       : []),
     ...(kind !== 'prime-agent'
@@ -144,7 +147,7 @@ export function getAgentStatusRunCloseOutSourceLines(): string[] {
     '    }',
     '    resetSubagentRoster()',
     '    resetPostQueue()',
-    '    resetEndpointWatch()',
+    '    if (ownsPaneRoster) resetEndpointWatch()',
     '    if (!unsettled) return',
     '    lifecycleState.endedRunGeneration = lifecycleState.runGeneration',
     '    postAgentEndOnce(true)',

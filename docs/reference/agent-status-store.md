@@ -498,29 +498,39 @@ piece of that Orca a running agent can read for itself, which it already does on
 
 While the pane is working, the Pi/OMP/Prime status extension (`agent-status-post-queue-source.ts`)
 keeps, per delivery attempt, the payload it tried and the endpoint key it tried it against. A 2s
-watch compares that key with the endpoint now on disk and, when it differs (or nothing has been
-attempted yet), republishes the last attempted payload at the endpoint Orca is serving. The row a
-restart restored therefore becomes a fresh, confirmed observation within a couple of seconds rather
-than waiting for the agent's next turn.
+watch compares that key with the endpoint now on disk and, when it differs, republishes the last
+attempted payload at the endpoint Orca is serving. The row a restart restored therefore becomes a
+fresh, confirmed observation within a couple of seconds rather than waiting for the agent's next
+turn.
 
-Three rules keep it honest and bounded:
+Four rules keep it honest and bounded:
 
 - **The attempt decides, not the registration.** A pi-subagents or OMP task child re-runs the
   factory inside the same process without ever posting, so registration state is the wrong place to
   read "what is this pane doing". The watch reads the last attempted payload instead, and stays
   armed while that payload shows work in flight: the turn has not ended, or the completion it
-  carried still listed live children (`subagent_runs` / `subagents`). A child finishing after the
-  lead settled retires the last of those and the watch stops on its own re-check, which is also why
-  no missed stop can leave an idle pane polling.
+  carried still listed live children in `subagent_runs` (the fork lane, which is the one that posts
+  the lead's completion while children run; the other lanes withhold it, so the turn flag covers
+  them). A child finishing after the lead settled retires the last of those and the watch stops on
+  its own re-check, which is also why no missed stop can leave an idle pane polling.
+- **The turn boundary is recorded when the event is posted, not when it is delivered.** The queue
+  coalesces into one latest-only slot, so a stalled completion can collapse `before_agent_start`,
+  `agent_start` and a first tool event into a single attempt — an attempted-only flag would keep
+  the previous turn's `done` and never watch the new turn. A completion promoted to `final` by a
+  queue reset (a reload, a sibling registration) is not a session end either, so it does not retire
+  the snapshot; only a `session_boundary` post does.
 - **The key compared is the one attempted.** A repeated failure at one endpoint — the WSL `curl.exe`
-  bridge, a host that answers 404 because status hooks are off — cannot spin. On WSL the bridge
-  tries the launch coordinates first and the endpoint file second, so a stale guest endpoint still
-  falls back to the host, while a restarted host is reachable through the file it just wrote.
+  bridge, a host that answers 404 because status hooks are off — cannot spin, and a republish never
+  displaces a post already queued or a final already retrying. On WSL the bridge tries the
+  coordinates that last landed, then the launch coordinates, then the endpoint file: a stale guest
+  endpoint still falls back to the host, and a restarted host is reachable through the file it just
+  wrote.
 - **Only a session end clears it.** A posted completion does not, because child work can outlive the
   turn; `resetEndpointWatch()` runs where a session ends (`session_shutdown` for `quit`, the generic
-  non-pi handler, `closeOutRun`) and leaves `/reload` and a same-file resume watching, since that
-  session keeps running. The watch is also gated on `ORCA_AGENT_HOOK_ENDPOINT`: a pane launched
-  without that file could never notice a restart, so it arms no timer at all.
+  non-pi handler, `closeOutRun`) and only from the registration that owns the pane's roster, so an
+  OMP task child's shutdown cannot silence the lead. `/reload` and a same-file resume keep watching,
+  since that session keeps running. The watch is also gated on `ORCA_AGENT_HOOK_ENDPOINT`: a pane
+  launched without that file could never notice a restart, so it arms no timer at all.
 
 Known gap: the new Orca's prompt cache starts empty and pi rows are not seeded from hydration (only
 Claude's are), so a republished non-prompt snapshot resolves the row's prompt to empty. That already

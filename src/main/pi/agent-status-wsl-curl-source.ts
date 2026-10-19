@@ -43,6 +43,8 @@ export function getPiAgentStatusWslCurlSourceLines(): string[] {
     '}',
     '',
     '// Why: WSL loopback is not the Windows loopback, so use curl.exe on the host.',
+    'let lastDeliveredWindowsCurl = null',
+    '',
     'async function postViaWindowsCurl(body: string, ompRuntime: boolean, coords): Promise<void> {',
     '  const curlPath = resolveWindowsCurlPath()',
     '  const candidates = []',
@@ -51,9 +53,10 @@ export function getPiAgentStatusWslCurlSourceLines(): string[] {
     '    if (candidates.some((candidate) => candidate.port === port && candidate.token === token)) return',
     '    candidates.push({ port, token })',
     '  }',
-    // Why: PTY env is the Orca that launched this pane and a guest endpoint file can be stale, so the
-    // launch coordinates are tried first — but an Orca restart leaves only the file with the new
-    // endpoint, so it is the fallback rather than discarded.
+    // Why: whatever landed last is tried first, so an Orca restart costs one refused connect rather
+    // than one on every post. Then PTY env — the Orca that launched this pane, since a guest endpoint
+    // file can be stale — and last the file, which is the only place a restarted host's token lives.
+    '  addCandidate(lastDeliveredWindowsCurl?.port, lastDeliveredWindowsCurl?.token)',
     '  addCandidate(process.env.ORCA_AGENT_HOOK_PORT, process.env.ORCA_AGENT_HOOK_TOKEN)',
     '  addCandidate(coords?.port, coords?.token)',
     "  if (!curlPath || candidates.length === 0) throw new Error('Orca WSL hook bridge unavailable')",
@@ -61,6 +64,7 @@ export function getPiAgentStatusWslCurlSourceLines(): string[] {
     '  for (const candidate of candidates) {',
     '    try {',
     '      await postViaWindowsCurlOnce(curlPath, body, ompRuntime, candidate.port, candidate.token)',
+    '      lastDeliveredWindowsCurl = candidate',
     '      return',
     '    } catch (error) {',
     '      failure = error',

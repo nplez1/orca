@@ -211,6 +211,11 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  const ompRuntime = isOmpRuntime()',
     // Why: the body is built at delivery, so the session is pinned here, where the event happened.
     '  const metadata = getPostSessionMetadata(ompRuntime)',
+    '  // Why: the turn boundary is what the event said, not what survives the latest-only slot — a',
+    '  // stalled completion can collapse before_agent_start, agent_start and a tool event into one',
+    '  // newer attempt, and the watch would otherwise believe the previous turn never ended.',
+    "  if (final || hookEventName === 'agent_end') postQueue.turnEnded = true",
+    "  else if (hookEventName === 'agent_start' || hookEventName === 'before_agent_start') postQueue.turnEnded = false",
     '  if (final) {',
     '    postQueue.finalPosts.push({ revision: postQueue.postRevision, attempts: 0, delivered: false, hookEventName, extra, metadata, ompRuntime, final })',
     '    drainPosts()',
@@ -249,7 +254,7 @@ export function getPiAgentStatusExtensionSource(kind: PiAgentKind = 'pi'): strin
     '  if (!coords.port || !coords.token || !paneKey) return',
     // Why: the endpoint watch republishes this snapshot, and reads it as the pane's own statement of
     // what it is doing — recorded on the attempt, because a failed delivery is what it has to answer.
-    '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, final, endpointKeyOf(coords))',
+    '  noteEndpointWatchAttempt(hookEventName, extra, metadata, ompRuntime, endpointKeyOf(coords))',
     '  const url = `http://127.0.0.1:${coords.port}${resolveHookPath(ompRuntime)}`',
     '  const body = JSON.stringify({',
     '    paneKey,',
