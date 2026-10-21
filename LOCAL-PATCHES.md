@@ -573,6 +573,20 @@ iterable` rejections from `ephemeral-vm-reclaim-ipc-bridge.ts:115`) and
 `src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts` (an `fs` read the test asserts must not
 happen does happen). Both reproduce in a scoped two-file run.
 
+**2026-10-21 (the `bbc8303b47` merge) — both are fixed, so nothing is left unlisted.** The ephemeral
+mock now answers `getSshTargetRegistryStore: () => null`, the registry's own "no host registered"
+answer, which clears the suite's 28 unhandled rejections with it; the session-scanner case passes and
+was never listed. The merge's own full run (@`51f09025ca`) passed 134,537 cases with 35 allowlisted
+failures and **one** unexpected one, that mock. Eight entries whose failures stopped reproducing were
+pruned, and `config/scripts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases
+execute calls `mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) —
+the same `host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
+
+Two local prerequisites decide whether a run's failures are real, and both are install artifacts:
+`mobile/node_modules` (without it the mobile type-aware pass reports upstream's own files) and the
+pinned Playwright browsers (`node node_modules/playwright-core/cli.js install chromium webkit` — the
+`playwright` bin on `PATH` downloads a different revision than `playwright-core/browsers.json` pins).
+
 Maintenance: this file stays the evidence, the JSON stays the assertion, and an entry changes in the
 same commit as the red set. An entry that passes is reported stale; an entry that does not appear in a
 run is reported unseen, which is the prune signal for one observed once and never reproduced. Prefer a

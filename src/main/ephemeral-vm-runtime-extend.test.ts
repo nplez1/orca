@@ -29,7 +29,10 @@ vi.mock('./ephemeral-vm-runtime-ssh', () => ({
   disconnectRuntimeOwnedSshTarget: mocks.disconnectRuntimeOwnedSshTarget
 }))
 vi.mock('./ssh/targets/ssh-target-registry', () => ({
-  getSshConnectionManager: mocks.getSshConnectionManager
+  getSshConnectionManager: mocks.getSshConnectionManager,
+  // Why null: no SSH target store is registered in this harness, which is what the registry
+  // answers before any host has been added.
+  getSshTargetRegistryStore: () => null
 }))
 
 import {
