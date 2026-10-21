@@ -65,7 +65,6 @@ stores use upstream's factory (`providerLabel`/`logScope`, not `description`/`lo
 **Do not:** reintroduce a second factory, or a store that throws a plain decrypt error for a
 transient read failure.
 
-
 **2026-10-16 addendum.** Both sides replaced Electron's `safeStorage` in the same files, so the
 merge is upstream's `getSecretStore()` shape plus the fork's own rules: the sealed-envelope-only
 port consultation, the "secret encryption unavailable" wording, and `adoptLegacyHomeStore()` for
@@ -119,7 +118,7 @@ grants are what make a first-launch OS-opened document readable.
 
 **Do not:** delete `authorizeExternalPath`, or "converge" the two mechanisms into one.
 
-**Sentinel scope (2026-10-07 sync):** the floating-terminal *scope* resolves through
+**Sentinel scope (2026-10-07 sync):** the floating-terminal _scope_ resolves through
 `resolveFloatingWorkspacePath()`, which honours a configured `floatingTerminalCwd` and otherwise
 returns `resolveFloatingWorkspaceLaunchDirectory()` **without creating it**. It deliberately does not
 fall back through `resolveFloatingTerminalCwd` with an empty path: that call ensures the folder, which
@@ -205,11 +204,11 @@ state.claudeRunningNonAgentTaskPaneKeys.has(paneKey)` and `hasLiveNonAgentWork` 
 **Why:** a running shell the agent launched is still agent work, and `foldAgentLeadStatus` returns
 `monitoring` only when `hasLiveAgentWork` is false, so moving the running shell off the non-agent side
 is the whole badge difference. Two fork tests pin the two halves from opposite directions:
-`claude-background-task-status.test.ts` (a running shell *and* a cron → plain `working`, because the
+`claude-background-task-status.test.ts` (a running shell _and_ a cron → plain `working`, because the
 running shell is agent work) and `server-claude-cancel-captures.test.ts` (a cron with the shell set
 empty → `monitoring`).
 
-**Accepted nuance:** upstream's *owed* shell notification stays on the non-agent side, as upstream
+**Accepted nuance:** upstream's _owed_ shell notification stays on the non-agent side, as upstream
 maps it, so a lone owed-shell window (no cron) can show `monitoring` for the notification lease. The
 2026-10-07 review gate flagged that against the policy sentence above; the alternative (owed shell as
 agent work) breaks `claude-background-task-status.test.ts`, and treating a live cron as overriding a
@@ -259,7 +258,6 @@ then stays in the live set until the descendant lane's quiet-reap window retract
 **Do not:** let a union duplicate a member (the concatenation repeats the shared ones), or drop the
 `disabled.has(...)` gate when re-seating a provider.
 
-
 **2026-10-16 addendum.** Upstream extracted the desktop's inline account-service construction into
 `createProviderAccountServices`, which the desktop and orcad both call. The fork's additions moved
 with it rather than staying behind in `main-process-account-services.ts`: the DeepSeek, Fireworks
@@ -299,7 +297,6 @@ then both meant 5), and a released build is out there writing it.
 gone), and two meanings under one number silently replay wrong rows.
 
 **Do not:** reintroduce `AiVaultWorkerScanOptions` or a second schema constant.
-
 
 **2026-10-16 addendum.** Upstream and the fork both extended the same third parameter of
 `scanAiVaultSessionsInService` in one sync — upstream with the scan-progress handle (#28788), the
@@ -345,7 +342,6 @@ to stay inside it, and no `max-lines` suppression is allowed.
 
 **Do not:** add a `max-lines` disable, or inline a credential section back into `AccountsPane.tsx`.
 
-
 **2026-10-16 addendum.** Upstream's "trim redundant tests" pass (#29156) deleted
 `accounts-pane-claude-section.test.tsx` and moved both of its cases into `AccountsPane.test.tsx`,
 so the deletion is taken and the fork's only contribution there — the DeepSeek/Fireworks/Copilot
@@ -383,7 +379,7 @@ when the guard is next touched, and keep the automation test's
 `expect(runtime.createTerminal).not.toHaveBeenCalled()`.
 
 **Open (found by the sync's review):** the same double-setup shape survives for an automation create
-that *does* carry a startup command — the spawner stages setup and
+that _does_ carry a startup command — the spawner stages setup and
 `provisionManagedWorktreeTerminals` runs it again with `hasStartupTerminal: false`
 (`worktree-remote.ts`). Upstream at `8b0fa15e94` behaves the same, and no current caller reaches it
 (the in-app automation dispatch passes no startup, and the other automation creates go through
@@ -550,7 +546,7 @@ upstream's side; both are reverted to the 1-arg form.
 
 **Paths:** `src/renderer/src/components/right-sidebar/checks-panel/**`, `src/renderer/src/components/right-sidebar/source-control/review/**`, `src/shared/review-refresh-policy.ts`
 
-**Decision:** upstream's visibility-driven refresh owns *when* the panel refreshes —
+**Decision:** upstream's visibility-driven refresh owns _when_ the panel refreshes —
 `useChecksDetailTimer` + `ChecksDetailPollingPolicy.delayMs` + `reviewRefreshIntervalMs` — and the
 fork does not set `pollIntervalRef` against that cadence. `use-hosted-review-polling.ts` and upstream's
 copy of the foreground refresh effect are taken as deletions; the fork's
@@ -563,7 +559,7 @@ against the polling implementation upstream replaced. Upstream's stability suite
 (`use-checks-panel-polling-stability.test.ts`) pins the new cadence, and the fork's force flag is
 independent of it — it only skips the renderer/gh cache while a run is live.
 
-**Open (named follow-up):** if the panel feels stale when a *new* run appears, re-add the
+**Open (named follow-up):** if the panel feels stale when a _new_ run appears, re-add the
 PR-transition refetch as a policy concern inside `ChecksDetailPollingPolicy`, not as a second
 `pollIntervalRef` writer.
 
@@ -594,7 +590,6 @@ now describe guards upstream retired.
 
 **Do not:** re-add a deleted inventory to carry one fork entry; add the assertion to a surviving test
 instead.
-
 
 **2026-10-16 addendum.** Two more of upstream's consolidations were taken with the fork's content
 re-homed rather than restored: `accounts-pane-claude-section.test.tsx` (deleted; both cases live in
@@ -728,7 +723,7 @@ the label and only the merge reason is appended.
 **Do not:** reinstate the fork's dialog modules, or drop `buildIssueUnlinkUpdates`/the marker
 because a conflict did not point at them.
 
-**Named follow-up (2026-10-09):** the fork's bare-key *direct* add (type `ABC-123`, press Enter) and
+**Named follow-up (2026-10-09):** the fork's bare-key _direct_ add (type `ABC-123`, press Enter) and
 its site-ambiguity copy were not ported into upstream's composer — upstream resolves a bare key
 through its search rows instead. Re-add only if that extra step proves annoying.
 
@@ -790,7 +785,6 @@ sync overflowed `src/renderer/src/runtime/runtime-jira-client.ts` by 8 lines, so
 now lives in `runtime-jira-detail-client.ts` as `jiraListEditFieldsForTarget` and is re-exported —
 mirroring upstream's own split of that file.
 
-
 **2026-10-16 addendum.** `src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts`
 overflowed the `.ts` budget by 26 lines once the fork's same-branch merge was re-expressed on
 upstream's `buildSidebarRowPlan` shape, and the pre-commit hook caught it before the merge commit
@@ -846,7 +840,7 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   roster is also **sorted by display name**, not left in Jira's returned order as the fork had it:
   upstream sorts candidate rows by name, and the pinned group is a prefix of that same list rather
   than a separately-ordered one. Both suites' ordering assertions hold only with the sort, and the
-  feature the fork's tests lock — *me and my team above the matches* — is unaffected by it.
+  feature the fork's tests lock — _me and my team above the matches_ — is unaffected by it.
 - Fork-only capability with no upstream counterpart is kept: self-hosted Jira Server/DC **body
   rendering** (`jira-rendered-html.ts`, the `renderedHtmlOnly`/`htmlOptions` path, the wiki comment
   write), editmeta-driven custom-field editing (`jira-issue-edit-metadata.ts`), the generic
@@ -903,7 +897,7 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   transition control does, because it renders the error itself. An earlier round keyed the skip on
   `field === 'transition'` and made the right-sidebar pane's status row fail **silently** — it has no
   inline error display, so it must keep the toast. **Rule:** whether a failure is reported inline is a
-  property of the *surface*, never of the field name.
+  property of the _surface_, never of the field name.
 - **Upstream's orphaned Jira detail hooks are deleted, and their transitions state is folded in —
   and this deletion is invisible to `post-sync.mjs`.** `use-jira-issue-workspace-data.ts`,
   `use-jira-issue-remote-details.ts` and `use-jira-issue-comment-submission.ts` (plus the orphaned
@@ -912,7 +906,7 @@ whenever it is a superset, and re-express every fork addition on top of it rathe
   **only** in the dead data hook — real `transitionsLoading` / `transitionsError` for the transition
   control's spinner, error and Retry — is re-implemented in `jira-issue-workspace-side-data.ts`.
   The reason this is recorded rather than just done: `post-sync-checks.mjs`'s orphan scan
-  (`deletedForkModules`) only looks at *fork* files, so it cannot see an orphaned **upstream** module,
+  (`deletedForkModules`) only looks at _fork_ files, so it cannot see an orphaned **upstream** module,
   and the next sync would re-import these three while silently dropping the transitions state again.
   **Follow-up:** extend that scan to upstream files, which is the general form of this gap.
 
@@ -1075,16 +1069,16 @@ it, where before the hydration and the children could fall back to the focused s
 detail read the workspace's. The task page's own board and detail capture the focused host as the
 page's Jira/Linear account, so their behaviour is unchanged. The measured result: **1161 → 959
 reads**, 19 of the 22 annotated rows removed, and no row raised. The **trap held** — the fix is to
-memoise on the *primitive* host id rather than the model, the source object or the settings object,
+memoise on the _primitive_ host id rather than the model, the source object or the settings object,
 because `TaskPageJiraBoard` re-creates its model on every store write and `JiraBoardSettings`
 receives a new settings object on every settings write; a memo keyed on either would have re-fetched
 the board each time. The board suite fails if that memo returns a fresh target. A memo that does key
 on a source object keys on one a `use-task-page-detail-routing` memo already stabilised — except the
 issue pane's: it derives its source from the workspace row through the sidebar's own resolver, so
-the card and the pane cannot cache under different scopes, and holds it stable *by value*
+the card and the pane cannot cache under different scopes, and holds it stable _by value_
 (`useStableTaskSource`), because the active row is replaced on routine writes — a PTY bind bumps
 `lastActivityAt` — and the panes refetch on their source's identity. Three rows survive at 1 read each
-and name their cause in the baseline: the global default-Jira-board setting, and two *transitive*
+and name their cause in the baseline: the global default-Jira-board setting, and two _transitive_
 readers that are not Jira/Linear surfaces at all (`openHttpLink`'s Link Routing; the agent-detection
 owner resolver's focused-runtime fallback for a workspace whose owner has not hydrated).
 
@@ -1131,7 +1125,7 @@ cold-scanning once. **5 is deliberately skipped**: it titled Copilot sessions fr
 and 6 exists to invalidate exactly those rows.
 
 **Do not:** reintroduce a JSON snapshot serializer, keep two caches, or bump the DB layout version on
-the fork's schedule. `SESSION_PARSE_CACHE_SCHEMA_VERSION = 4` versions the *database* layout, whose
+the fork's schedule. `SESSION_PARSE_CACHE_SCHEMA_VERSION = 4` versions the _database_ layout, whose
 first fork build is this one.
 
 ### `setupScriptLaunchMode` is retired; the host still stages its own Setup tab
@@ -1174,7 +1168,7 @@ tolerate that.
 
 **Decision.** Upstream consolidated path comparison into `src/main/git/worktree-path-comparison.ts`,
 which pulls `./runner` and the whole command-runner graph with it. `src/main/ipc/project-folder-placement.ts`
-is inside the *web* TypeScript project (the renderer imports it), so pointing it at the `git/` copy
+is inside the _web_ TypeScript project (the renderer imports it), so pointing it at the `git/` copy
 drags fourteen main-process modules into `tsconfig.tc.web.json` and fails the build with TS6307. The
 fork's reduced 118-line copy stays, listed in the web project's `include`, and the two fork-only
 importers keep pointing at it.
@@ -1249,9 +1243,9 @@ requests and the scan call. **Do not** collapse the two rules into one helper ag
 `aiVaultCacheEntryServes` was tried in this sync and broke whichever side it was not written for.
 
 **Accepted cost, recorded by the review.** Because main still answers a scoped lowered-depth request
-from an unbounded scan, a user who switches from Unlimited to a preset in a *scoped* view can see the
+from an unbounded scan, a user who switches from Unlimited to a preset in a _scoped_ view can see the
 deeper view's in-scope rows until that entry expires — up to 60 s locally (`AI_VAULT_CACHE_TTL_MS`)
-or 15 s for a host leg. It can only ever show *more* rows than the preset would have produced, never
+or 15 s for a host leg. It can only ever show _more_ rows than the preset would have produced, never
 fewer, and the renderer's own cache stays strict. Narrowing it means giving the fork's three
 "unbounded list answers a scoped request" cases up, which is a product decision rather than a sync
 one.
@@ -1314,7 +1308,7 @@ re-add `options.disabledAgents` to the agent list — a local filter must win ov
 
 `orca-runtime-get-status.ts` overflowed by 5 lines on the union — `hostModeRuntimeCapabilities()` moved
 to `runtime-host-mode-capabilities.ts` (the desktop-bridge, host-raised-unread and mobile-bundle
-capabilities: the ones that follow *how* the host runs, not what its build contains).
+capabilities: the ones that follow _how_ the host runs, not what its build contains).
 `ai-vault-session-refresh.ts` had been **red at the tip before this merge** (303 lines, recorded in
 LOCAL-PATCHES.md as deliberate debt); the forced-rescan throttle moved to
 `ai-vault-forced-rescan-throttle.ts` with `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as
@@ -1329,3 +1323,137 @@ Upstream pinned `@types/node` back to `^24.19.2` (the fork was on `^25.6.0`). Th
 `process.emit("message", message, sendHandle)` with a **required** third argument, so the AI Vault
 service harness emits `process.emit('message', message, undefined)` like every other harness in the
 repo. A two-argument emit typechecks against 25.x and fails against 24.x — that is the whole symptom.
+
+## 2026-10-21 sync (upstream `bbc8303b47`, 418 commits)
+
+63 conflicted paths. Upstream's delta is a product wave — the Agent Dashboard as a first-class view,
+the SSH settings screen rebuilt, the MiniMax/GLM accounts sections turned into host-aware components,
+queued-message editing grown to images, and four new lint ratchets — so most decisions below are
+"upstream's newer design wins, and here is where the fork's feature rides on it".
+
+### SSH settings: upstream's grouped, windowed list keeps the fork's Hide
+
+**Paths:** `src/renderer/src/components/settings/Ssh{TargetList,TargetCard,Pane}.tsx*`, `SshTargetVisibilityToggle.tsx`, `ssh-target-list-model.ts`
+
+**Decision:** `SshTargetList.tsx` is an **add/add collision of two different components**. Upstream's
+wins: grouped by source (`groupSshTargetsBySource`), windowed through `VirtualizedList` (a generated
+`~/.ssh/config` can import >10k hosts), grouped select-all, ⌘/Ctrl-A scoped to the list's own rows.
+The fork's Hide feature rides on top, all of it in the same file:
+
+- `partitionSshTargetsByVisibility(targets)` splits offered from hidden and is the unit under test
+  (the list itself cannot be rendered in happy-dom, because `VirtualizedList` needs a scroll element).
+- The row keeps `SshTargetVisibilityToggle` (fork component) in its action cluster, and the "Hidden"
+  `Badge` next to the label; the card is upstream's compact row with its dropdown menu, and the menu
+  omits Remove when the host is one `~/.ssh/config` re-imports.
+- The collapsible "Hidden (N)" section renders below upstream's groups, with the fork's copy.
+- `SshPane` passes `onSetHidden`, and its `totalBySource` counts **non-hidden** hosts, so a hidden
+  host never reads as "filtered out" (`{{count}} of {{total}}`).
+
+**Why:** upstream's list is a behavioural superset for everything except hiding, and the fork's
+privacy affordance cannot be dropped — a discovered host returns on every config sync, so Remove
+never sticks. Keeping two list components would re-conflict on every future sync.
+
+**Do not:** reintroduce a second list component, drop `onSetHidden` when upstream rewrites the card
+again, gate Remove back on for an auto-imported host, or count hidden hosts in `totalBySource`.
+`SshTargetCard`/`SshPane` tests render inside `TooltipProvider` because the fork's toggle is the only
+tooltip in the row — the app root has one.
+
+### Accounts: upstream's host-aware MiniMax component, the fork's switch wrapped around it
+
+**Paths:** `src/renderer/src/components/settings/AccountsPane.tsx`, `accounts-pane-{types,credential-sections,minimax-credentials}.ts(x)`, `MiniMaxAccountsSection.tsx`, `use-minimax-credentials.ts`
+
+**Decision:** MiniMax is upstream's `MiniMaxAccountsSection` component: it owns its credential state
+via `useMiniMaxCredentials(host.owner)` and renders where the credential is stored for the host the
+pane shows. The fork's model-driven half is **deleted** — `accounts-pane-minimax-section.tsx`
+(`renderMiniMaxAccountsSection`), `MiniMaxCredentialSectionModel`, and `useMiniMaxCredentials` inside
+`accounts-pane-credential-sections.ts` (which now serves DeepSeek, Fireworks and Copilot only).
+`miniMaxRateLimits` stays on `AccountsPaneSectionModel` because the component takes it as a prop.
+
+The fork's **per-provider enable switch** (`gateUsageProvider`) has no upstream equivalent and wraps
+upstream's _component_ sections as well as the model-driven ones — MiniMax, Grok and Cursor. Zcode
+stays ungated: it has no Settings switch to turn off.
+
+**Why:** upstream's component is the newer design and is strictly better at the host question (a
+paired host's credential lives on that host). Duplicating it as a model section would mean two
+surfaces writing one credential, which this ledger already forbids elsewhere.
+
+**Do not:** re-add a MiniMax model section, or add a gated section without `gateUsageProvider` — the
+`AccountsPane.test.tsx` enable-switch and switched-off-notice cases pin both.
+
+### The new-tab focus handoff: the fork's hook carries upstream's synchronous chat focus
+
+**Paths:** `src/renderer/src/components/tab-bar/{new-tab-menu-focus-handoff.ts,use-tab-bar-create-menu-controller.ts}`
+
+**Decision:** the fork's extraction (`useNewTabMenuFocusHandoff`) stands, and upstream's deltas are
+ported into it: `pendingNewTabMenuFocusRef` holds `{ focus, synchronous? }`; `queueFocusAfterNewTabMenuClose`
+clears a pending animation frame and retry before queueing; the unmount ref also clears the pending
+focus; and a `synchronous` request runs immediately instead of after a frame, because a structured
+chat mounts synchronously. The controller's `onFocusChat` (upstream) passes `true`.
+
+**Why:** a merge that resolved the controller as upstream's would have dropped the extraction and
+re-conflicted at every sync; a union would have kept two divergent copies of the deferred-focus logic.
+
+**Do not:** restore the inline refs in the controller, or make the chat focus wait for a frame — the
+composer has already mounted by then and Radix's close-time focus restore wins.
+
+### File Explorer owner routing: upstream's strict owner
+
+**Paths:** `src/renderer/src/components/right-sidebar/file-explorer-{operation-owner,types}.ts`
+
+**Decision:** `getFileExplorerOperationOwnerFromState` is upstream's `resolveOwner`/`HostAuthority`
+shape — a twin refuses rather than guessing, and focus never decides. The fork's
+`operationOwnerFromHostId` helper went with it. The fork's `getFileExplorerListUnavailableMessage`
+stays exported (the list surfaces import it).
+
+**Do not:** reintroduce a route-to-owner helper for the floating workspace; upstream's resolver
+already covers it, and a second path is how the two disagree.
+
+### Clipboard pastes: the expiry sweep is the fork's, and it stays
+
+**Paths:** `src/main/window/{native-chat-paste-files.ts,clipboard-ipc-handlers.ts}`
+
+**Decision:** upstream rewrote the paste folder helpers and dropped the fork's TTL sweep, with a
+header comment claiming the folder is "never swept". The sweep is restored
+(`sweepExpiredNativeChatPastes`, `NATIVE_CHAT_PASTE_TTL_MS`, `PASTE_FILE_NAME`, called from
+`registerClipboardHandlers`), and the header now says exactly what it deletes: only this build's own
+`orca-paste-*.png` names past 30 days. Nothing else in the folder is touched, and a restore still
+refuses anything outside it.
+
+**Why:** it shipped, and dropping it silently leaves the folder growing forever. Upstream's reason for
+not sweeping ("nothing tells which of them a sent message names") is about _arbitrary_ contents, not
+about this build's own expired files.
+
+**Do not:** widen the sweep to any other file in the folder, or delete the header paragraph that
+scopes it.
+
+### Queued-message editing: upstream's module, images included
+
+**Paths:** `src/main/native-chat/agent-session-journal/queued-message-{update,text-update,table}.ts`, `src/main/native-chat/agent-session-wire/structured-agent-session-queued-edit.ts`
+
+**Decision:** the fork's `queued-message-text-update.ts` is gone; upstream's `queued-message-update.ts`
+makes the same compare-and-set decision and is a superset — text _and_ images, `readsImageCards`
+refusal, and the previous body returned for a diff. The fork's two callers already import it.
+
+**Do not:** restore a text-only copy beside it; the fingerprint compare-and-set is the whole contract,
+and two copies is how a retry starts overwriting newer text again.
+
+### Sidebar ordering: upstream's host identity, the fork's merge unchanged
+
+The stamp-order goldens changed only in row order inside a section and the `lastChild` flag: upstream
+sorts by host identity (`rankOf(worktree)` + `sortedByHostIdentity`), and the fork's `mergeSameBranchRows`
+still runs on the rendered rows. No row was added or lost. `computeVisibleWorktrees` keeps the fork's
+workspace-status pre-pass (`applyWorkspaceKindFilters` over upstream's plan inputs); re-applying the
+kind switches there would hide folder roots.
+
+### Max-lines: four splits, no caps
+
+`runtime-environment-request-connections.ts` (upstream at the budget) folded the fork's spawn-time
+`observeConnection` into `runtime-environment-connection-observation.ts` — one seam that both
+broadcasts diagnostics and tells replication, so a later edit cannot do one without the other.
+`runtime-project-host-setup-controller.ts` gained `takeWorktreeLayoutMode()`,
+`src/cli/handlers/project.ts` yielded `project-worktree-layout-flag.ts`, and
+`config/scripts/electron-builder-config.test.mjs` yielded
+`electron-builder-linux-config.test.mjs` (the Linux packaging contracts).
+
+**Do not:** solve either of the first two by shortening upstream's half — the fork's addition is the
+line that moves, as in every previous sync.

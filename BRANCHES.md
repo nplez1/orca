@@ -1,6 +1,17 @@
 # Branch tracker
 
-Last updated **2026-10-19** — `nplez1/main` merged upstream main @ `83c768d1b4` (170 commits) from
+Last updated **2026-10-21** — `nplez1/main` merged upstream main @ `bbc8303b47` (418 commits) from
+`43fa95b4cf` (merge `276fe47cee`, merge base `83c768d1b4`, rollback tag
+`archive/pre-sync-43fa95b4cf`). 63 conflicted paths, mostly upstream product work rather than a
+reorganisation: the SSH settings screen became a grouped/windowed multi-select list, the MiniMax and
+GLM accounts sections became host-aware components, queued-message editing grew images, the Agent
+Dashboard became a first-class view, and four lint ratchets were added. Two file pairs were
+**add/add collisions** — `SshTargetList.tsx` on each side was a different component, and
+`AccountsPane.test.tsx`'s MiniMax half — so read [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § Sync log
+before touching either. See [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) §
+"2026-10-21 sync" for the decisions.
+
+Before that, on **2026-10-19** — `nplez1/main` merged upstream main @ `83c768d1b4` (170 commits) from
 `cc42fb3b93` (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). 52 conflicted
 paths, mostly upstream's own module reorganisation: the SSH tree split into
 `ssh/connection/`, `ssh/targets/` and `ssh/config/`, the filesystem-watcher and runtime-environment

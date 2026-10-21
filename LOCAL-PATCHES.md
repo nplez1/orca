@@ -641,6 +641,84 @@ pnpm run sync:localization-runtime-catalog
 
 ### Sync log
 
+- **2026-10-21 — merge of upstream `bbc8303b47` (418 commits) into the release line, from
+  `43fa95b4cf`** (merge base `83c768d1b4`, rollback tag `archive/pre-sync-43fa95b4cf`, merge commit
+  `276fe47cee`). **63 conflicted paths** — `both-rewrote 33, union 16, rename-replay 7,
+  duplicate-tail 4, add/add 2, duplicate-members 1`. Upstream's delta is a product wave rather than
+  a reorganisation: the Agent Dashboard became a first-class view, the SSH settings screen became a
+  grouped/windowed multi-select list, the MiniMax and GLM accounts sections became self-contained
+  host-aware components, queued-message editing grew image support, and four new quality ratchets
+  went into `pnpm lint`. Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-21 sync"; the
+  ones a reviewer will want first:
+
+  - **The SSH settings screen is upstream's list with the fork's Hide on top.** `SshTargetList.tsx`
+    is now a _different component on each side_ (add/add): upstream's groups by source, windows
+    > 10k imported hosts, and multi-selects. The fork's Hide feature survives as
+    > `partitionSshTargetsByVisibility()` (the offered/hidden split, unit-tested) plus the existing
+    > `SshTargetVisibilityToggle` in the row's action cluster and a collapsible "Hidden (N)" section;
+    > the card keeps upstream's dropdown menu, and Remove is omitted from it for a host
+    > `~/.ssh/config` keeps re-importing. `SshPane` keeps upstream's filter/toolbar/selection and
+    > passes `onSetHidden`; its group totals count non-hidden hosts so a hidden host never reads as
+    > "filtered out".
+  - **MiniMax converges on upstream's component, and the fork's enable switch wraps every section.**
+    Upstream's `MiniMaxAccountsSection` owns its own credential state through
+    `useMiniMaxCredentials(host.owner)` and says where the credential is stored, so the fork's
+    model-driven MiniMax half (`accounts-pane-minimax-section.tsx`, the `MiniMaxCredentialSectionModel`
+    type and its factory in `accounts-pane-credential-sections.ts`) is deleted. What the fork keeps is
+    the per-provider switch, which upstream has no equivalent of: `gateUsageProvider(...)` now wraps
+    upstream's _component_ sections too (MiniMax, Grok, Cursor), not only the model-driven ones.
+    Recorded in `local/sync/expected-deletions.json` with both call sites named.
+  - **The new-tab focus handoff stays a fork hook, carrying upstream's synchronous chat focus.**
+    Upstream changed the same inline code inside `use-tab-bar-create-menu-controller.ts` that the fork
+    had extracted into `new-tab-menu-focus-handoff.ts`, so the hook took upstream's deltas: the
+    `{ focus, synchronous? }` ref, the clear-then-queue that drops a stale animation frame, the
+    unmount path clearing the pending focus, and the chat composer focused **without** waiting a
+    frame because a structured chat mounts synchronously.
+  - **Queued-message editing is upstream's module, and it is a superset.** The fork's
+    `queued-message-text-update.ts` (text-only compare-and-set) is gone;
+    `queued-message-update.ts` does the same decision for text **and** images, refuses an image card
+    the caller was shown no images for, and returns the previous body. Both former callers
+    (`journal-queued-messages.ts`, `structured-agent-session-queued-edit.ts`) now import it, and its
+    `.spec.ts` carries the retry/superseded cases. Acknowledged in `expected-deletions.json`.
+  - **The File Explorer takes upstream's strict-owner routing.**
+    `getFileExplorerOperationOwnerFromState` is upstream's (`resolveOwner`/`HostAuthority`: a twin
+    refuses, focus never decides), which retired the fork's `operationOwnerFromHostId` helper; the
+    fork's `getFileExplorerListUnavailableMessage` copy survives as an export because the list
+    surfaces still import it.
+  - **Nothing of the fork's was silently dropped this time — two were caught and restored.**
+    The clipboard paste-expiry sweep (`sweepExpiredNativeChatPastes`, `NATIVE_CHAT_PASTE_TTL_MS`)
+    vanished with upstream's rewrite of `native-chat-paste-files.ts`, whose header then read "never
+    swept"; the sweep and its `registerClipboardHandlers` call are restored, and the header now says
+    what it actually deletes. The status bar's placeholder-last chip ordering
+    (`isOwnerNotSetUpPlaceholder`) vanished with the roster array the fork had moved into
+    `status-bar-usage-projection.ts`; it is ported there.
+  - **A green typecheck is not a green merge — four files landed over the max-lines budget** and each
+    was split rather than capped: `runtime-environment-connection-observation.ts` (the replication
+    observe folded into the diagnostics seam, which now has exactly one caller),
+    `takeWorktreeLayoutMode()` in `runtime-project-setup-layout-mode.ts`,
+    `src/cli/project-worktree-layout-flag.ts`, and
+    `config/scripts/electron-builder-linux-config.test.mjs` (the Linux packaging contracts, moved
+    out of `electron-builder-config.test.mjs`).
+  - **The branch was red before the merge started.** `1c81139662` added a `translate()` call whose
+    literal default equals the catalog value, so `TabBar.ab589350e5` stopped being runtime-required;
+    the derived `en-runtime-required.json` was never regenerated, and the pre-sync derived-catalog
+    gate refused to start. Fixed as its own commit (`43fa95b4cf`) before the merge.
+  - **`git merge` reported a clean tree that was not clean.** Three seams resolved without a marker:
+    `removeWorktreeMetadataAndTransientState` gained a `{ store, runtime }` argument (two fork call
+    sites passed a bare `store`), `store.migrateWorktreeIdentity` gained a host-qualified target (the
+    fork's relocation controller passed a string), and the two host-sync disposition tables gained
+    upstream's new fields (`agentNativeChatPermissionModes` replicated, `nodeDistMirrorUrl`
+    host-local like `httpProxyUrl`, `pairedTerminalTabCloseIntentsByEnvironment` host-local).
+
+  Verified: `pnpm tc` clean on all four projects, `post-sync.mjs` fully PASS (including the
+  derived-catalog, identity-sweep, deleted-export and repo-wide `oxlint` gates),
+  `check:code-quality:changed` clean once `mobile/` dependencies are installed — without them the
+  mobile type-aware pass reports upstream's own files as failures, which is an install artifact, not
+  a finding. The sidebar goldens were regenerated: every change is upstream's host-identity ordering
+  (row order inside a section, `lastChild`), with no row added or lost. **This merge ships the first
+  fork release with the Linux leg**; nothing in the Linux packaging contract needed a change for it.
+
 - **2026-10-19 — merge of upstream `83c768d1b4` (170 commits) into the release line, from
   `cc42fb3b93`** (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). Upstream's
   delta is mostly a module reorganisation rather than a feature wave: the SSH tree split into
@@ -686,7 +764,7 @@ pnpm run sync:localization-runtime-catalog
   failing case is a recorded class — `pr-auxiliary-preflight-admission` (8, bash 3.2),
   `browser-*.electron.test.ts` (10) and `renderer-publication-throttle.electron.test.ts` (1) — all the
   no-Electron-window class, `orcad-forked-child-paths` (4), `packaged-cli-assets` (1),
-  `cli-command-privileged-transaction` (1), plus two of the same class not yet listed: 
+  `cli-command-privileged-transaction` (1), plus two of the same class not yet listed:
   `macos-update-running-instances.integration` (`BrowserWindow.getAllWindows` undefined) and
   `shell-process-readiness`'s real-`lsof` case (30 s timeout). (3) The `node-runtime` project, run in
   the CI shape (`ORCA_BALANCE_UNIT_SHARDS=1`, which applies the repo's own exclude list), was clean —
@@ -755,8 +833,7 @@ pnpm run sync:localization-runtime-catalog
   ones a reviewer will want first:
 
   - **The AI Vault parse cache became upstream's.** Upstream deleted the JSON snapshot serializer
-    the fork had extended to schema 6 and replaced the store with a SQLite database (layout version
-    4) plus a one-shot legacy importer. The serializer is deleted, nothing imported it, and the
+    the fork had extended to schema 6 and replaced the store with a SQLite database (layout version 4) plus a one-shot legacy importer. The serializer is deleted, nothing imported it, and the
     fork's `subagent` fields ride inside the row's `session` JSON. The importer's gate is widened to
     `[4, 6]` — the last JSON schema each line shipped — so a fork install keeps its cache instead of
     cold-scanning once; schema 5 is skipped because 6 exists to invalidate its Copilot titles.
@@ -791,6 +868,7 @@ pnpm run sync:localization-runtime-catalog
     entry in the case upstream added — main's newer hosted-review broadcast found no review, or the
     same number in another repository, and must delete it. It preserves only when the rejecting write
     is not newer than the result.
+
 - **The Opus review of `db746c211b`+repairs came back ship-ready, and two findings landed as
   `a37f0a5165`.** `claude/opus` at high reasoning, tool-enabled, over `git show --remerge-diff
   db746c211b` plus the repair commits, told not to accept these docs as evidence: no blockers.
@@ -803,7 +881,7 @@ pnpm run sync:localization-runtime-catalog
     database's own version constant.
   - The merge ported only half of upstream's `!remoteOwned` guard into
     `getStatusBarUsageProjection`: `settings` was nulled for a remote owner, but
-    `antigravityUsageConfigured` was still computed from *this* machine's `agy` detection, so a
+    `antigravityUsageConfigured` was still computed from _this_ machine's `agy` detection, so a
     remote account owner could show an empty Antigravity bar. `remoteOwned` now threads in and gates
     the flag.
   - Also deleted `preserved-branch-removal-completion.ts`, which the merge orphaned.
@@ -818,7 +896,7 @@ pnpm run sync:localization-runtime-catalog
     moved rather than the code being re-written.
   - **Two cosmetic renames were undone so the next sync conflicts visibly instead of silently**:
     `right-panel-comment-focus-timers.ts` and `ui-slice-hydration-status-bar-items.ts` are upstream's
-    files again, with the fork's rows edited in place. The second matters most: the fork had *deleted*
+    files again, with the fork's rows edited in place. The second matters most: the fork had _deleted_
     upstream's file to add three default-on providers, which means a future upstream default-on
     provider would have been missed rather than merged.
   - **One job, one vocabulary**: the Jira priority chips now use upstream's `jira-priority-*` tokens
@@ -840,11 +918,11 @@ pnpm run sync:localization-runtime-catalog
        so a name of `" Blocker "` earns a tier and a wash but a grey chip. Upstream's list cell has the
        same asymmetry; fix both sides or neither.
     3. The `orcadCredentialRoot()` commit message (`3074852b7c`'s follow-up) overstates the old bug: the
-       credential *targets* always resolved the fork's home, so the defect was the headless server's
+       credential _targets_ always resolved the fork's home, so the defect was the headless server's
        sealing key living beside an official Orca's key state, not that it sealed that app's secrets.
   - **Recorded rather than changed**: the `aiVaultSearch.contentEnabled` tier rename (a persisted
     settings key; three earlier syncs paid for it, but changing it is a migration, not a cleanup);
-    `accounts-search-extra-providers.ts` and `worktree-remove-method.ts` still move *upstream's* code
+    `accounts-search-extra-providers.ts` and `worktree-remove-method.ts` still move _upstream's_ code
     out to make room for the fork's, which is the same shape as the projection bug above and should be
     inverted next time those files are touched; `jira-api-error.ts` keeps a parallel error class; and
     `dashboard-payload-validation.ts` keeps upstream's bytes declined because the fork's
@@ -878,19 +956,18 @@ pnpm run sync:localization-runtime-catalog
   retired launch mode took with it). `pnpm tc` is clean, so nothing references them.
 - **Left failing, and proved not ours.** Ten files, in three classes, none of which this merge's
   resolution touches:
-  - *macOS path semantics.* `src/main/cli/packaged-cli-assets.test.ts` is the documented one from the
+  - _macOS path semantics._ `src/main/cli/packaged-cli-assets.test.ts` is the documented one from the
     2026-10-16 sync — the darwin launcher's `app_realpath` uses `cd -P`, resolving `/var` to
     `/private/var` while the test builds its path from the unresolved `os.tmpdir()`. The same
     signature takes `config/scripts/macos-terminal-host-bundle.test.mjs` (a `yaml` decoy read as
     "outside the helper") and all four `src/main/orcad/orcad-forked-child-paths.test.ts` cases (that
     file is upstream's, and `src/main/orcad/**` had no conflicted path in this merge).
-  - *Host toolchain, not the tree.* `config/scripts/pr-auxiliary-preflight-admission.test.mjs` (8 of
-    194) fails on `bash: MOBILE_CI_ARGS[@]: unbound variable` — macOS ships bash 3.2, where an empty
+  - _Host toolchain, not the tree._ `config/scripts/pr-auxiliary-preflight-admission.test.mjs` (8 of 194) fails on `bash: MOBILE_CI_ARGS[@]: unbound variable` — macOS ships bash 3.2, where an empty
     array under `set -u` is an error. `config/scripts/process-host-dev-rebuild.test.ts` (6 of 8) and
     `config/scripts/main-entry-facade.test.ts` time out or mismatch inside the dev-rebuild/build
     harness. `src/main/ssh/ssh-relay-endpoint-incumbent-shell.integration.test.ts` and
     `tests/e2e/cursor-quota-transport.unit.test.ts` time out per test (46s and 62s).
-  - *No Electron window in this harness.* `browser-session-ua-wire-identity.electron.test.ts` (5),
+  - _No Electron window in this harness._ `browser-session-ua-wire-identity.electron.test.ts` (5),
     `browser-session-ua-wire-identity-cross-context.electron.test.ts` (2) and
     `browser-route-persisted-worker-egress.electron.test.ts` (1) each fail at exactly their per-test
     timeout (40s/60s/180s) with no assertion reached; all three are upstream's, under
@@ -1058,7 +1135,7 @@ pnpm run sync:localization-runtime-catalog
   The merge produced **88 conflicted paths** — `both-rewrote 51, union 20, rename-replay 6,
   modify/delete 5, add/add 4, duplicate-members 2`. Upstream spent the same window building the same
   Jira features this fork built, so roughly a third of the conflict set was one idea implemented twice
-  on both lines (assignee search and *Assign to me* #28612, a board and current-sprint filter #28633,
+  on both lines (assignee search and _Assign to me_ #28612, a board and current-sprint filter #28633,
   required transition fields #28588, planning columns #28615, linked-workspace views #28590). The
   convergence is recorded in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md)
   under five new sections; the short version is **per capability, not per feature**: upstream's shape
@@ -1071,7 +1148,7 @@ pnpm run sync:localization-runtime-catalog
     `jira-transition-queries.ts` takes upstream's version wholesale. `JiraIssueUpdate` carries both
     upstream's `transitionComment` and the fork's shaping keys. `jiraAddIssueComment` gained an
     **optional** `bodyFormat` — required would have broken upstream's four-argument call site. The
-    fork keeps what upstream has no counterpart for: self-hosted Server/DC *body* rendering,
+    fork keeps what upstream has no counterpart for: self-hosted Server/DC _body_ rendering,
     editmeta custom-field editing, sprint assignment, the configured agile board with drag-drop
     transitions, board settings, priority tone, and the generic transition-fields dialog (upstream
     handles only resolution + comment and calls anything else `unsupported`).
@@ -1089,7 +1166,7 @@ pnpm run sync:localization-runtime-catalog
     orphaned import was deleted; the feature is not re-added.
   - **Silent losses found by machinery, not by conflict markers.** Three more of the class this
     section has recorded before, each fixed rather than tolerated:
-    - *Upstream replaced an inheritance chain with composition.* `RuntimeFileCommands` now holds
+    - _Upstream replaced an inheritance chain with composition._ `RuntimeFileCommands` now holds
       `search`/`access`/`reads`/`mutations`/`watches` sub-objects, and the merge deleted
       `runtime-file-command-access.ts`, `runtime-file-search.ts`, `runtime-file-command-host.ts` and
       `runtime-file-command-target.ts` with it. The fork's `searchWorkspacePathNameFilter` lived only
@@ -1098,11 +1175,11 @@ pnpm run sync:localization-runtime-catalog
       `rpc/methods/files.ts` still called it. Re-homed onto upstream's composition — and note the
       2026-10-13 entry below already says of this same module "do not delete it again"; the local half
       is what the web client and paired desktops use.
-    - *Upstream made a runtime mixin `abstract`.* `OrcaRuntimeWithStartTuiIdleVisibleReadProbe` moved
+    - _Upstream made a runtime mixin `abstract`._ `OrcaRuntimeWithStartTuiIdleVisibleReadProbe` moved
       under `terminal/wait/` and became abstract, so the fork's two concrete mid-chain classes were
       suddenly required to implement 119 inherited members. Both are `abstract` now, matching
       upstream's chain, and the requirement propagates to the same concrete endpoint as upstream's.
-    - *An upstream field was dropped from a persisted type.* The auto-merge took the fork's shape of
+    - _An upstream field was dropped from a persisted type._ The auto-merge took the fork's shape of
       `PersistedUIState` and lost upstream's `dashboardPopoutBounds`, which upstream's own
       schema-parity check then caught. Restoring it exposed a second gap: upstream's new
       `wsl-move-ui-dispositions.ts` asserts every `PersistedUIState` field is classified, and the
@@ -1212,10 +1289,10 @@ pnpm run sync:localization-runtime-catalog
   - **An automation create must not stage setup twice.** Upstream's new
     `provisionManagedWorktreeTerminals` provisions an automation's setup and default tabs in main,
     and it arrived in the same sync as the fork's `setupScriptLaunchMode`-aware guard — so with no
-    startup command the fork spawned a Setup terminal *and* handed `setup` to the provisioner. The
+    startup command the fork spawned a Setup terminal _and_ handed `setup` to the provisioner. The
     guard now also returns early when the host provisions (`spawnLocalStartupAndSetupTerminals` takes
     `provisionedByHost`), the automation test asserts `runtime.createTerminal` was never called, and
-    the app-window test asserts the Setup terminal *was* created. Also caught by the Opus review.
+    the app-window test asserts the Setup terminal _was_ created. Also caught by the Opus review.
   - **The release needed a longer terminal-host boot deadline, and the cause was measured, not
     guessed.** Upstream added `verifyPackagedMacTerminalHostBoots`, which requires the packaged
     `Orca Terminal Host.app` for each slice to serve a PTY within 20s. On the fork's GitHub-hosted
@@ -1223,7 +1300,7 @@ pnpm run sync:localization-runtime-catalog
     attempts stalled at three different stages (no daemon token, no handshake, no PTY output).
     With Rosetta installed locally the whole chain proved sound — x64 `node-pty`
     (`Mach-O 64-bit bundle x86_64`), the pinned x64 Node spawning a PTY, the daemon entry completing
-    the check's own `runTerminalHostRoundTrip` with an arm64 *and* an x64 client, and a
+    the check's own `runTerminalHostRoundTrip` with an arm64 _and_ an x64 client, and a
     packaged-shaped helper passing the real `verifyPackagedMacTerminalHostBoots` — at **13.9s of the
     20s budget** on an idle machine. So the workflow raises the budget
     (`ORCA_TERMINAL_HOST_BOOT_TIMEOUT_MS=120000`) and the check keeps its default; see
@@ -1323,7 +1400,7 @@ pnpm run sync:localization-runtime-catalog
     environment (they bundle the mobile app with esbuild and hit alias resolution — the `mobile`
     workspace's install is partial here); one (`src/main/ssh/orcad-state-snapshot-shell.test.ts`)
     fails only under full-suite load and passes in isolation. The set was re-checked after the two
-    review fixes (`7b70893f71`): every one of the 35 is in the classes above. The ten files that *were* this sync's
+    review fixes (`7b70893f71`): every one of the 35 is in the classes above. The ten files that _were_ this sync's
     are fixed in `d31978f8e3`: an upstream test whose expectation this fork deliberately changed (the
     host stages setup for a blank create with default tabs; the Linux CLI is `orca-np`; the daemon
     host root and launchd bundle-id list are the fork's), and a fork file the merge re-pointed off
@@ -1377,7 +1454,7 @@ pnpm run sync:localization-runtime-catalog
     fork's suite, so upstream's newer cases (including the workflow-key naming test) are not
     covered here yet.
   - **The fork's repo-catalog connection fence converged onto upstream's, losing nothing.** Upstream
-    `63b3f15cc4` (*every repo catalog uses the host-catalog fence*, #27116) is upstream's own fix for
+    `63b3f15cc4` (_every repo catalog uses the host-catalog fence_, #27116) is upstream's own fix for
     what the fork filed as #20811 and implemented as `claimRepoCatalogGeneration` plus
     `captureRuntimeRepoCatalogConnectionFence`: its `claimHostCatalogFence` /
     `isHostCatalogFenceCurrent` replace both mechanisms, and its `failed` flag replaces the fork's
@@ -1393,10 +1470,10 @@ pnpm run sync:localization-runtime-catalog
     `settings/JiraBoardSettings.tsx`, `tab-bar/use-tab-bar-default-agent.ts`,
     `task-page-jira-board-page-fetch.ts`, `task-page/jira/Board.tsx`,
     `use-task-page-jira-board-pages.ts`, `use-task-page-jira-board.ts` and
-    `runtime/runtime-jira-board-client.ts`. They keep their pre-sync *routing target* — which host
+    `runtime/runtime-jira-board-client.ts`. They keep their pre-sync _routing target_ — which host
     they talk to is unchanged — and are registered in `config/focus-setting-read-baseline.txt` at
     their current counts so the ratchet holds the line. Routing them by the resource's owner is the
-    follow-up. The repair did change their *implementation*, though: the source is now a
+    follow-up. The repair did change their _implementation_, though: the source is now a
     `defaultScopeSource(...)` value, and because that allocates on every call it must be
     `useMemo`-stabilised at each call site, or it re-triggers the hooks that list `providerSettings`
     as a dependency and re-fetches on every render (see "Silent losses" below).
@@ -1404,14 +1481,14 @@ pnpm run sync:localization-runtime-catalog
     owner.** The transport type is the fix, not a call-site edit: `RuntimeJiraSettings` /
     `RuntimeLinearSettings` were `RowLessSource` (`TaskSourceContext | RuntimeClientTarget |
     DefaultScopeSource`), and resolving the `default-scope` arm inside `getJiraRuntimeTarget` /
-    `getLinearRuntimeTarget` *is* the Active Server read. Those two now take `OwnedSource`
+    `getLinearRuntimeTarget` _is_ the Active Server read. Those two now take `OwnedSource`
     (`TaskSourceContext | RuntimeClientTarget`, the new `lib/provider-source-target.ts`), so a caller
     has to name an owner before it can call anything, and `defaultScopeSource`, `rowLessSourceTarget`
     and `DefaultScopeSource` are gone. Read surfaces take a real owner, and where that owner really
-    can differ from the focused host it is now used: the right-sidebar issue panes read *and write*
+    can differ from the focused host it is now used: the right-sidebar issue panes read _and write_
     through the workspace's creation-time task source when that task is the same provider, else the
     workspace's own host, and a Cmd-J-opened detail keeps its own source. The task page's board and detail route by the host
-    the page already captured for its Jira/Linear account, which on that page *is* the focused host
+    the page already captured for its Jira/Linear account, which on that page _is_ the focused host
     by design — so their behaviour is unchanged, and what changed is that the read is now a decided
     target rather than a per-call settings read. A pane now carries one source rather than a target
     beside a nullable context: the Linear pane's issue-cache lookup keys on the source it fetched
@@ -1419,7 +1496,7 @@ pnpm run sync:localization-runtime-catalog
     edit and the comment all name one host. Creation, connection and settings-scope flows resolve
     `defaultCreationHost` / `defaultScopeHost` explicitly, the same target as before, so
     `getJiraRuntimeTarget` never allocates on their behalf. Every source the board hooks and the Jira
-    board picker derive is `useMemo`-stabilised on a *primitive* host id
+    board picker derive is `useMemo`-stabilised on a _primitive_ host id
     (`jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId`), not on the model, the source
     object or the settings object — the ledger's trap was that a re-created object re-triggers every
     load effect, and the board suite now fails if the memo returns a fresh target. The memos that do
@@ -1432,7 +1509,7 @@ pnpm run sync:localization-runtime-catalog
     three that remain are at 1 read each and name their cause in the baseline: `JiraBoardSettings`
     (the default Jira board is a global setting, so the pane's board list belongs to the focused
     host's account and its memo keys on that host id) and two files that read the setting
-    *transitively* through non-Jira code (`openHttpLink`'s Link Routing; the agent-detection owner
+    _transitively_ through non-Jira code (`openHttpLink`'s Link Routing; the agent-detection owner
     resolver's focused-runtime fallback before a workspace's owner hydrates). No count was raised to
     make this land.
   - **Issue #98 (Jira lane drag-and-drop, Dev/QE field editing) raised five focus-read counts.**
@@ -1446,7 +1523,7 @@ pnpm run sync:localization-runtime-catalog
   - **Silent losses found only after the merge was first committed, and repaired.** Three classes —
     none visible to a conflict marker, a typecheck, or a `node-runtime`-only test run, so the fork's
     own release line would have shipped all three:
-    - *A whole file deleted though both sides had it.*
+    - _A whole file deleted though both sides had it._
       `components/settings/AgentDashboardExperimentalSetting.tsx` was present at `cce80247fb` **and**
       at upstream and absent from the merge, as was the `ExperimentalPane.tsx` block that mounted
       it. Found by sweeping `git diff --diff-filter=D --name-only cce80247fb <merge>` against
@@ -1454,14 +1531,14 @@ pnpm run sync:localization-runtime-catalog
       `global-settings-types.ts` and the fork's test both use
       `experimentalAgentDashboardCardClickAction`, which upstream had replaced with
       `experimentalAgentDashboardMode`.
-    - *Upstream behaviour dropped when the fork's side won a file.* Confirmed for
+    - _Upstream behaviour dropped when the fork's side won a file._ Confirmed for
       `right-sidebar/ai-vault-session-refresh.ts`, which lost upstream's `c2c63e7f9a` (#27383)
       conditional paired-runtime history refresh — the renderer stopped sending `afterFingerprint`,
       so history was re-downloaded in full on every refresh — and for the zcode plan API-key store
       publication race and the kiro hook service, whose upstream tests pass at `cc5c85fb7a` and fail
       here. The detector is upstream's own test: **run every new upstream test against the merged
       tree before trusting a sync.**
-    - *A hidden dependency on a source file's contents.* `config/scripts/mobile-web-bundle-manifest.mjs`
+    - _A hidden dependency on a source file's contents._ `config/scripts/mobile-web-bundle-manifest.mjs`
       regex-scrapes `src/shared/protocol-version.ts` for `export const RUNTIME_PROTOCOL_VERSION = (\d+)`.
       Splitting that file to satisfy `max-lines` moved the line and silently broke
       `readProtocolWindow()`, which `build:mobile-web` — and so `build:desktop` and every
@@ -1474,8 +1551,8 @@ pnpm run sync:localization-runtime-catalog
     survived the first pass. Run both, or run `pnpm test`.
   - **Two contradictory repairs inside one sync, resolved FORK-first.** `zcode-plan-api-key-store.ts`
     was first changed to upstream's `safeStorage`, which broke its own suite; it was reverted to the
-    fork's `getSecretStore` port (fork #75, *depend on the SecretStore port instead of Electron's
-    safeStorage*, and `secret-store.ts`'s rule that core modules never import `electron`), and the
+    fork's `getSecretStore` port (fork #75, _depend on the SecretStore port instead of Electron's
+    safeStorage_, and `secret-store.ts`'s rule that core modules never import `electron`), and the
     three sibling suites were re-pointed with `setSecretStore`/`_resetSecretStoreForTests` instead.
     47 tests pass across them. **Do not re-introduce `safeStorage` in the zcode store.**
   - **Other re-points this sync made, none of them behaviour changes.**
@@ -1510,7 +1587,7 @@ pnpm run sync:localization-runtime-catalog
     also stale identically at both parents, so upstream's to fix, worth an upstream-facing note.
   - **Review gate (recorded, because the mandated reviewer was unavailable).** The sync's standing
     gate is Opus 5.5 at high reasoning. Its review of the first committed revision (`1262ebae7f`)
-    returned *not ready to ship* with three blockers — the Jira `defaultScopeSource` re-fetch loop,
+    returned _not ready to ship_ with three blockers — the Jira `defaultScopeSource` re-fetch loop,
     the `mobile-web-bundle-manifest.mjs` scraper broken by the `protocol-version.ts` split, and the
     dropped AI Vault `afterFingerprint` path — plus two should-fixes. All five were repaired. The
     mandated re-review then could not run: the `github-copilot` allowance was exhausted mid-session
@@ -1593,7 +1670,7 @@ pnpm run sync:localization-runtime-catalog
     reaches the screen reader.
   - **Breaks no conflict marker showed, all found by `pnpm tc` and tests.** `main-window-actions.ts`
     kept upstream's import of the `dashboard-popout-window` module the fork deleted (ledger:
-    *Dashboard and the popout window*) — the serve-mode quit loop closes only the main window again
+    _Dashboard and the popout window_) — the serve-mode quit loop closes only the main window again
     and the two tests that mocked the popout lost that mock. The fork's three Jira board RPC methods
     were missing the `permission` field upstream made required (`workspace`, like `jira.listIssues`).
     The orphan-removal helper still invalidated the **global** authorized-roots cache, which is
@@ -1631,9 +1708,9 @@ pnpm run sync:localization-runtime-catalog
   - **Named follow-ups.** Two list components now render the SSH settings surface — the fork's
     `SshTargetList.tsx` is dead in production and the extracted `SshTargetServerList.tsx` duplicates
     it; consolidate. The fork's bare-key direct add and its site-ambiguity copy did not come across
-    with upstream's composer (ledger, *Linked work items*). And the two retired test inventories
+    with upstream's composer (ledger, _Linked work items_). And the two retired test inventories
     (`renderer-node-builtin-boundary.test.ts`, `structured-agent-session-accepted-send-capability.test.tsx`)
-    took the deletion per the *Test inventories retired upstream* entry, so the popout entry in the
+    took the deletion per the _Test inventories retired upstream_ entry, so the popout entry in the
     first and the capability stub in the second are gone with them.
 
 - **2026-10-07 — merge of upstream `e5ade4b868` (148 commits) into the release line, from
@@ -1642,7 +1719,7 @@ pnpm run sync:localization-runtime-catalog
   duplicate-tail 2, duplicate-members 1, add/add 1`); the merge produced exactly those.
 
   - **What the classes resolved to.** The 7 `modify/delete` where the fork had deleted the Agent
-    Dashboard popout plumbing took the deletion (ledger: *Dashboard and the popout window*). The 12
+    Dashboard popout plumbing took the deletion (ledger: _Dashboard and the popout window_). The 12
     where upstream's `ca4e239861` retired test inventories took the deletion, including the fork's
     identity-renamed assertions. Identity-only conflicts took upstream's file for `identity-sweep.mjs`
     to re-sweep.
@@ -1654,7 +1731,7 @@ pnpm run sync:localization-runtime-catalog
     enumeration). `resolveClaudePaneStatus` moved to `claude-pane-hold-evidence.ts`, where the fork's
     `local(agents)` monitoring policy is re-expressed.
   - **Four things the merge left half-applied, all found by tests, fixed in `4370252718`:**
-    `owedShell` belongs to non-agent work (the fork's policy only moves *running* shells); the fork's
+    `owedShell` belongs to non-agent work (the fork's policy only moves _running_ shells); the fork's
     30s unfinished-checks cadence is dropped in favour of upstream's detail timer while the `force`
     cache bypass stays; the floating sentinel scope resolves the fork's pure folder path again (going
     through the settings-aware resolver mkdirs `~/.orca/floating-workspace`, which the test home-write
@@ -1667,7 +1744,7 @@ pnpm run sync:localization-runtime-catalog
   - **`post-sync.mjs` green, and one second-model gate — NO-GO, then two fixes.** A single
     `github-copilot/gpt-6.1-sol` high-reasoning pass ran its own probes over the merged tree. **P1
     (release blocker):** the floating-terminal scope had been resolved with the fork's pure folder
-    function, which ignores a configured `floatingTerminalCwd` — and that scope *is* a launch cwd
+    function, which ignores a configured `floatingTerminalCwd` — and that scope _is_ a launch cwd
     (`orca-runtime-create-terminal.ts` falls back to `workspace.path`), while the panel's own floating
     terminal honours the setting, so an agent could run in one directory while its filesystem requests
     addressed another. Its probe printed `CONFIGURED_DIRECTORY_HONOURED false`. **Fixed** to honour the
@@ -1709,14 +1786,14 @@ pnpm run sync:localization-runtime-catalog
   - **Gate 1** (on the merge) found pi settlement stranding on resume, pi ownership holes, relay
     cancellation matching only the sender id while the renderer submits under a UUID, and release
     notes counting 103 rebase-duplicate commits as new. **Gate 2** confirmed the settlement fix and
-    the notes, then rejected the ownership fix outright — *"B's distinct bus is unobserved… 'once per
-    evaluation' preserves the collision rather than fixes it"* — and found a child-only update
+    the notes, then rejected the ownership fix outright — _"B's distinct bus is unobserved… 'once per
+    evaluation' preserves the collision rather than fixes it"_ — and found a child-only update
     stranding the cached row plus two cancellation races (a cancel during authorization still
     submitting its query; a settled token falling back to the sender id and killing a peer). **Gate
     3** ran its own probes over the fixed tree and returned GO (`PI_PROBES_PASS`,
     `CANCELLATION_PROBES_PASS`), naming no blockers.
   - **What the fixes changed, in mechanism terms:** pi children are keyed by the session that owns
-    them and the *binding* is keyed by the bus (`PiAsyncSubagentBusBinding { bus, registration,
+    them and the _binding_ is keyed by the bus (`PiAsyncSubagentBusBinding { bus, registration,
     listeners }`, ownership transferred to the newest registration on that bus), a hold nobody claims
     is retracted rather than merely not re-published, and `session_start`'s placeholder is gated so a
     resumed session that loses its last child settles `done`. Cancellation moved to a live
@@ -1738,7 +1815,7 @@ pnpm run sync:localization-runtime-catalog
   ([UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)), and the pilot that paid for the tooling:
   `pre-sync.mjs` proved the tip green and predicted **26 conflicted paths** with classes
   (both-rewrote 17, union 4, rename-replay 2, duplicate-members 1, duplicate-tail 1, modify/delete 1)
-  *before anything moved*, the merge produced exactly those 26, `conflicts.mjs` triaged them file by
+  _before anything moved_, the merge produced exactly those 26, `conflicts.mjs` triaged them file by
   file, and `post-sync.mjs` finished with **7 passed, 1 skipped, no hard gate failed**. One conflict
   set, resolved once per file — no commit was replayed, nothing was force-pushed.
 
@@ -1786,7 +1863,7 @@ pnpm run sync:localization-runtime-catalog
        one that was right:** a `/reload` keeps the live set (item 1), and the listener count of 2 is
        expected rather than a doubling — two lanes bind `subagent:process-terminal` (the fork's
        descendant bus and upstream's runner-exit lane).
-  - **A tooling limit this sync exposed:** `post-sync.mjs`'s lost-content check compares *modified*
+  - **A tooling limit this sync exposed:** `post-sync.mjs`'s lost-content check compares _modified_
     files, so deleting fork-only code that had unique side effects escapes it. Three fork modules
     were deleted this sync as upstream-superseded; the review is the only thing that questioned
     whether a replaced surface was a superset. The next version of that check should inventory a
@@ -1808,7 +1885,7 @@ pnpm run sync:localization-runtime-catalog
        fireworks and copilot stores were ported onto it.
     2. **Repo detection: async meets one spawn.** Upstream rewrote `repo-detection.ts` to be sync
        with a single combined `rev-parse`; the fork's `ea059d2afc` made the same functions async to
-       keep them off the main thread. The merged file keeps the fork's async execution *and*
+       keep them off the main thread. The merged file keeps the fork's async execution _and_
        upstream's `GitRepoProbe`/`isGitRepoFromProbe`/`inspectGitRepoForRegistration` structure,
        ported to `gitExecFileAsync`/`scanGitMarker`/`fs/promises`, including upstream's
        newline-safe `indexOf('\\n')` root parse and the `records.length === 4` newline-ambiguity
@@ -1856,7 +1933,7 @@ pnpm run sync:localization-runtime-catalog
     tab-bar and sidebar suites.
 
   - **The sync process itself changed.** Every sync so far rebased the whole line, which pays per
-    commit *per collision*: seven fork commits touch `service-full-cycle-preparation.ts`, so that one
+    commit _per collision_: seven fork commits touch `service-full-cycle-preparation.ts`, so that one
     file stopped this rebase three times and the same decision was made three times. The release line
     now **merges** upstream (measured on the 50-commit delta pending after this sync: a merge presents
     26 file-level conflicts and auto-merges 68 files, while a rebase replays 150 commits), and rebase
@@ -1908,7 +1985,7 @@ pnpm run sync:localization-runtime-catalog
       `agentHookStatusCacheHydrationReady` assertions became a new case in upstream's trimmed
       `desktop-startup-ordering.test.ts` (the file is still a `reliability-gates` `assertionRefs`
       target, so it has to exist); the `cardClickAction: 'popover'` rejection stayed where upstream's
-      surviving analogue already asserts it; and the fork's *new* cases in those files stayed.
+      surviving analogue already asserts it; and the fork's _new_ cases in those files stayed.
 
   - **`local(identity)` met a Rust rewrite of the Windows launcher.** Upstream replaced
     `native/windows-cli-launcher/OrcaCliLauncher.cs` with `src/main.rs` (`#23383`, for MSIL
@@ -1931,7 +2008,7 @@ pnpm run sync:localization-runtime-catalog
     display-root scope (`displayRootPath`, `#18750`). The merged projection keeps the fork's
     helper-based acceptance/insertion/byte budget/chunked builder **and** upstream's
     `getRelativePathInsideRoot` scope walk plus its containment gate. Two consequences worth naming:
-    `worktreePath` → `displayRootPath` wherever it means the *displayed* root, and
+    `worktreePath` → `displayRootPath` wherever it means the _displayed_ root, and
     `file-explorer-visible-row-projection-build.ts` needed upstream's delta ported into it because
     `#34` had extracted those functions cleanly (git saw no conflict while upstream had patched
     exactly them).
@@ -2415,7 +2492,7 @@ pnpm run sync:localization-runtime-catalog
   - **Upstream rewrote the same hook** (4 files): upstream's #22173 (`b57facc5bc`, stale listings)
     deleted `resolvedQuery` from `RuntimeFileListState` and replaced the hook's
     `files`/`truncated`/`loading`/`resolvedQuery` state with a request-keyed `{ listing,
-loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalCount`,
+    loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalCount`,
     `ignoredFiles`, `queryMode`/`queryLimit` and the name-filter matcher to that same hook.
     Converged on upstream's model: `totalCount` and `ignoredFiles` moved _into_ the request-keyed
     listing — upstream's own comment there already promises "local listings key without the query, so
@@ -2666,7 +2743,7 @@ so packaging dies with `<repo> not a file`. An empty secret and an absent one ar
 **The cross-arch terminal-host boot gets a longer deadline (2026-10-13).** Upstream's `afterPack`
 check `verifyPackagedMacTerminalHostBoots` boots the packaged `Orca Terminal Host.app` for the slice
 it just built and requires it to serve a PTY within `TERMINAL_HOST_BOOT_TIMEOUT_MS` (20s upstream).
-On this fork's GitHub-hosted arm64 runner the *x64* slice is built cross-arch and booted under
+On this fork's GitHub-hosted arm64 runner the _x64_ slice is built cross-arch and booted under
 Rosetta, where the whole boot costs several times its local cost — measured at **~14s of that 20s**
 with a warm Rosetta cache and an idle CPU, and three consecutive np.28 attempts stalled at three
 different stages (no daemon token / no handshake / no PTY output). The artifact itself is sound: with
