@@ -11,7 +11,9 @@ import { ScreenPromptCorroboration } from './server-screen-prompt-corroboration'
 export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerStatusApplication {
   /** Bound by the host that owns panes (main, or the runtime behind `orca serve`); absent in the
    *  relay's parser, which has no screen to read. */
-  private screenPromptReader: ((paneKey: string) => ScreenPromptObservation | null) | null = null
+  private screenPromptReader:
+    | ((paneKey: string) => ScreenPromptObservation | null | undefined)
+    | null = null
 
   private readonly screenPromptCorroboration = new ScreenPromptCorroboration({
     readsScreen: () => this.screenPromptReader !== null,
@@ -26,9 +28,12 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
 
   /** Binds the pane-side screen reader; null leaves every screen claim unread. */
   setScreenPromptReader(
-    reader: ((paneKey: string) => ScreenPromptObservation | null) | null
+    reader: ((paneKey: string) => ScreenPromptObservation | null | undefined) | null
   ): void {
     this.screenPromptReader = reader
+    // Why here: a headless host starts the store before it has a runtime to read panes with, so the
+    // rows hydrated in between would otherwise never be adopted.
+    this.adoptHydratedScreenPromptRows()
   }
 
   /** The pane's screen gained a dialog: earlier and surer evidence than any deferred read. */

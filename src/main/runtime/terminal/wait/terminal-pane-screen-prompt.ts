@@ -9,13 +9,13 @@ import { detectTerminalWaitBlockedReason } from '../../terminal-wait-detection'
  *  whose agent cannot report one itself. Split out of the prompt-submission chain only to keep that
  *  file inside its line budget. */
 export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAgentPromptRequestCorrelation {
-  /** The interactive dialog the pane's screen is holding right now, or null when it holds none the
-   *  blocked-text layer reads as a person being asked something. A pane with no bound terminal
-   *  answers null, which leaves the row its hooks reported untouched. */
-  readPaneScreenPrompt(paneKey: string): ScreenPromptObservation | null {
+  /** The interactive dialog the pane's screen is holding, `null` when it holds none the blocked-text
+   *  layer reads as a person being asked something, and `undefined` when there is no terminal to ask:
+   *  a restored pane reconnects after the hook store starts, and "cannot see it" is not "no dialog". */
+  readPaneScreenPrompt(paneKey: string): ScreenPromptObservation | null | undefined {
     const handle = this.getAgentStatusTerminalHandleForPaneKey(paneKey)
     if (!handle) {
-      return null
+      return undefined
     }
     try {
       const snapshot = this.getTerminalAgentStatusSnapshot(
@@ -30,9 +30,9 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
       // not scrolled away yet, and the reader's own decision discards it on this clock.
       return { reason, since: snapshot.waitBlockedAt ?? 0 }
     } catch {
-      // Why: the readers throw once a terminal is gone or its handle is stale, and a pane that closed
-      // between the hook and this read simply has no screen to corroborate with.
-      return null
+      // Why unverifiable rather than "no dialog": these readers throw once a terminal is gone or its
+      // handle is stale, and answering "none" there would end a wait on evidence nobody read.
+      return undefined
     }
   }
 

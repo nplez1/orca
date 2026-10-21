@@ -8,7 +8,7 @@ import {
 } from '../orca-runtime-test-fixtures.spec'
 
 /** The visible lines of Copilot's approval dialog from `__fixtures__/copilot-command-prompt`, which
- *  prefixes each captured row with the box's `|` gutter. */
+ *  prefixes each captured row with the box's `│` gutter. */
 const APPROVAL_DIALOG = [
   ' Do you want to run this command?',
   ' ❯ 1. Yes',
@@ -61,7 +61,7 @@ describe('the screen prompt a pane is holding', () => {
     expect(gained).toEqual([paneKey])
   })
 
-  it('stops reading a dialog the CLI has erased with its later output', async () => {
+  it('stops reading a dialog its later output has pushed out of the window', async () => {
     // Why: the copilot fixtures' own note says an answered dialog is protected by the CLI erasing it
     // rather than by the matcher, so enough later output pushes it out of the window the layer reads.
     // That, and not a hook, is what ends the wait in practice.

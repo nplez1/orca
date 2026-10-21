@@ -35,7 +35,6 @@ function withoutRowTiming(row: EnrichedAgentHookEventPayload): AgentHookEventPay
     turnStartedAt: _turnStartedAt,
     observation: _observation,
     isReplay: _isReplay,
-    restoredUnconfirmed: _restoredUnconfirmed,
     programStatus: _programStatus,
     programStatusOnly: _programStatusOnly,
     authorityRestartId: _authorityRestartId,
@@ -81,7 +80,8 @@ export function screenPromptReleaseRow(
 export type ScreenPromptCorroborationHost = {
   /** False where no pane screen is readable at all (the relay's parser, a headless peer). */
   readsScreen: () => boolean
-  readScreenPrompt: (paneKey: string) => ScreenPromptObservation | null
+  /** `undefined` when the pane's screen cannot be read at all, which is not "no dialog". */
+  readScreenPrompt: (paneKey: string) => ScreenPromptObservation | null | undefined
   currentRow: (paneKey: string) => EnrichedAgentHookEventPayload | undefined
   /** Publishes the repaint and returns the `receivedAt` the stored row ended up with. */
   publishScreenPromptRow: (row: AgentHookEventPayload) => number | undefined
@@ -191,12 +191,15 @@ export class ScreenPromptCorroboration {
       this.forget(paneKey)
       return
     }
-    if (isScreenPromptForRow(pane.working, this.host.readScreenPrompt(paneKey))) {
+    const reading = this.host.readScreenPrompt(paneKey)
+    // Why wait: a pane whose terminal is not bound yet (a restored one still reconnecting) cannot
+    // answer, and releasing on that would report a live Working over a dialog nobody looked at.
+    if (reading === undefined || isScreenPromptForRow(pane.working, reading)) {
       this.scheduleRecheck(paneKey)
       return
     }
-    // Why forget first: publishing re-enters arm(), and a stale entry would schedule a read for a
-    // pane that is no longer waiting.
+    // Why forget first: forgetting after the publish would cancel the read that publish's own arm()
+    // just scheduled for this pane.
     this.forget(paneKey)
     this.host.publishScreenPromptRow(screenPromptReleaseRow(pane.working))
   }
@@ -208,7 +211,8 @@ export class ScreenPromptCorroboration {
       this.forget(paneKey)
       return
     }
-    const next = screenPromptRow(pane.working, current, this.host.readScreenPrompt(paneKey))
+    const reading = this.host.readScreenPrompt(paneKey)
+    const next = reading === undefined ? null : screenPromptRow(pane.working, current, reading)
     if (!next) {
       this.forget(paneKey)
       return

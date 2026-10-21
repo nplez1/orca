@@ -159,7 +159,7 @@ describe('the row a screen dialog implies', () => {
 describe('a Copilot approval that only the screen reports', () => {
   let userDataPath: string
   let server: AgentHookServer
-  let screen: { reason: 'agent-approval-prompt'; since: number } | null
+  let screen: { reason: 'agent-approval-prompt'; since: number } | null | undefined
 
   beforeEach(async () => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-screen-prompt-'))
@@ -240,8 +240,9 @@ describe('a Copilot approval that only the screen reports', () => {
     server.stop({ keepStatus: true })
 
     const restarted = new AgentHookServer()
-    restarted.setScreenPromptReader(() => null)
+    // Why bind after start: the headless host starts the store before it has a runtime to read with.
     await restarted.start({ env: 'production', userDataPath })
+    restarted.setScreenPromptReader(() => null)
     try {
       await vi.waitFor(
         () =>
@@ -270,7 +271,7 @@ describe('a Copilot approval that only the screen reports', () => {
 describe('the corroboration loop', () => {
   let published: EnrichedAgentHookEventPayload[]
   let reads: number
-  let screen: { reason: 'agent-approval-prompt'; since: number } | null
+  let screen: { reason: 'agent-approval-prompt'; since: number } | null | undefined
   let current: EnrichedAgentHookEventPayload
   /** Stands in for the store: every write re-enters arm(), exactly as commitStatusRowMutation does. */
   let commit: (row: EnrichedAgentHookEventPayload) => void
@@ -351,6 +352,21 @@ describe('the corroboration loop', () => {
     expect(reads).toBe(0)
     vi.advanceTimersByTime(250)
     expect(published.at(-1)?.payload.state).toBe('waiting')
+  })
+
+  it('keeps the wait while the pane cannot be read at all', () => {
+    const loop = corroboration()
+    loop.arm(current)
+    vi.advanceTimersByTime(250)
+    expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
+    // Why: a restored pane reconnects after the store starts, and "no terminal to ask" is not
+    // "the dialog is gone".
+    screen = undefined
+    vi.advanceTimersByTime(3_000)
+    expect(published.map((entry) => entry.payload.state)).toEqual(['waiting'])
+    screen = null
+    vi.advanceTimersByTime(1_000)
+    expect(published.at(-1)?.payload.state).toBe('working')
   })
 
   it('slows its re-reads instead of stopping them', () => {

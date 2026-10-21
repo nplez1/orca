@@ -17,6 +17,7 @@ export abstract class AgentHookServerStatusHookLifecycle extends AgentHookServer
       }
       this.assistantMessageRetryTimers.clear()
       this.clearAllTranscriptPolls()
+      this.clearScreenPromptReads()
     }
     this.statusHooksEnabled = enabled
     if (enabled && this.server) {
