@@ -2693,9 +2693,6 @@
             "591f9b12c1": "Split Up",
             "af80ed83c1": "Split Down"
           },
-          "TabBar": {
-            "ab589350e5": "Could not build launch command for {{value0}}."
-          },
           "TabBarQuickCommandsButton": {
             "c781f992e4": "destructive"
           },
