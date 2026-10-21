@@ -17,21 +17,25 @@ type NewWorkspaceComposerFooterProps = Pick<
   | 'createDisabled'
   | 'creating'
   | 'primaryActionLabel'
+  | 'identityLocked'
 > & {
   submitShortcutModifierLabel: string
 }
 
 export function NewWorkspaceComposerFooter({
   createError,
-  showCreateMultiple = false,
+  showCreateMultiple: showCreateMultipleProp = false,
   createMultiple = false,
   onCreateMultipleChange,
   onCreate,
   createDisabled,
   creating,
   primaryActionLabel,
+  identityLocked = false,
   submitShortcutModifierLabel
 }: NewWorkspaceComposerFooterProps): React.JSX.Element {
+  // Why: a copy pass clears the name, which a locked identity cannot accept a second time.
+  const showCreateMultiple = showCreateMultipleProp && !identityLocked
   return (
     <>
       {createError ? (

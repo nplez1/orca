@@ -303,6 +303,26 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
+  it('keeps an implied branch instead of suffixing it, and never probes its PR', async () => {
+    getBranchConflictKindMock.mockImplementation(async (_repoPath: string, branch: string) =>
+      branch === 'feature/something' ? 'local' : null
+    )
+
+    await expect(
+      handlers['worktrees:create'](null, {
+        repoId: 'repo-1',
+        name: 'feature/something',
+        branchNameOverride: 'feature/something',
+        exactBranchName: true
+      })
+    ).rejects.toThrow(/already exists locally, and this workspace keeps its branch name/u)
+
+    // Why: a suffixed branch — or a suffix searched for because the branch's own PR reads as a
+    // conflict — would publish a copy of this workspace under the wrong name.
+    expect(addWorktreeMock).not.toHaveBeenCalled()
+    expect(getPRForBranchMock).not.toHaveBeenCalled()
+  })
+
   it('allows a resolver-provided PR branch override to match its remote push target', async () => {
     getBranchConflictKindMock.mockImplementation(async (_repoPath: string, branch: string) =>
       branch === 'feature/fix' ? 'remote' : null

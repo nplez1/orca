@@ -21,7 +21,12 @@ export type WorkspaceCreationTarget = {
   setup: ProjectHostSetup
 }
 
-export type WorkspaceCreationTargetHint = Pick<WorkspaceCreationTarget, 'projectId' | 'hostId'> & {
+/** Which project (and optionally which host's setup) the composer should open on. The host is
+ *  optional: "add this workspace to another host" names the project and leaves the run target
+ *  as the decision the user still has to make. */
+export type WorkspaceCreationTargetHint = {
+  projectId: string
+  hostId?: ExecutionHostId | null
   projectHostSetupId?: string | null
 }
 

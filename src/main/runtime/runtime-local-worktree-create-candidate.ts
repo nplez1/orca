@@ -66,6 +66,11 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
   localWorktreeGitOptions: { wslDistro?: string }
   hostedReviewExecutionContext?: HostedReviewExecutionOptions
 }): Promise<RuntimeLocalWorktreeCreateCandidate> {
+  if (args.request.exactBranchName && !args.request.branchNameOverride) {
+    // Why: "keep this branch" only means something with a branch to keep; refuse rather than
+    // invent one from the worktree name.
+    throw new Error('An exact-branch create needs the branch it must keep.')
+  }
   const sanitizedName = sanitizeWorktreeName(args.request.name)
   let effectiveRequestedName = args.request.name
   let effectiveSanitizedName = sanitizedName
@@ -110,7 +115,11 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     branchName = await resolveCreateBranchName(
       args.repo.path,
       selectedExistingLocalBranchName ??
-        getBranchNameOverrideCandidate(args.request.branchNameOverride, suffix),
+        getBranchNameOverrideCandidate(
+          args.request.branchNameOverride,
+          // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
+          args.request.exactBranchName ? 1 : suffix
+        ),
       effectiveSanitizedName,
       args.settings,
       args.username,
@@ -175,10 +184,21 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
         }
       }
       if (branchConflictKind) {
+        if (args.request.exactBranchName) {
+          // Why: a copied workspace must land on its own branch; Orca's retry would otherwise
+          // publish the wrong branch under a suffixed name.
+          throw new WorktreeCreateCollisionError(
+            `Branch "${branchName}" already exists ${branchConflictKind === 'local' ? 'locally' : 'on a remote'}, and this workspace keeps its branch name.`
+          )
+        }
         continue
       }
     }
-    if (!checkoutExistingBranch && !selectedReviewConflictMatched) {
+    if (
+      !checkoutExistingBranch &&
+      !selectedReviewConflictMatched &&
+      !args.request.exactBranchName
+    ) {
       let existingPR: Awaited<ReturnType<typeof getPRForBranch>> | null = null
       try {
         existingPR = await getLocalGitHubPrForBranch(

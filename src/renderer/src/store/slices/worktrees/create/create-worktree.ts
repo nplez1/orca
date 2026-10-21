@@ -24,7 +24,10 @@ import {
 } from '../../../../runtime/runtime-rpc-client'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { runtimeTargetForRepoOwner } from '@/lib/repo-runtime-owner'
-import { WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY } from '../../../../../../shared/protocol-version'
+import {
+  WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
+  WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY
+} from '../../../../../../shared/protocol-version'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
 import { requestWorktreeBaseFallbackNotice } from '@/components/worktree-base-fallback-notice'
 import { showLocalBaseRefRefreshToast } from './local-base-ref-refresh-toast'
@@ -221,6 +224,14 @@ export function createCreateWorktree(
           'Update the remote runtime to link Jira'
         )
       }
+      if (options?.exactBranchName && target.kind === 'environment') {
+        // Why: an older host drops the flag and suffixes the branch instead, so fail closed.
+        await assertRuntimeEnvironmentCapability(
+          target.environmentId,
+          WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
+          'Update the remote runtime to copy a workspace to it'
+        )
+      }
       if (
         options?.provisionedRoot &&
         target.kind === 'environment' &&
@@ -268,7 +279,10 @@ export function createCreateWorktree(
           return result
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          const shouldRetry = isRetryableWorktreeCreateConflict(message)
+          // Why: an exact-branch create is a copy of a workspace, so a renamed branch is the wrong
+          // result — it must surface the host's refusal instead of retrying into `feature/x-2`.
+          const shouldRetry =
+            !options?.exactBranchName && isRetryableWorktreeCreateConflict(message)
           if (!shouldRetry || attempt === CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS - 1) {
             throw error
           }

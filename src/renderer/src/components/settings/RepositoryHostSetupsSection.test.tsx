@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/protocol-version'
 import type { Project, ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
+import type { ProjectHostAddRequest } from '../../store/slices/ui'
 import { useAppStore } from '../../store'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 
@@ -826,5 +827,41 @@ describe('RepositoryHostSetupsSection', () => {
       setupState: 'not-set-up',
       setupMethod: 'provisioned'
     })
+  })
+
+  function seedLocalProject(request?: ProjectHostAddRequest): Repo {
+    const localRepo = makeRepo({ id: 'local-repo', displayName: 'Orca', path: '/Users/alice/orca' })
+    useAppStore.setState({
+      repos: [localRepo],
+      projects: [makeProject({ id: 'github:stablyai/orca', sourceRepoIds: ['local-repo'] })],
+      projectHostSetups: [
+        makeSetup({
+          id: 'local-repo',
+          projectId: 'github:stablyai/orca',
+          repoId: 'local-repo',
+          hostId: 'local',
+          path: '/Users/alice/orca'
+        })
+      ],
+      sshTargetLabels: new Map([['openclaw 2', 'openclaw 2']]),
+      ...(request ? { settingsProjectAddHostRequest: request } : {})
+    })
+    return localRepo
+  }
+
+  it('opens the add flow on the host the sidebar asked for, then clears the request', () => {
+    renderSection(
+      seedLocalProject({
+        projectId: 'github:stablyai/orca',
+        repoId: 'local-repo',
+        hostId: toSshExecutionHostId('openclaw 2')
+      })
+    )
+
+    // The sidebar deep-links to this section, so it must stay addressable.
+    expect(container.querySelector('#repo-local-repo-host-setups')).not.toBeNull()
+    expect(container.textContent).toContain('Add project to host')
+    expect(container.textContent).toContain('openclaw 2')
+    expect(useAppStore.getState().settingsProjectAddHostRequest).toBeNull()
   })
 })

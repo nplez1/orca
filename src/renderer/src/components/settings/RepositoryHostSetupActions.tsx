@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ProjectHostAddRequest } from '@/store/slices/ui'
 import type {
   ProjectHostSetup,
   ProjectHostSetupCreateResult,
@@ -44,6 +45,9 @@ type RepositoryHostSetupActionsProps = {
     setupMethod: 'provisioned'
   }) => Promise<ProjectHostSetupCreateResult | null>
   onSetupReady: (hostId: ExecutionHostId) => void
+  /** Sidebar Add to… request for this project: opens the flow on that host instead of the default. */
+  addHostRequest?: ProjectHostAddRequest | null
+  onAddHostRequestHandled: () => void
 }
 
 type SetupStep = 'choose' | 'existing' | 'clone' | 'planned'
@@ -55,7 +59,9 @@ export function RepositoryHostSetupActions({
   setupProjectExistingFolder,
   setupProjectClone,
   createProjectHostSetup,
-  onSetupReady
+  onSetupReady,
+  addHostRequest = null,
+  onAddHostRequestHandled
 }: RepositoryHostSetupActionsProps): React.JSX.Element | null {
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<SetupStep>('choose')
@@ -67,6 +73,29 @@ export function RepositoryHostSetupActions({
   const [isSettingUp, setIsSettingUp] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const [isCreatingPendingSetup, setIsCreatingPendingSetup] = useState(false)
+  const [handledAddHostRequest, setHandledAddHostRequest] = useState<ProjectHostAddRequest | null>(
+    null
+  )
+  const pendingAddHostRequest =
+    addHostRequest && addHostRequest !== handledAddHostRequest ? addHostRequest : null
+  // Why: the sidebar validated the host against this pane's own option list, so a request only
+  // ever names a destination this flow can reach. Applied while rendering (React's own pattern
+  // for a prop-driven reset) instead of from an effect, which would flash the stale step.
+  if (pendingAddHostRequest) {
+    setHandledAddHostRequest(pendingAddHostRequest)
+    setSelectedSetupHostId(pendingAddHostRequest.hostId)
+    setStep('choose')
+    setSetupPath('')
+    setCloneUrl('')
+    setCloneDestination('')
+    setIsOpen(true)
+  }
+  useEffect(() => {
+    if (handledAddHostRequest) {
+      // Why: the store request only carried the intent here; it must not survive to reopen the flow.
+      onAddHostRequestHandled()
+    }
+  }, [handledAddHostRequest, onAddHostRequestHandled])
   const defaultSetupHostOption =
     setupHostOptions.find((option) => option.isAvailable && option.canUsePathActions) ??
     setupHostOptions.find((option) => option.isAvailable) ??

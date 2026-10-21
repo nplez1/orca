@@ -35,6 +35,7 @@ export type QuickCreationRequestInput = {
   linkedLinearIssueWorkspaceId: string | undefined
   linkedLinearIssueOrganizationUrlKey: string | undefined
   branchNameOverride: string | undefined
+  exactBranchName?: boolean
   parentWorktreeId: string | null
   workspaceStatus: WorktreeCreationRequest['workspaceStatus']
   linkedGitLabMR: number | null
@@ -56,6 +57,8 @@ export type QuickCreationRequestInput = {
 
 export type QuickSubmitOptions = {
   setupOnly?: boolean
+  /** Refuse a branch-name collision instead of suffixing; the copied workspace keeps its branch. */
+  exactBranchName?: boolean
 }
 
 export function buildQuickCreationRequest(
@@ -100,6 +103,7 @@ export function buildQuickCreationRequest(
       ? { linkedLinearIssueOrganizationUrlKey: input.linkedLinearIssueOrganizationUrlKey }
       : {}),
     ...(input.branchNameOverride ? { branchNameOverride: input.branchNameOverride } : {}),
+    ...(input.exactBranchName ? { exactBranchName: true } : {}),
     ...(input.parentWorktreeId ? { parentWorktreeId: input.parentWorktreeId } : {}),
     ...(input.workspaceStatus ? { workspaceStatus: input.workspaceStatus } : {}),
     ...(input.includeGitLabLinks && input.linkedGitLabMR != null

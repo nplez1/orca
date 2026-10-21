@@ -37,6 +37,8 @@ export const WorktreeCreate = z
     baseBranch: OptionalString,
     compareBaseRef: OptionalString,
     branchNameOverride: OptionalString,
+    /** Ask the host to refuse a branch-name collision instead of suffixing a new branch. */
+    exactBranchName: z.boolean().optional(),
     linkedIssue: TriStateLinkedIssue,
     linkedPR: TriStateLinkedIssue,
     linkedLinearIssue: z.string().optional(),
