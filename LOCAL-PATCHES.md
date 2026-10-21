@@ -2583,17 +2583,39 @@ loadingRequest }` pair — while our `2d946fd65a`/`1b420e58c6` (#20) add `totalC
 
 ### `local(ci)`: release workflow
 
-`.github/workflows/fork-release.yml` builds macOS and Windows artifacts and publishes them as a
-release on this fork — which is the feed the patched updater points at. It exists because every
+`.github/workflows/fork-release.yml` builds macOS, Windows and Linux artifacts and publishes them as
+a release on this fork — which is the feed the patched updater points at. It exists because every
 upstream release workflow is a no-op in a fork (they guard on
 `github.repository == 'stablyai/orca'`) and publishes to stablyai's separate channel repos. It is
 `workflow_dispatch` only, so it never runs on its own.
 
-It builds on GitHub-hosted runners (`macos-15`, `windows-2022`) rather than upstream's Blacksmith
-labels, which belong to stablyai's account. Signing is conditional on `MAC_CERTS` being set, so the
-pipeline is usable before a certificate exists and switches to the signed, notarized path by itself
-once it does. The release body comes from `.github/fork-release-notes.md`, rendered per release with
-the version, commit, date, and a signing paragraph that follows the signing mode.
+It builds on GitHub-hosted runners (`macos-15`, `windows-2022`, `ubuntu-latest`) rather than
+upstream's Blacksmith labels, which belong to stablyai's account. Signing is conditional on
+`MAC_CERTS` being set, so the pipeline is usable before a certificate exists and switches to the
+signed, notarized path by itself once it does. The release body comes from
+`.github/fork-release-notes.md`, rendered per release with the version, commit, date, and a signing
+paragraph that follows the signing mode.
+
+The three jobs are **serialized** (`linux: needs: windows`, `windows: needs: macos`) because every
+leg appends into one release and electron-builder decides create-vs-append at upload time. The
+`macos` job creates the draft, and the undraft is the last step of the last leg — so "published"
+means every platform's update manifest exists, and each leg asserts its own (`latest-mac.yml`,
+`latest.yml`, `latest-linux.yml`).
+
+The Linux leg (`2026-10-21`) is x86_64 only and packages AppImage + deb + rpm. Its packaging needs
+are the ones upstream's `release-cut.yml` linux matrix entry established: `python3-gi`,
+`gir1.2-atspi-2.0`, `at-spi2-core`, `xclip`, `xdotool` and `rpm` from apt (`build:release` verifies
+the computer-use provider by importing AT-SPI, and fpm shells out to `rpm`);
+`ensure-native-runtime.mjs --runtime=electron` before electron-builder rebuilds node-pty for the
+Electron ABI; a host-scoped `pnpm install` (the job packages only for its own architecture); and
+Docker, which `beforePack` uses to compile the Wayland clipboard helper against the glibc floor. The
+glibc floor gate itself is inside `afterPack`, so it needs no workflow step. No node-gyp override is
+installed here: upstream added one for a pnpm postinstall failure that has not reproduced on this
+job.
+
+Only the AppImage self-updates. `src/main/updater/updater-install-execution.ts` already routes deb
+and rpm to the "manual install required" message, and the release notes say so — those two artifacts
+are for people who want their package manager to own the install.
 
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
 empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
@@ -2819,6 +2841,7 @@ install owns is changed here. Nothing in this section is a PR candidate.
 | appId / `BASE_APP_USER_MODEL_ID` | `com.nplez1.orca`                 |
 | product name                     | `Orca NP`                         |
 | installed CLI command            | `orca-np` (Windows `orca-np.cmd`) |
+| Linux deb/rpm package name       | `orca-np` (`/usr/bin/orca-np`)    |
 | dev CLI                          | `orca-np-dev`                     |
 | packaged userData                | `appData/orca-np`                 |
 | home directory                   | `~/.orca-np`                      |
@@ -2847,10 +2870,46 @@ Three couplings this rename depends on. Each fails silently, so change them toge
    upstream's local and remote names coincided, so a test asserting the wrong one still looks
    plausible.
 
-Deliberately NOT renamed: the Linux deb/rpm names and `executableName: 'orca-ide'` (this fork builds
-only macOS and Windows, and renaming puts a space in the `/opt` install path that `after-install.sh`
-resolves unquoted); the bundled launcher FILE names; and the per-repo `.orca/` directory convention,
-which is a repo directory rather than the home directory.
+Deliberately NOT renamed: the bundled launcher FILE names (see the Linux note below); the per-repo
+`.orca/` directory convention, which is a repo directory rather than the home directory; and the
+AppImage artifact name.
+
+#### The Linux packages (`2026-10-21`)
+
+This fork now releases Linux, so the deferred half of the table above is settled. `deb.packageName`
+and `rpm.packageName` are **`orca-np`**, with matching artifact file names
+(`orca-np_<version>_amd64.deb`, `orca-np-<version>.x86_64.rpm`). That name is what dpkg and rpm use
+for ownership: while it stayed `orca-ide`, installing Orca NP from a package would have _replaced_ an
+official Orca install rather than sitting beside it, which is the whole point of this section.
+`resources/linux/packaging/after-install.sh` now links `/usr/bin/orca-np` (never
+`/usr/bin/orca-ide`, which belongs to the official package) and discovers the install directory from
+a quoted candidate list, because `productName` puts a space in it (`/opt/Orca NP` —
+electron-builder's `sanitizeFileName` keeps spaces, and only the directory name comes from it).
+
+Four couplings that stay as upstream has them, each for a reason:
+
+- **`linux.executableName: 'orca-ide'`** and the bundled launcher file `resources/bin/orca-ide`.
+  `LINUX_CLI_COMMAND_NAME` and the AppImage cache layout resolve that exact path, and the _installed_
+  command is already `orca-np` (`CLI_COMMAND_NAME`) — so renaming the in-bundle file would touch
+  app-side CLI registration and its AppImage tests for no gain. The directory differs from an
+  official install's, so nothing collides. Pinned by `config/scripts/electron-builder-config.test.mjs`.
+- **The AppImage artifact name** (`orca-linux[-arm64].AppImage`).
+  `config/scripts/static-appimage-package-contract.cjs` derives the artifact's target architecture
+  from that exact name, and the PR lane runs it as `dist/orca-linux.AppImage`.
+- **`StartupWMClass: 'orca'`** — unchanged, because the class comes from the app name Electron reports
+  rather than from the package or executable name. **Unverified for this fork's packaged name**:
+  upstream observed `WM_CLASS=orca` with its own app name, and this build's packaged app name is
+  `Orca NP` (`main-process-ready-foundation.ts` calls `app.setName`), so the first shipped build
+  should confirm with `xprop WM_CLASS` that the dock still groups. If it reports something else, that
+  one line in `config/electron-builder.config.cjs` is the fix.
+- **The `/opt` prefix itself.** electron-builder always stages the package payload at
+  `/opt/${sanitizedProductName}`, so the only lever is the discovery list in the two packaging
+  scripts — not a `productName` change, which would move the macOS bundle and the Windows app too.
+
+Files touched by the rename, so a sync can recheck them: `config/electron-builder.config.cjs`,
+`resources/linux/packaging/after-install.sh`, `resources/linux/packaging/after-remove.sh`,
+`config/scripts/electron-builder-config.test.mjs`, and the two package-name literals in
+`.github/workflows/pr.yml`'s "Verify root-package marker payloads" step.
 
 Consequences to expect on first run of a renamed build: it cannot read an official install's data,
 Keychain items or E2EE pairing files, and macOS re-prompts for TCC once per permission because

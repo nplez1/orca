@@ -713,9 +713,12 @@ module.exports = {
     mimeTypes: ['text/markdown', 'text/csv', 'text/tab-separated-values'],
     // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
     // The Linux installer should not claim those system package/file names.
-    // Why (fork): left as upstream's naming on purpose. This fork's release workflow builds only
-    // macOS and Windows, and renaming the package would put a space in the /opt install dir that
-    // after-install.sh resolves unquoted. See LOCAL-PATCHES.md § local(identity).
+    // Why (fork): the packages and the PATH command carry this fork's name (`orca-np`), so an
+    // official Orca .deb/.rpm and Orca NP's can be installed side by side — dpkg/rpm ownership is
+    // what decides that, not this binary name. The in-bundle binary and launcher keep upstream's
+    // file name because `LINUX_CLI_COMMAND_NAME` (src/main/cli/bundled-cli-launcher-path.ts) and
+    // the AppImage cache layout locate `resources/bin/orca-ide`; the *installed* command is already
+    // `orca-np` (CLI_COMMAND_NAME). See LOCAL-PATCHES.md § local(identity).
     executableName: 'orca-ide',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
@@ -723,7 +726,11 @@ module.exports = {
     desktop: {
       entry: {
         // Why: Electron reports WM_CLASS=orca for the visible Linux window;
-        // GNOME docks need an exact match to group it with orca-ide.desktop.
+        // GNOME docks need an exact match to group it with the .desktop entry.
+        // Why (fork) this is unchanged: the class comes from the app name Electron reports, not
+        // from the package or executable name, so the fork's package rename does not move it.
+        // Unverified on a real desktop for this fork's packaged name — see the note in
+        // LOCAL-PATCHES.md § local(identity); check `xprop WM_CLASS` on the first shipped build.
         StartupWMClass: 'orca'
       }
     },
@@ -755,11 +762,17 @@ module.exports = {
     category: 'Utility'
   },
   appImage: {
+    // Why (fork) this keeps upstream's file name: `verifyStaticAppImagePackage`
+    // (config/scripts/static-appimage-package-contract.cjs) identifies the AppImage's target
+    // architecture from this exact name, and the PR lane runs the file as `dist/orca-linux.AppImage`.
+    // The name is not something dpkg/rpm own, so it costs nothing; only the packages are renamed.
     artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
   },
   deb: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide_${version}_${arch}.${ext}',
+    // Why (fork): package name is what dpkg uses for ownership. `orca-ide` belongs to an official
+    // Orca install, so reusing it would make this build replace that app rather than sit beside it.
+    packageName: 'orca-np',
+    artifactName: 'orca-np_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
@@ -773,7 +786,7 @@ module.exports = {
       'xclip',
       'xvfb'
     ],
-    // Why: symlink the bundled CLI onto PATH at install time so `orca-ide serve`
+    // Why: symlink the bundled CLI onto PATH at install time so `orca-np serve`
     // works on a headless host. The in-app CLI registration (CliInstaller) is
     // GUI-triggered and can never run on a server, so without this the CLI is
     // unreachable from the shell on exactly the hosts that need it.
@@ -783,8 +796,9 @@ module.exports = {
     fpm: appImageNodeRuntimeFpmArgs
   },
   rpm: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide-${version}.${arch}.${ext}',
+    // Why (fork): see deb.packageName.
+    packageName: 'orca-np',
+    artifactName: 'orca-np-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [

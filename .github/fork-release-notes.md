@@ -16,6 +16,9 @@ Built from [`{{SHA}}`](https://github.com/nplez1/orca/commit/{{SHA}}) on {{DATE}
 | macOS, Apple silicon | `Orca-NP-{{VERSION}}-arm64-mac.zip` | unzip, drag **Orca NP** into Applications                   |
 | macOS, Intel         | `Orca-NP-{{VERSION}}-mac.zip`       | same app, x64 build                                         |
 | Windows              | `orca-windows-setup.exe`            | run it; SmartScreen warns once — _More info_ → _Run anyway_ |
+| Linux, x86_64        | `orca-linux.AppImage`               | `chmod +x`, run it; updates itself                          |
+| Linux, x86_64 (.deb) | `orca-np_{{VERSION}}_amd64.deb`     | `sudo apt install ./<file>`; updates are manual             |
+| Linux, x86_64 (.rpm) | `orca-np-{{VERSION}}.x86_64.rpm`    | `sudo dnf install ./<file>`; updates are manual             |
 
 The `.dmg` and the `.zip` contain the same app; either works.
 
@@ -36,7 +39,8 @@ The `.dmg` and the `.zip` contain the same app; either works.
 - macOS asks for **folder permissions again** (Documents, Desktop, Downloads, and any folder you
   grant). Permissions are anchored to the app's identity, so this happens once and then survives
   later updates.
-- Add the `orca-np` command to your PATH from **Settings → CLI** if you want it in a terminal.
+- Add the `orca-np` command to your PATH from **Settings → CLI** if you want it in a terminal. The
+  `.deb` and `.rpm` already do this at install time (`/usr/bin/orca-np`); the AppImage does not.
 
 ## Worth knowing
 
@@ -44,3 +48,6 @@ The `.dmg` and the `.zip` contain the same app; either works.
   in both. On a machine with both installed, macOS routes `orca://` to only one of them.
 - The Windows build is unsigned by choice: one SmartScreen warning per installer, after which
   self-updates work. If Smart App Control is enabled it refuses unsigned apps outright.
+- On Linux only the AppImage updates itself. The `.deb` and `.rpm` are installable packages, so a
+  newer release has to be installed the same way — the app says so instead of pretending to update.
+- The AppImage needs FUSE 2 (`libfuse2t64` on Ubuntu 24.04) to run. Package installs do not.

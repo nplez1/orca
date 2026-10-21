@@ -1,6 +1,6 @@
 name: Fork release
 
-# Builds distributable macOS and Windows artifacts from this fork and publishes them as a
+# Builds distributable macOS, Windows and Linux artifacts from this fork and publishes them as a
 # GitHub release here. That release is the update feed this fork's builds point at (see
 # LOCAL-PATCHES.md), so publishing here is what makes an installed build update itself.
 #
@@ -25,9 +25,9 @@ on:
 permissions:
   contents: write
 
-# Why the same version for both jobs: the mac and windows artifacts of one release must agree,
-# and the updater compares the version baked into each manifest. github.run_number is identical
-# across jobs in a run, so deriving from it keeps them in step without passing state around.
+# Why the same version for every job: the mac, windows and linux artifacts of one release must
+# agree, and the updater compares the version baked into each manifest. github.run_number is
+# identical across jobs in a run, so deriving from it keeps them in step without passing state around.
 env:
   PUBLISH_OWNER: nplez1
 
@@ -229,7 +229,7 @@ jobs:
           echo "::error::latest-mac.yml never appeared; an installed build will not see this release."
           exit 1
 
-  # Why serialized behind macos: both jobs publish into the same release, and electron-builder
+  # Why serialized behind macos: every job publishes into the same release, and electron-builder
   # decides whether to create or append at upload time. Running them at once races that decision.
   windows:
     needs: macos
@@ -317,9 +317,124 @@ jobs:
           echo "::error::latest.yml never appeared; an installed build will not see this release."
           exit 1
 
-      # Why here and not in the macos job: both platforms upload into one release, and a release
-      # that goes live before the last platform's manifest exists offers downloads that no
-      # installed build can update from. Flipping it last makes "published" mean "complete".
+      # Why not here any more: the release is undrafted by the last job, and Linux's manifest has
+      # to exist before it does. See the linux job below.
+
+  # Why serialized behind windows, and why last: every job appends into one release, and
+  # electron-builder decides whether to create or append at upload time — concurrent legs race that
+  # decision. The undraft has to be the final step of the final leg, because a release that goes
+  # live before the last platform's manifest exists offers downloads no installed build can
+  # update from.
+  linux:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-builder-linux-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-linux-
+
+      # Why no --cpu flags and no retry wrapper: this job packages only for its own runner OS and
+      # architecture, so the default host-scoped install is the correct one (upstream's linux release
+      # leg does the same).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why here: electron-builder's beforePack requires out/mobile-web, and the bundle
+      # build resolves React Native and Expo from mobile/node_modules.
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      # Why: `pnpm build:release` verifies the Linux computer-use provider by importing AT-SPI
+      # bindings, which are runtime package deps but not present on stock GitHub Ubuntu runners.
+      # Why rpm: electron-builder's fpm backend shells out to it to produce the .rpm artifact.
+      # Why Docker is not installed here: the Wayland clipboard helper is compiled in Docker by
+      # beforePack, and ubuntu-latest runners ship it.
+      - name: Install Linux packaging dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool rpm
+
+      # Why stamp the version: same reason as the other jobs — every release must compare strictly
+      # greater than the last, and all three platforms must agree on it.
+      - name: Stamp the release version
+        shell: bash
+        env:
+          SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          version="${base}-${SUFFIX:-np.${GITHUB_RUN_NUMBER}}"
+          node -e "const fs=require('fs');const p=require('./package.json');p.version=process.argv[1];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" "$version"
+          echo "RELEASE_VERSION=$version" >>"$GITHUB_ENV"
+          echo "Releasing $version"
+
+      - name: Build app
+        run: pnpm build:release
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why ensure-native-runtime first: electron-builder's beforeBuild rebuilds node-pty for the
+      # Electron ABI, and the Linux leg has to start from the runtime variant the app actually
+      # loads — upstream's release leg does the same on every Linux matrix entry.
+      #
+      # Why the publish overrides: the checked-in config names stablyai/orca. Overriding here rather
+      # than patching the config keeps that a runtime concern instead of a fork patch, so upstream
+      # edits to the publish block still apply cleanly. `--publish always` plus the config's own
+      # `releaseType: draft` appends into the draft the macos job created.
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm \
+            --x64 --publish always \
+            --config.publish.owner=${{ env.PUBLISH_OWNER }} \
+            --config.publish.repo=orca
+
+      - name: Confirm the Linux update manifest published
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Why the explicit tag: the release is a draft until this job finishes, and
+          # `gh release list` hides drafts.
+          tag="v$RELEASE_VERSION"
+          for attempt in 1 2 3 4 5; do
+            if gh release view "$tag" --repo "$PUBLISH_OWNER/orca" --json assets \
+              --jq '.assets[].name' | grep -qx 'latest-linux.yml'; then
+              echo "latest-linux.yml is present on $tag"
+              exit 0
+            fi
+            echo "waiting for latest-linux.yml (attempt $attempt)"
+            sleep 15
+          done
+          echo "::error::latest-linux.yml never appeared; an installed AppImage will not see this release."
+          exit 1
+
+      # Why here and not in an earlier job: every platform uploads into one release, and a release
+      # that goes live before the last platform's manifest exists offers downloads that no installed
+      # build can update from. Flipping it last makes "published" mean "complete".
       - name: Publish the release
         shell: bash
         env:

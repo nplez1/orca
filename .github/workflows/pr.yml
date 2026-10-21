@@ -1236,8 +1236,10 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('./package.json').version")"
-          deb="dist/orca-ide_${version}_amd64.deb"
-          rpm="dist/orca-ide-${version}.x86_64.rpm"
+          # Why the new names: this fork's packages are `orca-np`, so installing one cannot replace
+          # an official Orca install (see LOCAL-PATCHES.md § local(identity)).
+          deb="dist/orca-np_${version}_amd64.deb"
+          rpm="dist/orca-np-${version}.x86_64.rpm"
           test -s "$deb"
           test -s "$rpm"
           # Why: the /opt directory is named after productName, and a fork may rename it —

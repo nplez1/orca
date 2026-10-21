@@ -293,12 +293,15 @@ Works with **any CLI agent** — if it runs in a terminal, it runs in Orca.
 
 ## Install
 
-### Desktop — macOS, Windows
+### Desktop — macOS, Windows, Linux
 
 - **[Download the latest Orca NP release](https://github.com/nplez1/orca/releases/latest)**
-- Or grab a build directly: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [All builds](https://github.com/nplez1/orca/releases)
+- Or grab a build directly: [macOS Apple Silicon](https://github.com/nplez1/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/nplez1/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/nplez1/orca/releases/latest/download/orca-windows-setup.exe) · [Linux (AppImage)](https://github.com/nplez1/orca/releases/latest/download/orca-linux.AppImage) · [All builds](https://github.com/nplez1/orca/releases)
 
-Orca NP installs beside an official Orca and updates itself from this repository's releases. This fork does not publish a Linux build or a Homebrew/AUR package — on Linux, [build from source](.github/CONTRIBUTING.md) or use [upstream Orca](https://github.com/stablyai/orca/releases/latest).
+Orca NP installs beside an official Orca and updates itself from this repository's releases. The
+Linux build is x86_64 only: the AppImage updates itself, while the `.deb` and `.rpm` install the same
+app under a package manager and are updated by installing a newer release. This fork does not publish
+a Homebrew/AUR package.
 
 ### Mobile Companion — iOS, Android
 

@@ -455,14 +455,25 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca')
   })
 
-  it('uses the release artifact set as local Linux targets without changing existing names', () => {
+  it('keeps the in-bundle Linux launcher name the CLI path resolution expects', () => {
+    // Why pinned: `LINUX_CLI_COMMAND_NAME` and the AppImage cache layout locate
+    // resources/bin/orca-ide, so renaming this breaks CLI registration while installing cleanly.
+    expect(electronBuilderConfig.linux.executableName).toBe('orca-ide')
+  })
+
+  it('names the Linux packages after this build so an official install is not replaced', () => {
     expect(electronBuilderConfig.linux.target).toEqual(['AppImage', 'deb', 'rpm'])
     expect(electronBuilderConfig.toolsets).toEqual({ appimage: '1.0.3' })
+    // Why the AppImage keeps upstream's name: static-appimage-package-contract.cjs derives the
+    // target architecture from it, and dpkg/rpm ownership is not involved.
     expect(electronBuilderConfig.appImage.artifactName).toBe('orca-linux.${ext}')
-    expect(electronBuilderConfig.deb.artifactName).toBe('orca-ide_${version}_${arch}.${ext}')
+    expect(electronBuilderConfig.deb).toMatchObject({
+      packageName: 'orca-np',
+      artifactName: 'orca-np_${version}_${arch}.${ext}'
+    })
     expect(electronBuilderConfig.rpm).toMatchObject({
-      packageName: 'orca-ide',
-      artifactName: 'orca-ide-${version}.${arch}.${ext}'
+      packageName: 'orca-np',
+      artifactName: 'orca-np-${version}.${arch}.${ext}'
     })
   })
 
