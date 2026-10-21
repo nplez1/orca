@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   existsSync,
   lstatSync,
@@ -256,6 +256,44 @@ describe('PluginOverlayManager', () => {
 
     expect(second?.statusExtensionPath).toBe(statusPath)
     expect(statSync(statusPath).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
+  it('logs a failed relay Pi extension write instead of returning a bare null', () => {
+    // A directory where the file belongs: the read misses and the write is what fails.
+    mkdirSync(join(homeDir, '.pi', 'agent', 'extensions', 'orca-agent-status.ts'), {
+      recursive: true
+    })
+    manager.setSources({ piExtensionSource: '// pi extension' })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(manager.materializePi('tab-write-fail:0')).toBeNull()
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+        'failed to install pi extension'
+      )
+    } finally {
+      stderr.mockRestore()
+    }
+  })
+
+  it('logs a failed relay OMP fallback write with its reason', () => {
+    mkdirSync(
+      join(homeDir, '.orca-relay', 'omp-managed-status-extension', 'orca-agent-status.ts'),
+      { recursive: true }
+    )
+    manager.setSources({ ompExtensionSource: '// omp extension' })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(
+        manager.materializePi('tab-omp-write-fail:0', undefined, 'omp', {
+          materializeDefaultHome: false
+        })
+      ).toBeNull()
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+        'failed to write OMP managed status extension'
+      )
+    } finally {
+      stderr.mockRestore()
+    }
   })
 
   it("does not overwrite a user's same-named remote Pi extension file", () => {

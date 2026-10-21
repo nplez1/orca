@@ -327,7 +327,7 @@ export class PluginOverlayManager {
           `[plugin-overlay] failed to install ${kind} extension: ${error instanceof Error ? error.message : String(error)}\n`
         )
       })
-      // Why: a same-named file without Orca's marker is the user's own; leave it and report no status path.
+      // Why: no status path for a user-owned file, or for a write that already logged its reason.
       if (!isManagedPiExtensionInPlace(installed)) {
         return null
       }
