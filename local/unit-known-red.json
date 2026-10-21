@@ -28,7 +28,15 @@
     "unhandledErrorHeadlines": 2,
     "note": "`pnpm test` on this machine leaves 26 cases in 11 files per LOCAL-PATCHES np.37; the run above saw 29 in more files because the tree had moved on."
   },
-  "unhandledErrors": [],
+  "unhandledErrors": [
+    {
+      "headline": "Error: selector_not_found",
+      "class": "macos-path-semantics",
+      "owner": "unattributed",
+      "evidence": "raised by src/main/runtime/orca-runtime.test.ts (allowlisted in this file): \"does not coalesce concurrent same-id removals on different hosts\" returns the in-flight removal promise to the second caller without awaiting it, and that promise rejects with selector_not_found. Pre-existing at 1a64dbe2f6; the coalescing map is upstream code.",
+      "file": "src/main/runtime/orca-runtime.test.ts"
+    }
+  ],
   "entries": [
     {
       "file": "src/main/cli/packaged-cli-assets.test.ts",

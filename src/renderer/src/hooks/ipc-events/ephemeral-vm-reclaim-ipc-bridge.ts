@@ -108,7 +108,11 @@ export async function reconcileReclaimedEphemeralVmWorkspaces(
   }
   let runtimes: EphemeralVmRuntimeRecord[]
   try {
-    runtimes = await api.listRuntimes()
+    const answer = await api.listRuntimes()
+    // Why the guard: this runs on start from a fire-and-forget caller, so a stub or an older
+    // bridge answering anything but a list must read as "nothing to reconcile", not as an
+    // unhandled rejection in the middle of an unrelated test run.
+    runtimes = Array.isArray(answer) ? answer : []
   } catch {
     return
   }
