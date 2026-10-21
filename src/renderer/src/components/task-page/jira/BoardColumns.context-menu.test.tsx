@@ -5,6 +5,8 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../../shared/jira-types'
+import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
+import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
 import { TaskPageJiraBoardColumns } from './BoardColumns'
 
 const openUrl = vi.fn()
@@ -32,14 +34,30 @@ function issue(overrides: Partial<JiraIssue> = {}): JiraIssue {
 
 const noop = () => undefined
 
-function renderColumns(card = issue()) {
+const linkedWorkspace = makeWorktree({
+  id: 'wt-1',
+  repoId: 'repo',
+  displayName: 'app-1-fix-login',
+  linkedItems: [
+    {
+      provider: 'jira',
+      type: 'issue',
+      number: 0,
+      identifier: 'APP-1',
+      title: 'Fix login',
+      url: 'https://acme.atlassian.net/browse/APP-1'
+    }
+  ]
+})
+
+function renderColumns(card = issue(), linkedIndex = buildJiraIssueWorkspaceAttachmentIndex([])) {
   return render(
     <TooltipProvider>
       <TaskPageJiraBoardColumns
         columns={[{ column: { name: 'To Do', statusIds: ['1'] }, issues: [card] }]}
         otherIssues={[]}
         selectedIssue={null}
-        issueWorkspaceAttachmentIndex={new Map()}
+        issueWorkspaceAttachmentIndex={linkedIndex}
         sourceContext={null}
         draggingIssueKey={null}
         updatingIssueKeys={[]}
@@ -104,6 +122,14 @@ describe('Jira board card context menu', () => {
     await user.click(within(menu).getByRole('menuitem', { name: 'Start workspace' }))
     expect(onOpenOrStartWorkspace).toHaveBeenCalledWith(expect.objectContaining({ key: 'APP-1' }))
     expect(onOpenIssue).not.toHaveBeenCalled()
+  })
+
+  it('reads Show workspace when the card already has a workspace', async () => {
+    renderColumns(issue(), buildJiraIssueWorkspaceAttachmentIndex([linkedWorkspace]))
+    const user = userEvent.setup()
+    const menu = await openCardMenu(user)
+    expect(within(menu).getByRole('menuitem', { name: 'Show workspace' })).toBeInTheDocument()
+    expect(within(menu).queryByRole('menuitem', { name: 'Start workspace' })).toBeNull()
   })
 
   it('opens the card menu from the keyboard', async () => {

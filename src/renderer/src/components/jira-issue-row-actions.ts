@@ -14,8 +14,8 @@ export type JiraIssueRowAction = {
 
 export type JiraIssueRowWorkspaceAction = Pick<JiraIssueRowAction, 'label' | 'icon' | 'onSelect'>
 
-/** One descriptor list for every surface: the row menu renders it whole, the detail
- *  sheet renders the same copies, and the hover cluster reuses the same labels. */
+/** One descriptor list for every surface: the row and card menus render it, and the
+ *  detail sheet renders the same copies from `getJiraIssueWorkspaceActions`. */
 export function getJiraIssueRowActions(
   issue: JiraIssue,
   workspace: JiraIssueRowWorkspaceAction | null
@@ -30,7 +30,17 @@ export function getJiraIssueRowActions(
   return workspace ? [{ key: 'workspace', ...workspace }, ...shared] : shared
 }
 
-/** The row's first menu item: the same Show/Start rule the hover cluster follows. */
+/** The Show/Start wording and icon, shared by the row menu, the board cards and the
+ *  hover cluster so the conditional lives in one place. */
+export function jiraIssueWorkspaceActionLabel(linked: boolean): string {
+  return linked
+    ? translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')
+    : translate('auto.components.TaskPage.9497f2787c', 'Start workspace')
+}
+
+/** The row's first menu item. Show is only truthful when a handler can open the
+ *  attached workspace: an issue can be linked while only `onStartWorkspace` is wired,
+ *  and that handler starts a new one. */
 export function buildJiraIssueRowWorkspaceAction({
   issue,
   linked,
@@ -46,11 +56,10 @@ export function buildJiraIssueRowWorkspaceAction({
   if (!openOrStart) {
     return null
   }
+  const showAttached = linked && onOpenOrStartWorkspace !== undefined
   return {
-    label: linked
-      ? translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')
-      : translate('auto.components.TaskPage.9497f2787c', 'Start workspace'),
-    icon: linked ? FolderOpen : ArrowRight,
+    label: jiraIssueWorkspaceActionLabel(showAttached),
+    icon: showAttached ? FolderOpen : ArrowRight,
     onSelect: () => openOrStart(issue)
   }
 }

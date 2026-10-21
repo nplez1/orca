@@ -97,7 +97,6 @@ function JiraBoardCard({
         tabIndex={0}
         draggable={!updating}
         aria-current={selected ? 'true' : undefined}
-        aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
         data-current={selected ? 'true' : undefined}
         aria-disabled={updating ? 'true' : undefined}
         aria-grabbed={dragging}
@@ -111,22 +110,6 @@ function JiraBoardCard({
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             onOpenIssue(issue)
-            return
-          }
-          // Why synthesized: macOS has no Menu key and no Shift+F10 convention, so the
-          // context menu would otherwise be pointer-only. See the task row's own handler.
-          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-            event.preventDefault()
-            const rect = event.currentTarget.getBoundingClientRect()
-            event.currentTarget.dispatchEvent(
-              new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-                clientX: rect.left,
-                clientY: rect.top + rect.height / 2
-              })
-            )
           }
         }}
         className={cn(

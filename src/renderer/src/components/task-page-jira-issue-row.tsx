@@ -93,7 +93,6 @@ export function JiraIssueRow({
         role="button"
         tabIndex={0}
         aria-current={selected ? 'true' : undefined}
-        aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
         data-current={selected ? 'true' : undefined}
         onClick={() => onOpenIssue(issue)}
         onKeyDown={(event) => {
@@ -103,25 +102,6 @@ export function JiraIssueRow({
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             onOpenIssue(issue)
-            return
-          }
-          // Why: macOS has no Menu key and no Shift+F10 convention, so the browser emits
-          // nothing and the keyboard route has to be synthesized. Windows and Linux do get a
-          // native `contextmenu` for a focused element, and this is still safe there:
-          // cancelling the key press suppresses Chromium's key-down event, and the Menu key's
-          // key-up one lands on the already-open menu rather than on the row.
-          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-            event.preventDefault()
-            const rect = event.currentTarget.getBoundingClientRect()
-            event.currentTarget.dispatchEvent(
-              new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-                clientX: rect.left,
-                clientY: rect.top + rect.height / 2
-              })
-            )
           }
         }}
         className={cn(

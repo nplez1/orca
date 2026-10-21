@@ -13,8 +13,8 @@ import { getJiraIssueRowActions, type JiraIssueRowWorkspaceAction } from './jira
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
 import { JiraPromptTemplatePopover } from './JiraPromptTemplatePopover'
 
-/** The Jira task row and board card share one surface: right-click (or the platform
- *  context-menu key) opens every action the detail sheet declares, in one list. */
+/** The Jira task row and both board cards share one surface: right-click (or the
+ *  platform context-menu key) opens every action the detail sheet declares, in one list. */
 export function JiraIssueRowContextMenu({
   issue,
   workspaceAction,
@@ -34,13 +34,43 @@ export function JiraIssueRowContextMenu({
     <Popover open={templateOpen} onOpenChange={setTemplateOpen}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <PopoverAnchor asChild ref={setAnchor}>
+          <PopoverAnchor
+            asChild
+            ref={setAnchor}
+            aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
+            // Why here and not in each card: macOS has no Menu key and no Shift+F10
+            // convention, so the browser emits nothing and the keyboard route has to be
+            // synthesized. Windows and Linux do get a native `contextmenu` for a focused
+            // element, and this is still safe there: cancelling the key press suppresses
+            // Chromium's key-down event, and the Menu key's key-up one lands on the
+            // already-open menu rather than on the card.
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) {
+                return
+              }
+              if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) {
+                return
+              }
+              event.preventDefault()
+              const rect = event.currentTarget.getBoundingClientRect()
+              event.currentTarget.dispatchEvent(
+                new MouseEvent('contextmenu', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                  clientX: rect.left,
+                  clientY: rect.top + rect.height / 2
+                })
+              )
+            }}
+          >
             {children}
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent
-          // Why: the menu is portalled outside the triggering row, but a portal still
-          // bubbles React events to the row, so a menu click would otherwise activate it.
+          // Why: the portalled menu is a React sibling of the trigger, so its clicks
+          // bubble to the trigger's ancestors — never to the card itself, but a
+          // surrounding click-to-focus or close-on-click handler would still see them.
           onClick={(event) => event.stopPropagation()}
           onCloseAutoFocus={(event) => {
             if (templateOpen) {

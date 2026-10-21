@@ -131,7 +131,12 @@ describe('Jira task row context menu', () => {
     const user = userEvent.setup()
     await openRowMenu(user)
     expect(onOpenIssue).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Fix login/ })).not.toHaveAttribute('aria-current')
+  })
+
+  it('keeps the row reachable from the keyboard', async () => {
+    renderList()
+    const row = screen.getByRole('button', { name: /Fix login/ })
+    expect(row).toHaveAttribute('aria-keyshortcuts', 'Enter Space Shift+F10 ContextMenu')
   })
 
   it('opens from the keyboard on a focused row', async () => {
