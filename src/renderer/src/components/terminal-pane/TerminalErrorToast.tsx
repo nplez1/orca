@@ -18,6 +18,7 @@ import {
   describeSshSignInRequiredTerminalError,
   isSshSignInRequiredTerminalError
 } from './terminal-ssh-sign-in-error'
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
 
 const SSH_PREFIX = 'SSH connection is not active'
 // Produced by pty-connection.ts reportError() when a PTY reattach can't reach its SSH host.
@@ -322,7 +323,7 @@ export function TerminalErrorToast({
                 'If this persists, please'
               )}{' '}
               <a
-                href="https://github.com/stablyai/orca/issues"
+                href={`${ORCA_REPOSITORY_URL}/issues`}
                 style={{ color: 'inherit', textDecoration: 'underline' }}
               >
                 {translate(

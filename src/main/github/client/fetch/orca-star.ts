@@ -1,5 +1,5 @@
 import { ghExecFileAsync, acquire, release } from '../../gh-utils'
-export const ORCA_REPO = 'stablyai/orca'
+import { ORCA_REPOSITORY } from '../../../../shared/orca-repository'
 
 /**
  * Deadline for the two star-nag gh calls.
@@ -38,7 +38,7 @@ async function runOrcaStarredCheck(): Promise<boolean | null> {
   await acquire()
   try {
     const { stdout, stderr } = await ghExecFileAsync(
-      ['api', '--include', `user/starred/${ORCA_REPO}`],
+      ['api', '--include', `user/starred/${ORCA_REPOSITORY}`],
       { encoding: 'utf-8', timeout: STAR_GH_TIMEOUT_MS }
     )
     const response = `${stdout ?? ''}\n${stderr ?? ''}`
@@ -65,7 +65,7 @@ async function runOrcaStarredCheck(): Promise<boolean | null> {
 export async function starOrca(): Promise<boolean> {
   await acquire()
   try {
-    await ghExecFileAsync(['api', '-X', 'PUT', `user/starred/${ORCA_REPO}`], {
+    await ghExecFileAsync(['api', '-X', 'PUT', `user/starred/${ORCA_REPOSITORY}`], {
       encoding: 'utf-8',
       timeout: STAR_GH_TIMEOUT_MS
     })

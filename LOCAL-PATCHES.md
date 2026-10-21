@@ -43,6 +43,37 @@ Tests that pin the re-pointed URLs and the single-stream mapping: `src/main/upda
 `src/main/updater.check-preflight.test.ts`, and `src/main/updater.prerelease-fallback.test.ts`. They
 assert this fork's repo path, so a sync that restores upstream's expectations turns them red again.
 
+**The project's own links follow the same constant.** `src/shared/orca-repository.ts` derives
+`ORCA_REPOSITORY` / `ORCA_REPOSITORY_URL`, plus the scheme-less `ORCA_REPOSITORY_DISPLAY_URL` that
+share text prints, from `MAIN_RELEASE_REPO`. Every desktop link that names this project reads it:
+
+- `src/main/github/client/fetch/orca-star.ts` — the `gh api user/starred/...` check and the `PUT`;
+- the star surfaces — `StarNagCard.tsx`, `star-nag/StarNagToastHost.tsx`,
+  `settings/GeneralSupportSection.tsx`, `Landing.tsx`;
+- the report and share surfaces — `sidebar/SidebarFeedbackDialog.tsx` (GitHub issues),
+  `terminal-pane/TerminalErrorToast.tsx` (file an issue), `github-project/ProjectViewStates.tsx`
+  (feature request), `sidebar/SidebarSettingsHelpMenu.tsx` (Help → GitHub), and
+  `stats/ShareUsageButton.tsx` with `stats/share-card-utils.tsx` (shared text and card footer).
+
+Each of those carried upstream's repository as its own literal, so this fork's users starred a
+project this build does not come from and filed its bugs against it. A sync that restores one of
+those literals re-points the link at upstream; `src/shared/orca-repository.test.ts` requires each of
+those files to import the constant, fails on a repository named in any of them — a `github.com/...`
+URL or a bare `owner/orca` slug, which is the shape the `gh` call used — and fails on the identity
+module spelling the repo out instead of deriving it. The share card's repo line is built from the
+constant rather than translated, which leaves `auto.components.stats.share.card.utils.19f4b4dc75`
+unreferenced in the six catalogs and in `config/scripts/locale-ko-key-overrides.json`.
+`verify:localization-extraction` reports that without failing, the same way it reports the brand-name
+keys, but `verify:localization-catalogs` is stricter: an entry with no call site at all cannot be
+rebuilt from a default, so it must be listed in `src/renderer/src/i18n/en-runtime-required.json` —
+that one-line addition is part of this patch, and a sync that drops it fails the lint chain.
+
+Not covered, deliberately: `mobile/` still names upstream (`settings/about-screen.tsx`,
+`settings-menu-screen.tsx`, `ProtocolBlockScreen.tsx`, `app-update/github-release-update-source.ts`).
+Whether Orca NP publishes its own mobile app is a product decision; `config/scripts/check-upstream-identity-literals.mjs`
+records the APK update-source half as reported-not-policed, and the About, Settings and protocol-block
+links are not checked at all.
+
 ### `local(updater)`: probe every newer release, not a fixed window
 
 Upstream's resolver probes only the six newest candidates at or above the installed version

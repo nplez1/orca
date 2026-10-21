@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StarNagToastHost } from './StarNagToastHost'
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
 
 type ShowPayload = { mode?: 'gh' | 'web'; surface?: 'card' | 'toast' }
 type ShowCallback = (payload?: ShowPayload) => void
@@ -159,7 +160,7 @@ describe('StarNagToastHost', () => {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(shell.openUrl).toHaveBeenCalledWith('https://github.com/stablyai/orca')
+    expect(shell.openUrl).toHaveBeenCalledWith(ORCA_REPOSITORY_URL)
     expect(starNag.openWeb).toHaveBeenCalledTimes(1)
     expect(starNag.starOrca).not.toHaveBeenCalled()
     expect(toastContainer.textContent).toContain('GitHub opened')

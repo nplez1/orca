@@ -27,6 +27,7 @@ vi.mock('./github-api-repository', async (importOriginal) =>
 
 import { __resetOrcaStarCheckForTests, checkOrcaStarred, starOrca } from './client/fetch/orca-star'
 import { resetOriginRepositoryCache } from './client-test-harness'
+import { ORCA_REPOSITORY } from '../../shared/orca-repository'
 
 const { execFileAsyncMock, ghExecFileAsyncMock, acquireMock, releaseMock } = clientMocks
 
@@ -54,7 +55,9 @@ describe('checkOrcaStarred', () => {
     await expect(checkOrcaStarred()).resolves.toBe(true)
 
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
-      ['api', '--include', 'user/starred/stablyai/orca'],
+      // Why the constant and not a literal: this build's repository is whatever the release feed
+      // publishes from, so a star path pointed back at upstream fails here.
+      ['api', '--include', `user/starred/${ORCA_REPOSITORY}`],
       expect.objectContaining({ encoding: 'utf-8' })
     )
   })
@@ -156,7 +159,7 @@ describe('starOrca', () => {
 
     expect(execFileAsyncMock).not.toHaveBeenCalled()
     const [args, options] = ghExecFileAsyncMock.mock.calls[0]
-    expect(args).toEqual(['api', '-X', 'PUT', 'user/starred/stablyai/orca'])
+    expect(args).toEqual(['api', '-X', 'PUT', `user/starred/${ORCA_REPOSITORY}`])
     expect(options.timeout).toBeGreaterThan(0)
     expect(releaseMock).toHaveBeenCalledTimes(1)
   })
