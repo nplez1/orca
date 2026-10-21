@@ -1,4 +1,4 @@
-import { createAiVaultScopeCwdMatcher } from './ai-vault-scope-cwd-match'
+import { aiVaultSessionInScope, createAiVaultScopeCwdMatcher } from './ai-vault-scope-cwd-match'
 import type { AiVaultListArgs, AiVaultListResult } from './ai-vault-types'
 
 export const DEFAULT_AI_VAULT_SCAN_LIMIT = 1000
@@ -40,9 +40,14 @@ export function aiVaultSessionDepthCovers(
  * host only the scope's guarantee past its own default cap.
  */
 export function aiVaultAppliedScopePaths(
-  args?: Pick<AiVaultListArgs, 'scopePaths' | 'unlimited'>
+  args?: Pick<AiVaultListArgs, 'scopePaths' | 'unlimited'>,
+  /** The host's scan spelling (a symlinked scope contributes its real path too). */
+  resolvedScopePaths?: readonly string[]
 ): readonly string[] | undefined {
-  return args?.unlimited === true ? undefined : args?.scopePaths
+  if (args?.unlimited === true) {
+    return undefined
+  }
+  return args?.scopePaths ? (resolvedScopePaths ?? args.scopePaths) : undefined
 }
 
 // A deeper scan keeps every scoped row it found, so a scoped request reuses only a scan of its
@@ -69,7 +74,8 @@ export function truncateAiVaultListResult(
   const inScope = scopePaths.length > 0 ? createAiVaultScopeCwdMatcher(scopePaths) : null
   let outOfScopeCount = 0
   const sessions = result.sessions.filter(
-    (session) => inScope?.(session.cwd, session.filePath) === true || outOfScopeCount++ < depth
+    (session) =>
+      (inScope !== null && aiVaultSessionInScope(inScope, session)) || outOfScopeCount++ < depth
   )
   return {
     ...result,

@@ -42,6 +42,7 @@ export function useWorktreeJumpPaletteWorktrees({
   ptyIdsByTabId,
   browserTabsByWorktree,
   unifiedTabsByWorktree,
+  structuredChatSleptAtByPaneKey,
   activeWorktreeId,
   activeWorkspaceExecutionHostId,
   runtimeEnvironments,
@@ -83,7 +84,8 @@ export function useWorktreeJumpPaletteWorktrees({
   )
   const worktreeIdsWithStructuredChat = getStructuredChatWorktreeIds(
     showSleepingWorkspaces,
-    unifiedTabsByWorktree
+    unifiedTabsByWorktree,
+    structuredChatSleptAtByPaneKey
   )
   const kindFilteredWorktrees = useMemo(
     () =>

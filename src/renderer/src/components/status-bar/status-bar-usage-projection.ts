@@ -4,6 +4,7 @@ import type { StatusBarItem } from '../../../../shared/ui-chrome-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
+import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
 
 export type StatusBarUsageProjectionInputs = {
   rateLimits: RateLimitState
@@ -190,7 +191,10 @@ export function getStatusBarUsageProjection({
     showDeepSeek ? visibleDeepSeek : null,
     showFireworks ? visibleFireworks : null,
     showCopilot ? visibleCopilot : null
-  ].filter((p): p is ProviderRateLimits => p !== null)
+  ]
+    .filter((p): p is ProviderRateLimits => p !== null)
+    // Why: the bar collapses chips from the end, so placeholders give way first.
+    .sort((a, b) => Number(isOwnerNotSetUpPlaceholder(a)) - Number(isOwnerNotSetUpPlaceholder(b)))
 
   return {
     anyFetching,

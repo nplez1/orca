@@ -3,6 +3,7 @@ import { agentHookServer } from '../agent-hooks/server'
 import { setMigrationUnsupportedPtyListener } from '../agent-hooks/migration-unsupported-pty-state'
 import { stopSyntheticTitleSpinnerTimer } from './synthetic-title-runtime'
 import { mainProcessState as state } from './main-process-state'
+import { pickHostTurnEnd } from '../../shared/agent-status-types'
 
 export type MainWindowAgentStatusOptions = {
   window: BrowserWindow
@@ -21,6 +22,8 @@ export function installMainWindowAgentStatusListeners(options: MainWindowAgentSt
       evidenceObservedAt,
       stateStartedAt,
       turnStartedAt,
+      turnEndedAt,
+      turnEndDisposition,
       launchToken,
       providerSession,
       providerSessionOnly,
@@ -75,6 +78,7 @@ export function installMainWindowAgentStatusListeners(options: MainWindowAgentSt
         ...(evidenceObservedAt !== undefined ? { evidenceObservedAt } : {}),
         stateStartedAt,
         ...(turnStartedAt !== undefined ? { turnStartedAt } : {}),
+        ...pickHostTurnEnd({ turnEndedAt, turnEndDisposition }),
         ...(providerSession ? { providerSession } : {}),
         ...(promptInteractionKey ? { promptInteractionKey } : {}),
         ...(restoredUnconfirmed ? { restoredUnconfirmed: true } : {}),

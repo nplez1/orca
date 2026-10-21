@@ -10,6 +10,7 @@ import { isWslMoveFolderWorkspaceBlocked } from '../persistence/moving-wsl-proje
 import type { Store } from '../persistence'
 import type { RuntimeStore } from '../runtime/runtime-store-contract'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { resolveWorktreeMetaOwner } from '../persistence/host-qualified-worktree-meta'
 
 const ENABLE_FIRST_WORK_FOLDER_RENAME = false
 
@@ -18,6 +19,7 @@ export function firstWorkRenameDeps(
     RuntimeStore,
     | 'getSettings'
     | 'getRepo'
+    | 'getRepos'
     | 'getWorktreeMeta'
     | 'setWorktreeMeta'
     | 'getFolderWorkspace'
@@ -78,7 +80,11 @@ export function firstWorkRenameDeps(
         runtime.notifyFolderWorkspaceChanged()
         return
       }
-      store.setWorktreeMeta(worktreeId, {
+      const target = resolveWorktreeMetaOwner(store, worktreeId)
+      if (!target) {
+        return
+      }
+      store.setWorktreeMeta(target, {
         displayName,
         // The first-agent title is an intentional user-facing label; keep it stable after the
         // generated branch is renamed and across subsequent catalog refreshes.
@@ -96,7 +102,8 @@ export function firstWorkRenameDeps(
               const settings = store.getSettings()
               return { ...settings, worktreeLayoutMode: resolveWorktreeLayoutMode(settings) }
             },
-            migrateWorktreeIdentity: (oldId, newId) => store.migrateWorktreeIdentity!(oldId, newId),
+            migrateWorktreeIdentity: (target, newId) =>
+              store.migrateWorktreeIdentity!(target, newId),
             notifyWorktreeRenamed: (repoId, oldId, newId) =>
               runtime.notifyWorktreeFolderRenamed(repoId, oldId, newId),
             pathExists: async (candidate) => existsSync(candidate),
@@ -125,7 +132,11 @@ export function firstWorkRenameDeps(
       if ((current ?? null) === (error ?? null)) {
         return
       }
-      store.setWorktreeMeta(worktreeId, { firstAgentMessageRenameError: error })
+      const target = resolveWorktreeMetaOwner(store, worktreeId)
+      if (!target) {
+        return
+      }
+      store.setWorktreeMeta(target, { firstAgentMessageRenameError: error })
       // Why: the hook only knows the worktreeId, so derive the repoId notifyBranchRenamed expects.
       runtime.notifyBranchRenamed(getRepoIdFromWorktreeId(worktreeId))
     },

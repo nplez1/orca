@@ -23,11 +23,7 @@ import { parseAiVaultListResult } from './session-list-result-validation'
 import { aiVaultPartialListIssue, readAiVaultListPages } from '../../shared/ai-vault-list-pages'
 import { parseAiVaultSessionTitlesResult } from './session-title-result-validation'
 import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
-
-export type RuntimeAiVaultHostInfo = {
-  environmentId: string
-  executionHostId: `runtime:${string}`
-}
+import type { RuntimeAiVaultHostInfo } from '../ipc/ai-vault-runtime-scan'
 
 export type RuntimeAiVaultScanOptions = {
   /** One page's request bound. */
@@ -60,7 +56,10 @@ export function getSavedRuntimeAiVaultHostInfos(
     .filter((environment) => !isGatedOffWslHost(environment))
     .map((environment) => ({
       environmentId: environment.id,
-      executionHostId: toRuntimeExecutionHostId(environment.id)
+      executionHostId: toRuntimeExecutionHostId(environment.id),
+      ...(environment.connectionDependency
+        ? { connectionDependency: environment.connectionDependency }
+        : {})
     }))
 }
 

@@ -72,7 +72,8 @@ import {
   renderGeminiAccountsSection,
   renderOpenCodeAccountsSection
 } from './accounts-pane-provider-setting-sections'
-import { renderMiniMaxAccountsSection } from './accounts-pane-minimax-section'
+import { MiniMaxAccountsSection } from './MiniMaxAccountsSection'
+import { useUsageHostSettings } from './use-usage-host-settings'
 import { ManagedDataAccountsSection } from './ManagedDataAccountsSection'
 import { renderDeepSeekAccountsSection } from './accounts-pane-deepseek-section'
 import { renderFireworksAccountsSection } from './accounts-pane-fireworks-section'
@@ -244,6 +245,14 @@ export function AccountsPane({
     recordedOpenCodeSettingEditsRef.current.add(field)
     recordFeatureInteraction('usage-tracking')
   }
+  // Why: MiniMax/GLM keys are read by the selected host's own usage poller, so they live there too.
+  const usageCredentialHost = { owner: accountOwner, label: remoteServerLabel }
+  const usageHostSettings = useUsageHostSettings(
+    accountOwner,
+    remoteServerLabel,
+    settings,
+    updateSettings
+  )
 
   useEffect(() => {
     const owner: RuntimeClientTarget = scopeEnvironmentId
@@ -345,7 +354,6 @@ export function AccountsPane({
     runCodexAccountAction,
     recordOpenCodeSettingEdit,
     miniMaxRateLimits,
-    ...credentialSections.miniMax,
     ...credentialSections.deepSeek,
     ...credentialSections.fireworks,
     ...credentialSections.copilot
@@ -389,7 +397,16 @@ export function AccountsPane({
       ? gateUsageProvider('opencode-go', renderOpenCodeAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries())
-      ? gateUsageProvider('minimax', renderMiniMaxAccountsSection(model))
+      ? gateUsageProvider(
+          'minimax',
+          <MiniMaxAccountsSection
+            key={`minimax:${accountOwnerKey}`}
+            host={usageCredentialHost}
+            usageSettings={usageHostSettings}
+            miniMaxRateLimits={isRemoteAccountScope ? null : miniMaxRateLimits}
+            recordFeatureInteraction={recordFeatureInteraction}
+          />
+        )
       : null,
     matchesSettingsSearch(searchQuery, getAccountsDeepSeekSearchEntries())
       ? gateUsageProvider('deepseek', renderDeepSeekAccountsSection(model))
@@ -401,14 +418,17 @@ export function AccountsPane({
       ? gateUsageProvider('copilot', renderCopilotAccountsSection(model))
       : null,
     matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries())
-      ? gateUsageProvider('grok', <GrokAccountsSection />)
+      ? gateUsageProvider('grok', <GrokAccountsSection key="grok" />)
       : null,
     matchesSettingsSearch(searchQuery, getAccountsCursorSearchEntries())
-      ? gateUsageProvider('cursor', <CursorAccountsSection />)
+      ? gateUsageProvider('cursor', <CursorAccountsSection key="cursor" />)
       : null,
-    // Why no gate: zcode has no Settings switch, so it is never disableable.
     matchesSettingsSearch(searchQuery, getAccountsZcodePlanSearchEntries()) ? (
-      <ZcodePlanAccountsSection key="zcode" />
+      <ZcodePlanAccountsSection
+        key={`zcode:${accountOwnerKey}`}
+        host={usageCredentialHost}
+        usageSettings={usageHostSettings}
+      />
     ) : null
   ].filter(Boolean)
 

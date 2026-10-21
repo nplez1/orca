@@ -7,7 +7,7 @@ import { Label } from '../ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { cn } from '@/lib/utils'
-import { getFileTypeIcon } from '@/lib/file-type-icons'
+import { FileTypeIcon } from '@/components/FileTypeIcon'
 import { SearchableSetting } from './SearchableSetting'
 import {
   getWorktreeSymlinkPathFilterState,
@@ -194,7 +194,6 @@ export function WorktreeSymlinksSection({
                 ) : null}
                 {filtered.map((entry) => {
                   const alreadyAdded = paths.includes(entry.name)
-                  const FileIcon = getFileTypeIcon(entry.name)
                   return (
                     <CommandItem
                       key={entry.name}
@@ -206,7 +205,10 @@ export function WorktreeSymlinksSection({
                       {entry.isDirectory ? (
                         <Folder className="size-3.5 text-muted-foreground" />
                       ) : (
-                        <FileIcon className="size-3.5 text-muted-foreground" />
+                        <FileTypeIcon
+                          filePath={entry.name}
+                          className="size-3.5 text-muted-foreground"
+                        />
                       )}
                       <span className="truncate text-xs">{entry.name}</span>
                       {alreadyAdded ? (

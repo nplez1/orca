@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { captureWorkspaceSelection, restoreWorkspaceSelection } from '@/lib/active-workspace-host'
 import {
   clearWorktreeSleepIntent,
   hasWorktreeSleepIntent,
@@ -80,7 +81,9 @@ function describeChatStopFailure(): string {
 export async function runSleepWorktrees(
   worktreeIds: readonly string[]
 ): Promise<WorkspaceSleepResult[]> {
-  const { errors, results } = await sleepWorktreesReportingFailures(worktreeIds)
+  const { errors, results } = await sleepWorktreesReportingFailures(worktreeIds, {
+    markChatsAsleep: true
+  })
   if (errors.length > 0) {
     // Why: callers are fire-and-forget; surface actionable teardown failures after restoring retryable UI state.
     toast.error(
@@ -110,7 +113,9 @@ export type WorktreeSleepOutcome = {
 
 /** The sleep without the toast, for callers that report failures themselves. */
 export async function sleepWorktreesReportingFailures(
-  requestedWorktreeIds: readonly string[]
+  requestedWorktreeIds: readonly string[],
+  // Why: only the user's Sleep hides its chats; a project move pauses through this core too.
+  options: { markChatsAsleep?: boolean } = {}
 ): Promise<WorktreeSleepOutcome> {
   // Why unique: both copies of a twin share one id, and sleeping it sleeps the whole workspace.
   const worktreeIds = [...new Set(requestedWorktreeIds)]
@@ -125,6 +130,7 @@ export async function sleepWorktreesReportingFailures(
   } = useAppStore.getState()
   const sleptActiveWorktreeId =
     activeWorktreeId && worktreeIds.includes(activeWorktreeId) ? activeWorktreeId : null
+  const selectionBeforeSleep = captureWorkspaceSelection(useAppStore.getState())
   if (sleptActiveWorktreeId) {
     const restoreSidebarPosition = preserveSidebarWorktreePosition(sleptActiveWorktreeId)
     // Why: clearing the active workspace can unmount TerminalPanes before
@@ -148,7 +154,11 @@ export async function sleepWorktreesReportingFailures(
       await shutdownWorktreeTerminals(worktreeId, {
         keepIdentifiers: true,
         onAdmitted: () => {
-          chats = stopWorkspaceChats(useAppStore.getState(), worktreeId).catch((error: unknown) => {
+          chats = stopWorkspaceChats(
+            useAppStore.getState(),
+            worktreeId,
+            options.markChatsAsleep
+          ).catch((error: unknown) => {
             console.error('[sleep-worktree] native chat stop failed', { worktreeId, error })
             return { receipts: [], failed: true }
           })
@@ -205,8 +215,13 @@ export async function sleepWorktreesReportingFailures(
     for (const worktreeId of failedWorktreeIds) {
       clearWorktreeSleepIntent(worktreeId)
     }
-    if (sleptActiveWorktreeId && failedWorktreeIds.has(sleptActiveWorktreeId)) {
-      setActiveWorktree(sleptActiveWorktreeId)
+    // Why still empty: a workspace the user picked during the sleep is theirs to keep.
+    if (
+      sleptActiveWorktreeId &&
+      failedWorktreeIds.has(sleptActiveWorktreeId) &&
+      useAppStore.getState().activeWorktreeId === null
+    ) {
+      restoreWorkspaceSelection(useAppStore.getState(), selectionBeforeSleep)
     }
   }
   return {

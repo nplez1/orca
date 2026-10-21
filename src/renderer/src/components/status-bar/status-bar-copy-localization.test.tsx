@@ -34,6 +34,7 @@ vi.mock('../../store', () => {
   const state = (): Record<string, unknown> => ({
     ...storeState,
     settings: null,
+    repos: [],
     runtimeEnvironments: [],
     runtimeStatusByEnvironmentId: new Map(),
     setRuntimeEnvironmentStatus: vi.fn(),

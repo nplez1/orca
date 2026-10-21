@@ -37,6 +37,7 @@ import {
   mergeDraggedHostSectionOrder,
   orderHostSectionOptions
 } from '../../../../../../shared/sidebar-list/host-section-order'
+import type { ExecutionHostRegistryEntry } from '../../../../../../shared/execution-host-registry'
 import { buildSidebarHostOptions } from '../../sidebar-host-options'
 import { selectPendingWorktreeCreationKeys } from './pending-worktree-creation-keys'
 
@@ -286,8 +287,10 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     [sectionRows]
   )
 
+  const headerHostOptions: readonly ExecutionHostRegistryEntry[] = hostOptions
   return {
     occurrencePlan: rowPlan.occurrencePlan,
+    hostOptions: headerHostOptions,
     effectiveCollapsedGroups,
     rows,
     sectionRows,

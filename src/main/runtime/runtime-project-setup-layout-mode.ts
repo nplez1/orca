@@ -50,3 +50,14 @@ export function applyProjectSetupWorktreeLayoutMode(
   invalidateAuthorizedRootsCache()
   return true
 }
+
+/** Applies the host-level mode a setup payload carries, and drops it from the payload. */
+export function takeWorktreeLayoutMode<T extends { worktreeLayoutMode?: WorktreeLayoutMode }>(
+  deps: ProjectSetupLayoutModeDeps,
+  payload: T
+): Omit<T, 'worktreeLayoutMode'> {
+  applyProjectSetupWorktreeLayoutMode(deps, payload.worktreeLayoutMode)
+  const { worktreeLayoutMode: _mode, ...rest } = payload
+  void _mode
+  return rest
+}

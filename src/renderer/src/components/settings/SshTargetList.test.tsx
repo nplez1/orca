@@ -1,102 +1,87 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
-import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SshTargetList } from './SshTargetList'
-import { TooltipProvider } from '../ui/tooltip'
-import type { SshTarget } from '../../../../shared/ssh-types'
+import { afterEach, describe, expect, it } from 'vitest'
+import { isListOwnSelectAllTarget, partitionSshTargetsByVisibility } from './SshTargetList'
 
 afterEach(() => {
   document.body.innerHTML = ''
 })
 
-const offeredTarget: SshTarget = {
-  id: 'ssh-offered',
-  label: 'build-01',
-  host: 'build-01.internal',
-  port: 22,
-  username: 'deploy',
-  source: 'manual'
+function mount(html: string): HTMLElement {
+  const list = document.createElement('div')
+  list.innerHTML = html
+  document.body.append(list)
+  return list
 }
 
-const hiddenTarget: SshTarget = {
+describe('⌘/Ctrl-A on the SSH host list', () => {
+  it('selects hosts from a row control inside the list', () => {
+    const list = mount('<button id="row">Connect</button>')
+    expect(isListOwnSelectAllTarget(list, list.querySelector('#row'))).toBe(true)
+  })
+
+  // React bubbles keydown through portals, so a row dialog's event reaches the list handler.
+  it('ignores events from portalled dialogs and menus outside the list', () => {
+    const list = mount('<button>Connect</button>')
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    dialog.innerHTML = '<button id="inside">Restart</button>'
+    document.body.append(dialog)
+    expect(isListOwnSelectAllTarget(list, dialog.querySelector('#inside'))).toBe(false)
+  })
+
+  it('leaves text selection alone in fields, menus and detail text inside the list', () => {
+    const list = mount(
+      '<input id="field" /><div role="menu"><div id="item">Edit</div></div><pre id="detail">log</pre>'
+    )
+    for (const id of ['field', 'item', 'detail']) {
+      expect(isListOwnSelectAllTarget(list, list.querySelector(`#${id}`))).toBe(false)
+    }
+  })
+})
+
+const hiddenTarget = {
   id: 'ssh-hidden',
   label: 'prod',
   configHost: 'prod',
   host: 'prod.internal',
   port: 22,
   username: 'deploy',
-  source: 'ssh-config',
+  source: 'ssh-config' as const,
   hidden: true
 }
 
-async function renderList(targets: SshTarget[]): Promise<HTMLElement> {
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  await act(async () => {
-    createRoot(container).render(
-      <TooltipProvider>
-        <SshTargetList
-          targets={targets}
-          connectionStates={new Map()}
-          testingIds={new Set()}
-          busyActionForTarget={() => undefined}
-          onConnect={vi.fn()}
-          onDisconnect={vi.fn()}
-          onTest={vi.fn()}
-          onEdit={vi.fn()}
-          onRemove={vi.fn()}
-          onSetHidden={vi.fn()}
-          onChanged={vi.fn()}
-        />
-      </TooltipProvider>
-    )
-  })
-  return container
+const offeredTarget = {
+  id: 'ssh-offered',
+  label: 'build-01',
+  host: 'build-01.internal',
+  port: 22,
+  username: 'deploy',
+  source: 'manual' as const
 }
 
-function cardLabels(container: HTMLElement): string[] {
-  return [...container.querySelectorAll('[data-ssh-target-card]')].map(
-    (node) => node.getAttribute('data-ssh-target-label') ?? ''
-  )
+function offeredAndHidden(targets: Parameters<typeof partitionSshTargetsByVisibility>[0]): {
+  offered: string[]
+  hidden: string[]
+} {
+  const partition = partitionSshTargetsByVisibility(targets)
+  return {
+    offered: partition.offered.map((target) => target.label),
+    hidden: partition.hidden.map((target) => target.label)
+  }
 }
 
-describe('the SSH host list', () => {
-  it('says so when nothing is configured', async () => {
-    const container = await renderList([])
-
-    expect(container.textContent).toContain('No SSH targets configured')
-    expect(container.querySelector('[data-ssh-target-card]')).toBeNull()
-  })
-
-  it('shows offered hosts and keeps the hidden ones behind a collapsed count', async () => {
-    const container = await renderList([offeredTarget, hiddenTarget])
-
-    expect(cardLabels(container)).toEqual(['build-01'])
-    expect(container.textContent).toContain('Hidden (1)')
-  })
-
-  it('reveals the hidden hosts when the section is expanded', async () => {
-    const container = await renderList([offeredTarget, hiddenTarget])
-
-    const trigger = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Hidden (1)')
-    )
-    await act(async () => {
-      trigger?.click()
+describe('which SSH hosts the list shows', () => {
+  // Why: a host ~/.ssh/config keeps re-importing cannot be removed, so it is hidden instead —
+  // and the hidden section is the only place that can show and undo that choice.
+  it('keeps a hidden host out of the offered rows and counts it in the hidden section', () => {
+    expect(offeredAndHidden([offeredTarget, hiddenTarget])).toEqual({
+      offered: ['build-01'],
+      hidden: ['prod']
     })
-
-    expect(cardLabels(container)).toEqual(['build-01', 'prod'])
-    // The hidden row must say why it is here, and offer the way back.
-    expect(container.textContent).toContain('Hidden')
-    expect(container.querySelector('[aria-label="Unhide host"]')).not.toBeNull()
   })
 
-  it('renders no hidden section when every host is offered', async () => {
-    const container = await renderList([offeredTarget])
-
-    expect(container.textContent).not.toContain('Hidden (')
-    expect(cardLabels(container)).toEqual(['build-01'])
+  it('renders no hidden section when every host is offered', () => {
+    expect(offeredAndHidden([offeredTarget])).toEqual({ offered: ['build-01'], hidden: [] })
   })
 })

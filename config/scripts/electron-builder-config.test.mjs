@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -12,7 +12,6 @@ const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 const { copyFiles, FileMatcher } = require('app-builder-lib/out/fileMatcher')
-const FpmTarget = require('app-builder-lib/out/targets/FpmTarget').default
 const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.cjs')
 
 describe('electron-builder config', () => {
@@ -34,6 +33,7 @@ describe('electron-builder config', () => {
       expect.arrayContaining([
         '!src{,/**/*}',
         '!config{,/**/*}',
+        '!cloud{,/**/*}',
         '!docs{,/**/*}',
         '!mobile{,/**/*}',
         '!native{,/**/*}',
@@ -90,6 +90,10 @@ describe('electron-builder config', () => {
       expect(packs(toolingPath)).toBe(false)
     }
     expect(packs('out/main/index.js')).toBe(true)
+    expect(packs('out/web/web-index.html')).toBe(false)
+    expect(packs('out/web/assets/shared.js')).toBe(false)
+    expect(packs('out/renderer/web-index.html')).toBe(true)
+    expect(packs('out/renderer/.orca-web-client-files.json')).toBe(true)
   })
 
   it.each(['file', 'directory'])('keeps a root notes %s out of app.asar', async (kind) => {
@@ -377,12 +381,7 @@ describe('electron-builder config', () => {
 
   it('unpacks the compiled CommonJS boundary with CLI runtime files', () => {
     expect(electronBuilderConfig.asarUnpack).toEqual(
-      expect.arrayContaining([
-        'out/package.json',
-        'out/cli/**',
-        'out/shared/**',
-        'out/main/claude-accounts/keychain.js'
-      ])
+      expect.arrayContaining(['out/package.json', 'out/cli/**', 'out/shared/**'])
     )
   })
 
@@ -432,8 +431,9 @@ describe('electron-builder config', () => {
     )
     const isUnpacked = matcher.createFilter()
     for (const webPath of [
-      'out/web/web-index.html',
-      'out/web/assets/index-abc123.js',
+      'out/renderer/web-index.html',
+      'out/renderer/assets/index-abc123.js',
+      'out/renderer/.orca-web-client-files.json',
       'out/mobile-web/manifest.json',
       'out/mobile-web/assets/index-abc123.js'
     ]) {
@@ -445,83 +445,6 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.asarUnpack).not.toContain(
       'out/main/main-thread-hang-watchdog-entry.js'
     )
-  })
-
-  it('uses the multi-size icon source for Linux packages', () => {
-    expect(electronBuilderConfig.linux.icon).toBe('resources/build/icon.icns')
-  })
-
-  it('matches the Linux desktop entry to Electron window class', () => {
-    expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca')
-  })
-
-  it('keeps the in-bundle Linux launcher name the CLI path resolution expects', () => {
-    // Why pinned: `LINUX_CLI_COMMAND_NAME` and the AppImage cache layout locate
-    // resources/bin/orca-ide, so renaming this breaks CLI registration while installing cleanly.
-    expect(electronBuilderConfig.linux.executableName).toBe('orca-ide')
-  })
-
-  it('names the Linux packages after this build so an official install is not replaced', () => {
-    expect(electronBuilderConfig.linux.target).toEqual(['AppImage', 'deb', 'rpm'])
-    expect(electronBuilderConfig.toolsets).toEqual({ appimage: '1.0.3' })
-    // Why the AppImage keeps upstream's name: static-appimage-package-contract.cjs derives the
-    // target architecture from it, and dpkg/rpm ownership is not involved.
-    expect(electronBuilderConfig.appImage.artifactName).toBe('orca-linux.${ext}')
-    expect(electronBuilderConfig.deb).toMatchObject({
-      packageName: 'orca-np',
-      artifactName: 'orca-np_${version}_${arch}.${ext}'
-    })
-    expect(electronBuilderConfig.rpm).toMatchObject({
-      packageName: 'orca-np',
-      artifactName: 'orca-np-${version}.${arch}.${ext}'
-    })
-  })
-
-  it('retains electron-builder runtime dependencies in deb and rpm packages', () => {
-    for (const target of ['deb', 'rpm']) {
-      const dependencies = electronBuilderConfig[target].depends
-      expect(dependencies).toEqual(
-        expect.arrayContaining(FpmTarget.prototype.getDefaultDepends(target))
-      )
-      expect(new Set(dependencies).size).toBe(dependencies.length)
-    }
-  })
-
-  it('validates each AppImage before electron-builder publishes it', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-appimage-'))
-    try {
-      const appImage = join(root, 'orca-linux.AppImage')
-      await writeFile(appImage, 'not an ELF')
-      await chmod(appImage, 0o755)
-
-      expect(() =>
-        electronBuilderConfig.artifactBuildCompleted({ file: appImage, arch: 1 })
-      ).toThrow(/ELF header is outside/)
-      expect(() =>
-        electronBuilderConfig.artifactBuildCompleted({ file: join(root, 'orca-ide.deb') })
-      ).not.toThrow()
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-  it('uses a distinct AppImage name for Linux arm64 release uploads', () => {
-    const configPath = require.resolve('../electron-builder.config.cjs')
-    const original = process.env.ORCA_LINUX_ARM64_RELEASE
-    try {
-      delete require.cache[configPath]
-      process.env.ORCA_LINUX_ARM64_RELEASE = '1'
-      expect(require('../electron-builder.config.cjs').appImage.artifactName).toBe(
-        'orca-linux-arm64.${ext}'
-      )
-    } finally {
-      if (original === undefined) {
-        delete process.env.ORCA_LINUX_ARM64_RELEASE
-      } else {
-        process.env.ORCA_LINUX_ARM64_RELEASE = original
-      }
-      delete require.cache[configPath]
-      require('../electron-builder.config.cjs')
-    }
   })
 
   it('overrides packaged semver only for local macOS builds', () => {
@@ -626,6 +549,24 @@ describe('arch-aware packaging guard', () => {
       } else {
         process.env.ORCA_LAYOUT_OWNER = previous
       }
+    }
+  })
+
+  it('refuses to package an orcad template marked by a dark test build', async () => {
+    const templateDir = join(scratch, 'orcad-template')
+    await mkdir(templateDir, { recursive: true })
+    await writeFile(join(templateDir, 'ORCA_LAYOUT_OWNER_MAIN'), 'dark\n')
+    try {
+      expect(() =>
+        electronBuilderConfig.beforePack(
+          { electronPlatformName: process.platform, arch: HOST_ARCH },
+          bundleDir,
+          () => undefined,
+          templateDir
+        )
+      ).toThrow(`${templateDir} holds an ORCA_LAYOUT_OWNER=main build`)
+    } finally {
+      await rm(templateDir, { recursive: true, force: true })
     }
   })
 

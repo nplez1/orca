@@ -17,6 +17,10 @@ export type GitHubRepoLookupIndex = {
   findByIdOnHost: (repoId: string, hostId: string) => Repo | undefined
 }
 
+function idAndPathKey(repoId: string, repoPath: string): string {
+  return `${repoId}\u0000${repoPath}`
+}
+
 // Why: repo identity/path updates replace this array, while weak ownership avoids retaining superseded snapshots.
 const lookupByRepos = new WeakMap<readonly Repo[], GitHubRepoLookupIndex>()
 const EMPTY_REPOS: readonly Repo[] = []
@@ -34,6 +38,7 @@ export function getGitHubRepoLookupIndex(
   const byPath = new Map<string, IndexedRepo>()
   const byHostId = new Map<string, IndexedRepo>()
   const byHostPath = new Map<string, IndexedRepo>()
+  const byIdAndPath = new Map<string, IndexedRepo>()
   let indexedCount = 0
 
   const scanUntil = (matches: (repoId: string, repoPath: string) => boolean): Repo | undefined => {
@@ -55,6 +60,10 @@ export function getGitHubRepoLookupIndex(
       }
       if (!byPath.has(repoPath)) {
         byPath.set(repoPath, { index, repo })
+      }
+      const idAndPath = idAndPathKey(repoId, repoPath)
+      if (!byIdAndPath.has(idAndPath)) {
+        byIdAndPath.set(idAndPath, { index, repo })
       }
       if (matches(repoId, repoPath)) {
         return repo
@@ -81,6 +90,13 @@ export function getGitHubRepoLookupIndex(
     findByIdOrPath: (repoId, repoPath) => {
       if (!repoId) {
         return lookup.findByPath(repoPath)
+      }
+      // Why: a twin (one id on two hosts) has a row per host; the request path names which one.
+      const exactMatch =
+        byIdAndPath.get(idAndPathKey(repoId, repoPath))?.repo ??
+        scanUntil((id, path) => id === repoId && path === repoPath)
+      if (exactMatch) {
+        return exactMatch
       }
       const idMatch = byId.get(repoId)
       const pathMatch = byPath.get(repoPath)

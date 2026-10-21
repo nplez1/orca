@@ -6,6 +6,7 @@ import type { WindowsTerminalCapabilities } from '@/lib/windows-terminal-capabil
 import { useAppStore } from '../../store'
 import type { TabAgentLaunchOption } from './tab-agent-launch-options'
 import { useTabAgentMenuLaunch } from './QuickLaunchButton'
+import { requestNativeChatComposerFocus } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 import { useNewTabAgentMenuRows, type NewTabAgentMenuModel } from './use-new-tab-agent-menu-rows'
 import type { AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import { buildTabAgentLaunchOptionsFromRows } from './tab-agent-launch-options'
@@ -36,7 +37,7 @@ export type TabBarCreateMenuController = {
   clearPendingNewTabMenuFocusOnUnmount: (node: HTMLDivElement | null) => void
   queueNewActiveTerminalFocusAfterNewTabMenuClose: () => void
   queueTerminalTabFocusAfterNewTabMenuClose: (tabId: string) => void
-  queueFocusAfterNewTabMenuClose: (focus: () => void) => void
+  queueFocusAfterNewTabMenuClose: (focus: () => void, synchronous?: true) => void
   showStaticCreateMenuItems: boolean
 }
 export function useTabBarCreateMenuController({
@@ -186,7 +187,9 @@ export function useTabBarCreateMenuController({
     groupId: resolvedGroupId,
     launchSource: 'tab_bar_quick_launch',
     onFocusTerminal: queueTerminalTabFocusAfterNewTabMenuClose,
-    onFocusHostTerminal: queueNewActiveTerminalFocusAfterNewTabMenuClose
+    onFocusHostTerminal: queueNewActiveTerminalFocusAfterNewTabMenuClose,
+    onFocusChat: (tabId) =>
+      queueFocusAfterNewTabMenuClose(() => requestNativeChatComposerFocus(tabId), true)
   })
   const launchAgentFromNewTabEntry = (option: TabAgentLaunchOption): void => {
     if (option.row) {

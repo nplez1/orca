@@ -16,10 +16,9 @@ import type {
   RemoteRuntimeSharedConnectionDiagnostics,
   RemoteRuntimeSharedSubscription
 } from '../../../shared/remote-runtime-shared-control-types'
-import { isRuntimeEnvironmentCapabilityPaused } from './runtime-environment-capability-evidence'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
-import { publishRuntimeEnvironmentDiagnostics } from './runtime-environment-diagnostics-broadcast'
-import { getHostSettingsReplicationSync } from '../../host-sync/host-settings-replication-driver'
+import { publishConnectionDiagnostics } from './runtime-environment-connection-observation'
+import { sharedControlEnvironmentPolicy } from './runtime-environment-shared-control-policy'
 import {
   clearSharedControlAnswerSource,
   setSharedControlAnswerSource
@@ -43,6 +42,17 @@ type CachedSharedControlConnection = {
 const requestConnections = new Map<string, CachedRuntimeConnection>()
 const sharedControlConnections = new Map<string, CachedSharedControlConnection>()
 const statusOwners = new Map<string, { key: string; owner: RuntimeHostStatusOwner }>()
+
+/** Consult owned authenticated transports without acquiring another host channel. */
+export function isRemoteRuntimeConnectionReady(
+  environmentId: string,
+  pairedConnection: PairedRuntimeConnection
+): boolean {
+  const pairingKey = getPairingKey(pairedConnection)
+  return [sharedControlConnections.get(environmentId), requestConnections.get(environmentId)].some(
+    (cached) => cached?.pairingKey === pairingKey && cached.connection.isReady()
+  )
+}
 
 export function getRuntimeEnvironmentStatusOwner(
   userDataPath: string,
@@ -273,8 +283,7 @@ function getSharedControlConnection(
       connection: new RemoteRuntimeSharedControlConnection(pairedConnection, {
         environmentId,
         clientCapabilities: ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES,
-        isManuallyDisconnected: () => isRuntimeEnvironmentManuallyDisconnected(environmentId),
-        isCapabilityPaused: () => isRuntimeEnvironmentCapabilityPaused(environmentId),
+        ...sharedControlEnvironmentPolicy(environmentId),
         // Why wall clock: it advances across a suspend, so a pre-sleep answer reads as stale.
         onAnswered: () => {
           answeredAt = Date.now()
@@ -283,19 +292,7 @@ function getSharedControlConnection(
           if (getRuntimeEnvironmentTransportGeneration(environmentId) !== transportGeneration) {
             return
           }
-          // Why here: this is the one place the main learns a paired host's connection state, and a
-          // `ready` state on a new transport generation is exactly "a new host just attached" — the
-          // moment its credentials have to arrive for its task pane to work.
-          getHostSettingsReplicationSync().observeConnection({
-            environmentId,
-            transportGeneration,
-            state: diagnostics.state
-          })
-          publishRuntimeEnvironmentDiagnostics({
-            environmentId,
-            transportGeneration,
-            diagnostics
-          })
+          publishConnectionDiagnostics({ environmentId, transportGeneration, diagnostics })
           statusOwners
             .get(environmentId)
             ?.owner.connectionChanged(

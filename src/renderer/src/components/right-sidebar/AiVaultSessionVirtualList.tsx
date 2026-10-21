@@ -72,6 +72,7 @@ export function AiVaultSessionVirtualList({
   onOpenCwd,
   onRequestDelete,
   searchHits,
+  searchHitHostLabels,
   keyboardRef,
   query = '',
   resumeHere
@@ -112,6 +113,8 @@ export function AiVaultSessionVirtualList({
   onOpenCwd: (session: AiVaultSession) => void
   onRequestDelete: (session: AiVaultSession) => void
   searchHits?: ReadonlyMap<string, AiVaultSearchHit>
+  /** Set only when search hits span several hosts. */
+  searchHitHostLabels?: ReadonlyMap<string, string> | null
   /** Present only where rows are keyboard-selectable. */
   keyboardRef?: Ref<AiVaultSessionListKeyboard>
   /** The search text; editing it moves the keyboard selection back to the top match. */
@@ -307,6 +310,7 @@ export function AiVaultSessionVirtualList({
                 expandedSessionIds={expandedSessionIds}
                 vaultScope={vaultScope}
                 searchHits={searchHits}
+                searchHitHostLabels={searchHitHostLabels}
                 buildResumeStartup={buildResumeStartup}
                 getOriginalPaneTarget={getOriginalPaneTarget}
                 isStructuredSessionOpen={isStructuredSessionOpen}

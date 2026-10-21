@@ -13,6 +13,8 @@ import { aiVaultAppliedScopePaths } from '../../shared/ai-vault-session-depth'
 export type RuntimeAiVaultHostInfo = {
   environmentId: string
   executionHostId: `runtime:${string}`
+  /** The saved environment's own record of how it is reached; picks the all-hosts scan budget. */
+  connectionDependency?: 'ssh-tunnel'
 }
 
 export type RuntimeAiVaultScanOptions = {

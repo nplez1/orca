@@ -106,6 +106,10 @@ export const WORKSPACE_SESSION_FIELD_DISPOSITION = {
     onRepoRemoval: 'notRepoScoped',
     onTransfer: 'notTransferred'
   },
+  pairedTerminalTabCloseIntentsByEnvironment: {
+    onRepoRemoval: 'notRepoScoped',
+    onTransfer: 'notTransferred'
+  },
   activeTabTypeByWorktree: { onRepoRemoval: 'prunedByOwnerKey', onTransfer: 'copiedByOwnerKey' },
   browserUrlHistory: { onRepoRemoval: 'notRepoScoped', onTransfer: 'notTransferred' },
   workspaceDocHistory: { onRepoRemoval: 'notRepoScoped', onTransfer: 'notTransferred' },
@@ -204,6 +208,8 @@ export const WORKSPACE_SESSION_HOST_SYNC_DISPOSITION = {
   activeBrowserTabIdByWorktree: 'hostLocal',
   clientHostedBrowserPagesByWorktree: 'hostLocal',
   clientHostedBrowserCloseIntentsByEnvironment: 'hostLocal',
+  // Why host-local for the same reason: this client's record of the closes it still owes.
+  pairedTerminalTabCloseIntentsByEnvironment: 'hostLocal',
   activeTabTypeByWorktree: 'hostLocal',
   browserUrlHistory: 'replicatedOnlyIfEmpty',
   // Why host-local despite its name: the value stores a worktree id and an absolute file path, so it

@@ -11,8 +11,10 @@ import type {
   ProjectHostSetupUpdateResult
 } from '../../shared/project-types'
 import { getSshTargetIdForExecutionHost, type ExecutionHostId } from '../../shared/execution-host'
-import { WORKTREE_LAYOUT_MODES, type WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
+
 import type { RepoKind } from '../../shared/repo-types'
+import type { RuntimeStatus } from '../../shared/runtime-types'
+import { PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY } from '../../shared/worktree-runtime-capabilities'
 import type { CommandHandler, HandlerContext } from '../dispatch'
 import {
   formatProjectHostSetupCreateResult,
@@ -29,6 +31,7 @@ import {
   resolveHostFlagTarget
 } from '../execution-host-flag'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../flags'
+import { getOptionalWorktreeLayoutMode } from '../project-worktree-layout-flag'
 import { findProjectSetups, resolveProjectIdSelector } from '../project-selector'
 import { resolveRepoPathArgument } from '../repo-path-arguments'
 import { RuntimeClientError, type RuntimeRpcSuccess } from '../runtime-client'
@@ -93,6 +96,26 @@ async function getRequiredHostId(
   return resolved.id
 }
 
+// Why: a project on two hosts has two setups with the same id; `--host` picks one. An older
+// host strips the field and acts on the first twin, so refuse rather than let it guess.
+async function getOptionalSetupHostId(
+  flags: Map<string, string | boolean>,
+  client: HandlerContext['client']
+): Promise<ExecutionHostId | undefined> {
+  if (!flags.has('host')) {
+    return undefined
+  }
+  const status = await client.call<RuntimeStatus>('status.get')
+  if (!status.result.capabilities?.includes(PROJECT_HOST_SETUP_HOST_TARGET_RUNTIME_CAPABILITY)) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca server cannot pick a project setup by host yet. Update Orca on the server and try again.'
+    )
+  }
+  // Unresolved, like the setup paths: a removed SSH target's stale setup must stay deletable.
+  return await getRequiredHostId(flags, client)
+}
+
 function getOptionalRepoKind(flags: Map<string, string | boolean>): RepoKind | undefined {
   const kind = getOptionalStringFlag(flags, 'kind')
   if (kind === undefined) {
@@ -102,27 +125,6 @@ function getOptionalRepoKind(flags: Map<string, string | boolean>): RepoKind | u
     return kind
   }
   throw new RuntimeClientError('invalid_argument', '--kind must be git or folder')
-}
-
-function isWorktreeLayoutMode(value: string): value is WorktreeLayoutMode {
-  return WORKTREE_LAYOUT_MODES.some((mode) => mode === value)
-}
-
-/** Host-wide placement for new workspaces; see `applyWorktreeLayoutMode` on the runtime side. */
-function getOptionalWorktreeLayoutMode(
-  flags: Map<string, string | boolean>
-): WorktreeLayoutMode | undefined {
-  const mode = getOptionalStringFlag(flags, 'worktree-layout')
-  if (mode === undefined) {
-    return undefined
-  }
-  if (isWorktreeLayoutMode(mode)) {
-    return mode
-  }
-  throw new RuntimeClientError(
-    'invalid_argument',
-    `--worktree-layout must be one of ${WORKTREE_LAYOUT_MODES.join(', ')}`
-  )
 }
 
 export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
@@ -222,6 +224,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
     const path = getOptionalStringFlag(flags, 'path')
     const args: ProjectHostSetupUpdateArgs = {
       setupId: getRequiredStringFlag(flags, 'setup'),
+      hostId: await getOptionalSetupHostId(flags, client),
       updates: {
         displayName: getOptionalStringFlag(flags, 'display-name'),
         path:
@@ -249,6 +252,7 @@ export const PROJECT_HANDLERS: Record<string, CommandHandler> = {
       'projectHostSetup.delete',
       {
         setupId: getRequiredStringFlag(flags, 'setup'),
+        hostId: await getOptionalSetupHostId(flags, client),
         force: flags.get('force') === true
       }
     )

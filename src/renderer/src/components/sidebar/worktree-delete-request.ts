@@ -28,8 +28,6 @@ export type WorktreeDeleteWithToastOptions = {
   /** Opt-in `git push --delete` of the branch's upstream, from the delete dialog's checkbox. */
   deleteRemoteBranch?: boolean
   snapshotPruneBatchId?: string
-  // Batch deletion commits one focus handoff after all targets settle.
-  focusSuccessorOnDelete?: boolean
 }
 
 export function toWorktreeDeleteIdentities(

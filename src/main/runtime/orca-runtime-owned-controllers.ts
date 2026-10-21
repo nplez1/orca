@@ -48,7 +48,7 @@ export function installOrcaRuntimeOwnedControllers(
 
   runtime.projectGroups = new RuntimeProjectGroupController({
     getStore: () => runtime.store,
-    resolveRepo: (selector) => runtime.resolveRepoSelector(selector),
+    resolveRepo: (...args) => runtime.managedWorktreeQueries.resolveRepoForConnection(...args),
     notifyReposChanged: () => runtime.notifyReposChanged(),
     resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
     teardownFolderWorkspacePtys: (worktreeId, connectionId) =>

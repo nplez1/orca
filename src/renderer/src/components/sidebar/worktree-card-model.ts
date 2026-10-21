@@ -1,3 +1,4 @@
+import type { DraggedWorktreeCopies } from './worktree-list/drag/dragged-worktree-copies'
 import type React from 'react'
 
 import type { Repo } from '../../../../shared/repo-types'
@@ -51,7 +52,7 @@ export type WorktreeCardProps = {
   onCardDragStart?: (
     event: React.DragEvent<HTMLDivElement>,
     worktreeId: string,
-    draggedIds: readonly string[]
+    draggedCopies: DraggedWorktreeCopies
   ) => void
   onCardDragEnd?: (event: React.DragEvent<HTMLDivElement>) => void
   nativeDragEnabled?: boolean

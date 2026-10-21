@@ -213,6 +213,7 @@ async function gitExecFileAsyncBufferInSpan(
     preferWslDirectGit?: boolean
     admissionTier?: GitAdmissionTier
     signal?: AbortSignal
+    stdin?: string
   }
 ): Promise<{ stdout: Buffer }> {
   return withGitSpan({ args, cwd: options.cwd }, async (span) => {
@@ -252,6 +253,7 @@ async function gitExecFileAsyncBufferInSpan(
         cwd: resolved.cwd,
         encoding: 'buffer',
         signal: options.signal,
+        stdin: options.stdin,
         maxBuffer: options.maxBuffer,
         timeout: timeoutMs,
         env: untranslatedGitOutputEnv(options.env),

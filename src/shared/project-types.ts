@@ -6,6 +6,7 @@ import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { RepoSourceControlAiOverrides } from './source-control-ai-types'
 import type { WorktreeLayoutMode } from './orca-workspace-layout'
 import type { Repo, RepoKind } from './repo-types'
+import type { ProjectHostSetupTarget } from './project-host-setup-target'
 
 export type ProjectProviderIdentity = {
   provider: 'github'
@@ -102,8 +103,7 @@ export type ProjectHostSetupCloneArgs = {
   displayName?: string
 }
 
-export type ProjectHostSetupUpdateArgs = {
-  setupId: string
+export type ProjectHostSetupUpdateArgs = ProjectHostSetupTarget & {
   updates: Partial<
     Pick<
       ProjectHostSetup,
@@ -121,8 +121,7 @@ export type ProjectHostSetupUpdateArgs = {
   }
 }
 
-export type ProjectHostSetupDeleteArgs = {
-  setupId: string
+export type ProjectHostSetupDeleteArgs = ProjectHostSetupTarget & {
   /** `false` refuses while the project has live terminals or workspace metadata; absent skips the check. */
   force?: boolean
 }

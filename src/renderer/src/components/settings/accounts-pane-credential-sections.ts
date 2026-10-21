@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
-import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
 import type {
   CopilotCredentialSectionModel,
   CopilotCredentialSource,
   DeepSeekCredentialSectionModel,
-  FireworksCredentialSectionModel,
-  MiniMaxCredentialSectionModel
+  FireworksCredentialSectionModel
 } from './accounts-pane-types'
 import { createCopilotCredentialActions } from './accounts-pane-copilot-actions'
 import { createDeepSeekCredentialActions } from './accounts-pane-deepseek-actions'
 import { createFireworksCredentialActions } from './accounts-pane-fireworks-actions'
-import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
 
 export type AccountsPaneCredentialSections = {
-  miniMax: MiniMaxCredentialSectionModel
   deepSeek: DeepSeekCredentialSectionModel
   fireworks: FireworksCredentialSectionModel
   copilot: CopilotCredentialSectionModel
@@ -29,69 +25,10 @@ type RecordFeatureInteraction = (featureId: FeatureInteractionId) => void
 export function useAccountsPaneCredentialSections(
   recordFeatureInteraction: RecordFeatureInteraction
 ): AccountsPaneCredentialSections {
-  const miniMax = useMiniMaxCredentials(recordFeatureInteraction)
   const deepSeek = useDeepSeekCredentials(recordFeatureInteraction)
   const fireworks = useFireworksCredentials(recordFeatureInteraction)
   const copilot = useCopilotCredentials(recordFeatureInteraction)
-  return { miniMax, deepSeek, fireworks, copilot }
-}
-
-function useMiniMaxCredentials(
-  recordFeatureInteraction: RecordFeatureInteraction
-): MiniMaxCredentialSectionModel {
-  const [miniMaxCookieDraft, setMiniMaxCookieDraft] = useState('')
-  const [miniMaxApiKeyDraft, setMiniMaxApiKeyDraft] = useState('')
-  const [miniMaxApiKeyConfigured, setMiniMaxApiKeyConfigured] = useState(false)
-  const [miniMaxApiKeyProtection, setMiniMaxApiKeyProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxConfigured, setMiniMaxConfigured] = useState(false)
-  const [miniMaxCookieProtection, setMiniMaxCookieProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxCredentialBusy, setMiniMaxCredentialBusy] = useState(false)
-  const { saveMiniMaxCookie, clearMiniMaxCookie, saveMiniMaxApiKey, clearMiniMaxApiKey } =
-    createMiniMaxCredentialActions({
-      miniMaxCookieDraft,
-      setMiniMaxCookieDraft,
-      miniMaxApiKeyDraft,
-      setMiniMaxApiKeyDraft,
-      setMiniMaxApiKeyConfigured,
-      setMiniMaxApiKeyProtection,
-      setMiniMaxConfigured,
-      setMiniMaxCookieProtection,
-      setMiniMaxCredentialBusy,
-      recordFeatureInteraction
-    })
-
-  useEffect(() => {
-    const refresh = async (): Promise<void> => {
-      try {
-        const status = await window.api.minimaxCredentials.getStatus()
-        setMiniMaxConfigured(status.cookieConfigured)
-        setMiniMaxApiKeyConfigured(status.apiKeyConfigured)
-        setMiniMaxCookieProtection(status.cookieProtection)
-        setMiniMaxApiKeyProtection(status.apiKeyProtection)
-      } catch (error) {
-        console.error('Failed to load MiniMax credential status:', error)
-      }
-    }
-    void refresh()
-  }, [])
-
-  return {
-    miniMaxApiKeyDraft,
-    setMiniMaxApiKeyDraft,
-    miniMaxApiKeyConfigured,
-    miniMaxApiKeyProtection,
-    saveMiniMaxApiKey,
-    clearMiniMaxApiKey,
-    miniMaxCookieDraft,
-    setMiniMaxCookieDraft,
-    miniMaxConfigured,
-    miniMaxCookieProtection,
-    miniMaxCredentialBusy,
-    saveMiniMaxCookie,
-    clearMiniMaxCookie
-  }
+  return { deepSeek, fireworks, copilot }
 }
 
 function useDeepSeekCredentials(

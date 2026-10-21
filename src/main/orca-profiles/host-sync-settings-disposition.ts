@@ -349,7 +349,11 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   nativeChatProviders: 'replicated',
   // Why hostLocal: a `…Migrated…` marker — copying it would suppress the host's own migration.
   sshRemoteCliControlExistingHostsMigrated: 'hostLocal',
-  claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal'
+  claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal',
+  // Why replicated, like `nativeChatPermissionMode`: a per-agent chat preference the user chose.
+  agentNativeChatPermissionModes: 'replicated',
+  // Why hostLocal, like `httpProxyUrl`: which mirror of nodejs.org this network can reach.
+  nodeDistMirrorUrl: 'hostLocal'
 } as const satisfies Record<keyof GlobalSettings, SettingsFieldHostSyncDisposition>
 
 /** Keys a host applies from the main, either always or only when it holds nothing. */

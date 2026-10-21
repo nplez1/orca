@@ -6,6 +6,7 @@
  */
 import { mkdir, rename, stat } from 'node:fs/promises'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-worktree-contracts'
@@ -160,7 +161,10 @@ export class RuntimeRepositoryRelocationController {
           if (!store.migrateWorktreeIdentity) {
             throw new Error('runtime_unavailable')
           }
-          store.migrateWorktreeIdentity(oldId, newId)
+          store.migrateWorktreeIdentity(
+            hostWorktreeTarget({ id: oldId, hostId: getRepoExecutionHostId(repo) }),
+            newId
+          )
         },
         notifyRepoRelocated: (repoId, oldId, newId) =>
           this.deps.notifyRepoRelocated(repoId, oldId, newId)

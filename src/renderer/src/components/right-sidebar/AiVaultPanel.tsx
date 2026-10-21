@@ -45,6 +45,7 @@ import {
   type AiVaultSessionListKeyboard
 } from './use-ai-vault-session-keyboard-navigation'
 import { useAiVaultPanelHandle, type AiVaultPanelProps } from './ai-vault-panel-handle'
+import { aiVaultSearchHitHostLabels } from './ai-vault-search-hit-hosts'
 
 export default function AiVaultPanel({
   ref,
@@ -221,6 +222,10 @@ export default function AiVaultPanel({
       hideEmptySessions,
       showSubagentSessions
     })
+  const searchHitHostLabels = useMemo(
+    () => (searching ? aiVaultSearchHitHostLabels(filteredSessions, hostScopeOptions) : null),
+    [filteredSessions, hostScopeOptions, searching]
+  )
 
   useAiVaultPanelHandle(ref, {
     query,
@@ -319,6 +324,7 @@ export default function AiVaultPanel({
           <AiVaultSessionVirtualList
             key={searching ? search.resetKey : 'history'}
             searchHits={searching ? searchHits : undefined}
+            searchHitHostLabels={searchHitHostLabels}
             groups={groups}
             collapsedGroups={collapsedGroups}
             childrenByParentId={childrenByParentId}

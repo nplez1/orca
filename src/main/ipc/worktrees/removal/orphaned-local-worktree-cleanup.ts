@@ -48,7 +48,7 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
   )
   runtime.clearOptimisticReconcileToken(args.worktreeId)
   removeWorktreeMetadataAndTransientState(
-    store,
+    { store, runtime },
     args.worktreeId,
     args.removalHostId,
     args.snapshotPruneBatchId

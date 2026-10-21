@@ -143,6 +143,7 @@ export default function MonacoEditor({
     contentRef,
     contentSyncModeRef,
     modelKey: modelUri,
+    fileId,
     onContentChange
   })
   const annotations = useMonacoMarkdownAnnotations({
