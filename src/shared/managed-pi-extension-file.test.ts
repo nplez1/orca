@@ -70,6 +70,22 @@ describe('writeManagedPiExtension', () => {
       expect(statSync(path).mtime.getTime()).toBe(FIXED_MTIME.getTime())
     })
   })
+
+  it('hands a write failure to the caller instead of swallowing it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-managed-pi-extension-'))
+    try {
+      const errors: unknown[] = []
+      // No parent directory, so the write fails while the read stays a harmless ENOENT.
+      const unreachable = join(dir, 'missing-dir', 'orca-agent-status.ts')
+
+      expect(
+        writeManagedPiExtension(unreachable, 'managed source', (error) => errors.push(error))
+      ).toBe('failed')
+      expect(errors).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('isManagedPiExtensionInPlace', () => {

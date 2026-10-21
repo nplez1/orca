@@ -22,8 +22,15 @@ export function isManagedPiExtensionInPlace(result: ManagedPiExtensionWrite): bo
  * Why: Pi-Bolt compiles the managed extensions and reports a rewritten file as
  * changed since it was compiled even when the bytes are identical, so a
  * byte-equal target must keep its mtime (issue #143).
+ *
+ * `onWriteError` exists because a swallowed write failure is otherwise
+ * indistinguishable from an owned file: the relay callers log it.
  */
-export function writeManagedPiExtension(path: string, source: string): ManagedPiExtensionWrite {
+export function writeManagedPiExtension(
+  path: string,
+  source: string,
+  onWriteError?: (error: unknown) => void
+): ManagedPiExtensionWrite {
   const existing = readManagedPiExtension(path)
   // A missing or unreadable target is Orca's to create, matching the marker check alone.
   if (existing !== null) {
@@ -38,7 +45,8 @@ export function writeManagedPiExtension(path: string, source: string): ManagedPi
   try {
     writeFileSync(path, source)
     return 'written'
-  } catch {
+  } catch (error) {
+    onWriteError?.(error)
     return 'failed'
   }
 }

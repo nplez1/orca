@@ -241,6 +241,23 @@ describe('PluginOverlayManager', () => {
     expect(statSync(file).mtime.getTime()).toBe(compiledAt.getTime())
   })
 
+  it('leaves the relay bare-shell OMP status copy untouched across launches', () => {
+    manager.setSources({ ompExtensionSource: '// omp extension' })
+    const first = manager.materializePi('tab-omp-bare-stable-1:0', undefined, 'omp', {
+      materializeDefaultHome: false
+    })
+    const statusPath = first!.statusExtensionPath!
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    utimesSync(statusPath, compiledAt, compiledAt)
+
+    const second = manager.materializePi('tab-omp-bare-stable-2:0', undefined, 'omp', {
+      materializeDefaultHome: false
+    })
+
+    expect(second?.statusExtensionPath).toBe(statusPath)
+    expect(statSync(statusPath).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
   it("does not overwrite a user's same-named remote Pi extension file", () => {
     const piAgentDir = join(homeDir, '.pi', 'agent')
     const extensionFile = join(piAgentDir, 'extensions', 'orca-agent-status.ts')

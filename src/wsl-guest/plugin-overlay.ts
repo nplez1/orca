@@ -322,8 +322,13 @@ export class PluginOverlayManager {
       const extensionsDir = join(sourceAgentDir, 'extensions')
       mkdirSync(extensionsDir, { recursive: true })
       const extensionPath = join(extensionsDir, PI_EXTENSION_FILE)
+      const installed = writeManagedPiExtension(extensionPath, extensionSource, (error) => {
+        process.stderr.write(
+          `[plugin-overlay] failed to install ${kind} extension: ${error instanceof Error ? error.message : String(error)}\n`
+        )
+      })
       // Why: a same-named file without Orca's marker is the user's own; leave it and report no status path.
-      if (!isManagedPiExtensionInPlace(writeManagedPiExtension(extensionPath, extensionSource))) {
+      if (!isManagedPiExtensionInPlace(installed)) {
         return null
       }
       return {
