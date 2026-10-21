@@ -538,6 +538,47 @@ signature that identifies it. None imports a module this fork changed.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
   — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
 
+### `local(test)`: the full-suite verdict is a file, not a reading exercise
+
+The section above records the red set as prose, which means every agent that runs the full suite has
+to re-read this file and re-derive the classification — and it still ends with a nonzero exit code, so
+a session that wants "green" runs the suite again. Measured over seven days: 96 full-suite runs, 72%
+of them followed by more edits, one session running it seven times in 2.3 h against a failure set that
+never changed, 17–29 minutes a run.
+
+So the red set above now has a machine-readable twin, `local/unit-known-red.json`, shaped like the e2e
+titles file (`file` / `test` / `class` / `owner` / `evidence` / `flaky`). `local/gate-unit.mjs` runs
+`build:packages`, `ensure-native-runtime` and the full suite with a Vitest JSON reporter, and fails
+only on a failure that is **not** recorded. It is a fork-local gate: upstream keeps Vitest's exit code,
+and `local/check-unit-shard-verdict.mjs` stays the per-shard CI verdict.
+
+What it deliberately does not do:
+
+- It does not waive an unhandled error. One suite can raise the same rejection 28 times, so headlines
+  are collapsed and counted, but a headline outside `unhandledErrors` still fails the gate — an
+  unhandled rejection is a claim about the run, not about one test.
+- It does not waive a failure in a file that is in the branch's own diff. Every unallowlisted failure
+  gets one isolated re-run; a pass there is a load-order flake, except for a file the branch touches,
+  where "it passes alone" is not a claim anyone can rest on.
+- It does not run on a dirty tree. A verdict belongs to a revision, so an edited tree has none — the
+  cache is keyed `(HEAD, allowlist hash)` under `.git/orca-gate/`, which is what stops a re-run on an
+  unchanged revision from proving anything.
+- A missing or unreadable report, a run with no tests, and a timeout all fail closed.
+
+The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
+files, and two files that are red on their own and so are deliberately **not** listed —
+`src/main/ephemeral-vm-runtime-extend.test.ts` (its `vi.mock` for `./ssh/targets/ssh-target-registry`
+does not define `getSshTargetRegistryStore`, which also produces the run's 28 `TypeError: {} is not
+iterable` rejections from `ephemeral-vm-reclaim-ipc-bridge.ts:115`) and
+`src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts` (an `fs` read the test asserts must not
+happen does happen). Both reproduce in a scoped two-file run.
+
+Maintenance: this file stays the evidence, the JSON stays the assertion, and an entry changes in the
+same commit as the red set. An entry that passes is reported stale; an entry that does not appear in a
+run is reported unseen, which is the prune signal for one observed once and never reproduced. Prefer a
+`test` title over a file-level `*` as soon as the failing name is known — a file-level entry also masks
+a new failure inside that file.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,

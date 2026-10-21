@@ -1,0 +1,194 @@
+{
+  "note": [
+    "Machine-readable known-red set for the full unit suite on this fork, used by local/gate-unit.mjs.",
+    "A failure listed here is reported but does not fail the gate; a failure outside it does. Same",
+    "shape as local/e2e-known-failure-titles.json, which already gates the scheduled e2e lane.",
+    "",
+    "Reconciled against the first real gate run: 2026-10-21 on 1a64dbe2f6 (29 failing cases, 24 of",
+    "them allowlisted across 9 files). Two failures from that run are deliberately NOT listed —",
+    "src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts and src/main/ephemeral-vm-runtime-",
+    "extend.test.ts — because each still fails in an isolated re-run and has no recorded signature, so",
+    "each is either a real regression on this branch or a red nobody has classified yet.",
+    "",
+    "granularity `file` means the whole file is expected red. That is coarse on purpose: the evidence",
+    "is file-level. Tighten an entry to a `test` title as soon as you have the failing name, because a",
+    "file-level entry also masks a NEW failure inside that file.",
+    "",
+    "Keeping entries: documented in LOCAL-PATCHES.md => keep even when a run does not reproduce it",
+    "(the machine state varies). Observed once and undocumented => prune it; `unseen` is the signal.",
+    "An entry that passes is reported stale; prune it. LOCAL-PATCHES.md stays the evidence, this file",
+    "stays the assertion, and both change in the same commit."
+  ],
+  "recordedAt": "2026-10-21",
+  "observedRun": {
+    "revision": "1a64dbe2f6",
+    "failingCases": 29,
+    "allowlisted": 24,
+    "unexpected": 2,
+    "unhandledErrorHeadlines": 2,
+    "note": "`pnpm test` on this machine leaves 26 cases in 11 files per LOCAL-PATCHES np.37; the run above saw 29 in more files because the tree had moved on."
+  },
+  "unhandledErrors": [],
+  "entries": [
+    {
+      "file": "src/main/cli/packaged-cli-assets.test.ts",
+      "test": "*",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the darwin launcher resolves /var to /private/var with `cd -P` while the test builds its path from the unresolved os.tmpdir()",
+      "flaky": false
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "*",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: upstream file, same /private/var signature on all four cases",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/macos-terminal-host-bundle.test.mjs",
+      "test": "*",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md, same class: a yaml decoy read as outside the helper bundle",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/orca-runtime.test.ts",
+      "test": "*",
+      "class": "macos-path-semantics",
+      "owner": "unattributed",
+      "evidence": "2026-10-21 gate run, two cases assert '/private/var/...' to be '/var/...' — the same symlink resolution; still fails in an isolated re-run",
+      "flaky": false
+    },
+    {
+      "file": "src/main/cli/cli-command-privileged-transaction.test.ts",
+      "test": "*",
+      "class": "macos-path-semantics",
+      "owner": "unattributed",
+      "evidence": "LOCAL-PATCHES.md np.37 entry: 'Refusing to replace non-Orca command at /var/folders/...' — the same symlink resolution against a temp dir it just created",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "*",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: `bash: MOBILE_CI_ARGS[@]: unbound variable` — macOS ships bash 3.2, where an empty array under `set -u` is an error",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "*",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: rebuild/build harness times out or mismatches",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/main-entry-facade.test.ts",
+      "test": "*",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: rebuild/build harness times out or mismatches",
+      "flaky": false
+    },
+    {
+      "file": "src/main/sqlite/sync-database-portability.test.ts",
+      "test": "*",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what those contracts assume ('rejects explicit undefined bindings')",
+      "flaky": false
+    },
+    {
+      "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
+      "test": "*",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md np.37: same class, 'cannot add rowid alias: rowid'",
+      "flaky": false
+    },
+    {
+      "file": "src/main/ai-vault-search/session-search-file-write.test.ts",
+      "test": "*",
+      "class": "upstream-red-logic",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-16: fails identically at the pre-sync tip, leaving a stale subagent_parent_session_id",
+      "flaky": false
+    },
+    {
+      "file": "src/main/workspace-path-index/workspace-path-index-publication-admission.test.ts",
+      "test": "*",
+      "class": "load-sensitive",
+      "owner": "fork",
+      "evidence": "LOCAL-PATCHES.md: passes 3/3 in isolation twice; fails only under full-suite load on a vi.waitFor default timeout",
+      "flaky": false
+    },
+    {
+      "file": "src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts",
+      "test": "*",
+      "class": "pty-subprocess",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md np.37: 'Timed out waiting for PTY output'",
+      "flaky": false
+    },
+    {
+      "file": "src/main/ssh/ssh-relay-endpoint-incumbent-shell.integration.test.ts",
+      "test": "*",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: per-test timeout (46s)",
+      "flaky": false
+    },
+    {
+      "file": "tests/e2e/cursor-quota-transport.unit.test.ts",
+      "test": "*",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: per-test timeout (62s)",
+      "flaky": false
+    },
+    {
+      "file": "tests/e2e/relay-region-correction.unit.test.ts",
+      "test": "*",
+      "class": "missing-workspace",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: needs the `cloud/` workspace, which is not installed here; the suite fails to collect on 'Cannot find package pg'",
+      "flaky": false
+    },
+    {
+      "file": "src/main/browser/browser-session-ua-wire-identity.electron.test.ts",
+      "test": "*",
+      "class": "no-electron-window",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (40s) with no assertion reached",
+      "flaky": false
+    },
+    {
+      "file": "src/main/browser/browser-session-ua-wire-identity-cross-context.electron.test.ts",
+      "test": "*",
+      "class": "no-electron-window",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (60s) with no assertion reached",
+      "flaky": false
+    },
+    {
+      "file": "src/main/browser/browser-route-persisted-worker-egress.electron.test.ts",
+      "test": "*",
+      "class": "no-electron-window",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (180s) with no assertion reached",
+      "flaky": false
+    },
+    {
+      "file": "src/renderer/src/lib/palette-match/palette-match-performance.test.ts",
+      "test": "*",
+      "class": "flaky",
+      "owner": "unattributed",
+      "evidence": "Observed in one 2026-10-17 run and not the next; a timing assertion under load",
+      "flaky": true
+    }
+  ]
+}
