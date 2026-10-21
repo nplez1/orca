@@ -157,7 +157,7 @@ node .github/scripts/fork-release-notes.mjs --version 1.4.214-np.17 --signing un
    quarantine bit; a direct copy needs no Gatekeeper override. Notarized builds avoid this anyway,
    but it costs nothing.
 3. Confirm the installed version, e.g. `defaults read "/Applications/Orca NP.app/Contents/Info.plist"
-CFBundleShortVersionString`, and that `/usr/local/bin/orca-np` resolves.
+   CFBundleShortVersionString`, and that `/usr/local/bin/orca-np` resolves.
 
 ## Step 4 — prove the update path
 
@@ -201,4 +201,53 @@ gh release view --repo nplez1/orca --json tagName,body --jq '"\(.tagName)\n\(.bo
 
 # do the installed builds still point at this fork after the local patch series moves?
 grep -rn "nplez1/orca" src/main/updater-prerelease-feed.ts src/main/updater/updater-*.ts src/shared/release-channel.ts
+```
+
+## When a leg fails: retry, do not re-cut
+
+A run can fail _after_ it has uploaded something — a notarization stapling timeout at Apple's ticket
+service (error 68, "The network connection was lost"), or any lost connection. electron-builder
+appends to the existing release, so the retry then dies on its own first attempt's asset names:
+
+```
+422 Unprocessable Entity — ReleaseAsset: already_exists (field: name)
+```
+
+That is not a build problem, and the version does not change: `github.run_number` stays the same
+across re-runs, so `gh run rerun <id>` republishes the same `-np.<n>` tag.
+
+**Each leg clears its own assets first** (`.github/actions/clear-release-assets`, called before
+"Package and publish" in all three jobs). Each leg passes the extended-regex alternation of the names
+it publishes, so re-running one job never deletes another leg's artifacts, and a first attempt is
+unchanged because a missing release or no match is a no-op. So:
+
+```bash
+gh run rerun <run-id> --repo nplez1/orca     # re-runs every job; failed legs re-upload cleanly
+```
+
+Delete the draft and start over (`gh release delete v<version> --yes --cleanup-tag`) only when the
+_draft body_ is wrong — a re-run keeps the body it created.
+
+## The Linux leg, first run (2026-10-21, `v1.4.214-np.38`)
+
+The first release to carry Linux x64 built clean on GitHub's ubuntu-latest: AppImage, `.deb` and
+`.rpm`, plus `latest-linux.yml`. What the artifact itself confirms, checked against the upload rather
+than the config:
+
+- the glibc floor gate runs inside `afterPack` and passed on **21 bundled native binaries**
+  (`[verify-linux-glibc-floor] OK — Ubuntu 20.04 / glibc 2.31 / GLIBCXX_3.4.28`);
+- the payload is `/opt/Orca NP/orca-ide` + `resources/bin/orca-ide` + `chrome-sandbox`;
+- the packages are `orca-np` (`orca-np_<version>_amd64.deb`, `orca-np-<version>.x86_64.rpm`), so
+  installing one does not replace an official Orca install;
+- `postinst` creates `/usr/bin/orca-np` → the bundled launcher and `chmod 4755`s `chrome-sandbox`;
+  `postrm` removes the link only when it points into an Orca NP install;
+- `latest-linux.yml` names the AppImage with its blockmap, which is what makes an installed AppImage
+  see the release at all. Only the AppImage self-updates; the notes say so for deb/rpm.
+
+**Still unverified, needs one Linux desktop:** `StartupWMClass=orca` in the shipped desktop entry.
+The WM class comes from the running app rather than the package name, and this build's product name is
+`Orca NP`, so confirm on a real desktop that the launcher groups instead of showing a second icon:
+
+```bash
+xprop WM_CLASS     # click the running window; the fix is linux.desktop.entry.StartupWMClass
 ```

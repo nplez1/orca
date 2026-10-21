@@ -1,0 +1,48 @@
+name: Clear release assets
+description: Delete this leg's own assets from an existing draft release, so a re-run can republish them.
+
+# Why: electron-builder appends to a release at upload time and fails with `already_exists`
+# when an asset name is present, so a run that failed *after* uploading (a notarization
+# stapling timeout, a lost network) could not be retried at all — the second attempt died on
+# its own first attempt's assets. Each leg clears only the names it publishes, matched by the
+# patterns below, so re-running one job never deletes another leg's artifacts.
+#
+# Absent release, or no matching asset, is a no-op: a first attempt behaves exactly as before.
+
+inputs:
+  repo:
+    description: owner/name that owns the release
+    required: true
+  tag:
+    description: Release tag to clear
+    required: true
+  patterns:
+    description: Extended-regex alternation of the asset names this leg publishes
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Delete this leg's assets from an earlier attempt
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ inputs.repo }}
+        TAG: ${{ inputs.tag }}
+        PATTERNS: ${{ inputs.patterns }}
+      run: |
+        set -euo pipefail
+        if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+          echo "$TAG does not exist yet; nothing to clear"
+          exit 0
+        fi
+        cleared=0
+        while IFS= read -r name; do
+          [ -n "$name" ] || continue
+          if printf '%s' "$name" | grep -Eq -- "$PATTERNS"; then
+            gh release delete-asset "$TAG" "$name" --repo "$REPO" --yes
+            echo "cleared $name"
+            cleared=$((cleared + 1))
+          fi
+        done < <(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+        echo "cleared $cleared asset(s) from $TAG"

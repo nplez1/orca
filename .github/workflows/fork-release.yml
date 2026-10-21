@@ -181,6 +181,16 @@ jobs:
             echo "created draft $tag"
           fi
 
+      # Why before packaging: electron-builder appends to the release and fails on a name that
+      # already exists, so a retry after a partial publish (a notarization timeout, a lost
+      # connection) has to clear this leg's own assets first — and only this leg's.
+      - name: Clear macOS assets from an earlier attempt
+        uses: ./.github/actions/clear-release-assets
+        with:
+          repo: ${{ env.PUBLISH_OWNER }}/orca
+          tag: v${{ env.RELEASE_VERSION }}
+          patterns: '^(orca-macos-(x64|arm64)\\.dmg(\\.blockmap)?|Orca[.-]NP-[^/]*-mac\\.zip(\\.blockmap)?|latest-mac\\.yml)$'
+
       # Why --config.publish.owner: the checked-in config names stablyai/orca. Overriding here
       # rather than patching the config keeps that a runtime concern instead of a fork patch,
       # so upstream edits to the publish block still apply cleanly.
@@ -283,6 +293,16 @@ jobs:
         run: pnpm build:release
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      # Why before packaging: electron-builder appends to the release and fails on a name that
+      # already exists, so a retry after a partial publish (a notarization timeout, a lost
+      # connection) has to clear this leg's own assets first — and only this leg's.
+      - name: Clear Windows assets from an earlier attempt
+        uses: ./.github/actions/clear-release-assets
+        with:
+          repo: ${{ env.PUBLISH_OWNER }}/orca
+          tag: v${{ env.RELEASE_VERSION }}
+          patterns: '^(orca-windows-setup\\.exe(\\.blockmap)?|latest\\.yml)$'
 
       # Why no signing env: this fork ships Windows unsigned (see LOCAL-PATCHES.md), and the
       # config drops publisherName so electron-updater does not reject its own next build.
@@ -395,6 +415,16 @@ jobs:
 
       # Why ensure-native-runtime first: electron-builder's beforeBuild rebuilds node-pty for the
       # Electron ABI, and the Linux leg has to start from the runtime variant the app actually
+      # Why before packaging: electron-builder appends to the release and fails on a name that
+      # already exists, so a retry after a partial publish (a notarization timeout, a lost
+      # connection) has to clear this leg's own assets first — and only this leg's.
+      - name: Clear Linux assets from an earlier attempt
+        uses: ./.github/actions/clear-release-assets
+        with:
+          repo: ${{ env.PUBLISH_OWNER }}/orca
+          tag: v${{ env.RELEASE_VERSION }}
+          patterns: '^(latest-linux\\.yml|orca-linux[^/]*\\.AppImage|orca-np[_-][^/]*\\.(deb|rpm))$'
+
       # loads — upstream's release leg does the same on every Linux matrix entry.
       #
       # Why the publish overrides: the checked-in config names stablyai/orca. Overriding here rather

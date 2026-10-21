@@ -2749,6 +2749,31 @@ Only the AppImage self-updates. `src/main/updater/updater-install-execution.ts` 
 and rpm to the "manual install required" message, and the release notes say so — those two artifacts
 are for people who want their package manager to own the install.
 
+**What the first shipped Linux release confirmed (2026-10-21, `v1.4.214-np.38`).** Checked against the
+uploaded `.deb`, not the config: the payload is `/opt/Orca NP/orca-ide` +
+`resources/bin/orca-ide` + `chrome-sandbox`; the packages are `orca-np` (dpkg/rpm ownership), and
+`postinst` links `/usr/bin/orca-np` at the bundled launcher while `chmod 4755`s the sandbox helper;
+`postrm` removes the link only when it points into an Orca NP install. `afterPack`'s glibc floor gate
+passed on **21 bundled native binaries** (Ubuntu 20.04 / glibc 2.31 / GLIBCXX_3.4.28), and
+`latest-linux.yml` carries the AppImage's blockmap, so an installed AppImage sees the release.
+
+Two follow-ups this release exposed, neither fixed here:
+
+- **`StartupWMClass=orca` is still unverified for this build.** The class comes from the running app,
+  not the package, and this fork's product name is `Orca NP`. Confirm with `xprop WM_CLASS` on a Linux
+  desktop; the one-line fix is `linux.desktop.entry.StartupWMClass` in
+  `config/electron-builder.config.cjs`.
+- **The packages still attribute themselves to upstream.** `Vendor: stablyai`, `Maintainer: stablyai`
+  and `Homepage: https://github.com/stablyai/orca` come from `package.json`'s `author`/`homepage`
+  through fpm plus `linux.maintainer`. The package _name_ is right, so nothing collides, but a
+  `orca-np` package that links upstream's homepage reads as an official build. Changing it touches
+  `package.json`, which the Windows installer identity also reads, so it needs its own decision rather
+  than a rename inside a release.
+- **A retried release uploads cleanly now.** electron-builder appends to the release and fails on an
+  existing asset name, so the two failed attempts on `np.38` (Apple stapling timeout, then
+  `already_exists`) could not be retried as they stood; each leg now clears its own assets first via
+  `.github/actions/clear-release-assets`, matched by name so one leg never deletes another's.
+
 Why the unsigned path explicitly `unset`s the `CSC_*`/`APPLE_*` variables instead of leaving them
 empty: an unset secret still _defines_ them as empty strings, electron-builder reads a defined
 `CSC_LINK` as a certificate path, and `resolveCscLinkPath('', cwd)` resolves to the repository root —
