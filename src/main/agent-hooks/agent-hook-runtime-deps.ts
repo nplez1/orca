@@ -18,6 +18,9 @@ export function agentHookRuntimeDeps(
     onTerminalProgramStatusFacet: (event) => server.ingestProgramStatusFacet(event),
     onClaudeTerminalEvidence: (paneKey, evidence) =>
       server.observeClaudeTerminalEvidence(paneKey, evidence),
+    // Why: a dialog painted long after the agent's last hook is not caught by a deferred read; the
+    // scan that stamps the pane's blocked text is the moment it exists.
+    onPaneScreenPromptGained: (paneKey) => server.noteScreenPromptGained(paneKey),
     getAgentStatusSnapshot: () =>
       server.getStatusSnapshot().filter((entry) => entry.providerSessionOnly !== true),
     getAgentStatusSnapshotForPane: (paneKey) => server.getStatusSnapshotForPane(paneKey),

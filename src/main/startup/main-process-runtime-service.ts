@@ -154,6 +154,9 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     recordObservedAgentStatusPaneIdentity(observedPaneIdentities, enriched, runtime)
   )
   agentHookServer.setCliWriterExecutionMatcher(observedPaneIdentities, runtime)
+  // Switch point: the screen is the only witness of a dialog some agents' hooks cannot report, and
+  // only this host can read a pane's terminal.
+  agentHookServer.setScreenPromptReader((paneKey) => runtime.readPaneScreenPrompt(paneKey))
   // Switch point: main keeps the resume record of each pane it holds from the status it accepts.
   if (ORCA_LAYOUT_OWNER_IS_MAIN) {
     agentHookServer.subscribeEnrichedStatus((enriched) =>

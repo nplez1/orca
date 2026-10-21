@@ -315,6 +315,9 @@ async function startOrcadRuntime(
   // Recovery binds terminal and dispatch identities; only now can startup observations be fenced.
   observedStatusCapture.attach(runtime)
   agentHookServer.setCliWriterExecutionMatcher(observedPaneIdentities, runtime)
+  // Switch point: the screen is the only witness of a dialog some agents' hooks cannot report, and
+  // only this host can read a pane's terminal.
+  agentHookServer.setScreenPromptReader((paneKey) => runtime.readPaneScreenPrompt(paneKey))
   // Why before the RPC server binds: like `--serve`, the first client must find a ready graph.
   const { publishHeadlessRuntimeGraph } = await import('../runtime/headless-runtime-graph')
   publishHeadlessRuntimeGraph(runtime)

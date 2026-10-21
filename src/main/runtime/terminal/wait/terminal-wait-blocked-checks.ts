@@ -16,6 +16,7 @@ import {
   tailGainedNewerBlockedReason
 } from '../../terminal-wait-tail-state'
 import { ownRetainedString } from '../../../../shared/own-retained-string'
+import { isScreenInteractivePromptReason } from '../../../../shared/agent-screen-prompt'
 import type { ProcessedAgentStatusChunk } from '../../../../shared/agent-status-osc'
 import { createTerminalAgentStatusProcessor } from '../../../../shared/terminal-agent-status-processor'
 import type { RuntimePtyTitleTrackerEntry } from '../../runtime-terminal-state-records'
@@ -32,6 +33,8 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
   ): ReturnType<
     OrcaRuntimeWithRecordAgentPromptLifecycleState['recordAgentPromptPermissionObservation']
   >
+
+  protected abstract notePaneScreenPromptGained(paneKey: string): void
 
   protected abstract emitTerminalSideEffectBatch(
     ...args: Parameters<OrcaRuntimeWithEmitDaemonPtyTransientFact['emitTerminalSideEffectBatch']>
@@ -99,6 +102,18 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
     ) {
       pty.waitBlockedAt = at
       this.recordAgentPromptPermissionObservation(ptyId)
+      // Why only these reasons: a startup, trust or update dialog is not a wait on a person, and
+      // the store's corroboration reads the same blocked-text layer this scan just matched.
+      const paneKey = pty.paneKey
+      if (
+        paneKey &&
+        nextWaitState.signal &&
+        isScreenInteractivePromptReason(nextWaitState.signal.reason)
+      ) {
+        // Why deferred: this runs inside the PTY data path, before this scan records the state it
+        // just compared, and the store's read repaints a row the same tick.
+        queueMicrotask(() => this.notePaneScreenPromptGained(paneKey))
+      }
     }
     state.lastAt = at
     state.lastWaitState = nextWaitState

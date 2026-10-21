@@ -71,6 +71,7 @@ await import('./orca-runtime-tests/terminal-handles-and-agent-status-part-03.spe
 await import('./orca-runtime-tests/terminal-handles-and-agent-status-part-04.spec')
 await import('./orca-runtime-tests/terminal-handles-and-agent-status-part-05.spec')
 await import('./orca-runtime-tests/terminal-handles-and-agent-status-part-06.spec')
+await import('./orca-runtime-tests/pane-screen-prompt.spec')
 await import('./orca-runtime-tests/mobile-session-tabs.spec')
 await import('./orca-runtime-tests/mobile-session-tabs-part-02.spec')
 await import('./orca-runtime-tests/mobile-session-tabs-part-03.spec')

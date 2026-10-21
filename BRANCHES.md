@@ -185,10 +185,52 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   `src/main/agent-hooks` + `src/shared/agent-hook-listener`, and a replay of a real nested Copilot
   capture.
 
+### nplez1/bug-copilot-and-pi-questions-stay-working-instea
+
+- **Why:** issue #145 — a Copilot pane holding a question or an approval dialog kept reading **Working**,
+  so the agent never reached the dashboard's **Needs You** lane.
+- **Shape:** Copilot's hook stream cannot prove a dialog — `permission_prompt` also fires for the requests
+  its CLI approves itself (3,611 assisted to 831 asked across the 328 recorded sessions behind
+  `89a758b98d`), which is why that lane is dropped, and `PermissionRequest` precedes both a prompt and
+  a silent approval. The pane's screen already carries the evidence in the blocked-text layer the terminal waits read; it just
+  never reached the status row. A stored `working` row now arms one deferred read per pane (250 ms, so the
+  TUI can paint the dialog first). If the screen shows an approval or an interactive prompt gained during
+  that row's turn, the row is repainted `waiting` with the pane's identity and tool line intact; while
+  that wait stands it is re-read once a second (slowing to one per five) so the dialog leaving the screen
+  ends it — nothing posts when a person answers, and `PostToolUse` comes only after the approved command
+  finishes. The runtime's wait-blocked scan also reports the moment a dialog appears, so a dialog painted
+  long after the agent's last hook is seen without a timer. Gated to `copilot` and to rows this host owns
+  (`connectionId === null`), the way remote Claude evidence is already skipped. New `shared/agent-screen-prompt.ts`,
+  `agent-hooks/server/server-screen-prompt-{corroboration,wiring}.ts`,
+  `runtime/terminal/wait/terminal-pane-screen-prompt.ts`; reader bound in both bootstraps.
+- **Pi is NOT fixed here, and the reason is measured.** A real PTY capture of Pi-Bolt 1.3.0's select
+  dialog (`pi --no-extensions -e <select extension>`, 100x30) shows it painted with cursor addressing:
+  the visible grid carries `↑↓ navigate  enter select  escape/ctrl+c cancel`, but the tail text
+  `detectTerminalWaitBlockedReason` reads never contains it, so a Pi screen anchor cannot fire. A Pi fix
+  needs the emulated screen plus its own "gained" stamp — a separate change, tracked on #145.
+- **Targets:** fork issue #145. Upstream-worthy: the Copilot half is the negative of #19780, which taught
+  Orca to stop trusting `permission_prompt` — nothing replaced that lane, so a real dialog going
+  unanswered had no reporter.
+- **Review:** `claude/opus` at high reasoning, five rounds, each over a corrected revision. Round 1:
+  the repaint dropped `providerSession`/`launchToken` (the #10630 regression); the wait never ended,
+  because the next hook after an approval is the completed command; a dialog was seen only inside the
+  250 ms window; the Pi anchor was written without a capture — which the capture then disproved; no
+  teardown for pending reads; `readPaneScreenPrompt` untested. Round 2: the new runtime dep was declared
+  but never assigned, so the gained-dialog path was a no-op; a repaint of the dialog restarted the loop
+  and lost the release; the Pi anchor was still committed; a one-minute cap re-introduced the stuck wait;
+  a store refresh of our own row ended the loop; remote rows were not excluded. Round 3: the commit
+  attributed the measured ratio to the wrong source and duplicated a paragraph; it claimed a full run
+  that had not finished; the slow-re-read case could not fail; the release cancelled the read its own
+  write scheduled; a restored wait row had no loop. Round 4: the base had moved under the branch; a
+  hydrated wait row was never adopted (and its first test called `arm` directly, so it passed anyway);
+  the release-order fix had no test; this entry overstated the history. Fixed, with a case for each that
+  fails without the fix (the hydration case was verified by disabling the adoption call). Copilot panes
+  over SSH are **not** covered — this host does not own those rows — and #145 stays open for Pi.
+
 ### fix/repo-catalog-connection-fence
 
-- **Superseded on 2026-10-11 — do not open this.** Upstream landed `63b3f15cc4` (*every repo
-  catalog uses the host-catalog fence*, #27116), its own fix for #20811: `claimHostCatalogFence` /
+- **Superseded on 2026-10-11 — do not open this.** Upstream landed `63b3f15cc4` (_every repo
+  catalog uses the host-catalog fence_, #27116), its own fix for #20811: `claimHostCatalogFence` /
   `isHostCatalogFenceCurrent` removed both the fork's per-host generation map and its connection
   fence, and upstream's `failed` flag keeps repo-scoped UI from being validated for a host that
   never answered. The 2026-10-11 sync took upstream's side in full, so the branch has nothing left

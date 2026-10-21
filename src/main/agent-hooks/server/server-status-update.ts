@@ -22,11 +22,11 @@ import {
 } from './server-claude-status-rules'
 import { isStaleGrokTurnEnd } from './server-grok-status-rules'
 import { resolveCancelVerdictLatch } from './server-cancel-verdict-latch'
-import { AgentHookServerStatusApplication } from './server-status-application'
+import { AgentHookServerScreenPromptWiring } from './server-screen-prompt-wiring'
 import { claimsPaneAfterExit } from './agent-exit-evidence'
 import { writePiClaudeChildParentMarker } from './pi-claude-child-parent-marker'
 
-export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusApplication {
+export abstract class AgentHookServerStatusUpdate extends AgentHookServerScreenPromptWiring {
   protected readonly claudeOwedNotificationExpiry = new ClaudeOwedNotificationExpiryTimers(
     this.state
   )

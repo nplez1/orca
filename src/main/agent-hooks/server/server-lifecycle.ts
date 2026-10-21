@@ -240,6 +240,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     if (isCurrent() && this.statusHooksEnabled) {
       this.startOpenCodeBinderLoop()
     }
+    this.adoptHydratedScreenPromptRows()
   }
 
   private rollbackTransportStart(): void {
@@ -278,6 +279,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerStatusHook
     this.programStatusFacetRepublishes.clear()
     this.clearAllTranscriptPolls()
     this.claudeOwedNotificationExpiry.clearAll()
+    this.clearScreenPromptReads()
     this.endpointDir = null
     this.endpointFilePathCache = null
     this.endpointFileWritten = false
