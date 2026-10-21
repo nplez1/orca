@@ -2667,6 +2667,49 @@ permissions rejection. Set a fresh PAT as the repository secret and nothing else
 went green in 1m18s and mirrored `v1.4.223`, `v1.4.224` and `v1.4.227` — the first successful run
 since 2026-10-08, and `v1.4.224` is the highest tag that suite pins.
 
+### `local(ci)`: which workflows are live on this fork
+
+Upstream's whole Actions fleet is turned **off at the repository, not in the tree**. There is no
+commit to find and nothing a sync can revert: the state is `disabled_manually` on each workflow,
+readable only from the API.
+
+```bash
+gh api "repos/nplez1/orca/actions/workflows?per_page=100" \
+  --jq '.workflows[] | "\(.state)\t\(.name)\t\(.path)"'
+gh workflow disable <file>.yml --repo nplez1/orca    # the only way to change it
+```
+
+**Why the tree cannot express this.** Deleting the files would fight every sync, and an `if:` guard
+would leave the workflow listed and re-enabled at the first `workflow_dispatch` from upstream's own
+file. A disabled workflow keeps receiving file updates from sync and stays off until someone turns
+it back on — which is what a fork wants, and why this is documented here instead of patched.
+
+**Live on purpose — these two must stay enabled:**
+
+- `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
+- `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
+
+**Also left enabled, and inert without a manual dispatch:** `zcode-account-contract.yml`,
+`unit-module-cache-benchmark.yml`, `windows-native-preparation-benchmark.yml`, and the three
+`cloud-operate-relay-*` flags/watchers. `ci-cache-warmup-platform-jobs.yml` is `workflow_call`-only,
+so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
+
+Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
+`e2e.yml`, `mobile.yml`, `fork-main-gates.yml` and `fork-main-tests.yml`.
+
+**The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
+on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as
+mergeable, so the pre-PR gates in `AGENTS.md` (full `pnpm tc` / `lint` / `test` plus the review) are
+the only thing standing between a change and `nplez1/main` — nothing in CI backstops a skipped run.
+
+**A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
+eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
+`windows-typecheck-parity`, the three `preflight-*`, and the two `zcode-*-contract`) plus
+`ci-cache-warmup-platforms` on `push: [main]`. They surfaced as two mystery checks on PRs #146/#147
+— the WSL orcad lane, triggered because both touched `src/main/pi/**`, a path in its filter. So
+after any sync that adds workflows, re-run the listing above rather than assuming the sweep still
+covers the tree.
+
 ### `local(hooks)`: refuse fork-only commits on a PR branch
 
 `.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
