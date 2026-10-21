@@ -227,6 +227,20 @@ describe('PluginOverlayManager', () => {
     expect(readFileSync(file, 'utf8')).toContain('@orca-managed-pi-extension')
   })
 
+  it('leaves an already-current remote Pi extension file untouched so its mtime survives', () => {
+    manager.setSources({ piExtensionSource: '// pi extension' })
+    const first = manager.materializePi('tab-mtime-1:0')
+    const file = join(first!.sourceAgentDir!, 'extensions', 'orca-agent-status.ts')
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    utimesSync(file, compiledAt, compiledAt)
+
+    const second = manager.materializePi('tab-mtime-2:0')
+
+    expect(second?.sourceAgentDir).toBe(first?.sourceAgentDir)
+    expect(second?.statusExtensionPath).toBe(file)
+    expect(statSync(file).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
   it("does not overwrite a user's same-named remote Pi extension file", () => {
     const piAgentDir = join(homeDir, '.pi', 'agent')
     const extensionFile = join(piAgentDir, 'extensions', 'orca-agent-status.ts')
