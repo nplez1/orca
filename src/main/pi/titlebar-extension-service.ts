@@ -1,5 +1,10 @@
 import { materializeOmpFreshConfig } from '../../shared/omp-fresh-config'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  isManagedPiExtensionInPlace,
+  withOrcaManagedPiExtensionMarker,
+  writeManagedPiExtension
+} from '../../shared/managed-pi-extension-file'
+import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getAppEnvironment } from '../../shared/app-environment'
@@ -27,10 +32,7 @@ import type { PiAgentKind } from '../../shared/pi-agent-kind'
 export const isSafeDescendCandidate = sharedIsSafeDescendCandidate
 
 const PI_AGENT_SUBDIR = 'agent'
-const ORCA_MANAGED_EXTENSION_MARKER = '@orca-managed-pi-extension'
 const OMP_MANAGED_STATUS_EXTENSION_DIR = 'omp-managed-status-extension'
-
-type ManagedExtensionWriteResult = 'written' | 'skipped-user-owned' | 'failed'
 
 type PiManagedExtensionEnv = {
   extensionDir?: string
@@ -68,12 +70,6 @@ function toSafeOverlayDirName(ptyId: string): string {
   return createHash('sha256').update(ptyId).digest('hex').slice(0, 32)
 }
 
-function withOrcaManagedExtensionMarker(source: string): string {
-  return source.includes(ORCA_MANAGED_EXTENSION_MARKER)
-    ? source
-    : `// ${ORCA_MANAGED_EXTENSION_MARKER}\n${source}`
-}
-
 export class PiTitlebarExtensionService {
   private getOverlayRoot(kind: LegacyOverlayAgentKind): string {
     return join(getAppEnvironment().getPath('userData'), OVERLAY_ROOT_DIR_NAME[kind])
@@ -102,27 +98,6 @@ export class PiTitlebarExtensionService {
     safeRemoveOverlay(overlayDir, this.getOverlayRoot(kind))
   }
 
-  private canOverwriteManagedExtension(path: string): boolean {
-    try {
-      return readFileSync(path, 'utf8').includes(ORCA_MANAGED_EXTENSION_MARKER)
-    } catch {
-      return true
-    }
-  }
-
-  private writeManagedExtension(path: string, source: string): ManagedExtensionWriteResult {
-    if (existsSync(path) && !this.canOverwriteManagedExtension(path)) {
-      return 'skipped-user-owned'
-    }
-
-    try {
-      writeFileSync(path, source)
-      return 'written'
-    } catch {
-      return 'failed'
-    }
-  }
-
   private writeOmpFallbackStatusExtension(source: string): string | undefined {
     const fallbackDir = join(
       getAppEnvironment().getPath('userData'),
@@ -135,7 +110,9 @@ export class PiTitlebarExtensionService {
     }
 
     const fallbackPath = join(fallbackDir, ORCA_PI_AGENT_STATUS_EXTENSION_FILE)
-    return this.writeManagedExtension(fallbackPath, source) === 'written' ? fallbackPath : undefined
+    return isManagedPiExtensionInPlace(writeManagedPiExtension(fallbackPath, source))
+      ? fallbackPath
+      : undefined
   }
 
   private installManagedExtensions(
@@ -150,28 +127,27 @@ export class PiTitlebarExtensionService {
     }
 
     if (kind !== 'prime-agent') {
-      this.writeManagedExtension(
+      writeManagedPiExtension(
         join(extensionsDir, ORCA_PI_EXTENSION_FILE),
-        withOrcaManagedExtensionMarker(getPiTitlebarExtensionSource(kind))
+        withOrcaManagedPiExtensionMarker(getPiTitlebarExtensionSource(kind))
       )
-      this.writeManagedExtension(
+      writeManagedPiExtension(
         join(extensionsDir, ORCA_PI_PREFILL_EXTENSION_FILE),
-        withOrcaManagedExtensionMarker(getPiPrefillExtensionSource(kind))
+        withOrcaManagedPiExtensionMarker(getPiPrefillExtensionSource(kind))
       )
     }
     const statusExtensionPath = join(extensionsDir, ORCA_PI_AGENT_STATUS_EXTENSION_FILE)
-    const statusSource = withOrcaManagedExtensionMarker(getPiAgentStatusExtensionSource(kind))
-    const statusResult = this.writeManagedExtension(statusExtensionPath, statusSource)
+    const statusSource = withOrcaManagedPiExtensionMarker(getPiAgentStatusExtensionSource(kind))
+    const statusResult = writeManagedPiExtension(statusExtensionPath, statusSource)
 
     return {
       extensionDir: extensionsDir,
       sourceAgentDir,
-      statusExtensionPath:
-        statusResult === 'written'
-          ? statusExtensionPath
-          : kind === 'omp'
-            ? this.writeOmpFallbackStatusExtension(statusSource)
-            : undefined
+      statusExtensionPath: isManagedPiExtensionInPlace(statusResult)
+        ? statusExtensionPath
+        : kind === 'omp'
+          ? this.writeOmpFallbackStatusExtension(statusSource)
+          : undefined
     }
   }
 
@@ -209,7 +185,7 @@ export class PiTitlebarExtensionService {
     const materializeDefaultHome = options?.materializeDefaultHome !== false
     if (!existsSync(sourceAgentDir) && !materializeDefaultHome) {
       if (kind === 'omp') {
-        const statusSource = withOrcaManagedExtensionMarker(getPiAgentStatusExtensionSource(kind))
+        const statusSource = withOrcaManagedPiExtensionMarker(getPiAgentStatusExtensionSource(kind))
         const statusExtensionPath = this.writeOmpFallbackStatusExtension(statusSource)
         return statusExtensionPath
           ? { ...freshConfigEnv, ORCA_OMP_STATUS_EXTENSION: statusExtensionPath }

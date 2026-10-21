@@ -23,7 +23,12 @@ import { materializeOmpFreshConfig } from '../shared/omp-fresh-config'
 // implementation rooted at $HOME/.orca-relay/ for OpenCode and at the remote
 // Pi/OMP homes for those agents.
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
+import {
+  isManagedPiExtensionInPlace,
+  withOrcaManagedPiExtensionMarker,
+  writeManagedPiExtension
+} from '../shared/managed-pi-extension-file'
 import { writeOverlayOpenCodePluginAtomically } from '../shared/opencode-plugin-atomic-write'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -56,15 +61,9 @@ const ORCA_OPENCODE_PLUGIN_ENTRIES = new Set([
 ])
 const PI_EXTENSION_FILE = 'orca-agent-status.ts'
 const PI_AGENT_SUBDIR = 'agent'
-const OMP_MANAGED_STATUS_EXTENSION_DIR = 'omp-managed-status-extension'
 // Why: bare-shell OMP still needs ORCA_OMP_STATUS_EXTENSION without mkdir ~/.omp.
 // Mirror local userData/omp-managed-status-extension under the relay home root.
-const ORCA_MANAGED_EXTENSION_MARKER = '@orca-managed-pi-extension'
-function withOrcaManagedPiExtensionMarker(source: string): string {
-  return source.includes(ORCA_MANAGED_EXTENSION_MARKER)
-    ? source
-    : `// ${ORCA_MANAGED_EXTENSION_MARKER}\n${source}`
-}
+const OMP_MANAGED_STATUS_EXTENSION_DIR = 'omp-managed-status-extension'
 // Why: source-dir resolution is keyed off the launching agent (Pi or OMP).
 // Both consume `PI_CODING_AGENT_DIR` but default to different `~/.<kind>/agent`
 // paths on the remote disk. The renderer-chosen launch command flows in via
@@ -287,14 +286,6 @@ export class PluginOverlayManager {
     return join(this.homeDir, root, PI_AGENT_SUBDIR)
   }
 
-  private canOverwritePiExtension(path: string): boolean {
-    try {
-      return readFileSync(path, 'utf8').includes(ORCA_MANAGED_EXTENSION_MARKER)
-    } catch {
-      return true
-    }
-  }
-
   materializeOmpFreshConfig(): string {
     return materializeOmpFreshConfig(
       join(this.homeDir, RELAY_HOOKS_DIR, OMP_MANAGED_STATUS_EXTENSION_DIR)
@@ -331,10 +322,15 @@ export class PluginOverlayManager {
       const extensionsDir = join(sourceAgentDir, 'extensions')
       mkdirSync(extensionsDir, { recursive: true })
       const extensionPath = join(extensionsDir, PI_EXTENSION_FILE)
-      if (!this.canOverwritePiExtension(extensionPath)) {
+      const installed = writeManagedPiExtension(extensionPath, extensionSource, (error) => {
+        process.stderr.write(
+          `[plugin-overlay] failed to install ${kind} extension: ${error instanceof Error ? error.message : String(error)}\n`
+        )
+      })
+      // Why: no status path for a user-owned file, or for a write that already logged its reason.
+      if (!isManagedPiExtensionInPlace(installed)) {
         return null
       }
-      writeFileSync(extensionPath, extensionSource)
       return {
         sourceAgentDir,
         statusExtensionPath: extensionPath

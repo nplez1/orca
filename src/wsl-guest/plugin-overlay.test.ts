@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   existsSync,
   lstatSync,
@@ -225,6 +225,75 @@ describe('PluginOverlayManager', () => {
     expect(result?.statusExtensionPath).toBe(file)
     expect(existsSync(file)).toBe(true)
     expect(readFileSync(file, 'utf8')).toContain('@orca-managed-pi-extension')
+  })
+
+  it('leaves an already-current remote Pi extension file untouched so its mtime survives', () => {
+    manager.setSources({ piExtensionSource: '// pi extension' })
+    const first = manager.materializePi('tab-mtime-1:0')
+    const file = join(first!.sourceAgentDir!, 'extensions', 'orca-agent-status.ts')
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    utimesSync(file, compiledAt, compiledAt)
+
+    const second = manager.materializePi('tab-mtime-2:0')
+
+    expect(second?.sourceAgentDir).toBe(first?.sourceAgentDir)
+    expect(second?.statusExtensionPath).toBe(file)
+    expect(statSync(file).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
+  it('leaves the relay bare-shell OMP status copy untouched across launches', () => {
+    manager.setSources({ ompExtensionSource: '// omp extension' })
+    const first = manager.materializePi('tab-omp-bare-stable-1:0', undefined, 'omp', {
+      materializeDefaultHome: false
+    })
+    const statusPath = first!.statusExtensionPath!
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    utimesSync(statusPath, compiledAt, compiledAt)
+
+    const second = manager.materializePi('tab-omp-bare-stable-2:0', undefined, 'omp', {
+      materializeDefaultHome: false
+    })
+
+    expect(second?.statusExtensionPath).toBe(statusPath)
+    expect(statSync(statusPath).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
+  it('logs a failed relay Pi extension write instead of returning a bare null', () => {
+    // A directory where the file belongs: the read misses and the write is what fails.
+    mkdirSync(join(homeDir, '.pi', 'agent', 'extensions', 'orca-agent-status.ts'), {
+      recursive: true
+    })
+    manager.setSources({ piExtensionSource: '// pi extension' })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(manager.materializePi('tab-write-fail:0')).toBeNull()
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+        'failed to install pi extension'
+      )
+    } finally {
+      stderr.mockRestore()
+    }
+  })
+
+  it('logs a failed relay OMP fallback write with its reason', () => {
+    mkdirSync(
+      join(homeDir, '.orca-relay', 'omp-managed-status-extension', 'orca-agent-status.ts'),
+      { recursive: true }
+    )
+    manager.setSources({ ompExtensionSource: '// omp extension' })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(
+        manager.materializePi('tab-omp-write-fail:0', undefined, 'omp', {
+          materializeDefaultHome: false
+        })
+      ).toBeNull()
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+        'failed to write OMP managed status extension'
+      )
+    } finally {
+      stderr.mockRestore()
+    }
   })
 
   it("does not overwrite a user's same-named remote Pi extension file", () => {

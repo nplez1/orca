@@ -10,7 +10,9 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -515,6 +517,73 @@ describe('PiTitlebarExtensionService', () => {
     svc.buildPtyEnv('pty-3', piHome, 'pi')
     svc.buildPtyEnv('pty-3', piHome, 'pi')
     expectPiHomeIntact()
+  })
+
+  it('leaves unchanged managed extensions untouched across launches so compiled metadata survives', () => {
+    const svc = new PiTitlebarExtensionService()
+    svc.buildPtyEnv('pty-stable-1', piHome, 'pi')
+
+    // Why: Pi-Bolt reports a rewritten managed extension as changed since it was
+    // compiled even when the bytes match, so a relaunch must not touch the files.
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    const extensionPaths = [
+      'orca-agent-status.ts',
+      'orca-prefill.ts',
+      'orca-titlebar-spinner.ts'
+    ].map((name) => join(piHome, 'extensions', name))
+    for (const path of extensionPaths) {
+      utimesSync(path, compiledAt, compiledAt)
+    }
+
+    svc.buildPtyEnv('pty-stable-2', piHome, 'pi')
+
+    for (const path of extensionPaths) {
+      expect(statSync(path).mtime.getTime()).toBe(compiledAt.getTime())
+    }
+    expectPiHomeIntact()
+  })
+
+  it('keeps the OMP status env path when the managed status file is already current', () => {
+    const svc = new PiTitlebarExtensionService()
+    const first = svc.buildPtyEnv('pty-omp-stable-1', piHome, 'omp')
+    const statusPath = join(piHome, 'extensions', 'orca-agent-status.ts')
+    expect(first.ORCA_OMP_STATUS_EXTENSION).toBe(statusPath)
+
+    // Why: `unchanged` must still yield the env var — otherwise the agent loses status on
+    // every relaunch once its managed file is current.
+    const compiledAt = new Date('2020-01-02T03:04:05Z')
+    utimesSync(statusPath, compiledAt, compiledAt)
+
+    const second = svc.buildPtyEnv('pty-omp-stable-2', piHome, 'omp')
+
+    expect(second.ORCA_OMP_STATUS_EXTENSION).toBe(statusPath)
+    expect(statSync(statusPath).mtime.getTime()).toBe(compiledAt.getTime())
+  })
+
+  it('keeps the bare-shell OMP fallback status current across launches', () => {
+    const fakeHome = mkdtempSync(join(tmpdir(), 'orca-omp-bare-stable-'))
+    homedirOverride.current = fakeHome
+    try {
+      const svc = new PiTitlebarExtensionService()
+      const fallbackPath = join(userDataDir, 'omp-managed-status-extension', 'orca-agent-status.ts')
+      expect(
+        svc.buildPtyEnv('pty-omp-bare-1', undefined, 'omp', { materializeDefaultHome: false })
+          .ORCA_OMP_STATUS_EXTENSION
+      ).toBe(fallbackPath)
+
+      const compiledAt = new Date('2020-01-02T03:04:05Z')
+      utimesSync(fallbackPath, compiledAt, compiledAt)
+
+      expect(
+        svc.buildPtyEnv('pty-omp-bare-2', undefined, 'omp', { materializeDefaultHome: false })
+          .ORCA_OMP_STATUS_EXTENSION
+      ).toBe(fallbackPath)
+      expect(statSync(fallbackPath).mtime.getTime()).toBe(compiledAt.getTime())
+      expect(existsSync(join(fakeHome, '.omp'))).toBe(false)
+    } finally {
+      homedirOverride.current = ''
+      rmSync(fakeHome, { recursive: true, force: true })
+    }
   })
 
   it('refreshes a managed spinner in an explicitly selected senpi home', () => {
