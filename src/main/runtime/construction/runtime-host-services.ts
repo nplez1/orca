@@ -104,6 +104,8 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
 
   protected readonly onClaudeTerminalEvidence!: HostBindings['onClaudeTerminalEvidence'] | null
 
+  protected readonly onPaneScreenPromptGained!: HostBindings['onPaneScreenPromptGained'] | null
+
   protected terminalSideEffectLocalConsumerAvailable = false
 
   protected terminalSideEffectConsumerAvailable = false
