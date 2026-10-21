@@ -38,12 +38,13 @@ export function JiraIssueRowContextMenu({
             asChild
             ref={setAnchor}
             aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
-            // Why here and not in each card: macOS has no Menu key and no Shift+F10
+            // Why synthesized, and why here: macOS has no Menu key and no Shift+F10
             // convention, so the browser emits nothing and the keyboard route has to be
-            // synthesized. Windows and Linux do get a native `contextmenu` for a focused
-            // element, and this is still safe there: cancelling the key press suppresses
-            // Chromium's key-down event, and the Menu key's key-up one lands on the
-            // already-open menu rather than on the card.
+            // built by hand. Doing it on the trigger is what gives every wrapped card the
+            // route from one place. Windows and Linux do get a native `contextmenu` for a
+            // focused element, and this is still safe there: cancelling the key press
+            // suppresses Chromium's key-down event, and the Menu key's key-up one lands on
+            // the already-open menu rather than on the card.
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) {
                 return

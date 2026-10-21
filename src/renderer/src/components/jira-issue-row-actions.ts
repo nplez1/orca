@@ -30,8 +30,7 @@ export function getJiraIssueRowActions(
   return workspace ? [{ key: 'workspace', ...workspace }, ...shared] : shared
 }
 
-/** The Show/Start wording and icon, shared by the row menu, the board cards and the
- *  hover cluster so the conditional lives in one place. */
+/** The Show/Start wording, shared by the row menu, the board cards and the hover cluster. */
 export function jiraIssueWorkspaceActionLabel(linked: boolean): string {
   return linked
     ? translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')

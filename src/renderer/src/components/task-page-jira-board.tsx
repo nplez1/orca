@@ -23,7 +23,10 @@ import {
   type TaskPageJiraBoardSection
 } from './task-page-jira-board-sections'
 import { JiraIssueRowContextMenu } from './JiraIssueRowContextMenu'
-import { buildJiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
+import {
+  buildJiraIssueRowWorkspaceAction,
+  jiraIssueWorkspaceActionLabel
+} from './jira-issue-row-actions'
 
 export function jiraBoardIssueRefKey(issue: Pick<JiraIssue, 'key' | 'siteId'>): string {
   return `${issue.siteId ?? 'site'}:${issue.key}`
@@ -274,7 +277,7 @@ export function TaskPageJiraBoard({
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" sideOffset={6}>
-                              {translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
+                              {jiraIssueWorkspaceActionLabel(false)}
                             </TooltipContent>
                           </Tooltip>
                           <Tooltip>
