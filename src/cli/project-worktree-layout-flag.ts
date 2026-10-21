@@ -1,4 +1,4 @@
-import { WORKTREE_LAYOUT_MODES, type WorktreeLayoutMode } from '../../shared/orca-workspace-layout'
+import { WORKTREE_LAYOUT_MODES, type WorktreeLayoutMode } from '../shared/orca-workspace-layout'
 import { getOptionalStringFlag } from './flags'
 import { RuntimeClientError } from './runtime-client'
 
