@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getDefaultSettings } from '../../../../shared/constants'
 import type { RemoteBranchCleanup } from '../../../../shared/worktree/remote-branch-removal'
-import type { AppState } from '../types'
 import { makeWorktree } from './worktrees-slice-test-fixtures'
 import {
   createTestStore,
@@ -23,6 +23,7 @@ vi.mock('sonner', () => ({
 beforeEach(resetWorktreeSliceModuleMemory)
 
 const WORKTREE_ID = 'repo1::/path/wt1'
+const ENV = 'env-1'
 const DELETED: RemoteBranchCleanup = {
   status: 'deleted',
   remoteName: 'origin',
@@ -30,20 +31,36 @@ const DELETED: RemoteBranchCleanup = {
 }
 
 function seed(store: ReturnType<typeof createTestStore>, runtimeEnvironmentId?: string): void {
-  const worktree = makeWorktree({ id: WORKTREE_ID, repoId: 'repo1', path: '/path/wt1' })
-  // The slice reads only `activeRuntimeEnvironmentId` to choose a transport, so a full
-  // GlobalSettings object would be noise here.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: narrow settings stub for transport routing; no other setting is read on this path.
-  const settings = {
-    activeRuntimeEnvironmentId: runtimeEnvironmentId ?? null
-  } as AppState['settings']
-  store.setState({ worktreesByRepo: { repo1: [worktree] }, settings })
+  const worktree = makeWorktree({
+    id: WORKTREE_ID,
+    repoId: 'repo1',
+    path: '/path/wt1',
+    ...(runtimeEnvironmentId
+      ? {
+          hostId: `runtime:${runtimeEnvironmentId}`,
+          runtimeOwnerEnvironmentId: runtimeEnvironmentId
+        }
+      : {})
+  })
+  // Why the full settings object: the row's owner picks the transport now, not the focused host.
+  store.setState({
+    worktreesByRepo: { repo1: [worktree] },
+    settings: getDefaultSettings('/home/test')
+  })
 }
 
-function removeWithRemoteBranch(store: ReturnType<typeof createTestStore>) {
-  return store.getState().removeWorktree({ id: WORKTREE_ID, executionHostId: null }, false, {
-    deleteRemoteBranch: true
-  })
+function removeWithRemoteBranch(
+  store: ReturnType<typeof createTestStore>,
+  runtimeEnvironmentId?: string
+) {
+  return store.getState().removeWorktree(
+    {
+      id: WORKTREE_ID,
+      executionHostId: runtimeEnvironmentId ? `runtime:${runtimeEnvironmentId}` : null
+    },
+    false,
+    { deleteRemoteBranch: true }
+  )
 }
 
 describe('remote branch cleanup threading', () => {
@@ -103,7 +120,7 @@ describe('remote branch cleanup threading', () => {
   // would leave the user believing the remote branch is gone.
   it('reports a runtime host that answered without a cleanup', async () => {
     const store = createTestStore()
-    seed(store, 'env-1')
+    seed(store, ENV)
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-rm',
       ok: true,
@@ -111,7 +128,7 @@ describe('remote branch cleanup threading', () => {
       _meta: { runtimeId: 'runtime-remote' }
     })
 
-    const result = await removeWithRemoteBranch(store)
+    const result = await removeWithRemoteBranch(store, ENV)
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -123,7 +140,7 @@ describe('remote branch cleanup threading', () => {
 
   it('passes a runtime host cleanup through unchanged', async () => {
     const store = createTestStore()
-    seed(store, 'env-1')
+    seed(store, ENV)
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-rm',
       ok: true,
@@ -131,7 +148,7 @@ describe('remote branch cleanup threading', () => {
       _meta: { runtimeId: 'runtime-remote' }
     })
 
-    const result = await removeWithRemoteBranch(store)
+    const result = await removeWithRemoteBranch(store, ENV)
 
     expect(result).toEqual(expect.objectContaining({ remoteBranchCleanup: DELETED }))
   })

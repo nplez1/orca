@@ -118,8 +118,14 @@ describe('listAiVaultSessions host routing', () => {
 
     const timeoutFor = (environmentId: string): unknown =>
       mocks.scanRuntimeAiVaultSessions.mock.calls.find(([id]) => id === environmentId)?.[2]
-    expect(timeoutFor('lan-server')).toEqual({ timeoutMs: 3_000 })
-    expect(timeoutFor('ssh-server')).toEqual({ timeoutMs: 15_000 })
+    // Why both bounds: the fork's paged listing also caps when pages may start, and a tunneled
+    // host needs that window widened with its page bound or a large history cannot converge.
+    expect(timeoutFor('lan-server')).toEqual(
+      expect.objectContaining({ timeoutMs: 3_000, drainTimeoutMs: 20_000 })
+    )
+    expect(timeoutFor('ssh-server')).toEqual(
+      expect.objectContaining({ timeoutMs: 15_000, drainTimeoutMs: 40_000 })
+    )
   })
 
   it('keeps direct runtime host scans on the normal runtime timeout', async () => {

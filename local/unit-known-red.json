@@ -111,43 +111,11 @@
       "flaky": false
     },
     {
-      "file": "src/main/ai-vault-search/session-search-file-write.test.ts",
-      "test": "*",
-      "class": "upstream-red-logic",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-16: fails identically at the pre-sync tip, leaving a stale subagent_parent_session_id",
-      "flaky": false
-    },
-    {
-      "file": "src/main/workspace-path-index/workspace-path-index-publication-admission.test.ts",
-      "test": "*",
-      "class": "load-sensitive",
-      "owner": "fork",
-      "evidence": "LOCAL-PATCHES.md: passes 3/3 in isolation twice; fails only under full-suite load on a vi.waitFor default timeout",
-      "flaky": false
-    },
-    {
       "file": "src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts",
       "test": "*",
       "class": "pty-subprocess",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md np.37: 'Timed out waiting for PTY output'",
-      "flaky": false
-    },
-    {
-      "file": "src/main/ssh/ssh-relay-endpoint-incumbent-shell.integration.test.ts",
-      "test": "*",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: per-test timeout (46s)",
-      "flaky": false
-    },
-    {
-      "file": "tests/e2e/cursor-quota-transport.unit.test.ts",
-      "test": "*",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: per-test timeout (62s)",
       "flaky": false
     },
     {
@@ -159,36 +127,12 @@
       "flaky": false
     },
     {
-      "file": "src/main/browser/browser-session-ua-wire-identity.electron.test.ts",
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
       "test": "*",
-      "class": "no-electron-window",
+      "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (40s) with no assertion reached",
+      "evidence": "the workflow step these cases run calls mapfile (e2e.yml:631), which macOS /bin/bash 3.2 does not have; the ubuntu runners supply bash 5. Same class as the pr-auxiliary-preflight-admission entries.",
       "flaky": false
-    },
-    {
-      "file": "src/main/browser/browser-session-ua-wire-identity-cross-context.electron.test.ts",
-      "test": "*",
-      "class": "no-electron-window",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (60s) with no assertion reached",
-      "flaky": false
-    },
-    {
-      "file": "src/main/browser/browser-route-persisted-worker-egress.electron.test.ts",
-      "test": "*",
-      "class": "no-electron-window",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: fails at exactly its per-test timeout (180s) with no assertion reached",
-      "flaky": false
-    },
-    {
-      "file": "src/renderer/src/lib/palette-match/palette-match-performance.test.ts",
-      "test": "*",
-      "class": "flaky",
-      "owner": "unattributed",
-      "evidence": "Observed in one 2026-10-17 run and not the next; a timing assertion under load",
-      "flaky": true
     }
   ]
 }
