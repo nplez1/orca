@@ -46,21 +46,25 @@ export async function copyJiraTextToClipboard(text: string, label: string): Prom
 export function getJiraIssueWorkspaceActions(issue: JiraIssue): JiraIssueWorkspaceAction[] {
   return [
     {
+      key: 'open-in-jira',
       label: translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira'),
       icon: ExternalLink,
       action: () => window.api.shell.openUrl(issue.url)
     },
     {
+      key: 'copy-url',
       label: translate('auto.components.JiraIssueWorkspace.779bb91ee0', 'Copy URL'),
       icon: Clipboard,
       action: () => void copyJiraTextToClipboard(issue.url, 'URL')
     },
     {
+      key: 'copy-key',
       label: translate('auto.components.JiraIssueWorkspace.38839801e8', 'Copy key'),
       icon: Clipboard,
       action: () => void copyJiraTextToClipboard(issue.key, 'Key')
     },
     {
+      key: 'copy-branch-name',
       label: translate(
         'auto.components.JiraIssueWorkspace.80efa101c5',
         'Copy suggested branch name'
@@ -73,6 +77,7 @@ export function getJiraIssueWorkspaceActions(issue: JiraIssue): JiraIssueWorkspa
         )
     },
     {
+      key: 'copy-prompt',
       label: translate('auto.components.JiraIssueWorkspace.0cc62bd690', 'Copy prompt'),
       icon: Clipboard,
       action: () => void copyJiraTextToClipboard(buildJiraIssuePrompt(issue), 'Prompt')

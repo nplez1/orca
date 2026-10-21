@@ -12,6 +12,8 @@ import type { JiraComment, JiraIssue } from '../../../shared/jira-types'
 import { JiraIssueTitleLabelsEditor } from './jira-issue-title-labels-editor'
 
 export type JiraIssueWorkspaceAction = {
+  /** Stable across surfaces: the row context menu and the detail sheet render the same list. */
+  key: string
   label: string
   icon: LucideIcon
   action: () => void
@@ -189,7 +191,7 @@ export function JiraIssueWorkspaceContent({
           {actionItems.map((item) => {
             const Icon = item.icon
             return (
-              <Tooltip key={item.label}>
+              <Tooltip key={item.key}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"

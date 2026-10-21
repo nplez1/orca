@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import { JiraIssueRowCopyMenu } from './JiraIssueRowCopyMenu'
+import { JiraIssueRowContextMenu } from './JiraIssueRowContextMenu'
+import { buildJiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { JiraIssueWorkspaceSplitAction } from './JiraIssueWorkspaceSplitAction'
 import type { Worktree } from '../../../shared/worktree/types'
 import { jiraListColumnVisibility, type JiraListColumn } from './jira-list-columns'
@@ -77,11 +78,17 @@ export function JiraIssueRow({
     : sprintOptions
       ? SPRINT_ISSUE_ROW_GRID
       : ISSUE_ROW_GRID
+  const workspaceMenuItem = buildJiraIssueRowWorkspaceAction({
+    issue,
+    linked: workspaces.length > 0,
+    onOpenOrStartWorkspace,
+    onStartWorkspace
+  })
 
   return (
     // Why: the row contains action buttons, so a native button wrapper would
     // create invalid nested buttons; role + keyboard handling preserves access.
-    <JiraIssueRowCopyMenu issue={issue}>
+    <JiraIssueRowContextMenu issue={issue} workspaceAction={workspaceMenuItem}>
       <div
         role="button"
         tabIndex={0}
@@ -298,6 +305,6 @@ export function JiraIssueRow({
           </Tooltip>
         </div>
       </div>
-    </JiraIssueRowCopyMenu>
+    </JiraIssueRowContextMenu>
   )
 }

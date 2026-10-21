@@ -13,6 +13,8 @@ import { TaskPageJiraPriorityBadge } from '../../task-page-jira-priority-badge'
 import { getJiraPrioritySurfaceTone } from '../../task-page-jira-priority-tone'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { JiraIssueRowContextMenu } from '../../JiraIssueRowContextMenu'
+import { buildJiraIssueRowWorkspaceAction } from '../../jira-issue-row-actions'
 
 /** Story points, as the board's own `3sp` shorthand: Jira's own board shows the
  *  number alone, but a card carries no column heading to say what it is. */
@@ -43,6 +45,10 @@ type TaskPageJiraBoardColumnsProps = {
   onDragOverOther: (event: DragEvent<HTMLElement>) => void
   onDropOther: (event: DragEvent<HTMLElement>) => void
   dragOverColumnKey: string | null
+  /** The card carries the same right-click menu as a task row, so it needs the same
+   *  Start/Show workspace handler the row's hover cluster uses. */
+  onOpenOrStartWorkspace?: (issue: JiraIssue) => void
+  onStartWorkspace?: (issue: JiraIssue) => void
 }
 
 function isSelected(issue: JiraIssue, selectedIssue: JiraIssue | null): boolean {
@@ -60,6 +66,8 @@ function JiraBoardCard({
   dragging,
   updating,
   onOpenIssue,
+  onOpenOrStartWorkspace,
+  onStartWorkspace,
   onDragStart,
   onDragEnd
 }: {
@@ -69,95 +77,128 @@ function JiraBoardCard({
   dragging: boolean
   updating: boolean
   onOpenIssue: (issue: JiraIssue) => void
+  onOpenOrStartWorkspace?: (issue: JiraIssue) => void
+  onStartWorkspace?: (issue: JiraIssue) => void
   onDragStart: (issue: JiraIssue, event: DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
 }): JSX.Element {
   const prioritySurface = getJiraPrioritySurfaceTone(issue.priority)
   const storyPoints = cardStoryPoints(issue)
+  const workspaceMenuItem = buildJiraIssueRowWorkspaceAction({
+    issue,
+    linked: attachedWorkspaceLabel !== null,
+    onOpenOrStartWorkspace,
+    onStartWorkspace
+  })
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      draggable={!updating}
-      aria-current={selected ? 'true' : undefined}
-      data-current={selected ? 'true' : undefined}
-      aria-disabled={updating ? 'true' : undefined}
-      aria-grabbed={dragging}
-      onDragStart={(event) => onDragStart(issue, event)}
-      onDragEnd={onDragEnd}
-      onClick={() => onOpenIssue(issue)}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) {
-          return
-        }
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          onOpenIssue(issue)
-        }
-      }}
-      className={cn(
-        'cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        prioritySurface.border,
-        prioritySurface.base,
-        prioritySurface.hover,
-        !updating && 'cursor-grab active:cursor-grabbing',
-        selected && prioritySurface.selected,
-        dragging && 'opacity-50',
-        updating && 'cursor-wait opacity-70'
-      )}
-    >
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <div className="min-w-0">
-          <span className="block truncate font-mono text-[11px] text-muted-foreground">
-            {issue.key}
+    <JiraIssueRowContextMenu issue={issue} workspaceAction={workspaceMenuItem}>
+      <div
+        role="button"
+        tabIndex={0}
+        draggable={!updating}
+        aria-current={selected ? 'true' : undefined}
+        aria-keyshortcuts="Enter Space Shift+F10 ContextMenu"
+        data-current={selected ? 'true' : undefined}
+        aria-disabled={updating ? 'true' : undefined}
+        aria-grabbed={dragging}
+        onDragStart={(event) => onDragStart(issue, event)}
+        onDragEnd={onDragEnd}
+        onClick={() => onOpenIssue(issue)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) {
+            return
+          }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onOpenIssue(issue)
+            return
+          }
+          // Why synthesized: macOS has no Menu key and no Shift+F10 convention, so the
+          // context menu would otherwise be pointer-only. See the task row's own handler.
+          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+            event.preventDefault()
+            const rect = event.currentTarget.getBoundingClientRect()
+            event.currentTarget.dispatchEvent(
+              new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: rect.left,
+                clientY: rect.top + rect.height / 2
+              })
+            )
+          }
+        }}
+        className={cn(
+          'cursor-pointer rounded-md border border-border/50 bg-background px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          prioritySurface.border,
+          prioritySurface.base,
+          prioritySurface.hover,
+          !updating && 'cursor-grab active:cursor-grabbing',
+          selected && prioritySurface.selected,
+          dragging && 'opacity-50',
+          updating && 'cursor-wait opacity-70'
+        )}
+      >
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <span className="block truncate font-mono text-[11px] text-muted-foreground">
+              {issue.key}
+            </span>
+            <h3 className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
+              {issue.title}
+            </h3>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {issue.status.name ? (
+              <span
+                className={cn(
+                  'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+                  getJiraStatusTone(issue.status.categoryKey)
+                )}
+              >
+                {issue.status.name}
+              </span>
+            ) : null}
+            {storyPoints ? (
+              <span
+                // Why the label as well as the shorthand: a screen reader reads "3sp"
+                // as "3 s p", and the card's own name is built from its text.
+                aria-label={translate(
+                  'auto.components.TaskPage.jiraCardStoryPointsLabel',
+                  '{{value0}} story points',
+                  { value0: issue.storyPoints }
+                )}
+                title={translate(
+                  'auto.components.TaskPage.jiraCardStoryPointsTitle',
+                  'Story points'
+                )}
+                className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+              >
+                {storyPoints}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span className="truncate">
+            {issue.assignee?.displayName ??
+              translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
           </span>
-          <h3 className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
-            {issue.title}
-          </h3>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {issue.status.name ? (
-            <span
-              className={cn(
-                'max-w-24 shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-                getJiraStatusTone(issue.status.categoryKey)
-              )}
-            >
-              {issue.status.name}
-            </span>
-          ) : null}
-          {storyPoints ? (
-            <span
-              // Why the label as well as the shorthand: a screen reader reads "3sp"
-              // as "3 s p", and the card's own name is built from its text.
-              aria-label={translate(
-                'auto.components.TaskPage.jiraCardStoryPointsLabel',
-                '{{value0}} story points',
-                { value0: issue.storyPoints }
-              )}
-              title={translate('auto.components.TaskPage.jiraCardStoryPointsTitle', 'Story points')}
-              className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
-            >
-              {storyPoints}
-            </span>
-          ) : null}
+          <div className="flex min-w-0 items-center gap-2">
+            {attachedWorkspaceLabel ? (
+              <JiraAttachedWorkspaceChip label={attachedWorkspaceLabel} />
+            ) : null}
+            {issue.priority?.name ? (
+              <TaskPageJiraPriorityBadge
+                priority={issue.priority}
+                className="shrink-0 text-[10px]"
+              />
+            ) : null}
+          </div>
         </div>
       </div>
-      <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span className="truncate">
-          {issue.assignee?.displayName ??
-            translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
-        </span>
-        <div className="flex min-w-0 items-center gap-2">
-          {attachedWorkspaceLabel ? (
-            <JiraAttachedWorkspaceChip label={attachedWorkspaceLabel} />
-          ) : null}
-          {issue.priority?.name ? (
-            <TaskPageJiraPriorityBadge priority={issue.priority} className="shrink-0 text-[10px]" />
-          ) : null}
-        </div>
-      </div>
-    </div>
+    </JiraIssueRowContextMenu>
   )
 }
 
@@ -176,7 +217,9 @@ export function TaskPageJiraBoardColumns({
   onDrop,
   onDragOverOther,
   onDropOther,
-  dragOverColumnKey
+  dragOverColumnKey,
+  onOpenOrStartWorkspace,
+  onStartWorkspace
 }: TaskPageJiraBoardColumnsProps): JSX.Element {
   const renderColumn = (
     key: string,
@@ -223,6 +266,8 @@ export function TaskPageJiraBoardColumns({
               dragging={draggingIssueKey === issue.key}
               updating={updatingIssueKeys.includes(issue.key)}
               onOpenIssue={onOpenIssue}
+              onOpenOrStartWorkspace={onOpenOrStartWorkspace}
+              onStartWorkspace={onStartWorkspace}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
             />

@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { Clipboard, FileText } from 'lucide-react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
+import { FileText } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,16 +9,19 @@ import {
 } from '@/components/ui/context-menu'
 import { translate } from '@/i18n/i18n'
 import type { JiraIssue } from '../../../shared/jira-types'
-import { copyJiraTextToClipboard } from './jira-issue-workspace-actions'
-import { buildJiraIssuePrompt } from './jira-prompt-templates'
+import { getJiraIssueRowActions, type JiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
 import { JiraPromptTemplatePopover } from './JiraPromptTemplatePopover'
 
-export function JiraIssueRowCopyMenu({
+/** The Jira task row and board card share one surface: right-click (or the platform
+ *  context-menu key) opens every action the detail sheet declares, in one list. */
+export function JiraIssueRowContextMenu({
   issue,
+  workspaceAction,
   children
 }: {
   issue: JiraIssue
+  workspaceAction: JiraIssueRowWorkspaceAction | null
   children: ReactNode
 }): React.JSX.Element {
   const [templateOpen, setTemplateOpen] = useState(false)
@@ -26,23 +29,7 @@ export function JiraIssueRowCopyMenu({
   const setAnchor = (element: HTMLDivElement | null) => {
     anchorRef.current = element
   }
-  const actions = [
-    {
-      label: translate('auto.components.JiraIssueWorkspace.38839801e8', 'Copy key'),
-      text: issue.key,
-      copiedLabel: 'Key'
-    },
-    {
-      label: translate('auto.components.JiraIssueWorkspace.779bb91ee0', 'Copy URL'),
-      text: issue.url,
-      copiedLabel: 'URL'
-    },
-    {
-      label: translate('auto.components.JiraIssueWorkspace.0cc62bd690', 'Copy prompt'),
-      text: buildJiraIssuePrompt(issue),
-      copiedLabel: 'Prompt'
-    }
-  ]
+  const actions = getJiraIssueRowActions(issue, workspaceAction)
   return (
     <Popover open={templateOpen} onOpenChange={setTemplateOpen}>
       <ContextMenu>
@@ -52,6 +39,8 @@ export function JiraIssueRowCopyMenu({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent
+          // Why: the menu is portalled outside the triggering row, but a portal still
+          // bubbles React events to the row, so a menu click would otherwise activate it.
           onClick={(event) => event.stopPropagation()}
           onCloseAutoFocus={(event) => {
             if (templateOpen) {
@@ -59,15 +48,18 @@ export function JiraIssueRowCopyMenu({
             }
           }}
         >
-          {actions.map((action) => (
-            <ContextMenuItem
-              key={action.copiedLabel}
-              onSelect={() => void copyJiraTextToClipboard(action.text, action.copiedLabel)}
-            >
-              <Clipboard className="size-3.5" />
-              {action.label}
-            </ContextMenuItem>
-          ))}
+          {actions.map((action) => {
+            const Icon = action.icon
+            return (
+              <Fragment key={action.key}>
+                {action.separatorBefore ? <ContextMenuSeparator /> : null}
+                <ContextMenuItem onSelect={action.onSelect}>
+                  <Icon className="size-3.5" />
+                  {action.label}
+                </ContextMenuItem>
+              </Fragment>
+            )
+          })}
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => setTemplateOpen(true)}>
             <FileText className="size-3.5" />

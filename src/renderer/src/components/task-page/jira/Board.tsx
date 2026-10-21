@@ -232,6 +232,8 @@ export function TaskPageJiraBoard({
                   updatingIssueKeys={drop.movingIssueKeys}
                   dragOverColumnKey={drop.dragOverColumnKey}
                   onOpenIssue={model.openJiraDetailPage}
+                  onOpenOrStartWorkspace={model.handleOpenOrUseJiraItem}
+                  onStartWorkspace={model.handleUseJiraItem}
                   onDragStart={drop.startDrag}
                   onDragEnd={drop.endDrag}
                   onDragOver={drop.handleDragOver}
