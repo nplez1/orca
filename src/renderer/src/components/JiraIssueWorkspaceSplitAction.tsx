@@ -14,6 +14,7 @@ import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { JiraIssue } from '../../../shared/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import { jiraIssueWorkspaceActionLabel } from './jira-issue-row-actions'
 
 const HOLD_MS = 500
 
@@ -39,6 +40,7 @@ export function JiraIssueWorkspaceSplitAction({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heldRef = useRef(false)
   const linked = workspaces.length > 0
+  const workspaceLabel = jiraIssueWorkspaceActionLabel(linked)
 
   useEffect(() => {
     return () => {
@@ -108,7 +110,7 @@ export function JiraIssueWorkspaceSplitAction({
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>
-          {translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
+          {workspaceLabel}
         </TooltipContent>
       </Tooltip>
     )
@@ -160,7 +162,7 @@ export function JiraIssueWorkspaceSplitAction({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.TaskPage.jiraShowWorkspace', 'Show workspace')}
+            {workspaceLabel}
           </TooltipContent>
         </Tooltip>
         <DropdownMenuTrigger asChild>
