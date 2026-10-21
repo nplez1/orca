@@ -3,6 +3,7 @@ import type {
   ClaudeUsageSummary
 } from '../../../../shared/claude-usage-types'
 import type { CodexUsageDailyPoint, CodexUsageSummary } from '../../../../shared/codex-usage-types'
+import { ORCA_REPOSITORY_DISPLAY_URL } from '../../../../shared/orca-repository'
 import { translate } from '@/i18n/i18n'
 
 export type ClaudeShareData = {
@@ -213,10 +214,7 @@ export function CardFooter(props: {
             marginLeft: 5
           }}
         >
-          {translate(
-            'auto.components.stats.share.card.utils.19f4b4dc75',
-            'github.com/stablyai/orca'
-          )}
+          {ORCA_REPOSITORY_DISPLAY_URL}
         </span>
       </div>
     </div>

@@ -35,6 +35,7 @@ import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import type * as SidebarFeedbackDialogModule from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository'
 
 // Why lazy: the feedback form is only reachable from this menu's own item, so it does not
 // belong on the renderer boot graph. Shared with the menu-open warm below so both hit the
@@ -49,7 +50,6 @@ const SidebarFeedbackDialog = lazyWithRetry(
 
 const DOCS_URL = 'https://www.onorca.dev/docs'
 const CHANGELOG_URL = 'https://onorca.dev/changelog'
-const GITHUB_URL = 'https://github.com/stablyai/orca'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = {
@@ -313,7 +313,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
                 'GitHub'
               )}
-              url={GITHUB_URL}
+              url={ORCA_REPOSITORY_URL}
               icon={<Github className="size-3.5" />}
             />
             <DropdownMenuItem onSelect={() => openExternalUrl(DISCORD_URL)}>

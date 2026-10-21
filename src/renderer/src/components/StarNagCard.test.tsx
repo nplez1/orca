@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StarNagCard } from './StarNagCard'
+import { ORCA_REPOSITORY_URL } from '../../../shared/orca-repository'
 
 type ShowPayload = { mode?: 'gh' | 'web'; surface?: 'card' | 'toast' }
 type ShowCallback = (payload?: ShowPayload) => void
@@ -95,5 +96,22 @@ describe('StarNagCard', () => {
     )
     expect(fallbackButton?.className).toContain('bg-amber-400/15')
     expect(fallbackButton?.parentElement?.textContent).toContain('Later')
+  })
+
+  it('opens this build repository from the browser fallback', async () => {
+    ;({ root, container } = renderCard())
+
+    act(() => showCallback?.({ mode: 'web', surface: 'card' }))
+    const fallbackButton = Array.from(container.querySelectorAll('button')).find((candidate) =>
+      candidate.textContent?.includes('Open GitHub')
+    )
+
+    await act(async () => {
+      fallbackButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // Why: the card asked users to star upstream for as long as its URL was a literal here.
+    expect(shell.openUrl).toHaveBeenCalledWith(ORCA_REPOSITORY_URL)
+    expect(starNag.openWeb).toHaveBeenCalledTimes(1)
   })
 })

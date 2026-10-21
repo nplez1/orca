@@ -17,15 +17,13 @@ import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { useLandingOrcaStarState, type LandingStarState } from './landing-github-star-state'
+import { ORCA_REPOSITORY_URL } from '../../../shared/orca-repository'
 
 type ShortcutItem = {
   id: string
   shortcut: ShortcutKeyComboDetails
   action: string
 }
-
-// Do not deep-link to /stargazers: GitHub 404s that page for users without repo write access.
-const ORCA_GITHUB_URL = 'https://github.com/stablyai/orca'
 
 type StarButtonProps = {
   hasRepos: boolean
@@ -61,7 +59,7 @@ function GitHubStarButton({
       return
     }
     if (state === 'web-fallback') {
-      await window.api.shell.openUrl(ORCA_GITHUB_URL)
+      await window.api.shell.openUrl(ORCA_REPOSITORY_URL)
       return
     }
     if (state !== 'not-starred') {
