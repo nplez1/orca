@@ -4,6 +4,7 @@ import { splitWorktreeId } from '../../../../shared/worktree/id'
 import { defineMethod } from '../core'
 import { resolvePairedCallerHostId } from './paired-caller-host-id'
 import { readsWorktreeRemovalMarker } from '../worktree-removal-marker-projection'
+import { queueWorkspaceDelete } from '../../workspaces/workspace-lifecycle-commands'
 import { WorktreeRemove } from '../../../../shared/rpc-contract/worktree-params'
 
 export const WORKTREE_REMOVE_METHOD = defineMethod({
@@ -41,17 +42,20 @@ export const WORKTREE_REMOVE_METHOD = defineMethod({
     // resolution costs a scan and throws for an id two hosts share. Other selectors stay unstamped.
     const explicitWorktreeId = getExplicitWorktreeIdSelector(params.worktree)
     const repoId = explicitWorktreeId ? splitWorktreeId(explicitWorktreeId)?.repoId : undefined
-    const result = await runtime.removeManagedWorktree(params.worktree, {
-      force: params.force === true,
-      runHooks: params.runHooks === true,
-      allowUnverifiedPtyStop: params.allowUnverifiedPtyStop === true,
-      allowFailedArchiveHook: params.allowFailedArchiveHook === true,
-      deleteRemoteBranch: params.deleteRemoteBranch === true,
-      ...(resolvedHostId ? { hostId: resolvedHostId } : {}),
-      // Why: only a client that shows the `removing` marker can wait out Git's delete; older
-      // clients get the acceptance and never see the row again.
-      ...(readsWorktreeRemovalMarker(context) ? { waitForBackgroundRemoval: true } : {})
-    })
+    const result = await queueWorkspaceDelete(
+      runtime,
+      params.worktree,
+      resolvedHostId,
+      params,
+      (removal) =>
+        runtime.removeManagedWorktree(params.worktree, {
+          ...removal,
+          deleteRemoteBranch: params.deleteRemoteBranch === true,
+          // Why: only a client that shows the `removing` marker can wait out Git's delete; older
+          // clients get the acceptance and never see the row again.
+          ...(readsWorktreeRemovalMarker(context) ? { waitForBackgroundRemoval: true } : {})
+        })
+    )
     return {
       removed: true,
       ...result,

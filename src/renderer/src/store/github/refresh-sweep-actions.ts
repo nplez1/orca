@@ -8,6 +8,7 @@ import { CACHE_TTL, evictStaleEntries } from './cache-policy'
 import { pruneExpiredPRRefreshStates } from './pr-refresh-state'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
 import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
+import { selectWorktreesByRepo } from '../workspace-record-selectors'
 
 export const createRefreshSweepActions = (
   set: Parameters<StateCreator<AppState>>[0],
@@ -48,7 +49,7 @@ export const createRefreshSweepActions = (
     const now = Date.now()
     const repoLookup = getGitHubRepoLookupIndex(state.repos)
 
-    for (const worktrees of Object.values(state.worktreesByRepo)) {
+    for (const worktrees of Object.values(selectWorktreesByRepo(state))) {
       for (const wt of worktrees) {
         const repo = repoLookup.findById(wt.repoId)
         if (!repo) {
@@ -85,7 +86,7 @@ export const createRefreshSweepActions = (
   refreshGitHubForWorktree: (worktreeId) => {
     const state = get()
     let worktree: Worktree | undefined
-    for (const worktrees of Object.values(state.worktreesByRepo)) {
+    for (const worktrees of Object.values(selectWorktreesByRepo(state))) {
       worktree = worktrees.find((w) => w.id === worktreeId)
       if (worktree) {
         break

@@ -8,7 +8,7 @@ import {
 } from '../shared/ephemeral-vm-runtime-store'
 import { parseOrcaYaml } from '../shared/orca-yaml'
 import type { OrcaVmRecipe } from '../shared/orca-yaml-hook-types'
-import { provisionEphemeralVmRuntime } from './ephemeral-vm-runtime-service'
+import { provisionEphemeralVmRuntime } from './ephemeral-vm/runtime-service'
 
 const RELEASE_AT = '2026-06-01T13:00:00.000Z'
 

@@ -40,13 +40,7 @@ export function notifyWorktreeCatalogChanged(mainWindow: BrowserWindow, repoId: 
 
 export function notifyWatchedWorktreeCatalogChanged(
   mainWindow: BrowserWindow,
-  repoId: string,
-  connectionId?: string
+  repoId: string
 ): void {
-  if (connectionId) {
-    // Why: a nested SSH discovery stays local until the event can carry its owner (#16557).
-    notifyWorktreesChanged(mainWindow, repoId)
-    return
-  }
   notifyWorktreeCatalogChanged(mainWindow, repoId)
 }

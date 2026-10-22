@@ -9,6 +9,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import type { RuntimeNavigationTarget } from '../../../../shared/runtime-navigation'
 import type { TabActivationIntent } from '../../../../shared/tab-activation-intent'
 import type { RuntimeMobileSessionTabsResult } from '../../../../shared/runtime-types'
+import type { RuntimeMobileSessionTabActivationResult } from '../../../../shared/runtime-session-contracts'
 import type { ResolvedWorktree } from '../../runtime-worktree-path-identity'
 import { includeTargetResolvedWorktree } from '../../runtime-worktree-path-identity'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
@@ -17,6 +18,7 @@ import { navigationTargetsHost } from '../../../../shared/runtime-navigation'
 import { isAutomaticTabActivation } from '../../../../shared/tab-activation-intent'
 import { isWorktreeTerminalsSleepingError } from '../../worktree-terminals-sleeping-error'
 
+import { paneHoldsSession } from '../../terminal/surface/main-terminal-surfaces'
 export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh extends OrcaRuntimeWithRestoredPaneStart {
   protected abstract buildResolvedWorktreeFromId(
     ...args: Parameters<WorkspaceSelectors['buildResolvedWorktreeFromId']>
@@ -126,7 +128,7 @@ export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh exten
       navigation?: RuntimeNavigationTarget
       intent?: TabActivationIntent
     } = {}
-  ): Promise<RuntimeMobileSessionTabsResult> {
+  ): Promise<RuntimeMobileSessionTabActivationResult> {
     const navigation = opts.navigation ?? (opts.notifyClients === false ? 'caller' : 'all')
     const targetsHost = navigationTargetsHost(navigation)
     const explicitWorktreeId = this.getExplicitSessionWorktreeIdSelector(worktreeSelector)
@@ -187,6 +189,7 @@ export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh exten
           group.tabOrder.includes(tab.parentTabId)
         )?.id
         const trigger = { automatic, targetsHost, targetGroupId }
+        let startupCwdFallback: RuntimeMobileSessionTabActivationResult['startupCwdFallback']
         try {
           // Switch point: a pane main holds starts through main's one starter.
           if (ORCA_LAYOUT_OWNER_IS_MAIN) {
@@ -198,11 +201,12 @@ export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh exten
             if (started === null) {
               throw new Error('tab_not_found')
             }
+            startupCwdFallback = started.startupCwdFallback
           } else {
             await this.materializePendingMobileSessionTerminal(worktreeId, tab, {
               ...trigger,
               sessionId: tab.ptyId ?? tab.parentLayout?.ptyIdsByLeafId?.[tab.leafId] ?? undefined
-            })
+            }).then((created) => (startupCwdFallback = created.startupCwdFallback))
           }
         } catch (err) {
           if (automatic && isWorktreeTerminalsSleepingError(err)) {
@@ -216,12 +220,13 @@ export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh exten
           }
           throw err
         }
-        return this.applyMobileSessionTabNavigation(
+        const activated = this.applyMobileSessionTabNavigation(
           this.getMobileSessionTabsForWorktree(worktreeId),
           tab.id,
           navigation,
           opts.clientNavigationId
         )
+        return startupCwdFallback ? { ...activated, startupCwdFallback } : activated
       }
       const callerSnapshot = this.getMobileSessionTabsForWorktree(
         worktreeId,
@@ -279,5 +284,13 @@ export abstract class OrcaRuntimeWithPerformMobileSessionPtyRecordsRefresh exten
       navigation,
       opts.clientNavigationId
     )
+  }
+
+  /** Whether a pane may still hold an agent session: a terminal of it not proven exited, or none. */
+  protected paneHoldsSession(paneKey: string): boolean {
+    const panePtyIds = [...this.ptysById.values()].flatMap((pty) =>
+      this.paneOfPty(pty).paneKey === paneKey ? [pty.ptyId] : []
+    )
+    return paneHoldsSession(this, paneKey, panePtyIds, (ptyId) => this.isPtyKnownExited(ptyId))
   }
 }

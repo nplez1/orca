@@ -1,4 +1,4 @@
-import { readAgentProcessIdentity } from './agent-process-presence'
+import { readHookAgentProcess } from './agent-process-presence'
 import { isInheritedPaneOwnerEvent } from './agent-hook-listener/inherited-pane-owner-guard'
 import { admitNestedAgentPost } from './agent-hook-listener/pi-claude-child-events'
 import { normalizeAgentStatusPayload, type AgentMainAgentStatus } from './agent-status-types'
@@ -169,8 +169,11 @@ export function normalizeHookPayload(
   if (nested.kind !== 'pass') {
     return nested.kind === 'refuse' ? null : nested.event
   }
+  const agentProcess = readHookAgentProcess(source, record.agentProcess)
   // Reject before provider folds mutate the pane's prompt, tool and child caches.
-  if (isInheritedPaneOwnerEvent({ previousStatus, worktreeId, source })) {
+  if (
+    isInheritedPaneOwnerEvent({ previousStatus, worktreeId, source, incomingProcess: agentProcess })
+  ) {
     return null
   }
   // Why: only a MANUAL completion claims anything, so only it may write compact-scoped state. An
@@ -213,9 +216,6 @@ export function normalizeHookPayload(
     }
   }
 
-  // Why: presence needs the agent's own process; without it the hook cannot speak for liveness.
-  const agentProcess =
-    source === 'claude' ? readAgentProcessIdentity(record.agentProcess) : undefined
   const agentPresence = agentProcess
     ? { agent: source, process: agentProcess, sessionOwner: true as const }
     : undefined

@@ -7,6 +7,7 @@ import {
   getPiAgentStatusAsyncSubagentSessionNoteLines,
   getPiAgentStatusAsyncSubagentSourceLines
 } from './agent-status-async-subagent-source'
+import { getOmpPlanReviewHandlerSourceLines } from './omp-plan-review-source'
 import { getPiAgentStatusUiPromptHandlerSourceLines } from './agent-status-ui-prompt-source'
 import {
   getPiSubagentRosterEventSourceLines,
@@ -201,6 +202,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     '',
     ...approvalHandlers,
     ...getPiAgentStatusAsyncSubagentSourceLines(kind),
+    ...(kind === 'prime-agent' ? [] : getOmpPlanReviewHandlerSourceLines()),
     ...getPiAgentStatusUiPromptHandlerSourceLines(kind),
     ...modelSelectHandler,
     "  // Why: capture the assistant's final text on each completed message",

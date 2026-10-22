@@ -352,7 +352,8 @@
             "da68d35f7b": "Open failed page in default browser",
             "db325a7eeb": "Can't reach {{value0}}",
             "e72dfa268a": "annotate",
-            "e7ca5a098c": "success"
+            "e7ca5a098c": "success",
+            "f796c774a4": "Type a URL above to start browsing."
           },
           "BrowserToolbarMenu": {
             "6aa42813e4": "Imported {{value0}} cookies from {{value1}}{{value2}}."
@@ -791,6 +792,7 @@
             "databaseCount_other": "{{value0}} databases",
             "fileCount_one": "{{value0}} file",
             "fileCount_other": "{{value0}} files",
+            "reading": "Reading {{value0}} files",
             "refresh": "Refresh",
             "stoppedAfter": "Stopped after {{value0}}",
             "stoppedAt": "stopped at {{value0}}"
@@ -917,6 +919,7 @@
             "15b7f210d7": "Review the prompt before starting an agent.",
             "1f7119f604": "Base",
             "2830dd64a2": "deleted",
+            "2f609a2e7c": "Delete all untracked",
             "3636d0f686": "ready",
             "383cf92c73": "tree",
             "3a231c845b": "unknown",
@@ -1184,6 +1187,7 @@
           "b2b1aa936d": "Paste your opencode.ai session cookie for rate limit fetching.",
           "b8c2905c2b": "Could not load Codex accounts.",
           "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in.",
+          "remoteScopeAccounts": "Showing accounts managed by {{value0}}. Add or re-authenticate accounts on that server.",
           "remoteScopeLocalAccountsKept": "Accounts managed on this desktop are unchanged. Switch the default runtime back to Local desktop to view them."
         },
         "AdvancedNetworkSettingsSection": {
@@ -1245,6 +1249,10 @@
           "af0831a590": "Saved",
           "af2d9a2cc6": ". Orca generates only the final segment, like",
           "ebb942a2ec": "fix-login-flow"
+        },
+        "BrowserDefaultZoomSetting": {
+          "2622126877": "Zoom level applied to newly opened browser tabs.",
+          "bbeec087d3": "Applied to newly opened browser tabs."
         },
         "BrowserPane": {
           "4af9a17947": "kagi"
@@ -1364,7 +1372,8 @@
           "show": "Show"
         },
         "GitPane": {
-          "f35007e6e8": "git-username"
+          "f35007e6e8": "git-username",
+          "untrackedFirst": "Untracked first"
         },
         "GrokAccountsSection": {
           "c3d4e5f6a7": "Signed in. Orca only reads that file on disk — run grok login again if usage fails.",
@@ -2747,6 +2756,8 @@
             "6d9793d4bc": "Resource Manager - Terminals",
             "996295bff2": "orphan terminal",
             "9e2525c89f": "Resident memory held by Orca plus the processes under each worktree's terminals.",
+            "bd19fd7a59": "Kill all sessions",
+            "c9382662bb": "Restart daemon",
             "e7ccce7e87": "of system RAM"
           },
           "SshStatusSegment": {
@@ -2756,6 +2767,7 @@
             "bc5a3fd41a": "partial",
             "connectedHostCount_one": "{{count}} host",
             "connectedHostCount_other": "{{count}} hosts",
+            "connecting": "Connecting…",
             "d09ec41831": "Remote Hosts",
             "fbb3f9f05e": "conflict",
             "fd9a3c600e": "error",
@@ -2816,7 +2828,8 @@
             "2186a8407c": "Split Down",
             "7e8106899f": "Split Left",
             "96354ed249": "Split Up",
-            "966feb9ad5": "Split Right"
+            "966feb9ad5": "Split Right",
+            "9dd880bd56": "Close All Tabs To The Right"
           },
           "EditorFileTabCloseButton": {
             "a768f428f1": "Close tab"
@@ -2825,6 +2838,7 @@
             "1d04b1630b": "Split Down",
             "6b3efb106e": "Split Up",
             "e3ff145b98": "Split Left",
+            "e5ff31ccaf": "Close All Tabs To The Right",
             "f7c3d7d5af": "Split Right"
           },
           "QuickLaunchButton": {
@@ -2834,7 +2848,8 @@
             "0ce4bae39d": "Split Left",
             "21132389e9": "Split Right",
             "591f9b12c1": "Split Up",
-            "af80ed83c1": "Split Down"
+            "af80ed83c1": "Split Down",
+            "c1ee099c7e": "Close All Tabs To The Right"
           },
           "TabBarQuickCommandsButton": {
             "c781f992e4": "destructive"
@@ -3411,7 +3426,8 @@
       },
       "composer": {
         "effort": "Effort",
-        "imageUnsupported": "Image paste is not supported for this agent."
+        "imageUnsupported": "Image paste is not supported for this agent.",
+        "placeholder": "Ask anything, @ to mention files, / for commands"
       },
       "failureWords": {
         "accountSwitchInProgress": "{{agent}}'s setup is changing on this host. Try again after it finishes.",
@@ -3449,6 +3465,7 @@
         "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
         "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
         "cliMissing": "{{agent}} wasn't found on the computer running this chat. Install it, or check its Command in Settings → Agents.",
+        "cliTooOld": "{{agent}} {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
         "codexCliTooOld": "Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
         "codexManagedNotSignedIn": "This Codex account isn't signed in. Sign in again in Codex Accounts settings.",
         "codexSystemNotSignedIn": "Codex isn't signed in. Run `{{loginCommand}}`.",
@@ -3521,6 +3538,8 @@
       "notices": {
         "compaction": "Context compacted",
         "contextCleared": "Context cleared",
+        "continuedOutside": "Continued outside this chat.",
+        "continuedOutsideRewound": "Continued outside this chat. Earlier replies above are no longer in this conversation's history.",
         "historyItemTooLarge": "This part of the chat was too large to show.",
         "historyRepaired": "Part of this chat's history couldn't be loaded.",
         "plan": "Plan"
@@ -3645,6 +3664,7 @@
         "historyUnusable": "Unable to load this chat.",
         "hostReconciling": "Orca is still checking on this chat after restarting.",
         "messageNotSaved": "Couldn't save your message.",
+        "messageTooLarge": "It is over the 256 KB limit for one message.",
         "messagesUnsettled": "A message you sent earlier isn't confirmed yet.",
         "notAvailable": "This isn't available in this chat.",
         "notDoneAnswer": "Your answer was not sent.",
@@ -3675,6 +3695,7 @@
         "savedByNewerOrca": "Chats were saved by a newer Orca.",
         "sendOutcomeLost": "Orca couldn't confirm your message reached the agent. Check the chat, then send it again if needed.",
         "settleEarlierMessage": "Wait for your earlier message to go through, or retry it.",
+        "shortenMessage": "Shorten or split it, then send it again.",
         "shrinkQueue": "Delete a queued message, or wait for one to go through, then try again.",
         "startNewChat": "Start a new chat to continue.",
         "terminalAgentHoldsChat": "This chat is still open in a terminal agent.",
@@ -3699,6 +3720,19 @@
           "managePullRequests": "Read, comment on, and merge pull requests without leaving Orca",
           "reviewStatus": "See issue state, review status, and CI checks on every worktree",
           "startWorkspaceFromIssue": "Start a workspace from any GitHub issue or pull request, prefilled with its title and context"
+        }
+      }
+    },
+    "tab": {
+      "bar": {
+        "BrowserTab": {
+          "closeTabsToLeft": "Close All Tabs To The Left"
+        },
+        "EditorFileTabContextMenu": {
+          "closeTabsToLeft": "Close All Tabs To The Left"
+        },
+        "SortableTabContextMenu": {
+          "closeTabsToLeft": "Close All Tabs To The Left"
         }
       }
     },
@@ -3728,6 +3762,16 @@
           "readyManyOne": "{{value0}} workspaces found, with 1 cleanup suggestion.",
           "readyOneMany": "1 workspace found, with {{value0}} cleanup suggestions.",
           "readyOneOne": "1 workspace found, with 1 cleanup suggestion."
+        }
+      },
+      "delete": {
+        "unsavedEdits": {
+          "blocked_one": "Save or close {{count}} unsaved file in {{name}} first",
+          "blocked_other": "Save or close {{count}} unsaved files in {{name}} first",
+          "closedToast_one": "Closed {{count}} file with unsaved edits from {{workspace}}",
+          "closedToast_other": "Closed {{count}} files with unsaved edits from {{workspace}}",
+          "discarded_one": "Unsaved edits in {{count}} file will be discarded:",
+          "discarded_other": "Unsaved edits in {{count}} files will be discarded:"
         }
       }
     }
@@ -3761,9 +3805,6 @@
     }
   },
   "jira": {
-    "board": {
-      "noTransition": "No status change to {{column}} is available for {{key}}."
-    },
     "copy": {
       "actions": "Copy issue context",
       "context": "Copy context for {{key}}"
@@ -3779,6 +3820,12 @@
   },
   "menu": {
     "quitApp": "Quit {{appName}}"
+  },
+  "resourceManager": {
+    "pty": {
+      "localOwnedCount_one": "{{count}} Orca PTY on this computer",
+      "localOwnedCount_other": "{{count}} Orca PTYs on this computer"
+    }
   },
   "runtimeRpc": {
     "startupFailure": {

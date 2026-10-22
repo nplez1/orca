@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import type { Store } from '../persistence'
+import type { Store } from '../persistence/loading-store/store'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
@@ -10,28 +10,28 @@ import {
   getEphemeralVmRecipeResultPairingCode
 } from '../../shared/ephemeral-vm-recipes'
 import { updateEnvironmentFromPairingCode } from '../../shared/runtime-environment-store'
-import { releaseEphemeralVmRuntimeEnvironments } from '../ephemeral-vm-runtime-environment-release'
+import { releaseEphemeralVmRuntimeEnvironments } from '../ephemeral-vm/runtime-environment-release'
 import {
   cleanupEphemeralVmRuntime,
   resumeEphemeralVmRuntime,
-  stopEphemeralVmRuntimeCleanup,
   suspendEphemeralVmRuntime
-} from '../ephemeral-vm-runtime-service'
+} from '../ephemeral-vm/runtime-service'
+import { stopEphemeralVmRuntimeCleanup } from '../ephemeral-vm/runtime-cleanup-control'
 import { extendEphemeralVmRuntimeLease } from '../ephemeral-vm-runtime-extend'
 import { runEphemeralVmRuntimeContextMenuItem } from '../ephemeral-vm-runtime-context-menu'
-import { removeEphemeralVmRuntimeSshTarget } from '../ephemeral-vm-runtime-ssh-cleanup'
+import { removeEphemeralVmRuntimeSshTarget } from '../ephemeral-vm/runtime-ssh-cleanup'
 import {
   buildEphemeralVmRecipeCleanupCommand,
   buildEphemeralVmRecipeCleanupPayload
-} from '../ephemeral-vm-recipe-runner'
+} from '../../shared/ephemeral-vm-recipe-lifecycle-payload'
 import {
   connectRuntimeOwnedSshTarget,
   disconnectRuntimeOwnedSshTarget,
   removeRuntimeOwnedSshTarget
-} from '../ephemeral-vm-runtime-ssh'
+} from '../ephemeral-vm/runtime-ssh'
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { invalidateRuntimeEnvironmentTransport } from './runtime-environments/runtime-environments'
-import { attachEphemeralVmRuntimeToWorkspace } from '../ephemeral-vm-runtime-attachment'
+import { attachEphemeralVmRuntimeToWorkspace } from '../ephemeral-vm/runtime-attachment'
 
 export type EphemeralVmCleanupCommandResult = {
   runtimeId: string

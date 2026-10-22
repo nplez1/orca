@@ -103,6 +103,8 @@ export const mainProcessState = {
   crashReports: null as CrashReportStore | null,
   unsubscribeAgentAwakeStatusChanges: null as (() => void) | null,
   unsubscribeSystemResumeBroadcast: null as (() => void) | null,
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens the null slot to the stop function assigned by main-process-observers.
+  stopDesktopPresenceReporter: null as (() => void) | null,
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the state object's per-field nullable pattern; assigned in observers and read with an optional call.
   uninstallMainThreadStallProbe: null as (() => void) | null,
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: matches the state object's per-field nullable pattern; assigned during observer installation and read with an optional call.

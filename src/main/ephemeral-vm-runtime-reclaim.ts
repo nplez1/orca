@@ -12,10 +12,10 @@ import {
 } from '../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import { isRuntimeHostContactRevoked } from '../shared/runtime-host-status'
-import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm-runtime-environment-release'
+import { releaseEphemeralVmRuntimeEnvironments } from './ephemeral-vm/runtime-environment-release'
 import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
-import { removeRuntimeOwnedSshTarget } from './ephemeral-vm-runtime-ssh'
-import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm-runtime-ssh-cleanup'
+import { removeRuntimeOwnedSshTarget } from './ephemeral-vm/runtime-ssh'
+import { removeEphemeralVmRuntimeSshTarget } from './ephemeral-vm/runtime-ssh-cleanup'
 import { getRuntimeEnvironmentStatusSnapshots } from './ipc/runtime-environments/runtime-environment-request-connections'
 import { getSshConnectionManager } from './ssh/targets/ssh-target-registry'
 

@@ -10,7 +10,7 @@ import {
   runEphemeralVmRecipeContextMenuItem,
   type EphemeralVmRuntimeContextMenuItemRun
 } from '../shared/ephemeral-vm-recipe-context-menu-runner'
-import { contextFromRuntime } from './ephemeral-vm-runtime-service'
+import { contextFromRuntime } from './ephemeral-vm/runtime-service'
 
 export type RunEphemeralVmRuntimeContextMenuItemArgs = {
   userDataPath: string

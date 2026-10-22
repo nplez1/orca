@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react'
+import { useAppStore } from '@/store'
+import { confirmUnsavedDiscard } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
 import type { WorktreeRemovalTarget } from '../../../../shared/worktree/removal'
 import type { WorktreeDeleteIdentity } from './worktree-delete-request'
 import { runDialogForceDelete } from './delete-worktree-dialog-force-delete'
@@ -6,6 +8,7 @@ import { runLineageDeleteAll } from './delete-worktree-lineage-delete-all'
 import { runWorktreeDeletesInParallel } from './delete-worktree-flow'
 
 type RemoveWorktreeForDialog = Parameters<typeof runDialogForceDelete>[0]['removeWorktree']
+type UnsavedTargets = Parameters<typeof confirmUnsavedDiscard>[1]
 type ResolveConfirmedTargets = Parameters<typeof runLineageDeleteAll>[0]['resolveConfirmedTargets']
 
 /**
@@ -23,6 +26,8 @@ export function useDeleteWorktreeDialogActions(args: {
   forceOnConfirm: boolean
   /** The user opted into deleting the remote branch on this delete. */
   deleteRemoteBranch: boolean
+  /** Targets whose unsaved edits the dialog lists before the delete runs. */
+  unsavedTargets: UnsavedTargets
   removeWorktree: RemoveWorktreeForDialog
   resolveConfirmedTargets: ResolveConfirmedTargets
   persistDontAskAgainPreference: () => void
@@ -40,6 +45,7 @@ export function useDeleteWorktreeDialogActions(args: {
     allowSkipConfirm,
     forceOnConfirm,
     deleteRemoteBranch,
+    unsavedTargets,
     removeWorktree,
     resolveConfirmedTargets,
     persistDontAskAgainPreference,
@@ -63,6 +69,7 @@ export function useDeleteWorktreeDialogActions(args: {
       if (!currentWorktrees) {
         return
       }
+      const confirmedDiscards = confirmUnsavedDiscard(useAppStore.getState, unsavedTargets)
       // Why: force-delete is a recovery path taken after a failed first delete. Saving
       // "don't ask again" from that state would conflate the recovery action with a broader
       // preference, so only the primary (non-force) confirmation persists it.
@@ -76,6 +83,7 @@ export function useDeleteWorktreeDialogActions(args: {
           removeWorktree,
           closeModal,
           onDeleted,
+          confirmedDiscards,
           ...remoteBranchOptions
         })
         return
@@ -86,6 +94,7 @@ export function useDeleteWorktreeDialogActions(args: {
       const deletePromise = runWorktreeDeletesInParallel(currentWorktrees, {
         force: forceOnConfirm,
         ...remoteBranchOptions,
+        confirmedDiscards,
         onForceDeleted: onForceDeletedFromToast
       })
       // Why: the workspace card owns the in-progress feedback, so the confirmation should get
@@ -110,6 +119,7 @@ export function useDeleteWorktreeDialogActions(args: {
       resolveConfirmedTargets,
       worktreeCount,
       worktreeDeleteIdentities,
+      unsavedTargets,
       worktreeId
     ]
   )
@@ -121,6 +131,7 @@ export function useDeleteWorktreeDialogActions(args: {
       resolveConfirmedTargets,
       forceOnConfirm,
       ...remoteBranchOptions,
+      confirmedDiscards: confirmUnsavedDiscard(useAppStore.getState, unsavedTargets),
       onForceDeleted: onForceDeletedFromToast,
       closeModal,
       onDeleted
@@ -133,7 +144,8 @@ export function useDeleteWorktreeDialogActions(args: {
     onDeleted,
     onForceDeletedFromToast,
     remoteBranchOptions,
-    resolveConfirmedTargets
+    resolveConfirmedTargets,
+    unsavedTargets
   ])
 
   return { handleDelete, handleDeleteAll }

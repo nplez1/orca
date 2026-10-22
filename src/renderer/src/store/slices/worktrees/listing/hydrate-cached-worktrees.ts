@@ -27,7 +27,7 @@ export function createHydrateCachedWorktrees(
         if (!repo) {
           continue
         }
-        mergeFetchedWorktrees(set, {
+        mergeFetchedWorktrees(set, get, {
           repoId: repo.id,
           hostId: LOCAL_EXECUTION_HOST_ID,
           ownerWasMissingAtStart: false,

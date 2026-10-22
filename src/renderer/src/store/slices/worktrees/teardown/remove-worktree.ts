@@ -240,7 +240,8 @@ export function createRemoveWorktree(
         hostId,
         requiredExecutionHostId,
         beforeRemoval,
-        catalogVersion: removalResult?.catalogVersion
+        catalogVersion: removalResult?.catalogVersion,
+        confirmedDiscards: options?.confirmedDiscards
       })
       // Why after the teardown: it is the pass that released (or failed to release) the machine, and
       // a notice that claims otherwise must not be shown for a delete that never got this far.

@@ -6,18 +6,13 @@ import { clearQuickOpenPathInventories } from './quick-open-path-inventory'
 
 /** Tear down all watchers on app shutdown. */
 export async function closeAllWatchers(): Promise<void> {
-  // Why: drop the intent with the rest of the state, but keep the provider-registration
-  // subscription — a new fs:watchWorktree reopens the subsystem and still needs the re-arm hook.
-  watcherLifecycleState.desiredRemoteWatchers.clear()
   for (const lifetime of watcherLifecycleState.senderLifetimes.values()) {
     lifetime.dispose()
   }
   watcherLifecycleState.senderLifetimes.clear()
   watcherLifecycleState.unwatchableRoots.clear()
   watcherLifecycleState.suspendedLocalWatcherListeners.clear()
-  watcherLifecycleState.suspendedRemoteWatcherListeners.clear()
   watcherLifecycleState.cancelledLocalInstallWaiters.clear()
-  watcherLifecycleState.cancelledRemoteInstallWaiters.clear()
   for (const retry of watcherLifecycleState.pendingLocalCapacityRetries.values()) {
     retry.cancelWait()
   }
@@ -29,34 +24,9 @@ export async function closeAllWatchers(): Promise<void> {
   }
   watcherLifecycleState.pendingTeardowns.clear()
 
-  for (const timer of watcherLifecycleState.pendingRemoteWatcherRetries.values()) {
-    clearTimeout(timer)
-  }
-  watcherLifecycleState.pendingRemoteWatcherRetries.clear()
-  watcherLifecycleState.pendingRemoteWatcherRetryListeners.clear()
-  for (const state of watcherLifecycleState.remoteWatcherResyncStates.values()) {
-    if (state.timer) {
-      clearTimeout(state.timer)
-    }
-  }
-  watcherLifecycleState.remoteWatcherResyncStates.clear()
-  for (const dormant of watcherLifecycleState.dormantRemoteWatchers.values()) {
-    clearTimeout(dormant.timer)
-  }
-  watcherLifecycleState.dormantRemoteWatchers.clear()
-  watcherLifecycleState.loggedUnavailableRemoteWatchers.clear()
-  // Why: latch both subsystems shut so late installs can't register; generation bumps reject older-lifecycle waiters.
-  watcherLifecycleState.remoteWatchersClosed = true
-  watcherLifecycleState.remoteWatcherLifecycleGeneration += 1
+  // Why: latch the subsystem shut so late installs can't register; the generation bump rejects older-lifecycle waiters.
   watcherLifecycleState.localWatchersClosed = true
   watcherLifecycleState.localWatcherLifecycleGeneration += 1
-  watcherLifecycleState.pendingRemoteInstallPromises.clear()
-  // Why: cancel in-flight provider.watch() calls so their resolved unwatch handles aren't installed post-shutdown.
-  for (const token of watcherLifecycleState.inFlightRemoteInstalls.values()) {
-    token.listeners.clear()
-    token.cancelled = true
-    token.abortController.abort()
-  }
   for (const token of watcherLifecycleState.inFlightLocalInstalls.values()) {
     token.listeners.clear()
     token.cancelled = true
@@ -73,15 +43,4 @@ export async function closeAllWatchers(): Promise<void> {
   watcherLifecycleState.failedLocalUnsubscribes.clear()
   // Why: kill the forked watcher process instead of watcher.node's crash-prone async teardown; process death frees native handles.
   disposeWatcherProcess()
-
-  // Why: remote watchers are separate from local @parcel/watcher subs; unwatch here or the relay keeps polling FS after shutdown.
-  for (const [key, state] of watcherLifecycleState.remoteWatchers) {
-    state.batch.close()
-    try {
-      state.unwatch()
-    } catch (err) {
-      console.error(`[filesystem-watcher] remote unwatch error for ${key}:`, err)
-    }
-  }
-  watcherLifecycleState.remoteWatchers.clear()
 }

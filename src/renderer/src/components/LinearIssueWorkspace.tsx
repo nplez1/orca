@@ -18,6 +18,7 @@ import { LinearIssueSubIssues } from './linear-issue-sub-issues'
 import { useLinearIssueWorkspaceDetail } from './linear-issue-workspace-detail-state'
 import { LinearIssueWorkspaceHeader } from './linear-issue-workspace-header'
 import { LinearIssueWorkspaceSidebar } from './linear-issue-workspace-sidebar'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 type LinearIssueWorkspaceProps = {
   issue: LinearIssue | null
@@ -54,7 +55,7 @@ function LinearIssueWorkspaceIssue({
 }: LinearIssueWorkspaceIssueProps): React.JSX.Element {
   const providerSettings: RuntimeLinearSettings = sourceContext
   const allWorktrees = useAllWorktrees()
-  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const folderWorkspaces = useAppStore((state) => selectFolderWorkspaces(state))
   const attachmentWorkspaces = useMemo(
     () => [...allWorktrees, ...folderWorkspaces.map(folderWorkspaceToWorktree)],
     [allWorktrees, folderWorkspaces]

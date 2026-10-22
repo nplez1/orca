@@ -6,11 +6,17 @@ import { vi } from 'vitest'
 
 import { createTrackedPiEventBus, type PiEventBus } from './agent-status-extension-test-event-bus'
 import { getPiAgentStatusExtensionSource } from './agent-status-extension-source'
+import { AGENT_STATUS_EXTENSION_BASE_ENV } from './agent-status-extension-test-env'
 
 export type HookContext = {
   hasUI?: boolean
-  ui?: { setEditorText?: (text: string) => void; notify?: (message: string, level: string) => void }
+  ui?: {
+    setEditorText?: (text: string) => void
+    notify?: (message: string, level: string) => void
+    onTerminalInput?: (handler: (data: string) => { consume?: boolean } | undefined) => () => void
+  }
   isIdle?: () => boolean
+  resolvePlanReview?: (reviewId: string, choice: string) => boolean
   model?: { provider?: unknown; id?: unknown } | null
   modelRegistry?: { getAvailable: () => { provider: string; id: string }[] }
   sessionManager?: {
@@ -65,17 +71,6 @@ export type AgentStatusExtensionHarness = {
     piEventListenerCount: (name: string) => number
   }
 }
-
-const BASE_ENV = {
-  ORCA_PANE_KEY: 'pane-1',
-  ORCA_AGENT_LAUNCH_TOKEN: 'launch-1',
-  ORCA_TAB_ID: 'tab-1',
-  ORCA_WORKTREE_ID: 'tree-1',
-  ORCA_AGENT_HOOK_PORT: '4321',
-  ORCA_AGENT_HOOK_TOKEN: 'token-1',
-  ORCA_AGENT_HOOK_ENV: 'env-1',
-  ORCA_AGENT_HOOK_VERSION: '1.2.3'
-} satisfies Record<string, string>
 
 // Why: ownership keys on process.pid, so reload and child-process tests need
 // stable, distinct identities.
@@ -184,7 +179,7 @@ export function createAgentStatusExtensionHarness(args: {
   const processMock = {
     kill: killMock,
     env: {
-      ...BASE_ENV,
+      ...AGENT_STATUS_EXTENSION_BASE_ENV,
       ...(args.kind === 'prime-agent' ? { PRIME_AGENT_INTERNAL_DAEMON_WORKER: '1' } : {}),
       ...args.env
     },

@@ -7,7 +7,7 @@ import type {
   JiraSiteSelection,
   JiraViewer
 } from '../../shared/jira-types'
-import { clearAttachmentImagesForSite } from './attachment-image-cache'
+import { clearAttachmentImagesForSite } from './attachments/image-cache'
 import { noteReplicatedCredentialChanged } from '../host-sync/host-settings-replication-service'
 import { acquire, release } from './request-queue'
 import {

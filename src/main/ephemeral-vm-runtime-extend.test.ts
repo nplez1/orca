@@ -24,7 +24,7 @@ vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
 vi.mock('./ipc/runtime-environments', () => ({
   invalidateRuntimeEnvironmentTransport: mocks.invalidateRuntimeEnvironmentTransport
 }))
-vi.mock('./ephemeral-vm-runtime-ssh', () => ({
+vi.mock('./ephemeral-vm/runtime-ssh', () => ({
   connectRuntimeOwnedSshTarget: mocks.connectRuntimeOwnedSshTarget,
   disconnectRuntimeOwnedSshTarget: mocks.disconnectRuntimeOwnedSshTarget
 }))

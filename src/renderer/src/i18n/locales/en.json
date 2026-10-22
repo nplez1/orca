@@ -157,6 +157,27 @@
     },
     "request": {
       "pairedServerWorkspace": "This workspace runs on a paired server. Use that server's browser tabs."
+    },
+    "newTab": {
+      "emptyHint": "Search or enter an address above. Sites you visit, dev servers running in this workspace, and its PR and issue will show up here.",
+      "openServerFailed": "Couldn’t open {{address}}",
+      "removedFromHistory": "Removed “{{title}}” from history",
+      "removeSuggestion": "Remove from history",
+      "state": {
+        "closed": "Closed",
+        "draft": "Draft",
+        "merged": "Merged",
+        "open": "Open"
+      },
+      "suggested": "Suggested",
+      "thisWorkspace": "This workspace",
+      "undo": "Undo",
+      "checks": {
+        "failing": "Checks failing",
+        "passing": "Checks passing",
+        "pending": "Checks pending"
+      },
+      "runningElsewhere": "{{count}} running in other workspaces"
     }
   },
   "editor": {
@@ -272,7 +293,8 @@
         "korean": "한국어",
         "japanese": "日本語",
         "spanish": "Español",
-        "french": "Français"
+        "french": "Français",
+        "portuguese": "Português (Brasil)"
       },
       "statusBar": {
         "claudeToggleDescription": "Show Claude token and cost usage for the active workspace.",
@@ -391,6 +413,23 @@
         "optionNativeTooltip": "Keeps Electron's built-in identity for sites that reject the cleaned identity. Google sign-in is unavailable in Native mode.",
         "restartRequired": "Restart required",
         "unavailable": "Browser identity is unavailable."
+      },
+      "sitePermissions": {
+        "allow": "Allow",
+        "block": "Block",
+        "ask": "Ask again",
+        "profile": "Browser profile",
+        "empty": "No sites have been allowed or blocked yet.",
+        "title": "Site permissions",
+        "description": "Sites ask before using your camera, microphone, location and more. Change what you allowed or blocked for each site.",
+        "search": {
+          "permissions": "permissions",
+          "camera": "camera",
+          "microphone": "microphone",
+          "location": "location",
+          "notifications": "notifications",
+          "clipboard": "clipboard"
+        }
       }
     },
     "agents": {
@@ -431,7 +470,11 @@
       "customPermissions": "Custom arguments",
       "replaceWithPermissionMode": "Replace with {{mode}}",
       "expandAgentSettings": "Expand agent settings",
-      "collapseAgentSettings": "Collapse agent settings"
+      "collapseAgentSettings": "Collapse agent settings",
+      "defaultOpensAs": "Open {{value0}} as",
+      "defaultOpensAsChat": "Chat",
+      "defaultOpensAsCli": "CLI",
+      "defaultOpensAsScope": "Applies to new {{value0}} sessions launched from this computer, including on paired hosts. Matches its Providers switch."
     },
     "followSymlinkedDirectoriesKeywords": {
       "symlink": "symlink",
@@ -879,6 +922,14 @@
                 "5b7d781d67": "Failed to save quick command"
               }
             }
+          }
+        },
+        "worktree": {
+          "removal": {
+            "vmNotReleasedTitle": "Workspace removed — its VM may still be running",
+            "vmNotReleasedBody": "Its server never answered, so Orca removed the workspace locally and left the machine to its provider lease. Settings → Ephemeral VMs shows it while it is still running.",
+            "vmReleasedTitle": "Workspace removed — its VM was released",
+            "vmReleasedBody": "Its server never answered, so Orca released the machine without it instead of leaving it allocated."
           }
         }
       }
@@ -4016,7 +4067,8 @@
             "chatUnavailableAfterSelection": "Couldn't start a {{value0}} chat.",
             "startChat": "Start a chat with {{value0}}",
             "cliTag": "(CLI)",
-            "agentsLoading": "Loading agents"
+            "agentsLoading": "Loading agents",
+            "chatNotInSubfolder": "No chat in a subfolder"
           },
           "RecentTabSwitcher": {
             "329638ff6f": "Switch Tab",
@@ -7707,7 +7759,8 @@
         "BrowserDefaultZoomSetting": {
           "2622126877": "Zoom level applied to newly opened browser tabs.",
           "bbeec087d3": "Applied to newly opened browser tabs.",
-          "265597101f": "Default Zoom"
+          "265597101f": "Default Zoom",
+          "siteDefault": "Zoom for sites you haven't zoomed."
         },
         "BrowserHomePageSetting": {
           "d4ddcd0056": "Save",
@@ -8305,7 +8358,7 @@
           "1f32ba27a6": "Custom",
           "a182c5125e": "Git Username",
           "sourceControlGroupOrderTitle": "Source Control Group Order",
-          "sourceControlGroupOrderDescription": "Choose whether Changes, Staged Changes, or Untracked Files appear first in Source Control.",
+          "sourceControlGroupOrderDescription": "Choose whether Staged Changes or Changes appear first in Source Control.",
           "changesFirst": "Changes first",
           "stagedFirst": "Staged first",
           "untrackedFirst": "Untracked first",
@@ -10992,7 +11045,7 @@
             "5ecd91c5ef": "Prefix added to branch names when creating worktrees.",
             "68bd65fdb8": "Branch Prefix",
             "sourceControlGroupOrderTitle": "Source Control Group Order",
-            "sourceControlGroupOrderDescription": "Choose whether Changes, Staged Changes, or Untracked Files appear first in Source Control.",
+            "sourceControlGroupOrderDescription": "Choose whether Staged Changes or Changes appear first in Source Control.",
             "groupOrder": "group order",
             "changesFirst": "changes first",
             "stagedFirst": "staged first",
@@ -13440,7 +13493,7 @@
           "reassurance": "Runs on each host, reached over your own SSH connection. Your code and files stay where they are. Only Orca’s list of projects, tabs and terminals moves to the host."
         },
         "sshHostServer": {
-          "sourceChanged": "An older version of Orca changed this host’s projects. Move those changes to this host’s Orca server, or keep the server’s version, to connect again.",
+          "sourceChanged": "This computer has projects or folders for this host that its Orca server doesn’t have yet, often added by an older version of Orca. Move them to this host’s Orca server, or keep the server’s version, to connect again.",
           "deploying": "Setting up Orca on {{host}}…",
           "converting": "Moving to Orca on {{host}}…",
           "connecting": "Connecting to Orca on {{host}}…",
@@ -13498,7 +13551,8 @@
           "terminalsElsewhere": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
           "terminalsElsewhere_one": "Runs the relay while {{count}} terminal another Orca desktop or session opened on this host is running.",
           "terminalsElsewhere_other": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
-          "terminalsElsewhereUncounted": "Runs the relay while terminals another Orca desktop or session opened on this host are running."
+          "terminalsElsewhereUncounted": "Runs the relay while terminals another Orca desktop or session opened on this host are running.",
+          "refusedBlockedReason": "Orca isn’t set up on this host yet. {{reason}}"
         },
         "ZcodeCliSetupSection": {
           "title": "Use GLM with ZCode",
@@ -13854,6 +13908,12 @@
           "8e832829e7": "Let Orca query {{value0}}",
           "e3340ac4e1": "When off, Orca never asks {{value0}} for usage and never reads its sign-in from software installed on this computer.",
           "e9b8e0fc2e": "{{value0}} is off. Orca will not query it or read its sign-in from software installed on this computer."
+        },
+        "ReleaseBuildPicker": {
+          "build": "Build",
+          "searchLabel": "Search builds",
+          "searchPlaceholder": "Search builds…",
+          "noMatches": "No matching builds."
         }
       },
       "right": {
@@ -14136,10 +14196,10 @@
             "dcc294f28d": "(results truncated)"
           },
           "SearchFilters": {
-            "01e4671ccf": "files to exclude (e.g. *.min.js, dist/**)",
-            "0a6412a895": "Files To Exclude",
-            "8a77efcbd1": "files to include (e.g. *.ts, src/**)",
-            "a69ee1bd0e": "Files To Include"
+            "01e4671ccf": "e.g. *.min.js, dist/**",
+            "0a6412a895": "files to exclude",
+            "8a77efcbd1": "e.g. *.ts, src/**",
+            "a69ee1bd0e": "files to include"
           },
           "SearchHeader": {
             "6234a5ef85": "Use Regular Expression",
@@ -15436,7 +15496,9 @@
             "scanned": "Scanned {{value0}}",
             "stoppedAfter": "Stopped after {{value0}}",
             "stoppedAt": "stopped at {{value0}}",
-            "refresh": "Refresh"
+            "refresh": "Refresh",
+            "agentChecked": "{{agent}}: {{settled}} of {{total}} history candidates checked",
+            "checking": "Checking {{value0}}"
           },
           "IssuePane": {
             "providerGithub": "GitHub",
@@ -15481,6 +15543,23 @@
             "retry": "Retry",
             "empty": "No comments yet.",
             "unknownAuthor": "Unknown"
+          },
+          "run": {
+            "source": {
+              "control": {
+                "agent": {
+                  "action": {
+                    "start": {
+                      "git": {
+                        "operation": {
+                          "running": "Wait for the running Git operation to finish."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -17343,6 +17422,9 @@
             },
             "sectionStale": {
               "notice": "This file changed on disk since this section loaded."
+            },
+            "notUtf8": {
+              "notice": "Autosave is paused for {{name}} because it isn't UTF-8 text. Save it yourself to convert it to UTF-8."
             }
           }
         },
@@ -17407,6 +17489,9 @@
         },
         "useMarkdownDocuments": {
           "listFailed": "Failed to list Markdown documents."
+        },
+        "staleViewEdit": {
+          "rejected": "Recent typing in this view was discarded because the file changed in another view."
         }
       },
       "diff": {
@@ -17766,7 +17851,16 @@
             "bf648471c5": "Creating…",
             "53bbe3dab4": "Imported {{value0}} cookies from file.",
             "c5f0e4d3b2a1": "Imported {{value0}} cookies from {{value1}} ({{value2}}).",
-            "d6a1f5e4c3b2": "Imported {{value0}} cookies from {{value1}}."
+            "d6a1f5e4c3b2": "Imported {{value0}} cookies from {{value1}}.",
+            "zoom": "Zoom",
+            "zoomOut": "Zoom out",
+            "zoomIn": "Zoom in",
+            "resetZoom": "Reset zoom",
+            "appearance": "Appearance",
+            "appearanceMatchOrca": "Match Orca",
+            "appearanceLight": "Light",
+            "appearanceDark": "Dark",
+            "zoomPercent": "Zoom {{value0}}%"
           },
           "GrabConfirmationSheet": {
             "314a0aaa5b": "Attach to AI",
@@ -17790,7 +17884,8 @@
               "bar": {
                 "suggestions": {
                   "87fcdd0da9": "{{value0}} Search"
-                }
+                },
+                "placeholder": "Search or enter URL"
               }
             }
           },
@@ -19140,6 +19235,33 @@
           "password": "Password",
           "confirm": "Sign in",
           "cancel": "Cancel"
+        },
+        "sitePermission": {
+          "label": {
+            "camera": "Camera",
+            "microphone": "Microphone",
+            "location": "Location",
+            "notifications": "Notifications",
+            "clipboard": "Clipboard",
+            "midi": "MIDI devices",
+            "windowManagement": "Window management",
+            "idleDetection": "Device use"
+          },
+          "ask": {
+            "camera": "Use your camera",
+            "microphone": "Use your microphone",
+            "location": "Know your location",
+            "notifications": "Show notifications",
+            "clipboard": "See text and images copied to the clipboard",
+            "midi": "Use your MIDI devices",
+            "windowManagement": "Manage windows on all your displays",
+            "idleDetection": "Know when you are actively using this device"
+          },
+          "title": "{{site}} wants to",
+          "allow": "Allow",
+          "block": "Block",
+          "localFiles": "Local files",
+          "fileTitle": "This file wants to"
         }
       },
       "HostedReviewUnlinkMenuItem": {
@@ -19317,6 +19439,21 @@
         "copyFailed": "Could not copy the link.",
         "signingIn": "Signing in…",
         "cancel": "Cancel"
+      },
+      "plainSshTerminal": {
+        "open": "Open plain SSH terminal",
+        "unmanaged": "Plain SSH — unmanaged. Not an Orca workspace: agents and tabs here aren’t tracked, and this terminal isn’t restored. Closing it ends the SSH session.",
+        "ended": "ssh exited with code {{code}}. Close this window when you’re done reading.",
+        "title": "Plain SSH · {{host}}",
+        "minimize": "Minimize",
+        "close": "Close and end session",
+        "unknownTarget": "This SSH host is no longer saved in Orca.",
+        "notBlocked": "Orca can reach this host again, so use its terminals instead. Plain SSH is only for while Orca can’t set up on the host.",
+        "alreadyOpen": "Another Orca window already has a plain SSH terminal open to this host.",
+        "endedBySignal": "ssh was stopped (signal {{signal}}). Close this window when you’re done reading.",
+        "cancelled": "This plain SSH terminal was closed before it started.",
+        "terminalUnavailable": "Orca couldn’t open a terminal here.",
+        "openHint": "Keeps you working on the host while Orca can’t set up there."
       }
     },
     "i18n": {
@@ -19603,7 +19740,8 @@
         "agentNotSignedIn": "Sign in to {{agent}}.",
         "thenSendAgain": "Then send your message again.",
         "runCommandWhenDone": "Run /{{command}} when it's done.",
-        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}."
+        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}.",
+        "cliTooOld": "{{agent}} {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer."
       },
       "writeNotice": {
         "notDoneReadHistory": "This chat's history couldn't be loaded.",
@@ -19677,7 +19815,9 @@
         "clearAfterRetry": "Retry your earlier message, then run /clear.",
         "compactAfterRetry": "Retry your earlier message, then run /compact.",
         "clearAfterSending": "Your earlier message is still being sent. Run /clear once it has gone.",
-        "compactAfterSending": "Your earlier message is still being sent. Run /compact once it has gone."
+        "compactAfterSending": "Your earlier message is still being sent. Run /compact once it has gone.",
+        "messageTooLarge": "It is over the 256 KB limit for one message.",
+        "shortenMessage": "Shorten or split it, then send it again."
       },
       "taskList": {
         "title": "Tasks",
@@ -19725,7 +19865,9 @@
         "orcaStopCrash": "Orca on {{machine}} stopped unexpectedly while this response was in progress.",
         "orcaStopRemote": "Orca on {{machine}} stopped while this response was in progress.",
         "orcaStopCanContinue": "You can continue in this conversation.",
-        "orcaStopUnnamedServer": "the remote server"
+        "orcaStopUnnamedServer": "the remote server",
+        "continuedOutside": "Continued outside this chat.",
+        "continuedOutsideRewound": "Continued outside this chat. Earlier replies above are no longer in this conversation's history."
       },
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",
@@ -19835,7 +19977,12 @@
           "minimal": "Min",
           "medium": "Med",
           "xhigh": "XHigh"
-        }
+        },
+        "pastedTextLabel": "Pasted text",
+        "pasteNotSavedLabel": "Paste not saved",
+        "pasteNotSaved": "This paste was not saved. Paste it again or remove it.",
+        "pastedTextTooLarge": "This paste would put your message over the 256 KB limit for one message. Shorten it, then paste again.",
+        "imageUnavailable": "Preview unavailable"
       },
       "tool": {
         "exitCode": "exit {{value0}}",
@@ -20060,7 +20207,9 @@
         "send": "Submit",
         "next": "Next",
         "skip": "Skip",
-        "sending": "Sending…"
+        "sending": "Sending…",
+        "terminalRequired": "Answer this OMP question in the terminal.",
+        "openTerminal": "Answer in terminal"
       },
       "ask": {
         "awaiting": "Awaiting user input:",
@@ -20077,7 +20226,9 @@
         "needsAccess": "Needs access to",
         "needsNewerOrca": "This request needs a newer version of Orca.",
         "plan": {
-          "file": "Plan file"
+          "file": "Plan file",
+          "reviewTitle": "Review proposed plan",
+          "refineHint": "Refine plan closes the review so you can send what to change."
         }
       },
       "launchPromptNotDelivered": "Not delivered — check the terminal",
@@ -20276,7 +20427,11 @@
         "unverified": "Orca couldn't confirm the host's permissions for {{value0}}."
       },
       "visualOpenInSidebar": "Open in sidebar",
-      "visualClose": "Close visualization"
+      "visualClose": "Close visualization",
+      "imagePreview": {
+        "fileActions": "File actions",
+        "linkActions": "Link actions"
+      }
     },
     "tab": {
       "bar": {
@@ -20565,6 +20720,17 @@
           "checking": "Checking for changes…",
           "checkingDetails": "Checking…",
           "unavailableDetails": "Details unavailable"
+        },
+        "unsavedEdits": {
+          "discarded_one": "Unsaved edits in {{count}} file will be discarded:",
+          "discarded_other": "Unsaved edits in {{count}} files will be discarded:",
+          "moreFiles": "and {{value}} more",
+          "blocked_one": "Save or close {{count}} unsaved file in {{name}} first",
+          "blocked_other": "Save or close {{count}} unsaved files in {{name}} first",
+          "closedToast_one": "Closed {{count}} file with unsaved edits from {{workspace}}",
+          "closedToast_other": "Closed {{count}} files with unsaved edits from {{workspace}}",
+          "reopen": "Reopen",
+          "reopenFailed": "Some files couldn't be reopened. Open a workspace and try Reopen again."
         }
       }
     },
@@ -20680,7 +20846,8 @@
       "runTerminalUnavailable": "Run terminal is unavailable."
     },
     "agentCombobox": {
-      "clearSelection": "Clear agent selection"
+      "clearSelection": "Clear agent selection",
+      "startInTerminal": "Start {{value0}} in a terminal"
     },
     "newWorkspace": {
       "agentOptional": "Agent [Optional]",
@@ -20769,6 +20936,11 @@
     "jiraSchemaField": {
       "noUser": "None",
       "currentValue": "Current: {{value0}}"
+    },
+    "jiraStatusRow": {
+      "title": "Change {{value0}} to {{value1}}",
+      "description": "Jira requires these fields before it will apply this status change.",
+      "refused": "Jira refused this change. Review the reason below, or finish it in Jira."
     }
   },
   "dashboardPopout": {
@@ -20963,7 +21135,11 @@
   "sourceControl": {
     "discard": {
       "restoreStagedVersionDescription": "This will restore the last staged version and discard the deletion. This cannot be undone.",
-      "unstagedChangesDescription": "This will revert the unstaged changes to this file. This cannot be undone."
+      "unstagedChangesDescription": "This will revert the unstaged changes to this file. This cannot be undone.",
+      "deleteUntrackedFileDescription": "This will permanently delete this untracked file. This cannot be undone.",
+      "deleteUntrackedFilesDescription": "This will permanently delete these {{count}} untracked files. This cannot be undone.",
+      "unstagedSelectionIncludingUntrackedDescription": "This will revert unstaged changes and permanently delete any untracked files in this selection. This cannot be undone.",
+      "unstagedFilesIncludingUntrackedDescription": "This will revert unstaged changes and permanently delete any untracked files among these {{count}} files. This cannot be undone."
     },
     "unlinkedPr": {
       "status": "PR #{{number}} unlinked"
@@ -21392,10 +21568,31 @@
       "removeTitle": "Remove managed account?",
       "removeDescription": "Stop agents using this profile first. Removal deletes its saved credentials and conversation data. Your system login stays unchanged.",
       "cancel": "Cancel"
-    }
+    },
+    "hostSignIn": {
+      "copied": "Copied",
+      "copyFailed": "Could not copy",
+      "pasteCodeHelp": "After you sign in, the page shows a code. Paste it here.",
+      "continue": "Continue",
+      "starting": "Starting sign-in on {{host}}…",
+      "verifying": "Finishing sign-in on {{host}}…",
+      "waiting": "Open this page on this device and sign in. The account is saved on {{host}}.",
+      "copyLink": "Copy link",
+      "open": "Open",
+      "enterCode": "Enter this code on that page:",
+      "copyCode": "Copy code",
+      "cancelFailed": "Could not reach the server to cancel yet.",
+      "cancel": "Cancel"
+    },
+    "remoteScopeAccountsAddHere": "Showing accounts managed by {{value0}}. New accounts sign in there; you finish in this device’s browser."
   },
   "fileSearch": {
-    "failed": "Search failed. Try again."
+    "failed": "Search failed. Try again.",
+    "filters": {
+      "toggle": "Toggle search details",
+      "active": "{{count}} active"
+    },
+    "noResults": "No results. Try another search or adjust your filters."
   },
   "workspaceDeletion": {
     "preferenceSaveFailed": "Could not save deletion preference",
@@ -21648,7 +21845,9 @@
       "chooseTransition": "Choose a status change:",
       "cancel": "Cancel",
       "noTransition": "No status change to {{column}} is available for {{key}}.",
-      "queryTooLong": "The Jira query is too long. Shorten the query or clear filters."
+      "queryTooLong": "The Jira query is too long. Shorten the query or clear filters.",
+      "noTarget": "No Jira host is available for this move.",
+      "noTransitionSelected": "No status change is selected."
     },
     "favourites": {
       "loadFailed": "Could not load Jira favourites.",
@@ -21830,5 +22029,84 @@
       "staleHint": "Couldn't refresh — showing the last summary",
       "stale": "Couldn't refresh — showing the last summary."
     }
+  },
+  "onboarding": {
+    "language": {
+      "back": "Languages",
+      "requestPrompt": "Which language would you like Orca to support?",
+      "requestSuccess": "Language request recorded. You can continue onboarding.",
+      "requestError": "Could not record your request. Try again.",
+      "retry": "Retry",
+      "requestAction": "Request language",
+      "title": "Display language",
+      "device": "System language: {{language}}",
+      "unsupported": "System language: {{language}}. This language is not supported yet.",
+      "unknown": "Your system language could not be detected. Choose a language below.",
+      "loadError": "Could not load this language. Try again.",
+      "saveError": "Could not save your language preference. Try again.",
+      "other": "Other language…",
+      "settingsError": "Could not load your settings.",
+      "loadingSettings": "Loading settings…",
+      "loading": "Loading language…",
+      "saving": "Saving language…"
+    }
+  },
+  "resourceManager": {
+    "pty": {
+      "bound": "Has tab",
+      "unbound": "No tab",
+      "unavailable": "Unavailable",
+      "ownerPresent": "Present",
+      "ownerAbsent": "Absent",
+      "ownerUnknown": "Unknown",
+      "sessionId": "Orca session ID",
+      "incarnation": "Incarnation",
+      "workspace": "Workspace",
+      "cwd": "Last-reported cwd",
+      "binding": "Tab",
+      "agentOwnership": "Agent ownership evidence",
+      "observationTime": "Observation time",
+      "pid": "PID",
+      "idCopied": "Orca session ID copied",
+      "copyFailed": "Could not copy Orca session ID",
+      "detailsNamed": "Details for {{terminal}}",
+      "goToTerminal": "Go to terminal",
+      "copyId": "Copy Orca session ID",
+      "refreshBeforeEnd": "End is unavailable until PTYs are refreshed.",
+      "endUnsupported": "End is unavailable for this terminal. Its host does not support the required safety checks. Close it from its tab or on its host.",
+      "checkingTabs": "Checking tabs…",
+      "endTitle": "End {{terminal}}?",
+      "endDescription": "This ends the terminal and its child processes. Unsaved work may be lost.",
+      "lastProcess": "Last seen process: {{process}}",
+      "cancel": "Cancel",
+      "ending": "Ending…",
+      "end": "End terminal",
+      "unassigned": "Unassigned",
+      "thisComputer": "This computer",
+      "localOwnedCount_one": "{{count}} Orca PTY on this computer",
+      "localOwnedCount_other": "{{count}} Orca PTYs on this computer",
+      "withoutTab": "{{count}} without a tab",
+      "observedTime": "Last observed {{time}}",
+      "failed": "Unverifiable: local terminals could not be refreshed. Last-observed terminals are shown.",
+      "retry": "Retry",
+      "loading": "Loading terminals…",
+      "noLocalOrcaPtys": "No local Orca PTYs",
+      "openNamed": "Open {{terminal}}",
+      "endNamed": "End {{terminal}}",
+      "endShort": "End",
+      "endHint": "End this terminal and its child processes.",
+      "claimed": "An agent now owns this terminal. Refresh before trying again.",
+      "attached": "A client is now attached to this terminal. Refresh before trying again.",
+      "unverifiableEnd": "Unverifiable: the host could not confirm the result. The terminal may still be running."
+    },
+    "resources": "Resources",
+    "ptys": "PTYs",
+    "localDaemonScope": "This affects terminals on this computer.",
+    "countUnavailable": "terminal count unavailable",
+    "openToObserve": "Open Resources to observe terminal sessions.",
+    "refresh": "Refresh",
+    "restartLocal": "Restart local daemon",
+    "killAllLocal": "Kill all local sessions",
+    "killFailed": "The terminal could not be ended. Last-observed sessions are retained."
   }
 }

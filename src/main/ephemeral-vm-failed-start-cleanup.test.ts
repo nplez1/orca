@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { listEphemeralVmRuntimes } from '../shared/ephemeral-vm-runtime-store'
-import { cleanupFailedEphemeralVmStart } from './ephemeral-vm-failed-start-cleanup'
+import { cleanupFailedEphemeralVmStart } from './ephemeral-vm/failed-start-cleanup'
 
 const ownedDirs: string[] = []
 

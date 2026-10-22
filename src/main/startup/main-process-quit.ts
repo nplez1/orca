@@ -121,6 +121,8 @@ function installWillQuitHandler(): void {
     state.desktopPushService?.stop()
     state.unsubscribeSystemResumeBroadcast?.()
     state.unsubscribeSystemResumeBroadcast = null
+    state.stopDesktopPresenceReporter?.()
+    state.stopDesktopPresenceReporter = null
     state.uninstallMainThreadStallProbe?.()
     state.uninstallMainThreadStallProbe = null
     state.uninstallUiHangLifecycleObserver?.()

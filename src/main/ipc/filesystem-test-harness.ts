@@ -53,7 +53,6 @@ export const cancelGeneratePullRequestFieldsLocalMock: IpcMock = vi.fn()
 export const getPullRequestDraftContextMock: IpcMock = vi.fn()
 export const resolveHostedReviewBodyForGenerationMock: IpcMock = vi.fn()
 export const loadPullRequestLinkedIssueMock: IpcMock = vi.fn()
-export const getSshFilesystemProviderMock: IpcMock = vi.fn()
 export const tryDeleteWslUncPathMock: IpcMock = vi.fn()
 export const recordCrashBreadcrumbMock: IpcMock = vi.fn()
 
@@ -112,10 +111,6 @@ export const gitWorktreeMock = {
   listWorktreeGraph: listWorktreesMock,
   listWorktrees: listWorktreesMock,
   listWorktreesStrict: listWorktreesMock
-}
-
-export const sshFilesystemDispatchMock = {
-  getSshFilesystemProvider: getSshFilesystemProviderMock
 }
 
 export const textGenerationModuleMock = {
@@ -213,7 +208,6 @@ const ALL_MOCKS = [
   gitStatusModuleMock,
   gitIgnoredPathsMock,
   gitWorktreeMock,
-  sshFilesystemDispatchMock,
   textGenerationModuleMock,
   pullRequestContextMock,
   pullRequestTemplateMock,

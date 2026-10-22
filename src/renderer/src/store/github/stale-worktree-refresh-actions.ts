@@ -8,6 +8,7 @@ import { CACHE_TTL } from './cache-policy'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
 import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
 import { findLinkedIssueRepo } from '@/lib/linked-issue-repo'
+import { selectWorktreesByRepo } from '../workspace-record-selectors'
 
 export const createStaleWorktreeRefreshActions = (
   get: Parameters<StateCreator<AppState>>[1]
@@ -16,7 +17,7 @@ export const createStaleWorktreeRefreshActions = (
   refreshGitHubForWorktreeIfStale: (worktreeId) => {
     const state = get()
     let worktree: Worktree | undefined
-    for (const worktrees of Object.values(state.worktreesByRepo)) {
+    for (const worktrees of Object.values(selectWorktreesByRepo(state))) {
       worktree = worktrees.find((w) => w.id === worktreeId)
       if (worktree) {
         break

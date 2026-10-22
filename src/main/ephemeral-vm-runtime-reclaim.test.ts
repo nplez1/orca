@@ -30,10 +30,10 @@ vi.mock('./ipc/runtime-environments/runtime-environment-request-connections', ()
 vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: mocks.getRuntimeRecipeContext
 }))
-vi.mock('./ephemeral-vm-runtime-environment-release', () => ({
+vi.mock('./ephemeral-vm/runtime-environment-release', () => ({
   releaseEphemeralVmRuntimeEnvironments: mocks.releaseEphemeralVmRuntimeEnvironments
 }))
-vi.mock('./ephemeral-vm-runtime-ssh', () => ({
+vi.mock('./ephemeral-vm/runtime-ssh', () => ({
   removeRuntimeOwnedSshTarget: mocks.removeRuntimeOwnedSshTarget
 }))
 

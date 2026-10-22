@@ -8,6 +8,7 @@ import {
 import type { RemoveWorktreeOptions } from '@/store/slices/worktree-removal-options'
 import type { RendererRemoveWorktreeResult } from '@/store/slices/renderer-remove-worktree-result'
 import { showWorkspaceListChangedToast } from './stale-workspace-list-toast'
+import type { ConfirmedUnsavedDiscards } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
 
 /**
  * The dialog's explicit "Force Delete" retry.
@@ -28,6 +29,7 @@ export function runDialogForceDelete(args: {
   onDeleted: ((deleted: WorktreeRemovalTarget[]) => void) | null | undefined
   /** Opt-in `git push --delete` of the branch's upstream, carried from the dialog's checkbox. */
   deleteRemoteBranch?: boolean
+  confirmedDiscards: ConfirmedUnsavedDiscards
 }): void {
   const { worktreeId, currentWorktrees, removeWorktree, closeModal, onDeleted } = args
   // Why: this branch preserves the legacy "Force Delete" button behavior
@@ -49,7 +51,8 @@ export function runDialogForceDelete(args: {
   // the PTY-stop proof — unlike the confirmed delete in the branch below.
   const deletePromise = removeWorktree(toWorktreeRemovalTarget(forceTarget), true, {
     allowUnverifiedPtyStop: true,
-    ...(args.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {})
+    ...(args.deleteRemoteBranch === true ? { deleteRemoteBranch: true } : {}),
+    confirmedDiscards: args.confirmedDiscards
   })
   closeModal()
   deletePromise

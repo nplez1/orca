@@ -1,5 +1,5 @@
 import { parseFragment, serialize, type DefaultTreeAdapterMap } from 'parse5'
-import { attachmentIdFromUrl } from './attachment-discovery'
+import { attachmentIdFromUrl } from './attachments/discovery'
 
 export type RenderedJiraHtmlOptions = {
   /** Site root. Jira's rendered HTML links and image sources are root-relative,

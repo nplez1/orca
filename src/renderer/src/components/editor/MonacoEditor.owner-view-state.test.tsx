@@ -100,6 +100,7 @@ it('preserves a draft, selected range and scroll when the same tab gains a known
   }
   store.setState({
     openFiles: [file],
+    editorDrafts: { [file.id]: 'unsaved draft' },
     repos: [],
     worktreesByRepo: {},
     detectedWorktreesByRepo: {},

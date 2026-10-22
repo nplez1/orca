@@ -2,6 +2,7 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import { buildByIdIndex, buildWorktreeByIdIndex } from '../slices/worktree-by-id-index'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
+import { selectWorktreesByRepo } from '../workspace-record-selectors'
 
 export type PersistedTerminalHints = {
   tabsByWorktree: Record<string, TerminalTab[]> | null
@@ -124,7 +125,7 @@ export function createWorkspaceTerminalReconnectActions(
         })
       // Why indexed: the loop neither sets state nor awaits, so one index over the
       // whole store snapshot serves every iteration.
-      const worktreeById = buildWorktreeByIdIndex(get().worktreesByRepo)
+      const worktreeById = buildWorktreeByIdIndex(selectWorktreesByRepo(get()))
       const repoById = buildByIdIndex(get().repos)
       // Why: keep deferred SSH session IDs for post-cleanup reconnect.
       const deferredSshSessionIdsByTabId: Record<string, string> = {}

@@ -150,6 +150,12 @@ export const WORKSPACE_SESSION_FIELD_DISPOSITION = {
   closedTerminalTabTombstonesByTabId: {
     onRepoRemoval: 'notRepoScoped',
     onTransfer: 'notTransferred'
+  },
+  // As closed-tab records: removing the workspace's session rows prunes them by worktreeId, and the
+  // terminals they name never move with a project.
+  closedTerminalPanesByPaneKey: {
+    onRepoRemoval: 'notRepoScoped',
+    onTransfer: 'notTransferred'
   }
 } as const satisfies Record<keyof WorkspaceSessionState, SessionFieldDisposition>
 
@@ -229,7 +235,8 @@ export const WORKSPACE_SESSION_HOST_SYNC_DISPOSITION = {
   terminalPtyIncarnationsByPaneKey: 'hostLocal',
   terminalTopologyRevisionByRepoId: 'hostLocal',
   terminalSurfaceTombstonesByPaneKey: 'hostLocal',
-  closedTerminalTabTombstonesByTabId: 'hostLocal'
+  closedTerminalTabTombstonesByTabId: 'hostLocal',
+  closedTerminalPanesByPaneKey: 'hostLocal'
 } as const satisfies Record<keyof WorkspaceSessionState, SessionFieldHostSyncDisposition>
 
 // Why: the two tables are one contract, so neither may gain a key the other has not seen.

@@ -1,3 +1,4 @@
+import type { AgentProcessIdentity } from '../agent-process-presence'
 import type { AgentType } from '../agent-status-types'
 import type { AgentHookEventPayload } from './listener-event'
 import { resolveAgentStatusIdentity } from '../agent-status-identity'
@@ -11,8 +12,9 @@ export function isInheritedPaneOwnerEvent(args: {
   previousStatus: AgentHookEventPayload | undefined
   worktreeId: string | undefined
   source: AgentType
+  incomingProcess?: AgentProcessIdentity
 }): boolean {
-  const { previousStatus, worktreeId, source } = args
+  const { previousStatus, worktreeId, source, incomingProcess } = args
   const previousReceivedAt =
     previousStatus &&
     'receivedAt' in previousStatus &&
@@ -38,6 +40,7 @@ export function isInheritedPaneOwnerEvent(args: {
       agentPresence: previousStatus.providerSessionOnly ? undefined : previousStatus.agentPresence
     },
     incoming: source,
+    incomingProcess,
     now: Date.now()
   }).inheritedFromActivePane
 }

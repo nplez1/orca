@@ -322,6 +322,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   experimentalSidekick: 'replicated',
   experimentalActivity: 'replicated',
   experimentalAgentDashboardPopout: 'replicated',
+  // Why replicated: a feature flag the user turned on, like the other experimental keys.
+  experimentalConnectors: 'replicated',
   experimentalAgentDashboardShowIdle: 'replicated',
   experimentalAgentDashboardCardClickAction: 'replicated',
   experimentalTerminalAttention: 'replicated',
@@ -349,6 +351,8 @@ export const GLOBAL_SETTINGS_HOST_SYNC_DISPOSITION = {
   nativeChatProviders: 'replicated',
   // Why hostLocal: a `…Migrated…` marker — copying it would suppress the host's own migration.
   sshRemoteCliControlExistingHostsMigrated: 'hostLocal',
+  // Why hostLocal: a `…MigrationApplied` marker — copying it would suppress the host's own run.
+  uiLanguagePortugueseMigrationApplied: 'hostLocal',
   claudeCopiedSystemDefaultNoticeDismissed: 'hostLocal',
   // Why replicated, like `nativeChatPermissionMode`: a per-agent chat preference the user chose.
   agentNativeChatPermissionModes: 'replicated',

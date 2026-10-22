@@ -276,7 +276,7 @@ export function TaskPageJiraBoardView({
           if (!prompt?.selected) {
             return Promise.resolve({
               ok: false as const,
-              error: translate('jira.board.noTransition', 'No status change is selected.')
+              error: translate('jira.board.noTransitionSelected', 'No status change is selected.')
             })
           }
           return apply(prompt.issue, prompt.selected, updates)

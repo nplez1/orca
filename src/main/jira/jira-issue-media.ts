@@ -3,14 +3,14 @@ import {
   extractAttachmentContentIdsFromHtml,
   selectPreferredAttachmentIds,
   warnIfMediaResolutionIncomplete
-} from './attachment-discovery'
+} from './attachments/discovery'
 import { collectRenderedImageAttachmentIds } from './jira-rendered-html'
 import {
   createMediaMarkdownResolver,
   createRenderedImageSrcResolver,
   loadIssueImageAttachments,
   type MediaResolutionStats
-} from './attachment-images'
+} from './attachments/images'
 import type { JiraClientForSite } from './authenticated-request'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
 import type { RenderedJiraHtmlOptions } from './jira-rendered-html'
@@ -18,7 +18,7 @@ import {
   JIRA_IMAGE_MAX_BYTES,
   JIRA_IMAGE_MAX_REFERENCES,
   type JiraMediaFormat
-} from '../../shared/jira-attachment-image'
+} from '../../shared/jira/jira-attachment-image'
 
 export type MediaRequest = {
   attachmentField: unknown

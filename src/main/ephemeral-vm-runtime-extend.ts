@@ -17,11 +17,11 @@ import { invalidateRuntimeEnvironmentTransport } from './ipc/runtime-environment
 import {
   connectRuntimeOwnedSshTarget,
   disconnectRuntimeOwnedSshTarget
-} from './ephemeral-vm-runtime-ssh'
+} from './ephemeral-vm/runtime-ssh'
 import { withEphemeralVmRuntimeLock } from './ephemeral-vm-runtime-lock'
 import { getSshConnectionManager } from './ssh/targets/ssh-target-registry'
-import { contextFromRuntime } from './ephemeral-vm-runtime-service'
-import { runEphemeralVmRecipeExtend } from './ephemeral-vm-recipe-runner'
+import { contextFromRuntime } from './ephemeral-vm/runtime-service'
+import { runEphemeralVmRecipeExtend } from '../shared/ephemeral-vm-recipe-extend-runner'
 
 export type ExtendEphemeralVmRuntimeLeaseArgs = {
   userDataPath: string

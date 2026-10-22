@@ -30,6 +30,7 @@ import {
 import { WORKTREE_CATALOG_METHODS } from './worktree-catalog-methods'
 import { WORKTREE_PROVISIONED_ROOT_METHOD } from './worktree-provisioned-root-method'
 import { WORKTREE_REMOVE_METHOD } from './worktree-remove-method'
+import { WORKTREE_SLEEP_METHOD } from './worktree-sleep-method'
 
 export const WORKTREE_METHODS = [
   ...WORKTREE_CATALOG_METHODS,
@@ -61,12 +62,7 @@ export const WORKTREE_METHODS = [
       worktree: await runtime.showManagedWorktree(params.worktree)
     })
   }),
-  defineMethod({
-    name: 'worktree.sleep',
-    permission: 'workspace',
-    params: WorktreeSelector,
-    handler: async (params, { runtime }) => runtime.sleepManagedWorktree(params.worktree)
-  }),
+  WORKTREE_SLEEP_METHOD,
   defineMethod({
     name: 'worktree.activate',
     permission: 'workspace',
