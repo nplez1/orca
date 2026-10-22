@@ -8,6 +8,7 @@ import {
   Plus,
   // `Shapes` is lucide-react's own export name; exempted in config/oxlint-anti-slop.json.
   Shapes,
+  Server,
   SlidersHorizontal,
   Trash2
 } from 'lucide-react'
@@ -26,6 +27,7 @@ import {
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getRepositoryIconSectionId } from '@/components/settings/repository-settings-targets'
+import { useProjectAddToHost } from '../../use-project-add-to-host'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorktreeVisibilityDefaults } from '../../../../../../shared/global-settings-types'
@@ -66,6 +68,39 @@ export type RepoHeaderProjectActions = {
   onRemoveProjectFromGroup: (repo: Repo) => void
   onRemoveProject: (repo: Repo) => void
   onCreateForRepo: (projectId: string) => void
+}
+
+function RepoHeaderAddToHostSubmenu({ repo }: { repo: Repo }): React.JSX.Element | null {
+  // Why: mounted only while this dropdown is open, so no host list is built for closed menus.
+  const { addToHost, getAddToHostOptions } = useProjectAddToHost()
+  const options = getAddToHostOptions(repo)
+  if (options.length === 0) {
+    return null
+  }
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <Server className="size-3.5" />
+        {translate('auto.components.sidebar.WorktreeList.addToHost', 'Add to…')}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.id}
+            disabled={!option.isAvailable}
+            onSelect={() => addToHost(repo, option.id)}
+          >
+            <span className="min-w-0">
+              <span className="block max-w-48 truncate">{option.label}</span>
+              <span className="block max-w-48 truncate text-[11px] text-muted-foreground">
+                {option.detail}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  )
 }
 
 export function RepoHeaderProjectActionsMenu({
@@ -165,6 +200,7 @@ export function RepoHeaderProjectActionsMenu({
             {translate('auto.components.sidebar.WorktreeList.64e55f7f01', 'Remove from group')}
           </DropdownMenuItem>
         ) : null}
+        <RepoHeaderAddToHostSubmenu repo={repo} />
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => actions.onRemoveProject(repo)}>
           <Trash2 className="size-3.5" />

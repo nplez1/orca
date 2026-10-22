@@ -28,6 +28,10 @@ export const EMPTY_PROJECT_HOST_SETUP_OPTIONS: ProjectHostSetupOption[] = []
 export const EMPTY_EPHEMERAL_VM_RECIPES: EphemeralVmRecipeOption[] = []
 
 export type NewWorkspaceComposerCardProps = {
+  /** The workspace's name and branch came from an existing workspace, so both render as facts. */
+  identityLocked?: boolean
+  /** The picked host already owns this workspace; recreating it there would only rename the branch. */
+  lockedTargetIsSourceHost?: boolean
   contextualTourSource?: string
   containerClassName?: string
   contentClassName?: string

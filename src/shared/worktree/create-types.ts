@@ -111,6 +111,10 @@ export type CreateWorktreeArgs = {
    *  name. Used when creating from an existing branch whose local branch name
    *  legitimately contains `/` while the worktree directory must not. */
   branchNameOverride?: string
+  /** Refuse the create when `branchNameOverride` collides instead of suffixing a new branch.
+   *  Set when the branch is implied by an existing workspace, where a renamed copy is the
+   *  wrong result rather than a retry. */
+  exactBranchName?: boolean
   setupDecision?: SetupDecision
   /** Per-create choice; omitted callers use the execution host's saved default. */
   setupOnly?: boolean

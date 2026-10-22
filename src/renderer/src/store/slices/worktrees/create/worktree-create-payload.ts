@@ -17,6 +17,8 @@ export type CreateWorktreeCallOptions = {
   setupOnly?: boolean
   /** True only when `name` came from the creature-name generator; gates host-side retirement. */
   nameWasGenerated?: boolean
+  /** Refuse a branch-name collision instead of suffixing; set when the branch is implied. */
+  exactBranchName?: boolean
   displayNameKind?: CreateWorktreeArgs['displayNameKind']
   /** Parent picked in the composer. Sets sidebar nesting only; ignored if it no longer exists. */
   parentWorktreeId?: string
@@ -54,6 +56,7 @@ function sharedCreateFields(
     baseBranch: request.baseBranch,
     ...(request.compareBaseRef ? { compareBaseRef: request.compareBaseRef } : {}),
     ...(attempt.branchNameOverride ? { branchNameOverride: attempt.branchNameOverride } : {}),
+    ...(options?.exactBranchName ? { exactBranchName: true } : {}),
     setupDecision: request.setupDecision,
     ...(options?.setupOnly !== undefined ? { setupOnly: options.setupOnly } : {}),
     sparseCheckout: request.sparseCheckout,

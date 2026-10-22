@@ -27,6 +27,15 @@ describe('buildManagedWorktreeCreateArgs', () => {
     })
   })
 
+  it('carries an exact-branch request through the wire schema to the create args', () => {
+    // Why: a paired server or SSH host creates through this RPC, so a dropped key would let the
+    // host suffix the branch a copied workspace must keep.
+    expect(build({ repo: 'id:repo-1', name: 'fix-login', exactBranchName: true })).toMatchObject({
+      exactBranchName: true
+    })
+    expect(build({ repo: 'id:repo-1', name: 'fix-login' })).not.toHaveProperty('exactBranchName')
+  })
+
   it('keeps the legacy CLI marker on a name-only create request', () => {
     const args = buildManagedWorktreeCreateArgs(
       WorktreeCreate.parse({ repo: 'id:repo-1', name: 'feature' }),

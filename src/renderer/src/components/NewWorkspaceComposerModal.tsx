@@ -23,6 +23,8 @@ import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { WorkspaceSource as WorkspaceCreateTelemetrySource } from '../../../shared/workspace-source'
 import type { WorkspaceStatus } from '../../../shared/worktree/types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import { isLockedSourceHostTarget } from '@/components/new-workspace/locked-target-host'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
@@ -36,7 +38,7 @@ const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/Add
   reloadKey: 'composer-add-repo'
 })
 
-type ComposerModalData = {
+export type ComposerModalData = {
   prefilledName?: string
   initialRepoId?: string
   initialEphemeralVmRecipeId?: string
@@ -46,6 +48,13 @@ type ComposerModalData = {
   taskSourceContext?: TaskSourceContext | null
   initialWorkspaceTarget?: WorkspaceCreationTargetHint | null
   initialBaseBranch?: string
+  /** Set when an existing workspace is being copied to another host: the name and branch are
+   *  implied by that workspace, so the composer shows them as fixed facts. */
+  lockedWorkspaceBranch?: string
+  /** Host the copied workspace already lives on; recreating it there would only rename the branch. */
+  lockedWorkspaceSourceHostId?: ExecutionHostId
+  /** Paired-runtime owner of the source workspace, which counts as the same host. */
+  lockedWorkspaceSourceRuntimeOwnerEnvironmentId?: string
   initialWorkspaceStatus?: WorkspaceStatus
   enableIssueAutomation?: boolean
   /** Telemetry surface that opened the composer. Set by each
@@ -127,6 +136,13 @@ function QuickTabBody({
   active: boolean
 }): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  // Why: copying an existing workspace fixes the branch; the base ref follows it so the checkout
+  // starts from that branch instead of whatever the target host defaults to.
+  const lockedWorkspaceBranch = modalData.lockedWorkspaceBranch
+  const lockedWorkspaceSourceHostId = modalData.lockedWorkspaceSourceHostId
+  const lockedWorkspaceSourceRuntimeOwnerEnvironmentId =
+    modalData.lockedWorkspaceSourceRuntimeOwnerEnvironmentId
+  const initialBaseBranch = modalData.initialBaseBranch ?? lockedWorkspaceBranch
   const {
     cardProps,
     composerRef,
@@ -136,7 +152,7 @@ function QuickTabBody({
     createDisabled,
     selectAddedProjectRepo
   } = useComposerState({
-    initialName: modalData.prefilledName ?? '',
+    initialName: modalData.prefilledName ?? lockedWorkspaceBranch ?? '',
     // Why: the modal is quick-create only now, so prompt-prefill state is
     // intentionally ignored even if older callers still send it.
     initialPrompt: '',
@@ -148,13 +164,30 @@ function QuickTabBody({
     initialEphemeralVmRecipeId: modalData.initialEphemeralVmRecipeId,
     initialProjectGroupId: modalData.initialProjectGroupId,
     initialWorkspaceStatus: modalData.initialWorkspaceStatus,
-    ...(modalData.initialBaseBranch ? { initialBaseBranch: modalData.initialBaseBranch } : {}),
+    ...(lockedWorkspaceBranch ? { initialBranchNameOverride: lockedWorkspaceBranch } : {}),
+    ...(initialBaseBranch ? { initialBaseBranch } : {}),
     persistDraft: false,
     onCreated: onClose,
     isSubmissionCancelled,
     ...(modalData.telemetrySource ? { telemetrySource: modalData.telemetrySource } : {}),
     enableIssueAutomation: modalData.enableIssueAutomation === true
   })
+  // Why: the same branch cannot be checked out twice on one host, so git would silently
+  // rename the copy instead of copying it — the target host is the whole point of the flow.
+  const selectedSetupHostId = cardProps.projectHostSetupOptions?.find(
+    (option) => option.id === cardProps.selectedProjectHostSetupId
+  )?.hostId
+  const lockedTargetIsSourceHost =
+    // Why: a VM recipe creates nothing on the repo's host, so the source host is not the target.
+    !cardProps.selectedEphemeralVmRecipeId &&
+    isLockedSourceHostTarget({
+      sourceHostId: lockedWorkspaceSourceHostId,
+      sourceRuntimeOwnerEnvironmentId: lockedWorkspaceSourceRuntimeOwnerEnvironmentId,
+      selectedTargetHostIds: [cardProps.selectedRepoExecutionHostId, selectedSetupHostId]
+    })
+  // Why one value: the button, the Cmd/Ctrl+Enter guard and the effect deps must agree, or a
+  // keyboard submit slips past a disabled button.
+  const effectiveCreateDisabled = createDisabled || lockedTargetIsSourceHost
   // Why: the composer's built-in `onOpenAgentSettings` handler navigates to
   // the settings page and closes the modal. For the quick-create flow we want
   // a less disruptive affordance — a nested dialog layered over the composer
@@ -202,8 +235,12 @@ function QuickTabBody({
   }, [])
 
   const handleCreate = useCallback(async (): Promise<void> => {
-    await submitQuick(quickAgent, { setupOnly: quickSetupOnly })
-  }, [quickAgent, quickSetupOnly, submitQuick])
+    await submitQuick(quickAgent, {
+      setupOnly: quickSetupOnly,
+      // Why: a copied workspace keeps its branch, so a collision must fail instead of suffixing.
+      exactBranchName: Boolean(lockedWorkspaceBranch)
+    })
+  }, [lockedWorkspaceBranch, quickAgent, quickSetupOnly, submitQuick])
   // Why: Add Project layers over the composer as a nested dialog instead of
   // replacing it in the activeModal slot — closing the composer mid-flow (and
   // losing the typed name/prompt) was the old, abrupt behavior. Once opened it
@@ -282,7 +319,10 @@ function QuickTabBody({
       if (!shouldAllowComposerEnterSubmitTarget(target, composerRef.current)) {
         return
       }
-      if (createDisabled || composerRef.current?.hasAttribute('data-sparse-preset-editing')) {
+      if (
+        effectiveCreateDisabled ||
+        composerRef.current?.hasAttribute('data-sparse-preset-editing')
+      ) {
         return
       }
       event.preventDefault()
@@ -290,7 +330,7 @@ function QuickTabBody({
     }
     addAppKeyListener('keydown', onKeyDown)
     return () => removeAppKeyListener('keydown', onKeyDown)
-  }, [active, composerRef, createDisabled, handleCreate, nestedDialogOpen])
+  }, [active, composerRef, effectiveCreateDisabled, handleCreate, nestedDialogOpen])
 
   return (
     <>
@@ -323,6 +363,9 @@ function QuickTabBody({
         quickSetupOnly={quickSetupOnly}
         onQuickSetupOnlySelect={handleQuickSetupOnlySelect}
         {...cardProps}
+        identityLocked={Boolean(lockedWorkspaceBranch)}
+        lockedTargetIsSourceHost={lockedTargetIsSourceHost}
+        createDisabled={effectiveCreateDisabled}
         impliedTaskSourceUrl={impliedTaskSourceUrl}
         primaryActionLabel={primaryActionLabel}
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}

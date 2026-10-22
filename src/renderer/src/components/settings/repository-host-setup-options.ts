@@ -41,7 +41,7 @@ export function buildSetupHostOptions({
   projectHostSetups,
   hostOptions
 }: {
-  projectHostSetups: ProjectHostSetup[]
+  projectHostSetups: readonly ProjectHostSetup[]
   hostOptions: readonly ExecutionHostRegistryEntry[]
 }): SetupHostOption[] {
   const setupHostIds = new Set(projectHostSetups.map((setup) => setup.hostId))

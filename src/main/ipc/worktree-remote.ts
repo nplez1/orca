@@ -1257,6 +1257,11 @@ async function performLocalWorktreeCreate(
   let branchName = ''
   let worktreePath = ''
 
+  if (args.exactBranchName && !args.branchNameOverride) {
+    // Why: "keep this branch" only means something with a branch to keep; refuse rather than
+    // invent one from the worktree name.
+    throw new Error('An exact-branch create needs the branch it must keep.')
+  }
   const branchConflictSubject = args.branchNameOverride ? 'branch name' : 'worktree name'
   let resolved = false
   let checkoutExistingBranch = false
@@ -1299,7 +1304,11 @@ async function performLocalWorktreeCreate(
         repo.path,
         selectedExistingLocalBranchName
           ? selectedExistingLocalBranchName
-          : getBranchNameOverrideCandidate(args.branchNameOverride, suffix),
+          : getBranchNameOverrideCandidate(
+              args.branchNameOverride,
+              // Why: an exact branch keeps its name; only the worktree directory may take the suffix.
+              args.exactBranchName ? 1 : suffix
+            ),
         effectiveSanitizedName,
         settings,
         username,
@@ -1371,11 +1380,20 @@ async function performLocalWorktreeCreate(
         }
       }
       if (lastBranchConflictKind) {
+        if (args.exactBranchName) {
+          // Why: a copied workspace must land on its own branch; Orca's retry would otherwise
+          // publish the wrong branch under a suffixed name.
+          throw new WorktreeCreateCollisionError(
+            `Branch "${branchName}" already exists ${lastBranchConflictKind === 'local' ? 'locally' : 'on a remote'}, and this workspace keeps its branch name.`
+          )
+        }
         continue
       }
 
       // Why: gh pr list is a ~1–3s network call; only probe PR conflicts after a branch collision (suffix > 1) so the common no-collision path skips it.
-      if (suffix > 1 && !checkoutExistingBranch) {
+      // An exact-branch copy keeps its branch, so the PR on that branch belongs to the workspace
+      // being copied and must not send the loop hunting for a free branch.
+      if (suffix > 1 && !checkoutExistingBranch && !args.exactBranchName) {
         lastExistingPR = null
         try {
           lastExistingPR = await getLocalGitHubPrForBranch(

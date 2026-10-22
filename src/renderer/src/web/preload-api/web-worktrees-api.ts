@@ -6,6 +6,7 @@ import {
   WORKTREE_LINKED_ITEMS_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_ITEMS_DELTA_RUNTIME_CAPABILITY
 } from '../../../../shared/workspace-attachment-capabilities'
+import { WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY } from '../../../../shared/worktree-runtime-capabilities'
 import type { PreloadApi } from '../../../../preload/api-types'
 import type {
   ForceDeleteWorktreeBranchResult,
@@ -65,6 +66,9 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
       if (args.linkedItems !== undefined) {
         await assertAttachmentWriteSupported(args)
       }
+      if (args.exactBranchName) {
+        await assertExactBranchCreateSupported()
+      }
       invalidateRuntimeWorktreeCaches()
       const owned = await callRuntimeResultWithOwner<{ worktree: Worktree }>('worktree.create', {
         repo: args.repoId,
@@ -75,6 +79,7 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
         baseBranch: args.baseBranch,
         compareBaseRef: args.compareBaseRef,
         branchNameOverride: args.branchNameOverride,
+        ...(args.exactBranchName ? { exactBranchName: true } : {}),
         linkedIssue: args.linkedIssue,
         linkedPR: args.linkedPR,
         ...(args.linkedItems !== undefined ? { linkedItems: args.linkedItems } : {}),
@@ -225,6 +230,22 @@ export function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees
     onHeadIdentitiesChanged: () => noopUnsubscribe,
     onBaseStatus: () => noopUnsubscribe,
     onRemoteBranchConflict: () => noopUnsubscribe
+  }
+}
+
+async function assertExactBranchCreateSupported(): Promise<void> {
+  const environmentId = requireActiveEnvironment().id
+  const status = await getRemoteRuntimeStatus()
+  assertActiveEnvironment(environmentId)
+  // Why: an older host strips the flag and suffixes the branch, which is the one result a copied
+  // workspace must not get, so refuse before creating anything.
+  if (!status.capabilities?.includes(WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY)) {
+    throw new Error(
+      translate(
+        'workspace.exactBranch.updateRuntime',
+        'Update the remote runtime to copy a workspace to it'
+      )
+    )
   }
 }
 

@@ -2,6 +2,7 @@ import React from 'react'
 import { AlertTriangle, Check } from 'lucide-react'
 import SmartWorkspaceNameField from '@/components/new-workspace/SmartWorkspaceNameField'
 import { TaskImpliedSourceNameField } from './TaskImpliedSourceNameField'
+import { LockedComposerValue } from './LockedComposerValue'
 import { resolveImpliedTaskSource } from './implied-task-source'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
@@ -45,6 +46,8 @@ type NewWorkspaceComposerNameSectionProps = Pick<
   | 'baseBranch'
   | 'onBaseBranchChange'
   | 'startFromResetHint'
+  | 'identityLocked'
+  | 'lockedTargetIsSourceHost'
 > & {
   onNamePlainEnter: () => void
 }
@@ -84,9 +87,12 @@ export function NewWorkspaceComposerNameSection({
   onReuseSelectedBranchChange,
   baseBranch,
   onBaseBranchChange,
-  startFromResetHint
+  startFromResetHint,
+  identityLocked = false,
+  lockedTargetIsSourceHost = false
 }: NewWorkspaceComposerNameSectionProps): React.JSX.Element {
   const showBaseRefPicker =
+    !identityLocked &&
     Boolean(onBaseBranchChange) &&
     shouldShowComposerBaseRefPicker({
       selectedRepoIsGit,
@@ -94,6 +100,7 @@ export function NewWorkspaceComposerNameSection({
       smartNameMode: smartNameMode ?? 'smart',
       smartNameSelectionKind: smartNameSelection?.kind ?? null
     })
+  const showReuseBranchOption = canReuseSelectedBranch && !identityLocked
   // Why a source the composer cannot change: the dialog was opened from the
   // task, so the only decision left is what to call the workspace. Resolved
   // against the live selection, not a flag, so a source that was dropped or
@@ -103,15 +110,17 @@ export function NewWorkspaceComposerNameSection({
     <div className="min-w-0 space-y-1" data-contextual-tour-target="workspace-creation-name">
       <div className="flex items-center justify-between gap-2">
         <label className="min-w-0 truncate text-xs font-medium text-muted-foreground">
-          {selectedRepoIsGit && !impliedSource
+          {selectedRepoIsGit && !impliedSource && !identityLocked
             ? translate('auto.components.NewWorkspaceComposerCard.ac3748dcda', 'Create From')
             : translate(
                 'auto.components.NewWorkspaceComposerCard.0ee17638fe',
                 'Workspace name'
               )}{' '}
-          <span className="text-muted-foreground/70">
-            {translate('auto.components.NewWorkspaceComposerCard.0c5d6a479c', '[Optional]')}
-          </span>
+          {identityLocked ? null : (
+            <span className="text-muted-foreground/70">
+              {translate('auto.components.NewWorkspaceComposerCard.0c5d6a479c', '[Optional]')}
+            </span>
+          )}
         </label>
         {showBaseRefPicker && onBaseBranchChange ? (
           <ComposerBaseRefPicker
@@ -123,7 +132,11 @@ export function NewWorkspaceComposerNameSection({
           />
         ) : null}
       </div>
-      {impliedSource ? (
+      {identityLocked ? (
+        // Why: the workspace this copy stands for already fixed the name and branch;
+        // only the host is still a decision, so the field is a fact rather than an input.
+        <LockedComposerValue value={name} />
+      ) : impliedSource ? (
         <TaskImpliedSourceNameField
           inputRef={nameInputRef}
           source={impliedSource}
@@ -170,6 +183,14 @@ export function NewWorkspaceComposerNameSection({
           onPlainEnter={onNamePlainEnter}
         />
       )}
+      {lockedTargetIsSourceHost ? (
+        <p className="text-[11px] text-muted-foreground">
+          {translate(
+            'auto.components.NewWorkspaceComposerCard.pickAnotherHost',
+            'This workspace already lives on that host. Pick another one to copy this branch there.'
+          )}
+        </p>
+      ) : null}
       {forkPushWarning ? (
         <p className="flex items-start gap-1.5 text-[11px] text-yellow-600 dark:text-yellow-500">
           <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
@@ -179,9 +200,9 @@ export function NewWorkspaceComposerNameSection({
       <div
         className={cn(
           'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-          canReuseSelectedBranch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+          showReuseBranchOption ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         )}
-        aria-hidden={!canReuseSelectedBranch}
+        aria-hidden={!showReuseBranchOption}
       >
         <div className="min-h-0">
           <div className="space-y-1 pt-1">

@@ -137,6 +137,18 @@ export function useSettingsPageEffects(
   }, [hasUnsavedSourceControlAiPromptChangesRef, promptDiscardSourceControlAiPromptChanges])
 
   useEffect(() => {
+    // Why: closing Settings is not the only way out (activating a workspace or switching views
+    // also unmounts it), so an add-to-host request nothing consumed must not survive the page.
+    return () => {
+      const state = useAppStore.getState()
+      // Why: StrictMode's simulated unmount runs this while Settings is still the active view.
+      if (state.activeView !== 'settings') {
+        state.clearProjectHostAddRequest()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const handleFindShortcut = (event: KeyboardEvent): void => {
       if (event.defaultPrevented) {
         return

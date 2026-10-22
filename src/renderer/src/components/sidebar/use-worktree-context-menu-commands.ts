@@ -16,6 +16,11 @@ import {
   planWorkspaceStatusAssignment,
   preserveDeleteSiblingPosition
 } from './worktree-context-menu-policy'
+import {
+  buildWorktreeToHostComposerData,
+  canAddWorktreeToAnotherHost
+} from './worktree-to-host-composer-data'
+import { getProjectHostSetupProjectionFromState } from '@/store/selectors'
 
 export function useWorktreeContextMenuCommands(args: {
   activeContextWorktrees: readonly Worktree[]
@@ -178,7 +183,26 @@ export function useWorktreeContextMenuCommands(args: {
       activateAndRevealWorktree(args.validParentWorktreeId, { navigationIntent: 'user-open' })
     }
   }, [args.validParentWorktreeId])
+  const canAddToAnotherHost = canAddWorktreeToAnotherHost({
+    worktree: args.worktree,
+    repo: args.repo
+  })
+  const handleAddToAnotherHost = useCallback(() => {
+    args.setMenuOpenState(false)
+    const projectId =
+      args.worktree.projectId ??
+      getProjectHostSetupProjectionFromState(args.getState()).setups.find(
+        (setup) => setup.repoId === args.worktree.repoId
+      )?.projectId ??
+      null
+    args.openModal(
+      'new-workspace-composer',
+      buildWorktreeToHostComposerData({ worktree: args.worktree, repo: args.repo, projectId })
+    )
+  }, [args])
   return {
+    canAddToAnotherHost,
+    handleAddToAnotherHost,
     handleAssignWorkspaceStatus,
     handleCloseTerminals,
     handleCopyName,

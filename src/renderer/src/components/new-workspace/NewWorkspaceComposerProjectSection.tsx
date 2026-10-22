@@ -11,6 +11,7 @@ import type {
   NewWorkspaceComposerCardProps
 } from './new-workspace-composer-card-props'
 import { EMPTY_PROJECT_OPTIONS } from './new-workspace-composer-card-props'
+import { LockedComposerValue } from './LockedComposerValue'
 
 type NewWorkspaceComposerProjectSectionProps = Pick<
   NewWorkspaceComposerCardProps,
@@ -33,6 +34,7 @@ type NewWorkspaceComposerProjectSectionProps = Pick<
   | 'ephemeralVmRecipeError'
 > & {
   disabled?: boolean
+  identityLocked?: boolean
   projectDescriptionId: string
   onAddProject: () => void
   focusNameInput: () => void
@@ -51,6 +53,7 @@ type NewWorkspaceComposerProjectSectionProps = Pick<
 
 export function NewWorkspaceComposerProjectSection({
   disabled = false,
+  identityLocked = false,
   projectOptions = EMPTY_PROJECT_OPTIONS,
   selectedProjectId = null,
   onProjectChange,
@@ -91,7 +94,7 @@ export function NewWorkspaceComposerProjectSection({
             {projectLabel ??
               translate('auto.components.NewWorkspaceComposerCard.969a8bff66', 'Project')}
           </label>
-          {showAddProjectButton ? (
+          {showAddProjectButton && !identityLocked ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -115,20 +118,25 @@ export function NewWorkspaceComposerProjectSection({
           ) : null}
         </div>
         <div className="space-y-1" data-contextual-tour-target="workspace-creation-project">
-          <ProjectCombobox
-            options={projectOptions}
-            value={selectedProjectId}
-            onValueChange={onProjectChange}
-            onValueSelected={focusNameInput}
-            onAddProject={onAddProject}
-            placeholder={
-              projectPlaceholder ??
-              translate('auto.components.NewWorkspaceComposerCard.dccd26d4e4', 'Choose project')
-            }
-            triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
-            invalid={Boolean(projectError)}
-            describedBy={projectDescriptionId}
-          />
+          {identityLocked ? (
+            // Why: the project is implied by the workspace being copied; the run target below stays live.
+            <LockedComposerValue value={selectedProjectName} />
+          ) : (
+            <ProjectCombobox
+              options={projectOptions}
+              value={selectedProjectId}
+              onValueChange={onProjectChange}
+              onValueSelected={focusNameInput}
+              onAddProject={onAddProject}
+              placeholder={
+                projectPlaceholder ??
+                translate('auto.components.NewWorkspaceComposerCard.dccd26d4e4', 'Choose project')
+              }
+              triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
+              invalid={Boolean(projectError)}
+              describedBy={projectDescriptionId}
+            />
+          )}
           {projectError ? (
             <p id={projectDescriptionId} className="text-[11px] text-destructive">
               {projectError}

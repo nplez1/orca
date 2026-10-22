@@ -15,7 +15,11 @@ export function createUiSettingsActions(set: UISliceSet, get: UISliceGet): Parti
     },
     closeSettingsPage: () =>
       set((state) => {
-        return { activeView: state.previousViewBeforeSettings }
+        return {
+          activeView: state.previousViewBeforeSettings,
+          // Why: an unconsumed add-to-host request must not reopen the flow on a later visit.
+          settingsProjectAddHostRequest: null
+        }
       }),
     settingsNavigationTarget: null,
     openSettingsTarget: (target) => {
@@ -30,6 +34,10 @@ export function createUiSettingsActions(set: UISliceSet, get: UISliceGet): Parti
     clearSettingsTarget: () => set({ settingsNavigationTarget: null }),
     settingsProjectHostSelection: {},
     settingsProjectSetupSelection: {},
+    settingsProjectAddHostRequest: null,
+    // Why: a fresh object per request, so asking for the same host twice re-opens the flow.
+    requestProjectHostAdd: (request) => set({ settingsProjectAddHostRequest: { ...request } }),
+    clearProjectHostAddRequest: () => set({ settingsProjectAddHostRequest: null }),
     // Why: renderer-only, never persisted — no window.api.ui.set, and absent from the debounced UI writer in App.tsx.
     setSettingsProjectHostSelection: (selectionKey, hostId, setupId) =>
       set((s) => {

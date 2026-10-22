@@ -1,12 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   getExecutionHostLabel,
   parseExecutionHostId,
   toRuntimeExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
-import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
-import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
 import { useAppStore } from '../../store'
@@ -20,7 +18,9 @@ import { SettingsBadge } from './SettingsFormControls'
 import { matchesSettingsSearch } from './settings-search'
 import type { SettingsSearchEntry } from './settings-search'
 import { translate } from '@/i18n/i18n'
+import { useConfiguredExecutionHostOptions } from '@/hooks/use-configured-execution-host-options'
 import { buildSetupHostOptions, getSetupStateLabel } from './repository-host-setup-options'
+import { getRepositoryHostSetupsSectionId } from './repository-settings-targets'
 import { RepositoryHostSetupActions } from './RepositoryHostSetupActions'
 import {
   selectRuntimeAwareSshStatus,
@@ -75,38 +75,15 @@ export function RepositoryHostSetupsSection({
   const setupProjectClone = useAppStore((state) => state.setupProjectClone)
   const createProjectHostSetup = useAppStore((state) => state.createProjectHostSetup)
   const deleteProjectHostSetup = useAppStore((state) => state.deleteProjectHostSetup)
-  const repos = useAppStore((state) => state.repos)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
   const sshConnectionStates = useAppStore((state) => state.sshConnectionStates)
-  const settings = useAppStore((state) => state.settings)
-  const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
   const sshStateByEnvironment = useAppStore((state) => state.sshStateByEnvironment)
   const removedSshTargetLabels = useAppStore((state) => state.removedSshTargetLabels)
   const sshTargetsHydrated = useAppStore((state) => state.sshTargetsHydrated)
-  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
-  const hostOptions = useMemo(
-    () =>
-      buildExecutionHostRegistry({
-        repos,
-        settings,
-        hostSource: 'configured-only',
-        sshTargetLabels,
-        sshConnectionStates,
-        runtimeEnvironments,
-        runtimeStatusByEnvironmentId,
-        hostLabelOverrides
-      }),
-    [
-      repos,
-      settings,
-      sshTargetLabels,
-      sshConnectionStates,
-      runtimeEnvironments,
-      runtimeStatusByEnvironmentId,
-      hostLabelOverrides
-    ]
-  )
+  const addHostRequest = useAppStore((state) => state.settingsProjectAddHostRequest)
+  const clearProjectHostAddRequest = useAppStore((state) => state.clearProjectHostAddRequest)
+  const hostOptions = useConfiguredExecutionHostOptions()
   const projectHostSetupProjection = useAppStore((state) =>
     getProjectHostSetupProjectionFromState(state)
   )
@@ -147,6 +124,15 @@ export function RepositoryHostSetupsSection({
   const [deletingSetupId, setDeletingSetupId] = useState<string | null>(null)
   // Why: split clone entries share a projectId, so each keeps its own selection.
   const selectionKey = settingsSelectionKey ?? selectedProjectHostSetup?.projectId
+  // Why: the sidebar's Add to… menu can only preselect hosts this pane offers, from the repo row
+  // it linked to, and for its own project — so a sibling pane can never consume it first.
+  const projectHostAddRequest =
+    addHostRequest &&
+    addHostRequest.repoId === repo.id &&
+    addHostRequest.projectId === selectedProjectHostSetup?.projectId &&
+    setupHostOptions.some((option) => option.id === addHostRequest.hostId)
+      ? addHostRequest
+      : null
   // Why: the single project pane switches host in place — set the ephemeral
   // per-entry selection instead of navigating to a separate repo section.
   const selectHost = (hostId: ExecutionHostId) => {
@@ -175,6 +161,7 @@ export function RepositoryHostSetupsSection({
       )}
       keywords={[repo.displayName, 'host', 'ssh', 'remote', 'vm', 'path']}
       className="space-y-3"
+      id={getRepositoryHostSetupsSectionId(repo.id)}
       forceVisible={forceVisible}
     >
       <div className="space-y-1">
@@ -390,6 +377,8 @@ export function RepositoryHostSetupsSection({
           setupProjectClone={setupProjectClone}
           createProjectHostSetup={createProjectHostSetup}
           onSetupReady={selectHost}
+          addHostRequest={projectHostAddRequest}
+          onAddHostRequestHandled={clearProjectHostAddRequest}
         />
       ) : null}
     </SearchableSetting>

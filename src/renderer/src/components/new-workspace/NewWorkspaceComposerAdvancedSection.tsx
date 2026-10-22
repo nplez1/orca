@@ -62,6 +62,7 @@ type NewWorkspaceComposerAdvancedSectionProps = Pick<
   | 'sparseSelectedPresetId'
   | 'onSparseSelectPreset'
   | 'canUseSparseCheckout'
+  | 'identityLocked'
 > & {
   sparseEditing?: boolean
   onSparseEditingChange: (editing: boolean) => void
@@ -114,7 +115,8 @@ export function NewWorkspaceComposerAdvancedSection({
   sparsePresets,
   sparseSelectedPresetId,
   onSparseSelectPreset,
-  canUseSparseCheckout
+  canUseSparseCheckout,
+  identityLocked = false
 }: NewWorkspaceComposerAdvancedSectionProps): React.JSX.Element {
   const handleNotePaste = React.useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = event.clipboardData.getData('text/plain')
@@ -182,6 +184,7 @@ export function NewWorkspaceComposerAdvancedSection({
                 type="text"
                 value={name}
                 onChange={(event) => onNameValueChange(event.target.value)}
+                readOnly={identityLocked}
                 placeholder={translate(
                   'auto.components.NewWorkspaceComposerCard.0ee17638fe',
                   'Workspace name'
@@ -206,6 +209,7 @@ export function NewWorkspaceComposerAdvancedSection({
                 type="text"
                 value={branchNameOverride ?? ''}
                 onChange={(event) => onBranchNameOverrideChange(event.target.value)}
+                readOnly={identityLocked}
                 placeholder={translate(
                   'auto.components.NewWorkspaceComposerCard.branchNamePlaceholder',
                   'feature/my-branch'

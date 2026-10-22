@@ -31,6 +31,11 @@ export const WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY =
 // that. Advertised unconditionally: every build carrying this constant has the gate.
 export const WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY =
   'worktree.archive-failure-blocking.v1' as const
+// Why: worktree.create's params are a non-strict object, so an older host strips
+// exactBranchName and answers by suffixing the branch — the one result a copied workspace must
+// not get. Clients must refuse rather than create the wrong branch.
+export const WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY =
+  'worktree.exact-branch-name.v1' as const
 export const WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY =
   'worktree.visibility-defaults.v1' as const
 export const WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY =
@@ -52,6 +57,7 @@ export const WORKTREE_RUNTIME_CAPABILITIES = [
   REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
   FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
   WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
+  WORKTREE_EXACT_BRANCH_NAME_RUNTIME_CAPABILITY,
   WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY,
   WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY

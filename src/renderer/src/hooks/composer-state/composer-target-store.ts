@@ -27,6 +27,8 @@ export type ComposerStateInput = {
   initialWorkspaceTarget?: WorkspaceCreationTargetHint | null
   initialWorkspaceStatus?: WorkspaceStatus
   initialBaseBranch?: string
+  /** Pins the branch the create checks out; set when an existing workspace is copied to another host. */
+  initialBranchNameOverride?: string
   persistDraft: boolean
   onCreated?: () => void
   isSubmissionCancelled?: () => boolean
@@ -50,6 +52,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
     initialWorkspaceTarget = null,
     initialWorkspaceStatus,
     initialBaseBranch,
+    initialBranchNameOverride,
     persistDraft,
     onCreated,
     isSubmissionCancelled = NEVER_CANCEL_COMPOSER_SUBMIT,
@@ -171,6 +174,7 @@ export function useComposerTargetStore(options: ComposerStateInput, decisions: C
     initialWorkspaceTarget,
     initialWorkspaceStatus,
     initialBaseBranch,
+    initialBranchNameOverride,
     persistDraft,
     onCreated,
     isSubmissionCancelled,
