@@ -265,6 +265,9 @@ export type JiraEditableField = {
   /** The display names behind a user-field draft, so a picker shows names rather than
    *  ids before any search runs. Absent for non-user fields. */
   displayName?: string
+  /** The users a multi-user field already holds, in draft order, so the picker can name
+   *  each of them without a search. Absent for every other field. */
+  users?: JiraUser[]
 }
 
 export type JiraIssueFilter = 'assigned' | 'reported' | 'all' | 'done'

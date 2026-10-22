@@ -72,6 +72,35 @@ describe('JiraSchemaFieldControl', () => {
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
+  it('shows a multi-user field as a picker of names, not a box of accountIds', () => {
+    render(
+      <JiraSchemaFieldControl
+        field={{
+          key: 'customfield_10013',
+          name: 'QEs',
+          required: false,
+          schema: { type: 'array', items: 'user' }
+        }}
+        value="u-ada, u-grace"
+        onValueChange={vi.fn()}
+        userField={{
+          selectedUser: null,
+          onSelectUser: vi.fn(),
+          selectedUsers: [
+            { accountId: 'u-ada', displayName: 'Ada Lovelace' },
+            { accountId: 'u-grace', displayName: 'Grace Hopper' }
+          ],
+          onSelectUsers: vi.fn(),
+          providerSettings: { kind: 'local' }
+        }}
+      />
+    )
+
+    expect(screen.getByRole('combobox').textContent).toContain('Ada Lovelace, Grace Hopper')
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(document.body.textContent).not.toContain('u-ada')
+  })
+
   it('shows a single option field as a select, not a text box', () => {
     render(
       <JiraSchemaFieldControl

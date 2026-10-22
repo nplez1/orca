@@ -1,5 +1,6 @@
 import { resolveJiraFieldControlKind } from '../../shared/jira-field-rendering'
-import type { JiraCreateField, JiraEditableField } from '../../shared/jira-types'
+import { joinJiraFieldDraft } from '../../shared/jira-field-draft'
+import type { JiraCreateField, JiraEditableField, JiraUser } from '../../shared/jira-types'
 import { adfToMarkdownText } from './adf-markdown'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
@@ -53,6 +54,12 @@ function userDraft(value: unknown): { id: string; displayName?: string } {
   return { id, ...(displayName ? { displayName } : {}) }
 }
 
+/** The person a held id names, with the id standing in for a name the site does not
+ *  report: the picker has to show something, and the id is the only handle left. */
+function heldUser(user: { id: string; displayName?: string }): JiraUser {
+  return { accountId: user.id, displayName: user.displayName ?? user.id }
+}
+
 /** Renders the issue's current value into the draft the paired control holds. */
 function describeEditableValue(
   field: JiraCreateField,
@@ -64,23 +71,19 @@ function describeEditableValue(
     return { value: user.id, ...(user.displayName ? { displayName: user.displayName } : {}) }
   }
   if (kind === 'userList') {
-    const entries = Array.isArray(raw) ? raw : []
-    const users = entries.map(userDraft)
-    const ids = users.map((user) => user.id).filter(Boolean)
-    const names = users.map((user) => user.displayName).filter(Boolean)
+    const entries = (Array.isArray(raw) ? raw : []).map(userDraft).filter((user) => user.id)
+    // Why no displayName: the picker names each held person itself, so a joined hint
+    // beside it would only repeat them.
     return {
-      value: ids.join(', '),
-      ...(names.length > 0 ? { displayName: names.join(', ') } : {})
+      value: joinJiraFieldDraft(entries.map((user) => user.id)),
+      ...(entries.length > 0 ? { users: entries.map(heldUser) } : {})
     }
   }
   if (Array.isArray(raw)) {
     // Why no displayName: an option list names its own options, and a string list's
     // values are already what the user typed, so neither needs a hint beside it.
     return {
-      value: raw
-        .map((entry) => optionDraft(field, entry))
-        .filter(Boolean)
-        .join(', ')
+      value: joinJiraFieldDraft(raw.map((entry) => optionDraft(field, entry)).filter(Boolean))
     }
   }
   if (raw === null || raw === undefined) {

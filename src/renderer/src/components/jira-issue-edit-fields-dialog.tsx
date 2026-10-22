@@ -35,6 +35,11 @@ function selectedUserFor(entry: JiraEditableField): JiraUser | null {
   return { accountId: entry.value, displayName: entry.displayName ?? entry.value }
 }
 
+/** The people a multi-user field already holds, empty for a single-user field. */
+function selectedUsersFor(entry: JiraEditableField): JiraUser[] {
+  return entry.users ?? []
+}
+
 function EditFieldsForm({
   issue,
   fields,
@@ -59,6 +64,9 @@ function EditFieldsForm({
   )
   const [selectedUsers, setSelectedUsers] = useState<Record<string, JiraUser | null>>(() =>
     Object.fromEntries(fields.map((entry) => [entry.field.key, selectedUserFor(entry)]))
+  )
+  const [selectedUserLists, setSelectedUserLists] = useState<Record<string, JiraUser[]>>(() =>
+    Object.fromEntries(fields.map((entry) => [entry.field.key, selectedUsersFor(entry)]))
   )
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>({})
@@ -148,6 +156,9 @@ function EditFieldsForm({
                 selectedUser: selectedUsers[entry.field.key] ?? null,
                 onSelectUser: (user) =>
                   setSelectedUsers((previous) => ({ ...previous, [entry.field.key]: user })),
+                selectedUsers: selectedUserLists[entry.field.key] ?? [],
+                onSelectUsers: (users) =>
+                  setSelectedUserLists((previous) => ({ ...previous, [entry.field.key]: users })),
                 providerSettings,
                 siteId: issue.siteId,
                 allowClear: true

@@ -157,6 +157,45 @@ describe('Jira issue edit metadata', () => {
     expect(field.displayName).toBeUndefined()
   })
 
+  it('drafts a multi-user field with the people it holds', async () => {
+    jiraRequestMock.mockResolvedValue({
+      fields: {
+        customfield_10013: [
+          { accountId: 'u-ada', displayName: 'Ada Lovelace' },
+          { accountId: 'u-grace', displayName: 'Grace Hopper' }
+        ]
+      },
+      editmeta: {
+        fields: {
+          customfield_10013: {
+            name: 'QEs',
+            required: false,
+            schema: {
+              type: 'array',
+              items: 'user',
+              custom: 'com.atlassian.jira.plugin.system.customfieldtypes:multiuserpicker'
+            },
+            operations: ['set']
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const [field] = await listEditFields('ALP-1', 'site-1')
+
+    // The picker names each person, so there is no joined hint to build.
+    expect(field).toEqual({
+      field: expect.objectContaining({ key: 'customfield_10013' }),
+      value: 'u-ada, u-grace',
+      users: [
+        { accountId: 'u-ada', displayName: 'Ada Lovelace' },
+        { accountId: 'u-grace', displayName: 'Grace Hopper' }
+      ]
+    })
+    expect(field.displayName).toBeUndefined()
+  })
+
   it('drafts a string list from the entries themselves', async () => {
     jiraRequestMock.mockResolvedValue({
       fields: { customfield_10100: ['one', ' two '] },

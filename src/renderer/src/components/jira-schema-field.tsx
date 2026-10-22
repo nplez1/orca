@@ -1,6 +1,8 @@
 import type { JiraCreateField, JiraUser } from '../../../shared/jira-types'
 import { resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
+import { joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'
+import { JiraUserMultiPicker } from '@/components/jira-user-multi-picker'
 import { JiraUserPicker, type JiraUserPickerFixedOption } from '@/components/jira-user-picker'
 import { getJiraCreateAllowedValueLabel } from '@/components/task-page-jira-create-fields'
 import { Input } from '@/components/ui/input'
@@ -40,6 +42,9 @@ export function JiraSchemaFieldControl({
   userField?: {
     selectedUser: JiraUser | null
     onSelectUser: (user: JiraUser | null) => void
+    /** The people a multi-user field already holds, and where an edit of them goes. */
+    selectedUsers?: JiraUser[]
+    onSelectUsers?: (users: JiraUser[]) => void
     providerSettings: RuntimeJiraSettings
     siteId?: string | null
     /** Adds a row that clears the field, so an existing value can be removed. */
@@ -80,6 +85,25 @@ export function JiraSchemaFieldControl({
         disabled={disabled}
         label={field.name}
         fixedOptions={fixedOptions}
+      />
+    )
+  }
+  if (kind === 'userList' && userField) {
+    return (
+      <JiraUserMultiPicker
+        providerSettings={userField.providerSettings}
+        siteId={userField.siteId}
+        value={value}
+        users={userField.selectedUsers ?? []}
+        onChange={(users) => {
+          userField.onSelectUsers?.(users)
+          onValueChange(joinJiraFieldDraft(users.map((user) => user.accountId)))
+        }}
+        disabled={disabled}
+        label={field.name}
+        placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+          value0: field.name
+        })}
       />
     )
   }
