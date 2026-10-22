@@ -186,7 +186,10 @@
         "duplicateIssueNumberPlaceholder": "Issue number",
         "f294c500ef": "No GitLab work matches this filter.",
         "fe28c9821f": "view",
-        "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}."
+        "jiraNoStatusTransition": "Jira has no available transition to {{value0}} for {{value1}}.",
+        "jiraTransitionFieldsApply": "Apply and move",
+        "jiraTransitionFieldsApplying": "Moving…",
+        "jiraTransitionFieldsUnsupported": "Orca cannot set {{value0}}. If Jira requires it and the issue has no value, the move will be refused and Jira will name the field."
       },
       "Terminal": {
         "cdc9ac4b2d": "editor"
@@ -3758,9 +3761,16 @@
     }
   },
   "jira": {
+    "board": {
+      "noTransition": "No status change to {{column}} is available for {{key}}."
+    },
     "copy": {
       "actions": "Copy issue context",
       "context": "Copy context for {{key}}"
+    },
+    "transitions": {
+      "completeInJira": "Complete “{{name}}” in Jira",
+      "unsupported": "Jira requires fields Orca cannot collect yet: {{fields}}."
     },
     "workspace": {
       "open": "Open workspace linked to {{key}}",
