@@ -156,12 +156,21 @@ export function JiraStatusRow({
                 value1: selected?.name ?? ''
               })}
             </DialogTitle>
-            <DialogDescription>
-              {translate(
-                'components.jiraStatusRow.description',
-                'Jira requires these fields before it will apply this status change.'
-              )}
-            </DialogDescription>
+            {requirement?.kind === 'form' ? (
+              <DialogDescription>
+                {translate(
+                  'components.jiraStatusRow.description',
+                  'Jira requires these fields before it will apply this status change.'
+                )}
+              </DialogDescription>
+            ) : (
+              <DialogDescription>
+                {translate(
+                  'components.jiraStatusRow.refused',
+                  'Jira refused this change. Review the reason below, or finish it in Jira.'
+                )}
+              </DialogDescription>
+            )}
           </DialogHeader>
           {selected && requirement?.kind === 'form' ? (
             <JiraTransitionFieldsForm

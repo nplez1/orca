@@ -243,6 +243,48 @@ describe('JiraLinkedIssuePane', () => {
     )
   })
 
+  it('shows a non-field refusal in its own dialog, with the refusal copy', async () => {
+    // Why: the fields copy over a permissions/validator refusal would be wrong, and a
+    // toast alone leaves the user with nothing to finish the move from.
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' }
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({
+      ok: false,
+      error: 'You lack the transition permission.'
+    })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('You lack the transition permission.')).toBeTruthy()
+    expect(
+      within(dialog).getByText(
+        'Jira refused this change. Review the reason below, or finish it in Jira.'
+      )
+    ).toBeTruthy()
+    expect(within(dialog).queryByText(/requires these fields/)).toBeNull()
+  })
+
   it('collects the fields a transition screen requires before posting', async () => {
     mocks.jiraGetIssue.mockResolvedValue(issue())
     mocks.jiraIssueComments.mockResolvedValue([])

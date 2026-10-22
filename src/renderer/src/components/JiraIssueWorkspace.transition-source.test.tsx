@@ -410,6 +410,90 @@ describe('Jira transition form source ownership', () => {
     expect(screen.getByText('Approval task not complete')).toBeTruthy()
   })
 
+  it('replaces a carried workflow message once the form has its own refusal', async () => {
+    // Why: the parent's sentence opened the form; a later attempt that says something
+    // else must not leave the old one on screen.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'filled',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValueOnce({
+      ok: false,
+      error: 'Approval task not complete; Component/s is required.',
+      errorMessages: ['Approval task not complete'],
+      fieldErrors: { components: 'Component/s is required.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const dialogInput = await screen.findByPlaceholderText('Comma-separated values')
+    await waitFor(() => expect(screen.getByText('Approval task not complete')).toBeTruthy())
+    const form = dialogInput.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    mocks.update.mockResolvedValueOnce({ ok: false, error: 'Workflow step rejected.' })
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Workflow step rejected.')).toBeTruthy())
+    expect(screen.queryByText('Approval task not complete')).toBeNull()
+  })
+
+  it('shows the sentence for a refused field with no control beside a rendered one', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Release approval must be Approved; Close reason is not allowed.',
+      fieldErrors: {
+        customfield_42: 'Release approval must be Approved.',
+        customfield_99: 'Close reason is not allowed.'
+      }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    // The rendered key shows inline, the unrendered one in the banner, each once.
+    await waitFor(() =>
+      expect(screen.getAllByText('Release approval must be Approved.')).toHaveLength(1)
+    )
+    expect(screen.getAllByText(/Close reason is not allowed\./)).toHaveLength(1)
+  })
+
   it('keeps a field a rejection brought back while the next attempt is in flight', async () => {
     // Why: clearing the messages at submit time must not un-ask for the field, or the
     // value the user just typed disappears and the next submit leaves it out.

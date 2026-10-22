@@ -134,9 +134,22 @@ export function JiraTransitionFieldsForm({
   const carriedMessages = attempted ? [] : (rejectedErrorMessages ?? [])
   const workflowMessages = [...carriedMessages, ...(attempted ? errorMessages : [])]
   const banner = [...workflowMessages, ...unrenderedMessages]
+  // Why the remainder from `error`: the host joins its own top-level message into that
+  // sentence, and a banner built only from the parts above would drop it. Parts already
+  // shown — inline on a control, or in the banner — are the only ones left out.
+  const shownParts = new Set([
+    ...banner,
+    ...renderedKeys.map((key) => fieldErrors[key]).filter(Boolean)
+  ])
+  const uncovered = attempted
+    ? (error ?? '')
+        .split('; ')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0 && !shownParts.has(part))
+    : []
   const shownError =
-    banner.length > 0
-      ? banner.join('; ')
+    banner.length > 0 || uncovered.length > 0
+      ? [...banner, ...uncovered].join('; ')
       : carriesError
         ? null
         : attempted

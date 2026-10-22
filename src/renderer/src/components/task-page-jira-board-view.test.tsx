@@ -300,7 +300,9 @@ describe('Jira board moves', () => {
     mocks.apply.mockResolvedValueOnce({
       result: {
         ok: false,
-        error: 'Jira rejected the update.',
+        // Why the same sentence: the host joins Jira's field errors into `message`, so
+        // this is what a real refusal carries, and the form must not print it twice.
+        error: 'Release approval must be Approved.',
         fieldErrors: { customfield_42: 'Release approval must be Approved.' }
       },
       latest: null
@@ -314,10 +316,11 @@ describe('Jira board moves', () => {
       throw new Error('Expected the transition form')
     }
     fireEvent.submit(form)
-    await screen.findByText('Release approval must be Approved.')
-    // Why absent: Jira's message already joins its field errors, so showing the
-    // banner as well would print the same sentence twice.
-    expect(screen.queryByText('Jira rejected the update.')).toBeNull()
+    // Why exactly once: Jira's message already joins its field errors, so the banner
+    // must not repeat the sentence the control beneath it carries.
+    await waitFor(() =>
+      expect(screen.getAllByText('Release approval must be Approved.')).toHaveLength(1)
+    )
     fireEvent.change(input, { target: { value: 'Approved' } })
     fireEvent.submit(form)
     await waitFor(() =>
@@ -342,6 +345,24 @@ describe('Jira board moves', () => {
     mount()
     await move()
     await screen.findByText('You do not have permission to set Close reason.')
+    expect(mocks.apply).toHaveBeenCalledTimes(1)
+  })
+
+  it("shows Jira's workflow message for a refusal that names no transition field", async () => {
+    // Why: readJiraErrorDetail folds errorMessages into `message`, and a field-level
+    // display would otherwise hide the workflow half entirely.
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        error: 'Approval task not complete; Close reason is not allowed.',
+        errorMessages: ['Approval task not complete'],
+        fieldErrors: { customfield_99: 'Close reason is not allowed.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    await screen.findByText('Approval task not complete; Close reason is not allowed.')
     expect(mocks.apply).toHaveBeenCalledTimes(1)
   })
 
