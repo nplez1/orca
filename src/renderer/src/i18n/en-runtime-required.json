@@ -792,7 +792,6 @@
             "databaseCount_other": "{{value0}} databases",
             "fileCount_one": "{{value0}} file",
             "fileCount_other": "{{value0}} files",
-            "reading": "Reading {{value0}} files",
             "refresh": "Refresh",
             "stoppedAfter": "Stopped after {{value0}}",
             "stoppedAt": "stopped at {{value0}}"

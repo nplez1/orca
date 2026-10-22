@@ -1561,6 +1561,26 @@ is never hand-merged; it is regenerated.
 placeholder-less sentence is now `jira.board.noTransitionSelected`. That file is the red-flag scan's
 single "modified but upstream never touched it" entry this sync, which is the scan working.
 
+### The worktree base watcher: upstream deleted the helper, so the fork's rule moved to the call site
+
+**Paths:** `src/main/ipc/worktree-base-directory-watch-targets.ts`
+
+Upstream deleted `getBaseWatchLayout` (with the SSH filesystem provider and the local/remote
+branching that surrounded it) as part of its SSH removal, and this sync first took that deletion
+whole — which silently dropped the fork's project-folder rule with it: `nestWorkspaces` must be
+`false` when the layout is `project-folder`, because the watched root already IS the per-project
+container and a nested matcher then looks for a repo-named level that placement never creates. With
+the rule gone, a worktree created outside the app is not detected. The rule now lives on the `config`
+object that `maybeAddBaseTarget` builds, and `worktree-base-directory-watch-targets.test.ts`'s
+"watches the per-project container as a flat root" case pins it.
+
+**Why this is recorded rather than just fixed:** a deletion upstream makes for its own reasons can
+carry a fork rule out with it, and the deletion conflicts cleanly — there is no marker, and the only
+signal is a fork test the sync did not run. That test is not in `local/unit-known-red.json` and must
+never be added there.
+
+**Do not:** re-add `getBaseWatchLayout` or the SSH provider branch to get the rule back.
+
 ### Max-lines and the ratchets: two splits, one prune, two restorations
 
 `orcad-entry.ts` was over the budget on the union, so its credential-store bootstrap moved to

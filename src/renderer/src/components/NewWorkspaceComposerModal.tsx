@@ -253,7 +253,7 @@ function QuickTabBody({
   }, [])
 
   const handleCreate = useCallback(async (): Promise<void> => {
-    if (createDisabled) {
+    if (effectiveCreateDisabled) {
       return
     }
     await submitQuick(quickAgent, {
@@ -263,7 +263,7 @@ function QuickTabBody({
       launchChoice: launchSelection.choice
     })
   }, [
-    createDisabled,
+    effectiveCreateDisabled,
     lockedWorkspaceBranch,
     quickAgent,
     launchSelection.choice,
