@@ -33,6 +33,8 @@ export type JiraBoardMovePrompt = {
   /** Jira's field-level refusal from the last attempt, so the field it names is
    *  asked for again and can be changed. */
   fieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from that refusal, which a field-level display hides. */
+  errorMessages?: string[]
   loading: boolean
 }
 
@@ -121,6 +123,7 @@ export function JiraBoardMoveDialog({
             siteId={prompt.issue.siteId}
             forcedFieldKeys={forcedFieldKeys}
             rejectedFieldErrors={prompt.fieldErrors}
+            rejectedErrorMessages={prompt.errorMessages}
             errorReason={prompt.error}
             issueUrl={prompt.issue.url}
             onBack={onClose}

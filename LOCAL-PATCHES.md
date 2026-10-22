@@ -638,8 +638,14 @@ Converged on the fork's shape, as one collector on all three surfaces:
   option, which the edit form was also getting wrong.
 - `src/renderer/src/components/jira-transition-fields-form.tsx` — renders `resolution`, `comment` and
   every other required field through `JiraSchemaFieldControl`, seeded from `currentValue`, submitting
-  **only fields the user changed** so a shape Orca cannot rebuild is never rewritten. Jira's
-  `fieldErrors` render beside the control that failed and the form stays open to retry.
+  **only fields the user changed**. That rule is what makes the skip reversible: the classifier only
+  renders an unfilled field (so "changed" means "filled in"), and a field a rejection brought back is
+  rendered holding the issue's own value and stays unsubmitted until the user edits it — so a shape
+  Orca cannot rebuild is never rewritten. A field a rejection brought back is the exception: it is
+  always sent when it has a control and a non-empty draft, because resubmitting the value Jira just
+  refused would repeat the same request. Jira's `fieldErrors` render beside the control that failed
+  and the form stays open to retry; the banner is suppressed only when a _rendered_ field carries the
+  sentence, and Jira's separate workflow `errorMessages` are always shown.
 - `task-page/jira/TransitionFieldsDialog.tsx` is now a shell over that one form, and the detail-pane
   control, the ad-hoc board move dialog and the board drop all render it.
 - `src/renderer/src/components/jira-issue-mutation-queue.ts` — `JiraMutationFailure` carries

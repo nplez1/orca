@@ -3,7 +3,10 @@ import { useAppStore } from '@/store'
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
 import { translate } from '@/i18n/i18n'
-import { classifyTransitionRequirements } from '../../../shared/jira-transition-fields'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../shared/jira-transition-fields'
 import type {
   JiraIssue,
   JiraIssueUpdate,
@@ -154,15 +157,17 @@ export function TaskPageJiraBoardView({
     if (outcome.ok || requestRef.current !== request) {
       return
     }
+    // Why the forced-key count and not "any field errors": a key that names no field of
+    // this transition opens no control, so the dialog would show only its title.
+    const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
     setPrompt((current) =>
       current
         ? {
             ...current,
             selected: transition,
-            // Why not the flat sentence: Jira named fields, so the form has to stand
-            // them up. Only a refusal that names nothing keeps the plain error.
-            error: outcome.fieldErrors ? null : outcome.error,
-            fieldErrors: outcome.fieldErrors
+            error: forced.size > 0 ? null : outcome.error,
+            fieldErrors: outcome.fieldErrors,
+            errorMessages: outcome.errorMessages
           }
         : null
     )

@@ -19,6 +19,8 @@ export type JiraPendingTransitionFields = {
   /** Jira's field-level refusal that reopened the form, so the field it names is
    *  asked for again instead of reported as a sentence with no control behind it. */
   rejectedFieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from that refusal, which a field-level display hides. */
+  errorMessages?: string[]
   /** The rejection that reopened the form, shown until the form has its own. */
   error?: string | null
 }
@@ -108,7 +110,10 @@ export function useJiraBoardTransitionMove({
     openTransitionFields: (
       issue: JiraIssue,
       transition: JiraTransition,
-      rejection?: Pick<JiraPendingTransitionFields, 'rejectedFieldErrors' | 'error'>
+      rejection?: Pick<
+        JiraPendingTransitionFields,
+        'rejectedFieldErrors' | 'errorMessages' | 'error'
+      >
     ) => setPendingTransitionFields({ issue, transition, ...rejection }),
     closeTransitionFields: () => {
       if (inFlightCount === 0) {

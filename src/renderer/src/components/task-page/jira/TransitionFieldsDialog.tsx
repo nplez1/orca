@@ -19,6 +19,8 @@ export type JiraTransitionFieldsRequest = {
   /** Jira's field-level refusal that reopened this form, so the field it names is
    *  asked for again and the sentence has a control to sit beside. */
   rejectedFieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from that refusal, which a field-level display hides. */
+  errorMessages?: string[]
   /** The rejection that reopened the form, shown until the form has its own. */
   error?: string | null
 }
@@ -67,6 +69,7 @@ export function TaskPageJiraTransitionFieldsDialog({
             providerSettings={providerSettings}
             siteId={request.issue.siteId}
             rejectedFieldErrors={request.rejectedFieldErrors}
+            rejectedErrorMessages={request.errorMessages}
             errorReason={request.error}
             issueUrl={request.issue.url}
             onBack={onClose}

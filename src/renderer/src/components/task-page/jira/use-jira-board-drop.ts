@@ -79,6 +79,7 @@ export function useJiraBoardDrop({
       clearPicker()
       move.openTransitionFields(issue, transition, {
         rejectedFieldErrors: outcome.fieldErrors,
+        errorMessages: outcome.errorMessages,
         error: outcome.error
       })
       return

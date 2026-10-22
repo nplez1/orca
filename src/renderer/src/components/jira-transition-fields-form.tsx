@@ -32,7 +32,14 @@ import type {
 
 export type JiraTransitionSubmitOutcome =
   | { ok: true }
-  | { ok: false; error: string; fieldErrors?: JiraFieldErrors }
+  | {
+      ok: false
+      error: string
+      fieldErrors?: JiraFieldErrors
+      /** Jira's own workflow messages, which the joined `error` also carries but a
+       *  field-level display would otherwise hide. */
+      errorMessages?: string[]
+    }
 
 type Props = {
   transition: JiraTransition
@@ -47,6 +54,9 @@ type Props = {
   forcedFieldKeys?: ReadonlySet<string>
   /** The field-level refusal that reopened this form, shown beside its control. */
   rejectedFieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from the refusal that reopened this form. Its joined
+   *  `error` carries them too, but a field-level display would hide them. */
+  rejectedErrorMessages?: string[]
   /** A rejection this surface already received, shown until the form has its own. */
   errorReason?: string | null
   /** The escape hatch when a text box cannot satisfy Jira. */
@@ -69,6 +79,7 @@ export function JiraTransitionFieldsForm({
   siteId,
   forcedFieldKeys,
   rejectedFieldErrors,
+  rejectedErrorMessages,
   errorReason,
   issueUrl
 }: Props): React.JSX.Element | null {
@@ -78,13 +89,13 @@ export function JiraTransitionFieldsForm({
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>(rejectedFieldErrors ?? {})
-  // Why the union: a rejection this form receives has to bring back the field it
-  // names even when the classifier had skipped it, or there is nothing to fix.
-  const forced = new Set([
-    ...(forcedFieldKeys ?? []),
-    ...Object.keys(rejectedFieldErrors ?? {}),
-    ...Object.keys(fieldErrors)
-  ])
+  const [errorMessages, setErrorMessages] = useState<string[]>([])
+  // Why sticky: a field a rejection brought back must stay in the form while the next
+  // attempt is in flight, or the value the user just typed is hidden and dropped.
+  const [carriedKeys, setCarriedKeys] = useState<ReadonlySet<string>>(
+    () => new Set(Object.keys(rejectedFieldErrors ?? {}))
+  )
+  const forced = new Set([...(forcedFieldKeys ?? []), ...carriedKeys, ...Object.keys(fieldErrors)])
   const requirement = classifyTransitionRequirements(transition, forced)
   if (requirement.kind !== 'form') {
     return null
@@ -104,9 +115,22 @@ export function JiraTransitionFieldsForm({
   const unfilled = requirement.fields.filter(
     (field) => resolveJiraFieldControlKind(field) !== null && !draftOf(field).trim()
   )
-  // Why the form's own sentence is dropped when a field carries one: Jira's message
-  // joins its field errors, so showing both says the same thing twice.
-  const shownError = error && Object.keys(fieldErrors).length === 0 ? error : (errorReason ?? null)
+  // Why only a rendered field suppresses the banner: Jira's message joins its field
+  // errors, so repeating it there would say the same thing twice — but a rejection
+  // naming a field this form does not render has nothing else to be read in.
+  const renderedKeys = [
+    ...requirement.fields.map((field) => field.key),
+    ...(requirement.resolution ? [requirement.resolution.key] : [])
+  ]
+  const carriesError = renderedKeys.some((key) => fieldErrors[key])
+  const carriedMessages = rejectedErrorMessages ?? []
+  const shownError = errorMessages.length
+    ? errorMessages.join('; ')
+    : carriedMessages.length
+      ? carriedMessages.join('; ')
+      : carriesError
+        ? null
+        : (error ?? errorReason ?? null)
   const canSubmit =
     unfilled.length === 0 &&
     (!requirement.resolution || resolutionValue !== null) &&
@@ -119,10 +143,16 @@ export function JiraTransitionFieldsForm({
     }
     setError(null)
     setFieldErrors({})
-    // Why only changed fields: an untouched field keeps the value the issue
-    // already holds, so a shape Orca cannot rebuild is never rewritten.
+    setErrorMessages([])
+    // Why a forced field with a control is always sent: it was brought back because
+    // Jira refused it, and resubmitting the value the issue already holds would repeat
+    // the same request. A field with no control keeps the never-rewrite rule.
+    const mustSend = (field: JiraCreateField): boolean =>
+      forced.has(field.key) &&
+      resolveJiraFieldControlKind(field) !== null &&
+      draftOf(field).trim() !== ''
     const changed = requirement.fields.filter(
-      (field) => draftOf(field).trim() !== (field.currentValue ?? '').trim()
+      (field) => mustSend(field) || draftOf(field).trim() !== (field.currentValue ?? '').trim()
     )
     const values = Object.fromEntries(
       requirement.fields.map((field) => [field.key, draftOf(field)])
@@ -145,6 +175,11 @@ export function JiraTransitionFieldsForm({
     if (!outcome.ok) {
       setError(outcome.error)
       setFieldErrors(outcome.fieldErrors ?? {})
+      setErrorMessages(outcome.errorMessages ?? [])
+      const rejected = Object.keys(outcome.fieldErrors ?? {})
+      if (rejected.length > 0) {
+        setCarriedKeys((previous) => new Set([...previous, ...rejected]))
+      }
     }
   }
 

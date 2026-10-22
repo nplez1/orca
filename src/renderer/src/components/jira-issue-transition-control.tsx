@@ -50,6 +50,7 @@ export function JiraIssueTransitionControl({
   // Why held here as well as in the form: a one-click transition that Jira refuses by
   // field never mounts the form, so this is what promotes it into one.
   const [rejectedFieldErrors, setRejectedFieldErrors] = useState<JiraFieldErrors>({})
+  const [rejectedErrorMessages, setRejectedErrorMessages] = useState<string[]>([])
   const forcedFieldKeys = selected
     ? rejectedTransitionFieldKeys(selected, rejectedFieldErrors)
     : new Set<string>()
@@ -60,6 +61,7 @@ export function JiraIssueTransitionControl({
     setSelected(null)
     setSubmitError(null)
     setRejectedFieldErrors({})
+    setRejectedErrorMessages([])
   }
 
   async function apply(
@@ -78,7 +80,8 @@ export function JiraIssueTransitionControl({
       return {
         ok: false,
         error: result.error,
-        ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {})
+        ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+        ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
       }
     } catch (error) {
       return {
@@ -110,6 +113,7 @@ export function JiraIssueTransitionControl({
     const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
     if (forced.size > 0 && outcome.fieldErrors) {
       setRejectedFieldErrors(outcome.fieldErrors)
+      setRejectedErrorMessages(outcome.errorMessages ?? [])
       return
     }
     setSubmitError(outcome.error)
@@ -173,6 +177,7 @@ export function JiraIssueTransitionControl({
               siteId={issue.siteId}
               forcedFieldKeys={forcedFieldKeys}
               rejectedFieldErrors={rejectedFieldErrors}
+              rejectedErrorMessages={rejectedErrorMessages}
               errorReason={submitError}
               issueUrl={issue.url}
               onBack={reset}

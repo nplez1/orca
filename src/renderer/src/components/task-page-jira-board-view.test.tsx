@@ -328,6 +328,23 @@ describe('Jira board moves', () => {
     )
   })
 
+  it('reports a refusal that names no field of the transition', async () => {
+    // Why: a key outside the transition's own fields opens no control, so a dialog that
+    // suppresses its sentence just because field errors exist would show nothing at all.
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        error: 'You do not have permission to set Close reason.',
+        fieldErrors: { customfield_99: 'You do not have permission to set Close reason.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    await screen.findByText('You do not have permission to set Close reason.')
+    expect(mocks.apply).toHaveBeenCalledTimes(1)
+  })
+
   it('rolls back a rejected mutation and keeps its error available for Retry', async () => {
     mocks.apply.mockResolvedValueOnce({
       result: { ok: false, error: 'Workflow rejected the move' },

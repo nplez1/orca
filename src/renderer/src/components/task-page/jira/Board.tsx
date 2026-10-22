@@ -293,6 +293,7 @@ export function TaskPageJiraBoard({
                 issue: drop.pendingTransitionFields.issue,
                 transition: drop.pendingTransitionFields.transition,
                 rejectedFieldErrors: drop.pendingTransitionFields.rejectedFieldErrors,
+                errorMessages: drop.pendingTransitionFields.errorMessages,
                 error: drop.pendingTransitionFields.error
               }
             : null
