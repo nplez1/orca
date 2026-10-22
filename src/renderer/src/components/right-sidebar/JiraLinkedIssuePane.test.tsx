@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira-types'
@@ -204,7 +204,7 @@ describe('JiraLinkedIssuePane', () => {
     expect(row.textContent).toContain('5')
   })
 
-  it('toasts when a status change fails from the pane', async () => {
+  it('reports a rejected status change beside the Jira link', async () => {
     mocks.jiraGetIssue.mockResolvedValue(issue())
     mocks.jiraIssueComments.mockResolvedValue([])
     mocks.jiraListAssignableUsers.mockResolvedValue([])
@@ -232,7 +232,120 @@ describe('JiraLinkedIssuePane', () => {
     fireEvent.click(statusRow)
     fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Transition rejected'))
+    // Why the dialog and not a toast: this pane reports its own refusals now, so the
+    // sentence lands beside the control and the escape hatch to Jira.
+    expect((await screen.findByRole('alert')).textContent).toContain('Transition rejected')
+    expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+      PANE_OWNER_SOURCE,
+      'ABC-1',
+      { transitionId: '31' },
+      'site-1'
+    )
+  })
+
+  it('collects the fields a transition screen requires before posting', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    // Why not posted yet: the screen requires a value, and the pane has no control
+    // for it to guess from.
+    expect(mocks.jiraUpdateIssue).not.toHaveBeenCalled()
+    // Why within the dialog: this pane already holds a title box and a comment editor,
+    // and the translate mock here does not interpolate the field's placeholder.
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        PANE_OWNER_SOURCE,
+        'ABC-1',
+        { transitionId: '31', transitionFields: { customfield_42: 'approved' } },
+        'site-1'
+      )
+    )
+  })
+
+  it('moves without a form when the issue already fills the required field', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        PANE_OWNER_SOURCE,
+        'ABC-1',
+        { transitionId: '31' },
+        'site-1'
+      )
+    )
   })
 
   it('reads through the workspace owner when the link has no task source', async () => {

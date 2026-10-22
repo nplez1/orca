@@ -647,7 +647,11 @@ Converged on the fork's shape, as one collector on all three surfaces:
   and the form stays open to retry; the banner is suppressed only when a _rendered_ field carries the
   sentence, and Jira's separate workflow `errorMessages` are always shown.
 - `task-page/jira/TransitionFieldsDialog.tsx` is now a shell over that one form, and the detail-pane
-  control, the ad-hoc board move dialog and the board drop all render it.
+  control, the ad-hoc board move dialog, the board drop **and the workspace sidebar's linked-issue
+  pane** all render it. The pane's status row (`right-sidebar/jira-status-row.tsx`) no longer posts a
+  bare `{transitionId}`: it opens the form for a screen that requires fields, and a refusal naming a
+  field reopens it with that field asked for. A refusal that names none shows beside an "Open in Jira"
+  link in that row's own dialog rather than as a toast.
 - `src/renderer/src/components/jira-issue-mutation-queue.ts` — `JiraMutationFailure` carries
   `fieldErrors`, and `use-jira-issue-workspace-mutation.ts` passes them through instead of flattening
   the result to `{ ok, error }`, so the detail pane — not only the board paths — can name the field
@@ -663,6 +667,26 @@ value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-i
 (the filled-field move, the collected custom field, and the field-level rejection) and
 `task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
 `unsupported` kind turns all of them red.
+
+### `local(test)`: a bun-pool timeout failure can read as `Errors 1: EISDIR` instead of a failing test
+
+Symptom worth recognising, because it reads as a crash rather than a failure and cost a session half an
+hour: a test whose `findBy`/`waitFor` times out is reported as `Errors 1` with
+`Error: EISDIR: illegal operation on a directory, read` raised inside Vitest's own `getSourceMap`, the
+failing test is not named, and the file's remaining tests vanish from the counts (`Tests N passed (N+2)`,
+`Test Files N passed (N+1)`). A _synchronous_ assertion failure in the same file reports normally, which
+is what makes it look like a flake.
+
+Reproduced 2026-10-22 against `src/renderer/src/components/JiraIssueWorkspace.transition-source.test.tsx`
+by appending a deliberate `findByPlaceholderText` timeout: in the bun pool → EISDIR, no test named; the
+same file under the node runtime → `× scratch: deliberate timeout reports itself`, failing test named.
+Minimal files with the same failing query reported fine in bun, so the trigger is the file, not the
+query.
+
+Remedy applied: that file is seated in the node-runtime project
+(`config/scripts/vitest-node-runtime-files.mjs`, `LOCAL(nplez1)` entry). If the symptom appears
+elsewhere, check it the same way — a deliberate timeout failure is the probe — and seat that file rather
+than re-running the suite. Do not read `Errors 1` in a bun-pool run as "the failure was elsewhere".
 
 ## Syncing with upstream
 

@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TaskPageJiraPriorityBadge } from '@/components/task-page-jira-priority-badge'
 import { useAppStore } from '@/store'
-import { cn } from '@/lib/utils'
 import type { JiraComment, JiraIssue, JiraUser } from '../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
@@ -20,6 +19,7 @@ import { IssuePaneHeader } from './IssuePaneHeader'
 import { IssuePaneMessage } from './IssuePaneMessage'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 import { JiraEditFieldsRow } from './JiraEditFieldsRow'
+import { JiraStatusRow } from './jira-status-row'
 import { JiraStoryPointsRow } from './jira-story-points-row'
 import { useLinkedIssuePaneActions } from './use-linked-issue-pane-actions'
 import type { SupportedWorkspaceLinkedIssue } from './workspace-linked-issue'
@@ -46,16 +46,6 @@ function jiraCommentView(comment: JiraComment): IssueCommentView {
     createdAt: comment.createdAt,
     body: comment.body
   }
-}
-
-function jiraStatusToneClass(categoryKey: string): string {
-  if (categoryKey === 'done') {
-    return 'bg-emerald-500'
-  }
-  if (categoryKey === 'indeterminate') {
-    return 'bg-sky-500'
-  }
-  return 'bg-muted-foreground'
 }
 
 const MENU_ITEM_CLASS =
@@ -128,7 +118,29 @@ export function JiraLinkedIssuePane({
         <>
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
             <div className="space-y-0.5 p-2">
-              <JiraStatusRow displayed={displayed} detail={detail} />
+              <JiraStatusRow
+                issue={displayed}
+                transitions={detail.transitions}
+                pending={detail.pendingField === 'transition'}
+                providerSettings={providerSettings}
+                onTransition={async (updates, transition) => {
+                  const result = await detail.mutateIssue(
+                    'transition',
+                    updates,
+                    { status: transition.to },
+                    { reportsInline: true }
+                  )
+                  if (result.ok) {
+                    return { ok: true }
+                  }
+                  return {
+                    ok: false,
+                    error: result.error,
+                    ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+                    ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
+                  }
+                }}
+              />
               <IssueAssigneeCombobox
                 label={translate('auto.components.right.sidebar.IssueAssignee.label', 'Assignee')}
                 roster={detail.users.map(jiraUserOption)}
@@ -224,59 +236,6 @@ export function JiraLinkedIssuePane({
 }
 
 type JiraDetail = ReturnType<typeof useJiraIssueWorkspaceDetail>
-
-function JiraStatusRow({
-  displayed,
-  detail
-}: {
-  displayed: JiraIssue
-  detail: JiraDetail
-}): React.JSX.Element {
-  const pending = detail.pendingField === 'transition'
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <IssuePanePropertyRow
-          label={translate('auto.components.right.sidebar.IssuePane.status', 'Status')}
-          pending={pending}
-          disabled={pending || detail.transitions.length === 0}
-          value={
-            <span className="flex items-center gap-1.5">
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full',
-                  jiraStatusToneClass(displayed.status.categoryKey)
-                )}
-                aria-hidden
-              />
-              <span className="min-w-0 truncate">{displayed.status.name}</span>
-            </span>
-          }
-        />
-      </PopoverTrigger>
-      <PopoverContent className="w-52" align="start">
-        <div className="max-h-64 overflow-y-auto scrollbar-sleek">
-          {detail.transitions.map((transition) => (
-            <button
-              key={transition.id}
-              type="button"
-              onClick={() =>
-                void detail.mutateIssue(
-                  'transition',
-                  { transitionId: transition.id },
-                  { status: transition.to }
-                )
-              }
-              className={MENU_ITEM_CLASS}
-            >
-              {transition.name}
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
 
 function JiraPriorityRow({
   displayed,
