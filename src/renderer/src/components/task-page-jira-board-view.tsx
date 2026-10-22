@@ -147,12 +147,25 @@ export function TaskPageJiraBoardView({
     if (classifyTransitionRequirements(transition).kind !== 'none') {
       return
     }
+    const request = requestRef.current
     const outcome = await apply(issue, transition, { transitionId: transition.id })
-    if (!outcome.ok) {
-      setPrompt((current) =>
-        current ? { ...current, selected: transition, error: outcome.error } : null
-      )
+    // Why before writing anything: a newer move (or a Retry) owns the prompt now, and
+    // this rejection would land on a dialog it does not belong to.
+    if (outcome.ok || requestRef.current !== request) {
+      return
     }
+    setPrompt((current) =>
+      current
+        ? {
+            ...current,
+            selected: transition,
+            // Why not the flat sentence: Jira named fields, so the form has to stand
+            // them up. Only a refusal that names nothing keeps the plain error.
+            error: outcome.fieldErrors ? null : outcome.error,
+            fieldErrors: outcome.fieldErrors
+          }
+        : null
+    )
   }
 
   async function move(

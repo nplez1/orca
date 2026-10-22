@@ -13,8 +13,16 @@ import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
 } from './jira-transition-fields-form'
-import { classifyTransitionRequirements } from '../../../shared/jira-transition-fields'
-import type { JiraIssue, JiraIssueUpdate, JiraTransition } from '../../../shared/jira-types'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../shared/jira-transition-fields'
+import type {
+  JiraFieldErrors,
+  JiraIssue,
+  JiraIssueUpdate,
+  JiraTransition
+} from '../../../shared/jira-types'
 
 export type JiraBoardMovePrompt = {
   issue: JiraIssue
@@ -22,6 +30,9 @@ export type JiraBoardMovePrompt = {
   transitions: JiraTransition[]
   selected: JiraTransition | null
   error: string | null
+  /** Jira's field-level refusal from the last attempt, so the field it names is
+   *  asked for again and can be changed. */
+  fieldErrors?: JiraFieldErrors
   loading: boolean
 }
 
@@ -44,7 +55,12 @@ export function JiraBoardMoveDialog({
   onSubmit,
   onRetry
 }: Props): React.JSX.Element {
-  const requirement = prompt?.selected ? classifyTransitionRequirements(prompt.selected) : null
+  const forcedFieldKeys = prompt?.selected
+    ? rejectedTransitionFieldKeys(prompt.selected, prompt.fieldErrors)
+    : new Set<string>()
+  const requirement = prompt?.selected
+    ? classifyTransitionRequirements(prompt.selected, forcedFieldKeys)
+    : null
   return (
     <Dialog
       open={prompt !== null}
@@ -103,6 +119,10 @@ export function JiraBoardMoveDialog({
             pending={pending}
             providerSettings={providerSettings}
             siteId={prompt.issue.siteId}
+            forcedFieldKeys={forcedFieldKeys}
+            rejectedFieldErrors={prompt.fieldErrors}
+            errorReason={prompt.error}
+            issueUrl={prompt.issue.url}
             onBack={onClose}
             onSubmit={onSubmit}
           />

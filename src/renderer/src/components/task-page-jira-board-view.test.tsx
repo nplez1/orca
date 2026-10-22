@@ -315,7 +315,9 @@ describe('Jira board moves', () => {
     }
     fireEvent.submit(form)
     await screen.findByText('Release approval must be Approved.')
-    expect(screen.getByText('Jira rejected the update.')).toBeTruthy()
+    // Why absent: Jira's message already joins its field errors, so showing the
+    // banner as well would print the same sentence twice.
+    expect(screen.queryByText('Jira rejected the update.')).toBeNull()
     fireEvent.change(input, { target: { value: 'Approved' } })
     fireEvent.submit(form)
     await waitFor(() =>

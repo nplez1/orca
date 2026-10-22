@@ -79,6 +79,10 @@ export type JiraCreateField = {
    *  emptiness, so a field this fills is not input the user owes us. Absent when
    *  the host could not read the values, which keeps the field asked for. */
   currentValue?: string
+  /** True when the issue holds any value at all, whatever its shape. Separate from
+   *  `currentValue` because that one only exists when a control can seed from it: a
+   *  value Orca has no control for still means the user owes nothing. */
+  hasCurrentValue?: boolean
   /** Human label for a `currentValue` that carries an id, so a form can show it. */
   currentDisplayValue?: string
   schema?: {

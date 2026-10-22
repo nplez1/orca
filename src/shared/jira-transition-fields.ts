@@ -1,4 +1,9 @@
-import type { JiraCreateField, JiraCreateFieldAllowedValue, JiraTransition } from './jira-types'
+import type {
+  JiraCreateField,
+  JiraCreateFieldAllowedValue,
+  JiraFieldErrors,
+  JiraTransition
+} from './jira-types'
 
 export type JiraTransitionRequirement =
   | { kind: 'none' }
@@ -26,21 +31,54 @@ function isCommentField(field: JiraCreateField): boolean {
  * them on this transition even when a value already exists.
  */
 function issueFillsField(field: JiraCreateField): boolean {
-  return !isResolutionField(field) && !isCommentField(field) && Boolean(field.currentValue?.trim())
+  if (isResolutionField(field) || isCommentField(field)) {
+    return false
+  }
+  // Why both: `hasCurrentValue` covers a shape no control can seed from, and
+  // `currentValue` is what a host from before that flag sends.
+  return field.hasCurrentValue === true || Boolean(field.currentValue?.trim())
 }
 
-export function requiredTransitionFields(transition: JiraTransition): JiraCreateField[] {
+export function requiredTransitionFields(
+  transition: JiraTransition,
+  /** Fields Jira rejected by name, asked for again even though they look filled. */
+  forcedFieldKeys?: ReadonlySet<string>
+): JiraCreateField[] {
   // Why: a field Jira will default itself is not input the user owes us; prompting
   // for it turns a valid move into a blocked one.
   return (transition.fields ?? []).filter(
-    (field) => field.required && field.hasDefaultValue !== true && !issueFillsField(field)
+    (field) =>
+      field.required &&
+      field.hasDefaultValue !== true &&
+      (forcedFieldKeys?.has(field.key) === true || !issueFillsField(field))
   )
 }
 
+/**
+ * The fields a rejection names, so a skipped field can be asked for again instead
+ * of dead-ending on a value Orca will not touch. A value that went stale, or a
+ * validator that demands the field be set on this transition, both arrive here
+ * rather than as a sentence with nowhere to act on it.
+ */
+export function rejectedTransitionFieldKeys(
+  transition: JiraTransition,
+  fieldErrors: JiraFieldErrors | undefined
+): ReadonlySet<string> {
+  const rejected = new Set(Object.keys(fieldErrors ?? {}))
+  const forced = new Set<string>()
+  for (const field of transition.fields ?? []) {
+    if (rejected.has(field.key)) {
+      forced.add(field.key)
+    }
+  }
+  return forced
+}
+
 export function classifyTransitionRequirements(
-  transition: JiraTransition
+  transition: JiraTransition,
+  forcedFieldKeys?: ReadonlySet<string>
 ): JiraTransitionRequirement {
-  const required = requiredTransitionFields(transition)
+  const required = requiredTransitionFields(transition, forcedFieldKeys)
   if (required.length === 0) {
     return { kind: 'none' }
   }

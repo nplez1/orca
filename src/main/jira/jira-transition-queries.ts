@@ -15,6 +15,24 @@ import {
 } from './jira-record-pages'
 
 /**
+ * Whether Jira reported any value at all for a field. Decided from the raw value
+ * rather than from the draft, because a shape Orca has no control for (a team
+ * object, a parent issue) still means the issue fills the field.
+ */
+function holdsValue(raw: unknown): boolean {
+  if (raw === null || raw === undefined) {
+    return false
+  }
+  if (typeof raw === 'string') {
+    return raw.trim() !== ''
+  }
+  if (Array.isArray(raw)) {
+    return raw.length > 0
+  }
+  return typeof raw === 'object' ? Object.keys(asRecord(raw)).length > 0 : true
+}
+
+/**
  * Attaches the value the issue already holds to each required transition field.
  * Jira's `required` is the transition screen's own flag, not a statement that the
  * issue is missing the field, so the values are what tell a field the user owes
@@ -47,7 +65,12 @@ async function attachCurrentValues(
     const values = asRecord(asRecord(response).fields)
     for (const transition of transitions) {
       for (const field of transition.fields ?? []) {
-        const draft = describeFieldDraft(field, values[field.key])
+        const raw = values[field.key]
+        if (!holdsValue(raw)) {
+          continue
+        }
+        field.hasCurrentValue = true
+        const draft = describeFieldDraft(field, raw)
         if (!draft.value.trim()) {
           continue
         }

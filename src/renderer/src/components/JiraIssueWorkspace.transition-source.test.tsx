@@ -230,4 +230,88 @@ describe('Jira transition form source ownership', () => {
     expect(screen.queryByLabelText('Comment')).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
   })
+
+  it("shows Jira's field-level refusal against the control that failed, end to end", async () => {
+    // Why through the real workspace: the mutation hook used to flatten the result to
+    // `{ ok, error }`, so a field error reached this control as undefined.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Jira rejected the update.',
+      fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    // Why waitFor + getBy rather than findBy: a DOM query that times out here fails in
+    // this file's bun pool with a masked `Test Run Error`, so the assertion is kept
+    // synchronous inside the retry.
+    await waitFor(() => expect(screen.getByText('Release approval must be Approved.')).toBeTruthy())
+    expect(screen.getByPlaceholderText('Enter Release approval')).toBeTruthy()
+  })
+
+  it('reopens a one-click transition as a form when Jira refuses it by field', async () => {
+    // A skipped, already-filled field can still be refused (a stale value, or a
+    // validator demanding it be set), and the user needs a control to act on.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'filled',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Jira rejected the update.',
+      fieldErrors: { components: 'Component/s is required.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith(
+        taskSourceRuntimeTarget(source),
+        issue.key,
+        { transitionId: 'filled' },
+        'site-a'
+      )
+    )
+    await waitFor(() => expect(screen.getByText('Component/s is required.')).toBeTruthy())
+    // Why the text-list placeholder: Component/s is `array/items: string`, which the
+    // control map renders as a comma-separated list.
+    expect(screen.getByPlaceholderText('Comma-separated values')).toBeTruthy()
+  })
 })

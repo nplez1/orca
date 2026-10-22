@@ -3,6 +3,7 @@ import {
   buildResolutionFieldValue,
   transitionAllowedValueKey,
   classifyTransitionRequirements,
+  rejectedTransitionFieldKeys,
   requiredTransitionFields,
   transitionAllowedValueLabel
 } from './jira-transition-fields'
@@ -59,20 +60,58 @@ describe('jira-transition-fields', () => {
         key: 'components',
         name: 'Component/s',
         required: true,
-        currentValue: '10400',
-        currentDisplayValue: 'Web',
+        hasCurrentValue: true,
+        currentValue: 'Web',
         schema: { type: 'array', items: 'string' }
       },
       {
         key: 'customfield_10002',
         name: 'Team',
         required: true,
+        hasCurrentValue: true,
         currentValue: 'team-1',
         schema: { type: 'array', items: 'string' }
       }
     ]
     expect(requiredTransitionFields(transition(filled))).toEqual([])
     expect(classifyTransitionRequirements(transition(filled))).toEqual({ kind: 'none' })
+  })
+
+  it('does not ask for a filled field Orca has no control to seed', () => {
+    // Why `hasCurrentValue` exists: Cloud's Team field holds an object no control can
+    // draft, and deciding "filled" from the draft alone asked for a field that is set.
+    const team = {
+      key: 'customfield_10002',
+      name: 'Team',
+      required: true,
+      hasCurrentValue: true,
+      schema: { type: 'team', custom: 'com.atlassian.teams:team' }
+    }
+    expect(requiredTransitionFields(transition([team]))).toEqual([])
+    expect(classifyTransitionRequirements(transition([team]))).toEqual({ kind: 'none' })
+  })
+
+  it('asks again for a filled field a rejection named', () => {
+    // Why: a stale value or a validator that demands the field be set on this
+    // transition both arrive as a rejection, and the form has to be able to act.
+    const components = {
+      key: 'components',
+      name: 'Component/s',
+      required: true,
+      hasCurrentValue: true,
+      currentValue: 'Web',
+      schema: { type: 'array', items: 'string' }
+    }
+    const rejected = { components: 'Component/s is required.' }
+    expect(rejectedTransitionFieldKeys(transition([components]), rejected)).toEqual(
+      new Set(['components'])
+    )
+    expect(
+      classifyTransitionRequirements(
+        transition([components]),
+        rejectedTransitionFieldKeys(transition([components]), rejected)
+      )
+    ).toEqual({ kind: 'form', resolution: null, commentRequired: false, fields: [components] })
   })
 
   it('still asks for resolution and comment when the issue holds a value', () => {

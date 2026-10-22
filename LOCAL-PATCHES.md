@@ -622,9 +622,16 @@ Converged on the fork's shape, as one collector on all three surfaces:
   on the transition even when a value exists. The classifier returns the remaining fields to render and
   de-duplicates a field Jira lists twice instead of refusing the transition over it.
 - `src/main/jira/jira-transition-queries.ts` — `attachCurrentValues` reads the issue for the union of
-  required field keys and attaches `currentValue` / `currentDisplayValue` to each field. Best effort:
-  a failed read leaves every field asked for, and an auth failure is rethrown so a dead token cannot
-  read as "these fields are empty".
+  required field keys and attaches `hasCurrentValue` (any value at all) plus `currentValue` /
+  `currentDisplayValue` (that value as a control draft) to each field. The two are separate on purpose:
+  Cloud's Team field holds an object no control can seed, and deciding "filled" from the draft alone
+  asks for a field the issue already has. Best effort: a failed read leaves every field asked for, and
+  an auth failure is rethrown so a dead token cannot read as "these fields are empty".
+- `src/shared/jira-transition-fields.ts` — `rejectedTransitionFieldKeys` lets a rejection undo a skip.
+  A stale value, or a validator that demands the field be set on this transition, comes back as
+  `fieldErrors` naming the field; every surface reopens the form with that field asked for rather than
+  printing a sentence the user cannot act on. `classifyTransitionRequirements` takes the forced keys as
+  an optional second argument, so the call sites that have none are unchanged.
 - `src/main/jira/jira-field-drafts.ts` — **new.** `describeFieldDraft` is the schema-to-draft map lifted
   out of `jira-issue-edit-metadata.ts`, so a transition field and an edit field show a value the same
   way. Primitive array entries (team ids, labels) now draft as themselves instead of as an empty
@@ -636,7 +643,9 @@ Converged on the fork's shape, as one collector on all three surfaces:
 - `task-page/jira/TransitionFieldsDialog.tsx` is now a shell over that one form, and the detail-pane
   control, the ad-hoc board move dialog and the board drop all render it.
 - `src/renderer/src/components/jira-issue-mutation-queue.ts` — `JiraMutationFailure` carries
-  `fieldErrors`, so the queued board path can name the field Jira refused instead of one flat string.
+  `fieldErrors`, and `use-jira-issue-workspace-mutation.ts` passes them through instead of flattening
+  the result to `{ ok, error }`, so the detail pane — not only the board paths — can name the field
+  Jira refused.
 
 `jira.transitions.unsupported` and `jira.transitions.completeInJira` are now unused in `en.json`. They
 stay in the catalogue rather than being deleted, because removing a key churns all 20 locales and the

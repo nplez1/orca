@@ -1,6 +1,11 @@
 import { jiraBoardErrorText } from './jira-board-error-text'
 import { useState } from 'react'
-import type { JiraIssue, JiraIssueUpdate, JiraTransition } from '../../../../../shared/jira-types'
+import type {
+  JiraFieldErrors,
+  JiraIssue,
+  JiraIssueUpdate,
+  JiraTransition
+} from '../../../../../shared/jira-types'
 import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
@@ -11,6 +16,11 @@ import { toast } from 'sonner'
 export type JiraPendingTransitionFields = {
   issue: JiraIssue
   transition: JiraTransition
+  /** Jira's field-level refusal that reopened the form, so the field it names is
+   *  asked for again instead of reported as a sentence with no control behind it. */
+  rejectedFieldErrors?: JiraFieldErrors
+  /** The rejection that reopened the form, shown until the form has its own. */
+  error?: string | null
 }
 
 /**
@@ -95,8 +105,11 @@ export function useJiraBoardTransitionMove({
     transitionSaving: inFlightCount > 0,
     pendingTransitionFields,
     applyTransition,
-    openTransitionFields: (issue: JiraIssue, transition: JiraTransition) =>
-      setPendingTransitionFields({ issue, transition }),
+    openTransitionFields: (
+      issue: JiraIssue,
+      transition: JiraTransition,
+      rejection?: Pick<JiraPendingTransitionFields, 'rejectedFieldErrors' | 'error'>
+    ) => setPendingTransitionFields({ issue, transition, ...rejection }),
     closeTransitionFields: () => {
       if (inFlightCount === 0) {
         setPendingTransitionFields(null)

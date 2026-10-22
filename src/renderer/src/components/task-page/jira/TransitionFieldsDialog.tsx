@@ -1,16 +1,26 @@
 import type { JSX } from 'react'
-import type { JiraIssue, JiraIssueUpdate, JiraTransition } from '../../../../../shared/jira-types'
+import type {
+  JiraFieldErrors,
+  JiraIssue,
+  JiraIssueUpdate,
+  JiraTransition
+} from '../../../../../shared/jira-types'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
 } from '@/components/jira-transition-fields-form'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 
 export type JiraTransitionFieldsRequest = {
   issue: JiraIssue
   transition: JiraTransition
+  /** Jira's field-level refusal that reopened this form, so the field it names is
+   *  asked for again and the sentence has a control to sit beside. */
+  rejectedFieldErrors?: JiraFieldErrors
+  /** The rejection that reopened the form, shown until the form has its own. */
+  error?: string | null
 }
 
 /**
@@ -35,13 +45,20 @@ export function TaskPageJiraTransitionFieldsDialog({
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && !submitting && onClose()}>
       <DialogContent className="max-w-lg">
-        <DialogTitle className="sr-only">
+        <DialogTitle>
           {translate(
             'auto.components.TaskPage.jiraTransitionFieldsTitle',
             'Update fields to move {{value0}}',
             { value0: request?.issue.key ?? '' }
           )}
         </DialogTitle>
+        <DialogDescription>
+          {translate(
+            'auto.components.TaskPage.jiraTransitionFieldsDescription',
+            'Jira requires these fields before it will apply the {{value0}} transition.',
+            { value0: request?.transition.name ?? '' }
+          )}
+        </DialogDescription>
         {request ? (
           <JiraTransitionFieldsForm
             key={`${request.issue.key}:${request.transition.id}`}
@@ -49,6 +66,9 @@ export function TaskPageJiraTransitionFieldsDialog({
             pending={submitting}
             providerSettings={providerSettings}
             siteId={request.issue.siteId}
+            rejectedFieldErrors={request.rejectedFieldErrors}
+            errorReason={request.error}
+            issueUrl={request.issue.url}
             onBack={onClose}
             onSubmit={onSubmit}
           />

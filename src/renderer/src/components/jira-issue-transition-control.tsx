@@ -4,12 +4,16 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
-import { classifyTransitionRequirements } from '../../../shared/jira-transition-fields'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../shared/jira-transition-fields'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
 } from './jira-transition-fields-form'
 import type {
+  JiraFieldErrors,
   JiraIssue,
   JiraIssueUpdate,
   JiraMutationResult,
@@ -43,12 +47,19 @@ export function JiraIssueTransitionControl({
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<JiraTransition | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const requirement = selected ? classifyTransitionRequirements(selected) : null
+  // Why held here as well as in the form: a one-click transition that Jira refuses by
+  // field never mounts the form, so this is what promotes it into one.
+  const [rejectedFieldErrors, setRejectedFieldErrors] = useState<JiraFieldErrors>({})
+  const forcedFieldKeys = selected
+    ? rejectedTransitionFieldKeys(selected, rejectedFieldErrors)
+    : new Set<string>()
+  const requirement = selected ? classifyTransitionRequirements(selected, forcedFieldKeys) : null
   const busy = pending || loading
 
   function reset(): void {
     setSelected(null)
     setSubmitError(null)
+    setRejectedFieldErrors({})
   }
 
   async function apply(
@@ -90,9 +101,18 @@ export function JiraIssueTransitionControl({
       return
     }
     const outcome = await apply(transition, { transitionId: transition.id })
-    if (!outcome.ok) {
-      setSubmitError(outcome.error)
+    if (outcome.ok) {
+      return
     }
+    // Why reopened rather than reported flat: Jira named fields it refused, so the form
+    // has to stand them up and let the user change them. A refusal that names nothing
+    // keeps the plain sentence and the Jira link.
+    const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
+    if (forced.size > 0 && outcome.fieldErrors) {
+      setRejectedFieldErrors(outcome.fieldErrors)
+      return
+    }
+    setSubmitError(outcome.error)
   }
 
   return (
@@ -151,6 +171,10 @@ export function JiraIssueTransitionControl({
               pending={busy || Boolean(error)}
               providerSettings={providerSettings}
               siteId={issue.siteId}
+              forcedFieldKeys={forcedFieldKeys}
+              rejectedFieldErrors={rejectedFieldErrors}
+              errorReason={submitError}
+              issueUrl={issue.url}
               onBack={reset}
               onSubmit={(updates) => apply(selected, updates)}
             />

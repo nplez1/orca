@@ -3,7 +3,10 @@ import type { DragEvent } from 'react'
 import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../../../shared/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import { getTaskPageJiraBoardTransitionTargets } from '../../task-page-jira-board-model'
-import { classifyTransitionRequirements } from '../../../../../shared/jira-transition-fields'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../../../shared/jira-transition-fields'
 import { jiraListTransitions } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
@@ -67,9 +70,20 @@ export function useJiraBoardDrop({
     const outcome = await move.applyTransition(issue, transition)
     if (outcome.ok) {
       clearPicker()
-    } else {
-      toast.error(outcome.error)
+      return
     }
+    // Why reopened: Jira named fields it refused, so they have to be asked for rather
+    // than reported as a sentence with no control behind it.
+    const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
+    if (forced.size > 0) {
+      clearPicker()
+      move.openTransitionFields(issue, transition, {
+        rejectedFieldErrors: outcome.fieldErrors,
+        error: outcome.error
+      })
+      return
+    }
+    toast.error(outcome.error)
   }
 
   const loadTransitions = async (issue: JiraIssue): Promise<JiraTransition[] | null> => {

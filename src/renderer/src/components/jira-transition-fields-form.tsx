@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -41,13 +42,23 @@ type Props = {
   /** Needed by the user picker; without it a user field falls back to a text box. */
   providerSettings?: RuntimeJiraSettings
   siteId?: string | null
+  /** Fields an earlier attempt had rejected by name, asked for even though the
+   *  issue looks like it fills them, so a refusal can be acted on here. */
+  forcedFieldKeys?: ReadonlySet<string>
+  /** The field-level refusal that reopened this form, shown beside its control. */
+  rejectedFieldErrors?: JiraFieldErrors
+  /** A rejection this surface already received, shown until the form has its own. */
+  errorReason?: string | null
+  /** The escape hatch when a text box cannot satisfy Jira. */
+  issueUrl?: string
 }
 
 /**
  * Collects everything a transition's screen requires, so a workflow that demands
  * input can be completed rather than refused. A field the issue already fills is
  * seeded with that value and left out of the submission unless it changes, and a
- * field Jira refuses is named back to the user so they can fix it and retry.
+ * field Jira refuses is named back to the user so they can fix it and retry —
+ * including a field this form had skipped, which a rejection brings back.
  */
 export function JiraTransitionFieldsForm({
   transition,
@@ -55,35 +66,47 @@ export function JiraTransitionFieldsForm({
   onBack,
   onSubmit,
   providerSettings,
-  siteId
+  siteId,
+  forcedFieldKeys,
+  rejectedFieldErrors,
+  errorReason,
+  issueUrl
 }: Props): React.JSX.Element | null {
-  const requirement = classifyTransitionRequirements(transition)
-  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
-    requirement.kind === 'form'
-      ? Object.fromEntries(requirement.fields.map((field) => [field.key, field.currentValue ?? '']))
-      : {}
-  )
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => ({}))
   const [selectedUsers, setSelectedUsers] = useState<Record<string, JiraUser | null>>({})
-  const [resolution, setResolution] = useState(() =>
-    requirement.kind === 'form' ? (requirement.resolution?.currentValue ?? '') : ''
-  )
+  const [resolution, setResolution] = useState('')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>({})
-
+  const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>(rejectedFieldErrors ?? {})
+  // Why the union: a rejection this form receives has to bring back the field it
+  // names even when the classifier had skipped it, or there is nothing to fix.
+  const forced = new Set([
+    ...(forcedFieldKeys ?? []),
+    ...Object.keys(rejectedFieldErrors ?? {}),
+    ...Object.keys(fieldErrors)
+  ])
+  const requirement = classifyTransitionRequirements(transition, forced)
   if (requirement.kind !== 'form') {
     return null
   }
+  const draftOf = (field: JiraCreateField): string =>
+    drafts[field.key] ?? (requirement.fields.includes(field) ? (field.currentValue ?? '') : '')
+  const resolutionDraft = requirement.resolution
+    ? resolution || (requirement.resolution.currentValue ?? '')
+    : ''
   const resolutionValue = requirement.resolution
-    ? buildResolutionFieldValue(requirement.resolution, resolution)
+    ? buildResolutionFieldValue(requirement.resolution, resolutionDraft)
     : null
   const commentState = getCommentBodySubmitState(comment)
   // Why only control-backed fields gate submission: a schema Orca has no control
   // for gets a text box that may not carry the shape Jira wants, so it stays the
   // user's best guess and Jira's own rejection is what gets reported back.
   const unfilled = requirement.fields.filter(
-    (field) => resolveJiraFieldControlKind(field) !== null && !(drafts[field.key] ?? '').trim()
+    (field) => resolveJiraFieldControlKind(field) !== null && !draftOf(field).trim()
   )
+  // Why the form's own sentence is dropped when a field carries one: Jira's message
+  // joins its field errors, so showing both says the same thing twice.
+  const shownError = error && Object.keys(fieldErrors).length === 0 ? error : (errorReason ?? null)
   const canSubmit =
     unfilled.length === 0 &&
     (!requirement.resolution || resolutionValue !== null) &&
@@ -99,9 +122,12 @@ export function JiraTransitionFieldsForm({
     // Why only changed fields: an untouched field keeps the value the issue
     // already holds, so a shape Orca cannot rebuild is never rewritten.
     const changed = requirement.fields.filter(
-      (field) => (drafts[field.key] ?? '').trim() !== (field.currentValue ?? '').trim()
+      (field) => draftOf(field).trim() !== (field.currentValue ?? '').trim()
     )
-    const submission = buildJiraCreateSubmission(changed, drafts)
+    const values = Object.fromEntries(
+      requirement.fields.map((field) => [field.key, draftOf(field)])
+    )
+    const submission = buildJiraCreateSubmission(changed, values)
     const transitionFields = { ...submission.customFields }
     if (requirement.resolution && resolutionValue) {
       transitionFields[requirement.resolution.key] = resolutionValue
@@ -131,7 +157,7 @@ export function JiraTransitionFieldsForm({
         </Label>
         <JiraSchemaFieldControl
           field={field}
-          value={drafts[field.key] ?? ''}
+          value={draftOf(field)}
           disabled={pending}
           fallbackToText
           displayValue={field.currentDisplayValue}
@@ -164,7 +190,7 @@ export function JiraTransitionFieldsForm({
       {requirement.resolution ? (
         <div className="space-y-2">
           <Label htmlFor="jira-transition-resolution">{requirement.resolution.name}</Label>
-          <Select value={resolution} onValueChange={setResolution} disabled={pending}>
+          <Select value={resolutionDraft} onValueChange={setResolution} disabled={pending}>
             <SelectTrigger id="jira-transition-resolution" className="w-full" autoFocus>
               <SelectValue
                 placeholder={translate('jira.transitions.chooseResolution', 'Choose a resolution')}
@@ -206,13 +232,27 @@ export function JiraTransitionFieldsForm({
           />
         </div>
       ) : null}
-      {error ? (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-        >
-          {error}
-        </p>
+      {shownError ? (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {/* Why the sentence keeps role=alert and the button does not: an alert's text
+              is the message, and a control inside it would join that text. */}
+          <p role="alert" className="min-w-0 flex-1">
+            {shownError}
+          </p>
+          {issueUrl ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-my-1 shrink-0"
+              disabled={pending}
+              onClick={() => void window.api.shell.openUrl(issueUrl)}
+            >
+              <ExternalLink className="size-3" />
+              {translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira')}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onBack} disabled={pending}>
