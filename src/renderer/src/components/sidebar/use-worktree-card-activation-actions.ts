@@ -124,14 +124,17 @@ export function useWorktreeCardActivationActions({
   )
 
   const handleRenameTitle = useCallback(
-    // Inline rename has no surface for the failure; the store already logs and
-    // refetches, which reverts the optimistic title in place.
+    // Why throw: the inline editor owns the failure surface, and a rename that only reached some
+    // hosts must not read as a rename that reached all of them.
     async (displayName: string): Promise<void> => {
-      await updateWorktreeMeta(
+      const result = await updateWorktreeMeta(
         worktree.id,
         { displayName },
         { executionHostId: worktree.hostId ?? 'local' }
       )
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
     },
     [updateWorktreeMeta, worktree.hostId, worktree.id]
   )

@@ -27,7 +27,9 @@ import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
-const CACHE_DIR = join(ROOT, '.git', 'orca-gate')
+// Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
+// is not a directory and the gate could not record the verdict it just computed.
+const CACHE_DIR = join(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'), 'orca-gate')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
 const RUN_VITEST = join(ROOT, 'config', 'scripts', 'run-vitest.mjs')

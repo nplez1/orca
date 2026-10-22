@@ -1,7 +1,6 @@
 import {
   hasExplicitWorkspaceReviewSelection,
-  getWorkspaceReviewPersistenceUpdates,
-  getWorkspaceReviewRefreshHints
+  getWorkspaceReviewPersistenceUpdates
 } from './workspace-attachment-review-selection'
 import {
   getWorkspaceAttachments,
@@ -20,8 +19,7 @@ import { getHostedReviewCacheKey } from '../../hosted-review-cache-identity'
 import { getGitHubPRCacheKeyCandidates } from '../../../../../../shared/github/github-cache-key'
 import {
   applyDetectedWorktreeUpdates,
-  findKnownWorktreeById,
-  getFolderWorkspaceMetaUpdates
+  findKnownWorktreeById
 } from '../listing/detected-worktree-meta'
 import {
   bumpHostedReviewLinkMutationGeneration,
@@ -33,6 +31,9 @@ import {
   resolveGitHubReviewPushTarget
 } from './hosted-review-push-target'
 import { persistWorktreeMeta } from './worktree-meta-persist'
+import { planWorktreeRename, settleWorktreeRename } from './worktree-rename-across-hosts'
+import { updateFolderWorkspaceMeta } from './folder-workspace-meta-update'
+import { refreshHostedReviewAfterMetaUpdate } from './refresh-hosted-review-after-meta-update'
 import { withPendingSidebarRowWrites } from '@/lib/sidebar-pending-layer'
 import { isRuntimeSelectorNotFoundError } from '../listing/runtime-worktree-rpc-errors'
 import { runtimeTargetForWorktreeOwner } from '../listing/worktree-owner-target'
@@ -66,31 +67,12 @@ export function createUpdateWorktreeMeta(
           }
     const workspaceScope = parseWorkspaceKey(worktreeId)
     if (workspaceScope?.type === 'folder') {
-      const folderUpdates = getFolderWorkspaceMetaUpdates(mutationUpdates)
-      if (Object.keys(folderUpdates).length === 0) {
-        return { ok: true }
-      }
-      try {
-        // Why: a rejected folder update reconciles the optimistic write away, so
-        // reporting ok would show the dialog a save that silently undid itself.
-        const updated = await get().updateFolderWorkspace(
-          workspaceScope.folderWorkspaceId,
-          folderUpdates,
-          { executionHostId }
-        )
-        return updated
-          ? { ok: true }
-          : {
-              ok: false,
-              error: translate(
-                'auto.store.slices.worktrees.a17f4d2e93',
-                'Could not update this workspace.'
-              )
-            }
-      } catch (err) {
-        console.error('Failed to update folder workspace meta:', err)
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
-      }
+      return updateFolderWorkspaceMeta({
+        state: get(),
+        folderWorkspaceId: workspaceScope.folderWorkspaceId,
+        updates: mutationUpdates,
+        executionHostId
+      })
     }
     let normalizedUpdates = normalizeWorkspaceAttachmentUpdate(existingWorktree, mutationUpdates)
     // Why: manual PR linking supplies only the number; resolve the head branch so Push targets the review branch.
@@ -172,6 +154,9 @@ export function createUpdateWorktreeMeta(
       'comment' in renameCleared && !ORCA_SIDEBAR_INPUTS_IS_MAIN
         ? { ...renameCleared, lastActivityAt: Date.now() }
         : renameCleared
+    // A name is the workspace's, not one host's copy of it: every host that publishes this
+    // workspace is renamed; a host that refuses keeps its name and is reported.
+    const renamePlan = planWorktreeRename(get(), worktreeId, enriched, executionHostId)
 
     let didApply = false
     set((s) => {
@@ -182,14 +167,17 @@ export function createUpdateWorktreeMeta(
         return s
       }
       didApply = true
+      // Why the plan first: a rename covers every same-id row, and only with the name itself — the
+      // rest of a mixed update belongs to the host the user edited.
+      const base = renamePlan ? renamePlan.applyOptimistic(s) : s
       const nextWorktrees = applyWorktreeUpdates(
-        s.worktreesByRepo,
+        base.worktreesByRepo,
         worktreeId,
         enriched,
         executionHostId
       )
       const nextDetectedWorktrees = applyDetectedWorktreeUpdates(
-        s.detectedWorktreesByRepo,
+        base.detectedWorktreesByRepo,
         worktreeId,
         enriched,
         executionHostId
@@ -258,28 +246,37 @@ export function createUpdateWorktreeMeta(
       bumpHostedReviewLinkMutationGeneration(worktreeId)
     }
 
-    try {
-      await persistWorktreeMeta(
-        runtimeTargetForWorktreeOwner(get(), worktreeId, executionHostId),
+    const writePrimary = (): Promise<void> =>
+      persistWorktreeMeta(
+        renamePlan?.primary?.target ??
+          runtimeTargetForWorktreeOwner(get(), worktreeId, executionHostId),
         worktreeId,
         getWorkspaceReviewPersistenceUpdates(mutationUpdates, enriched),
-        executionHostId ?? existingWorktree?.hostId,
+        renamePlan?.primary?.hostId ?? executionHostId ?? existingWorktree?.hostId,
         worktreeForUpdate?.identity?.key
       )
-      if (
-        !options?.suppressHostedReviewRefresh &&
-        reviewRepo &&
-        reviewBranch &&
-        typeof get().fetchHostedReviewForBranch === 'function'
-      ) {
-        // Why: refetch against post-update links so a cache entry from the previous provider link can't keep showing the removed review.
-        void get().fetchHostedReviewForBranch(reviewRepo.path, reviewBranch, {
-          repoId: reviewRepo.id,
-          repoOwnerExecutionHostId: executionHostId ?? worktreeForUpdate?.hostId,
-          ...getWorkspaceReviewRefreshHints(targetEnriched, worktreeForUpdate),
-          force: true
-        })
+    // Why with the rename plan: every host's write is started together, so a caller's own host that
+    // refuses cannot leave the rest of the fleet unrenamed.
+    const rename = renamePlan
+      ? await settleWorktreeRename({ state: get(), worktreeId, plan: renamePlan, writePrimary })
+      : null
+    try {
+      if (rename?.primaryError) {
+        throw rename.primaryError.reason
       }
+      // Why only outside a rename: the settlement already started and awaited the caller's write.
+      if (!rename) {
+        await writePrimary()
+      }
+      refreshHostedReviewAfterMetaUpdate({
+        state: get(),
+        options,
+        reviewRepo,
+        reviewBranch,
+        review: { repoOwnerExecutionHostId: executionHostId ?? worktreeForUpdate?.hostId },
+        targetEnriched,
+        worktreeForUpdate
+      })
     } catch (err) {
       if (isRuntimeSelectorNotFoundError(err)) {
         void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
@@ -296,6 +293,10 @@ export function createUpdateWorktreeMeta(
       // Why: the refetch above reverts the optimistic write, so a caller that
       // closes its surface on this path shows the user a save that undid itself.
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+    if (rename?.failure) {
+      set(rename.failure.revertPatch)
+      return rename.failure.result
     }
     return { ok: true }
   }
