@@ -622,7 +622,8 @@ describe('DeleteWorktreeDialog remote branch option', () => {
 
     expect(runWorktreeDeletesInParallel).toHaveBeenCalledWith([expect.anything()], {
       force: true,
-      onForceDeleted: expect.any(Function)
+      onForceDeleted: expect.any(Function),
+      confirmedDiscards: expect.any(Map)
     })
   })
 

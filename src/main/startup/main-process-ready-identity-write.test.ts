@@ -152,6 +152,7 @@ vi.mock('./windows-shell-path-hydration', () => ({
   })
 }))
 vi.mock('../git/runner', () => ({
+  configureLocalLoginShellGitEnvironment: vi.fn(),
   configureWindowsHostGitEnvironmentReadiness: vi.fn(),
   setDefaultWslDistroOverride: vi.fn()
 }))

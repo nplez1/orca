@@ -5,22 +5,24 @@
     "and fails when an export has no surviving reference. That is the right default: a module disappearing",
     "is exactly when a caller can leave with it. This file is how a reviewed supersession is recorded so",
     "the check can pass without weakening it.",
-    "Each entry must name the live replacement and the evidence for calling it a superset — the check",
+    "Each entry must name the live replacement and the evidence for calling it a superset \u2014 the check",
     "prints this, so the next sync inherits the reasoning instead of re-deriving it.",
     "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed.",
     "Entries are therefore per sync: a previous sync's acknowledgements are pruned once their deletion is",
     "no longer part of the tip..HEAD range."
   ],
   "acknowledged": {
-    "src/main/native-chat/agent-session-journal/queued-message-text-update.ts": {
-      "supersededBy": "src/main/native-chat/agent-session-journal/queued-message-update.ts (queuedMessageUpdateDecision, updateQueuedMessage, QueuedMessageUpdate)",
-      "reason": "The fork added text-only editing of a queued message; upstream landed the same compare-and-set decision in `queued-message-update.ts` and made it a superset — it edits images as well as text, refuses an image card the caller was shown no images for (`readsImageCards`), and returns the previous body so the caller can publish a diff. Its `queued-message-update.spec.ts` carries the retry/superseded cases the fork spec held, and both live callers were re-pointed (`journal-queued-messages.ts` `update()`, `structured-agent-session-wire/structured-agent-session-queued-edit.ts`), so the feature kept its surface and its callers.",
-      "since": "276fe47cee"
+    "mobile/src/session/mobile-native-chat-page-anchoring.ts": {
+      "supersededBy": "mobile/src/session/mobile-native-chat-scroll-anchoring.ts (MobileNativeChatScrollAnchoring)",
+      "reason": "Upstream renamed the page-level anchoring helper to scroll-box terms in this sync (#31339): the merge carries the file as a rename (R078) and only the class name changed, so nothing left with the old name."
     },
-    "src/renderer/src/components/settings/accounts-pane-minimax-section.tsx": {
-      "supersededBy": "src/renderer/src/components/settings/MiniMaxAccountsSection.tsx (MiniMaxAccountsSection)",
-      "reason": "The fork rendered the MiniMax section from the shared accounts model; upstream replaced it with a self-contained `MiniMaxAccountsSection` component that owns its own credential state through `useMiniMaxCredentials(host.owner)` and reports where the credential is stored, for the host the pane is showing. The fork's contribution on top of it — the per-provider enable switch — now wraps that component in `AccountsPane.tsx`, and `AccountsPane.test.tsx` pins both the switch and the switched-off notice for it.",
-      "since": "276fe47cee"
+    "mobile/src/session/mobile-native-chat-page-motion.ts": {
+      "supersededBy": "mobile/src/session/mobile-native-chat-scroll-motion.ts (MobileNativeChatScrollMotion, scrollKeepsPlace, scrollWritesStopMomentum)",
+      "reason": "Same upstream rename: `MobileNativeChatPageObservation` and `pageKeepsPlace` became the scroll-box names (`scrollKeepsPlace`), and the file moved as a rename (R076) with its body intact."
+    },
+    "src/renderer/src/components/use-task-page-gitlab-loading.ts": {
+      "supersededBy": "src/renderer/src/components/task-page/gitlab/use-task-page-gitlab-loading.ts (useTaskPageGitLabLoading, GITLAB_TASK_FETCH_CONCURRENCY)",
+      "reason": "Upstream grouped the task-page GitLab modules under `task-page/gitlab/`; the hook moved as a rename (R092) with both live exports. The fork's `TaskPageGitLabLoadingModel` alias has no importer anywhere in the merged tree, which is why its absence is not a loss."
     }
   }
 }
