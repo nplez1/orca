@@ -33,6 +33,20 @@ export const RECOVERABLE_MESSAGE_FRAGMENTS: readonly string[] = [
   'timed out waiting for the remote orca runtime'
 ]
 
+/**
+ * The "host did not answer" family: nothing was reachable, so nothing on the far side ran.
+ *
+ * Why a predicate of its own: this decides copy (a Tailscale remedy, or none) AND whether a
+ * delete may stop waiting for a guest at all — a VM Orca allocated is released provider-side,
+ * which needs no guest. Two spellings of the rule would let those two disagree.
+ */
+const REMOTE_RUNTIME_UNREACHABLE_RE =
+  /could not connect to the remote orca runtime|remote orca runtime closed the connection|timed out (?:waiting for|while connecting to) the remote orca runtime/i
+
+export function isRemoteRuntimeUnreachableMessage(message: string): boolean {
+  return REMOTE_RUNTIME_UNREACHABLE_RE.test(message)
+}
+
 export function isRuntimeRpcQueueOverloadError(error: RemoteRuntimeClientErrorLike): boolean {
   if (error.code) {
     return error.code === RUNTIME_RPC_QUEUE_OVERLOAD_CODE

@@ -1,9 +1,15 @@
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { WorktreeCatalogVersion } from '../../../../../../shared/worktree/catalog-version'
 import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { appliedWorktreeCatalogVersionPatch } from '../listing/worktree-catalog-version-state'
-import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
+import {
+  cleanupEphemeralVmRuntimesForDeleted,
+  type EphemeralVmCleanupSummary
+} from '@/lib/ephemeral-vm-runtime-cleanup'
 import { forgetAgentStartupDeliveriesForTabs } from '@/lib/agent-startup-delivery-guards'
 import { forgetForegroundTerminalTabs } from '@/lib/foreground-terminal-tabs'
 import { requestVirtualizedScrollAnchorRecord } from '@/hooks/requestVirtualizedScrollAnchorRecord'
@@ -30,7 +36,7 @@ export async function tearDownRemovedWorktreeRendererState(args: {
   beforeRemoval: WorktreeStateBeforeRemoval
   /** The catalog the host's removal produced, when the host stamps it. */
   catalogVersion?: WorktreeCatalogVersion
-}): Promise<void> {
+}): Promise<EphemeralVmCleanupSummary> {
   const { set, get, worktreeId, hostId, requiredExecutionHostId, beforeRemoval } = args
   // Why first: a listing scanned before this removal must not be applied after it and bring
   // the row back, so the version is on record before any await below yields.
@@ -68,13 +74,14 @@ export async function tearDownRemovedWorktreeRendererState(args: {
     backendOwnsPtyTeardown: true
   })
   // Why: dispose the SSH relay AFTER terminal teardown so a still-mounted pane can't hit a gone relay and toast "SSH not active".
+  // Why host-scoped for a remote host: a bare workspace id can name a record on another host, and
+  // destroying that one would take a machine a live workspace still sits on. A local row keeps the
+  // workspace-id match it has always used — a VM is only ever reached as a runtime or SSH host.
+  const cleanupHostId =
+    requiredExecutionHostId ?? (hostId && hostId !== LOCAL_EXECUTION_HOST_ID ? hostId : undefined)
   const runtimeCleanup = await cleanupEphemeralVmRuntimesForDeleted(
-    requiredExecutionHostId
-      ? {
-          hostScopedWorkspaces: [
-            { workspaceId: worktreeId, executionHostId: requiredExecutionHostId }
-          ]
-        }
+    cleanupHostId
+      ? { hostScopedWorkspaces: [{ workspaceId: worktreeId, executionHostId: cleanupHostId }] }
       : { workspaceIds: [worktreeId] }
   )
   const tabs = get().tabsByWorktree[worktreeId] ?? []
@@ -106,4 +113,5 @@ export async function tearDownRemovedWorktreeRendererState(args: {
   // Optional-chained: minimal store assemblies (some unit tests) omit the generation slices.
   get().prunePullRequestGenerationRecords?.(liveWorktreeKeys)
   get().pruneCommitMessageGenerationRecords?.(liveWorktreeKeys)
+  return runtimeCleanup
 }

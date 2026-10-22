@@ -7,12 +7,9 @@
  * logs, and mobile typecheck also consume).
  */
 
-const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download'
+import { isRemoteRuntimeUnreachableMessage } from './remote-runtime-client-error-classification'
 
-// Why: only the "runtime is unreachable" family of failures has a Tailscale
-// remedy; auth/protocol errors pass through untouched.
-const REMOTE_RUNTIME_UNREACHABLE_RE =
-  /could not connect to the remote orca runtime|remote orca runtime closed the connection|timed out (?:waiting for|while connecting to) the remote orca runtime/i
+const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download'
 
 const TAILSCALE_MAGIC_DNS_SUFFIX_RE = /(?:^|\.)ts\.net$/i
 // Why: gate the CGNAT check on a full IPv4 literal — the range regex alone also
@@ -71,7 +68,7 @@ export function withRemoteRuntimeTailscaleHint(
   message: string,
   endpoint: string | null | undefined
 ): string {
-  if (!REMOTE_RUNTIME_UNREACHABLE_RE.test(message)) {
+  if (!isRemoteRuntimeUnreachableMessage(message)) {
     return message
   }
   // Why: keep the hint idempotent so a message routed through this helper twice (e.g. a

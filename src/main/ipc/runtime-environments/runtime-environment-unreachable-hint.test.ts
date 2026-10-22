@@ -21,6 +21,31 @@ describe('withRuntimeUnreachableHint', () => {
     )
   })
 
+  it('points an ephemeral-VM host at releasing the machine, never at Tailscale', () => {
+    const message = withRuntimeUnreachableHint(
+      { source: 'ephemeral-vm' as const },
+      UNREACHABLE,
+      'ws://127.0.0.1:42000'
+    )
+    expect(message).not.toMatch(/tailscale/i)
+    expect(message).toContain('Orca created this VM')
+    expect(message).toContain('Settings → Ephemeral VMs')
+    // Why no delete advice: the same hint rides connect and terminal failures, where the VM may
+    // simply still be booting — so it describes the state and stops there.
+    expect(message).not.toMatch(/delet/i)
+  })
+
+  it('keeps the VM hint off a failure that is not connectivity', () => {
+    expect(withRuntimeUnreachableHint({ source: 'ephemeral-vm' }, 'Unauthorized', null)).toBe(
+      'Unauthorized'
+    )
+  })
+
+  it('does not append the VM hint twice', () => {
+    const once = withRuntimeUnreachableHint({ source: 'ephemeral-vm' }, UNREACHABLE, null)
+    expect(withRuntimeUnreachableHint({ source: 'ephemeral-vm' }, once, null)).toBe(once)
+  })
+
   it('leaves other failures alone', () => {
     const wsl = {
       orcadDeployment: { kind: 'wsl' as const, distro: 'Ubuntu', localPort: 1, remotePort: 2 }

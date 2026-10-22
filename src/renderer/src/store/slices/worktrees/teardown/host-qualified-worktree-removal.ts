@@ -21,7 +21,10 @@ import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { appliedWorktreeCatalogVersionPatch } from '../listing/worktree-catalog-version-state'
 import { WORKTREE_REMOVAL_HOST_CHANGED_ERROR } from '../listing/worktree-slice-constants'
 import { translate } from '@/i18n/i18n'
-import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
+import {
+  cleanupEphemeralVmRuntimesForDeleted,
+  type EphemeralVmCleanupSummary
+} from '@/lib/ephemeral-vm-runtime-cleanup'
 import { purgeOrphanedRuntimeSshProjects } from './orphaned-runtime-ssh-project-purge'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
 
@@ -38,7 +41,7 @@ import { ambiguousWorkspaceOwnerMessage } from '@/lib/duplicate-paired-servers'
 
 export { prepareHostScopedRemovalCompletion, preservesSameIdRendererState }
 
-type PreservedBranchWorktree = Pick<Worktree, 'displayName' | 'isMainWorktree'> | undefined
+type PreservedBranchWorktree = Pick<Worktree, 'displayName' | 'isMainWorktree' | 'path'> | undefined
 type RemoveWorktreeSliceResult = Awaited<ReturnType<WorktreeSlice['removeWorktree']>>
 
 /** Route at the confirmed host when there is one, else the ordinary active-host route. */
@@ -201,6 +204,8 @@ export async function completeSameIdHostScopedRemoval(args: {
   worktreeBeforeRemoval: PreservedBranchWorktree
   suppressPreservedBranchToast: boolean
   rowAlreadyDropped?: boolean
+  /** Reports the released machine, so this path narrates it exactly as the full one does. */
+  onRuntimeCleanup?: (cleanup: EphemeralVmCleanupSummary) => void
 }): Promise<Awaited<RemoveWorktreeSliceResult>> {
   const {
     set,
@@ -228,6 +233,7 @@ export async function completeSameIdHostScopedRemoval(args: {
   const runtimeCleanup = await cleanupEphemeralVmRuntimesForDeleted({
     hostScopedWorkspaces: [{ workspaceId: worktreeId, executionHostId: requiredExecutionHostId }]
   })
+  args.onRuntimeCleanup?.(runtimeCleanup)
   await purgeOrphanedRuntimeSshProjects(get, runtimeCleanup.destroyedSshTargetIds)
   if (!args.rowAlreadyDropped) {
     dropConfirmedHostRow(set, worktreeId, requiredExecutionHostId)
