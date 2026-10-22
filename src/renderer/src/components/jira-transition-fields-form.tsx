@@ -90,6 +90,9 @@ export function JiraTransitionFieldsForm({
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>(rejectedFieldErrors ?? {})
   const [errorMessages, setErrorMessages] = useState<string[]>([])
+  // Why: before this form submits, the only refusal it knows is the one it was opened
+  // with; after it submits, that parent's sentence is stale and must not outrank its own.
+  const [attempted, setAttempted] = useState(false)
   // Why sticky: a field a rejection brought back must stay in the form while the next
   // attempt is in flight, or the value the user just typed is hidden and dropped.
   const [carriedKeys, setCarriedKeys] = useState<ReadonlySet<string>>(
@@ -123,14 +126,22 @@ export function JiraTransitionFieldsForm({
     ...(requirement.resolution ? [requirement.resolution.key] : [])
   ]
   const carriesError = renderedKeys.some((key) => fieldErrors[key])
-  const carriedMessages = rejectedErrorMessages ?? []
-  const shownError = errorMessages.length
-    ? errorMessages.join('; ')
-    : carriedMessages.length
-      ? carriedMessages.join('; ')
+  // Why unrendered keys are named in the banner: they have no control to carry their
+  // sentence, and this is the only place the user can still read it.
+  const unrenderedMessages = Object.entries(fieldErrors)
+    .filter(([key]) => !renderedKeys.includes(key))
+    .map(([, message]) => message)
+  const carriedMessages = attempted ? [] : (rejectedErrorMessages ?? [])
+  const workflowMessages = [...carriedMessages, ...(attempted ? errorMessages : [])]
+  const banner = [...workflowMessages, ...unrenderedMessages]
+  const shownError =
+    banner.length > 0
+      ? banner.join('; ')
       : carriesError
         ? null
-        : (error ?? errorReason ?? null)
+        : attempted
+          ? error
+          : (errorReason ?? null)
   const canSubmit =
     unfilled.length === 0 &&
     (!requirement.resolution || resolutionValue !== null) &&
@@ -141,6 +152,7 @@ export function JiraTransitionFieldsForm({
     if (pending || !canSubmit || requirement.kind !== 'form') {
       return
     }
+    setAttempted(true)
     setError(null)
     setFieldErrors({})
     setErrorMessages([])

@@ -91,6 +91,34 @@ describe('jira-transition-fields', () => {
     expect(classifyTransitionRequirements(transition([team]))).toEqual({ kind: 'none' })
   })
 
+  it('asks for a refused field the screen does not require', () => {
+    // Why: a validator on an optional or defaulted screen field is a common way for
+    // Jira to refuse by field, and reporting it with no control behind it is a dead end.
+    const optional = {
+      key: 'customfield_77',
+      name: 'Deployment window',
+      required: false,
+      schema: { type: 'string' }
+    }
+    const defaulted = {
+      key: 'customfield_78',
+      name: 'Dev',
+      required: true,
+      hasDefaultValue: true,
+      schema: { type: 'string' }
+    }
+    const forced = rejectedTransitionFieldKeys(transition([optional, defaulted]), {
+      customfield_77: 'Deployment window must be set.',
+      customfield_78: 'Dev must be set.'
+    })
+    expect(classifyTransitionRequirements(transition([optional, defaulted]), forced)).toEqual({
+      kind: 'form',
+      resolution: null,
+      commentRequired: false,
+      fields: [optional, defaulted]
+    })
+  })
+
   it('asks again for a filled field a rejection named', () => {
     // Why: a stale value or a validator that demands the field be set on this
     // transition both arrive as a rejection, and the form has to be able to act.

@@ -78,7 +78,8 @@ export function useJiraBoardTransitionMove({
         return {
           ok: false,
           error: result.error,
-          ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {})
+          ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+          ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
         }
       }
       succeeded = true

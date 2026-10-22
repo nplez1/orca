@@ -46,12 +46,16 @@ export function requiredTransitionFields(
 ): JiraCreateField[] {
   // Why: a field Jira will default itself is not input the user owes us; prompting
   // for it turns a valid move into a blocked one.
-  return (transition.fields ?? []).filter(
-    (field) =>
-      field.required &&
-      field.hasDefaultValue !== true &&
-      (forcedFieldKeys?.has(field.key) === true || !issueFillsField(field))
-  )
+  return (transition.fields ?? []).filter((field) => {
+    // Why a forced key overrides the other rules: Jira refused this field, and a
+    // validator on an *optional* or defaulted screen field is a common way to refuse —
+    // skipping it again because it is not `required` would report the refusal with no
+    // control behind it.
+    if (forcedFieldKeys?.has(field.key) === true) {
+      return true
+    }
+    return field.required && field.hasDefaultValue !== true && !issueFillsField(field)
+  })
 }
 
 /**

@@ -371,6 +371,45 @@ describe('Jira transition form source ownership', () => {
     )
   })
 
+  it("shows Jira's workflow message beside a field error rather than instead of it", async () => {
+    // Why: readJiraErrorDetail joins both into `message`, and a field-level display used
+    // to swallow the workflow half entirely.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Approval task not complete; Release approval must be Approved.',
+      errorMessages: ['Approval task not complete'],
+      fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Release approval must be Approved.')).toBeTruthy())
+    expect(screen.getByText('Approval task not complete')).toBeTruthy()
+  })
+
   it('keeps a field a rejection brought back while the next attempt is in flight', async () => {
     // Why: clearing the messages at submit time must not un-ask for the field, or the
     // value the user just typed disappears and the next submit leaves it out.

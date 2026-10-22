@@ -136,6 +136,9 @@ export function TaskPageJiraBoardView({
         error: error instanceof Error ? error.message : 'Failed to change status.',
         ...(error instanceof JiraMutationFailure && error.fieldErrors
           ? { fieldErrors: error.fieldErrors }
+          : {}),
+        ...(error instanceof JiraMutationFailure && error.errorMessages
+          ? { errorMessages: error.errorMessages }
           : {})
       }
     } finally {

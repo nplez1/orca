@@ -31,7 +31,9 @@ const listeners = new Map<string, Set<IssuePatchListener>>()
 export class JiraMutationFailure extends Error {
   constructor(
     message: string,
-    readonly fieldErrors?: JiraFieldErrors
+    readonly fieldErrors?: JiraFieldErrors,
+    /** Jira's workflow messages, which a field-level display would otherwise hide. */
+    readonly errorMessages?: string[]
   ) {
     super(message)
     this.name = 'JiraMutationFailure'
@@ -128,7 +130,7 @@ export function enqueueJiraIssueMutation({
     try {
       const result = await update()
       if (!result.ok) {
-        throw new JiraMutationFailure(result.error, result.fieldErrors)
+        throw new JiraMutationFailure(result.error, result.fieldErrors, result.errorMessages)
       }
       saved = true
       write.confirmed = { ...write.confirmed, ...optimistic }

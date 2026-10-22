@@ -94,7 +94,7 @@ export function JiraStatusRow({
       return
     }
     // Why reopened: Jira named fields it refused, so they have to be asked for. A
-    // refusal that names none was already reported by the mutation itself.
+    // refusal that names none lands in this row's own dialog below.
     const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
     if (forced.size > 0 && outcome.fieldErrors) {
       setRejectedFieldErrors(outcome.fieldErrors)
@@ -145,9 +145,7 @@ export function JiraStatusRow({
       </Popover>
 
       <Dialog
-        open={
-          selected !== null && (pending || requirement?.kind === 'form' || errorReason !== null)
-        }
+        open={selected !== null && (requirement?.kind === 'form' || errorReason !== null)}
         onOpenChange={(open) => !open && !pending && reset()}
       >
         <DialogContent className="max-w-lg">
@@ -178,7 +176,16 @@ export function JiraStatusRow({
               errorReason={errorReason}
               issueUrl={issue.url}
               onBack={reset}
-              onSubmit={(updates) => onTransition(updates, selected)}
+              onSubmit={async (updates) => {
+                const outcome = await onTransition(updates, selected)
+                // Why here and not in the caller: this row owns the dialog, and a
+                // committed move left it standing open with a live Submit that would
+                // post the same transition id against the new status.
+                if (outcome.ok) {
+                  reset()
+                }
+                return outcome
+              }}
             />
           ) : null}
           {selected && requirement?.kind !== 'form' && errorReason ? (
