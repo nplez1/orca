@@ -1,4 +1,4 @@
-import type { JiraIssue, JiraMutationResult } from '../../../shared/jira-types'
+import type { JiraFieldErrors, JiraIssue, JiraMutationResult } from '../../../shared/jira-types'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
@@ -22,6 +22,21 @@ type IssueWrite = {
 
 const writes = new Map<string, IssueWrite>()
 const listeners = new Map<string, Set<IssuePatchListener>>()
+
+/**
+ * A rejected write carrying Jira's own reason and its field-level sentences, so
+ * a surface can name the control the site refused instead of showing one
+ * flattened message.
+ */
+export class JiraMutationFailure extends Error {
+  constructor(
+    message: string,
+    readonly fieldErrors?: JiraFieldErrors
+  ) {
+    super(message)
+    this.name = 'JiraMutationFailure'
+  }
+}
 
 export function jiraIssueRequestScope(
   issue: JiraIssue | null,
@@ -113,7 +128,7 @@ export function enqueueJiraIssueMutation({
     try {
       const result = await update()
       if (!result.ok) {
-        throw new Error(result.error)
+        throw new JiraMutationFailure(result.error, result.fieldErrors)
       }
       saved = true
       write.confirmed = { ...write.confirmed, ...optimistic }

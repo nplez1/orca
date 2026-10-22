@@ -66,6 +66,60 @@ describe('required Jira transition fields', () => {
     )
   })
 
+  it('reads the issue so a required field it already fills is not asked for', async () => {
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [
+            {
+              ...transition,
+              fields: {
+                ...transition.fields,
+                components: {
+                  required: true,
+                  name: 'Component/s',
+                  schema: { type: 'array', items: 'string' }
+                },
+                customfield_10002: {
+                  required: true,
+                  name: 'Team',
+                  schema: { type: 'array', items: 'string' }
+                }
+              }
+            }
+          ]
+        }
+      }
+      return {
+        fields: {
+          resolution: null,
+          components: [{ id: '10400', name: 'Web' }],
+          customfield_10002: ['team-1']
+        }
+      }
+    })
+    const { listTransitions } = await import('./jira-transition-queries')
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    const byKey = Object.fromEntries((loaded.fields ?? []).map((field) => [field.key, field]))
+    expect(byKey.components).toMatchObject({ currentValue: 'Web', currentDisplayValue: 'Web' })
+    expect(byKey.customfield_10002?.currentValue).toBe('team-1')
+    // Why: an unset field carries no value, so it stays the user's to fill.
+    expect(byKey.resolution?.currentValue).toBeUndefined()
+    expect(jiraRequest.mock.calls[1]?.[1]).toBe(
+      '/rest/api/3/issue/APP-1?fields=resolution,components,customfield_10002'
+    )
+  })
+
+  it('keeps every field asked for when the value read fails', async () => {
+    jiraRequest
+      .mockResolvedValueOnce({ transitions: [transition] })
+      .mockRejectedValueOnce(new JiraApiError('Not found', 404))
+    const { listTransitions } = await import('./jira-transition-queries')
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    expect(loaded.fields?.[0]?.currentValue).toBeUndefined()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('posts resolution and comment in the same request Jira validates', async () => {
     jiraRequest.mockImplementation(async (_entry, _path, options) => {
       const payload = JSON.parse(options.body)

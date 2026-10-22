@@ -74,6 +74,13 @@ export type JiraCreateField = {
   /** True when Jira will supply the value itself, so a required transition
    *  field marked this way needs no prompt. */
   hasDefaultValue?: boolean
+  /** What the issue already holds, as the paired control's draft. Jira marks a
+   *  field required by the transition screen rather than by the issue's own
+   *  emptiness, so a field this fills is not input the user owes us. Absent when
+   *  the host could not read the values, which keeps the field asked for. */
+  currentValue?: string
+  /** Human label for a `currentValue` that carries an id, so a form can show it. */
+  currentDisplayValue?: string
   schema?: {
     type?: string
     items?: string

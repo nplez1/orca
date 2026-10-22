@@ -603,6 +603,52 @@ its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle
 `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
 switch call. `tab-session-history-switch.ts` and three test files import from the new module.
 
+### `local(jira)`: a required transition field the issue already fills is not the user's to fill
+
+After the 2026-10-15 sync, two of the three status-change surfaces refused a transition outright with
+"Jira requires fields Orca cannot collect yet: Team, Component/s." The ticket in the report had both
+fields populated: Jira's `required` flag on `GET /issue/{key}/transitions?expand=transitions.fields`
+is the **transition screen's** flag, not a statement that this issue is missing the field, so the
+block was for a move Jira would have accepted. Upstream `#28588` (`eb1ee8f908`) only ever collected
+`resolution` + `comment` and called everything else `unsupported`; the fork's generic collector
+survived only on the configured agile board (`components/task-page/jira/Board.tsx`), which is why the
+same transition was blocked from the detail pane and the ad-hoc board and attempted from the board.
+
+Converged on the fork's shape, as one collector on all three surfaces:
+
+- `src/shared/jira-transition-fields.ts` — `JiraTransitionRequirement` has **no `unsupported` kind**.
+  `requiredTransitionFields` skips a field whose `currentValue` is set (the `hasDefaultValue`
+  exclusion's sibling), exempting `resolution` and `comment` because a workflow can demand those be set
+  on the transition even when a value exists. The classifier returns the remaining fields to render and
+  de-duplicates a field Jira lists twice instead of refusing the transition over it.
+- `src/main/jira/jira-transition-queries.ts` — `attachCurrentValues` reads the issue for the union of
+  required field keys and attaches `currentValue` / `currentDisplayValue` to each field. Best effort:
+  a failed read leaves every field asked for, and an auth failure is rethrown so a dead token cannot
+  read as "these fields are empty".
+- `src/main/jira/jira-field-drafts.ts` — **new.** `describeFieldDraft` is the schema-to-draft map lifted
+  out of `jira-issue-edit-metadata.ts`, so a transition field and an edit field show a value the same
+  way. Primitive array entries (team ids, labels) now draft as themselves instead of as an empty
+  option, which the edit form was also getting wrong.
+- `src/renderer/src/components/jira-transition-fields-form.tsx` — renders `resolution`, `comment` and
+  every other required field through `JiraSchemaFieldControl`, seeded from `currentValue`, submitting
+  **only fields the user changed** so a shape Orca cannot rebuild is never rewritten. Jira's
+  `fieldErrors` render beside the control that failed and the form stays open to retry.
+- `task-page/jira/TransitionFieldsDialog.tsx` is now a shell over that one form, and the detail-pane
+  control, the ad-hoc board move dialog and the board drop all render it.
+- `src/renderer/src/components/jira-issue-mutation-queue.ts` — `JiraMutationFailure` carries
+  `fieldErrors`, so the queued board path can name the field Jira refused instead of one flat string.
+
+`jira.transitions.unsupported` and `jira.transitions.completeInJira` are now unused in `en.json`. They
+stay in the catalogue rather than being deleted, because removing a key churns all 20 locales and the
+regenerated catalogues are a sync-owned artifact.
+
+Tests that pin the new behaviour: `src/shared/jira-transition-fields.test.ts` (a filled field is not
+asked, resolution/comment still are), `src/main/jira/jira-transition-required-fields.test.ts` (the
+value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-issue-transition-control.test.tsx`
+(the filled-field move, the collected custom field, and the field-level rejection) and
+`task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
+`unsupported` kind turns all of them red.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream

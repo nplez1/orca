@@ -1,26 +1,16 @@
 import { jiraBoardErrorText } from './jira-board-error-text'
 import { useState } from 'react'
-import type {
-  JiraCreateField,
-  JiraFieldErrors,
-  JiraIssue,
-  JiraTransition
-} from '../../../../../shared/jira-types'
-import type { JiraCreateFieldSubmission } from '../../task-page-jira-create-fields'
+import type { JiraIssue, JiraIssueUpdate, JiraTransition } from '../../../../../shared/jira-types'
+import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 
-export type JiraTransitionOutcome =
-  | { ok: true }
-  | { ok: false; error: string; fieldErrors?: JiraFieldErrors }
-
 /** The fields a transition's own screen requires, held while the form collects them. */
 export type JiraPendingTransitionFields = {
   issue: JiraIssue
   transition: JiraTransition
-  fields: JiraCreateField[]
 }
 
 /**
@@ -58,30 +48,18 @@ export function useJiraBoardTransitionMove({
   const applyTransition = async (
     issue: JiraIssue,
     transition: JiraTransition,
-    submission?: JiraCreateFieldSubmission
-  ): Promise<JiraTransitionOutcome> => {
+    updates?: JiraIssueUpdate
+  ): Promise<JiraTransitionSubmitOutcome> => {
     const previousStatus = issue.status
     applyIssuePatch(issue.key, { status: transition.to }, issue.siteId)
     markMoving(issue.key, true)
     setInFlightCount((current) => current + 1)
     let succeeded = false
     try {
-      const hasFields = Boolean(
-        submission?.customFields && Object.keys(submission.customFields).length > 0
-      )
       const result = await jiraUpdateIssue(
         providerSettings,
         issue.key,
-        {
-          transitionId: transition.id,
-          ...(hasFields
-            ? {
-                transitionFields: submission?.customFields,
-                transitionUserFieldKeys: submission?.userFieldKeys,
-                transitionTextFieldKeys: submission?.textFieldKeys
-              }
-            : {})
-        },
+        { ...updates, transitionId: transition.id },
         issue.siteId
       )
       if (!result.ok) {
@@ -117,19 +95,16 @@ export function useJiraBoardTransitionMove({
     transitionSaving: inFlightCount > 0,
     pendingTransitionFields,
     applyTransition,
-    openTransitionFields: (
-      issue: JiraIssue,
-      transition: JiraTransition,
-      fields: JiraCreateField[]
-    ) => setPendingTransitionFields({ issue, transition, fields }),
+    openTransitionFields: (issue: JiraIssue, transition: JiraTransition) =>
+      setPendingTransitionFields({ issue, transition }),
     closeTransitionFields: () => {
       if (inFlightCount === 0) {
         setPendingTransitionFields(null)
       }
     },
     submitTransitionFields: async (
-      submission: JiraCreateFieldSubmission
-    ): Promise<JiraTransitionOutcome> => {
+      updates: JiraIssueUpdate
+    ): Promise<JiraTransitionSubmitOutcome> => {
       const pending = pendingTransitionFields
       if (!pending) {
         return {
@@ -140,7 +115,7 @@ export function useJiraBoardTransitionMove({
           )
         }
       }
-      const outcome = await applyTransition(pending.issue, pending.transition, submission)
+      const outcome = await applyTransition(pending.issue, pending.transition, updates)
       if (outcome.ok) {
         setPendingTransitionFields(null)
       }

@@ -196,7 +196,39 @@ describe('Jira board moves', () => {
     )
   })
 
-  it('leaves unsupported required fields in Jira', async () => {
+  it('moves without asking when the issue already fills the required fields', async () => {
+    // Why: Jira flags the field required by the transition's screen, not by this
+    // issue's emptiness, so a filled Component/s or Team must not block the move.
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            currentValue: '10400',
+            schema: { type: 'array', items: 'string' }
+          },
+          {
+            key: 'customfield_10002',
+            name: 'Team',
+            required: true,
+            currentValue: 'team-1',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mount()
+    await move()
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, { transitionId: 'done' })
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('collects a required field the issue does not fill', async () => {
     mocks.transitions.mockResolvedValue([
       {
         ...transition,
@@ -205,17 +237,93 @@ describe('Jira board moves', () => {
             key: 'customfield_42',
             name: 'Release approval',
             required: true,
-            schema: { type: 'array' }
+            schema: { type: 'string' }
           }
         ]
       }
     ])
     mount()
     await move()
-    await screen.findByText('Jira requires fields Orca cannot collect yet: Release approval.')
-    expect(screen.getByRole('button', { name: 'Open in Jira' })).toBeTruthy()
+    const input = await screen.findByPlaceholderText('Enter Release approval')
     expect(mocks.apply).not.toHaveBeenCalled()
-    expect(mocks.patch).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, {
+        transitionId: 'done',
+        transitionFields: { customfield_42: 'approved' }
+      })
+    )
+  })
+
+  it('leaves a field the issue already fills out of the submission', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            currentValue: 'approved',
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mount()
+    await move()
+    // Why: a value the issue already holds stays untouched unless the user changes it.
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, { transitionId: 'done' })
+    )
+  })
+
+  it('names the field Jira rejects and keeps the form open to fix it', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        error: 'Jira rejected the update.',
+        fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await screen.findByText('Release approval must be Approved.')
+    expect(screen.getByText('Jira rejected the update.')).toBeTruthy()
+    fireEvent.change(input, { target: { value: 'Approved' } })
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenLastCalledWith(target, issue, {
+        transitionId: 'done',
+        transitionFields: { customfield_42: 'Approved' }
+      })
+    )
   })
 
   it('rolls back a rejected mutation and keeps its error available for Retry', async () => {

@@ -137,9 +137,7 @@ describe('Jira transition control', () => {
     expect(mutate.mock.calls[1]).toEqual(mutate.mock.calls[0])
   })
 
-  it('names unsupported fields and opens the correct Jira issue without posting', async () => {
-    const openUrl = vi.fn()
-    Object.defineProperty(window, 'api', { configurable: true, value: { shell: { openUrl } } })
+  it('collects a required custom field instead of refusing the transition', async () => {
     const mutate = await choose([
       {
         ...close,
@@ -148,15 +146,82 @@ describe('Jira transition control', () => {
             key: 'customfield_123',
             name: 'Close reason',
             required: true,
-            schema: { type: 'option' }
+            schema: { type: 'option' },
+            allowedValues: [{ id: '9', value: 'Fixed' }]
           }
         ]
       }
     ])
-    expect(screen.getByText(/Close reason/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Jira' }))
-    expect(openUrl).toHaveBeenCalledWith(issue.url)
     expect(mutate).not.toHaveBeenCalled()
+    const submit = screen.getByRole('button', { name: 'Change status' })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Fixed' }))
+    fireEvent.click(submit)
+    await waitFor(() =>
+      expect(mutate).toHaveBeenCalledExactlyOnceWith(
+        {
+          transitionId: '31',
+          transitionFields: { customfield_123: { id: '9' } }
+        },
+        expect.objectContaining({ id: '31' })
+      )
+    )
+  })
+
+  it('moves without asking when the issue already fills the required field', async () => {
+    const mutate = await choose([
+      {
+        ...close,
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            currentValue: '10400',
+            currentDisplayValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    await waitFor(() =>
+      expect(mutate).toHaveBeenCalledExactlyOnceWith({ transitionId: '31' }, expect.anything())
+    )
+  })
+
+  it('names the field Jira rejects beside its own control', async () => {
+    const mutate = await choose(
+      [
+        {
+          ...close,
+          fields: [
+            {
+              key: 'customfield_123',
+              name: 'Close reason',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ]
+        }
+      ],
+      vi.fn().mockResolvedValue({
+        ok: false,
+        error: 'Jira rejected the update.',
+        fieldErrors: { customfield_123: 'Close reason is not one of the allowed values.' }
+      })
+    )
+    const input = screen.getByPlaceholderText('Enter Close reason')
+    fireEvent.change(input, { target: { value: 'something' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    expect(await screen.findByText('Close reason is not one of the allowed values.')).toBeTruthy()
+    expect(mutate).toHaveBeenCalledTimes(1)
+    // Why the form still stands: the value can be fixed and submitted again.
+    expect(screen.getByPlaceholderText('Enter Close reason')).toBeTruthy()
   })
 
   it('keeps failures visible and exposes Jira fallback', async () => {

@@ -6,9 +6,7 @@ export type JiraTransitionRequirement =
       kind: 'form'
       resolution: JiraCreateField | null
       commentRequired: boolean
-    }
-  | {
-      kind: 'unsupported'
+      /** Everything else the screen requires and the issue does not already fill. */
       fields: JiraCreateField[]
     }
 
@@ -20,11 +18,22 @@ function isCommentField(field: JiraCreateField): boolean {
   return field.key === 'comment' && !field.schema?.custom
 }
 
+/**
+ * Why: Jira flags a field required by the transition's screen, not by this
+ * issue's emptiness, so a field the issue already fills is not input the user
+ * owes — asking for it turns a move Jira would accept into a blocked one.
+ * Resolution and the comment are exempt: a workflow can demand the user set
+ * them on this transition even when a value already exists.
+ */
+function issueFillsField(field: JiraCreateField): boolean {
+  return !isResolutionField(field) && !isCommentField(field) && Boolean(field.currentValue?.trim())
+}
+
 export function requiredTransitionFields(transition: JiraTransition): JiraCreateField[] {
   // Why: a field Jira will default itself is not input the user owes us; prompting
   // for it turns a valid move into a blocked one.
   return (transition.fields ?? []).filter(
-    (field) => field.required && field.hasDefaultValue !== true
+    (field) => field.required && field.hasDefaultValue !== true && !issueFillsField(field)
   )
 }
 
@@ -38,13 +47,16 @@ export function classifyTransitionRequirements(
 
   let resolution: JiraCreateField | null = null
   let commentRequired = false
-  const unsupported: JiraCreateField[] = []
+  const fields: JiraCreateField[] = []
+  const seen = new Set<string>()
 
   for (const field of required) {
-    if (required.filter((other) => other.key === field.key).length > 1) {
-      unsupported.push(field)
+    // Why: Jira can list one field twice; one control holds it, and asking twice
+    // would submit the same key and lose whichever value the user typed second.
+    if (seen.has(field.key)) {
       continue
     }
+    seen.add(field.key)
     if (
       isResolutionField(field) &&
       field.allowedValues?.some((value) => transitionAllowedValueKey(value))
@@ -56,14 +68,10 @@ export function classifyTransitionRequirements(
       commentRequired = true
       continue
     }
-    unsupported.push(field)
+    fields.push(field)
   }
 
-  if (unsupported.length > 0) {
-    return { kind: 'unsupported', fields: unsupported }
-  }
-
-  return { kind: 'form', resolution, commentRequired }
+  return { kind: 'form', resolution, commentRequired, fields }
 }
 
 export function transitionAllowedValueLabel(value: JiraCreateFieldAllowedValue): string {

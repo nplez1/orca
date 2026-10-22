@@ -151,6 +151,7 @@ export function JiraIssueMetadataBar({
           loading={transitionsLoading}
           error={transitionsError}
           pending={pendingField !== null}
+          providerSettings={providerSettings}
           onRetry={reloadTransitions}
           onTransition={(updates, transition) =>
             mutateIssue('transition', updates, { status: transition.to }, { reportsInline: true })

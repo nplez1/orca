@@ -17,7 +17,12 @@ import type { TaskPageJiraBoardSection } from './task-page-jira-board-sections'
 import { JiraBoardMoveDialog, type JiraBoardMovePrompt } from './task-page-jira-board-move-dialog'
 import { applyJiraBoardMove, getJiraBoardMoveTransitions } from './task-page-jira-board-move'
 import { formatRelativeTime } from './task-page-source-context'
-import { enqueueJiraIssueMutation, jiraIssueRequestScope } from './jira-issue-mutation-queue'
+import {
+  JiraMutationFailure,
+  enqueueJiraIssueMutation,
+  jiraIssueRequestScope
+} from './jira-issue-mutation-queue'
+import type { JiraTransitionSubmitOutcome } from './jira-transition-fields-form'
 
 type Props = {
   issues: JiraIssue[]
@@ -72,9 +77,12 @@ export function TaskPageJiraBoardView({
     issue: JiraIssue,
     transition: JiraTransition,
     updates: JiraIssueUpdate
-  ): Promise<void> {
+  ): Promise<JiraTransitionSubmitOutcome> {
     if (!target) {
-      return
+      return {
+        ok: false,
+        error: translate('jira.board.noTarget', 'No Jira host is available for this move.')
+      }
     }
     const request = requestRef.current
     const patchOptions = {
@@ -90,7 +98,10 @@ export function TaskPageJiraBoardView({
         activeRuntimeEnvironmentId: runtimeTargetEnvironmentId(target)
       })
       if (!mutationScope) {
-        return
+        return {
+          ok: false,
+          error: translate('jira.board.noTarget', 'No Jira host is available for this move.')
+        }
       }
       let latest: JiraIssue | null = null
       await enqueueJiraIssueMutation({
@@ -107,24 +118,23 @@ export function TaskPageJiraBoardView({
         patchIssue: (patch) => patchJiraIssue(issue.key, patch, patchOptions)
       })
       if (requestRef.current !== request) {
-        return
+        return { ok: true }
       }
       lockedIssueRef.current = null
       setPrompt(null)
       onRefresh()
+      return { ok: true }
     } catch (error) {
-      if (requestRef.current !== request) {
-        return
+      // Why returned rather than written to the prompt: a form submission renders
+      // its own rejection beside the field Jira refused, and writing it here too
+      // would show the same sentence twice.
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Failed to change status.',
+        ...(error instanceof JiraMutationFailure && error.fieldErrors
+          ? { fieldErrors: error.fieldErrors }
+          : {})
       }
-      setPrompt((current) =>
-        current
-          ? {
-              ...current,
-              selected: transition,
-              error: error instanceof Error ? error.message : 'Failed to change status.'
-            }
-          : null
-      )
     } finally {
       if (requestRef.current === request) {
         setPending(false)
@@ -134,8 +144,14 @@ export function TaskPageJiraBoardView({
 
   async function choose(issue: JiraIssue, transition: JiraTransition): Promise<void> {
     setPrompt((current) => (current ? { ...current, selected: transition, error: null } : null))
-    if (classifyTransitionRequirements(transition).kind === 'none') {
-      await apply(issue, transition, { transitionId: transition.id })
+    if (classifyTransitionRequirements(transition).kind !== 'none') {
+      return
+    }
+    const outcome = await apply(issue, transition, { transitionId: transition.id })
+    if (!outcome.ok) {
+      setPrompt((current) =>
+        current ? { ...current, selected: transition, error: outcome.error } : null
+      )
     }
   }
 
@@ -228,16 +244,21 @@ export function TaskPageJiraBoardView({
       <JiraBoardMoveDialog
         prompt={prompt}
         pending={pending}
+        providerSettings={sourceContext ?? undefined}
         onClose={close}
         onChoose={(transition) => {
           if (prompt) {
             void choose(prompt.issue, transition)
           }
         }}
-        onSubmit={async (updates) => {
-          if (prompt?.selected) {
-            await apply(prompt.issue, prompt.selected, updates)
+        onSubmit={(updates) => {
+          if (!prompt?.selected) {
+            return Promise.resolve({
+              ok: false as const,
+              error: translate('jira.board.noTransition', 'No status change is selected.')
+            })
           }
+          return apply(prompt.issue, prompt.selected, updates)
         }}
         onRetry={() => {
           if (!prompt || !lastDestinationRef.current) {
