@@ -1466,3 +1466,126 @@ broadcasts diagnostics and tells replication, so a later edit cannot do one with
 
 **Do not:** solve either of the first two by shortening upstream's half — the fork's addition is the
 line that moves, as in every previous sync.
+
+## 2026-10-22 sync (upstream `57b5082404`, 268 commits)
+
+52 conflicted paths: `union 22, both-rewrote 20, modify/delete 5, duplicate-members 2,
+rename-replay 2, duplicate-tail 1`. No add/add, and almost no product collision: upstream's delta is
+a **module reorganisation** — `src/main/ephemeral-vm/`, `src/main/ipc/jira/`, `jira/attachments/`,
+`task-page/gitlab/`, and the mobile chat helpers renamed page → scroll — with one feature behind a
+flag (`experimentalConnectors`) and one new locale. The cost was the renames that never conflicted.
+
+### Ephemeral VM: upstream's `ephemeral-vm/` grouping wins; the fork's modules stay flat
+
+**Paths:** `src/main/ephemeral-vm/**`, `src/main/ephemeral-vm-*.ts`, `src/shared/ephemeral-vm-recipe-*`
+
+**Decision.** Upstream moved its ten ephemeral-VM modules into `src/main/ephemeral-vm/`. Those moves
+are taken as renames, and every fork-owned importer follows them (`./ephemeral-vm-runtime-service` →
+`./ephemeral-vm/runtime-service`, and the same for `runtime-ssh`, `runtime-ssh-cleanup`,
+`runtime-environment-release`, `provisioned-root-source` and `failed-start-cleanup`). The fork's own
+four modules — `ephemeral-vm-runtime-extend.ts`, `-context-menu.ts`, `-lock.ts`, `-reclaim.ts` — stay
+**flat**, because they are fork-only and never collide; moving them buys nothing and costs a rename on
+every future sync. `src/main/ephemeral-vm-recipe-runner.ts` is **deleted**, as upstream deleted it:
+it was a three-line barrel over shared modules, so its one importer now reads
+`shared/ephemeral-vm-recipe-extend-runner` directly, and the moved `ephemeral-vm/recipe-runner.test.ts`
+imports each shared module by name.
+
+**Do not:** recreate the barrel to keep an import path stable, or move the fork's four flat modules
+into the directory "for consistency" — `rg 'ephemeral-vm-runtime-(extend|lock|reclaim|context-menu)'`
+is the shape the next sync expects.
+
+### Jira: upstream's `ipc/jira/` split and `jira/attachments/` renames win
+
+**Paths:** `src/main/ipc/jira/**`, `src/main/jira/**`, `src/main/ipc/jira-board-handlers.ts`,
+`src/main/ipc/jira-issue-update-payload.ts`
+
+**Decision.** `src/main/ipc/jira.ts` became `ipc/jira/register-handlers.ts`, and upstream split
+`jira/issues.ts`'s operations into `jira-issue-mutations` / `-read` / `-comments` /
+`-transition-queries` / `-issue-search` (`jira/issues.ts` survives upstream as a barrel). The
+register file takes upstream's per-module imports and keeps the fork's three additions on top:
+`registerJiraBoardHandlers()` (from the flat `ipc/jira-board-handlers.ts`), the `jira:listEditFields`
+handler (from `jira-issue-edit-metadata`), and the `normalizeIssueUpdate` second narrower. The
+attachment modules moved to `jira/attachments/` (`discovery`, `image-cache`), which the fork's own
+`jira-rendered-html.ts` had to follow.
+
+**Do not:** import `jira:listEditFields`'s source from the `jira/issues` barrel in new code — the
+per-module import is what upstream uses, and the barrel is a compatibility surface only.
+
+### Worktree delete: the queue is upstream's, the extraction is the fork's
+
+**Paths:** `src/main/runtime/rpc/methods/worktree.ts`, `worktree-remove-method.ts`,
+`src/renderer/src/components/sidebar/DeleteWorktreeDialog.tsx`, `use-delete-worktree-dialog-actions.ts`
+
+**Decision.** Upstream routes `worktree.rm` through `queueWorkspaceDelete(runtime, selector, hostId,
+params, run)` so a delete queues on the workspace lifecycle; the fork had extracted the whole method
+into `worktree-remove-method.ts` on the max-lines budget. Both survive: the extraction keeps
+`WORKTREE_REMOVE_METHOD`, and upstream's queue call lands **inside** it, carrying the fork's
+`deleteRemoteBranch` through the `run` callback (`queueWorkspaceDelete` only normalizes the four
+`RemovalFlag`s). On the renderer side upstream added `confirmedDiscards` to every delete path; the
+fork's `useDeleteWorktreeDialogActions` hook computes it from `unsavedTargets` — passed in as an
+argument — so the dialog component keeps its size and the hook keeps both dependency arrays.
+
+**Why:** the alternative — dropping the extraction — puts the dialog back over `max-lines` and
+re-couples the two destructive actions; dropping the queue loses the lifecycle serialization.
+
+**Do not:** give `queueWorkspaceDelete` a sixth flag for `deleteRemoteBranch`. The `run` callback
+already sees the raw `params`, which is where the fork reads it.
+
+### Agent-hook listener: the fork's guards stay and carry upstream's `incomingProcess`
+
+**Paths:** `src/shared/agent-hook-listener.ts`, `src/shared/agent-hook-listener/inherited-pane-owner-guard.ts`
+
+**Decision.** The fork's two extractions (`admitNestedAgentPost`, `isInheritedPaneOwnerEvent`) stay,
+and upstream's new evidence is threaded through them: `readAgentProcessIdentity` is upstream's
+`readHookAgentProcess(source, record.agentProcess)`, and the guard takes an `incomingProcess` argument
+and forwards it to `resolveAgentStatusIdentity`, which uses it to tell a nested `claude -p` from the
+pane's own agent. `previousReceivedAt` lives inside the guard (it has no other reader), so the
+listener computes only `agentProcess`.
+
+**Do not:** delete the guard's `incomingProcess` parameter as "unused by the caller" — the caller
+passes it, and dropping it turns a nested child into the pane's owner.
+
+### Localization: `en.json` is unioned then regenerated, and one key held two sentences
+
+**Paths:** `src/renderer/src/i18n/locales/en.json`, `src/renderer/src/i18n/en-runtime-required.json`
+
+**Decision.** `en.json` was resolved by a three-way merge of the parsed catalogs (15 conflicting
+leaves: 8 kept the fork's value — the `~/.orca-np` paths, the floating-workspace copy, the dashboard
+description, the Jira-aware issue-link copy, the fork's provider list — and 7 took upstream's, all
+cases where upstream rewrote the same string and ours was still the base value), then
+`pnpm run sync:localization-catalog` added the 8 keys the merged source needed. `en-runtime-required.json`
+is never hand-merged; it is regenerated.
+
+**Found and fixed here:** `jira.board.noTransition` was used for two different sentences (one with
+`{{column}}`/`{{key}}`, one without) — the catalog's placeholder check caught it, and the
+placeholder-less sentence is now `jira.board.noTransitionSelected`. That file is the red-flag scan's
+single "modified but upstream never touched it" entry this sync, which is the scan working.
+
+### Max-lines and the ratchets: two splits, one prune, two restorations
+
+`orcad-entry.ts` was over the budget on the union, so its credential-store bootstrap moved to
+`orcad-secret-store-bootstrap.ts` (one seam: prepare the store, then migrate the plaintext
+credentials); the pi test harness moved its `BASE_ENV` fixture to
+`agent-status-extension-test-env.ts`. Neither cap moved. The focus-read baseline was re-pruned
+against the upstream code that removed the runtime Jira/Linear reads (1161 → 718 reads) and the
+fork's two documented transitive readers were **restored with their causes**
+(`use-linked-issue-pane-actions.ts`'s `openHttpLink`, and `JiraBoardSettings.tsx`'s global default
+board) — taking upstream's baseline alone would have deleted both justifications.
+
+**Do not:** re-add a ratchet entry without its cause and date, and do not carry upstream's baseline
+over the top of the fork's entries — the counts belong to the merged tree, not to either side.
+
+### A clean merge is not a correct merge — the four breaks no marker showed
+
+- `store-test-helpers.ts`: upstream wrapped the test store in `withEditorBufferRecords`, and that
+  rewrite dropped `createWorktreeSetupRunnerSlice` from the list while the fork's `AppState` still
+  requires it (`pnpm tc` named the missing properties).
+- `use-browser-new-tab-linked-items.ts` (fork-only): upstream's review-details hook gained required
+  `issueRepo` / `issueRepoIsOffDevice` outputs, so the browser new-tab caller had to pass them.
+- `host-sync-settings-disposition.ts` and `profile-project-session-field-disposition.ts`: two new
+  upstream settings (`experimentalConnectors` → `replicated`, a feature flag;
+  `uiLanguagePortugueseMigrationApplied` → `hostLocal`, a migration marker) and one new session field
+  (`closedTerminalPanesByPaneKey` → `hostLocal`) have to be classified, or the replication contract
+  fails to compile.
+- `worktrees-local-create-base-prefetch.test.ts` mocked `../providers/ssh-filesystem-dispatch`, which
+  upstream deleted, so the mock target vanished with it.

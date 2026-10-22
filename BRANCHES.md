@@ -1,6 +1,19 @@
 # Branch tracker
 
-Last updated **2026-10-21** — `nplez1/main` merged upstream main @ `bbc8303b47` (418 commits) from
+Last updated **2026-10-22** — `nplez1/main` merged upstream main @ `57b5082404` (268 commits) from
+`c67d40f97b` (merge `05b4768249`, merge base `bbc8303b47`, rollback tag
+`archive/pre-sync-c67d40f97b`). 52 conflicted paths, and no add/add this time: `union 22,
+both-rewrote 20, modify/delete 5, duplicate-members 2, rename-replay 2, duplicate-tail 1`. Upstream's
+delta is mostly **module reorganisation** rather than product work — the `src/main/ephemeral-vm/` and
+`src/main/ipc/jira/` groupings, `jira/attachments/`, the mobile chat helpers renamed page → scroll,
+the `task-page/gitlab/` group — plus an off-by-default connectors flag, growth in the English runtime
+catalog and the new Brazilian Portuguese locale. The renames are what cost the time: the fork's own
+flat modules, its extra Jira/board handlers and `en.json` all had to follow them with no conflict
+marker pointing at them. Decisions are in
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-22 sync", and the
+sync log in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) names each resolution.
+
+Before that, on **2026-10-21** — `nplez1/main` merged upstream main @ `bbc8303b47` (418 commits) from
 `43fa95b4cf` (merge `276fe47cee`, merge base `83c768d1b4`, rollback tag
 `archive/pre-sync-43fa95b4cf`). 63 conflicted paths, mostly upstream product work rather than a
 reorganisation: the SSH settings screen became a grouped/windowed multi-select list, the MiniMax and
