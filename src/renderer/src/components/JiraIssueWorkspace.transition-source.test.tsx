@@ -470,7 +470,9 @@ describe('Jira transition form source ownership', () => {
     ])
     mocks.update.mockResolvedValue({
       ok: false,
-      error: 'Release approval must be Approved; Close reason is not allowed.',
+      // Why the periods: the host joins the values as they are, so a realistic sentence
+      // carries the field error's own punctuation and a banner repeat would match.
+      error: 'Release approval must be Approved.; Close reason is not allowed.',
       fieldErrors: {
         customfield_42: 'Release approval must be Approved.',
         customfield_99: 'Close reason is not allowed.'
@@ -488,8 +490,9 @@ describe('Jira transition form source ownership', () => {
     }
     fireEvent.submit(form)
     // The rendered key shows inline, the unrendered one in the banner, each once.
+    // Why a regex: an exact-text match would miss the sentence repeated inside the banner.
     await waitFor(() =>
-      expect(screen.getAllByText('Release approval must be Approved.')).toHaveLength(1)
+      expect(screen.getAllByText(/Release approval must be Approved\./)).toHaveLength(1)
     )
     expect(screen.getAllByText(/Close reason is not allowed\./)).toHaveLength(1)
   })

@@ -134,19 +134,22 @@ export function JiraTransitionFieldsForm({
   const carriedMessages = attempted ? [] : (rejectedErrorMessages ?? [])
   const workflowMessages = [...carriedMessages, ...(attempted ? errorMessages : [])]
   const banner = [...workflowMessages, ...unrenderedMessages]
-  // Why the remainder from `error`: the host joins its own top-level message into that
-  // sentence, and a banner built only from the parts above would drop it. Parts already
-  // shown — inline on a control, or in the banner — are the only ones left out.
-  const shownParts = new Set([
+  // Why the remainder from the host's joined sentence: `readJiraErrorDetail` folds Jira's
+  // own top-level message into it, so a banner built only from the parts above would drop
+  // it. The parts already shown — inline on a control, or in the banner — are removed as
+  // whole substrings rather than by splitting, so a message that itself contains '; '
+  // neither loses text nor repeats. Before the first submit the same treatment applies to
+  // the sentence that opened this form.
+  const shownParts = [
     ...banner,
     ...renderedKeys.map((key) => fieldErrors[key]).filter(Boolean)
-  ])
-  const uncovered = attempted
-    ? (error ?? '')
-        .split('; ')
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0 && !shownParts.has(part))
-    : []
+  ].filter(Boolean)
+  const joinedSentence = (attempted ? error : errorReason)?.trim() ?? ''
+  const uncovered = shownParts
+    .reduce((text, part) => text.replace(part, ' '), joinedSentence)
+    .split('; ')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
   const shownError =
     banner.length > 0 || uncovered.length > 0
       ? [...banner, ...uncovered].join('; ')
