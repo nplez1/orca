@@ -8,6 +8,7 @@ export type JiraFieldControlKind =
   | 'user'
   | 'userList'
   | 'select'
+  | 'optionList'
   | 'textList'
   | 'textarea'
   | 'date'
@@ -31,8 +32,13 @@ export function resolveJiraFieldControlKind(field: JiraCreateField): JiraFieldCo
   if (type === 'array' && items === 'user') {
     return 'userList'
   }
-  if (type === 'array' && (items === 'string' || (items === 'option' && hasOptions))) {
+  if (type === 'array' && items === 'string') {
     return 'textList'
+  }
+  // An option list holds ids it must submit back, so it gets a control that can
+  // name the options rather than a text box that would show the ids themselves.
+  if (type === 'array' && items === 'option' && hasOptions) {
+    return 'optionList'
   }
   if (type === 'array') {
     return null

@@ -25,6 +25,10 @@ function isEditableCustomField(field: JiraCreateField, meta: JiraRecord): boolea
 /** The token an option control should hold: whichever form the allowed-value
  *  list can match back on, falling back to the value the response carried. */
 function optionDraft(field: JiraCreateField, value: unknown): string {
+  // A string list's entries are the values themselves, not option records.
+  if (typeof value === 'string') {
+    return value.trim()
+  }
   const record = asRecord(value)
   const id = asString(record.id)
   const optionValue = asString(record.value)
@@ -40,13 +44,6 @@ function optionDraft(field: JiraCreateField, value: unknown): string {
     return name
   }
   return optionValue || name || id
-}
-
-/** The human-readable label for an option value, for a name-bearing hint beside
- *  a control that has to hold the id the submission needs. */
-function optionLabel(value: unknown): string {
-  const record = asRecord(value)
-  return asString(record.name) || asString(record.value) || asString(record.id)
 }
 
 function userDraft(value: unknown): { id: string; displayName?: string } {
@@ -77,13 +74,13 @@ function describeEditableValue(
     }
   }
   if (Array.isArray(raw)) {
-    const labels = raw.map(optionLabel).filter(Boolean)
+    // Why no displayName: an option list names its own options, and a string list's
+    // values are already what the user typed, so neither needs a hint beside it.
     return {
       value: raw
         .map((entry) => optionDraft(field, entry))
         .filter(Boolean)
-        .join(', '),
-      ...(labels.length > 0 ? { displayName: labels.join(', ') } : {})
+        .join(', ')
     }
   }
   if (raw === null || raw === undefined) {

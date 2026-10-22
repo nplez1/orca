@@ -20752,6 +20752,10 @@
       "stepUnpack": "Unpack",
       "stepCheck": "Check"
     },
+    "jiraOptionMultiSelect": {
+      "search": "Search options...",
+      "noMatch": "No options match your search."
+    },
     "jiraSchemaField": {
       "noUser": "None",
       "currentValue": "Current: {{value0}}"

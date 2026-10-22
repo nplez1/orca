@@ -1,4 +1,4 @@
-import type { JiraCreateField } from '../../../shared/jira-types'
+import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
 import { isJiraTextAreaField } from '../../../shared/jira-field-rendering'
 
 // 'assignee' is system here because the dialog renders a dedicated picker for it.
@@ -59,7 +59,10 @@ export function getJiraCreateAllowedValueLabel(
   return value.name ?? value.value ?? value.id ?? 'Option'
 }
 
-export function findJiraCreateAllowedValue(field: JiraCreateField, draftValue: string) {
+export function findJiraCreateAllowedValue(
+  field: { allowedValues?: readonly JiraCreateFieldAllowedValue[] | undefined },
+  draftValue: string
+) {
   return field.allowedValues?.find((value) => {
     return value.id === draftValue || value.value === draftValue || value.name === draftValue
   })

@@ -121,6 +121,63 @@ describe('Jira issue edit metadata', () => {
     expect(path).toBe('/rest/api/3/issue/ALP-1?expand=editmeta')
   })
 
+  it('drafts a multi-select option field as the ids its control holds', async () => {
+    jiraRequestMock.mockResolvedValue({
+      fields: {
+        customfield_10062: [
+          { id: '184354', value: 'mac-intel' },
+          { id: '184357', value: 'win-arm' }
+        ]
+      },
+      editmeta: {
+        fields: {
+          customfield_10062: {
+            name: 'System',
+            required: false,
+            schema: { type: 'array', items: 'option' },
+            allowedValues: [
+              { id: '184354', value: 'mac-intel' },
+              { id: '184355', value: 'mar-arm' },
+              { id: '184357', value: 'win-arm' }
+            ],
+            operations: ['set']
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const [field] = await listEditFields('ALP-1', 'site-1')
+
+    // The control names these options itself, so no hint is built for it.
+    expect(field).toEqual({
+      field: expect.objectContaining({ key: 'customfield_10062' }),
+      value: '184354, 184357'
+    })
+    expect(field.displayName).toBeUndefined()
+  })
+
+  it('drafts a string list from the entries themselves', async () => {
+    jiraRequestMock.mockResolvedValue({
+      fields: { customfield_10100: ['one', ' two '] },
+      editmeta: {
+        fields: {
+          customfield_10100: {
+            name: 'Notes',
+            required: false,
+            schema: { type: 'array', items: 'string' },
+            operations: ['set']
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const [field] = await listEditFields('ALP-1', 'site-1')
+
+    expect(field.value).toBe('one, two')
+  })
+
   it('leaves an unset user field as an empty draft', async () => {
     jiraRequestMock.mockResolvedValue({
       fields: {},

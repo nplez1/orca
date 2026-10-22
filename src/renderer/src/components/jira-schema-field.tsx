@@ -1,5 +1,6 @@
 import type { JiraCreateField, JiraUser } from '../../../shared/jira-types'
 import { resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
+import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'
 import { JiraUserPicker, type JiraUserPickerFixedOption } from '@/components/jira-user-picker'
 import { getJiraCreateAllowedValueLabel } from '@/components/task-page-jira-create-fields'
 import { Input } from '@/components/ui/input'
@@ -33,8 +34,8 @@ export function JiraSchemaFieldControl({
   value: string
   onValueChange: (value: string) => void
   disabled?: boolean
-  /** Names for a value the control holds in a submission-shaped token (a joined
-   *  id list), so the current selection is readable beside it. */
+  /** Names for a value the control holds in a submission-shaped token (a joined id
+   *  list), so a user field's current selection is readable beside it. */
   displayValue?: string
   userField?: {
     selectedUser: JiraUser | null
@@ -82,6 +83,19 @@ export function JiraSchemaFieldControl({
       />
     )
   }
+  if (kind === 'optionList' && field.allowedValues?.length) {
+    return (
+      <JiraOptionMultiSelect
+        options={field.allowedValues}
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+        placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+          value0: field.name
+        })}
+      />
+    )
+  }
   if (kind === 'select' && field.allowedValues?.length) {
     return (
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -94,7 +108,7 @@ export function JiraSchemaFieldControl({
         </SelectTrigger>
         <SelectContent>
           {field.allowedValues.map((option) => {
-            const optionValue = option.id ?? option.value ?? option.name ?? ''
+            const optionValue = jiraOptionToken(option)
             return optionValue ? (
               <SelectItem key={optionValue} value={optionValue}>
                 {getJiraCreateAllowedValueLabel(option)}
