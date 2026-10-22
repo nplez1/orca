@@ -10,10 +10,6 @@ import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { readIpcErrorDetail } from '@/lib/ipc-error'
 import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/archive-hook-removal-gate'
 import {
-  resolveWorktreeOperationRouteResult,
-  resolveWorktreeOperationRouteResultForHost
-} from '@/lib/worktree-operation-route'
-import {
   beginHostQualifiedRemoval,
   completeSameIdHostScopedRemoval,
   findWorktreeOnConfirmedHost,
@@ -31,10 +27,6 @@ import { getWorktreeDeleteStateKey } from './worktree-delete-state'
 import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
-import {
-  isRuntimeRepoNotFoundError,
-  isRuntimeSelectorNotFoundError
-} from '../listing/runtime-worktree-rpc-errors'
 import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-prune'
 import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
@@ -43,6 +35,10 @@ import { buildWorktreeRemovalSuccessResult } from './worktree-removal-result'
 import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
+import { resolveLocalForgetRemovalFallback } from './local-forget-removal-fallback'
+import type { EphemeralVmCleanupSummary } from '@/lib/ephemeral-vm-runtime-cleanup'
+import { showUnreachableVmRemovalNotice } from './unreachable-vm-workspace-release'
+import { refreshEphemeralVmRuntimesAfterMutation } from '@/hooks/useEphemeralVmRuntimes'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -122,6 +118,15 @@ export function createRemoveWorktree(
       }
       let removalResult: RemoveWorktreeResult
       let snapshotPruneHandledByLocalMain = policy.forgetLocalOnly || target.kind === 'local'
+      // Set when the host never answered and Orca owns its machine, so the delete reports on it.
+      let unreachableOrcaMachine = false
+      const reportMachine = (cleanup: EphemeralVmCleanupSummary): void => {
+        refreshEphemeralVmRuntimesAfterMutation()
+        // Why: the release removed this VM's server from main's store, so a list still showing it
+        // would keep a dead host — and its active environment — in front of the user.
+        void get().hydrateRuntimeEnvironmentStatuses()
+        showUnreachableVmRemovalNotice(cleanup)
+      }
       try {
         removalResult = await dispatchWorktreeRemoval({
           worktreeId,
@@ -134,40 +139,28 @@ export function createRemoveWorktree(
           assertCurrent: () => removalGenerationGuard?.assertCurrent()
         })
       } catch (error) {
-        if (
-          !policy.forgetLocalOnly &&
-          target.kind !== 'local' &&
-          (isRuntimeRepoNotFoundError(error) || isRuntimeSelectorNotFoundError(error))
-        ) {
-          // Missing means stale mirror; ambiguous or changed ownership must fail closed.
-          const currentResolution = requiredExecutionHostId
-            ? resolveWorktreeOperationRouteResultForHost(get(), worktreeId, requiredExecutionHostId)
-            : resolveWorktreeOperationRouteResult(get(), worktreeId)
-          if (currentResolution.kind === 'ambiguous') {
-            throw error
-          }
-          if (currentResolution.kind === 'resolved') {
-            removalGenerationGuard?.assertCurrent()
-          }
-          try {
-            removalResult = await window.api.worktrees.forgetLocal({
+        // Why an unreachable VM is handled even for a local-transport route: an SSH-connection-mode
+        // VM is reached as `ssh:<runtime-owned target>`, and its delete fails the same way.
+        const fallback = policy.forgetLocalOnly
+          ? ({ kind: 'not-applicable' } as const)
+          : await resolveLocalForgetRemovalFallback({
+              error,
               worktreeId,
               hostId,
-              ...(options?.snapshotPruneBatchId
-                ? { snapshotPruneBatchId: options.snapshotPruneBatchId }
-                : {})
+              requiredExecutionHostId,
+              target,
+              generationGuard: removalGenerationGuard,
+              get,
+              snapshotPruneBatchId: options?.snapshotPruneBatchId,
+              worktreePath: worktreeBeforeRemoval?.path ?? worktreeId,
+              allowFailedArchiveHook: options?.allowFailedArchiveHook === true
             })
-            snapshotPruneHandledByLocalMain = true
-          } catch (fallbackError) {
-            // Preserve the remote verdict as fallback failure context.
-            throw new Error(
-              fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-              { cause: error }
-            )
-          }
-        } else {
+        if (fallback.kind === 'not-applicable') {
           throw error
         }
+        removalResult = fallback.result
+        snapshotPruneHandledByLocalMain = true
+        unreachableOrcaMachine = fallback.unreachableOrcaMachine
       }
 
       if (!snapshotPruneHandledByLocalMain) {
@@ -210,7 +203,8 @@ export function createRemoveWorktree(
               target,
               worktreeBeforeRemoval,
               suppressPreservedBranchToast: options?.suppressPreservedBranchToast === true,
-              rowAlreadyDropped: true
+              rowAlreadyDropped: true,
+              ...(unreachableOrcaMachine ? { onRuntimeCleanup: reportMachine } : {})
             })
           }
         }
@@ -239,7 +233,7 @@ export function createRemoveWorktree(
         }
       }
 
-      await tearDownRemovedWorktreeRendererState({
+      const runtimeCleanup = await tearDownRemovedWorktreeRendererState({
         set,
         get,
         worktreeId,
@@ -248,6 +242,11 @@ export function createRemoveWorktree(
         beforeRemoval,
         catalogVersion: removalResult?.catalogVersion
       })
+      // Why after the teardown: it is the pass that released (or failed to release) the machine, and
+      // a notice that claims otherwise must not be shown for a delete that never got this far.
+      if (unreachableOrcaMachine) {
+        reportMachine(runtimeCleanup)
+      }
       // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
       clearSessionCommitDraftForWorktree(worktreeId)
       const preservedBranch = removalResult?.preservedBranch
