@@ -85,6 +85,7 @@ export function JiraTransitionFieldsForm({
 }: Props): React.JSX.Element | null {
   const [drafts, setDrafts] = useState<Record<string, string>>(() => ({}))
   const [selectedUsers, setSelectedUsers] = useState<Record<string, JiraUser | null>>({})
+  const [selectedUserLists, setSelectedUserLists] = useState<Record<string, JiraUser[]>>({})
   const [resolution, setResolution] = useState('')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -230,6 +231,11 @@ export function JiraTransitionFieldsForm({
                   selectedUser: selectedUsers[field.key] ?? null,
                   onSelectUser: (user) =>
                     setSelectedUsers((previous) => ({ ...previous, [field.key]: user })),
+                  // Why the held people: a person list names them from this, and the ids
+                  // in the draft are internal data.
+                  selectedUsers: selectedUserLists[field.key] ?? field.currentUsers ?? [],
+                  onSelectUsers: (users) =>
+                    setSelectedUserLists((previous) => ({ ...previous, [field.key]: users })),
                   providerSettings,
                   siteId
                 }

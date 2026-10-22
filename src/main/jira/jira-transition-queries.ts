@@ -78,6 +78,9 @@ async function attachCurrentValues(
         if (draft.displayName?.trim()) {
           field.currentDisplayValue = draft.displayName
         }
+        if (draft.users?.length) {
+          field.currentUsers = draft.users
+        }
       }
     }
   } catch (error) {

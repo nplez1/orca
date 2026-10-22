@@ -85,6 +85,9 @@ export type JiraCreateField = {
   hasCurrentValue?: boolean
   /** Human label for a `currentValue` that carries an id, so a form can show it. */
   currentDisplayValue?: string
+  /** The people a multi-user field already holds, so a picker names them rather than
+   *  showing accountIds. Absent for every other field kind. */
+  currentUsers?: JiraUser[]
   schema?: {
     type?: string
     items?: string
