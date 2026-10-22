@@ -538,6 +538,31 @@ signature that identifies it. None imports a module this fork changed.
 - `tests/e2e/cross-version-wire/*` (three files) time out at 30 s inside `materializeReleaseCheckout`
   — a git checkout of a baseline ref — when the machine is loaded. They pass on a quiet machine.
 
+### `local(test)`: the 2026-10-22 sync's red set, and one parser fix it needed
+
+The first full gate run after the sync left 41 failing cases in 19 files. Three were real merge
+breaks, fixed in the tree rather than recorded: `session-search-list-reparse` (upstream's new
+"second fold" case assumed upstream's `claude: true`, while the fork keeps claude out of the
+self-contained set — the case now pins `agent: 'pi'`), `agent-session-failure-words-text` (the
+`en.json` union kept a `codexCliTooOld` key upstream had dropped), and `pty-pane-copy-census`
+(a fork-only terminal-wait file read `pty.paneKey` directly and now goes through `paneOfPty`).
+Fourteen were already recorded. The last two are the same host-toolchain class as their neighbours:
+
+- `config/scripts/dependency-security-release.test.mjs` — the audit action's bash step uses
+  `mapfile`, and this machine's bash is Apple's 3.2 (`bash: mapfile: command not found`). Same
+  signature as `ci-managed-ssh-execution.test.mjs`, which is already recorded.
+- `tests/e2e/cross-version-wire/host-model-catalog-released-phone.unit.test.ts` — both cases call
+  `stripTypeScriptTypes` from `node:module`; the bun 1.4.3 pool's `node:module` does not export it,
+  so the file passes only under a Node runtime.
+
+**The gate also had to learn one heading.** Vitest reports the run's unhandled errors in two shapes,
+and `collectUnhandledErrors` matched only `Unhandled Rejection` / `Uncaught Exception`. A pool crash
+arrives under `Unhandled Error`, so the declared count read 7 against 6 headlines and the gate failed
+closed on a count it could not explain. The separator now matches all three; with it, the 7 headlines
+are the recorded `selector_not_found`, five of the tolerated worker-teardown race, and one pool crash
+(`Worker node-runtime emitted error`, SIGTRAP) whose file passes 11/11 alone — recorded as
+`pool-crash` rather than waived silently.
+
 ### `local(test)`: the full-suite verdict is a file, not a reading exercise
 
 The section above records the red set as prose, which means every agent that runs the full suite has

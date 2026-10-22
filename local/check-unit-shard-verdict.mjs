@@ -27,7 +27,10 @@ export const TOLERATED_UNHANDLED_ERROR =
 // Why `\W` on both sides: Vitest frames these headers in box-drawing rules (U+23AF at this
 // version), and pinning the glyph would make the verdict fail closed on its next cosmetic change.
 const UNHANDLED_HEADER = /^\W*Unhandled Errors\W*$/
-const ERROR_SEPARATOR = /^\W*Unhandled Rejection\W*$|^\W*Uncaught Exception\W*$/
+// Why `Unhandled Error` too: Vitest frames a pool/worker failure with that heading, not
+// `Unhandled Rejection`, and missing it made the declared count unreadable (failing closed).
+const ERROR_SEPARATOR =
+  /^\W*Unhandled Rejection\W*$|^\W*Uncaught Exception\W*$|^\W*Unhandled Error\W*$/
 const FAILING_TEST_LIMIT = 5
 
 /** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */

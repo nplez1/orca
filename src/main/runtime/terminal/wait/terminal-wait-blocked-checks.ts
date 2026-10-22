@@ -104,7 +104,7 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
       this.recordAgentPromptPermissionObservation(ptyId)
       // Why only these reasons: a startup, trust or update dialog is not a wait on a person, and
       // the store's corroboration reads the same blocked-text layer this scan just matched.
-      const paneKey = pty.paneKey
+      const paneKey = this.paneOfPty(pty).paneKey
       if (
         paneKey &&
         nextWaitState.signal &&

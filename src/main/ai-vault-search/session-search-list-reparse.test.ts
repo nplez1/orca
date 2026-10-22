@@ -128,9 +128,12 @@ it('still indexes new appended messages', () => {
 
 it('keeps the index current when a second fold appends a span it already holds', () => {
   // Pi and OMP fold one shared transcript apart, so the same append reaches the index twice.
+  // `pi`, not the fixture's default `claude`: the fork keeps claude out of the self-contained set
+  // because its pi-parent marker can appear while the transcript stands still, so a covered claude
+  // append has to write. The property under test — a covered append adds nothing — is the same.
   replayTranscriptRead({ messages })
   const append = {
-    candidate: syntheticCandidate({ sizeBytes: 5000 }),
+    candidate: { ...syntheticCandidate({ sizeBytes: 5000 }), agent: 'pi' as const },
     mode: 'append' as const,
     previousByteOffset: 4096,
     messages,
