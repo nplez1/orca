@@ -52,6 +52,7 @@ function TransitionFieldsForm({
 }): JSX.Element {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [selectedUsers, setSelectedUsers] = useState<Record<string, JiraUser | null>>({})
+  const [selectedUserLists, setSelectedUserLists] = useState<Record<string, JiraUser[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<JiraFieldErrors>({})
 
@@ -115,6 +116,9 @@ function TransitionFieldsForm({
                 selectedUser: selectedUsers[field.key] ?? null,
                 onSelectUser: (user) =>
                   setSelectedUsers((previous) => ({ ...previous, [field.key]: user })),
+                selectedUsers: selectedUserLists[field.key] ?? [],
+                onSelectUsers: (users) =>
+                  setSelectedUserLists((previous) => ({ ...previous, [field.key]: users })),
                 providerSettings,
                 siteId: request.siteId
               }}

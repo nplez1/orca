@@ -262,9 +262,12 @@ export type JiraEditableField = {
   /** The current value as a control draft, '' when the field is unset. For a user
    *  field this is the accountId (Cloud) or username (Server/DC) the ref needs. */
   value: string
-  /** The current user's display name, so a picker shows a name rather than an id
-   *  before any search runs. Absent for non-user fields. */
+  /** The display names behind a user-field draft, so a picker shows names rather than
+   *  ids before any search runs. Absent for non-user fields. */
   displayName?: string
+  /** The users a multi-user field already holds, in draft order, so the picker can name
+   *  each of them without a search. Absent for every other field. */
+  users?: JiraUser[]
 }
 
 export type JiraIssueFilter = 'assigned' | 'reported' | 'all' | 'done'

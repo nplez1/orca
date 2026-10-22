@@ -110,6 +110,8 @@ export function useJiraUserSearch({
 
   useEffect(() => {
     if (!active) {
+      // Why: a lookup abandoned by closing the picker must not leave it spinning.
+      setLoading(false)
       return
     }
     let cancelled = false
