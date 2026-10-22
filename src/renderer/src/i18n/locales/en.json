@@ -791,6 +791,13 @@
                     }
                   }
                 }
+              },
+              "rename": {
+                "across": {
+                  "hosts": {
+                    "3b80b33a5a": "Renamed on every other host, but {{hosts}} did not take the new name."
+                  }
+                }
               }
             }
           },

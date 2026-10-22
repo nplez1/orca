@@ -82,10 +82,11 @@ export const mockApi = {
     forceDeletePreservedBranch: stubMock().mockResolvedValue({ deleted: true }),
     resolvePrBase: stubMock(),
     resolveMrBase: stubMock(),
+    // Matches the real IPC payload: a host-qualified write names the host it targets.
     updateMeta:
-      stubMock<[{ worktreeId: string; updates: Partial<WorktreeMeta> }]>().mockResolvedValue(
-        undefined
-      ),
+      stubMock<
+        [{ worktreeId: string; executionHostId?: string; updates: Partial<WorktreeMeta> }]
+      >().mockResolvedValue(undefined),
     updateLineage: stubMock().mockResolvedValue(null)
   },
   pty: {
