@@ -1,5 +1,6 @@
 import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
 import { isJiraTextAreaField } from '../../../shared/jira-field-rendering'
+import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
 
 // 'assignee' is system here because the dialog renders a dedicated picker for it.
 const JIRA_CREATE_SYSTEM_FIELD_KEYS = new Set([
@@ -90,10 +91,7 @@ export function buildJiraCreateFieldValue(field: JiraCreateField, draftValue: st
     return undefined
   }
   if (field.schema?.type === 'array') {
-    const parts = trimmed
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
+    const parts = splitJiraFieldDraft(trimmed)
     if (field.allowedValues?.length) {
       return parts.map((part) =>
         getJiraCreateOptionPayload(findJiraCreateAllowedValue(field, part), part)

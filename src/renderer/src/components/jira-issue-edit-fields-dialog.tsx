@@ -7,6 +7,7 @@ import type {
   JiraUser
 } from '../../../shared/jira-types'
 import { isJiraTextAreaField, isJiraUserField } from '../../../shared/jira-field-rendering'
+import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { buildJiraCreateFieldValue } from '@/components/task-page-jira-create-fields'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
 import { Button } from '@/components/ui/button'
@@ -35,9 +36,22 @@ function selectedUserFor(entry: JiraEditableField): JiraUser | null {
   return { accountId: entry.value, displayName: entry.displayName ?? entry.value }
 }
 
-/** The people a multi-user field already holds, empty for a single-user field. */
+/** The people a multi-user field already holds. A host that predates `users` reports only
+ *  the joined names beside the ids, so pair them back up rather than showing bare
+ *  accountIds; when the counts do not line up, the caller keeps the name hint instead. */
 function selectedUsersFor(entry: JiraEditableField): JiraUser[] {
-  return entry.users ?? []
+  if (entry.users) {
+    return entry.users
+  }
+  const ids = splitJiraFieldDraft(entry.value)
+  const names = (entry.displayName ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  if (ids.length === 0 || names.length !== ids.length) {
+    return []
+  }
+  return ids.map((id, index) => ({ accountId: id, displayName: names[index] }))
 }
 
 function EditFieldsForm({

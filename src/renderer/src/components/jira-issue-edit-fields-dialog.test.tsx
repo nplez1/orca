@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraEditableField, JiraIssue } from '../../../shared/jira-types'
+import type { JiraCreateField, JiraEditableField, JiraIssue } from '../../../shared/jira-types'
 import { JiraIssueEditFieldsDialog } from './jira-issue-edit-fields-dialog'
 
 vi.mock('@/runtime/runtime-jira-client', () => ({
@@ -36,7 +36,108 @@ function textField(value: string): JiraEditableField {
 
 afterEach(cleanup)
 
+const QES_FIELD: JiraCreateField = {
+  key: 'customfield_13',
+  name: 'QEs',
+  required: false,
+  schema: { type: 'array', items: 'user' }
+}
+
 describe('JiraIssueEditFieldsDialog', () => {
+  // The reporter's second field: a person list that used to show accountIds.
+  it('names the people a multi-user field holds and submits their ids', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[
+          {
+            field: QES_FIELD,
+            value: 'u-ada, u-grace',
+            users: [
+              { accountId: 'u-ada', displayName: 'Ada Lovelace' },
+              { accountId: 'u-grace', displayName: 'Grace Hopper' }
+            ]
+          }
+        ]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={onSubmit}
+      />
+    )
+
+    const trigger = screen.getByRole('combobox')
+    expect(trigger.textContent).toContain('Ada Lovelace, Grace Hopper')
+    expect(document.body.textContent).not.toContain('u-ada')
+
+    await user.click(trigger)
+    await user.click(await screen.findByRole('option', { name: /Ada Lovelace/ }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        customFields: { customfield_13: ['u-grace'] },
+        userFieldKeys: ['customfield_13'],
+        textFieldKeys: []
+      })
+    )
+  })
+
+  // A host that predates the per-user names sends only the joined hint; pairing the two
+  // back up is what keeps the picker from showing bare accountIds against it.
+  it("pairs an older host's joined names back onto its accountIds", () => {
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[
+          {
+            field: QES_FIELD,
+            value: 'u-ada, u-grace',
+            displayName: 'Ada Lovelace, Grace Hopper'
+          }
+        ]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={vi.fn()}
+      />
+    )
+
+    const trigger = screen.getByRole('combobox')
+    expect(trigger.textContent).toContain('Ada Lovelace, Grace Hopper')
+    expect(trigger.textContent).not.toContain('u-ada')
+    // Named, so the hint the text box needed would only repeat the trigger.
+    expect(document.body.textContent).not.toContain('Current:')
+  })
+
+  // When the joined names cannot be lined up with the ids — a name holding a comma, or a
+  // count Jira left short — the hint is the only readable form left, so it stays.
+  it("keeps the name hint when an older host's names cannot be paired", () => {
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[
+          {
+            field: QES_FIELD,
+            value: 'u-ada, u-grace',
+            displayName: 'Ada Lovelace, Hopper, Grace'
+          }
+        ]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={vi.fn()}
+      />
+    )
+
+    expect(document.body.textContent).toContain('Current: Ada Lovelace, Hopper, Grace')
+  })
+
   it('submits only the fields the user changed', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue({ ok: true })

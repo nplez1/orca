@@ -2,7 +2,7 @@ import type { JiraCreateField, JiraUser } from '../../../shared/jira-types'
 import { resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
 import { joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'
-import { JiraUserMultiPicker } from '@/components/jira-user-multi-picker'
+import { JiraUserMultiPicker, jiraHeldUsers } from '@/components/jira-user-multi-picker'
 import { JiraUserPicker, type JiraUserPickerFixedOption } from '@/components/jira-user-picker'
 import { getJiraCreateAllowedValueLabel } from '@/components/task-page-jira-create-fields'
 import { Input } from '@/components/ui/input'
@@ -89,22 +89,35 @@ export function JiraSchemaFieldControl({
     )
   }
   if (kind === 'userList' && userField) {
+    const held = jiraHeldUsers(userField.selectedUsers ?? [], value)
+    // A host too old to report names leaves the ids standing in for them; the joined
+    // names it does still send are the only readable form of the value then.
+    const unnamed = held.some((user) => user.displayName === user.accountId)
     return (
-      <JiraUserMultiPicker
-        providerSettings={userField.providerSettings}
-        siteId={userField.siteId}
-        value={value}
-        users={userField.selectedUsers ?? []}
-        onChange={(users) => {
-          userField.onSelectUsers?.(users)
-          onValueChange(joinJiraFieldDraft(users.map((user) => user.accountId)))
-        }}
-        disabled={disabled}
-        label={field.name}
-        placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
-          value0: field.name
-        })}
-      />
+      <div className="flex min-w-0 flex-col gap-1">
+        <JiraUserMultiPicker
+          providerSettings={userField.providerSettings}
+          siteId={userField.siteId}
+          value={value}
+          users={userField.selectedUsers ?? []}
+          onChange={(users) => {
+            userField.onSelectUsers?.(users)
+            onValueChange(joinJiraFieldDraft(users.map((user) => user.accountId)))
+          }}
+          disabled={disabled}
+          label={field.name}
+          placeholder={translate('auto.components.TaskPage.1f0fce91e3', 'Select {{value0}}', {
+            value0: field.name
+          })}
+        />
+        {unnamed && displayValue && displayValue !== value ? (
+          <p className="text-[11px] text-muted-foreground">
+            {translate('components.jiraSchemaField.currentValue', 'Current: {{value0}}', {
+              value0: displayValue
+            })}
+          </p>
+        ) : null}
+      </div>
     )
   }
   if (kind === 'optionList' && field.allowedValues?.length) {

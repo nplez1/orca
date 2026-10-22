@@ -23,6 +23,13 @@ function isEditableCustomField(field: JiraCreateField, meta: JiraRecord): boolea
   return resolveJiraFieldControlKind(field) !== null
 }
 
+/** The human-readable label for an option value, for a name-bearing hint beside a
+ *  control that has to hold the id the submission needs. */
+function optionLabel(value: unknown): string {
+  const record = asRecord(value)
+  return asString(record.name) || asString(record.value) || asString(record.id)
+}
+
 /** The token an option control should hold: whichever form the allowed-value
  *  list can match back on, falling back to the value the response carried. */
 function optionDraft(field: JiraCreateField, value: unknown): string {
@@ -64,7 +71,7 @@ function heldUser(user: { id: string; displayName?: string }): JiraUser {
 function describeEditableValue(
   field: JiraCreateField,
   raw: unknown
-): Pick<JiraEditableField, 'value' | 'displayName'> {
+): Pick<JiraEditableField, 'value' | 'displayName' | 'users'> {
   const kind = resolveJiraFieldControlKind(field)
   if (kind === 'user') {
     const user = userDraft(raw)
@@ -72,18 +79,23 @@ function describeEditableValue(
   }
   if (kind === 'userList') {
     const entries = (Array.isArray(raw) ? raw : []).map(userDraft).filter((user) => user.id)
-    // Why no displayName: the picker names each held person itself, so a joined hint
-    // beside it would only repeat them.
+    const names = entries.map((user) => user.displayName).filter(Boolean)
+    // The joined hint stays for a renderer that predates `users` and still renders the
+    // text box; the picker here ignores it, naming each person from `users` instead.
     return {
       value: joinJiraFieldDraft(entries.map((user) => user.id)),
+      ...(names.length > 0 ? { displayName: names.join(', ') } : {}),
       ...(entries.length > 0 ? { users: entries.map(heldUser) } : {})
     }
   }
   if (Array.isArray(raw)) {
-    // Why no displayName: an option list names its own options, and a string list's
-    // values are already what the user typed, so neither needs a hint beside it.
+    // The joined labels stay for a renderer that predates the option list control and still
+    // draws the text box: there they are the only readable form of the value. A string
+    // list's entries carry no label, so it gets none.
+    const labels = raw.map(optionLabel).filter(Boolean)
     return {
-      value: joinJiraFieldDraft(raw.map((entry) => optionDraft(field, entry)).filter(Boolean))
+      value: joinJiraFieldDraft(raw.map((entry) => optionDraft(field, entry)).filter(Boolean)),
+      ...(labels.length > 0 ? { displayName: labels.join(', ') } : {})
     }
   }
   if (raw === null || raw === undefined) {

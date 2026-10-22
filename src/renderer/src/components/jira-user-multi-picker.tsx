@@ -14,7 +14,9 @@ import { translate } from '@/i18n/i18n'
  *  be removed. */
 export function jiraHeldUsers(users: readonly JiraUser[], value: string): JiraUser[] {
   const byId = new Map(users.map((user) => [user.accountId, user]))
-  return splitJiraFieldDraft(value).map(
+  // Why dedupe: two draft entries naming the same person would give duplicate keys and a
+  // payload Jira rejects.
+  return [...new Set(splitJiraFieldDraft(value))].map(
     (token) => byId.get(token) ?? { accountId: token, displayName: token }
   )
 }
@@ -122,17 +124,22 @@ export function JiraUserMultiPicker({
               <CommandItem
                 key={user.accountId}
                 value={user.accountId}
+                aria-checked
                 data-state="checked"
                 onSelect={() => toggle(user)}
               >
                 <Check className="size-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{user.displayName}</span>
+                {user.email ? (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{user.email}</span>
+                ) : null}
               </CommandItem>
             ))}
             {results.map((user) => (
               <CommandItem
                 key={user.accountId}
                 value={user.accountId}
+                aria-checked={false}
                 data-state="unchecked"
                 onSelect={() => toggle(user)}
               >
@@ -143,13 +150,18 @@ export function JiraUserMultiPicker({
                 ) : null}
               </CommandItem>
             ))}
+            {results.length === 0 && !loading ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">
+                {held.length > 0
+                  ? translate(
+                      'components.jiraUserMultiPicker.noOtherMatch',
+                      'No other users match.'
+                    )
+                  : translate('components.jiraUserPicker.empty', 'No users found')}
+              </p>
+            ) : null}
           </CommandList>
         </Command>
-        {results.length === 0 && held.length === 0 && !loading ? (
-          <p className="px-3 py-2 text-xs text-muted-foreground">
-            {translate('components.jiraUserPicker.empty', 'No users found')}
-          </p>
-        ) : null}
       </PopoverContent>
     </Popover>
   )

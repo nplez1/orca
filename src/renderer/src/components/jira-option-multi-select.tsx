@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import type { JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
+import { splitJiraFieldDraft, joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import {
   findJiraCreateAllowedValue,
   getJiraCreateAllowedValueLabel
@@ -24,14 +25,6 @@ import { translate } from '@/i18n/i18n'
  */
 export function jiraOptionToken(option: JiraCreateFieldAllowedValue): string {
   return option.id ?? option.value ?? option.name ?? ''
-}
-
-/** The option tokens in a comma-separated draft. */
-function jiraOptionTokens(value: string): string[] {
-  return value
-    .split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
 }
 
 /** Searchable by label only: an option's `value` is its id, so matching on it would
@@ -62,7 +55,7 @@ export function jiraOptionLabels(
   options: readonly JiraCreateFieldAllowedValue[],
   value: string
 ): string[] {
-  return jiraOptionTokens(value).map((token) => {
+  return splitJiraFieldDraft(value).map((token) => {
     const option = jiraOptionForToken(options, token)
     return option ? getJiraCreateAllowedValueLabel(option) : token
   })
@@ -103,7 +96,7 @@ export function JiraOptionMultiSelect({
   const selectedLabels = useMemo(() => jiraOptionLabels(options, value), [options, value])
   // Canonical tokens the draft already names, whatever form each one arrived in.
   const selected = useMemo(
-    () => new Set(jiraOptionTokens(value).map((token) => canonicalToken(options, token))),
+    () => new Set(splitJiraFieldDraft(value).map((token) => canonicalToken(options, token))),
     [options, value]
   )
   // A value Jira no longer offers is still on the issue. It gets its own checked row,
@@ -114,11 +107,11 @@ export function JiraOptionMultiSelect({
   }, [entries, selected])
 
   const toggle = (token: string): void => {
-    const held = jiraOptionTokens(value).map((entry) => canonicalToken(options, entry))
+    const held = splitJiraFieldDraft(value).map((entry) => canonicalToken(options, entry))
     const next = selected.has(token) ? held.filter((entry) => entry !== token) : [...held, token]
     // Why the set: two draft entries can name the same option, and Jira rejects the
     // same id twice in one payload.
-    onValueChange([...new Set(next)].join(', '))
+    onValueChange(joinJiraFieldDraft([...new Set(next)]))
   }
 
   return (
@@ -167,6 +160,7 @@ export function JiraOptionMultiSelect({
                     key={entry.token}
                     value={entry.token}
                     keywords={[entry.label]}
+                    aria-checked={isSelected}
                     data-state={isSelected ? 'checked' : 'unchecked'}
                     onSelect={() => toggle(entry.token)}
                   >

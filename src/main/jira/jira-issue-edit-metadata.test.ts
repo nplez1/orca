@@ -149,12 +149,13 @@ describe('Jira issue edit metadata', () => {
 
     const [field] = await listEditFields('ALP-1', 'site-1')
 
-    // The control names these options itself, so no hint is built for it.
     expect(field).toEqual({
       field: expect.objectContaining({ key: 'customfield_10062' }),
-      value: '184354, 184357'
+      value: '184354, 184357',
+      // Kept for a renderer that predates the option list control and still shows the text
+      // box; there the labels are the only readable form of the value.
+      displayName: 'mac-intel, win-arm'
     })
-    expect(field.displayName).toBeUndefined()
   })
 
   it('drafts a multi-user field with the people it holds', async () => {
@@ -184,16 +185,16 @@ describe('Jira issue edit metadata', () => {
 
     const [field] = await listEditFields('ALP-1', 'site-1')
 
-    // The picker names each person, so there is no joined hint to build.
     expect(field).toEqual({
       field: expect.objectContaining({ key: 'customfield_10013' }),
       value: 'u-ada, u-grace',
+      // Kept for a renderer that predates `users` and still shows the text box.
+      displayName: 'Ada Lovelace, Grace Hopper',
       users: [
         { accountId: 'u-ada', displayName: 'Ada Lovelace' },
         { accountId: 'u-grace', displayName: 'Grace Hopper' }
       ]
     })
-    expect(field.displayName).toBeUndefined()
   })
 
   it('drafts a string list from the entries themselves', async () => {
