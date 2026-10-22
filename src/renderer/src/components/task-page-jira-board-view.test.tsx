@@ -196,7 +196,39 @@ describe('Jira board moves', () => {
     )
   })
 
-  it('leaves unsupported required fields in Jira', async () => {
+  it('moves without asking when the issue already fills the required fields', async () => {
+    // Why: Jira flags the field required by the transition's screen, not by this
+    // issue's emptiness, so a filled Component/s or Team must not block the move.
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            currentValue: '10400',
+            schema: { type: 'array', items: 'string' }
+          },
+          {
+            key: 'customfield_10002',
+            name: 'Team',
+            required: true,
+            currentValue: 'team-1',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mount()
+    await move()
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, { transitionId: 'done' })
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('collects a required field the issue does not fill', async () => {
     mocks.transitions.mockResolvedValue([
       {
         ...transition,
@@ -205,17 +237,133 @@ describe('Jira board moves', () => {
             key: 'customfield_42',
             name: 'Release approval',
             required: true,
-            schema: { type: 'array' }
+            schema: { type: 'string' }
           }
         ]
       }
     ])
     mount()
     await move()
-    await screen.findByText('Jira requires fields Orca cannot collect yet: Release approval.')
-    expect(screen.getByRole('button', { name: 'Open in Jira' })).toBeTruthy()
+    const input = await screen.findByPlaceholderText('Enter Release approval')
     expect(mocks.apply).not.toHaveBeenCalled()
-    expect(mocks.patch).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, {
+        transitionId: 'done',
+        transitionFields: { customfield_42: 'approved' }
+      })
+    )
+  })
+
+  it('leaves a field the issue already fills out of the submission', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            currentValue: 'approved',
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mount()
+    await move()
+    // Why: a value the issue already holds stays untouched unless the user changes it.
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenCalledWith(target, issue, { transitionId: 'done' })
+    )
+  })
+
+  it('names the field Jira rejects and keeps the form open to fix it', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        ...transition,
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        // Why the same sentence: the host joins Jira's field errors into `message`, so
+        // this is what a real refusal carries, and the form must not print it twice.
+        error: 'Release approval must be Approved.',
+        fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    // Why exactly once: Jira's message already joins its field errors, so the banner
+    // must not repeat the sentence the control beneath it carries.
+    await waitFor(() =>
+      expect(screen.getAllByText('Release approval must be Approved.')).toHaveLength(1)
+    )
+    fireEvent.change(input, { target: { value: 'Approved' } })
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.apply).toHaveBeenLastCalledWith(target, issue, {
+        transitionId: 'done',
+        transitionFields: { customfield_42: 'Approved' }
+      })
+    )
+  })
+
+  it('reports a refusal that names no field of the transition', async () => {
+    // Why: a key outside the transition's own fields opens no control, so a dialog that
+    // suppresses its sentence just because field errors exist would show nothing at all.
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        error: 'You do not have permission to set Close reason.',
+        fieldErrors: { customfield_99: 'You do not have permission to set Close reason.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    await screen.findByText('You do not have permission to set Close reason.')
+    expect(mocks.apply).toHaveBeenCalledTimes(1)
+  })
+
+  it("shows Jira's workflow message for a refusal that names no transition field", async () => {
+    // Why: readJiraErrorDetail folds errorMessages into `message`, and a field-level
+    // display would otherwise hide the workflow half entirely.
+    mocks.apply.mockResolvedValueOnce({
+      result: {
+        ok: false,
+        error: 'Approval task not complete; Close reason is not allowed.',
+        errorMessages: ['Approval task not complete'],
+        fieldErrors: { customfield_99: 'Close reason is not allowed.' }
+      },
+      latest: null
+    })
+    mount()
+    await move()
+    await screen.findByText('Approval task not complete; Close reason is not allowed.')
+    expect(mocks.apply).toHaveBeenCalledTimes(1)
   })
 
   it('rolls back a rejected mutation and keeps its error available for Retry', async () => {

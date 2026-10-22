@@ -916,6 +916,15 @@ upstream's ad-hoc status board over the current result set (`jiraViewMode`, curr
 host-targeted). Both are deliberate for now; unifying them into one control is a UI decision that
 should not be made inside a sync.
 
+**2026-10-22 — the required-fields half of that follow-up landed, on the fork's shape.** Adopting
+upstream `#28588`'s classifier on the detail pane and the ad-hoc board reintroduced a `local(jira)`
+regression rather than converging anything: it collected only `resolution` + `comment` and refused
+every other required field, including fields the issue already fills, because Jira's `required` flag
+describes the transition screen and not the issue. The two boards are still two surfaces; what is now
+shared is the fields collector — one form, seeded from the issue's own values, on all three surfaces.
+The patch and its anchors are in [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) § `local(jira)`. The two
+board surfaces stay as they are.
+
 **Do not:** re-litigate the Jira overlap per sync. The fork's implementations of the assignee,
 board, sprint-filter and required-fields ideas are the ones upstream superseded; re-adding them means
 re-resolving these same 30 paths next time.

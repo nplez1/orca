@@ -8,9 +8,21 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
-import { JiraTransitionFieldsForm } from './jira-transition-fields-form'
-import { classifyTransitionRequirements } from '../../../shared/jira-transition-fields'
-import type { JiraIssue, JiraIssueUpdate, JiraTransition } from '../../../shared/jira-types'
+import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import {
+  JiraTransitionFieldsForm,
+  type JiraTransitionSubmitOutcome
+} from './jira-transition-fields-form'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../shared/jira-transition-fields'
+import type {
+  JiraFieldErrors,
+  JiraIssue,
+  JiraIssueUpdate,
+  JiraTransition
+} from '../../../shared/jira-types'
 
 export type JiraBoardMovePrompt = {
   issue: JiraIssue
@@ -18,27 +30,39 @@ export type JiraBoardMovePrompt = {
   transitions: JiraTransition[]
   selected: JiraTransition | null
   error: string | null
+  /** Jira's field-level refusal from the last attempt, so the field it names is
+   *  asked for again and can be changed. */
+  fieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from that refusal, which a field-level display hides. */
+  errorMessages?: string[]
   loading: boolean
 }
 
 type Props = {
   prompt: JiraBoardMovePrompt | null
   pending: boolean
+  providerSettings?: RuntimeJiraSettings
   onClose: () => void
   onChoose: (transition: JiraTransition) => void
-  onSubmit: (updates: JiraIssueUpdate) => Promise<void>
+  onSubmit: (updates: JiraIssueUpdate) => Promise<JiraTransitionSubmitOutcome>
   onRetry: () => void
 }
 
 export function JiraBoardMoveDialog({
   prompt,
   pending,
+  providerSettings,
   onClose,
   onChoose,
   onSubmit,
   onRetry
 }: Props): React.JSX.Element {
-  const requirement = prompt?.selected ? classifyTransitionRequirements(prompt.selected) : null
+  const forcedFieldKeys = prompt?.selected
+    ? rejectedTransitionFieldKeys(prompt.selected, prompt.fieldErrors)
+    : new Set<string>()
+  const requirement = prompt?.selected
+    ? classifyTransitionRequirements(prompt.selected, forcedFieldKeys)
+    : null
   return (
     <Dialog
       open={prompt !== null}
@@ -90,25 +114,23 @@ export function JiraBoardMoveDialog({
             ))}
           </div>
         ) : null}
-        {requirement?.kind === 'unsupported' ? (
-          <p className="text-sm text-muted-foreground">
-            {translate(
-              'jira.transitions.unsupported',
-              'Jira requires fields Orca cannot collect yet: {{fields}}.',
-              { fields: requirement.fields.map((field) => field.name).join(', ') }
-            )}
-          </p>
-        ) : null}
         {requirement?.kind === 'form' && prompt?.selected ? (
           <JiraTransitionFieldsForm
             key={prompt.selected.id}
             transition={prompt.selected}
             pending={pending}
+            providerSettings={providerSettings}
+            siteId={prompt.issue.siteId}
+            forcedFieldKeys={forcedFieldKeys}
+            rejectedFieldErrors={prompt.fieldErrors}
+            rejectedErrorMessages={prompt.errorMessages}
+            errorReason={prompt.error}
+            issueUrl={prompt.issue.url}
             onBack={onClose}
             onSubmit={onSubmit}
           />
         ) : null}
-        {prompt && (prompt.error || requirement?.kind === 'unsupported') ? (
+        {prompt && prompt.error ? (
           <div className="flex justify-end gap-2">
             <Button variant="ghost" disabled={pending} onClick={onClose}>
               {translate('jira.board.cancel', 'Cancel')}

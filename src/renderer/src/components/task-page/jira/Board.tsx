@@ -290,10 +290,11 @@ export function TaskPageJiraBoard({
         request={
           drop.pendingTransitionFields
             ? {
-                issueKey: drop.pendingTransitionFields.issue.key,
-                transitionName: drop.pendingTransitionFields.transition.name,
-                siteId: drop.pendingTransitionFields.issue.siteId,
-                fields: drop.pendingTransitionFields.fields
+                issue: drop.pendingTransitionFields.issue,
+                transition: drop.pendingTransitionFields.transition,
+                rejectedFieldErrors: drop.pendingTransitionFields.rejectedFieldErrors,
+                errorMessages: drop.pendingTransitionFields.errorMessages,
+                error: drop.pendingTransitionFields.error
               }
             : null
         }

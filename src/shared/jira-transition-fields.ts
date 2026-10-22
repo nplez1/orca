@@ -1,4 +1,9 @@
-import type { JiraCreateField, JiraCreateFieldAllowedValue, JiraTransition } from './jira-types'
+import type {
+  JiraCreateField,
+  JiraCreateFieldAllowedValue,
+  JiraFieldErrors,
+  JiraTransition
+} from './jira-types'
 
 export type JiraTransitionRequirement =
   | { kind: 'none' }
@@ -6,9 +11,7 @@ export type JiraTransitionRequirement =
       kind: 'form'
       resolution: JiraCreateField | null
       commentRequired: boolean
-    }
-  | {
-      kind: 'unsupported'
+      /** Everything else the screen requires and the issue does not already fill. */
       fields: JiraCreateField[]
     }
 
@@ -20,31 +23,82 @@ function isCommentField(field: JiraCreateField): boolean {
   return field.key === 'comment' && !field.schema?.custom
 }
 
-export function requiredTransitionFields(transition: JiraTransition): JiraCreateField[] {
+/**
+ * Why: Jira flags a field required by the transition's screen, not by this
+ * issue's emptiness, so a field the issue already fills is not input the user
+ * owes — asking for it turns a move Jira would accept into a blocked one.
+ * Resolution and the comment are exempt: a workflow can demand the user set
+ * them on this transition even when a value already exists.
+ */
+function issueFillsField(field: JiraCreateField): boolean {
+  if (isResolutionField(field) || isCommentField(field)) {
+    return false
+  }
+  // Why both: `hasCurrentValue` covers a shape no control can seed from, and
+  // `currentValue` is what a host from before that flag sends.
+  return field.hasCurrentValue === true || Boolean(field.currentValue?.trim())
+}
+
+export function requiredTransitionFields(
+  transition: JiraTransition,
+  /** Fields Jira rejected by name, asked for again even though they look filled. */
+  forcedFieldKeys?: ReadonlySet<string>
+): JiraCreateField[] {
   // Why: a field Jira will default itself is not input the user owes us; prompting
   // for it turns a valid move into a blocked one.
-  return (transition.fields ?? []).filter(
-    (field) => field.required && field.hasDefaultValue !== true
-  )
+  return (transition.fields ?? []).filter((field) => {
+    // Why a forced key overrides the other rules: Jira refused this field, and a
+    // validator on an *optional* or defaulted screen field is a common way to refuse —
+    // skipping it again because it is not `required` would report the refusal with no
+    // control behind it.
+    if (forcedFieldKeys?.has(field.key) === true) {
+      return true
+    }
+    return field.required && field.hasDefaultValue !== true && !issueFillsField(field)
+  })
+}
+
+/**
+ * The fields a rejection names, so a skipped field can be asked for again instead
+ * of dead-ending on a value Orca will not touch. A value that went stale, or a
+ * validator that demands the field be set on this transition, both arrive here
+ * rather than as a sentence with nowhere to act on it.
+ */
+export function rejectedTransitionFieldKeys(
+  transition: JiraTransition,
+  fieldErrors: JiraFieldErrors | undefined
+): ReadonlySet<string> {
+  const rejected = new Set(Object.keys(fieldErrors ?? {}))
+  const forced = new Set<string>()
+  for (const field of transition.fields ?? []) {
+    if (rejected.has(field.key)) {
+      forced.add(field.key)
+    }
+  }
+  return forced
 }
 
 export function classifyTransitionRequirements(
-  transition: JiraTransition
+  transition: JiraTransition,
+  forcedFieldKeys?: ReadonlySet<string>
 ): JiraTransitionRequirement {
-  const required = requiredTransitionFields(transition)
+  const required = requiredTransitionFields(transition, forcedFieldKeys)
   if (required.length === 0) {
     return { kind: 'none' }
   }
 
   let resolution: JiraCreateField | null = null
   let commentRequired = false
-  const unsupported: JiraCreateField[] = []
+  const fields: JiraCreateField[] = []
+  const seen = new Set<string>()
 
   for (const field of required) {
-    if (required.filter((other) => other.key === field.key).length > 1) {
-      unsupported.push(field)
+    // Why: Jira can list one field twice; one control holds it, and asking twice
+    // would submit the same key and lose whichever value the user typed second.
+    if (seen.has(field.key)) {
       continue
     }
+    seen.add(field.key)
     if (
       isResolutionField(field) &&
       field.allowedValues?.some((value) => transitionAllowedValueKey(value))
@@ -56,14 +110,10 @@ export function classifyTransitionRequirements(
       commentRequired = true
       continue
     }
-    unsupported.push(field)
+    fields.push(field)
   }
 
-  if (unsupported.length > 0) {
-    return { kind: 'unsupported', fields: unsupported }
-  }
-
-  return { kind: 'form', resolution, commentRequired }
+  return { kind: 'form', resolution, commentRequired, fields }
 }
 
 export function transitionAllowedValueLabel(value: JiraCreateFieldAllowedValue): string {

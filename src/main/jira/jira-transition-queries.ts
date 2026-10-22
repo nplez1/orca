@@ -3,6 +3,7 @@ import type { JiraProjectStatusOrder, JiraTransition } from '../../shared/jira-t
 import { acquire, release } from './request-queue'
 import { apiBasePath, JiraApiError, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
+import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField, mapStatus } from './jira-issue-mapping'
 import {
   asFiniteNumber,
@@ -12,6 +13,85 @@ import {
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
+
+/**
+ * Whether Jira reported any value at all for a field. Decided from the raw value
+ * rather than from the draft, because a shape Orca has no control for (a team
+ * object, a parent issue) still means the issue fills the field.
+ */
+function holdsValue(raw: unknown): boolean {
+  if (raw === null || raw === undefined) {
+    return false
+  }
+  if (typeof raw === 'string') {
+    return raw.trim() !== ''
+  }
+  if (Array.isArray(raw)) {
+    return raw.length > 0
+  }
+  return typeof raw === 'object' ? Object.keys(asRecord(raw)).length > 0 : true
+}
+
+/**
+ * Attaches the value the issue already holds to each required transition field.
+ * Jira's `required` is the transition screen's own flag, not a statement that the
+ * issue is missing the field, so the values are what tell a field the user owes
+ * from one that is already filled. Best effort: a failed read leaves every field
+ * asked for, which is the behaviour without it.
+ */
+async function attachCurrentValues(
+  entry: ReturnType<typeof getClients>[number],
+  key: string,
+  transitions: JiraTransition[]
+): Promise<void> {
+  const keys = new Set<string>()
+  for (const transition of transitions) {
+    for (const field of transition.fields ?? []) {
+      // Why not the comment: it is not an issue field, so it has no value to read.
+      if (field.required && field.key !== 'comment') {
+        keys.add(field.key)
+      }
+    }
+  }
+  if (keys.size === 0) {
+    return
+  }
+  const requested = [...keys].map((fieldKey) => encodeURIComponent(fieldKey)).join(',')
+  try {
+    const response = await jiraRequest<JiraRecord>(
+      entry,
+      `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}?fields=${requested}`
+    )
+    const values = asRecord(asRecord(response).fields)
+    for (const transition of transitions) {
+      for (const field of transition.fields ?? []) {
+        const raw = values[field.key]
+        if (!holdsValue(raw)) {
+          continue
+        }
+        field.hasCurrentValue = true
+        const draft = describeFieldDraft(field, raw)
+        if (!draft.value.trim()) {
+          continue
+        }
+        field.currentValue = draft.value
+        if (draft.displayName?.trim()) {
+          field.currentDisplayValue = draft.displayName
+        }
+        if (draft.users?.length) {
+          field.currentUsers = draft.users
+        }
+      }
+    }
+  } catch (error) {
+    // Why rethrow auth: a dead token must not read as "these fields are empty".
+    if (isAuthError(error)) {
+      clearToken(entry.site.id)
+      throw error
+    }
+    console.warn('[jira] transition field values failed:', error)
+  }
+}
 
 export async function listTransitions(
   key: string,
@@ -36,7 +116,7 @@ export async function listTransitions(
       }
       response = await jiraRequest(entry, issuePath)
     }
-    return (response.transitions ?? []).map((transition) => ({
+    const transitions = (response.transitions ?? []).map((transition) => ({
       id: asString(transition.id),
       name: asString(transition.name),
       to: mapStatus(transition.to),
@@ -46,6 +126,8 @@ export async function listTransitions(
             .filter((field) => field !== null)
         : undefined
     }))
+    await attachCurrentValues(entry, key, transitions)
+    return transitions
   } catch (error) {
     if (isAuthError(error)) {
       clearToken(entry.site.id)

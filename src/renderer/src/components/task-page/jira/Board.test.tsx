@@ -694,7 +694,9 @@ describe('TaskPageJiraBoard', () => {
     dragCardOnto(card, doingColumn, sprintIssue.key)
 
     await user.type(await screen.findByPlaceholderText('Enter Dev'), 'platform')
-    await user.click(screen.getByRole('button', { name: 'Apply and move' }))
+    // Why 'Change status': every surface renders the same fields form, so the
+    // board drop submits with the label the status control uses.
+    await user.click(screen.getByRole('button', { name: 'Change status' }))
 
     await waitFor(() =>
       expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(

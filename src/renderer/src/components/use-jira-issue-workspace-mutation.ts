@@ -6,7 +6,7 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
-import { enqueueJiraIssueMutation } from './jira-issue-mutation-queue'
+import { enqueueJiraIssueMutation, JiraMutationFailure } from './jira-issue-mutation-queue'
 import {
   editedJiraIssueFields,
   type EditableJiraIssueField
@@ -136,7 +136,18 @@ export function useJiraIssueWorkspaceMutation({
         if (!options?.reportsInline) {
           toast.error(message)
         }
-        return { ok: false, error: message }
+        // Why carried through: a transition's refusal names the fields it refused,
+        // and a surface that shows them inline has nothing to show without this.
+        return {
+          ok: false,
+          error: message,
+          ...(error instanceof JiraMutationFailure && error.fieldErrors
+            ? { fieldErrors: error.fieldErrors }
+            : {}),
+          ...(error instanceof JiraMutationFailure && error.errorMessages
+            ? { errorMessages: error.errorMessages }
+            : {})
+        }
       } finally {
         if (scopeGeneration === scopeGenerationRef.current) {
           setPendingField(null)

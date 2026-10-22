@@ -51,8 +51,8 @@ export function JiraSchemaFieldControl({
     allowClear?: boolean
   }
   /** Renders a text box for a schema Orca has no control for. The create dialog
-   *  has always done this; the edit and transition forms refuse the field instead
-   *  and name it, because they resubmit a value Jira already holds. */
+   *  has always done this; the edit form refuses the field instead and names it,
+   *  and the transition form falls back only where the issue holds no value. */
   fallbackToText?: boolean
 }): React.JSX.Element | null {
   const kind = resolveJiraFieldControlKind(field)

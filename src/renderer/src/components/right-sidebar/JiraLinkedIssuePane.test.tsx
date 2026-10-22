@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { JiraIssue } from '../../../../shared/jira-types'
@@ -204,7 +204,7 @@ describe('JiraLinkedIssuePane', () => {
     expect(row.textContent).toContain('5')
   })
 
-  it('toasts when a status change fails from the pane', async () => {
+  it('reports a rejected status change beside the Jira link', async () => {
     mocks.jiraGetIssue.mockResolvedValue(issue())
     mocks.jiraIssueComments.mockResolvedValue([])
     mocks.jiraListAssignableUsers.mockResolvedValue([])
@@ -232,7 +232,306 @@ describe('JiraLinkedIssuePane', () => {
     fireEvent.click(statusRow)
     fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Transition rejected'))
+    // Why the dialog and not a toast: this pane reports its own refusals now, so the
+    // sentence lands beside the control and the escape hatch to Jira.
+    expect((await screen.findByRole('alert')).textContent).toContain('Transition rejected')
+    expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+      PANE_OWNER_SOURCE,
+      'ABC-1',
+      { transitionId: '31' },
+      'site-1'
+    )
+  })
+
+  it('shows a non-field refusal in its own dialog, with the refusal copy', async () => {
+    // Why: the fields copy over a permissions/validator refusal would be wrong, and a
+    // toast alone leaves the user with nothing to finish the move from.
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' }
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({
+      ok: false,
+      error: 'You lack the transition permission.'
+    })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('You lack the transition permission.')).toBeTruthy()
+    expect(
+      within(dialog).getByText(
+        'Jira refused this change. Review the reason below, or finish it in Jira.'
+      )
+    ).toBeTruthy()
+    expect(within(dialog).queryByText(/requires these fields/)).toBeNull()
+  })
+
+  it('collects the fields a transition screen requires before posting', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    // Why not posted yet: the screen requires a value, and the pane has no control
+    // for it to guess from.
+    expect(mocks.jiraUpdateIssue).not.toHaveBeenCalled()
+    // Why within the dialog: this pane already holds a title box and a comment editor,
+    // and the translate mock here does not interpolate the field's placeholder.
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        PANE_OWNER_SOURCE,
+        'ABC-1',
+        { transitionId: '31', transitionFields: { customfield_42: 'approved' } },
+        'site-1'
+      )
+    )
+  })
+
+  it('closes the fields dialog once the move is committed', async () => {
+    // Why: a dialog left standing after success offers a Submit that would post the
+    // same transition id against the status it already reached.
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('reopens the fields form when Jira refuses a field the issue already fills', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({
+      ok: false,
+      error: 'Component/s is required.',
+      fieldErrors: { components: 'Component/s is required.' }
+    })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    // One click first, then the refusal brings the field back holding its value.
+    await waitFor(() => expect(mocks.jiraUpdateIssue).toHaveBeenCalledTimes(1))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Component/s is required.')).toBeTruthy()
+    const input = within(dialog).getByRole('textbox')
+    expect(input instanceof HTMLInputElement ? input.value : null).toBe('Web')
+    // Why no toast: this pane reports its own refusals inline.
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
+  it('asks for a refused field that the screen does not mark required', async () => {
+    // A validator on an optional screen field is a common way for Jira to refuse by
+    // field, so the forced key has to override the required/default rules.
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'customfield_77',
+            name: 'Deployment window',
+            required: false,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({
+      ok: false,
+      error: 'Deployment window must be set.',
+      fieldErrors: { customfield_77: 'Deployment window must be set.' }
+    })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Deployment window must be set.')).toBeTruthy()
+    expect(within(dialog).getByRole('textbox')).toBeTruthy()
+  })
+
+  it('moves without a form when the issue already fills the required field', async () => {
+    mocks.jiraGetIssue.mockResolvedValue(issue())
+    mocks.jiraIssueComments.mockResolvedValue([])
+    mocks.jiraListAssignableUsers.mockResolvedValue([])
+    mocks.jiraListPriorities.mockResolvedValue([])
+    mocks.jiraListTransitions.mockResolvedValue([
+      {
+        id: '31',
+        name: 'Done',
+        to: { id: '3', name: 'Done', categoryKey: 'done', categoryName: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.jiraUpdateIssue.mockResolvedValue({ ok: true })
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <JiraLinkedIssuePane linkedIssue={linkedIssue} sourceContext={PANE_OWNER_SOURCE} />
+      </TooltipProvider>
+    )
+
+    const statusRow = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /In Progress/
+    })
+    await waitFor(() => expect(statusRow.disabled).toBe(false))
+    fireEvent.click(statusRow)
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+    await waitFor(() =>
+      expect(mocks.jiraUpdateIssue).toHaveBeenCalledWith(
+        PANE_OWNER_SOURCE,
+        'ABC-1',
+        { transitionId: '31' },
+        'site-1'
+      )
+    )
   })
 
   it('reads through the workspace owner when the link has no task source', async () => {

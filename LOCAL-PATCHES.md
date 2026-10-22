@@ -603,6 +603,91 @@ its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle
 `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
 switch call. `tab-session-history-switch.ts` and three test files import from the new module.
 
+### `local(jira)`: a required transition field the issue already fills is not the user's to fill
+
+After the 2026-10-15 sync, two of the three status-change surfaces refused a transition outright with
+"Jira requires fields Orca cannot collect yet: Team, Component/s." The ticket in the report had both
+fields populated: Jira's `required` flag on `GET /issue/{key}/transitions?expand=transitions.fields`
+is the **transition screen's** flag, not a statement that this issue is missing the field, so the
+block was for a move Jira would have accepted. Upstream `#28588` (`eb1ee8f908`) only ever collected
+`resolution` + `comment` and called everything else `unsupported`; the fork's generic collector
+survived only on the configured agile board (`components/task-page/jira/Board.tsx`), which is why the
+same transition was blocked from the detail pane and the ad-hoc board and attempted from the board.
+
+Converged on the fork's shape, as one collector on all three surfaces:
+
+- `src/shared/jira-transition-fields.ts` — `JiraTransitionRequirement` has **no `unsupported` kind**.
+  `requiredTransitionFields` skips a field whose `currentValue` is set (the `hasDefaultValue`
+  exclusion's sibling), exempting `resolution` and `comment` because a workflow can demand those be set
+  on the transition even when a value exists. The classifier returns the remaining fields to render and
+  de-duplicates a field Jira lists twice instead of refusing the transition over it.
+- `src/main/jira/jira-transition-queries.ts` — `attachCurrentValues` reads the issue for the union of
+  required field keys and attaches `hasCurrentValue` (any value at all) plus `currentValue` /
+  `currentDisplayValue` (that value as a control draft) to each field. The two are separate on purpose:
+  Cloud's Team field holds an object no control can seed, and deciding "filled" from the draft alone
+  asks for a field the issue already has. Best effort: a failed read leaves every field asked for, and
+  an auth failure is rethrown so a dead token cannot read as "these fields are empty".
+- `src/shared/jira-transition-fields.ts` — `rejectedTransitionFieldKeys` lets a rejection undo a skip.
+  A stale value, or a validator that demands the field be set on this transition, comes back as
+  `fieldErrors` naming the field; every surface reopens the form with that field asked for rather than
+  printing a sentence the user cannot act on. `classifyTransitionRequirements` takes the forced keys as
+  an optional second argument, so the call sites that have none are unchanged.
+- `src/main/jira/jira-field-drafts.ts` — **new.** `describeFieldDraft` is the schema-to-draft map lifted
+  out of `jira-issue-edit-metadata.ts`, so a transition field and an edit field show a value the same
+  way. Primitive array entries (team ids, labels) now draft as themselves instead of as an empty
+  option, which the edit form was also getting wrong.
+- `src/renderer/src/components/jira-transition-fields-form.tsx` — renders `resolution`, `comment` and
+  every other required field through `JiraSchemaFieldControl`, seeded from `currentValue`, submitting
+  **only fields the user changed**. That rule is what makes the skip reversible: the classifier only
+  renders an unfilled field (so "changed" means "filled in"), and a field a rejection brought back is
+  rendered holding the issue's own value and stays unsubmitted until the user edits it — so a shape
+  Orca cannot rebuild is never rewritten. A field a rejection brought back is the exception: it is
+  always sent when it has a control and a non-empty draft, because resubmitting the value Jira just
+  refused would repeat the same request. Jira's `fieldErrors` render beside the control that failed
+  and the form stays open to retry; the banner is suppressed only when a _rendered_ field carries the
+  sentence, and Jira's separate workflow `errorMessages` are always shown.
+- `task-page/jira/TransitionFieldsDialog.tsx` is now a shell over that one form, and the detail-pane
+  control, the ad-hoc board move dialog, the board drop **and the workspace sidebar's linked-issue
+  pane** all render it. The pane's status row (`right-sidebar/jira-status-row.tsx`) no longer posts a
+  bare `{transitionId}`: it opens the form for a screen that requires fields, and a refusal naming a
+  field reopens it with that field asked for. A refusal that names none shows beside an "Open in Jira"
+  link in that row's own dialog rather than as a toast.
+- `src/renderer/src/components/jira-issue-mutation-queue.ts` — `JiraMutationFailure` carries
+  `fieldErrors`, and `use-jira-issue-workspace-mutation.ts` passes them through instead of flattening
+  the result to `{ ok, error }`, so the detail pane — not only the board paths — can name the field
+  Jira refused.
+
+`jira.transitions.unsupported` and `jira.transitions.completeInJira` are now unused in `en.json`. They
+stay in the catalogue rather than being deleted, because removing a key churns all 20 locales and the
+regenerated catalogues are a sync-owned artifact.
+
+Tests that pin the new behaviour: `src/shared/jira-transition-fields.test.ts` (a filled field is not
+asked, resolution/comment still are), `src/main/jira/jira-transition-required-fields.test.ts` (the
+value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-issue-transition-control.test.tsx`
+(the filled-field move, the collected custom field, and the field-level rejection) and
+`task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
+`unsupported` kind turns all of them red.
+
+### `local(test)`: a bun-pool timeout failure can read as `Errors 1: EISDIR` instead of a failing test
+
+Symptom worth recognising, because it reads as a crash rather than a failure and cost a session half an
+hour: a test whose `findBy`/`waitFor` times out is reported as `Errors 1` with
+`Error: EISDIR: illegal operation on a directory, read` raised inside Vitest's own `getSourceMap`, the
+failing test is not named, and the file's remaining tests vanish from the counts (`Tests N passed (N+2)`,
+`Test Files N passed (N+1)`). A _synchronous_ assertion failure in the same file reports normally, which
+is what makes it look like a flake.
+
+Reproduced 2026-10-22 against `src/renderer/src/components/JiraIssueWorkspace.transition-source.test.tsx`
+by appending a deliberate `findByPlaceholderText` timeout: in the bun pool → EISDIR, no test named; the
+same file under the node runtime → `× scratch: deliberate timeout reports itself`, failing test named.
+Minimal files with the same failing query reported fine in bun, so the trigger is the file, not the
+query.
+
+Remedy applied: that file is seated in the node-runtime project
+(`config/scripts/vitest-node-runtime-files.mjs`, `LOCAL(nplez1)` entry). If the symptom appears
+elsewhere, check it the same way — a deliberate timeout failure is the probe — and seat that file rather
+than re-running the suite. Do not read `Errors 1` in a bun-pool run as "the failure was elsewhere".
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "rebase upstream

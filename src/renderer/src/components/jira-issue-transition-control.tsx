@@ -3,9 +3,17 @@ import { ChevronDown, CircleAlert, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
-import { classifyTransitionRequirements } from '../../../shared/jira-transition-fields'
-import { JiraTransitionFieldsForm } from './jira-transition-fields-form'
+import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import {
+  classifyTransitionRequirements,
+  rejectedTransitionFieldKeys
+} from '../../../shared/jira-transition-fields'
+import {
+  JiraTransitionFieldsForm,
+  type JiraTransitionSubmitOutcome
+} from './jira-transition-fields-form'
 import type {
+  JiraFieldErrors,
   JiraIssue,
   JiraIssueUpdate,
   JiraMutationResult,
@@ -18,6 +26,7 @@ type Props = {
   loading: boolean
   error: string | null
   pending: boolean
+  providerSettings?: RuntimeJiraSettings
   onRetry: () => void
   onTransition: (
     updates: JiraIssueUpdate,
@@ -31,49 +40,83 @@ export function JiraIssueTransitionControl({
   loading,
   error,
   pending,
+  providerSettings,
   onRetry,
   onTransition
 }: Props): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<JiraTransition | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const requirement = selected ? classifyTransitionRequirements(selected) : null
+  // Why held here as well as in the form: a one-click transition that Jira refuses by
+  // field never mounts the form, so this is what promotes it into one.
+  const [rejectedFieldErrors, setRejectedFieldErrors] = useState<JiraFieldErrors>({})
+  const [rejectedErrorMessages, setRejectedErrorMessages] = useState<string[]>([])
+  const forcedFieldKeys = selected
+    ? rejectedTransitionFieldKeys(selected, rejectedFieldErrors)
+    : new Set<string>()
+  const requirement = selected ? classifyTransitionRequirements(selected, forcedFieldKeys) : null
   const busy = pending || loading
 
   function reset(): void {
     setSelected(null)
     setSubmitError(null)
+    setRejectedFieldErrors({})
+    setRejectedErrorMessages([])
   }
 
-  async function apply(transition: JiraTransition, updates: JiraIssueUpdate): Promise<void> {
-    setSubmitError(null)
+  async function apply(
+    transition: JiraTransition,
+    updates: JiraIssueUpdate
+  ): Promise<JiraTransitionSubmitOutcome> {
     try {
       const result = await onTransition(updates, transition)
       if (result.ok) {
         setOpen(false)
         reset()
-      } else {
-        setSubmitError(result.error)
+        return { ok: true }
+      }
+      // Why returned rather than stored: the fields form owns its own rejection
+      // so it can name the field Jira refused beside the control that failed.
+      return {
+        ok: false,
+        error: result.error,
+        ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+        ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
       }
     } catch (error) {
-      setSubmitError(
-        error instanceof Error
-          ? error.message
-          : translate(
-              'auto.components.JiraIssueWorkspace.ea21952aa3',
-              'Failed to update Jira issue.'
-            )
-      )
+      return {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.JiraIssueWorkspace.ea21952aa3',
+                'Failed to update Jira issue.'
+              )
+      }
     }
   }
 
-  function choose(transition: JiraTransition): void {
+  async function choose(transition: JiraTransition): Promise<void> {
     reset()
-    const nextRequirement = classifyTransitionRequirements(transition)
     setSelected(transition)
-    if (nextRequirement.kind === 'none') {
-      void apply(transition, { transitionId: transition.id })
+    if (classifyTransitionRequirements(transition).kind !== 'none') {
+      return
     }
+    const outcome = await apply(transition, { transitionId: transition.id })
+    if (outcome.ok) {
+      return
+    }
+    // Why reopened rather than reported flat: Jira named fields it refused, so the form
+    // has to stand them up and let the user change them. A refusal that names nothing
+    // keeps the plain sentence and the Jira link.
+    const forced = rejectedTransitionFieldKeys(transition, outcome.fieldErrors)
+    if (forced.size > 0 && outcome.fieldErrors) {
+      setRejectedFieldErrors(outcome.fieldErrors)
+      setRejectedErrorMessages(outcome.errorMessages ?? [])
+      return
+    }
+    setSubmitError(outcome.error)
   }
 
   return (
@@ -127,27 +170,21 @@ export function JiraIssueTransitionControl({
           ) : null}
           {requirement?.kind === 'form' && selected ? (
             <JiraTransitionFieldsForm
+              key={selected.id}
               transition={selected}
               pending={busy || Boolean(error)}
+              providerSettings={providerSettings}
+              siteId={issue.siteId}
+              forcedFieldKeys={forcedFieldKeys}
+              rejectedFieldErrors={rejectedFieldErrors}
+              rejectedErrorMessages={rejectedErrorMessages}
+              errorReason={submitError}
+              issueUrl={issue.url}
               onBack={reset}
               onSubmit={(updates) => apply(selected, updates)}
             />
-          ) : error || loading ? null : requirement?.kind === 'unsupported' ? (
-            <>
-              <p className="text-sm font-medium">
-                {translate('jira.transitions.completeInJira', 'Complete “{{name}}” in Jira', {
-                  name: selected?.name
-                })}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'jira.transitions.unsupported',
-                  'Jira requires fields Orca cannot collect yet: {{fields}}.',
-                  { fields: requirement.fields.map((field) => field.name).join(', ') }
-                )}
-              </p>
-            </>
-          ) : selected && submitError ? null : transitions.length === 0 ? (
+          ) : error || loading ? null : selected && submitError ? null : transitions.length ===
+            0 ? (
             <p className="text-xs text-muted-foreground">
               {translate('jira.transitions.empty', 'No status changes available.')}
             </p>
@@ -160,7 +197,7 @@ export function JiraIssueTransitionControl({
                   size="sm"
                   className="justify-start"
                   disabled={busy}
-                  onClick={() => choose(transition)}
+                  onClick={() => void choose(transition)}
                 >
                   {transition.name}
                 </Button>
@@ -172,7 +209,7 @@ export function JiraIssueTransitionControl({
               {submitError}
             </p>
           ) : null}
-          {requirement?.kind === 'unsupported' || submitError ? (
+          {submitError ? (
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={reset} disabled={busy}>
                 {translate('jira.transitions.back', 'Back')}

@@ -31,6 +31,13 @@ const NODE_RUNTIME_INCLUDE = [
   'src/main/orcad/orcad-daemon-teardown-linux.test.ts',
   'src/renderer/src/components/terminal-pane/pty-input-write-queue.test.ts',
   'src/renderer/src/lib/react-commit-cascade-observer.test.ts',
+  // LOCAL(nplez1): the bun pool reports an every-`findBy`/`waitFor` timeout in this file as
+  // `Errors 1: EISDIR` and drops the test from the run, so a real assertion failure reads as a
+  // test-run crash. Under the Node runtime the same timeout reports normally. Reproduced
+  // 2026-10-22 by appending a deliberate `findBy` timeout: bun → EISDIR, no test named; Node →
+  // the failure named. A *synchronous* failure in the same file reports fine in bun, which is
+  // what made it look like a flake.
+  'src/renderer/src/components/JiraIssueWorkspace.transition-source.test.tsx',
   'src/renderer/src/lib/react-commit-cascade-telemetry.test.ts',
   // These reach Node SQLite through a shared helper or a dynamic import, which the scan skips.
   'tests/e2e/native-chat-startup-option-pickers.unit.test.ts',

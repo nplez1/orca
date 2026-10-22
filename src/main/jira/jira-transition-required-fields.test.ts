@@ -66,6 +66,96 @@ describe('required Jira transition fields', () => {
     )
   })
 
+  it('reads the issue so a required field it already fills is not asked for', async () => {
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [
+            {
+              ...transition,
+              fields: {
+                ...transition.fields,
+                components: {
+                  required: true,
+                  name: 'Component/s',
+                  schema: { type: 'array', items: 'string' }
+                },
+                customfield_10002: {
+                  required: true,
+                  name: 'Team',
+                  schema: { type: 'array', items: 'string' }
+                }
+              }
+            }
+          ]
+        }
+      }
+      return {
+        fields: {
+          resolution: null,
+          components: [{ id: '10400', name: 'Web' }],
+          customfield_10002: ['team-1']
+        }
+      }
+    })
+    const { listTransitions } = await import('./jira-transition-queries')
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    const byKey = Object.fromEntries((loaded.fields ?? []).map((field) => [field.key, field]))
+    expect(byKey.components).toMatchObject({
+      hasCurrentValue: true,
+      currentValue: 'Web',
+      currentDisplayValue: 'Web'
+    })
+    expect(byKey.customfield_10002).toMatchObject({
+      hasCurrentValue: true,
+      currentValue: 'team-1'
+    })
+    // Why: an unset field carries no value, so it stays the user's to fill.
+    expect(byKey.resolution?.hasCurrentValue).toBeUndefined()
+    expect(byKey.resolution?.currentValue).toBeUndefined()
+    expect(jiraRequest.mock.calls[1]?.[1]).toBe(
+      '/rest/api/3/issue/APP-1?fields=resolution,components,customfield_10002'
+    )
+  })
+
+  it('marks a filled field that no control can seed as filled all the same', async () => {
+    // Why: Cloud's Team field is an object with no matching control; deciding "filled"
+    // from the draft alone is what asked for a field the issue already had.
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [
+            {
+              ...transition,
+              fields: {
+                customfield_10002: {
+                  required: true,
+                  name: 'Team',
+                  schema: { type: 'team', custom: 'com.atlassian.teams:team' }
+                }
+              }
+            }
+          ]
+        }
+      }
+      return { fields: { customfield_10002: { id: 'team-1', name: 'Platform' } } }
+    })
+    const { listTransitions } = await import('./jira-transition-queries')
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    expect(loaded.fields?.[0]).toMatchObject({ hasCurrentValue: true })
+    expect(loaded.fields?.[0]?.currentValue).toBeUndefined()
+  })
+
+  it('keeps every field asked for when the value read fails', async () => {
+    jiraRequest
+      .mockResolvedValueOnce({ transitions: [transition] })
+      .mockRejectedValueOnce(new JiraApiError('Not found', 404))
+    const { listTransitions } = await import('./jira-transition-queries')
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    expect(loaded.fields?.[0]?.currentValue).toBeUndefined()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('posts resolution and comment in the same request Jira validates', async () => {
     jiraRequest.mockImplementation(async (_entry, _path, options) => {
       const payload = JSON.parse(options.body)
@@ -122,6 +212,16 @@ describe('required Jira transition fields', () => {
     await expect(listTransitions('APP-1')).rejects.toThrow('Unauthorized')
     expect(jiraRequest).toHaveBeenCalledTimes(1)
     expect(clearToken).toHaveBeenCalledWith('site-1')
+  })
+
+  it('rethrows an auth failure from the value read instead of reading it as empty', async () => {
+    jiraRequest
+      .mockResolvedValueOnce({ transitions: [transition] })
+      .mockRejectedValueOnce(new JiraApiError('Unauthorized', 401))
+    const { listTransitions } = await import('./jira-transition-queries')
+    await expect(listTransitions('APP-1', 'site-1')).rejects.toThrow('Unauthorized')
+    expect(clearToken).toHaveBeenCalledWith('site-1')
+    expect(release).toHaveBeenCalledOnce()
   })
 
   it('keeps old-client bare transitions and Server comments compatible', async () => {

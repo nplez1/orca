@@ -230,4 +230,311 @@ describe('Jira transition form source ownership', () => {
     expect(screen.queryByLabelText('Comment')).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
   })
+
+  it("shows Jira's field-level refusal against the control that failed, end to end", async () => {
+    // Why through the real workspace: the mutation hook used to flatten the result to
+    // `{ ok, error }`, so a field error reached this control as undefined.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Jira rejected the update.',
+      fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    // Why waitFor + getBy rather than findBy: a DOM query that times out here fails in
+    // this file's bun pool with a masked `Test Run Error`, so the assertion is kept
+    // synchronous inside the retry.
+    await waitFor(() => expect(screen.getByText('Release approval must be Approved.')).toBeTruthy())
+    expect(screen.getByPlaceholderText('Enter Release approval')).toBeTruthy()
+  })
+
+  it('reopens a one-click transition as a form when Jira refuses it by field', async () => {
+    // A skipped, already-filled field can still be refused (a stale value, or a
+    // validator demanding it be set), and the user needs a control to act on.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'filled',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Jira rejected the update.',
+      fieldErrors: { components: 'Component/s is required.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith(
+        taskSourceRuntimeTarget(source),
+        issue.key,
+        { transitionId: 'filled' },
+        'site-a'
+      )
+    )
+    await waitFor(() => expect(screen.getByText('Component/s is required.')).toBeTruthy())
+    // Why the text-list placeholder: Component/s is `array/items: string`, which the
+    // control map renders as a comma-separated list.
+    const input = screen.getByPlaceholderText('Comma-separated values')
+    // Why the resubmit matters: the reopened form must be able to send the very value
+    // it shows, or the only way through is picking a different one.
+    expect(input instanceof HTMLInputElement ? input.value : null).toBe('Web')
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    mocks.update.mockResolvedValue({ ok: true })
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenLastCalledWith(
+        taskSourceRuntimeTarget(source),
+        issue.key,
+        { transitionId: 'filled', transitionFields: { components: ['Web'] } },
+        'site-a'
+      )
+    )
+  })
+
+  it('keeps the reason Jira gave when it names a field this form does not render', async () => {
+    // Why: a key outside the transition's own fields opens no control, so nothing else
+    // on screen can carry the sentence Jira sent.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'You do not have permission to set Close reason.',
+      fieldErrors: { customfield_99: 'You do not have permission to set Close reason.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() =>
+      expect(screen.getByText('You do not have permission to set Close reason.')).toBeTruthy()
+    )
+  })
+
+  it("shows Jira's workflow message beside a field error rather than instead of it", async () => {
+    // Why: readJiraErrorDetail joins both into `message`, and a field-level display used
+    // to swallow the workflow half entirely.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      error: 'Approval task not complete; Release approval must be Approved.',
+      errorMessages: ['Approval task not complete'],
+      fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Release approval must be Approved.')).toBeTruthy())
+    expect(screen.getByText('Approval task not complete')).toBeTruthy()
+  })
+
+  it('replaces a carried workflow message once the form has its own refusal', async () => {
+    // Why: the parent's sentence opened the form; a later attempt that says something
+    // else must not leave the old one on screen.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'filled',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'components',
+            name: 'Component/s',
+            required: true,
+            hasCurrentValue: true,
+            currentValue: 'Web',
+            schema: { type: 'array', items: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValueOnce({
+      ok: false,
+      error: 'Approval task not complete; Component/s is required.',
+      errorMessages: ['Approval task not complete'],
+      fieldErrors: { components: 'Component/s is required.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const dialogInput = await screen.findByPlaceholderText('Comma-separated values')
+    await waitFor(() => expect(screen.getByText('Approval task not complete')).toBeTruthy())
+    const form = dialogInput.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    mocks.update.mockResolvedValueOnce({ ok: false, error: 'Workflow step rejected.' })
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Workflow step rejected.')).toBeTruthy())
+    expect(screen.queryByText('Approval task not complete')).toBeNull()
+  })
+
+  it('shows the sentence for a refused field with no control beside a rendered one', async () => {
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValue({
+      ok: false,
+      // Why the periods: the host joins the values as they are, so a realistic sentence
+      // carries the field error's own punctuation and a banner repeat would match.
+      error: 'Release approval must be Approved.; Close reason is not allowed.',
+      fieldErrors: {
+        customfield_42: 'Release approval must be Approved.',
+        customfield_99: 'Close reason is not allowed.'
+      }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'pending' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    // The rendered key shows inline, the unrendered one in the banner, each once.
+    // Why a regex: an exact-text match would miss the sentence repeated inside the banner.
+    await waitFor(() =>
+      expect(screen.getAllByText(/Release approval must be Approved\./)).toHaveLength(1)
+    )
+    expect(screen.getAllByText(/Close reason is not allowed\./)).toHaveLength(1)
+  })
+
+  it('keeps a field a rejection brought back while the next attempt is in flight', async () => {
+    // Why: clearing the messages at submit time must not un-ask for the field, or the
+    // value the user just typed disappears and the next submit leaves it out.
+    mocks.transitions.mockResolvedValue([
+      {
+        id: 'with-field',
+        name: 'Close',
+        to: { ...issue.status, id: 'done', name: 'Done' },
+        fields: [
+          {
+            key: 'customfield_42',
+            name: 'Release approval',
+            required: true,
+            schema: { type: 'string' }
+          }
+        ]
+      }
+    ])
+    mocks.update.mockResolvedValueOnce({
+      ok: false,
+      error: 'Jira rejected the update.',
+      fieldErrors: { customfield_42: 'Release approval must be Approved.' }
+    })
+    render(workspace(source))
+    await waitForTransitions()
+    fireEvent.click(screen.getByRole('button', { name: 'Change status: Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    const input = await screen.findByPlaceholderText('Enter Release approval')
+    fireEvent.change(input, { target: { value: 'approved' } })
+    const form = input.closest('form')
+    if (!form) {
+      throw new Error('Expected the transition form')
+    }
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Release approval must be Approved.')).toBeTruthy())
+    mocks.update.mockResolvedValueOnce({ ok: false, error: 'Workflow step rejected.' })
+    fireEvent.submit(form)
+    await waitFor(() => expect(screen.getByText('Workflow step rejected.')).toBeTruthy())
+    expect(screen.getByPlaceholderText('Enter Release approval')).toBeTruthy()
+  })
 })

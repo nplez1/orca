@@ -74,6 +74,20 @@ export type JiraCreateField = {
   /** True when Jira will supply the value itself, so a required transition
    *  field marked this way needs no prompt. */
   hasDefaultValue?: boolean
+  /** What the issue already holds, as the paired control's draft. Jira marks a
+   *  field required by the transition screen rather than by the issue's own
+   *  emptiness, so a field this fills is not input the user owes us. Absent when
+   *  the host could not read the values, which keeps the field asked for. */
+  currentValue?: string
+  /** True when the issue holds any value at all, whatever its shape. Separate from
+   *  `currentValue` because that one only exists when a control can seed from it: a
+   *  value Orca has no control for still means the user owes nothing. */
+  hasCurrentValue?: boolean
+  /** Human label for a `currentValue` that carries an id, so a form can show it. */
+  currentDisplayValue?: string
+  /** The people a multi-user field already holds, so a picker names them rather than
+   *  showing accountIds. Absent for every other field kind. */
+  currentUsers?: JiraUser[]
   schema?: {
     type?: string
     items?: string

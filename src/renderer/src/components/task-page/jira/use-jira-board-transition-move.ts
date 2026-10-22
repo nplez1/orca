@@ -1,26 +1,28 @@
 import { jiraBoardErrorText } from './jira-board-error-text'
 import { useState } from 'react'
 import type {
-  JiraCreateField,
   JiraFieldErrors,
   JiraIssue,
+  JiraIssueUpdate,
   JiraTransition
 } from '../../../../../shared/jira-types'
-import type { JiraCreateFieldSubmission } from '../../task-page-jira-create-fields'
+import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 
-export type JiraTransitionOutcome =
-  | { ok: true }
-  | { ok: false; error: string; fieldErrors?: JiraFieldErrors }
-
 /** The fields a transition's own screen requires, held while the form collects them. */
 export type JiraPendingTransitionFields = {
   issue: JiraIssue
   transition: JiraTransition
-  fields: JiraCreateField[]
+  /** Jira's field-level refusal that reopened the form, so the field it names is
+   *  asked for again instead of reported as a sentence with no control behind it. */
+  rejectedFieldErrors?: JiraFieldErrors
+  /** Jira's workflow messages from that refusal, which a field-level display hides. */
+  errorMessages?: string[]
+  /** The rejection that reopened the form, shown until the form has its own. */
+  error?: string | null
 }
 
 /**
@@ -58,37 +60,26 @@ export function useJiraBoardTransitionMove({
   const applyTransition = async (
     issue: JiraIssue,
     transition: JiraTransition,
-    submission?: JiraCreateFieldSubmission
-  ): Promise<JiraTransitionOutcome> => {
+    updates?: JiraIssueUpdate
+  ): Promise<JiraTransitionSubmitOutcome> => {
     const previousStatus = issue.status
     applyIssuePatch(issue.key, { status: transition.to }, issue.siteId)
     markMoving(issue.key, true)
     setInFlightCount((current) => current + 1)
     let succeeded = false
     try {
-      const hasFields = Boolean(
-        submission?.customFields && Object.keys(submission.customFields).length > 0
-      )
       const result = await jiraUpdateIssue(
         providerSettings,
         issue.key,
-        {
-          transitionId: transition.id,
-          ...(hasFields
-            ? {
-                transitionFields: submission?.customFields,
-                transitionUserFieldKeys: submission?.userFieldKeys,
-                transitionTextFieldKeys: submission?.textFieldKeys
-              }
-            : {})
-        },
+        { ...updates, transitionId: transition.id },
         issue.siteId
       )
       if (!result.ok) {
         return {
           ok: false,
           error: result.error,
-          ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {})
+          ...(result.fieldErrors ? { fieldErrors: result.fieldErrors } : {}),
+          ...(result.errorMessages ? { errorMessages: result.errorMessages } : {})
         }
       }
       succeeded = true
@@ -120,16 +111,19 @@ export function useJiraBoardTransitionMove({
     openTransitionFields: (
       issue: JiraIssue,
       transition: JiraTransition,
-      fields: JiraCreateField[]
-    ) => setPendingTransitionFields({ issue, transition, fields }),
+      rejection?: Pick<
+        JiraPendingTransitionFields,
+        'rejectedFieldErrors' | 'errorMessages' | 'error'
+      >
+    ) => setPendingTransitionFields({ issue, transition, ...rejection }),
     closeTransitionFields: () => {
       if (inFlightCount === 0) {
         setPendingTransitionFields(null)
       }
     },
     submitTransitionFields: async (
-      submission: JiraCreateFieldSubmission
-    ): Promise<JiraTransitionOutcome> => {
+      updates: JiraIssueUpdate
+    ): Promise<JiraTransitionSubmitOutcome> => {
       const pending = pendingTransitionFields
       if (!pending) {
         return {
@@ -140,7 +134,7 @@ export function useJiraBoardTransitionMove({
           )
         }
       }
-      const outcome = await applyTransition(pending.issue, pending.transition, submission)
+      const outcome = await applyTransition(pending.issue, pending.transition, updates)
       if (outcome.ok) {
         setPendingTransitionFields(null)
       }
