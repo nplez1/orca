@@ -555,6 +555,12 @@ Fourteen were already recorded. The last two are the same host-toolchain class a
   `stripTypeScriptTypes` from `node:module`; the bun 1.4.3 pool's `node:module` does not export it,
   so the file passes only under a Node runtime.
 
+Verdict, on the revision that ships:
+
+```
+Unit gate @b8d9bf7987 (clean): PASS — 136644 passed; 38 failed (38 allowlisted, 0 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 1227 s
+```
+
 **The gate also had to learn one heading.** Vitest reports the run's unhandled errors in two shapes,
 and `collectUnhandledErrors` matched only `Unhandled Rejection` / `Uncaught Exception`. A pool crash
 arrives under `Unhandled Error`, so the declared count read 7 against 6 headlines and the gate failed
