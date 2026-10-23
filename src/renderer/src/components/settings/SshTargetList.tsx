@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import {
   isSshTargetHidden,
@@ -11,6 +11,8 @@ import { Button } from '../ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { Checkbox } from '../ui/checkbox'
 import { VirtualizedList } from '../virtualized-list'
+import { boundHostList } from '../host-picker/bounded-host-list'
+import { HostListOverflowNote } from '../host-picker/HostListOverflowNote'
 import { useSettingsContentScrollElement } from './settings-content-scroll-element'
 import type { SshTargetBusyAction } from './ssh-target-action-state'
 import {
@@ -38,6 +40,11 @@ type SshTargetListProps = {
   onServerChanged: () => void
   /** Hide/unhide for a host ~/.ssh/config keeps re-importing. */
   onSetHidden?: (target: SshTarget, hidden: boolean) => void | Promise<void>
+  /**
+   * The screen's own host filter. It narrows the targets before they arrive, and ranking each
+   * match by it is what puts an exact host name above the 50th substring match.
+   */
+  filterQuery?: string
 }
 
 function groupTitle(group: SshTargetGroup): React.JSX.Element {
@@ -97,14 +104,36 @@ export function SshTargetList({
   onEdit,
   onRemove,
   onServerChanged,
-  onSetHidden
+  onSetHidden,
+  filterQuery = ''
 }: SshTargetListProps): React.JSX.Element {
   const [hiddenExpanded, setHiddenExpanded] = useState(false)
   // Why: hidden hosts stay on this screen — they are the ones Orca discovered in ~/.ssh/config,
   // so they come back on every sync and Settings is the one place that can undo the choice.
-  const { offered: visibleTargets, hidden: hiddenTargets } =
-    partitionSshTargetsByVisibility(targets)
+  const { offered: visibleTargets, hidden: hiddenTargets } = useMemo(
+    () => partitionSshTargetsByVisibility(targets),
+    [targets]
+  )
   const groups = groupSshTargetsBySource(visibleTargets)
+  // Why bounded: hidden hosts are exactly the ones ~/.ssh/config re-imports, so this section holds as
+  // many rows as the config does — and it is the one list on this screen drawn outside a window. The
+  // search is SshPane's filter above, which narrows `targets` before the section sees them; a second
+  // box here would AND with it. Nothing is computed while the section is closed.
+  const hiddenHosts = useMemo(
+    () =>
+      hiddenTargets.map((target) => ({
+        ...target,
+        searchText: `${target.host} ${target.username} ${target.configHost ?? ''}`
+      })),
+    [hiddenTargets]
+  )
+  const hiddenRows = useMemo(
+    () =>
+      hiddenExpanded
+        ? boundHostList(hiddenHosts, { query: filterQuery })
+        : { shown: [], hiddenCount: 0 },
+    [filterQuery, hiddenExpanded, hiddenHosts]
+  )
   const scrollElement = useSettingsContentScrollElement()
   const isMac = navigator.userAgent.includes('Mac')
 
@@ -220,7 +249,7 @@ export function SshTargetList({
                   'These hosts come from your SSH config. They stay out of the lists where you pick a host, but anything already running on them keeps working.'
                 )}
               </p>
-              {hiddenTargets.map((target) => (
+              {hiddenRows.shown.map((target) => (
                 <div key={target.id} className="overflow-hidden rounded-lg border border-border/60">
                   <SshTargetCard
                     target={target}
@@ -237,6 +266,7 @@ export function SshTargetList({
                   />
                 </div>
               ))}
+              <HostListOverflowNote hiddenCount={hiddenRows.hiddenCount} />
             </div>
           </CollapsibleContent>
         </Collapsible>

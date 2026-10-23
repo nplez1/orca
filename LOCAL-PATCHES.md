@@ -665,6 +665,15 @@ as local:
   was the wasted spawn and a null branch — but the lookup was one ordering change away from naming a
   project folder from the wrong checkout. It now passes `getRepoRoutingConnectionId(repo)`.
 
+**The hidden-host section drew a card per host** (`check:host-list-render-ratchet`). Hidden hosts are
+exactly the ones `~/.ssh/config` keeps re-importing, so that section grows with the config and was the
+only host list on the screen drawn outside a window. It now draws a bounded page through
+`boundHostList` from `components/host-picker` — the function `useBoundedHostRows` wraps, used directly
+because this section has no query of its own: `SshPane`'s filter above already narrows the targets
+before the list sees them, and a second box inside the section would AND with it. 13,692 hidden hosts
+therefore mount 50 rows plus a "more hosts" note, and the pane filter still reaches the last one.
+Nothing is computed while the section is closed.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,
