@@ -6,6 +6,7 @@ import {
   attachPRReviewReplyParent,
   canPostPRReviewThreadReply,
   checksPanelReviewStableKey,
+  hasPRCommentGroupNeedingReply,
   resolvePRReviewReplyThreadId,
   setPendingPRCommentAiAck,
   takePendingPRCommentAiAck
@@ -73,18 +74,18 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       const isPanelStillOnLaunchReview = (): boolean =>
         checksPanelReviewStableKey(asyncResultKeyRef.current) === launchStableKey
       const githubTarget = resolution.githubTarget
-      // Why: GitHub is the only provider Orca replies on today. An MR selection is left
-      // untouched — this path never wrote a resolve that a missing reply would have to replace.
+      // Why: GitHub is the only provider Orca replies on today; MR threads and GitHub threads
+      // the host can resolve are left open for the user, with no host write at all.
       const canReplyOnHost = resolution.provider === 'github' && githubTarget != null
-      // Why: a PR with no reply target cannot be answered; only report it when the provider
-      // could otherwise have posted something.
+      // Why: a PR with no reply target cannot be answered; only report it when something in the
+      // selection would otherwise have been replied to.
       let lastHostError =
         resolution.provider === 'github' &&
         githubTarget == null &&
-        resolution.selectedGroups.length > 0
+        hasPRCommentGroupNeedingReply(resolution.selectedGroups)
           ? translate(
               'auto.components.right.sidebar.ChecksPanel.7e4b2a19c0',
-              'Could not resolve the GitHub PR to reply on.'
+              'Could not identify the GitHub PR to reply on.'
             )
           : undefined
       const counts = await acknowledgePRCommentsAfterAiLaunch({
@@ -178,15 +179,19 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       }
 
       // Why: surface the underlying API error when replies were possible but none landed.
-      const repliedNoneDespiteHostSupport = canReplyOnHost && counts.replied === 0
+      // Threads that need no reply are left open by design, so replied=0 is not a failure there.
+      const repliedNoneDespiteHostSupport =
+        canReplyOnHost &&
+        counts.replied === 0 &&
+        hasPRCommentGroupNeedingReply(resolution.selectedGroups)
       if (counts.failed > 0 || repliedNoneDespiteHostSupport || lastHostError) {
         toast.error(
           translate(
             'auto.components.right.sidebar.ChecksPanel.f273f2271c',
-            'Started the agent. Replied to {{value0}}, skipped {{value1}}, failed {{value2}}.{{value3}}',
+            'Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.{{value3}}',
             {
               value0: counts.replied,
-              value1: counts.skipped,
+              value1: counts.leftOpen,
               value2: counts.failed,
               value3: lastHostError ? ` ${lastHostError}` : ''
             }
@@ -197,10 +202,10 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       toast.success(
         translate(
           'auto.components.right.sidebar.ChecksPanel.aa95b81a3a',
-          'Started the agent. Replied to {{value0}}, skipped {{value1}}, failed {{value2}}. Threads stay unresolved until you close them.',
+          'Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.',
           {
             value0: counts.replied,
-            value1: counts.skipped,
+            value1: counts.leftOpen,
             value2: counts.failed
           }
         )

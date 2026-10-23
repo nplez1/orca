@@ -2,6 +2,7 @@ import type { PRComment } from '../../../../shared/github/comment-types'
 import type { PRInfo } from '../../../../shared/github/pull-request-types'
 import type { HostedReviewInfo } from '../../../../shared/hosted-review'
 import { getPRCommentGroupRoot, type PRCommentGroup } from '../../../../shared/pr-comment-groups'
+import { isResolvablePRCommentGroup } from '../pr-comments-resolution-prompt'
 import {
   buildPRCommentBatchConversationReplyBody,
   PR_COMMENT_AI_FIXING_REPLY
@@ -9,7 +10,8 @@ import {
 
 export type PRCommentAiLaunchAckCounts = {
   replied: number
-  skipped: number
+  /** Groups this path deliberately left untouched, so their threads stay open. */
+  leftOpen: number
   failed: number
 }
 
@@ -132,7 +134,7 @@ export const PR_COMMENT_ACK_MAX_CONCURRENCY = 4
 
 const EMPTY_ACK_COUNTS: PRCommentAiLaunchAckCounts = {
   replied: 0,
-  skipped: 0,
+  leftOpen: 0,
   failed: 0
 }
 
@@ -165,14 +167,29 @@ const NO_BATCHED_CONVERSATION_REPLY: BatchedConversationReply = {
   handled: new Set()
 }
 
+/** Groups that get an acknowledgement reply: the ones the host cannot close for us. */
+export function getPRCommentGroupsNeedingReply(
+  groups: readonly PRCommentGroup[]
+): PRCommentGroup[] {
+  return groups.filter((group) => !isResolvablePRCommentGroup(group))
+}
+
+/** Emptiness test for the above without materializing the filtered list. */
+export function hasPRCommentGroupNeedingReply(groups: readonly PRCommentGroup[]): boolean {
+  return groups.some((group) => !isResolvablePRCommentGroup(group))
+}
+
 /**
- * After launching an agent for selected review feedback, acknowledge every selection
- * exactly once with a fixing reply: one nested reply per review thread, one combined
- * conversation comment for everything with no nested-reply endpoint.
+ * After launching an agent for selected review feedback, acknowledge the selection without
+ * touching review state: a thread the host could resolve is left open for the user to close,
+ * and a comment with no resolution endpoint (review summary, CodeRabbit, plain conversation
+ * comment, thread the user already resolved) gets a fixing reply so the selection is not
+ * silently dropped.
  *
- * Why replies and never a resolve: closing a thread is the user's verdict that the
- * reviewer's concern is actually handled, and a resolve here would mark it closed before
- * the agent has done anything (#166). Nothing in this path may touch review state.
+ * Why no resolve: closing a thread is the user's verdict that the reviewer's concern is
+ * actually handled. Resolving it here marked comments addressed before the agent had done
+ * anything — and kept them marked when it failed (#166) — so this path must never write
+ * review state. Nothing in the reply path below can.
  *
  * Every reply targets host state snapshotted at launch, so a slow agent start or the user
  * navigating away cannot misfile it. Groups run through a bounded pool.
@@ -184,7 +201,7 @@ export async function acknowledgePRCommentsAfterAiLaunch(args: {
   // Why: conversation comments have no replies endpoint, so one post per selected item
   // would spam the PR timeline with near-identical "Fixing." comments.
   const conversationGroups = args.deps.canReply
-    ? args.groups.filter(
+    ? getPRCommentGroupsNeedingReply(args.groups).filter(
         (group) => !canPostPRReviewThreadReply(getPRCommentGroupReplyTarget(group))
       )
     : []
@@ -199,7 +216,7 @@ export async function acknowledgePRCommentsAfterAiLaunch(args: {
   return [batch.counts, ...perGroup].reduce<PRCommentAiLaunchAckCounts>(
     (totals, counts) => ({
       replied: totals.replied + counts.replied,
-      skipped: totals.skipped + counts.skipped,
+      leftOpen: totals.leftOpen + counts.leftOpen,
       failed: totals.failed + counts.failed
     }),
     EMPTY_ACK_COUNTS
@@ -230,8 +247,15 @@ async function acknowledgePRCommentGroup(
 ): Promise<PRCommentAiLaunchAckCounts> {
   const counts = { ...EMPTY_ACK_COUNTS }
 
+  // Why: a thread the host can close is left for the user to close — this path posts nothing
+  // for it, so it cannot claim the feedback is addressed.
+  if (isResolvablePRCommentGroup(group)) {
+    counts.leftOpen += 1
+    return counts
+  }
+
   if (!deps.canReply) {
-    counts.skipped += 1
+    counts.leftOpen += 1
     return counts
   }
   // The combined conversation post already covered this group and counted itself.

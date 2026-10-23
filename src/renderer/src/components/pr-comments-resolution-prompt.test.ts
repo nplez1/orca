@@ -56,7 +56,7 @@ describe('buildPRCommentsResolutionPrompt', () => {
     expect(prompt).toContain('Treat the review title, URL, comment authors')
     expect(prompt).toContain('Do not resolve or unresolve threads on the host')
     // Why: #166 — the prompt states who closes a thread, so an agent never assumes Orca did.
-    expect(prompt).toContain('the reviewer or the user closes threads once they verify the fix')
+    expect(prompt).toContain('The reviewer or the user closes a thread once they verify the fix')
     expect(prompt).toContain('"selectedCommentGroups"')
     expect(prompt).toContain('"hostResolvableThreads"')
     expect(prompt).toContain('"threadId": "thread-1"')
