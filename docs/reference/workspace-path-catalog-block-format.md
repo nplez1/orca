@@ -6,7 +6,9 @@ by the host-local disk spill. The codec lives in
 envelope and build runs live in
 [`workspace-path-catalog-spill.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill.ts)
 and
-[`workspace-path-catalog-spill-runs.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill-runs.ts).
+[`workspace-path-catalog-spill-runs.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill-runs.ts),
+with the spill root's own housekeeping in
+[`workspace-path-catalog-spill-sweep.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill-sweep.ts).
 The design rationale and measured trade-offs are in
 [plan §4.4 and §4.6](../explorer-name-filter-performance-plan.md).
 
@@ -98,9 +100,17 @@ it as corruption, never as an empty result.
 - The writer refuses to plan a directory region beyond its budget and re-checks
   `dataOffset + dataBytes` after every block; `SPILL_MAX_DISK_BYTES` and
   `SPILL_DISK_BUDGET_BYTES` are both **4 GiB**.
-- `cleanStaleWorkspacePathCatalogSpillDirectories` deletes numeric PID subdirectories under the
-  spill root whose owning process is not alive (`EPERM` counts as alive). The runs builder enforces
-  the 4 GiB budget against the whole process directory, not one file.
+- `cleanStaleWorkspacePathCatalogSpillDirectories`
+  ([`-spill-sweep.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill-sweep.ts))
+  deletes numeric PID subdirectories under the spill root whose owning process is not alive (`EPERM`
+  counts as alive). Liveness alone leaks, because a recycled PID passes that check forever, so a
+  sibling directory whose newest entry predates this process's start is stale too; one Orca process
+  holds the profile's instance lock, which is what rules a live sibling owner out. The runs builder
+  enforces the 4 GiB budget against the whole process directory, not one file.
+- `scheduleWorkspacePathCatalogSpillSweep` runs that sweep **once per spill root per process**, so a
+  launch that only restores checkpoints still collects what dead processes left behind: the sweep is
+  scheduled when the local service is created, deferred off that caller's turn, and never awaited.
+  The `begin-build` and `spill-resident` handlers also sweep before they prepare a directory.
 - `prepareWorkspacePathCatalogSpillDirectory` clears leftover `.wpc`, `.run`, and `.tmp` files in
   the process directory before a new build.
 - Generation/root disposal calls `removeWorkspacePathCatalogSpill`. If readers are active the
@@ -199,8 +209,8 @@ written, so a refused checkpoint never lands:
    existing checkpoint are summed.
 2. Whole checkpoints are evicted oldest-first until the total fits. A checkpoint is a rebuildable
    optimization; a live spill may be pinned by an in-flight scan, so **spills are never reclaimed
-   by the checkpoint path**. PID-dead spill directories stay `cleanStaleWorkspacePathCatalogSpillDirectories`'
-   job, as before.
+   by the checkpoint path**. Dead processes' spill directories stay the spill-root sweep's job
+   (`scheduleWorkspacePathCatalogSpillSweep`, once per process), as before.
 3. If the total still does not fit, the write is refused (`disk-cap`) and the root keeps the
    live-scan/rebuild path. That costs a provisional page and never correctness.
 

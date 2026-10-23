@@ -40,6 +40,7 @@ import {
   subscribeLocalPathIndexWatcher,
   unsubscribeLocalPathIndexWatcher
 } from '../ipc/filesystem-watcher-local-subscription'
+import { scheduleWorkspacePathCatalogSpillSweep } from './workspace-path-catalog-spill-sweep'
 
 export const WORKSPACE_PATH_INDEX_LISTING_POLICY_VERSION = 'quick-open-scope-v1'
 
@@ -55,16 +56,20 @@ export function createLocalWorkspacePathIndexService(
     return localService
   }
   localStore = store
+  const spillDirectory = join(
+    app.getPath('userData'),
+    'workspace-path-index-spill',
+    String(process.pid)
+  )
+  // Why (issue #156): a launch that restores every catalog from its checkpoint never begins a
+  // build, so the dead-process sweep cannot hang off `begin-build` alone. Deferred and unawaited.
+  void scheduleWorkspacePathCatalogSpillSweep(spillDirectory)
   let worker: WorkspacePathIndexWorkerClient | null = null
   const getWorker = (): WorkspacePathIndexWorkerClient => {
     worker ??= new WorkspacePathIndexWorkerClient({
       workerFactory: createDefaultWorkspacePathIndexWorker,
       onInstrumentation,
-      spillDirectory: join(
-        app.getPath('userData'),
-        'workspace-path-index-spill',
-        String(process.pid)
-      )
+      spillDirectory
     })
     return worker
   }

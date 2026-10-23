@@ -2,10 +2,8 @@ import { dirname } from 'node:path'
 import { WorkspacePathCatalogBuilder } from '../../shared/workspace-path-catalog-builder'
 import type { WorkspacePathSearchPathSet } from '../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchInstrumentationEvent } from '../../shared/workspace-path-search-instrumentation'
-import {
-  cleanStaleWorkspacePathCatalogSpillDirectories,
-  prepareWorkspacePathCatalogSpillDirectory
-} from './workspace-path-catalog-spill'
+import { cleanStaleWorkspacePathCatalogSpillDirectories } from './workspace-path-catalog-spill-sweep'
+import { prepareWorkspacePathCatalogSpillDirectory } from './workspace-path-catalog-spill'
 import { WorkspacePathCatalogSpillRuns } from './workspace-path-catalog-spill-runs'
 import {
   addWorkspacePathIndexOverlayBatch,
