@@ -367,7 +367,7 @@ export function ChecksPanelActiveContent({
         onLaunchAccepted={handleLaunchAccepted}
         onLaunchAborted={handleLaunchAborted}
         onLaunched={() => {
-          // Why: prompt delivery succeeded — the only point at which host replies/resolves may run.
+          // Why: prompt delivery succeeded — the only point at which host replies may run.
           consumeClaimedCommentResolutionAfterDeliveryRef.current()
           if (agentComposerState?.actionId === 'resolveConflicts') {
             toast.success(
@@ -379,7 +379,7 @@ export function ChecksPanelActiveContent({
             return
           }
           if (agentComposerState?.actionId === 'resolveComments') {
-            // Why: resolve/reply toast is emitted by resolveSelectedThreadsAfterLaunch.
+            // Why: reply toast is emitted by replyToSelectedCommentsAfterLaunch.
             return
           }
           toast.success(

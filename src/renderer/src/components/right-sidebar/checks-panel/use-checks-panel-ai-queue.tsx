@@ -1,4 +1,3 @@
-import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { buildResolvePullRequestConflictsPrompt } from '../SourceControl'
@@ -21,7 +20,6 @@ type ChecksPanelAiQueueInput = Pick<
 > &
   Pick<
     ChecksPanelControllerState,
-    | 'activeWorktree'
     | 'activeWorktreeId'
     | 'activeWorktreePath'
     | 'claimedCommentResolutionRef'
@@ -39,7 +37,6 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
   const {
     activeConflictReview,
     activeReview,
-    activeWorktree,
     activeWorktreeId,
     activeWorktreePath,
     claimedCommentResolutionRef,
@@ -150,31 +147,13 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
         }
       })()
       const githubTarget = githubTargetFromPr ?? githubTargetFromUrl
-      // Why: resolving needs no prRepo, so a degraded PR entry that only yields a number must
-      // still ack by resolving instead of failing every selected thread.
-      const githubResolveTarget =
-        githubTarget ??
-        (activeReview.provider === 'github' && prNumber
-          ? { repoPath: repo.path, repoId: repo.id, prNumber }
-          : undefined)
-      // Why: the ack resolves against this MR after delivery, so pin the iid now — the panel
-      // may already be showing a different review by then.
-      const gitlabTarget =
-        activeReview.provider === 'gitlab'
-          ? {
-              repoPath: repo.path,
-              repoId: repo.id,
-              iid: activeReview.number,
-              ownerHostId: forgeOwnerHostIdForWorkspace(repo, activeWorktree)
-            }
-          : undefined
+      // Why: the reply lands after delivery, so pin the review the agent is fixing now — the
+      // panel may already be showing a different review by then. Replies are GitHub-only today.
       const commentResolution = {
         reviewContextKey: stateRequestKey,
         provider: activeReview.provider,
         selectedGroups,
-        githubTarget,
-        githubResolveTarget,
-        gitlabTarget
+        githubTarget
       }
       claimedCommentResolutionRef.current = null
       commentResolutionLaunchAcceptedRef.current = false
@@ -182,17 +161,16 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
         actionId: 'resolveComments',
         title: translate(
           'auto.components.right.sidebar.ChecksPanel.d00ebdc402',
-          'Resolve {{value0}} Comments With AI',
+          'Fix {{value0}} Comments With AI',
           { value0: activeReview.provider === 'gitlab' ? 'MR' : 'PR' }
         ),
         // Why: only GitHub with a resolved PR target posts fixing replies; other providers
-        // must not be promised a reply the ack never sends. Resolvable threads are acked by
-        // resolving alone, so the copy leads with that.
+        // must not be promised a reply the ack never sends. Nothing here resolves a thread.
         description:
           githubTarget && activeReview.provider === 'github'
             ? translate(
                 'auto.components.right.sidebar.ChecksPanel.5eb2163b6b',
-                'Review the prompt before starting an agent. After the prompt is delivered, Orca resolves the selected host threads and replies to comments it cannot resolve.'
+                'Review the prompt before starting an agent. After the prompt is delivered, Orca replies to the selected comments and leaves every thread unresolved for you to close.'
               )
             : translate(
                 'auto.components.right.sidebar.ChecksPanel.abf59262fb',
@@ -215,7 +193,6 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
     },
     [
       activeReview,
-      activeWorktree,
       activeWorktreeId,
       activeWorktreePath,
       pr?.prRepo,
