@@ -33,7 +33,8 @@ const entry = {
 const COMPONENTS_TRANSITION_FIELD = {
   required: true,
   name: 'Component/s',
-  schema: { type: 'array', items: 'string', system: 'components' }
+  // A site reporting the reference item type rather than `string` must land here too.
+  schema: { type: 'array', items: 'component', system: 'components' }
 }
 
 const transition = {
