@@ -188,7 +188,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
         toast.error(
           translate(
             'auto.components.right.sidebar.ChecksPanel.f273f2271c',
-            'Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.{{value3}}',
+            'Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.{{value3}}',
             {
               value0: counts.replied,
               value1: counts.leftOpen,
@@ -202,7 +202,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       toast.success(
         translate(
           'auto.components.right.sidebar.ChecksPanel.aa95b81a3a',
-          'Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.',
+          'Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.',
           {
             value0: counts.replied,
             value1: counts.leftOpen,

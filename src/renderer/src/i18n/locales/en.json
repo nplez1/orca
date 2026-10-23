@@ -13957,9 +13957,9 @@
             "653c105ecc": "More PR actions",
             "f316a8ca2b": "No unresolved comments selected.",
             "d00ebdc402": "Fix {{value0}} Comments With AI",
-            "5eb2163b6b": "Review the prompt before starting an agent. After the prompt is delivered, Orca replies to the selected comments and leaves every thread unresolved for you to close.",
-            "f273f2271c": "Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.{{value3}}",
-            "aa95b81a3a": "Started the agent. Replied to {{value0}}, left {{value1}} for you to resolve, failed {{value2}}.",
+            "5eb2163b6b": "Review the prompt before starting an agent. After the prompt is delivered, Orca replies to comments it cannot resolve on the host and leaves every thread open for you to close.",
+            "f273f2271c": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.{{value3}}",
+            "aa95b81a3a": "Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.",
             "495b2f8c4b": "Started the agent, but could not reply on the selected comments.",
             "3c3ad3a1d2": "Started the agent. No selected comments can be marked resolved on the host.",
             "review": {

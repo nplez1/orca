@@ -170,7 +170,7 @@ export function useChecksPanelAiQueue(model: ChecksPanelAiQueueInput) {
           githubTarget && activeReview.provider === 'github'
             ? translate(
                 'auto.components.right.sidebar.ChecksPanel.5eb2163b6b',
-                'Review the prompt before starting an agent. After the prompt is delivered, Orca replies to the selected comments and leaves every thread unresolved for you to close.'
+                'Review the prompt before starting an agent. After the prompt is delivered, Orca replies to comments it cannot resolve on the host and leaves every thread open for you to close.'
               )
             : translate(
                 'auto.components.right.sidebar.ChecksPanel.abf59262fb',

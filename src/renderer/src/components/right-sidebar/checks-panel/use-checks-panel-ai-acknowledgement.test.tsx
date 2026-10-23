@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('sonner', () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError, message: vi.fn() }
 }))
+// Why: the pre-#166 GitLab ack resolved MR discussions through this client, not through the
+// GitHub resolver dep — so the spy below cannot catch a GitLab regression on its own.
+const gitlab = vi.hoisted(() => ({ resolveGitLabDiscussion: vi.fn(async () => ({ ok: true })) }))
+vi.mock('./gitlab-review-client', () => ({
+  resolveGitLabMRDiscussionForChecks: gitlab.resolveGitLabDiscussion
+}))
 
 const REVIEW_CONTEXT_KEY = 'repo-1::feature::acme/widgets::12::abc123'
 
@@ -135,6 +141,7 @@ beforeEach(() => {
   // Why: the pending ack payload is a module-level slot so it survives re-renders; a test that
   // leaves one behind would let the next test ack the wrong review.
   clearPendingPRCommentAiAck()
+  gitlab.resolveGitLabDiscussion.mockClear()
   mocks.toastSuccess.mockClear()
   mocks.toastError.mockClear()
 })
@@ -181,7 +188,7 @@ describe('useChecksPanelAiAcknowledgement', () => {
     const threadEntries = model.renderedComments().filter((entry) => entry.threadId === 'T1')
     expect(threadEntries).toContainEqual(expect.objectContaining({ id: 10, isResolved: false }))
     expect(threadEntries.every((entry) => entry.isResolved === false)).toBe(true)
-    expect(mocks.toastSuccess).toHaveBeenCalledWith(expect.stringContaining('left 1 for you'))
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(expect.stringContaining('left 1 open'))
   })
 
   // Why: a launch that never delivers is not evidence of anything — writing to the host on the
@@ -219,7 +226,31 @@ describe('useChecksPanelAiAcknowledgement', () => {
     expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
     expect(model.input.addPRConversationComment).not.toHaveBeenCalled()
     expect(model.resolveReviewThread).not.toHaveBeenCalled()
+    expect(gitlab.resolveGitLabDiscussion).not.toHaveBeenCalled()
     expect(model.renderedComments().every((entry) => entry.isResolved !== true)).toBe(true)
+  })
+
+  // Why: an open-thread selection on a PR whose repo could not be resolved writes nothing, but
+  // the launch itself succeeded — that is a success toast, not an error.
+  it('reports a thread-only selection with no reply target as a success', async () => {
+    const model = hookInput()
+    model.pendingCommentResolutionRef.current = {
+      ...mixedPayload(),
+      selectedGroups: [
+        { kind: 'thread', threadId: 'T1', root: reviewThreadComment(), replies: [] }
+      ],
+      githubTarget: undefined
+    }
+    const { result } = renderHook(() => useChecksPanelAiAcknowledgement(model.input))
+
+    act(() => result.current.handleLaunchAccepted())
+    act(() => result.current.consumeClaimedCommentResolutionAfterDeliveryRef.current())
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1))
+
+    expect(mocks.toastError).not.toHaveBeenCalled()
+    expect(model.input.addPRReviewCommentReply).not.toHaveBeenCalled()
+    expect(model.input.addPRConversationComment).not.toHaveBeenCalled()
+    expect(model.resolveReviewThread).not.toHaveBeenCalled()
   })
 
   it('reports a missing GitHub reply target instead of claiming success', async () => {
