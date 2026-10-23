@@ -647,6 +647,24 @@ silent `null` as a deleted row). `RelocationDependencies.setRepoPath` lost its `
 it: the plan's own row is in scope at the only call site, so the id was a second, weaker spelling of
 the same target.
 
+**A repo row's SSH host was read off the raw `connectionId`** (`check:repo-host-read-ratchet`). Both
+sites are hardening rather than a behaviour change, and the two are worth keeping distinct from the
+fix above. A row may name its host only as `executionHostId: 'ssh:<target>'`, which a raw read answers
+as local:
+
+- `register-worktree-catalog-handlers.ts` already refused those rows a line later through
+  `getRepoExecutionHostId(repo) !== LOCAL_EXECUTION_HOST_ID`, so no listing was served from the wrong
+  machine. The raw read was the bug waiting to happen: a row whose `connectionId` disagrees with its
+  `executionHostId` was excluded only by field order. It now goes through `isRepoOnCatalogHost`, the
+  strict gate the orcad migration paths already use, which is identical for every row shape upstream
+  produces and cannot be reordered into serving a remote checkout.
+- `runtime-repository-relocation-controller.ts` passed the raw `connectionId` to
+  `getRepoDefaultBranchName`, so an `ssh:`-only row resolved the default branch with a local `git`
+  spawn against a path this machine cannot read. The plan refuses a remote row
+  (`planPrimaryCheckoutRelocation` → `remote-host`) before that name is used, so the observable effect
+  was the wasted spawn and a null branch — but the lookup was one ordering change away from naming a
+  project folder from the wrong checkout. It now passes `getRepoRoutingConnectionId(repo)`.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,

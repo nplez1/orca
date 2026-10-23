@@ -4,6 +4,7 @@ import { isFolderRepo } from '../../../../shared/repo-kind'
 import {
   getRepoExecutionHostId,
   getRepoDialableSshTargetId,
+  isRepoOnCatalogHost,
   LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
@@ -139,9 +140,8 @@ export function registerWorktreeCatalogHandlers(context: WorktreeIpcContext): vo
       const repo = store.getRepo(entry.repoId)
       if (
         !repo ||
-        repo.connectionId ||
+        !isRepoOnCatalogHost(repo) ||
         isFolderRepo(repo) ||
-        getRepoExecutionHostId(repo) !== LOCAL_EXECUTION_HOST_ID ||
         repo.path !== entry.repoPath
       ) {
         continue

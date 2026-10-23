@@ -5,7 +5,7 @@
  * decision to the real filesystem, git, and store, and owns the host-scoped refusals.
  */
 import { mkdir, rename, stat } from 'node:fs/promises'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { getRepoExecutionHostId, getRepoRoutingConnectionId } from '../../shared/execution-host'
 import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
@@ -120,7 +120,13 @@ export class RuntimeRepositoryRelocationController {
       settings: store.getSettings(),
       // A checkout on a WSL filesystem resolves through the same repo path: when the distro cannot
       // answer, this reports no branch and the plan refuses rather than naming a folder by guess.
-      defaultBranchName: await getRepoDefaultBranchName(repo.path, repo.connectionId),
+      // Why the resolver: a row may name its SSH host only as `ssh:<target>`, and reading the raw
+      // `connectionId` answers "local" for it — the branch is then resolved by a local `git` run
+      // against a path this machine cannot read.
+      defaultBranchName: await getRepoDefaultBranchName(
+        repo.path,
+        getRepoRoutingConnectionId(repo)
+      ),
       platform: process.platform
     })
     if (decision.kind !== 'ready' || options.dryRun) {
