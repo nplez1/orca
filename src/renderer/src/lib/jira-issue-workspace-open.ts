@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 import {
   activateAndRevealFolderWorkspace,
   activateAndRevealWorktree
@@ -58,7 +59,7 @@ export function openJiraIssueWorkspaceOrStart(
   // workspace — strict identity first, then the fork's permissive URL-identity finder
   // — so the label and the click can never disagree about what they point at.
   const attached = findJiraIssueWorkspaceAttachmentForIssue(
-    [...state.allWorktrees(), ...state.folderWorkspaces.map(folderWorkspaceToWorktree)],
+    [...state.allWorktrees(), ...selectFolderWorkspaces(state).map(folderWorkspaceToWorktree)],
     issue,
     source
   )

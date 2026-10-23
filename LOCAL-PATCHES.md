@@ -674,6 +674,20 @@ before the list sees them, and a second box inside the section would AND with it
 therefore mount 50 rows plus a "more hosts" note, and the pane filter still reaches the last one.
 Nothing is computed while the section is closed.
 
+### `local(ratchets)`: the fourth lint drift, and the workspace-record baseline
+
+Behind those three in the chain sat `check:workspace-record-read-ratchet`, which the issue could not
+see for the same reason (`pnpm lint` never reached it). This one is the fork's own code against an
+upstream ratchet, like the three above, so it is repaired where the code is ours:
+`jira-issue-workspace-open.ts` and `worktree-pr-comment-inline.ts` read through
+`workspace-record-selectors.ts` now, and the two store slices stay in the baseline under the convention
+it already uses for writers — `hydrate-cached-worktrees.ts` hands the slice it rewrites to the merge,
+and `worktree-rename-across-hosts.ts` computes the next slice for every host publishing the row. The
+row for `useDashboardPopoutBridge.ts` was pruned: that file no longer exists, and the ratchet fails on
+a row it cannot reproduce until it is. Three baseline lines in
+`config/workspace-record-read-baseline.txt` therefore belong to this fork — the evidence for them is
+this paragraph, as with the red sets.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,
