@@ -45,7 +45,7 @@ export function findRepoRowForHostScopedWrite(
     .map((candidate) => getRepoExecutionHostId(candidate))
   if (storedHostIds.length > 0) {
     console.error(
-      `[persistence] Discarded a repo update for ${id}: requested host ${hostId}, but the row is stored on ${storedHostIds.join(', ')}. Address updateRepo by the row's own executionHostId stamp.`
+      `[persistence] Discarded a host-scoped write for ${id}: requested host ${hostId}, but the row is stored on ${storedHostIds.join(', ')}. Address the write by the row's own executionHostId stamp.`
     )
   }
   return undefined
@@ -276,9 +276,16 @@ export class RepoUpdatePersistenceOperations {
    * ids and catalog keys are derived from it, so every writer that got one would have to re-key
    * them. Relocating a checkout is the one flow that must move it, and it re-keys explicitly —
    * see `relocatePrimaryCheckout`. Deliberately absent from `updateRepo`'s field list.
+   *
+   * Addressed by the row's own host identity: two execution hosts can publish one repo id, and the
+   * checkout being moved belongs to exactly one machine.
    */
-  relocateRepoPath(id: string, newPath: string): Repo | null {
-    const repo = this.state.repos.find((candidate) => candidate.id === id)
+  relocateRepoPath(target: RepoHostTarget, newPath: string): Repo | null {
+    const repo = findRepoRowForHostScopedWrite(
+      this.state.repos,
+      target.id,
+      getRepoExecutionHostId(target)
+    )
     if (!repo || !newPath) {
       return null
     }
@@ -292,7 +299,7 @@ export class RepoUpdatePersistenceOperations {
       repo.folderUpgradeGitRootPath = newPath
     }
     repo.path = newPath
-    this.bumpLocalWorktreeScanGeneration(id)
+    this.bumpLocalWorktreeScanGeneration(repo.id)
     this.scheduleSave()
     return this.hydrateRepo(repo)
   }

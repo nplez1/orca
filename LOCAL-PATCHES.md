@@ -624,6 +624,29 @@ run is reported unseen, which is the prune signal for one observed once and neve
 `test` title over a file-level `*` as soon as the failing name is known — a file-level entry also masks
 a new failure inside that file.
 
+### `local(ratchets)`: `pnpm lint` was red on `nplez1/main` (#161)
+
+`pnpm lint` failed on this fork's own default branch. The ratchets that failed are upstream's
+(`config/scripts/check-*.mjs` and their baselines are present on `upstream/main`, and no script is
+modified here), but **the offending call sites are all this fork's own code** — checked against
+`upstream/main`: it has no `relocateRepoPath`, no `project-folder-relocation.ts`, no hidden-host
+section in `SshTargetList.tsx` and no cached-listing host gate. #161 read the three as foreign because
+they look like upstream files failing; the distinction decides fix-versus-allowlist, so it is worth
+being precise: there was no upstream copy to wait for, and fixing them costs no sync. Each is a real
+defect, so each is repaired rather than baseline-hidden. A fourth drift the issue could not see is
+handled in § `local(ratchets)`: the fourth lint drift — the only one of the four that changes a
+baseline, and it adds fork-owned rows rather than allowing an upstream one.
+
+**A repo relocation addressed its row by bare id** (`check:id-only-store-write-ratchet`).
+`relocateRepoPath(id, newPath)` resolved `state.repos.find((candidate) => candidate.id === id)`, and a
+repo id can be published by two execution hosts — so with one id registered on two hosts, a
+primary-checkout relocation rewrote whichever row came first, moving a path that belongs to one
+machine. It now takes `RepoHostTarget` and resolves the row through `findRepoRowForHostScopedWrite`,
+the gate `updateRepo` already uses (and which reports a host mismatch instead of returning the same
+silent `null` as a deleted row). `RelocationDependencies.setRepoPath` lost its `repoId` argument with
+it: the plan's own row is in scope at the only call site, so the id was a second, weaker spelling of
+the same target.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,

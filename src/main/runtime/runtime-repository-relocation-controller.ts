@@ -151,8 +151,10 @@ export class RuntimeRepositoryRelocationController {
           // usage error and the move rolls back, which is the safe outcome but not a friendly one.
           await gitExecFileAsync(['worktree', 'repair'], { cwd: movedRepoPath })
         },
-        setRepoPath: (repoId, newPath) => {
-          const updated = store.relocateRepoPath?.(repoId, newPath)
+        setRepoPath: (newPath) => {
+          // Why the row and not its id: a repo id can be published by two execution hosts, and only
+          // this one's checkout moved — the write has to name the host with the id.
+          const updated = store.relocateRepoPath?.(repo, newPath)
           if (!updated) {
             throw new Error('repo_not_found')
           }
