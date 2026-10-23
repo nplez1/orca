@@ -12,7 +12,7 @@ const electronMock = vi.hoisted(() => ({ getPath: vi.fn<(name: string) => string
 
 vi.mock('electron', () => ({ app: { getPath: electronMock.getPath } }))
 
-// Above any default pid_max, so an ambient process can never make this case flaky.
+// No live process can hold this pid: above POSIX pid_max, and Windows pids are multiples of 4.
 const DEAD_PID = '99999999'
 
 let userDataDirectory: string | null = null

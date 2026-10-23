@@ -69,7 +69,7 @@ export function scheduleWorkspacePathCatalogSpillSweep(processDirectory: string)
   const sweep = new Promise<void>((resolve) => setImmediate(resolve))
     .then(() => cleanStaleWorkspacePathCatalogSpillDirectories(processDirectory))
     .catch(() => {
-      // A failed sweep must not memoize itself: the next caller gets to try again.
+      // A sweep that cannot read its root must not memoize itself; the next caller retries.
       sweepsByRoot.delete(rootDirectory)
     })
   sweepsByRoot.set(rootDirectory, sweep)

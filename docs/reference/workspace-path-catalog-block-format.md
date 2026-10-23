@@ -104,8 +104,9 @@ it as corruption, never as an empty result.
   ([`-spill-sweep.ts`](../../src/main/workspace-path-index/workspace-path-catalog-spill-sweep.ts))
   deletes numeric PID subdirectories under the spill root whose owning process is not alive (`EPERM`
   counts as alive). Liveness alone leaks, because a recycled PID passes that check forever, so a
-  sibling directory whose newest entry predates this process's start is stale too; one Orca process
-  holds the profile's instance lock, which is what rules a live sibling owner out. The runs builder
+  sibling directory whose newest entry predates this process's start is stale too; that is only
+  sound while the profile's instance lock is held, which is what rules a live sibling owner out
+  (the diagnostics-only lock bypass does not). The runs builder
   enforces the 4 GiB budget against the whole process directory, not one file.
 - `scheduleWorkspacePathCatalogSpillSweep` runs that sweep **once per spill root per process**, so a
   launch that only restores checkpoints still collects what dead processes left behind: the sweep is

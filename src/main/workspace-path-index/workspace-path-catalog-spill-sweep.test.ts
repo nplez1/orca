@@ -7,7 +7,7 @@ import {
   scheduleWorkspacePathCatalogSpillSweep
 } from './workspace-path-catalog-spill-sweep'
 
-// Above any default pid_max, so an ambient process can never make a dead-PID case flaky.
+// No live process can hold this pid: above POSIX pid_max, and Windows pids are multiples of 4.
 const DEAD_PID = '99999999'
 const RECYCLED_PID = '5150'
 const OLD_ENOUGH = new Date('2026-10-15T09:41:00.000Z')
