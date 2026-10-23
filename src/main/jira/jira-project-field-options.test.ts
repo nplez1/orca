@@ -59,17 +59,51 @@ const COMPONENT_RECORDS = [
 ]
 const VERSION_RECORDS = [
   { id: '10100', name: '1.0', released: true },
+  // Why dropped: Jira's own picker hides archived versions and refuses to set one.
+  { id: '10101', name: '0.9-legacy', archived: true },
   // No id: Jira would reject a reference to it, so it is not offered.
   { name: 'nameless' }
 ]
 
-describe('projectKeyOfIssueKey', () => {
-  it('splits the project off an issue key', async () => {
-    const { projectKeyOfIssueKey } = await import('./jira-project-field-options')
-    expect(projectKeyOfIssueKey('APP-1')).toBe('APP')
-    expect(projectKeyOfIssueKey('AB_C-1234')).toBe('AB_C')
-    // A key with no number keeps itself rather than becoming empty.
-    expect(projectKeyOfIssueKey('APP')).toBe('APP')
+describe('readIssueProjectKey', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isAuthErrorMock.mockReturnValue(false)
+  })
+
+  it('asks Jira which project the issue is in', async () => {
+    // Why not the key's prefix: a moved issue keeps answering to its old key, and a
+    // numeric id would be read as a project id.
+    jiraRequestMock.mockResolvedValue({ fields: { project: { key: 'NEW', name: 'New home' } } })
+    const { readIssueProjectKey } = await import('./jira-project-field-options')
+
+    expect(await readIssueProjectKey(entry, 'APP-1')).toBe('NEW')
+    expect(jiraRequestMock.mock.calls[0]?.[1]).toBe('/rest/api/3/issue/APP-1?fields=project')
+  })
+
+  it('returns an empty key when the read fails, rather than guessing one', async () => {
+    jiraRequestMock.mockRejectedValue(new Error('boom'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { readIssueProjectKey } = await import('./jira-project-field-options')
+
+    expect(await readIssueProjectKey(entry, 'APP-1')).toBe('')
+    warn.mockRestore()
+  })
+
+  it('returns an empty key when the response carries no project', async () => {
+    jiraRequestMock.mockResolvedValue({ fields: {} })
+    const { readIssueProjectKey } = await import('./jira-project-field-options')
+
+    expect(await readIssueProjectKey(entry, 'APP-1')).toBe('')
+  })
+
+  it('clears the token and rethrows an auth failure', async () => {
+    jiraRequestMock.mockRejectedValue(new Error('401'))
+    isAuthErrorMock.mockReturnValue(true)
+    const { readIssueProjectKey } = await import('./jira-project-field-options')
+
+    await expect(readIssueProjectKey(entry, 'APP-1')).rejects.toThrow('401')
+    expect(clearTokenMock).toHaveBeenCalledWith('site-1')
   })
 })
 
@@ -109,6 +143,7 @@ describe('readProjectFieldOptions', () => {
 
     const options = await readProjectFieldOptions(entry, 'APP', [VERSIONS, FIX_VERSIONS])
 
+    // The archived and the id-less entries are gone; the released one stays assignable.
     expect(options.versions).toEqual([{ id: '10100', name: '1.0' }])
     expect(jiraRequestMock.mock.calls.map((call) => call[1])).toEqual([
       '/rest/api/3/project/APP/versions'
@@ -164,6 +199,18 @@ describe('readProjectFieldOptions', () => {
     await readProjectFieldOptions(entry, 'APP/X', [COMPONENTS])
 
     expect(jiraRequestMock.mock.calls[0]?.[1]).toBe('/rest/api/3/project/APP%2FX/components')
+  })
+})
+
+describe('needsProjectFieldOptions', () => {
+  it('asks for a list only for a reference field Jira listed no values for', async () => {
+    const { needsProjectFieldOptions } = await import('./jira-project-field-options')
+
+    expect(needsProjectFieldOptions(COMPONENTS)).toBe(true)
+    expect(
+      needsProjectFieldOptions({ ...COMPONENTS, allowedValues: [{ id: '10400', name: 'Web' }] })
+    ).toBe(false)
+    expect(needsProjectFieldOptions(LABELS)).toBe(false)
   })
 })
 

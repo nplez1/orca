@@ -30,6 +30,12 @@ const entry = {
   site: { id: 'site-1', siteUrl: 'https://jira.example.com' },
   authorization: 'token'
 }
+const COMPONENTS_TRANSITION_FIELD = {
+  required: true,
+  name: 'Component/s',
+  schema: { type: 'array', items: 'string', system: 'components' }
+}
+
 const transition = {
   id: '31',
   name: 'Close',
@@ -93,6 +99,9 @@ describe('required Jira transition fields', () => {
       if (path.endsWith('/components')) {
         return [{ id: '10400', name: 'Web' }]
       }
+      if (path.endsWith('?fields=project')) {
+        return { fields: { project: { key: 'APP', name: 'Alpha' } } }
+      }
       return {
         fields: {
           resolution: null,
@@ -121,8 +130,39 @@ describe('required Jira transition fields', () => {
     expect(byKey.resolution?.currentValue).toBeUndefined()
     expect(jiraRequest.mock.calls.map((call) => call[1])).toEqual([
       '/rest/api/3/issue/APP-1/transitions?expand=transitions.fields',
+      // Why the project read: the issue key's prefix is not proof of the project.
+      '/rest/api/3/issue/APP-1?fields=project',
       '/rest/api/3/project/APP/components',
       '/rest/api/3/issue/APP-1?fields=resolution,components,customfield_10002'
+    ])
+  })
+
+  it('keeps the text box when the issue project cannot be read', async () => {
+    // Why: without a project there is no list to offer, and guessing one from the key
+    // would offer another project's components after the issue moved.
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [{ ...transition, fields: { components: COMPONENTS_TRANSITION_FIELD } }]
+        }
+      }
+      if (path.endsWith('?fields=project')) {
+        throw new JiraApiError('Forbidden', 403)
+      }
+      return { fields: {} }
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { listTransitions } = await import('./jira-transition-queries')
+
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    warn.mockRestore()
+
+    expect(loaded.fields?.[0]?.allowedValues).toBeUndefined()
+    expect(jiraRequest.mock.calls.map((call) => call[1])).toEqual([
+      '/rest/api/3/issue/APP-1/transitions?expand=transitions.fields',
+      '/rest/api/3/issue/APP-1?fields=project',
+      // The value read still runs; it just has no list to draft an id against.
+      '/rest/api/3/issue/APP-1?fields=components'
     ])
   })
 

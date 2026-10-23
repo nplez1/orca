@@ -6,7 +6,8 @@ import { clearToken, getClients, isAuthError } from './client'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField, mapStatus } from './jira-issue-mapping'
 import {
-  projectKeyOfIssueKey,
+  needsProjectFieldOptions,
+  readIssueProjectKey,
   readProjectFieldOptions,
   withJiraProjectFieldOptions
 } from './jira-project-field-options'
@@ -102,7 +103,7 @@ async function attachCurrentValues(
  * Gives a components/versions field on a transition screen the project's own list, so
  * the form offers a picker that submits a reference instead of a text box whose string
  * Jira rejects. Runs before the value read, which drafts an entry as the id only once
- * the list can match it.
+ * the list can match it. Costs nothing when no field on the screens needs a list.
  */
 async function attachProjectFieldOptions(
   entry: ReturnType<typeof getClients>[number],
@@ -110,10 +111,16 @@ async function attachProjectFieldOptions(
   transitions: JiraTransition[]
 ): Promise<void> {
   const fields = transitions.flatMap((transition) => transition.fields ?? [])
-  if (fields.length === 0) {
+  if (!fields.some(needsProjectFieldOptions)) {
     return
   }
-  const options = await readProjectFieldOptions(entry, projectKeyOfIssueKey(key), fields)
+  // Why the read: the key's prefix is not proof of the project, since a moved issue
+  // keeps answering to its old key.
+  const projectKey = await readIssueProjectKey(entry, key)
+  if (!projectKey) {
+    return
+  }
+  const options = await readProjectFieldOptions(entry, projectKey, fields)
   for (const transition of transitions) {
     if (transition.fields) {
       transition.fields = transition.fields.map((field) =>

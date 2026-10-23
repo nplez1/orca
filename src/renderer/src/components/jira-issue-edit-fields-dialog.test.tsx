@@ -214,7 +214,7 @@ describe('JiraIssueEditFieldsDialog', () => {
     )
   })
 
-  it('clears every component by submitting null', async () => {
+  it('clears every component by submitting an empty array', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue({ ok: true })
     render(
@@ -235,7 +235,8 @@ describe('JiraIssueEditFieldsDialog', () => {
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
-        customFields: { components: null },
+        // Jira clears an array field with an empty array, not null.
+        customFields: { components: [] },
         userFieldKeys: [],
         textFieldKeys: []
       })

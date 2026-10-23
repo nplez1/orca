@@ -62,6 +62,28 @@ describe('resolveJiraFieldControlKind', () => {
     ).toBe('textList')
   })
 
+  it('does not depend on which item type a site reports for these fields', () => {
+    // Sites report `items: string` or `items: component`/`version` for the same field, and
+    // neither shape can be trusted to decide the control.
+    expect(
+      resolveJiraFieldControlKind(
+        field({
+          key: 'components',
+          schema: { type: 'array', items: 'component', system: 'components' },
+          allowedValues: [{ id: '10400', name: 'Web' }]
+        })
+      )
+    ).toBe('optionList')
+    expect(
+      resolveJiraFieldControlKind(
+        field({
+          key: 'fixVersions',
+          schema: { type: 'array', items: 'version', system: 'fixVersions' }
+        })
+      )
+    ).toBe('textList')
+  })
+
   it('leaves an option list Jira names no values for unrenderable rather than guessing', () => {
     expect(resolveJiraFieldControlKind(field({ schema: { type: 'array', items: 'option' } }))).toBe(
       null
@@ -128,6 +150,12 @@ describe('resolveJiraObjectListFieldKind', () => {
     ).toBeNull()
     expect(resolveJiraObjectListFieldKind(objectList({ key: 'labels' }))).toBeNull()
     expect(resolveJiraObjectListFieldKind(field({ schema: { type: 'string' } }))).toBeNull()
+    // A custom field is never one of the three, whatever its own custom type is called.
+    expect(
+      resolveJiraObjectListFieldKind(
+        objectList({ key: 'customfield_10003', schema: { type: 'array', custom: 'components' } })
+      )
+    ).toBeNull()
   })
 })
 

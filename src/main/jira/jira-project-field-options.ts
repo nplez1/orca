@@ -6,6 +6,7 @@ import {
 import { apiBasePath, jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, isAuthError } from './client'
 import { mapCreateFieldAllowedValue } from './jira-issue-mapping'
+import { asRecord, asString, type JiraRecord } from './jira-record-pages'
 
 /**
  * A project's own reference lists, keyed by the field kind that needs them.
@@ -22,11 +23,37 @@ const PROJECT_LIST_PATHS: Record<JiraObjectListFieldKind, string> = {
   versions: 'versions'
 }
 
-/** The project an issue key belongs to. Jira issue keys are `<project key>-<number>`
- *  and a project key never contains a dash, so the last dash splits the two. */
-export function projectKeyOfIssueKey(issueKey: string): string {
-  const separator = issueKey.lastIndexOf('-')
-  return separator > 0 ? issueKey.slice(0, separator) : issueKey
+/** True when a field needs its project's list: a reference-holding system field that
+ *  Jira supplied no values for. */
+export function needsProjectFieldOptions(field: JiraCreateField): boolean {
+  return resolveJiraObjectListFieldKind(field) !== null && !field.allowedValues?.length
+}
+
+/**
+ * The project an issue actually lives in, read from Jira rather than split off its key:
+ * a moved issue keeps answering to its old key, and a numeric issue id would be taken
+ * for a project id and load another project's lists. '' when the read fails, which
+ * leaves the field on the text box its submission sends names from.
+ */
+export async function readIssueProjectKey(
+  entry: JiraClientForSite,
+  issueKey: string
+): Promise<string> {
+  try {
+    const response = await jiraRequest<JiraRecord>(
+      entry,
+      `${apiBasePath(entry.site)}/issue/${encodeURIComponent(issueKey)}?fields=project`
+    )
+    const values = asRecord(asRecord(response).fields)
+    return asString(asRecord(values.project).key)
+  } catch (error) {
+    if (isAuthError(error)) {
+      clearToken(entry.site.id)
+      throw error
+    }
+    console.warn('[jira] issue project read failed:', error)
+    return ''
+  }
 }
 
 async function readProjectList(
@@ -44,8 +71,11 @@ async function readProjectList(
     return []
   }
   // Why the id: it is what the submission carries, so a list entry without one
-  // cannot name a value Jira would accept and is not offered.
+  // cannot name a value Jira would accept and is not offered. Why archived versions are
+  // dropped: Jira's own picker hides them and refuses to set one, and an issue that
+  // already holds one still shows it as an orphan row in the control.
   return response
+    .filter((record) => kind !== 'versions' || asRecord(record).archived !== true)
     .map((record) => mapCreateFieldAllowedValue(record))
     .filter((option) => Boolean(option.id && option.name))
 }
@@ -67,7 +97,7 @@ export async function readProjectFieldOptions(
     const kind = resolveJiraObjectListFieldKind(field)
     // Why skip a field Jira already lists: a site that supplies allowedValues scopes
     // them to the screen the field came from, which is more specific than the project.
-    if (kind && !field.allowedValues?.length) {
+    if (kind && needsProjectFieldOptions(field)) {
       kinds.add(kind)
     }
   }

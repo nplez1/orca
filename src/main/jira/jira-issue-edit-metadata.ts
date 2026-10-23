@@ -8,11 +8,7 @@ import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField } from './jira-issue-mapping'
-import {
-  projectKeyOfIssueKey,
-  readProjectFieldOptions,
-  withJiraProjectFieldOptions
-} from './jira-project-field-options'
+import { readProjectFieldOptions, withJiraProjectFieldOptions } from './jira-project-field-options'
 import { asRecord, asString, type JiraRecord } from './jira-record-pages'
 
 /** True when Jira lets this user write the field. Custom-field keys are the
@@ -64,13 +60,16 @@ export async function listEditFields(
     }
     // Why before the control check and the draft: a components field has no allowedValues
     // of its own, so it is only renderable — and only drafts as the id Jira accepts —
-    // once the project's list is attached.
-    const projectKey = asString(asRecord(values.project).key) || projectKeyOfIssueKey(key)
-    const options = await readProjectFieldOptions(
-      entry,
-      projectKey,
-      offered.map((candidate) => candidate.field)
-    )
+    // once the project's list is attached. No project key means no list: guessing it from
+    // the issue key would offer another project's components after the issue moved.
+    const projectKey = asString(asRecord(values.project).key)
+    const options = projectKey
+      ? await readProjectFieldOptions(
+          entry,
+          projectKey,
+          offered.map((candidate) => candidate.field)
+        )
+      : {}
     const editable: JiraEditableField[] = []
     for (const candidate of offered) {
       const field = withJiraProjectFieldOptions(candidate.field, options)

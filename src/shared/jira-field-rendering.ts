@@ -64,11 +64,14 @@ export function resolveJiraFieldControlKind(field: JiraCreateField): JiraFieldCo
   if (type === 'array' && items === 'user') {
     return 'userList'
   }
+  // Why before the `items` branches: Jira reports these three as `items: string` on some
+  // sites and `items: component`/`items: version` on others, so the reference shape — not
+  // the item type — is what decides the control.
+  if (objectListKind !== null) {
+    return hasOptions ? 'optionList' : 'textList'
+  }
   if (type === 'array' && items === 'string') {
-    // A components/versions field says `string` but holds references, so it gets the
-    // picker that carries the ids once the project's own list has been read for it.
-    // Without that list it keeps the text box, and the submission sends names.
-    return objectListKind !== null && hasOptions ? 'optionList' : 'textList'
+    return 'textList'
   }
   // An option list holds ids it must submit back, so it gets a control that can
   // name the options rather than a text box that would show the ids themselves.

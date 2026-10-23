@@ -288,6 +288,31 @@ describe('Jira issue edit metadata', () => {
     expect(jiraRequestMock.mock.calls[1]?.[1]).toBe('/rest/api/3/project/ALP/components')
   })
 
+  it('keeps the text box when the edit read names no project', async () => {
+    // Why: without a project there is no list to read, and guessing one from the issue
+    // key would offer another project's components to an issue that has moved.
+    jiraRequestMock.mockResolvedValue({
+      fields: { components: [{ id: '10401', name: 'Platform' }] },
+      editmeta: {
+        fields: {
+          components: {
+            name: 'Component/s',
+            required: false,
+            schema: { type: 'array', items: 'string', system: 'components' },
+            operations: ['set']
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const [field] = await listEditFields('ALP-1', 'site-1')
+
+    expect(field?.field.allowedValues).toBeUndefined()
+    expect(field?.value).toBe('Platform')
+    expect(jiraRequestMock).toHaveBeenCalledTimes(1)
+  })
+
   it('returns nothing when no site is connected', async () => {
     getClientsMock.mockReturnValue([])
     const { listEditFields } = await import('./issues')
