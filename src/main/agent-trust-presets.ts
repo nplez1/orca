@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeFileAtomically } from './codex-accounts/fs-utils'
+import { runKeyedSerializedOperation } from './cli/keyed-promise-queue'
 import { upsertProjectTrustLevel } from './codex/config-toml-trust'
 import { runExclusivelyForCodexTrustConfig } from './codex/codex-trust-config-mutation-queue'
 import type { TuiAgentConfig } from '../shared/tui-agent-config'
@@ -36,8 +38,11 @@ export type AgentTrustPreset = NonNullable<TuiAgentConfig['preflightTrust']>
  * (versions/2026.04.17-787b533/index.ts: `_=".workspace-trusted"`, slug
  * derived via the same util that resolves `~/.cursor/projects/<slug>`).
  */
-export function markCursorWorkspaceTrusted(workspacePath: string, home: string): void {
-  const absPath = canonicalize(workspacePath)
+export async function markCursorWorkspaceTrusted(
+  workspacePath: string,
+  home: string
+): Promise<void> {
+  const absPath = await canonicalize(workspacePath)
   const slug = cursorWorkspaceSlug(absPath)
   if (!slug) {
     return
@@ -66,39 +71,16 @@ export function markCursorWorkspaceTrusted(workspacePath: string, home: string):
  * We append to the array in-place so unrelated config keys (loggedInUsers,
  * copilotTokens, etc.) survive untouched.
  */
-export function markCopilotFolderTrusted(workspacePath: string, home: string): void {
-  const absPath = canonicalize(workspacePath)
+export async function markCopilotFolderTrusted(workspacePath: string, home: string): Promise<void> {
   const configDir = join(home, '.copilot')
-  const configPath = join(configDir, 'config.json')
-  let config: Record<string, unknown> = {}
-  try {
-    if (existsSync(configPath)) {
-      const raw = readFileSync(configPath, 'utf-8')
-      const parsed: unknown = JSON.parse(raw)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        config = Object.fromEntries(Object.entries(parsed))
-      }
-    }
-  } catch {
-    // Why: a corrupted config.json is the user's to fix — refuse to overwrite
-    // it from this side-effect path. Copilot will rewrite the file itself
-    // after the user accepts the trust prompt manually.
-    return
-  }
-  const existing = Array.isArray(config.trustedFolders) ? (config.trustedFolders as unknown[]) : []
-  const normalizedExisting = existing.map((entry) =>
-    typeof entry === 'string' ? canonicalize(entry) : null
-  )
-  if (normalizedExisting.includes(absPath)) {
-    return
-  }
-  const next = [...existing.filter((e) => typeof e === 'string'), absPath]
-  config.trustedFolders = next
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true })
-  }
-  // Why: config.json can hold copilotTokens, so it must stay owner-only (also on shared SSH hosts).
-  writeFileAtomically(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })
+  await appendTrustedConfigEntry({
+    configPath: join(configDir, 'config.json'),
+    configDir,
+    key: 'trustedFolders',
+    workspacePath,
+    // Why: config.json can hold copilotTokens, so it must stay owner-only (also on shared SSH hosts).
+    mode: 0o600
+  })
 }
 
 /**
@@ -121,37 +103,97 @@ export function markCopilotFolderTrusted(workspacePath: string, home: string): v
  * We append in-place so the sibling keys in the same file (model, permissions,
  * toolPermission, agentMode, …) survive untouched.
  */
-export function markAntigravityWorkspaceTrusted(workspacePath: string, home: string): void {
-  const absPath = canonicalize(workspacePath)
+export async function markAntigravityWorkspaceTrusted(
+  workspacePath: string,
+  home: string
+): Promise<void> {
   const configDir = join(home, '.gemini', 'antigravity-cli')
-  const configPath = join(configDir, 'settings.json')
-  let config: Record<string, unknown> = {}
+  await appendTrustedConfigEntry({
+    configPath: join(configDir, 'settings.json'),
+    configDir,
+    key: 'trustedWorkspaces',
+    workspacePath
+  })
+}
+
+/** An agent config that holds an array of trusted folder paths, keyed by one property. */
+type TrustedEntryConfig = {
+  configPath: string
+  configDir: string
+  key: 'trustedFolders' | 'trustedWorkspaces'
+  workspacePath: string
+  mode?: number
+}
+
+const trustedConfigWriteQueue = new Map<string, Promise<void>>()
+
+/** The config as a plain object, `{}` when absent, or null when it cannot be extended as one. */
+function readTrustedConfig(configPath: string): Record<string, unknown> | null {
+  if (!existsSync(configPath)) {
+    return {}
+  }
   try {
-    if (existsSync(configPath)) {
-      const raw = readFileSync(configPath, 'utf-8')
-      const parsed = JSON.parse(raw)
-      if (parsed && typeof parsed === 'object') {
-        config = parsed as Record<string, unknown>
-      }
-    }
+    const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'))
+    // Why null and not `{}`: a top level that is not an object is not a config this path can extend,
+    // and writing over it would drop whatever the agent keeps there.
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? Object.fromEntries(Object.entries(parsed))
+      : null
   } catch {
-    // Why: a corrupted settings.json is the user's to fix — refuse to
-    // overwrite it from this side-effect path. agy rewrites the file itself
-    // once the user accepts the trust prompt manually.
+    // Why: a corrupted config is the user's to fix — refuse to overwrite it from this
+    // side-effect path. The agent rewrites the file itself after the user accepts the prompt.
+    return null
+  }
+}
+
+function trustedEntries(config: Record<string, unknown>, key: TrustedEntryConfig['key']): string[] {
+  const value = config[key]
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : []
+}
+
+/**
+ * Appends `workspacePath` to an agent's trusted-folder array, at most once.
+ *
+ * Why re-read before writing: realpath awaits open a window the sync version did not have. Two
+ * launches at once both read N entries and both write N+1, so one workspace loses its entry; and
+ * when the trusted folders sit on a stalled volume, the entry realpaths outlast the launch deadline
+ * and a late write would put back a snapshot that has already missed the agent's own rewrite (an
+ * entry, `copilotTokens`, …). So the file is read again in the same tick as the write, and Orca's
+ * writers for one config are serialized.
+ */
+async function appendTrustedConfigEntry(args: TrustedEntryConfig): Promise<void> {
+  const absPath = await canonicalize(args.workspacePath)
+  const initial = readTrustedConfig(args.configPath)
+  if (!initial) {
     return
   }
-  const existing = Array.isArray(config.trustedWorkspaces) ? config.trustedWorkspaces : []
-  const normalizedExisting = existing.map((entry) =>
-    typeof entry === 'string' ? canonicalize(entry) : null
-  )
-  if (normalizedExisting.includes(absPath)) {
-    return
+  // Why one at a time: entries on a dead mount would otherwise pin every libuv fs thread at once.
+  for (const entry of trustedEntries(initial, args.key)) {
+    if ((await canonicalize(entry)) === absPath) {
+      return
+    }
   }
-  config.trustedWorkspaces = [...existing.filter((e) => typeof e === 'string'), absPath]
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true })
-  }
-  writeFileAtomically(configPath, `${JSON.stringify(config, null, 2)}\n`)
+  await runKeyedSerializedOperation(trustedConfigWriteQueue, args.configPath, async () => {
+    const config = readTrustedConfig(args.configPath)
+    if (!config) {
+      return
+    }
+    const existing = trustedEntries(config, args.key)
+    if (existing.includes(absPath)) {
+      return
+    }
+    config[args.key] = [...existing, absPath]
+    if (!existsSync(args.configDir)) {
+      mkdirSync(args.configDir, { recursive: true })
+    }
+    writeFileAtomically(
+      args.configPath,
+      `${JSON.stringify(config, null, 2)}\n`,
+      args.mode === undefined ? undefined : { mode: args.mode }
+    )
+  })
 }
 
 /**
@@ -165,12 +207,12 @@ export function markAntigravityWorkspaceTrusted(workspacePath: string, home: str
  * `configFiles` names every config.toml the launched Codex may read, in the
  * hook installer's lock order (an Orca-owned CODEX_HOME before the system one).
  */
-export function markCodexProjectTrusted(
+export async function markCodexProjectTrusted(
   workspacePath: string,
   configFiles: readonly string[]
 ): Promise<void> {
   // Why: Codex checks the cwd's own entry before the repo root, so no git-layout logic is needed.
-  const absPath = canonicalize(workspacePath)
+  const absPath = await canonicalize(workspacePath)
   // Why (#16441): hook installs read and rewrite these files across awaits, so
   // an unqueued write here could land between their read and their write and be
   // lost. Same runtime-before-system lock order the installer takes.
@@ -185,19 +227,18 @@ export function markCodexProjectTrusted(
   return write()
 }
 
-function canonicalize(p: string): string {
+async function canonicalize(p: string): Promise<string> {
   // Why: macOS reports `/tmp/x` and `/private/tmp/x` as the same inode, but
   // both Cursor and Copilot's trust comparators run realpath() before the
   // string compare. Mirror that so a worktree under a symlinked parent
   // (orca caches realpath()'d worktree paths) matches the agent's lookup.
+  // Why async: realpath on the workspace path is a probe of the repo's volume, and a stalled one
+  // would freeze the app mid-launch. A missing path throws and keeps the raw input, as existsSync did.
   try {
-    if (existsSync(p)) {
-      return realpathSync.native(p)
-    }
+    return await realpath(p)
   } catch {
-    // Fall through to the raw input.
+    return p
   }
-  return p
 }
 
 function cursorWorkspaceSlug(absPath: string): string {

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { realpath } from 'node:fs/promises'
 import {
   chmodSync,
   existsSync,
@@ -282,18 +283,15 @@ async function updateClaudeGlobalConfigNow(args: {
   }
 }
 
-/** Keys for `workspacePath` as Claude will see it: the given and realpath'd forms. */
-export function claudeTrustKeysForHostPath(
+// Why async: realpath probes the workspace's volume; a stalled one must not freeze the app.
+export async function claudeTrustKeysForHostPath(
   workspacePath: string,
   keyStyle: ClaudeTrustPathStyle,
   toClaudePath: (hostPath: string) => string | null = (hostPath) => hostPath
-): string[] {
-  const forms = [resolve(workspacePath)]
-  try {
-    forms.push(realpathSync.native(workspacePath))
-  } catch {
-    // The resolved form alone still matches an unsymlinked path.
-  }
+): Promise<string[]> {
+  const real = await realpath(workspacePath).catch(() => null)
+  // Why: the resolved form alone still matches an unsymlinked path.
+  const forms = real === null ? [resolve(workspacePath)] : [resolve(workspacePath), real]
   const keys = new Set<string>()
   for (const form of forms) {
     const claudePath = toClaudePath(form)
@@ -359,7 +357,11 @@ export async function grantClaudeWorkspaceTrust(
   target: ClaudeTrustConfigTarget,
   workspacePath: string
 ): Promise<ClaudeFolderTrustOutcome> {
-  const folderKeys = claudeTrustKeysForHostPath(workspacePath, target.keyStyle, target.toClaudePath)
+  const folderKeys = await claudeTrustKeysForHostPath(
+    workspacePath,
+    target.keyStyle,
+    target.toClaudePath
+  )
   return folderKeys.length === 0
     ? 'unchanged'
     : grantClaudeFolderTrust({ configFile: target.configFile, folderKeys })

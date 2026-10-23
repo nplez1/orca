@@ -25,7 +25,7 @@ afterAll(() => {
 })
 
 describe('Qoder managed configuration', () => {
-  it('preserves user hooks and trust, installs idempotently, then removes only Orca hooks', () => {
+  it('preserves user hooks and trust, installs idempotently, then removes only Orca hooks', async () => {
     const path = join(sandbox.home, '.qoder', 'settings.json')
     const userHook = { hooks: [{ type: 'command', command: 'echo user-hook' }] }
     writeFileSync(
@@ -44,7 +44,7 @@ describe('Qoder managed configuration', () => {
     }
     expect(installed.hooks.TeammateIdle).toBeUndefined()
     expect(installed.statusLine).toBeUndefined()
-    markQoderWorkspaceTrusted('/new-workspace', sandbox.home)
+    await markQoderWorkspaceTrusted('/new-workspace', sandbox.home)
     const trusted = JSON.parse(readFileSync(path, 'utf8'))
     expect(trusted.permissions.trustDirectories).toEqual(['/existing', '/new-workspace'])
     expect(trusted.hooks).toEqual(installed.hooks)
@@ -65,11 +65,11 @@ describe('Qoder managed configuration', () => {
     expect(qoderHookService.remove().state).toBe('not_installed')
   })
 
-  it('refuses malformed settings instead of overwriting them', () => {
+  it('refuses malformed settings instead of overwriting them', async () => {
     const path = join(sandbox.home, '.qoder', 'settings.json')
     writeFileSync(path, '{broken')
     expect(qoderHookService.install().state).toBe('error')
-    markQoderWorkspaceTrusted('/new-workspace', sandbox.home)
+    await markQoderWorkspaceTrusted('/new-workspace', sandbox.home)
     expect(readFileSync(path, 'utf8')).toBe('{broken')
     expect(withQoderTrustedWorkspace({ permissions: 'invalid' }, '/workspace')).toBeNull()
     expect(
@@ -114,7 +114,7 @@ it.each([
   }
 ])(
   'installs and removes $source hooks without changing user settings',
-  ({ service, directory, source, events }) => {
+  async ({ service, directory, source, events }) => {
     const configDir = join(sandbox.home, directory)
     mkdirSync(configDir, { recursive: true })
     const path = join(configDir, 'settings.json')
@@ -138,7 +138,7 @@ it.each([
       )
     ).toContain(`/hook/${source}`)
     if (source === 'qoder-cn') {
-      markQoderWorkspaceTrusted('/cn-workspace', sandbox.home, '.qoder-cn')
+      await markQoderWorkspaceTrusted('/cn-workspace', sandbox.home, '.qoder-cn')
       expect(JSON.parse(readFileSync(path, 'utf8')).permissions.trustDirectories).toEqual([
         '/cn-workspace'
       ])

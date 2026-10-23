@@ -4,7 +4,7 @@
 import { worktreeCreateGit } from '../git/worktree-create-git-executor'
 import { getStoredRepoExecutionHostId } from '../repo-execution-host'
 import type { BrowserWindow } from 'electron'
-import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { GitAdmissionTier } from '../../shared/rpc-contract/git-admission-tier-params'
@@ -1077,6 +1077,19 @@ export function createLocalWorktree(
     })
 }
 
+/**
+ * Whether `worktreePath` is already on disk, for name allocation. Same answer `existsSync` gave — any
+ * error means absent — asked off the main thread so a stalled repo volume cannot freeze the app.
+ */
+async function worktreePathTaken(worktreePath: string): Promise<boolean> {
+  try {
+    await stat(worktreePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function performLocalWorktreeCreate(
   args: CreateWorktreeArgsWithSystemProvenance,
   repo: Repo,
@@ -1417,7 +1430,7 @@ async function performLocalWorktreeCreate(
       // Why the pending check: Git may already have deleted the directory while Orca still owns
       // the path until its removal settles; take the next name instead of racing it.
       if (
-        existsSync(worktreePath) ||
+        (await worktreePathTaken(worktreePath)) ||
         findPendingWorktreeRemovalConflict(repo.path, { worktreePath })
       ) {
         continue

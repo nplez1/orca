@@ -63,6 +63,16 @@ function pending(): { promise: Promise<void>; release: () => void } {
   return { promise, release }
 }
 
+/** Real event-loop turns until the mocked Claude write is in flight. */
+async function waitForClaudeWriteToStart(): Promise<void> {
+  // Why hrtime: fake timers own Date and setTimeout, and a fixed turn count is too short under
+  // load — the guard's realpath is real fs I/O.
+  const giveUpAt = process.hrtime.bigint() + 2_000_000_000n
+  while (mocks.claudeGrant.mock.calls.length === 0 && process.hrtime.bigint() < giveUpAt) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -254,7 +264,11 @@ describe('applyAgentWorkspaceTrust for Claude', () => {
   })
 
   it('gives a local Claude write a short budget, after which Claude asks', async () => {
-    vi.useFakeTimers()
+    // Why setImmediate stays real: the home guard's realpath is real fs I/O, and faked immediates
+    // would never let it land, so the deadline would start before any write was pending.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date']
+    })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const grant = pending()
     mocks.claudeGrant.mockReturnValueOnce(grant.promise.then(() => 'granted' as const))
@@ -265,6 +279,8 @@ describe('applyAgentWorkspaceTrust for Claude', () => {
     }).then(() => {
       settled = true
     })
+    await waitForClaudeWriteToStart()
+    expect(mocks.claudeGrant).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(SHORT_AGENT_TRUST_WRITE_DEADLINE_MS - 1)
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(2)

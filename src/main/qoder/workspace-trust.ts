@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isPlainObject, readHooksJson, writeHooksJson } from '../agent-hooks/installer-utils'
 
@@ -24,14 +24,15 @@ export function withQoderTrustedWorkspace(
   }
 }
 
-export function markQoderWorkspaceTrusted(
+export async function markQoderWorkspaceTrusted(
   workspacePath: string,
   home: string,
   configDirName: '.qoder' | '.qoder-cn' = '.qoder'
-): void {
+): Promise<void> {
   let canonicalPath = workspacePath
   try {
-    canonicalPath = realpathSync.native(workspacePath)
+    // Why async: realpath probes the workspace's volume, and a stalled one would freeze the app.
+    canonicalPath = await realpath(workspacePath)
   } catch {
     /* Keep the supplied path when absent. */
   }

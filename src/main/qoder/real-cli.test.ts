@@ -61,7 +61,7 @@ it.skipIf(process.env.ORCA_REAL_QODER_CLI_TEST !== '1')(
         JSON.stringify({ general: { enableAutoUpdate: false } })
       )
       expect(qoderHookService.install().state).toBe('installed')
-      markQoderWorkspaceTrusted(workspace, sandbox.home)
+      await markQoderWorkspaceTrusted(workspace, sandbox.home)
       await server.start({ env: 'production', userDataPath: join(sandbox.home, 'orca') })
       const env = {
         ...process.env,

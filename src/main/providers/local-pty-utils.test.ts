@@ -118,17 +118,19 @@ describe('validateWorkingDirectory', () => {
     expect(existsSyncMock).not.toHaveBeenCalled()
   })
 
-  it('validates native Windows paths via fs without consulting the distro', async () => {
-    existsSyncMock.mockReturnValue(true)
-    statSyncMock.mockReturnValue(dirStats(true))
+  it('validates native Windows paths through the off-thread probe, never a sync fs call', async () => {
+    statMock.mockResolvedValue(dirStats(true))
 
     await expect(validateWorkingDirectory(NATIVE_DIR)).resolves.toBeUndefined()
     expect(wslUncDirectoryExistsAsyncMock).not.toHaveBeenCalled()
-    expect(existsSyncMock).toHaveBeenCalledWith(NATIVE_DIR)
+    expect(statMock).toHaveBeenCalledWith(NATIVE_DIR)
+    // Why: a sync probe on a stalled repo volume freezes every window (issue #157).
+    expect(existsSyncMock).not.toHaveBeenCalled()
+    expect(statSyncMock).not.toHaveBeenCalled()
   })
 
   it('rejects a missing native Windows path', async () => {
-    existsSyncMock.mockReturnValue(false)
+    statMock.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
     const previousVersion = process.env.ORCA_APP_VERSION
     process.env.ORCA_APP_VERSION = '1.4.178-test'
 
@@ -137,6 +139,8 @@ describe('validateWorkingDirectory', () => {
         /does not exist.*orca: 1\.4\.178-test/
       )
       expect(wslUncDirectoryExistsAsyncMock).not.toHaveBeenCalled()
+      expect(existsSyncMock).not.toHaveBeenCalled()
+      expect(statSyncMock).not.toHaveBeenCalled()
     } finally {
       if (previousVersion === undefined) {
         delete process.env.ORCA_APP_VERSION
@@ -147,10 +151,25 @@ describe('validateWorkingDirectory', () => {
   })
 
   it('rejects a native Windows path that exists but is not a directory', async () => {
-    existsSyncMock.mockReturnValue(true)
-    statSyncMock.mockReturnValue(dirStats(false))
+    statMock.mockResolvedValue(dirStats(false))
 
     await expect(validateWorkingDirectory(NATIVE_DIR)).rejects.toThrow(/is not a directory/)
+  })
+
+  it('returns to the event loop while a local path probe is still running', async () => {
+    const probe = Promise.withResolvers<Stats>()
+    statMock.mockReturnValue(probe.promise)
+    let settled = false
+
+    const validation = validateWorkingDirectory(NATIVE_DIR).finally(() => {
+      settled = true
+    })
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(settled).toBe(false)
+
+    probe.resolve(dirStats(true))
+    await validation
+    expect(settled).toBe(true)
   })
 })
 

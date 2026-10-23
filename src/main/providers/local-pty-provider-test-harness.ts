@@ -18,6 +18,8 @@ export type LocalPtyMockProcess = {
 export type LocalPtyProviderMocks = {
   existsSyncMock: Mock
   statSyncMock: Mock
+  /** `node:fs/promises` stat, for the off-thread cwd probe; omitted suites that spawn real paths. */
+  statMock?: Mock
   accessSyncMock: Mock
   mkdirSyncMock: Mock
   writeFileSyncMock: Mock
@@ -76,6 +78,16 @@ export function applyLocalPtyProviderMockDefaults(mocks: LocalPtyProviderMocks):
   mocks.existsSyncMock.mockReturnValue(true)
   // size: the wrapper writer verifies each generated file is non-empty.
   mocks.statSyncMock.mockReturnValue({ isDirectory: () => true, mode: 0o755, size: 1 })
+  // Why derive from existsSync: suites declare a fake filesystem with existsSync alone, and the cwd
+  // probe now asks `node:fs/promises` so the volume's answer cannot block main.
+  mocks.statMock?.mockImplementation(async (path: string) => {
+    if (!mocks.existsSyncMock(path)) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, stat '${path}'`), {
+        code: 'ENOENT'
+      })
+    }
+    return mocks.statSyncMock(path)
+  })
   mocks.accessSyncMock.mockReturnValue(undefined)
   mocks.mkdirSyncMock.mockReset()
   mocks.writeFileSyncMock.mockReset()
