@@ -7,7 +7,8 @@ import {
   scheduleWorkspacePathCatalogSpillSweep
 } from './workspace-path-catalog-spill-sweep'
 
-const DEAD_PID = '20141'
+// Above any default pid_max, so an ambient process can never make a dead-PID case flaky.
+const DEAD_PID = '99999999'
 const RECYCLED_PID = '5150'
 const OLD_ENOUGH = new Date('2026-10-15T09:41:00.000Z')
 
@@ -42,10 +43,12 @@ function currentProcessDirectory(root: string): string {
 describe('workspace path catalog spill root sweep', () => {
   it('removes a dead process directory without touching the current process', async () => {
     const root = await spillRoot('dead')
-    const currentDirectory = join(root, String(process.pid))
+    const currentDirectory = currentProcessDirectory(root)
     await writeSpillFile(currentDirectory, 'live.wpc', null)
     await writeSpillFile(join(root, DEAD_PID), 'stale.wpc', null)
-    await cleanStaleWorkspacePathCatalogSpillDirectories(currentDirectory)
+    await cleanStaleWorkspacePathCatalogSpillDirectories(currentDirectory, {
+      isProcessAlive: () => false
+    })
     expect(await readdir(root)).toEqual([String(process.pid)])
     expect(await readdir(currentDirectory)).toEqual(['live.wpc'])
   })
@@ -108,12 +111,16 @@ describe('workspace path catalog spill root sweep', () => {
     expect(await readdir(leftOver)).toEqual(['created-after-the-sweep.wpc'])
   })
 
-  it('resolves instead of rejecting when the spill root cannot be swept', async () => {
+  it('resolves instead of rejecting when the spill root cannot be swept, then retries', async () => {
     const root = await spillRoot('blocked')
-    const blocker = join(root, 'not-a-directory')
-    await writeFile(blocker, 'file')
-    await expect(
-      scheduleWorkspacePathCatalogSpillSweep(join(blocker, String(process.pid)))
-    ).resolves.toBeUndefined()
+    const processDirectory = join(root, 'not-a-directory', String(process.pid))
+    await writeFile(join(root, 'not-a-directory'), 'file')
+    await expect(scheduleWorkspacePathCatalogSpillSweep(processDirectory)).resolves.toBeUndefined()
+
+    await rm(join(root, 'not-a-directory'))
+    const abandoned = join(root, 'not-a-directory', DEAD_PID)
+    await writeSpillFile(abandoned, 'abandoned.wpc', null)
+    await scheduleWorkspacePathCatalogSpillSweep(processDirectory)
+    expect(await readdir(join(root, 'not-a-directory'))).toEqual([])
   })
 })

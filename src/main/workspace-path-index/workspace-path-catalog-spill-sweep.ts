@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { processIsAlive } from './workspace-path-catalog-spill-io'
 
@@ -12,8 +12,8 @@ export type WorkspacePathCatalogSpillSweepOptions = {
 /**
  * Removes spill directories an earlier process left behind. Liveness alone leaks: a recycled PID
  * passes the check forever, so a directory whose newest entry predates this process is stale too.
- * That is only sound because one Orca process holds the profile's instance lock, which is what
- * rules a live sibling owner out.
+ * That is only sound while the profile's instance lock is held, which is what rules a live sibling
+ * owner out; the diagnostics-only lock bypass does not.
  */
 export async function cleanStaleWorkspacePathCatalogSpillDirectories(
   processDirectory: string,
@@ -37,10 +37,18 @@ export async function cleanStaleWorkspacePathCatalogSpillDirectories(
       continue
     }
     const directory = join(rootDirectory, entry.name)
-    if (isProcessAlive(ownerPid) && !(await predatesProcessStart(directory, processStartedAtMs))) {
+    try {
+      if (
+        isProcessAlive(ownerPid) &&
+        !(await predatesProcessStart(directory, processStartedAtMs))
+      ) {
+        continue
+      }
+      await rm(directory, { recursive: true, force: true })
+    } catch {
+      // One undeletable directory (EBUSY on Windows, EACCES) must not spare its siblings.
       continue
     }
-    await rm(directory, { recursive: true, force: true })
   }
 }
 
@@ -85,7 +93,7 @@ async function newestEntryTimestampMs(directory: string): Promise<number | null>
   try {
     let newestMs = (await stat(directory)).mtimeMs
     for (const name of await readdir(directory)) {
-      const entry = await stat(join(directory, name)).catch(() => null)
+      const entry = await lstat(join(directory, name)).catch(() => null)
       if (entry && entry.mtimeMs > newestMs) {
         newestMs = entry.mtimeMs
       }

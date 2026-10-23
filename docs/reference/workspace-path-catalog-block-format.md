@@ -210,7 +210,7 @@ written, so a refused checkpoint never lands:
 2. Whole checkpoints are evicted oldest-first until the total fits. A checkpoint is a rebuildable
    optimization; a live spill may be pinned by an in-flight scan, so **spills are never reclaimed
    by the checkpoint path**. Dead processes' spill directories stay the spill-root sweep's job
-   (`scheduleWorkspacePathCatalogSpillSweep`, once per process), as before.
+   (`scheduleWorkspacePathCatalogSpillSweep`, once per process per spill root).
 3. If the total still does not fit, the write is refused (`disk-cap`) and the root keeps the
    live-scan/rebuild path. That costs a provisional page and never correctness.
 
