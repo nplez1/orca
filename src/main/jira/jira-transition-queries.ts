@@ -6,6 +6,11 @@ import { clearToken, getClients, isAuthError } from './client'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField, mapStatus } from './jira-issue-mapping'
 import {
+  projectKeyOfIssueKey,
+  readProjectFieldOptions,
+  withJiraProjectFieldOptions
+} from './jira-project-field-options'
+import {
   asFiniteNumber,
   asIdentifier,
   asRecord,
@@ -93,6 +98,31 @@ async function attachCurrentValues(
   }
 }
 
+/**
+ * Gives a components/versions field on a transition screen the project's own list, so
+ * the form offers a picker that submits a reference instead of a text box whose string
+ * Jira rejects. Runs before the value read, which drafts an entry as the id only once
+ * the list can match it.
+ */
+async function attachProjectFieldOptions(
+  entry: ReturnType<typeof getClients>[number],
+  key: string,
+  transitions: JiraTransition[]
+): Promise<void> {
+  const fields = transitions.flatMap((transition) => transition.fields ?? [])
+  if (fields.length === 0) {
+    return
+  }
+  const options = await readProjectFieldOptions(entry, projectKeyOfIssueKey(key), fields)
+  for (const transition of transitions) {
+    if (transition.fields) {
+      transition.fields = transition.fields.map((field) =>
+        withJiraProjectFieldOptions(field, options)
+      )
+    }
+  }
+}
+
 export async function listTransitions(
   key: string,
   siteId?: string | null,
@@ -126,6 +156,7 @@ export async function listTransitions(
             .filter((field) => field !== null)
         : undefined
     }))
+    await attachProjectFieldOptions(entry, key, transitions)
     await attachCurrentValues(entry, key, transitions)
     return transitions
   } catch (error) {

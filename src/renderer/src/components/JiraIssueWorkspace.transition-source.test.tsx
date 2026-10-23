@@ -310,8 +310,8 @@ describe('Jira transition form source ownership', () => {
       )
     )
     await waitFor(() => expect(screen.getByText('Component/s is required.')).toBeTruthy())
-    // Why the text-list placeholder: Component/s is `array/items: string`, which the
-    // control map renders as a comma-separated list.
+    // Why the text-list placeholder: this host read no project component list, so the
+    // field keeps the comma-separated box and the entry is sent as a name reference.
     const input = screen.getByPlaceholderText('Comma-separated values')
     // Why the resubmit matters: the reopened form must be able to send the very value
     // it shows, or the only way through is picking a different one.
@@ -326,7 +326,8 @@ describe('Jira transition form source ownership', () => {
       expect(mocks.update).toHaveBeenLastCalledWith(
         taskSourceRuntimeTarget(source),
         issue.key,
-        { transitionId: 'filled', transitionFields: { components: ['Web'] } },
+        // #162: a bare ['Web'] is the shape Jira rejects for Component/s.
+        { transitionId: 'filled', transitionFields: { components: [{ name: 'Web' }] } },
         'site-a'
       )
     )

@@ -1,25 +1,33 @@
-import { resolveJiraFieldControlKind } from '../../shared/jira-field-rendering'
+import {
+  resolveJiraFieldControlKind,
+  resolveJiraObjectListFieldKind
+} from '../../shared/jira-field-rendering'
 import type { JiraCreateField, JiraEditableField } from '../../shared/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
 import { describeFieldDraft } from './jira-field-drafts'
 import { mapCreateField } from './jira-issue-mapping'
-import { asRecord, type JiraRecord } from './jira-record-pages'
+import {
+  projectKeyOfIssueKey,
+  readProjectFieldOptions,
+  withJiraProjectFieldOptions
+} from './jira-project-field-options'
+import { asRecord, asString, type JiraRecord } from './jira-record-pages'
 
-/** True when Jira lets this user write the field and Orca can render its shape.
- *  Custom-field keys are the site-specific `customfield_NNNNN` ids; the summary,
- *  labels, assignee, and priority the detail view already edits inline are
- *  deliberately not offered here. */
-function isEditableCustomField(field: JiraCreateField, meta: JiraRecord): boolean {
-  if (!field.key.startsWith('customfield_')) {
+/** True when Jira lets this user write the field. Custom-field keys are the
+ *  site-specific `customfield_NNNNN` ids; the summary, labels, assignee, and priority
+ *  the detail view already edits inline are deliberately not offered here. The
+ *  components/versions fields are the exception among system fields: they hold
+ *  references no other surface writes, so with the project's own list behind them
+ *  they belong here too. */
+function isWritableField(field: JiraCreateField, meta: JiraRecord): boolean {
+  const isCustomField = field.key.startsWith('customfield_')
+  if (!isCustomField && resolveJiraObjectListFieldKind(field) === null) {
     return false
   }
   const operations = Array.isArray(meta.operations) ? meta.operations : null
-  if (operations && !operations.some((op) => op === 'set' || op === 'add')) {
-    return false
-  }
-  return resolveJiraFieldControlKind(field) !== null
+  return !operations || operations.some((op) => op === 'set' || op === 'add')
 }
 
 /**
@@ -45,14 +53,31 @@ export async function listEditFields(
     )
     const values = asRecord(response.fields)
     const meta = asRecord(asRecord(response.editmeta).fields)
-    const editable: JiraEditableField[] = []
+    const offered: { key: string; field: JiraCreateField }[] = []
     for (const [fieldKey, rawMeta] of Object.entries(meta)) {
       const metaRecord = asRecord(rawMeta)
       const field = mapCreateField(metaRecord, fieldKey)
-      if (!field || !isEditableCustomField(field, metaRecord)) {
+      if (!field || !isWritableField(field, metaRecord)) {
         continue
       }
-      editable.push({ field, ...describeFieldDraft(field, values[fieldKey]) })
+      offered.push({ key: fieldKey, field })
+    }
+    // Why before the control check and the draft: a components field has no allowedValues
+    // of its own, so it is only renderable — and only drafts as the id Jira accepts —
+    // once the project's list is attached.
+    const projectKey = asString(asRecord(values.project).key) || projectKeyOfIssueKey(key)
+    const options = await readProjectFieldOptions(
+      entry,
+      projectKey,
+      offered.map((candidate) => candidate.field)
+    )
+    const editable: JiraEditableField[] = []
+    for (const candidate of offered) {
+      const field = withJiraProjectFieldOptions(candidate.field, options)
+      if (resolveJiraFieldControlKind(field) === null) {
+        continue
+      }
+      editable.push({ field, ...describeFieldDraft(field, values[candidate.key]) })
     }
     // Why: object key order follows the editmeta payload, which is not stable
     // across sites; a name-ordered form is the same form every time it opens.

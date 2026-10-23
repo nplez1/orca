@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isJiraStoryPointsField, resolveJiraFieldControlKind } from './jira-field-rendering'
+import {
+  isJiraStoryPointsField,
+  resolveJiraFieldControlKind,
+  resolveJiraObjectListFieldKind
+} from './jira-field-rendering'
 import type { JiraCreateField } from './jira-types'
 
 const GREENHOPPER = 'com.pyxis.greenhopper.jira:jsw-story-points'
@@ -29,6 +33,35 @@ describe('resolveJiraFieldControlKind', () => {
     )
   })
 
+  it('gives a components field the picker its project list makes possible', () => {
+    // Jira reports `array/items: string` for Component/s while holding objects, so the
+    // string-list rule must not win once the project's own list is attached.
+    expect(
+      resolveJiraFieldControlKind(
+        field({
+          key: 'components',
+          schema: { type: 'array', items: 'string', system: 'components' },
+          allowedValues: [
+            { id: '10400', name: 'Web' },
+            { id: '10401', name: 'Platform' }
+          ]
+        })
+      )
+    ).toBe('optionList')
+  })
+
+  it('keeps the text box for a components field no project list was read for', () => {
+    // An older host, or a read its permission denied: the submission then sends names.
+    expect(
+      resolveJiraFieldControlKind(
+        field({
+          key: 'components',
+          schema: { type: 'array', items: 'string', system: 'components' }
+        })
+      )
+    ).toBe('textList')
+  })
+
   it('leaves an option list Jira names no values for unrenderable rather than guessing', () => {
     expect(resolveJiraFieldControlKind(field({ schema: { type: 'array', items: 'option' } }))).toBe(
       null
@@ -41,6 +74,60 @@ describe('resolveJiraFieldControlKind', () => {
         field({ schema: { type: 'option' }, allowedValues: [{ id: '2', value: 'High' }] })
       )
     ).toBe('select')
+  })
+})
+
+describe('resolveJiraObjectListFieldKind', () => {
+  const objectList = (overrides: Partial<JiraCreateField>): JiraCreateField =>
+    field({ schema: { type: 'array', items: 'string' }, ...overrides })
+
+  it('names the project list each reference-holding system field needs', () => {
+    expect(
+      resolveJiraObjectListFieldKind(
+        objectList({
+          key: 'components',
+          schema: { type: 'array', items: 'string', system: 'components' }
+        })
+      )
+    ).toBe('components')
+    expect(
+      resolveJiraObjectListFieldKind(
+        objectList({
+          key: 'versions',
+          schema: { type: 'array', items: 'string', system: 'versions' }
+        })
+      )
+    ).toBe('versions')
+    // One project list serves both version fields.
+    expect(
+      resolveJiraObjectListFieldKind(
+        objectList({
+          key: 'fixVersions',
+          schema: { type: 'array', items: 'string', system: 'fixVersions' }
+        })
+      )
+    ).toBe('versions')
+  })
+
+  it('falls back to the key when a site omits the system name', () => {
+    expect(resolveJiraObjectListFieldKind(objectList({ key: 'components' }))).toBe('components')
+    expect(
+      resolveJiraObjectListFieldKind(objectList({ key: 'fixVersions', schema: { type: 'array' } }))
+    ).toBe('versions')
+  })
+
+  it('leaves a genuine string list alone', () => {
+    // Team and labels hold strings, and rewriting those as references would break them.
+    expect(
+      resolveJiraObjectListFieldKind(
+        objectList({
+          key: 'customfield_10002',
+          schema: { type: 'array', items: 'string', custom: 'com.pyxis:team' }
+        })
+      )
+    ).toBeNull()
+    expect(resolveJiraObjectListFieldKind(objectList({ key: 'labels' }))).toBeNull()
+    expect(resolveJiraObjectListFieldKind(field({ schema: { type: 'string' } }))).toBeNull()
   })
 })
 
