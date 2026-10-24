@@ -220,7 +220,7 @@ export async function gitStreamStdout(
           terminateAtStalledDeadline({
             overrunMs,
             isSettled: () => settled,
-            hasExited: () => child.exitCode !== null || child.signalCode !== null,
+            hasExited: () => child.exitCode != null || child.signalCode != null,
             terminate: () => {
               void killSpawnedCommandTree(child)
               finish(

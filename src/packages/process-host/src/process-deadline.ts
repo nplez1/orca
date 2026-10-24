@@ -1,9 +1,9 @@
 /**
  * How late a deadline timer may fire before the lateness means the loop was blocked (#155).
  *
- * Why shared: a blocked main thread makes a deadline fire late, and the same block delays the
- * child's exit and the close of its pipes. The git command runner's `stalled-deadline-kill`
- * imports both constants instead of keeping its own copies.
+ * Why a copy of `STALLED_DEADLINE_OVERRUN_MS` in the git command runner's `stalled-deadline-kill`
+ * and not one shared constant: several suites mock this package, and a new export they do not
+ * provide fails the whole suite.
  */
 export const BLOCKED_DEADLINE_OVERRUN_MS = 100
 
@@ -20,17 +20,20 @@ export function deadlineOverrunField(overrunMs: number | null): { deadlineOverru
 /**
  * Kill a child at its deadline unless the exit it was waiting for has already arrived.
  *
- * Why the extra turn (#155): timers run before I/O callbacks in the same loop turn, so after a
- * block the overdue deadline fires before Node handles the exit of a child that already finished —
- * killing there reports a millisecond-long command as a timeout, and one block becomes a burst of
- * them. `setImmediate` lands after that poll phase, so a child that ended during the block has
- * already exited. That is why `hasExited` is the question asked rather than `isSettled`: a child's
- * `close` — what settles the promise — waits for every stdio pipe, and those callbacks run in the
- * close phase, one turn *after* the immediate.
+ * Why a turn first when the deadline fired late (#155): timers run before I/O callbacks in the same
+ * loop turn, so after a block the overdue deadline fires before Node handles the exit of a child
+ * that already finished — killing there reports a millisecond-long command as a timeout, and one
+ * block becomes a burst of them. A 0 ms timer fires in the next iteration's timers phase, i.e.
+ * after this iteration has polled I/O, so the exit the block hid has been delivered by then.
  *
- * Why a drain window instead of a kill once it has exited: a grandchild can hold a pipe open, so an
- * exited child is still bounded, just not killed on the spot. A deadline that fired on time and
- * whose child has not exited kills immediately.
+ * Why that turn is skipped otherwise: `overrunMs` says only how late this timer fired, not how long
+ * the loop was blocked before it, so a long block that ends just after the deadline still reads as
+ * on time. That residual — any block ending within the block threshold of the deadline — is taken
+ * deliberately: it is where this path already sat, and a turn for it would move every caller's own
+ * deadlines by a millisecond.
+ *
+ * Why a drain window instead of a kill once the child has exited: a grandchild can hold a pipe
+ * open, so an exited child is still bounded, just not killed on the spot.
  */
 export function scheduleDeadlineKill(params: {
   deadlineMs: number
@@ -40,33 +43,40 @@ export function scheduleDeadlineKill(params: {
 }): { cancel: () => void } {
   const { deadlineMs, isSettled, hasExited, kill } = params
   const deadlineAt = performance.now()
+  let decide: ReturnType<typeof setTimeout> | undefined
   let drain: ReturnType<typeof setTimeout> | undefined
+  const killAfterDrain = (overrunMs: number): void => {
+    drain = setTimeout(() => {
+      // Why one more turn: a second block can land inside the drain, and its timers phase would
+      // again run before the poll that delivers the child's `close`.
+      decide = setTimeout(() => {
+        if (!isSettled()) {
+          kill(overrunMs)
+        }
+      }, 0)
+      decide.unref?.()
+    }, BLOCKED_DEADLINE_DRAIN_MS)
+    drain.unref?.()
+  }
   const timer = setTimeout(() => {
-    setImmediate(() => {
+    const overrunMs = performance.now() - deadlineAt - deadlineMs
+    if (overrunMs < BLOCKED_DEADLINE_OVERRUN_MS && !hasExited()) {
+      kill(overrunMs)
+      return
+    }
+    decide = setTimeout(() => {
       if (isSettled()) {
         return
       }
-      const overrunMs = performance.now() - deadlineAt - deadlineMs
-      if (overrunMs < BLOCKED_DEADLINE_OVERRUN_MS && !hasExited()) {
-        kill(overrunMs)
-        return
-      }
-      drain = setTimeout(() => {
-        // Why the same turn again: a second block can land inside the drain, and the timers phase
-        // still runs before the poll that would deliver the child's `close`.
-        setImmediate(() => {
-          if (!isSettled()) {
-            kill(overrunMs)
-          }
-        })
-      }, BLOCKED_DEADLINE_DRAIN_MS)
-      drain.unref?.()
-    })
+      killAfterDrain(overrunMs)
+    }, 0)
+    decide.unref?.()
   }, deadlineMs)
   timer.unref?.()
   return {
     cancel: () => {
       clearTimeout(timer)
+      clearTimeout(decide)
       clearTimeout(drain)
     }
   }

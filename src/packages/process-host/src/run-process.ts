@@ -7,6 +7,7 @@ import { hasSpawnObserver, notifySpawnObserver } from './spawn-observer'
 import { createOutputSink } from './bounded-output-sink'
 import { createChildTerminationReporter } from './child-termination-reporter'
 import { deadlineOverrunField, scheduleDeadlineKill } from './process-deadline'
+import { runResolvedProcessSyncEntry } from './run-process-sync'
 
 export { WindowsCmdLineBreakError } from './windows-command-line'
 
@@ -35,8 +36,6 @@ const PROCESS_EXIT_GRACE_MS = 2_000
  * reports would otherwise leave the promise pending for the app's lifetime.
  */
 const BARRIER_UNVERIFIED_EXIT_GRACE_MS = 10_000
-export { BLOCKED_DEADLINE_DRAIN_MS, BLOCKED_DEADLINE_OVERRUN_MS } from './process-deadline'
-
 /**
  * Start a child process. Use for long-lived or streaming children.
  *
@@ -291,7 +290,7 @@ export function runProcess(
             deadlineMs: spec.timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS,
             isSettled: () => settled,
             hasExited: () =>
-              deferredExit !== null || child.exitCode !== null || child.signalCode !== null,
+              deferredExit !== null || child.exitCode != null || child.signalCode != null,
             kill: killAtDeadline
           })
 
@@ -353,4 +352,14 @@ function terminate(child: ChildProcess, signal?: NodeJS.Signals): void {
   }
 }
 
-export { runProcessSync } from './run-process-sync'
+/**
+ * Synchronous variant, for the call sites that genuinely cannot await — CLI entry points and
+ * teardown paths that run while the event loop is stopping.
+ *
+ * Why defined here rather than beside its body: `windows-native-benchmark-observer.mjs` replaces
+ * `runProcessSync` on this module's exports, and a re-export compiles to a getter-only property
+ * that assignment throws on.
+ */
+export function runProcessSync(spec: ProcessSpec): ProcessResult {
+  return runResolvedProcessSyncEntry(spec)
+}

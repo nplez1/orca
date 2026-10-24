@@ -277,7 +277,7 @@ export function execFileCapture(
         terminateAtStalledDeadline({
           overrunMs,
           isSettled: () => settled || terminating,
-          hasExited: () => child !== null && (child.exitCode !== null || child.signalCode !== null),
+          hasExited: () => child !== null && (child.exitCode != null || child.signalCode != null),
           terminate: () => terminateAtDeadline(overrunMs)
         })
       }, options.timeout)

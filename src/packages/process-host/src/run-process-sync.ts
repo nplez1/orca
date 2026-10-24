@@ -12,7 +12,7 @@ import { DEFAULT_PROCESS_TIMEOUT_MS, DEFAULT_MAX_OUTPUT_BYTES } from './process-
  * invariants (hidden console, correct `.cmd` argv) instead of reaching for
  * `execFileSync` and re-deciding them.
  */
-export function runProcessSync(spec: ProcessSpec): ProcessResult {
+export function runResolvedProcessSyncEntry(spec: ProcessSpec): ProcessResult {
   const resolved = resolveSpawn(spec, process.platform)
   // Diagnostics only: spawnSync holds the calling thread until the child exits,
   // so the whole call is the block, reported even when it throws.

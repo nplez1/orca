@@ -22,7 +22,7 @@ async function untilCalled(
 }
 
 describe('scheduleDeadlineKill', () => {
-  it('kills a child that has not exited, one turn after an on-time deadline', async () => {
+  it('kills a child that has not exited as soon as an on-time deadline fires', async () => {
     const kill = vi.fn()
     scheduleDeadlineKill({ deadlineMs: 20, isSettled: () => false, hasExited: () => false, kill })
     await untilCalled(kill)
@@ -79,12 +79,12 @@ describe('scheduleDeadlineKill', () => {
 })
 
 describe('scheduleDeadlineKill across a blocked thread', () => {
-  it('defers the kill for a child that exited during a block too short to look like one', async () => {
+  it('holds the kill when a block ended past the deadline with the exit hidden', async () => {
     let exited = false
     const killedAt: number[] = []
     const overruns: number[] = []
     scheduleDeadlineKill({
-      deadlineMs: 30,
+      deadlineMs: 60,
       isSettled: () => false,
       hasExited: () => exited,
       kill: (overrunMs) => {
@@ -92,8 +92,8 @@ describe('scheduleDeadlineKill across a blocked thread', () => {
         overruns.push(overrunMs)
       }
     })
-    // ~70 ms late: below the block threshold, so only the exit itself can defer the kill.
-    Atomics.wait(stallCell, 0, 0, 100)
+    // ~20 ms late: under the block threshold, so only the exit itself can defer the kill.
+    Atomics.wait(stallCell, 0, 0, 80)
     const resumedAt = performance.now()
     exited = true
     await tick(BLOCKED_DEADLINE_DRAIN_MS + 200)

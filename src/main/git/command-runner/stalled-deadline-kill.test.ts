@@ -16,7 +16,9 @@ describe('terminateAtStalledDeadline', () => {
     vi.useRealTimers()
   })
 
-  it('kills once the poll phase shows nothing exited', async () => {
+  it('kills on the spot when the deadline fired on time and nothing exited', () => {
+    // Why no turn here: an on-time deadline leaves no backlog, and every caller's own deadlines
+    // hang off this instant.
     const terminate = vi.fn()
     terminateAtStalledDeadline({
       overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
@@ -24,8 +26,6 @@ describe('terminateAtStalledDeadline', () => {
       hasExited: () => false,
       terminate
     })
-    expect(terminate).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(0)
     expect(terminate).toHaveBeenCalledTimes(1)
   })
 
@@ -39,7 +39,8 @@ describe('terminateAtStalledDeadline', () => {
       hasExited: () => true,
       terminate
     })
-    await vi.advanceTimersByTimeAsync(0)
+    expect(terminate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
     expect(terminate).not.toHaveBeenCalled()
   })
 

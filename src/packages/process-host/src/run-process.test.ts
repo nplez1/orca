@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { BLOCKED_DEADLINE_OVERRUN_MS, runProcess, runProcessSync } from './run-process'
+import { BLOCKED_DEADLINE_OVERRUN_MS } from './process-deadline'
+import { runProcess, runProcessSync } from './run-process'
 import { resolveSpawn } from './spawn-resolution'
 import { WINDOWS_ARGUMENT_CORPUS } from './__fixtures__/windows-argument-corpus'
 
@@ -307,11 +308,15 @@ describe('deadline across a blocked main thread', () => {
   it('lets a child that exited during the block settle with its result', async () => {
     const pending = runProcess({
       program: process.execPath,
-      args: ['-e', "setTimeout(() => process.stdout.write('done'), 20)"],
+      // Why `--version`: the cheapest possible child, so a loaded box still finishes it inside the
+      // block. A `-e` child has to start a runtime first.
+      args: ['--version'],
       timeoutMs: 10
     })
     blockMainThread(400)
-    await expect(pending).resolves.toMatchObject({ timedOut: false, stdout: 'done' })
+    const result = await pending
+    expect(result.timedOut).toBe(false)
+    expect(result.stdout.trim().startsWith('v')).toBe(true)
   })
 
   it('kills a child still running after the block, tagged with the lateness', async () => {
