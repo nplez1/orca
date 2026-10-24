@@ -469,11 +469,17 @@ function reportResult(result) {
   for (const entry of result.unseen) {
     console.log(`  unseen entry (nothing in this run matched it) — prune or re-name: ${entry.key}`)
   }
+  if (result.filtered) {
+    console.log('  unseen entries are not judged when a selector filters the run')
+  }
   const quarantined = result.quarantined?.files ?? []
   if (quarantined.length) {
     console.log(
       `  upstream-quarantined (UNIT_EXCLUDE, not run): ${quarantined.length} file(s) — ${quarantined.slice(0, MAX_SUMMARY_LIST).join(', ')}`
     )
+    if (quarantined.length > MAX_SUMMARY_LIST) {
+      console.log(`  …and ${quarantined.length - MAX_SUMMARY_LIST} more quarantined file(s)`)
+    }
   }
   for (const entry of result.unhandled?.known ?? []) {
     console.log(`  known unhandled error (×${entry.count}): ${entry.headline}`)
@@ -496,6 +502,9 @@ function evaluate(options, { reportPath, logPath, dir }) {
     process.exit(2)
   }
   const manifest = readJsonFile(options.allowlist, 'known-red allowlist')
+  // Why: a forwarded selector describes a different suite, so every entry outside it matches nothing.
+  // Reporting those as unseen would invite pruning an entry the full run needs.
+  const fullRun = options.vitestArgs.length === 0
   const entries = allowlistEntries(manifest)
   const quarantined = quarantinedFiles()
   const forkTests = forkTestFiles()
@@ -544,7 +553,7 @@ function evaluate(options, { reportPath, logPath, dir }) {
     known = judged.known
     unexpected = judged.unexpected
     stale = judged.stale
-    unseen = judged.unseen
+    unseen = fullRun ? judged.unseen : []
     // Why not `numFailedTests`: it counts cases only, so a file that failed to collect would be
     // missing from it while it is very much a failure of this run.
     counts.failed = cases.failures.length
@@ -616,6 +625,7 @@ function evaluate(options, { reportPath, logPath, dir }) {
     flaky,
     stale,
     unseen,
+    filtered: !fullRun,
     problems,
     unhandled: {
       tolerated: tolerated.length,
