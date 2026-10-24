@@ -528,7 +528,9 @@ signature that identifies it. None imports a module this fork changed.
   `config/scripts/macos-terminal-host-bundle.test.mjs` — `os.tmpdir()` resolves to `/var/folders/…`
   while the code under test reports the resolved `/private/var/folders/…`.
 - `src/main/cli/cli-command-privileged-transaction.test.ts` — "Refusing to replace non-Orca command
-  at /var/folders/…/protected/orca": the same symlink resolution against a temp dir it just created.
+  at /var/folders/…/protected/orca". **Re-diagnosed and repaired in `local(test)` below, fork issue
+  #151 § 4:** the recorded error path is `/var/…`, not `/private/var/…`, and the cause is the fork's
+  `orca-np` rename rather than symlink resolution. The entry is gone from the manifest.
 - `src/main/sqlite/sync-database-portability.test.ts` ("rejects explicit undefined bindings") and
   `src/main/persistence/profile-state/profile-state-streaming-validation.test.ts` ("cannot add
   rowid alias") — the bundled SQLite's own binding behaviour differs from what those contracts
@@ -618,7 +620,7 @@ mock. Eight entries whose failures stopped reproducing were pruned, and
 **Re-diagnosed for fork issue #151 § 4, and the recorded cause was wrong.** Two corrections:
 
 - `ephemeral-vm-runtime-extend.test.ts:23` mocked `./ipc/runtime-environments`, a path that stopped
-  existing in the 2026-10-19 module reorganisation — the code imports
+  existing in upstream's module reorganisation (`1938bd055a`, #30362) — the code imports
   `./ipc/runtime-environments/runtime-environments` (`ephemeral-vm-runtime-extend.ts:16`), and the
   directory has no `index.ts`, so the mock was inert and the real module loaded with everything it
   reaches. That is how a registry-mock gap surfaced thirty frames away. The mock now names the module
