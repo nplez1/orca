@@ -52,10 +52,9 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
    *  the titlebar extension for exactly as long as a dialog holds the pane and never for scrollback.
    *  Why the ruled grid first: it refuses a grid painted for another size (a resize, a reflow, a
    *  provider-restored suffix), and holding the wait is right there - releasing on a garbled grid
-   *  would flap the row. The live projection is the fallback for a pane whose size the runtime does
-   *  not know yet (a restored pane reconnecting), which is also the only case where the ruled grid is
-   *  unavailable but the card is still readable; a mis-read there costs one tick, because the release
-   *  row re-arms this same read.
+   *  would flap the row. The live projection is the fallback only for a pane whose size the runtime
+   *  does not know yet (a restored pane reconnecting), where no other read is possible and a mis-read
+   *  costs one tick; a pane whose size IS known and whose grid is still refused stays "cannot see it".
    *  Why `current`: the pane's own marker outranks the gained stamp - a card the pane still claims
    *  cannot be scrollback, and the store must not reject it on a turn clock it could not pin. */
   private readPiAskDialogPrompt(handle: string): ScreenPromptObservation | null | undefined {
@@ -67,6 +66,9 @@ export abstract class OrcaRuntimeWithPaneScreenPrompt extends OrcaRuntimeWithAge
         return null
       }
       const screen = this.readRuledScreen(ptyId)
+      if (!screen && this.getTerminalSize(ptyId)) {
+        return undefined
+      }
       const lines = screen ? screen.lines : this.readLiveTerminalScreenLines(ptyId)
       const card = this.piAskDialogs.observe(ptyId, lines)
       return card ? { ...card, current: true } : card

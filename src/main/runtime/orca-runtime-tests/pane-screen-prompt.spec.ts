@@ -106,7 +106,7 @@ const PI_ASK_CARD = [
 ].join('\r\n')
 
 const PI_NEEDS_INPUT_TITLE = '\x1b]0;\u03c0 ! worker\x07'
-const PI_WORKING_TITLE = '\x1b]0;\u03c0 - worker\x07'
+const PI_WORKING_TITLE = '\x1b]0;\u03c0 : worker\x07'
 
 async function piTerminalRuntime() {
   const spawn = vi.fn().mockResolvedValue({ id: 'pty-screen' })
@@ -159,8 +159,8 @@ describe('the ask card a pi pane is holding', () => {
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
     runtime.onPtyData('pty-screen', '\x1b[2J\x1b[H  \u2713 12 tests passed\r\n', 2_000)
     await flush()
-    // Why null and not undefined: the pane withdrew the claim, which is the evidence that ends the
-    // wait - unlike a grid or title it cannot read, which must hold.
+    // Why null and not undefined: the grid was read and no longer holds the card, which is the
+    // evidence that ends the wait - unlike a grid or title it cannot read, which must hold.
     expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 
