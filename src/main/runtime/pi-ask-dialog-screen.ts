@@ -67,8 +67,4 @@ export class PiAskDialogScreenGained {
     this.sinceByPtyId.set(ptyId, since)
     return { reason: 'agent-interactive-prompt', since }
   }
-
-  clear(): void {
-    this.sinceByPtyId.clear()
-  }
 }
