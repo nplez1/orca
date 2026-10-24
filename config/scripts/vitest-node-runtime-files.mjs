@@ -9,6 +9,10 @@ const NODE_RUNTIME_INCLUDE = [
   'src/main/ssh/legacy-relay/ssh-relay-endpoint-incumbent-shell.integration.test.ts',
   'src/main/ssh/ssh-remote-commands.test.ts',
   'src/packages/process-host/src/run-process.test.ts',
+  // Why: a main-thread stall only misreports a finished child under Node's loop ordering — bun
+  // services the pending exit before the overdue deadline timer — so #155's regression tests can
+  // only fail without the fix in the Node runtime.
+  'src/main/git/command-runner/git-command-timeout-behavior.test.ts',
   'tests/e2e/cursor-quota-transport.unit.test.ts',
   'tests/e2e/helpers/electron-process-shutdown.unit.test.ts',
   'src/main/ai-vault-search/session-search-index-writer.test.ts',

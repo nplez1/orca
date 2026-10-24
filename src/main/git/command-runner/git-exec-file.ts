@@ -1,15 +1,14 @@
-import { execFileSync, type SpawnOptions } from 'node:child_process'
 import { withGitSpan } from '../../observability/instrumentation'
-import { recordSubprocessSpawn } from '../../diagnostics/main-thread-churn-probe'
 import {
   resolveGitFetchHeadCommand,
   runWithGitFetchHeadLock
 } from '../../../shared/git-fetch-head-lock'
 import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
-import { resolveCommand, type ResolvedCommand } from './wsl-command-resolution'
+import type { ResolvedCommand } from './wsl-command-resolution'
 import { annotateWslHostFailure } from './wsl-host-failure'
 import type { GitAdmissionTier, GitExecOptions } from './git-exec-options'
 import { execFileCapture, execFileCaptureToTermination } from './exec-file-capture'
+import { recordDeadlineOverrunOnSpan } from './stalled-deadline-kill'
 import {
   pendingWslDirectGitReadEnvironment,
   directWslGitExitCode,
@@ -21,10 +20,7 @@ import {
 import { prepareWindowsHostGitEnvironment } from './windows-host-git-environment'
 import { buildNetworkSshPolicyEnv } from './git-ssh-policy-env'
 import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-env'
-import {
-  localLoginShellGitEnvironmentSnapshot,
-  prepareLocalLoginShellGitEnvironment
-} from './local-login-shell-git-environment'
+import { prepareLocalLoginShellGitEnvironment } from './local-login-shell-git-environment'
 import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
 import { classifyGitCommand } from '../../../shared/git-command-classification'
@@ -121,6 +117,7 @@ async function gitExecFileAsyncUnlocked(
           : execFileCapture(command.binary, command.args, captureOptions)
         // Why: a dead WSL distro fails with an empty stderr, so the span would carry no cause at all.
         return captured.catch((error: unknown) => {
+          recordDeadlineOverrunOnSpan(span, error)
           throw annotateWslHostFailure(error, command)
         })
       }
@@ -278,6 +275,9 @@ async function gitExecFileAsyncBufferInSpan(
         throw new Error('Git buffer capture returned text instead of bytes')
       }
       return { stdout: readCapturedGitBuffer(stdout, resolved) }
+    } catch (error) {
+      recordDeadlineOverrunOnSpan(span, error)
+      throw error
     } finally {
       if (termination) {
         void termination.then(grant.release)
@@ -288,9 +288,6 @@ async function gitExecFileAsyncBufferInSpan(
   })
 }
 
-// Why: sync git blocks the main thread; a dead network drive can hang git for minutes without a timeout (issue #7225's 127s freeze).
-const GIT_EXEC_SYNC_TIMEOUT_MS = 15_000
-
 export function gitExecFileAsyncBuffer(
   args: string[],
   options: Parameters<typeof gitExecFileAsyncBufferInSpan>[1]
@@ -298,35 +295,4 @@ export function gitExecFileAsyncBuffer(
   return runUnlessGitCwdKnownMissing(options, () => gitExecFileAsyncBufferInSpan(args, options))
 }
 
-/**
- * Sync git command execution. Drop-in replacement for
- * `execFileSync('git', args, { cwd, encoding, ... })`.
- *
- * Returns trimmed stdout as a string.
- */
-export function gitExecFileSync(
-  args: string[],
-  options: {
-    cwd: string
-    encoding?: BufferEncoding
-    stdio?: SpawnOptions['stdio']
-    timeout?: number
-  }
-): string {
-  const resolved = resolveCommand('git', args, options.cwd)
-  const spawnStartedAt = performance.now()
-  try {
-    return execFileSync(resolved.binary, resolved.args, {
-      cwd: resolved.cwd,
-      encoding: options.encoding ?? 'utf-8',
-      // Why best-effort: this path is sync, so it can only use a probe that already settled.
-      env: untranslatedGitOutputEnv(localLoginShellGitEnvironmentSnapshot(process.env)),
-      stdio: options.stdio ?? ['pipe', 'pipe', 'pipe'],
-      timeout: options.timeout ?? GIT_EXEC_SYNC_TIMEOUT_MS,
-      windowsHide: true
-    })
-  } finally {
-    // Sync exec blocks the main thread for its whole duration — the cost issue #7576 flags.
-    recordSubprocessSpawn(resolved.binary, resolved.args, performance.now() - spawnStartedAt)
-  }
-}
+export { gitExecFileSync } from './git-exec-file-sync'

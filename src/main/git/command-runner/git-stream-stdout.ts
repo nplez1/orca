@@ -4,13 +4,14 @@ import { withGitSpan } from '../../observability/instrumentation'
 import { recordSubprocessSpawn } from '../../diagnostics/main-thread-churn-probe'
 import { createAbortError } from './abort-error'
 import { killSpawnedCommandTree } from './spawned-command-tree-kill'
+import {
+  deadlineOverrunMetadata,
+  recordDeadlineOverrunOnSpan,
+  terminateAtStalledDeadline
+} from './stalled-deadline-kill'
 import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
 import type { ResolvedCommand } from './wsl-command-resolution'
-import {
-  DEFAULT_GIT_MAX_BUFFER,
-  type GitAdmissionTier,
-  type GitExecOptions
-} from './git-exec-options'
+import { DEFAULT_GIT_MAX_BUFFER, type GitExecOptions } from './git-exec-options'
 import {
   pendingWslDirectGitReadEnvironment,
   directWslGitExitCode,
@@ -25,29 +26,9 @@ import { nonInteractiveGitEnv, untranslatedGitOutputEnv } from './git-process-en
 import { gitSpawn } from './git-spawn'
 import { acquireGitAdmission } from './git-subprocess-admission'
 import { GitCommandTimeoutError, gitCommandTimeoutMs } from './git-command-timeout'
+import type { GitStreamOptions, GitStreamResult } from './git-stream-options'
 
-/** Result of a streamed git command; `stoppedEarly` is true when onStdout asked to stop before the child exited. */
-export type GitStreamResult = { stoppedEarly: boolean }
-
-export type GitStreamOptions = {
-  cwd: string
-  env?: NodeJS.ProcessEnv
-  wslDistro?: string
-  preferWslDirectGit?: boolean
-  signal?: AbortSignal
-  /** Byte backstop; defaults to DEFAULT_GIT_MAX_BUFFER. */
-  maxBuffer?: number
-  /** Explicit wall-clock deadline; read commands default to the production backstop. */
-  timeoutMs?: number
-  /** Overrides only the default read deadline in tests. */
-  timeoutMsForTest?: number
-  admissionTier?: GitAdmissionTier
-  /**
-   * Called for each decoded stdout chunk. Return true to stop: the child is
-   * killed and the promise resolves with stoppedEarly=true.
-   */
-  onStdout: (chunk: string) => boolean | void
-}
+export type { GitStreamOptions, GitStreamResult } from './git-stream-options'
 
 /**
  * Stream a git command's stdout incrementally instead of buffering it whole.
@@ -234,9 +215,21 @@ export async function gitStreamStdout(
           finish(createAbortError())
         }
 
-        function onTimeout(): void {
-          void killSpawnedCommandTree(child)
-          finish(new GitCommandTimeoutError(timeoutMs as number))
+        function onTimeout(deadlineAt: number, timeoutMs: number): void {
+          const overrunMs = performance.now() - deadlineAt
+          terminateAtStalledDeadline({
+            overrunMs,
+            isSettled: () => settled,
+            terminate: () => {
+              void killSpawnedCommandTree(child)
+              finish(
+                Object.assign(
+                  new GitCommandTimeoutError(timeoutMs),
+                  deadlineOverrunMetadata(overrunMs)
+                )
+              )
+            }
+          })
         }
 
         child.stdout?.on('data', onStdoutData)
@@ -245,7 +238,8 @@ export async function gitStreamStdout(
         child.on('close', onClose)
         options.signal?.addEventListener('abort', onAbort, { once: true })
         if (timeoutMs !== undefined && timeoutMs > 0) {
-          timeoutTimer = setTimeout(onTimeout, timeoutMs)
+          const deadlineAt = performance.now() + timeoutMs
+          timeoutTimer = setTimeout(() => onTimeout(deadlineAt, timeoutMs), timeoutMs)
         }
         if (options.signal?.aborted) {
           onAbort()
@@ -255,6 +249,7 @@ export async function gitStreamStdout(
       try {
         return await stream(resolved)
       } catch (error) {
+        recordDeadlineOverrunOnSpan(span, error)
         const stdoutBytes =
           error && typeof error === 'object'
             ? (error as { stdoutBytes?: unknown }).stdoutBytes
@@ -267,7 +262,10 @@ export async function gitStreamStdout(
           await terminationState.current
           const wasMissing = invalidateMissingDirectWslGit(error, resolved)
           resolved = resolveGitCommandWithoutProbe(args, gitOptions)
-          const result = await stream(resolved)
+          const result = await stream(resolved).catch((retryError: unknown) => {
+            recordDeadlineOverrunOnSpan(span, retryError)
+            throw retryError
+          })
           disableDirectWslGitAfterSuccessfulFallback(wasMissing, resolved)
           return result
         }

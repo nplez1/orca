@@ -1,9 +1,12 @@
+import { existsSync } from 'node:fs'
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { execFileCapture } from './exec-file-capture'
 import { gitExecFileAsync, gitExecFileAsyncBuffer } from './git-exec-file'
 import { GitCommandTimeoutError } from './git-command-timeout'
+import { deadlineOverrunOf } from './stalled-deadline-kill'
 import { gitStreamStdout } from './git-stream-stdout'
 
 const tempRoots: string[] = []
@@ -41,6 +44,9 @@ async function run() {
   }
   await sleep(Number(process.env.ORCA_STUB_SLEEP_MS))
   process.stdout.write('done')
+  if (process.env.ORCA_STUB_TOUCH_FILE) {
+    require('node:fs').writeFileSync(process.env.ORCA_STUB_TOUCH_FILE, '')
+  }
 }
 void run()
 `
@@ -53,6 +59,75 @@ void run()
 }
 
 describe.skipIf(process.platform === 'win32')('git read timeout behavior', () => {
+  // Why real time: a fake clock cannot reproduce a main thread that stops servicing the I/O
+  // its deadline timers wait on — the exact shape of #155. `Atomics.wait` blocks this thread
+  // without yielding to the loop, so the stall is a pure stall and costs no CPU.
+  const stallCell = new Int32Array(new SharedArrayBuffer(4))
+  function stallMainThread(stallMs: number, untilStubFinished?: string): void {
+    const stalledAt = performance.now() + stallMs
+    const giveUpAt = stalledAt + 10_000
+    for (;;) {
+      const stalled = performance.now() >= stalledAt
+      const stubFinished = untilStubFinished === undefined || existsSync(untilStubFinished)
+      if ((stalled && stubFinished) || performance.now() >= giveUpAt) {
+        return
+      }
+      Atomics.wait(stallCell, 0, 0, 2)
+    }
+  }
+
+  it('does not fail a command that finished while the main thread was stalled', async () => {
+    const fixture = await createTimedGitFixture()
+    // Why the sentinel: the stall has to outlast the deadline *and* the stub, on any machine.
+    const stubFinished = path.join(fixture.cwd, 'stub-finished')
+    const captured = execFileCapture('git', ['status'], {
+      cwd: fixture.cwd,
+      env: {
+        ...fixture.env,
+        ORCA_STUB_SLEEP_MS: '10',
+        ORCA_STUB_TOUCH_FILE: stubFinished
+      },
+      encoding: 'utf-8',
+      timeout: 60
+    })
+    stallMainThread(600, stubFinished)
+    await expect(captured).resolves.toMatchObject({ stdout: 'done' })
+  })
+
+  it('still rejects a command running after the stall, tagged with the stall', async () => {
+    const fixture = await createTimedGitFixture()
+    const captured = execFileCapture('git', ['status'], {
+      cwd: fixture.cwd,
+      env: { ...fixture.env, ORCA_STUB_SLEEP_MS: '10000' },
+      encoding: 'utf-8',
+      timeout: 60,
+      createTimeoutError: () => new GitCommandTimeoutError(60)
+    })
+    stallMainThread(400)
+    const error: unknown = await captured.then(
+      () => null,
+      (failure: unknown) => failure
+    )
+    expect(error).toBeInstanceOf(GitCommandTimeoutError)
+    expect(deadlineOverrunOf(error) ?? 0).toBeGreaterThanOrEqual(300)
+  })
+
+  it('does not fail a streamed read that finished while the main thread was stalled', async () => {
+    const fixture = await createTimedGitFixture()
+    let output = ''
+    const streamed = gitStreamStdout(['status'], {
+      ...fixture,
+      env: { ...fixture.env, ORCA_STUB_SLEEP_MS: '10' },
+      timeoutMsForTest: 1000,
+      onStdout: (chunk) => {
+        output += chunk
+        stallMainThread(1600)
+      }
+    })
+    await expect(streamed).resolves.toEqual({ stoppedEarly: false })
+    expect(output).toBe('done')
+  })
+
   it('allows a progressively streaming read that exits at 0.9 times the deadline', async () => {
     const fixture = await createTimedGitFixture()
     let output = ''
