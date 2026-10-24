@@ -49,16 +49,22 @@ catch-up against this merge before it can be opened — `local/open-pr.mjs` refu
 not descend from its base, and a branch whose base moved needs the new base folded in first.
 
 **Branch measurements could not be re-taken in this worktree.** The PR-bound branches are not
-fetched here, so `node local/branch-status.mjs` reports every one as `MISSING locally` and the
-merge-base/behind figures below are still the 2026-10-13 measurements. Re-run the script from a
-worktree that has them before trusting the numbers; the merge moved the shared ancestor, so every
-branch's behind-count has grown by this sync's 311 commits plus the fork's own.
+fetched here, so `node local/branch-status.mjs` reports each one's delta as `not local` while still
+reading its fork SHA and PR state from the network, and the merge-base/behind figures below are still
+the 2026-10-13 measurements. Fetch a branch (`git fetch origin <branch>:<branch>`) before trusting its
+delta; the merge moved the shared ancestor, so every branch's behind-count has grown by this sync's
+311 commits plus the fork's own.
 
 The live table — SHAs, whether the fork has each branch, each branch's own delta, and its PR state —
-is generated, not kept by hand:
+is generated, not kept by hand. The inventory comes from the refs (`refs/heads/nplez1`,
+`origin/nplez1/*`, and the fork's own heads), so a branch that exists is in the report and a listed
+branch that was deleted is not; the few upstream-bound branches, which no ref here describes, are the
+one named list left, and a name in it that matches no ref is reported. PR state is read from both
+`nplez1/orca` and `stablyai/orca`.
 
 ```bash
-node local/branch-status.mjs
+node local/branch-status.mjs               # local refs, the fork's refs, both repos' PR state
+node local/branch-status.mjs --local-only  # offline: refs and deltas only
 ```
 
 Run it first. This file records what that script cannot know: **why each branch exists, what it
@@ -90,7 +96,7 @@ depends on, and what is blocking it.** If the two disagree, the script is right.
 
 ```text
 origin/main
-├── fix/cli-symlink-world-readable          ← PR #20813 (open)
+├── fix/cli-symlink-world-readable          ← PR #20813 (closed 2026-10-16)
 ├── fix/copilot-background-work
 ├── fix/repo-catalog-connection-fence
 ├── fix/claude-codex-enterprise-accounts
@@ -169,7 +175,7 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 
 ## Branches
 
-### fix/cli-symlink-world-readable — PR #20813, open
+### fix/cli-symlink-world-readable — PR #20813, closed 2026-10-16 without a review
 
 - **Why:** macOS published the privileged `/usr/local/bin/orca` shim as `0700`, so `readlink` failed
   and Settings → CLI registration crashed with `EACCES` (upstream issue #19120).
@@ -178,8 +184,9 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Verified:** typecheck, `pnpm build`, full suite 81,234 pass, plain `oxlint`, changed-code gate;
   both review bots clean; CodeRabbit's two threads resolved. Manual before/after on installed builds
   (`0700` → `0755`).
-- **Blocked on:** a maintainer. No human review, no comment, and CI has not even been released to
-  run — as of the last check, 17h after opening.
+- **Blocked on:** nothing — upstream closed it on 2026-10-16 with no review and no comment
+  (`local/branch-status.mjs` reports `#20813 closed (upstream)`). The branch is still on the fork and
+  the fix is not in any upstream release, so it can be re-opened or carried upstream on request.
 
 ### fix/copilot-background-work
 
@@ -372,10 +379,9 @@ series, `.github/workflows/fork-release.yml` for the release pipeline, and
 
 ## Open threads
 
-- **PR #20813 awaits a human.** Rebased onto the current base on 2026-09-16 (4 commits, all
-  `range-diff`-identical), so it is mergeable and no longer stale. The next action is still a
-  maintainer's; the bots have been the only reviewers. If nothing moves after a few days, one short
-  comment on the PR, or their Discord (https://discord.gg/fzjDKHxv8Q), is the proportionate nudge.
+- **PR #20813 was closed upstream, not merged.** Upstream closed it on 2026-10-16 with no review and
+  no comment, so the macOS CLI symlink fix is not in any upstream release. The branch is intact on the
+  fork; re-opening it, or carrying the fix some other way, is a decision rather than a next step.
 - **Do not open the other PRs yet.** A first-time contributor filing eight PRs into a queue that is
   not being triaged risks all of them going stale. Land one, become a `CONTRIBUTOR`, then move. The
   PR-bound branches are _not_ current — see § Base drift for the measured distance — so whoever opens

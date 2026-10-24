@@ -1,9 +1,10 @@
 #!/usr/bin/env sh
 # LOCAL(nplez1): fork-only changes must never land on a PR branch.
 #
-# PR branches are cut from origin/main, so a fork-only file committed to one would be reviewed
-# upstream — which is the whole reason LOCAL-PATCHES.md exists. This guard is here because the
-# mistake was made twice in one session: a `local(...)` commit authored on the wrong branch.
+# Fork PR branches are cut from nplez1/main and upstream-bound ones from origin/main, so a
+# fork-only file committed to either would be reviewed as part of that PR's diff — and the whole
+# point of LOCAL-PATCHES.md is that these patches are reviewed nowhere. This guard is here because
+# the mistake was made twice in one session: a `local(...)` commit authored on the wrong branch.
 #
 # Every `local(...)` commit belongs on nplez1/main and nowhere else.
 
