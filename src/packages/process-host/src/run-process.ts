@@ -6,7 +6,7 @@ import { inFlightWindowsTreeKill } from './windows-tree-kill'
 import { hasSpawnObserver, notifySpawnObserver } from './spawn-observer'
 import { createOutputSink } from './bounded-output-sink'
 import { createChildTerminationReporter } from './child-termination-reporter'
-import { scheduleDeadlineKill } from './process-deadline'
+import { deadlineOverrunField, scheduleDeadlineKill } from './process-deadline'
 
 export { WindowsCmdLineBreakError } from './windows-command-line'
 
@@ -161,9 +161,7 @@ export function runProcess(
           ...(spec.captureStdoutAsBytes ? { stdoutBytes: stdout.buffer() } : {}),
           stderr: stderr.text(),
           timedOut,
-          ...(deadlineOverrunMs === null
-            ? {}
-            : { deadlineOverrunMs: Math.round(deadlineOverrunMs) }),
+          ...deadlineOverrunField(deadlineOverrunMs),
           outputTruncated: stdout.truncated() || stderr.truncated()
         })
       )
@@ -292,6 +290,8 @@ export function runProcess(
         : scheduleDeadlineKill({
             deadlineMs: spec.timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS,
             isSettled: () => settled,
+            hasExited: () =>
+              deferredExit !== null || child.exitCode !== null || child.signalCode !== null,
             kill: killAtDeadline
           })
 
