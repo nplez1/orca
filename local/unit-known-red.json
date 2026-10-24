@@ -4,53 +4,86 @@
     "A failure listed here is reported but does not fail the gate; a failure outside it does. Same",
     "shape as local/e2e-known-failure-titles.json, which already gates the scheduled e2e lane.",
     "",
-    "Reconciled against the first real gate run: 2026-10-21 on 1a64dbe2f6 (29 failing cases, 24 of",
-    "them allowlisted across 9 files). Two failures from that run are deliberately NOT listed \u2014",
-    "src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts and src/main/ephemeral-vm-runtime-",
-    "extend.test.ts \u2014 because each still fails in an isolated re-run and has no recorded signature, so",
-    "each is either a real regression on this branch or a red nobody has classified yet.",
+    "Every entry names a test title, not a file. A file-level entry (`\"test\": \"*\"`) also masks a NEW",
+    "failure inside that file, which is how `the screen prompt a pane is holding answers null for a",
+    "pane it cannot bind to a terminal` hid for two syncs: it asserts null where the implementation",
+    "documents undefined, so it was fixed rather than recorded.",
     "",
-    "granularity `file` means the whole file is expected red. That is coarse on purpose: the evidence",
-    "is file-level. Tighten an entry to a `test` title as soon as you have the failing name, because a",
-    "file-level entry also masks a NEW failure inside that file.",
+    "An entry for a file the gate does not run is a problem, not a pass. The gate runs upstream's own",
+    "unit lane (`UNIT_EXCLUDE`), so the 80 files that list drops — the electron, node-pty, live-shell",
+    "and cross-version-wire ones — are upstream-quarantined and deliberately absent here.",
     "",
     "Keeping entries: documented in LOCAL-PATCHES.md => keep even when a run does not reproduce it",
     "(the machine state varies). Observed once and undocumented => prune it; `unseen` is the signal.",
     "An entry that passes is reported stale; prune it. LOCAL-PATCHES.md stays the evidence, this file",
     "stays the assertion, and both change in the same commit."
   ],
-  "recordedAt": "2026-10-22",
+  "recordedAt": "2026-10-23",
   "observedRun": {
-    "revision": "post-sync (2026-10-22 sync)",
-    "failingCases": 41,
-    "allowlisted": null,
+    "kind": "scoped",
+    "revision": "b094309766",
+    "subject": "the fifteen files the previous manifest named, plus the two the 2026-10-21 sync left unlisted",
+    "failingRecords": 38,
+    "allowlisted": 32,
+    "upstreamQuarantined": 5,
+    "fixed": 1,
     "unexpected": 0,
-    "unhandledErrorHeadlines": 7,
-    "note": "First gate run of the 2026-10-22 sync saw 41 cases in 19 files: 14 files already recorded, 3 real merge breaks (fixed in-suite: session-search-list-reparse, agent-session-failure-words-text, pty-pane-copy-census), 2 host-toolchain reds recorded here. All 7 unhandled headlines are now read (the parser also matches Vitest's `Unhandled Error` heading): 1 recorded, 5 the tolerated worker-teardown race, 1 pool crash recorded here."
+    "unhandledErrorHeadlines": 0,
+    "note": "Reconciliation run for the tightening below, not a gate verdict: it runs the allowlisted files and the two formerly-unlisted ones, so it cannot see a red in any other file. Every record closes: allowlisted + upstreamQuarantined + fixed = failingRecords. The full-suite verdict for the revision that ships is recorded in LOCAL-PATCHES.md, because this file changing is what invalidates that verdict's cache key."
   },
   "unhandledErrors": [
     {
       "headline": "Error: selector_not_found",
       "class": "macos-path-semantics",
-      "owner": "unattributed",
-      "evidence": "raised by src/main/runtime/orca-runtime.test.ts (allowlisted in this file): \"does not coalesce concurrent same-id removals on different hosts\" returns the in-flight removal promise to the second caller without awaiting it, and that promise rejects with selector_not_found. Pre-existing at 1a64dbe2f6; the coalescing map is upstream code.",
-      "file": "src/main/runtime/orca-runtime.test.ts"
+      "owner": "upstream",
+      "evidence": "Raised by src/main/runtime/orca-runtime.test.ts: `does not coalesce concurrent same-id removals on different hosts` hands the in-flight removal promise to the second caller without awaiting it, and that promise rejects with selector_not_found. Pre-existing at 1a64dbe2f6; the coalescing map is upstream code. Declared for the headline, not for a test: the 2026-10-22 full run raised none."
     },
     {
       "headline": "Error: [vitest-pool]: Worker node-runtime emitted error.",
       "class": "pool-crash",
       "owner": "unattributed",
-      "evidence": "LOCAL-PATCHES.md: a node-runtime worker exited with SIGTRAP during the full run while it was on src/main/plugins/plugin-service-reconciliation.test.ts; that file passes 11/11 alone in 2.4 s, so the crash is pool/memory pressure across a 19-minute run, not a failing test",
-      "file": "src/main/plugins/plugin-service-reconciliation.test.ts"
+      "evidence": "LOCAL-PATCHES.md: a node-runtime worker exited with SIGTRAP during the full run while it was on src/main/plugins/plugin-service-reconciliation.test.ts; that file passes 11/11 alone in 2.4 s, so the crash is pool/memory pressure across a 19-minute run, not a failing test."
     }
   ],
   "entries": [
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "*",
+      "test": "managed SSH workflow command keeps compatibility with legacy checkout refs",
       "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "the workflow step these cases run calls mapfile (e2e.yml:631), which macOS /bin/bash 3.2 does not have; the ubuntu runners supply bash 5. Same class as the pr-auxiliary-preflight-admission entries.",
+      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps compatibility with missing checkout refs",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps full daily and explicit suite execution for ",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps full daily and explicit suite execution for [\"tests/e2e/ssh-orcad-\",\"tests/e2e/ssh-orcad-open-in-owner.spec.ts\"]",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command passes only the selected SSH files to Playwright, with literal file matching",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
       "flaky": false
     },
     {
@@ -58,111 +91,215 @@
       "test": "extracts release data while excluding executable package and Cargo configuration",
       "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the audit action's bash step uses `mapfile`, which macOS bash 3.2 does not have (`bash: mapfile: command not found`); same class as ci-managed-ssh-execution.test.mjs",
+      "evidence": "LOCAL-PATCHES.md: the audit action the case extracts runs a bash step with `mapfile`, absent from macOS bash 3.2 — same class as ci-managed-ssh-execution.",
       "flaky": false
     },
     {
       "file": "config/scripts/macos-terminal-host-bundle.test.mjs",
-      "test": "*",
+      "test": "terminal host assembly flags a require that only resolves outside the helper",
       "class": "macos-path-semantics",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md, same class: a yaml decoy read as outside the helper bundle",
+      "evidence": "LOCAL-PATCHES.md: the case reads one yaml decoy as a require that resolves outside the helper bundle; the resolver walks the same /private/var indirection this machine adds.",
       "flaky": false
     },
     {
       "file": "config/scripts/main-entry-facade.test.ts",
-      "test": "*",
+      "test": "keeps main code and asset paths working after a CLI build replaces its public entry",
       "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: rebuild/build harness times out or mismatches",
+      "evidence": "LOCAL-PATCHES.md: the CLI build harness these cases drive times out or reports a mismatched result document on this machine.",
       "flaky": false
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "*",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual addition",
       "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: `bash: MOBILE_CI_ARGS[@]: unbound variable` \u2014 macOS ships bash 3.2, where an empty array under `set -u` is an error",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual deletion",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual rename",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual type change",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual addition",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual deletion",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual rename",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual type change",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
       "flaky": false
     },
     {
       "file": "config/scripts/process-host-dev-rebuild.test.ts",
-      "test": "*",
+      "test": "External process-host development rebuilds emits private source edits and new imports before the Electron reload hook",
       "class": "host-toolchain",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: rebuild/build harness times out or mismatches",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "External process-host development rebuilds rebuilds when an explicitly imported excluded source is created or edited",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "External process-host development rebuilds rebuilds when an inherited compiler configuration changes",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "External process-host development rebuilds recompiles when a nested package manifest is created or removed",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "External process-host development rebuilds recovers when a missing import is created in a new source directory",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/process-host-dev-rebuild.test.ts",
+      "test": "External process-host development rebuilds reports a failed compilation, preserves prior output, and recovers after a fix",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
       "flaky": false
     },
     {
       "file": "src/main/cli/cli-command-privileged-transaction.test.ts",
-      "test": "*",
+      "test": "macOS privileged CLI command transaction repairs an unreadable link to an older Orca launcher through the transaction",
       "class": "macos-path-semantics",
-      "owner": "unattributed",
-      "evidence": "LOCAL-PATCHES.md np.37 entry: 'Refusing to replace non-Orca command at /var/folders/...' \u2014 the same symlink resolution against a temp dir it just created",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md np.37: `Refusing to replace non-Orca command at /var/folders/...` — the transaction compares the launcher it just created against a path the OS resolves to /private/var.",
       "flaky": false
     },
     {
       "file": "src/main/cli/packaged-cli-assets.test.ts",
-      "test": "*",
+      "test": "packaged CLI assets sanitizes node env and forwards argv verbatim through the macOS launcher",
       "class": "macos-path-semantics",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the darwin launcher resolves /var to /private/var with `cd -P` while the test builds its path from the unresolved os.tmpdir()",
-      "flaky": false
-    },
-    {
-      "file": "src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts",
-      "test": "*",
-      "class": "pty-subprocess",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: 'Timed out waiting for PTY output'",
+      "evidence": "LOCAL-PATCHES.md: the darwin launcher resolves /var to /private/var with `cd -P` while the case builds its argv from the unresolved os.tmpdir().",
       "flaky": false
     },
     {
       "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "*",
+      "test": "orcad forked-child paths forks the session scanner child shipped beside orcad.js",
       "class": "macos-path-semantics",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, same /private/var signature on all four cases",
+      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths forks the watcher child shipped beside orcad.js",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths ignores a decoy child under the working directory",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths reports the install root and the Node binary, not the data directory",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
       "flaky": false
     },
     {
       "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
-      "test": "*",
+      "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
       "class": "sqlite-binding",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: same class, 'cannot add rowid alias: rowid'",
+      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite refuses the extra column that shadows its rowid alias (`cannot add rowid alias: rowid`) where the contract expects it accepted.",
       "flaky": false
     },
     {
       "file": "src/main/runtime/orca-runtime.test.ts",
-      "test": "*",
+      "test": "OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path",
       "class": "macos-path-semantics",
-      "owner": "unattributed",
-      "evidence": "2026-10-21 gate run, two cases assert '/private/var/...' to be '/var/...' \u2014 the same symlink resolution; still fails in an isolated re-run",
+      "owner": "upstream",
+      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/orca-runtime.test.ts",
+      "test": "OrcaRuntimeService sets up an existing folder on a fresh runtime after importing the repo project",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
       "flaky": false
     },
     {
       "file": "src/main/sqlite/sync-database-portability.test.ts",
-      "test": "*",
+      "test": "SQLite runtime contract rejects explicit undefined bindings before modifying rows",
       "class": "sqlite-binding",
       "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what those contracts assume ('rejects explicit undefined bindings')",
-      "flaky": false
-    },
-    {
-      "file": "tests/e2e/cross-version-wire/host-model-catalog-released-phone.unit.test.ts",
-      "test": "*",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: both cases call node:module's stripTypeScriptTypes; the bun 1.4.3 pool's node:module does not export it, so the file only passes under a Node runtime",
-      "flaky": false
-    },
-    {
-      "file": "tests/e2e/relay-region-correction.unit.test.ts",
-      "test": "*",
-      "class": "missing-workspace",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: needs the `cloud/` workspace, which is not installed here; the suite fails to collect on 'Cannot find package pg'",
+      "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what the contract assumes ('rejects explicit undefined bindings').",
       "flaky": false
     }
   ]
