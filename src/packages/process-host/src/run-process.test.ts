@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { runProcess, runProcessSync } from './run-process'
+import { BLOCKED_DEADLINE_OVERRUN_MS, runProcess, runProcessSync } from './run-process'
 import { resolveSpawn } from './spawn-resolution'
 import { WINDOWS_ARGUMENT_CORPUS } from './__fixtures__/windows-argument-corpus'
 
@@ -292,5 +292,37 @@ describe('output truncation', () => {
     })
     expect(result.stderr).not.toContain('FAILED')
     expect(result.stderr).toBe('n'.repeat(64))
+  })
+})
+
+describe('deadline across a blocked main thread', () => {
+  // Why real time and a real block: a fake clock cannot reproduce a thread that stops servicing the
+  // I/O its deadline timers wait on, which is the shape #155 reported. `Atomics.wait` blocks this
+  // thread without yielding to the loop, so the stall is a pure stall and costs no CPU.
+  const stallCell = new Int32Array(new SharedArrayBuffer(4))
+  const blockMainThread = (ms: number): void => {
+    Atomics.wait(stallCell, 0, 0, ms)
+  }
+
+  it('lets a child that exited during the block settle with its result', async () => {
+    const pending = runProcess({
+      program: process.execPath,
+      args: ['-e', "setTimeout(() => process.stdout.write('done'), 20)"],
+      timeoutMs: 10
+    })
+    blockMainThread(400)
+    await expect(pending).resolves.toMatchObject({ timedOut: false, stdout: 'done' })
+  })
+
+  it('kills a child still running after the block, tagged with the lateness', async () => {
+    const pending = runProcess({
+      program: process.execPath,
+      args: ['-e', 'setTimeout(() => {}, 10_000)'],
+      timeoutMs: 10
+    })
+    blockMainThread(400)
+    const result = await pending
+    expect(result.timedOut).toBe(true)
+    expect(result.deadlineOverrunMs ?? 0).toBeGreaterThanOrEqual(BLOCKED_DEADLINE_OVERRUN_MS)
   })
 })

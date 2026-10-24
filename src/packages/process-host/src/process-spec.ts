@@ -70,6 +70,8 @@ export type ProcessResult = {
   stderr: string
   /** True when the process was killed by `timeoutMs` rather than exiting. */
   timedOut: boolean
+  /** How late the deadline timer fired, when a main-thread block delayed it. */
+  deadlineOverrunMs?: number
   /** True when stdout or stderr exceeded `maxOutputBytes` and was clipped. */
   outputTruncated?: boolean
 }
