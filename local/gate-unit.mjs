@@ -217,21 +217,29 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
     if (forkStep.status !== 0) {
       return { outcome: 'fork-local tests failed', elapsedMs, forkTestsPassed: false }
     }
-    for (const [label, program, args] of [
-      ['build:packages', 'pnpm', ['run', 'build:packages']],
-      [
-        'ensure native runtime',
-        'node',
-        [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
-      ]
+    // Why objects: a heterogeneous tuple array widens `label` to `string | string[]` under the
+    // fork's type-aware lint, which then rejects it inside the failure template.
+    for (const preparation of [
+      { label: 'build:packages', program: 'pnpm', args: ['run', 'build:packages'] },
+      {
+        label: 'ensure native runtime',
+        program: 'node',
+        args: [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
+      }
     ]) {
-      const step = runStep(label, program, args, logFd, timeoutMs)
+      const step = runStep(
+        preparation.label,
+        preparation.program,
+        preparation.args,
+        logFd,
+        timeoutMs
+      )
       elapsedMs += step.elapsedMs
       if (step.timedOut) {
         return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
       }
       if (step.status !== 0) {
-        return { outcome: `${label} failed`, elapsedMs, forkTestsPassed }
+        return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
       }
     }
     const suite = runStep(
