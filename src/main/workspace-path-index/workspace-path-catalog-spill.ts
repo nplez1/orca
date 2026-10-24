@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, open, readdir, rename, rm, stat, type FileHandle } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { join } from 'node:path'
 import {
   workspacePathCatalogRetainedBytes,
   type WorkspacePathCatalog
@@ -25,7 +25,6 @@ import {
 import {
   checkCancelled,
   hashIdentity,
-  processIsAlive,
   writeAll,
   writeRecordBlock,
   writeZeroBytes
@@ -45,25 +44,6 @@ export {
   openWorkspacePathCatalogSpillReader,
   removeWorkspacePathCatalogSpill
 } from './workspace-path-catalog-spill-reader'
-
-/** Writes sorted records as checksummed prefix blocks and atomically publishes one file. */
-export async function cleanStaleWorkspacePathCatalogSpillDirectories(
-  processDirectory: string
-): Promise<void> {
-  const rootDirectory = dirname(processDirectory)
-  await mkdir(rootDirectory, { recursive: true, mode: 0o700 })
-  const currentName = basename(processDirectory)
-  for (const entry of await readdir(rootDirectory, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !/^[0-9]+$/.test(entry.name) || entry.name === currentName) {
-      continue
-    }
-    const ownerPid = Number(entry.name)
-    if (!Number.isSafeInteger(ownerPid) || processIsAlive(ownerPid)) {
-      continue
-    }
-    await rm(join(rootDirectory, entry.name), { recursive: true, force: true })
-  }
-}
 
 export async function prepareWorkspacePathCatalogSpillDirectory(directory: string): Promise<void> {
   await mkdir(directory, { recursive: true, mode: 0o700 })

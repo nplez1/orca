@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, open, readdir, rm, stat, truncate, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readdir, rm, stat, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -20,7 +20,6 @@ import type {
 } from '../../shared/workspace-path-catalog'
 import type { WorkspacePathSpillRecord } from './workspace-path-catalog-spill'
 import {
-  cleanStaleWorkspacePathCatalogSpillDirectories,
   openWorkspacePathCatalogSpillReader,
   writeWorkspacePathCatalogSpill
 } from './workspace-path-catalog-spill'
@@ -39,19 +38,6 @@ afterEach(async () => {
 })
 
 describe('workspace path catalog spill files', () => {
-  it('cleans stale process directories without touching the current process', async () => {
-    temporaryDirectory = await mkdtemp(join(tmpdir(), 'orca-path-spill-stale-'))
-    const currentDirectory = join(temporaryDirectory, String(process.pid))
-    const staleDirectory = join(temporaryDirectory, '99999999')
-    await mkdir(currentDirectory, { recursive: true })
-    await mkdir(staleDirectory, { recursive: true })
-    await writeFile(join(currentDirectory, 'live.wpc'), 'live')
-    await writeFile(join(staleDirectory, 'stale.wpc'), 'stale')
-    await cleanStaleWorkspacePathCatalogSpillDirectories(currentDirectory)
-    expect(await readdir(temporaryDirectory)).toEqual([String(process.pid)])
-    expect(await readdir(currentDirectory)).toEqual(['live.wpc'])
-  })
-
   it('round-trips sorted blocks and validates identity, fold policy, and exact rows', async () => {
     temporaryDirectory = await mkdtemp(join(tmpdir(), 'orca-path-spill-'))
     const source: WorkspacePathSpillRecord[] = [
