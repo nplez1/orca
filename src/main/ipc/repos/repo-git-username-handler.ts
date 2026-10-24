@@ -13,6 +13,6 @@ export function registerRepoGitUsernameHandler(store: Store): void {
     if (repo.connectionId) {
       return ''
     }
-    return resolveLocalGitUsername(repo.path)
+    return resolveLocalGitUsername(repo.path, repo.ghAccount)
   })
 }

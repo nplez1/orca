@@ -1,6 +1,7 @@
 import { extractExecError, ghExecFileAsync, gitExecFileAsync } from './runner'
 import { parseHostedRemote } from './hosted-remote-url'
 import { resolveDefaultBaseRefViaExec } from './repo'
+import type { GhAccountBinding } from '../../shared/github/account-binding'
 
 const EXPLICIT_USERNAME_CONFIG_KEYS = ['github.user', 'user.username'] as const
 
@@ -286,7 +287,8 @@ async function localRepoHasEffectiveGitHubRemote(repoPath: string): Promise<bool
  * { username: '', authoritative: false }.
  */
 export async function resolveLocalGitUsernameDetailed(
-  repoPath: string
+  repoPath: string,
+  ghAccount?: GhAccountBinding
 ): Promise<ResolvedGitUsername> {
   for (const key of EXPLICIT_USERNAME_CONFIG_KEYS) {
     try {
@@ -304,7 +306,14 @@ export async function resolveLocalGitUsernameDetailed(
     }
   }
   if (await localRepoHasEffectiveGitHubRemote(repoPath)) {
-    const outcome = await getGhLoginOutcome()
+    // Why: a pinned repo's branch prefix is its bound login, not the machine's active one —
+    // and using it here skips a probe that would report the wrong account. The gate above
+    // only classifies github.com, so a GHES binding must not become a github.com prefix.
+    const boundLogin =
+      ghAccount?.host.trim().toLowerCase() === 'github.com'
+        ? normalizeHostedLogin(ghAccount.user)
+        : ''
+    const outcome = boundLogin ? { login: boundLogin, timedOut: false } : await getGhLoginOutcome()
     if (outcome.login || outcome.timedOut) {
       return { username: outcome.login, authoritative: !outcome.timedOut }
     }
@@ -317,8 +326,11 @@ export async function resolveLocalGitUsernameDetailed(
   return { username: '', authoritative: true }
 }
 
-export async function resolveLocalGitUsername(repoPath: string): Promise<string> {
-  return (await resolveLocalGitUsernameDetailed(repoPath)).username
+export async function resolveLocalGitUsername(
+  repoPath: string,
+  ghAccount?: GhAccountBinding
+): Promise<string> {
+  return (await resolveLocalGitUsernameDetailed(repoPath, ghAccount)).username
 }
 
 export function resetGhLoginCacheForTests(): void {

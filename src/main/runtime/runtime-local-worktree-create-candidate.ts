@@ -36,6 +36,7 @@ import { runtimePathExists } from './runtime-worktree-filesystem'
 import { findPendingWorktreeRemovalConflict } from '../worktree-removal-table'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
+import { getLocalProjectGhExecOptions } from '../project-runtime-git-options'
 
 export type RuntimeLocalWorktreeCreateCandidate = {
   effectiveRequestedName: string
@@ -72,6 +73,13 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     throw new Error('An exact-branch create needs the branch it must keep.')
   }
   const sanitizedName = sanitizeWorktreeName(args.request.name)
+  // Why: the branch→PR probes are gh calls; run them as the repo's pinned account, not the
+  // ambient login the caller may not have threaded through.
+  const ghLookupOptions =
+    args.hostedReviewExecutionContext?.localGitExecOptions ??
+    (args.store
+      ? getLocalProjectGhExecOptions(args.store, args.repo)
+      : args.localWorktreeGitOptions)
   let effectiveRequestedName = args.request.name
   let effectiveSanitizedName = sanitizedName
   let branchName = ''
@@ -163,7 +171,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
             existingPR = await getLocalGitHubPrForBranch(
               args.repo.path,
               branchName,
-              args.localWorktreeGitOptions
+              ghLookupOptions
             )
           } catch {}
           if (isMatchingSelectedGitHubPr(existingPR, args.request, branchName)) {
@@ -201,11 +209,7 @@ export async function resolveRuntimeLocalWorktreeCreateCandidate(args: {
     ) {
       let existingPR: Awaited<ReturnType<typeof getPRForBranch>> | null = null
       try {
-        existingPR = await getLocalGitHubPrForBranch(
-          args.repo.path,
-          branchName,
-          args.localWorktreeGitOptions
-        )
+        existingPR = await getLocalGitHubPrForBranch(args.repo.path, branchName, ghLookupOptions)
       } catch {}
       if (existingPR && !isMatchingSelectedGitHubPr(existingPR, args.request, branchName)) {
         continue

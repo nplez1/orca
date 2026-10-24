@@ -14,6 +14,7 @@ import {
 } from './selected-review-branch'
 import { hasLocalGitOptions, normalizeLocalBranchName } from './runtime-worktree-selection'
 import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
+import type { LocalGitExecOptions } from '../github/github-repository-identity'
 
 export async function resolveCreateBranchName(
   repoPath: string,
@@ -79,7 +80,7 @@ export async function canCheckoutExistingLocalBranch(
 export function getLocalGitHubPrForBranch(
   repoPath: string,
   branchName: string,
-  gitOptions: { wslDistro?: string }
+  gitOptions: LocalGitExecOptions
 ): ReturnType<typeof getPRForBranch> {
   return hasLocalGitOptions(gitOptions)
     ? getPRForBranch(repoPath, branchName, null, null, null, {

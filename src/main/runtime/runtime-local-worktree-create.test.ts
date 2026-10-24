@@ -6,6 +6,7 @@ import type { HostWorktreeTarget } from '../../shared/worktree/host-qualified-id
 import type { Repo } from '../../shared/repo-types'
 import { getDefaultRepoHookSettings } from '../../shared/constants'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
+import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
 import type { AddWorktreeOptions } from '../git/worktree'
 import {
   acquireGitAdmission,
@@ -17,6 +18,7 @@ import { resolveGitAdmissionTier } from '../git/command-runner/git-operation-exe
 const mocks = vi.hoisted(() => ({
   rearm: vi.fn(),
   routing: vi.fn<() => { wslDistro?: string }>(),
+  ghBinding: vi.fn<() => { ghAccount?: { host: string; user: string } }>(),
   defaultBase: vi.fn(),
   hasBase: vi.fn(),
   branchName: vi.fn(),
@@ -48,6 +50,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../project-runtime-git-options', () => ({
   getLocalProjectGitExecOptions: () => ({ cwd: '/repo', ...mocks.routing() }),
   getLocalProjectWorktreeGitOptions: mocks.routing,
+  getLocalProjectGhExecOptions: () => ({ ...mocks.routing(), ...mocks.ghBinding() }),
   getWorktreeMirrorDistro: () => undefined
 }))
 vi.mock('../git/repo', () => ({
@@ -112,7 +115,8 @@ function createWorktree(
   request: Partial<RuntimeManagedWorktreeCreateArgs> = {},
   rearm: PreparationRearmHolder = { fire: () => {} },
   timing: WorktreeCreateTimingRecorder = createWorktreeCreateTimingRecorder(),
-  repoOverrides: Partial<Repo> = {}
+  repoOverrides: Partial<Repo> = {},
+  hostedReviewExecutionContext?: HostedReviewExecutionOptions
 ) {
   const store = {
     getSettings: () => ({
@@ -148,7 +152,8 @@ function createWorktree(
     fetchRemote: async (...fetchArgs) => await mocks.fetch(...fetchArgs),
     onWorktreeMetadataPersisted: () => undefined,
     rearm,
-    timing
+    timing,
+    hostedReviewExecutionContext
   })
 }
 
@@ -156,6 +161,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.created.path = worktreePath
   mocks.routing.mockReturnValue({})
+  mocks.ghBinding.mockReturnValue({})
   mocks.defaultBase.mockImplementation(async () => {
     expect(resolveGitAdmissionTier()).toBe('interactive')
     return 'main'
@@ -519,6 +525,33 @@ describe('runtime create PR conflict probe', () => {
         options: expect.objectContaining({ remoteTrackingBase })
       })
     )
+  })
+
+  it('probes PR conflicts as the repo pinned GitHub account', async () => {
+    const ghAccount = { host: 'github.com', user: 'Alice' }
+    mocks.ghBinding.mockReturnValue({ ghAccount })
+    mocks.githubPr.mockResolvedValue(null)
+
+    await createWorktree({}, undefined, undefined, { ghAccount })
+
+    expect(mocks.githubPr).toHaveBeenCalledWith('/repo', 'app', { ghAccount })
+  })
+
+  it('prefers the caller-resolved account over the store fallback', async () => {
+    const fromStore = { host: 'github.com', user: 'StoreUser' }
+    const supplied = { host: 'github.com', user: 'Alice' }
+    mocks.ghBinding.mockReturnValue({ ghAccount: fromStore })
+    mocks.githubPr.mockResolvedValue(null)
+
+    await createWorktree(
+      {},
+      undefined,
+      undefined,
+      { ghAccount: fromStore },
+      { localGitExecOptions: { ghAccount: supplied } }
+    )
+
+    expect(mocks.githubPr).toHaveBeenCalledWith('/repo', 'app', { ghAccount: supplied })
   })
 
   it('suffixes past a PR on the first name', async () => {

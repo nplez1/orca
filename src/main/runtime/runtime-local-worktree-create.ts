@@ -102,7 +102,7 @@ async function performRuntimeLocalWorktreeCreate<T>(args: RuntimeLocalWorktreeCr
   // both before awaiting removes one serial git/config round trip from create.
   const usernamePromise =
     !request.branchNameOverride && settings.branchPrefix === 'git-username'
-      ? resolveLocalGitUsername(repo.path)
+      ? resolveLocalGitUsername(repo.path, repo.ghAccount)
       : Promise.resolve('')
   const baseBranchPromise = resolveWorktreeCreateBase({
     requestedBaseBranch: request.baseBranch,
