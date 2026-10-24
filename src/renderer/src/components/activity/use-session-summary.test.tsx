@@ -88,6 +88,32 @@ describe('useSessionSummary', () => {
     expect(open).toHaveBeenCalledTimes(1)
   })
 
+  // The latch this session was stuck in: a pane opened before Pi reported its session
+  // identity landed on "no readable transcript" and never asked again, because the old
+  // effect depended only on paneKey/open/host. The identity arriving must re-open it.
+  it('re-opens the fold when the pane session identity arrives', async () => {
+    const { open } = installBridge()
+    const session = {
+      agentType: 'pi' as const,
+      providerSession: { key: 'session_id' as const, id: 'pi-session-1' }
+    }
+
+    const { rerender } = renderHook(
+      (props: { session: typeof session | null }) =>
+        useSessionSummary(PANE_KEY, true, 'local', props.session),
+      { initialProps: { session: null } }
+    )
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1))
+    expect(open.mock.calls[0]?.[0]).not.toHaveProperty('session')
+
+    await act(async () => {
+      rerender({ session })
+    })
+
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2))
+    expect(open.mock.calls[1]?.[0]).toMatchObject({ session })
+  })
+
   it('accepts a snapshot only for the pane it belongs to', async () => {
     installBridge()
 
