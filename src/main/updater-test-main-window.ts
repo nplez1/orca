@@ -21,7 +21,14 @@ export function createUpdaterMainWindow(send: UpdaterSpy = vi.fn()): UpdaterMain
   let webContentsDestroyed = false
   const mainWindow = {
     webContents: {
-      send,
+      // Why: sends to a destroyed target must fail the way Electron does, or a missing guard in the
+      // service under test would pass silently.
+      send: vi.fn((...args: unknown[]) => {
+        if (windowDestroyed || webContentsDestroyed) {
+          throw new TypeError('Object has been destroyed')
+        }
+        return send(...args)
+      }),
       isDestroyed: () => webContentsDestroyed
     },
     isDestroyed: () => windowDestroyed,

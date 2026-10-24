@@ -280,8 +280,6 @@ describe('updater', () => {
     const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater } = await loadUpdaterModule()
-
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the setup path only reads `webContents.send`, and a real BrowserWindow is not constructible in this harness.
     setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => null })
 
     await vi.waitFor(() => {

@@ -234,7 +234,6 @@ describe('updater', () => {
     const onBeforeQuit = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 5_000)))
     const mainWindow = createUpdaterMainWindow()
     const { setupAutoUpdater, quitAndInstall } = await loadUpdaterModule()
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: updater only reads the mocked webContents.send in this lifecycle test.
     setupAutoUpdater(mainWindow, { onBeforeQuit, onBeforeQuitFailure: 'abort' })
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(2_600)

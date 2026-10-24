@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
-const { appMock, moduleFactories, resetUpdaterMocks } = await vi.hoisted(async () =>
-  (await import('./updater-test-harness')).createUpdaterMocks()
+const { appMock, autoUpdaterMock, moduleFactories, resetUpdaterMocks } = await vi.hoisted(
+  async () => (await import('./updater-test-harness')).createUpdaterMocks()
 )
 
 vi.mock('electron', () => moduleFactories.electron())
@@ -43,7 +43,7 @@ describe('updater main-window lifecycle', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('skips the send while only the renderer is gone and keeps the window bound', async () => {
+  it('skips the send while only the renderer is gone', async () => {
     const send = vi.fn()
     const mainWindow = createUpdaterMainWindow(send)
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
@@ -91,6 +91,30 @@ describe('updater main-window lifecycle', () => {
     setupAutoUpdater(createUpdaterMainWindow(send), {})
 
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('replays a recorded idle, which the renderer cannot distinguish from the default', async () => {
+    vi.useFakeTimers()
+    // Why: only a packaged app wires the electron-updater handlers this settle path runs through.
+    appMock.isPackaged = true
+    const error = new Error('Unable to find latest version on GitHub')
+    autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+      autoUpdaterMock.emit('checking-for-update')
+      queueMicrotask(() => autoUpdaterMock.emit('error', error))
+      return Promise.reject(error)
+    })
+    const first = createUpdaterMainWindow()
+    const { setupAutoUpdater, checkForUpdates } = await loadUpdaterModule()
+    setupAutoUpdater(first, { getLastUpdateCheckAt: () => Date.now() })
+
+    checkForUpdates()
+    await vi.advanceTimersByTimeAsync(0)
+
+    first.close()
+    const replacementSend = vi.fn()
+    setupAutoUpdater(createUpdaterMainWindow(replacementSend), {})
+
+    expect(replacementSend).toHaveBeenCalledWith('updater:status', { state: 'idle' })
   })
 
   it('keeps the newer window bound when the replaced one closes', async () => {

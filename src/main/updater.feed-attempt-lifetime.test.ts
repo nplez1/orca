@@ -44,7 +44,6 @@ function holdFirstPreflight(): (value: FeedResult) => void {
 async function setup() {
   const updater = await loadUpdaterModule()
   const mainWindow = createUpdaterMainWindow()
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Only webContents.send is used; all native Electron APIs are mocked.
   updater.setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
   return updater
 }
