@@ -1,17 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { forkTestFiles, quarantinedFiles } from '../../local/gate-unit.mjs'
 import {
   allowlistEntries,
   collectCases,
   collectedQuarantinedFiles,
-  forkTestFiles,
   judge,
   judgeUnhandled,
+  prunableEntries,
   quarantinedEntryProblems,
-  quarantinedFiles,
-  repoPath
-} from '../../local/gate-unit.mjs'
+  repoPath,
+  reproducedFailures
+} from '../../local/unit-gate-judgement.mjs'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 // Why rooted at the checkout: the gate reports repo-relative paths, so a fixture outside ROOT would
@@ -128,6 +129,8 @@ describe('the run a verdict is computed from', () => {
   it('leaves a path outside the checkout as it found it', () => {
     expect(repoPath('/elsewhere/thing.test.ts')).toBe('/elsewhere/thing.test.ts')
     expect(repoPath(THING)).toBe('src/main/thing.test.ts')
+    // Why: a sibling checkout whose name starts with this one's must not read as inside it.
+    expect(repoPath(`${ROOT}-x/src/main/thing.test.ts`)).toBe(`${ROOT}-x/src/main/thing.test.ts`)
   })
 })
 
@@ -147,6 +150,78 @@ describe('the upstream-quarantined set', () => {
     expect(collectedQuarantinedFiles(report, ['tests/e2e/x.ts'])).toEqual(['tests/e2e/x.ts'])
     expect(collectedQuarantinedFiles(report, [])).toEqual([])
     expect(collectedQuarantinedFiles({}, ['tests/e2e/x.ts'])).toEqual([])
+  })
+})
+
+describe('the isolated re-run', () => {
+  const rerun = (over = {}) => ({
+    complete: true,
+    failures: new Set(),
+    passes: new Set(),
+    filePassed: false,
+    ...over
+  })
+  const failures = [
+    { file: 'src/main/thing.test.ts', test: 'came back', detail: '' },
+    { file: 'src/main/thing.test.ts', test: 'went away', detail: '' }
+  ]
+
+  it('waives only what the re-run reported as passing', () => {
+    const kept = reproducedFailures(failures, rerun({ passes: new Set(['went away']) }))
+    expect(kept.map((failure) => failure.test)).toEqual(['came back'])
+  })
+
+  it('keeps a failure the re-run never reported, because absence is not evidence', () => {
+    expect(reproducedFailures(failures, rerun()).map((failure) => failure.test)).toEqual([
+      'came back',
+      'went away'
+    ])
+  })
+
+  it('keeps everything when the re-run produced no usable report', () => {
+    expect(
+      reproducedFailures(failures, rerun({ complete: false })).map((failure) => failure.test)
+    ).toEqual(['came back', 'went away'])
+  })
+
+  it('waives a collect failure only when the file itself passed', () => {
+    const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
+    expect(reproducedFailures(suite, rerun())).toHaveLength(1)
+    expect(reproducedFailures(suite, rerun({ filePassed: true }))).toHaveLength(0)
+  })
+})
+
+describe('what the manifest may prune', () => {
+  const report = {
+    testResults: [
+      { name: join(ROOT, 'src', 'suite-only.test.ts'), assertionResults: [] },
+      { name: THING, assertionResults: [{ status: 'passed' }] }
+    ]
+  }
+  const entry = (file) => ({ file, key: `${file} › t` })
+
+  it('says nothing about a filtered run, which saw only part of the suite', () => {
+    expect(
+      prunableEntries([entry('src/main/thing.test.ts')], report, { full: false, complete: true })
+    ).toEqual([])
+  })
+
+  it('says nothing about a run that did not complete', () => {
+    expect(
+      prunableEntries([entry('src/main/thing.test.ts')], report, { full: true, complete: false })
+    ).toEqual([])
+  })
+
+  it('skips a file whose only report entry is a collect failure', () => {
+    expect(
+      prunableEntries([entry('src/suite-only.test.ts')], report, { full: true, complete: true })
+    ).toEqual([])
+  })
+
+  it('keeps the entry for a file that reported its cases', () => {
+    expect(
+      prunableEntries([entry('src/main/thing.test.ts')], report, { full: true, complete: true })
+    ).toEqual([entry('src/main/thing.test.ts')])
   })
 })
 

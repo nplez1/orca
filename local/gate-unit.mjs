@@ -39,6 +39,17 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
+import {
+  allowlistEntries,
+  collectCases,
+  collectedQuarantinedFiles,
+  judge,
+  judgeUnhandled,
+  prunableEntries,
+  quarantinedEntryProblems,
+  repoPath,
+  reproducedFailures
+} from './unit-gate-judgement.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 /** Why this switch: the unit and PR workflows set it, and it is what makes `config/vitest.config.ts`
@@ -129,124 +140,6 @@ function readJsonFile(path, what) {
   }
 }
 
-/** Entries are file-level (`*` or absent) unless they name a test. */
-export function allowlistEntries(manifest) {
-  const entries = Array.isArray(manifest.entries) ? manifest.entries : []
-  return entries.map((entry) => {
-    const file = String(entry.file).replaceAll('\\', '/')
-    const test = entry.test === undefined || entry.test === '*' ? null : String(entry.test)
-    return {
-      file,
-      test,
-      class: String(entry.class ?? 'unclassified'),
-      owner: String(entry.owner ?? 'unattributed'),
-      flaky: entry.flaky === true,
-      key: test === null ? `${file} › *` : `${file} › ${test}`
-    }
-  })
-}
-
-export function repoPath(name) {
-  // Why both sides: Vitest reports forward-slash names even on Windows, where ROOT is backslashed.
-  const root = ROOT.replaceAll('\\', '/')
-  const normalised = String(name ?? '').replaceAll('\\', '/')
-  return normalised.startsWith(root) ? normalised.slice(root.length).replace(/^\//, '') : normalised
-}
-
-function firstLine(message) {
-  const line = String(message ?? '')
-    .replace(/^Error:\s*/, '')
-    .split('\n')[0]
-    .trim()
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line
-}
-
-/**
- * Vitest's JSON reporter is jest-shaped: one entry per file in `testResults`, one per case in
- * `assertionResults`. A file can fail without a failing assertion (collect/import error), so that
- * is recorded as a `(suite)` failure rather than being lost.
- */
-export function collectCases(report) {
-  const failures = []
-  const passes = []
-  for (const file of report.testResults ?? []) {
-    const path = repoPath(file.name)
-    let sawFailedCase = false
-    for (const assertion of file.assertionResults ?? []) {
-      const test = String(assertion.fullName || assertion.title || '(unnamed)')
-      if (assertion.status === 'failed') {
-        sawFailedCase = true
-        failures.push({ file: path, test, detail: firstLine(assertion.failureMessages) })
-      } else if (assertion.status === 'passed') {
-        passes.push({ file: path, test })
-      }
-    }
-    if (!sawFailedCase && file.status === 'failed') {
-      failures.push({
-        file: path,
-        test: '(suite)',
-        detail: firstLine(file.message) || 'the file failed without a failing case'
-      })
-    }
-  }
-  return { failures, passes }
-}
-
-export function judge(entries, failures, passes) {
-  const known = []
-  const unexpected = []
-  for (const failure of failures) {
-    const entry = entries.find(
-      (candidate) =>
-        candidate.file === failure.file &&
-        (candidate.test === null || candidate.test === failure.test)
-    )
-    if (entry) {
-      known.push({ failure, entry })
-    } else {
-      unexpected.push(failure)
-    }
-  }
-  // Why the failure set is consulted: a file-level entry matches one failing case while other
-  // cases in the same file pass, which must not read as "this entry is stale".
-  const matched = new Set(known.map((item) => item.entry.key))
-  const stale = entries.filter(
-    (entry) =>
-      !matched.has(entry.key) &&
-      passes.some(
-        (pass) => pass.file === entry.file && (entry.test === null || entry.test === pass.test)
-      )
-  )
-  // Why not "the file did not fail": with a named entry, a renamed or deleted case is unmatched and
-  // not stale while its file still reds elsewhere — the entry has gone dead, and nothing else says so.
-  const staleKeys = new Set(stale.map((entry) => entry.key))
-  const unseen = entries.filter((entry) => !matched.has(entry.key) && !staleKeys.has(entry.key))
-  return { known, unexpected, stale, unseen }
-}
-
-/**
- * An unhandled error is a claim about the run, not about one test, so it is matched by headline and
- * collapsed: one suite can raise the same rejection 28 times, and 28 identical lines is noise.
- */
-export function judgeUnhandled(headlines, entries) {
-  const declared = Array.isArray(entries) ? entries : []
-  const counts = new Map()
-  for (const headline of headlines) {
-    counts.set(headline, (counts.get(headline) ?? 0) + 1)
-  }
-  const known = []
-  const blocking = []
-  for (const [headline, count] of counts) {
-    const entry = declared.find((candidate) => String(candidate.headline) === headline)
-    if (entry) {
-      known.push({ ...entry, headline, count })
-    } else {
-      blocking.push({ headline, count })
-    }
-  }
-  return { known, blocking }
-}
-
 /**
  * The file is inside the branch's own diff when it appears between the merge-base and HEAD. Without
  * a resolvable base the answer is `unknown`, and a flaky pass is never waived on `unknown`.
@@ -298,22 +191,6 @@ export function forkTestFiles(root = ROOT) {
   return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
     .map(normalise)
     .sort()
-}
-
-/** An entry for a file the gate never runs can never match, which is the same rot as a stale one. */
-export function quarantinedEntryProblems(entries, quarantined) {
-  const set = quarantined instanceof Set ? quarantined : new Set(quarantined)
-  return entries
-    .filter((entry) => set.has(entry.file))
-    .map((entry) => `allowlist entry for a file the gate does not run (UNIT_EXCLUDE): ${entry.key}`)
-}
-
-/** Files the report collected although `UNIT_EXCLUDE` drops them: the exclusion did not apply. */
-export function collectedQuarantinedFiles(report, quarantined) {
-  const set = quarantined instanceof Set ? quarantined : new Set(quarantined)
-  return (report?.testResults ?? [])
-    .map((file) => repoPath(file.name))
-    .filter((file) => set.has(file))
 }
 
 function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
@@ -419,14 +296,30 @@ function rerunIsolation(file, reportPath, timeoutMs) {
       UNIT_LANE_ENV
     )
     if (step.timedOut || !existsSync(reportPath)) {
-      return { complete: false, failures: new Set() }
+      return NO_RERUN
     }
-    const cases = collectCases(readJsonFile(reportPath, 'isolation report'))
-    return { complete: true, failures: new Set(cases.failures.map((failure) => failure.test)) }
+    let report
+    try {
+      report = JSON.parse(readFileSync(reportPath, 'utf8'))
+    } catch {
+      // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
+      return NO_RERUN
+    }
+    const cases = collectCases(report)
+    return {
+      complete: true,
+      failures: new Set(cases.failures.map((failure) => failure.test)),
+      passes: new Set(cases.passes.map((pass) => pass.test)),
+      filePassed: (report.testResults ?? []).some(
+        (entry) => repoPath(entry.name) === file && entry.status === 'passed'
+      )
+    }
   } finally {
     closeSyncSafe(logFd)
   }
 }
+
+const NO_RERUN = { complete: false, failures: new Set(), passes: new Set(), filePassed: false }
 
 function formatSummary(result) {
   const counts = result.counts
@@ -553,7 +446,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
     known = judged.known
     unexpected = judged.unexpected
     stale = judged.stale
-    unseen = fullRun ? judged.unseen : []
+    unseen = prunableEntries(judged.unseen, report, {
+      full: fullRun,
+      complete: run.outcome === 'complete'
+    })
     // Why not `numFailedTests`: it counts cases only, so a file that failed to collect would be
     // missing from it while it is very much a failure of this run.
     counts.failed = cases.failures.length
@@ -604,10 +500,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
       join(dir, `isolation-${isolationIndex}.json`),
       options.timeoutMs
     )
+    const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
+    const inDiff = diff ? diff.files.has(file) : true
     for (const failure of failures) {
-      const reproduced = !rerun.complete || rerun.failures.has(failure.test)
-      const inDiff = diff ? diff.files.has(file) : true
-      if (reproduced || inDiff) {
+      if (reproduced.has(failure.test) || inDiff) {
         blocking.push(failure)
       } else {
         flaky.push({ file, test: failure.test, inDiff })
