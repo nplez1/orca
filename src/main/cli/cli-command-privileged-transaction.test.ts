@@ -216,7 +216,10 @@ describe.skipIf(process.platform !== 'darwin' || process.getuid?.() === 0)(
 
     it('repairs an unreadable link to an older Orca launcher through the transaction', async () => {
       const fixture = await createPrivilegedFixture()
-      await symlink('/Applications/Old Orca.app/Contents/Resources/bin/orca', fixture.commandPath)
+      await symlink(
+        '/Applications/Old Orca.app/Contents/Resources/bin/orca-np',
+        fixture.commandPath
+      )
       await lchmod(fixture.commandPath, 0o300)
       const commands: string[] = []
       const installer = new CliInstaller({

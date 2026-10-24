@@ -5,18 +5,19 @@
     "shape as local/e2e-known-failure-titles.json, which already gates the scheduled e2e lane.",
     "",
     "Every entry names a test title, not a file. A file-level entry (`\"test\": \"*\"`) also masks a NEW",
-    "failure inside that file, which is how `the screen prompt a pane is holding answers null for a",
-    "pane it cannot bind to a terminal` hid for two syncs: it asserts null where the implementation",
-    "documents undefined, so it was fixed rather than recorded.",
+    "failure inside that file, and two of those were found the moment this file was tightened: one",
+    "asserted null where the implementation documents undefined, the other linked an `orca` launcher the",
+    "fork renamed to `orca-np`. Both were fixed in the tree instead of recorded here.",
+    "",
+    "Two rules: an entry that passes is reported stale and pruned; a named entry nothing matched is",
+    "reported unseen, which covers a renamed or deleted case as well as a file that no longer reds.",
+    "LOCAL-PATCHES.md stays the evidence for WHY a class is red, not a reason to keep an entry that has",
+    "stopped reproducing. Prune wins.",
     "",
     "An entry for a file the gate does not run is a problem, not a pass. The gate runs upstream's own",
-    "unit lane (`UNIT_EXCLUDE`), so the 80 files that list drops — the electron, node-pty, live-shell",
-    "and cross-version-wire ones — are upstream-quarantined and deliberately absent here.",
-    "",
-    "Keeping entries: documented in LOCAL-PATCHES.md => keep even when a run does not reproduce it",
-    "(the machine state varies). Observed once and undocumented => prune it; `unseen` is the signal.",
-    "An entry that passes is reported stale; prune it. LOCAL-PATCHES.md stays the evidence, this file",
-    "stays the assertion, and both change in the same commit."
+    "unit lane (`config/scripts/ci-unit-files.mjs` `UNIT_EXCLUDE`), so the 80 files that list drops —",
+    "the electron, node-pty, live-shell and cross-version-wire ones — are upstream-quarantined and",
+    "deliberately absent here."
   ],
   "recordedAt": "2026-10-23",
   "observedRun": {
@@ -24,12 +25,24 @@
     "revision": "b094309766",
     "subject": "the fifteen files the previous manifest named, plus the two the 2026-10-21 sync left unlisted",
     "failingRecords": 38,
-    "allowlisted": 32,
+    "allowlisted": 31,
     "upstreamQuarantined": 5,
-    "fixed": 1,
+    "fixed": 2,
+    "repairedCases": [
+      {
+        "file": "src/main/runtime/orca-runtime.test.ts",
+        "test": "the screen prompt a pane is holding answers null for a pane it cannot bind to a terminal",
+        "why": "asserted null where terminal-pane-screen-prompt.ts documents undefined, in the same fork commit that added both, so it never passed"
+      },
+      {
+        "file": "src/main/cli/cli-command-privileged-transaction.test.ts",
+        "test": "macOS privileged CLI command transaction repairs an unreadable link to an older Orca launcher through the transaction",
+        "why": "linked /Applications/Old Orca.app/.../bin/orca while the fork ships orca-np, so the installer read its own launcher as a foreign command; the two sibling cases in the same file already use orca-np"
+      }
+    ],
     "unexpected": 0,
     "unhandledErrorHeadlines": 0,
-    "note": "Reconciliation run for the tightening below, not a gate verdict: it runs the allowlisted files and the two formerly-unlisted ones, so it cannot see a red in any other file. Every record closes: allowlisted + upstreamQuarantined + fixed = failingRecords. The full-suite verdict for the revision that ships is recorded in LOCAL-PATCHES.md, because this file changing is what invalidates that verdict's cache key."
+    "note": "Reconciliation run for the tightening above, not a gate verdict: it runs the allowlisted files and the two formerly-unlisted ones, so it cannot see a red in any other file. Every record closes: allowlisted + upstreamQuarantined + fixed = failingRecords. The full-suite verdict for the revision that ships is recorded in LOCAL-PATCHES.md, because this file changing is what invalidates that verdict's cache key."
   },
   "unhandledErrors": [
     {
@@ -220,14 +233,6 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the dev-rebuild harness misses its `waiting for ERROR` deadline and reads a stale dist file under load; the file builds the process-host package six times.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/cli/cli-command-privileged-transaction.test.ts",
-      "test": "macOS privileged CLI command transaction repairs an unreadable link to an older Orca launcher through the transaction",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md np.37: `Refusing to replace non-Orca command at /var/folders/...` — the transaction compares the launcher it just created against a path the OS resolves to /private/var.",
       "flaky": false
     },
     {
