@@ -129,7 +129,7 @@ describe('relocating a primary checkout with linked worktrees', () => {
     }
 
     // Records: the path write, then the id re-key, then the notification.
-    expect(deps.setRepoPath).toHaveBeenCalledWith('repo-homelab', target)
+    expect(deps.setRepoPath).toHaveBeenCalledWith(target)
     expect(deps.migrateWorktreeIdentity).toHaveBeenCalledWith(
       getRepoMainWorktreeId({ id: 'repo-homelab', path: checkout }),
       getRepoMainWorktreeId({ id: 'repo-homelab', path: target })

@@ -1,0 +1,27 @@
+{
+  "note": [
+    "Machine-readable known-red set for `pnpm lint` on this fork, used by `local/gate-lint.mjs`.",
+    "A failing step or failure line listed here is reported but does not fail the gate; one outside",
+    "it does. Same shape as `local/unit-known-red.json`, which gates the unit suite.",
+    "",
+    "An entry is a claim that a red is not this branch's to fix: it arrives through a merge of someone",
+    "else's work, or it is a fork-owned file upstream will rename out from under the fix. Record the",
+    "evidence in LOCAL-PATCHES.md and keep this file the assertion \u2014 both change in the same commit.",
+    "No entry belongs here merely because the fix is inconvenient.",
+    "",
+    "`step` is the package.json script name (or the literal command, for a bare `oxlint` step).",
+    "`match` is an optional regex against one failure line. The ratchets print one `::error::` line or",
+    "one `file: N unit(s), baseline allows M.` row per offending entry, so a narrow regex allowlists",
+    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option \u2014",
+    "prefer `match` for a ratchet, because a whole-step entry also masks a NEW failure in that step.",
+    "A step that prints `::error file=X::text` is matched as `X: text`, so an entry can name one file;",
+    "the text alone is the same for every file those ratchets report.",
+    "Only a whole-step entry can cover a step whose failure the parser could not split into lines.",
+    "",
+    "Keeping entries: documented in LOCAL-PATCHES.md => keep even when a run reproduces nothing",
+    "(the machine state varies). Observed once and undocumented => prune it. An entry that stops",
+    "reproducing is reported stale; `node local/gate-lint.mjs --prune` drops it."
+  ],
+  "recordedAt": "2026-10-22",
+  "entries": []
+}

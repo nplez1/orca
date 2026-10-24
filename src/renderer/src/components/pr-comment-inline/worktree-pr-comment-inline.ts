@@ -3,8 +3,12 @@ import type { AppState } from '@/store/types'
 import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
 import type { PRComment } from '../../../../shared/github/comment-types'
 import { useAppStore } from '@/store'
+import { selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
-import { getGitHubPRCacheKey, getGitHubRepoCacheKey } from '../../../../shared/github/github-cache-key'
+import {
+  getGitHubPRCacheKey,
+  getGitHubRepoCacheKey
+} from '../../../../shared/github/github-cache-key'
 import { prCommentsCacheSuffix } from '@/store/github/cache-identity'
 import { isGitHubPRSuppressed } from '../../../../shared/worktree/github-pr-suppression'
 import { isPRCommentsInlineEnabled } from '@/lib/pr-comment-inline-setting'
@@ -115,7 +119,7 @@ export function deriveWorktreePRCommentInline(
   if (!worktreeId) {
     return { ...NO_REVIEW, enabled }
   }
-  const worktree = findWorktreeById(state.worktreesByRepo, worktreeId)
+  const worktree = findWorktreeById(selectWorktreesByRepo(state), worktreeId)
   if (!worktree) {
     return { ...NO_REVIEW, enabled }
   }
@@ -186,7 +190,7 @@ export function useWorktreePRCommentInline(
   // Why: settings and the worktree catalog hydrate asynchronously, and a partial hydration is a
   // real state, not just a test fixture — the module-level fallbacks keep the selector identity
   // stable so an absent slice cannot turn into a re-render loop.
-  const worktreesByRepo = useAppStore((s) => s.worktreesByRepo ?? EMPTY_WORKTREES_BY_REPO)
+  const worktreesByRepo = useAppStore((s) => selectWorktreesByRepo(s) ?? EMPTY_WORKTREES_BY_REPO)
   const repos = useAppStore((s) => s.repos ?? EMPTY_REPOS)
   const settings = useAppStore((s) => s.settings)
   const prCache = useAppStore((s) => s.prCache ?? EMPTY_PR_CACHE)

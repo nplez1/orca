@@ -194,8 +194,9 @@ export type RelocationDependencies = {
   moveDirectory: (from: string, to: string) => Promise<void>
   /** `git worktree repair` in the relocated checkout. */
   repairWorktrees: (movedRepoPath: string) => Promise<void>
-  /** The new `Repo.path`. Deliberately narrow: relocation is the only caller. */
-  setRepoPath: (repoId: string, newPath: string) => void
+  /** The new `Repo.path`. Deliberately narrow: relocation is the only caller, and the row it moves
+   *  is the one the plan was built from. */
+  setRepoPath: (newPath: string) => void
   migrateWorktreeIdentity: (oldWorktreeId: string, newWorktreeId: string) => void
   notifyRepoRelocated: (repoId: string, oldWorktreeId: string, newWorktreeId: string) => void
 }
@@ -241,7 +242,7 @@ export async function relocatePrimaryCheckout(args: {
   await deps.moveDirectory(from, to)
   try {
     await deps.repairWorktrees(to)
-    deps.setRepoPath(repo.id, to)
+    deps.setRepoPath(to)
   } catch (error) {
     await deps.moveDirectory(to, from).catch(() => {})
     // Why repair again: the repair above may already have pointed every linked worktree's gitdir at

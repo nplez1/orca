@@ -624,6 +624,97 @@ run is reported unseen, which is the prune signal for one observed once and neve
 `test` title over a file-level `*` as soon as the failing name is known — a file-level entry also masks
 a new failure inside that file.
 
+### `local(ratchets)`: `pnpm lint` was red on `nplez1/main` (#161)
+
+`pnpm lint` failed on this fork's own default branch. The ratchets that failed are upstream's
+(`config/scripts/check-*.mjs` and their baselines are present on `upstream/main`, and no script is
+modified here), but **the offending call sites are all this fork's own code** — checked against
+`upstream/main`: it has no `relocateRepoPath`, no `project-folder-relocation.ts`, no hidden-host
+section in `SshTargetList.tsx` and no cached-listing host gate. #161 read the three as foreign because
+they look like upstream files failing; the distinction decides fix-versus-allowlist, so it is worth
+being precise: there was no upstream copy to wait for, and fixing them costs no sync. Each is a real
+defect, so each is repaired rather than baseline-hidden. A fourth drift the issue could not see has
+its own section below (the workspace-record baseline); it is the only one of the four that touches a
+baseline, and it adds fork-owned rows rather than allowing an upstream one.
+
+**A repo relocation addressed its row by bare id** (`check:id-only-store-write-ratchet`).
+`relocateRepoPath(id, newPath)` resolved `state.repos.find((candidate) => candidate.id === id)`, and a
+repo id can be published by two execution hosts — so with one id registered on two hosts, a
+primary-checkout relocation rewrote whichever row came first, moving a path that belongs to one
+machine. It now takes `RepoHostTarget` and resolves the row through `findRepoRowForHostScopedWrite`,
+the gate `updateRepo` already uses (and which reports a host mismatch instead of returning the same
+silent `null` as a deleted row). `RelocationDependencies.setRepoPath` lost its `repoId` argument with
+it: the plan's own row is in scope at the only call site, so the id was a second, weaker spelling of
+the same target.
+
+**A repo row's SSH host was read off the raw `connectionId`** (`check:repo-host-read-ratchet`). Both
+sites are hardening rather than a behaviour change, and the two are worth keeping distinct from the
+fix above. A row may name its host only as `executionHostId: 'ssh:<target>'`, which a raw read answers
+as local:
+
+- `register-worktree-catalog-handlers.ts` already refused those rows a line later through
+  `getRepoExecutionHostId(repo) !== LOCAL_EXECUTION_HOST_ID`, so no listing was served from the wrong
+  machine. The raw read was also fully redundant: `getRepoExecutionHostId` folds `connectionId` in
+  already, so the two conditions in that gate were one question asked twice — and only the weaker
+  spelling could disagree with the row's own host stamp. It now goes through `isRepoOnCatalogHost`,
+  the strict gate the orcad migration paths already use, which asks the question once.
+- `runtime-repository-relocation-controller.ts` passed the raw `connectionId` to
+  `getRepoDefaultBranchName`, so an `ssh:`-only row resolved the default branch with a local `git`
+  spawn against a path this machine cannot read. The plan refuses a remote row
+  (`planPrimaryCheckoutRelocation` → `remote-host`) before that name is used, so the observable effect
+  was the wasted spawn and a null branch — but the lookup was one ordering change away from naming a
+  project folder from the wrong checkout. It now passes `getRepoRoutingConnectionId(repo)`.
+
+**The hidden-host section drew a card per host** (`check:host-list-render-ratchet`). Hidden hosts are
+exactly the ones `~/.ssh/config` keeps re-importing, so that section grows with the config and was the
+only host list on the screen drawn outside a window. It now draws a bounded page through
+`boundHostList` from `components/host-picker` — the function `useBoundedHostRows` wraps, used directly
+because this section has no query of its own: `SshPane`'s filter above already narrows the targets
+before the list sees them, and a second box inside the section would AND with it. 13,692 hidden hosts
+therefore mount 50 rows plus a "more hosts" note, and nothing is computed while the section is closed.
+The pane's filter is also passed down as the ranking query, so typing a name that 60 other hosts share
+as a prefix still puts the exact host first instead of showing the first 50 in input order.
+
+### `local(ratchets)`: the fourth lint drift, and the workspace-record baseline
+
+Behind those three in the chain sat `check:workspace-record-read-ratchet`, which the issue could not
+see for the same reason (`pnpm lint` never reached it). This one is the fork's own code against an
+upstream ratchet, like the three above, so it is repaired where the code is ours:
+`jira-issue-workspace-open.ts` and `worktree-pr-comment-inline.ts` read through
+`workspace-record-selectors.ts` now, and the two store slices are added to the baseline under the
+convention it already uses for writers — `hydrate-cached-worktrees.ts` hands the slice it rewrites to
+the merge,
+and `worktree-rename-across-hosts.ts` computes the next slice for every host publishing the row. The
+row for `useDashboardPopoutBridge.ts` was pruned: that file no longer exists, and the ratchet fails on
+a row it cannot reproduce until it is. Three baseline lines in
+`config/workspace-record-read-baseline.txt` therefore belong to this fork — the evidence for them is
+this paragraph, as with the red sets.
+
+### `local(lint)`: the lint verdict is a file too
+
+Reds on the base branch have had to be hand-verified as pre-existing in an unrelated PR (#160, then
+#161 itself), and one of them was invisible because `pnpm lint` is a single `&&` chain that stops at
+the first failure and says nothing about the other 31 steps. That is the same shape the unit suite had
+before `local/unit-known-red.json` and `local/gate-unit.mjs` turned its red set into a verdict.
+
+So the lint chain gets the same shape: `local/gate-lint.mjs` reads the steps out of `package.json`'s
+`lint` script (never restates them, so a step a sync adds is run instead of skipped, and a step a sync
+removes turns its entries stale), runs each one on its own exactly as `pnpm lint` would, and classifies
+every failure against `local/lint-known-red.json`. A recorded failure is reported with its class and
+owner; a failure outside the list fails the gate; a recorded failure that stops reproducing is reported
+stale and `--prune` drops it. Each ratchet prints one line per offending entry, so an entry can carry a
+`match` regex that allowlists that entry alone instead of the whole step — a whole-step entry also
+masks a new failure inside it, and only a whole-step entry may cover a step whose output the parser
+could not split.
+
+It is fork-local: upstream keeps `pnpm lint`'s exit code and CI is unchanged.
+`tests/tools/lint-gate.test.mjs` covers the chain reader, the per-step failure split and the
+classification. There is no per-revision cache, unlike `local/gate-unit.mjs`: the whole chain is
+~100–160 s, and a cached verdict would outlive the edit it was computed against. The list is empty
+today — the four repairs above make all 32 steps green — and it is the place a future red on the base
+branch gets recorded with its evidence instead of being re-derived by hand. This file stays the
+evidence and the JSON the assertion, as with the unit red set.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,

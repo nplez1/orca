@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { act, useState, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SshTarget } from '../../../../shared/ssh-types'
+import { HOST_LIST_ROW_LIMIT } from '../host-picker/bounded-host-list'
 import { SettingsContentScrollElementProvider } from './settings-content-scroll-element'
 import { SshTargetList } from './SshTargetList'
 
@@ -28,13 +30,20 @@ function configTarget(index: number): SshTarget {
   }
 }
 
-function SettingsScrollerHarness({ targets }: { targets: SshTarget[] }): ReactElement {
+function SettingsScrollerHarness({
+  targets,
+  filterQuery
+}: {
+  targets: SshTarget[]
+  filterQuery?: string
+}): ReactElement {
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
   return (
     <div className="overflow-y-auto" data-testid="settings-scroller" ref={setScroller}>
       <SettingsContentScrollElementProvider value={scroller}>
         <SshTargetList
           targets={targets}
+          filterQuery={filterQuery}
           totalBySource={{ 'ssh-config': targets.length, manual: 0 }}
           connectionStates={new Map()}
           testingIds={new Set()}
@@ -129,5 +138,74 @@ describe('the SSH host list with a very large imported config', () => {
     })
     expect(rowLabels()).toEqual(['node-00000', 'node-00001', 'node-00002'])
     expect(document.querySelector('[data-testid="virtualized-list"]')).toBeNull()
+  })
+})
+
+function hiddenConfigTargets(): SshTarget[] {
+  return Array.from({ length: IMPORTED_HOST_COUNT }, (_, index) => ({
+    ...configTarget(index),
+    hidden: true
+  }))
+}
+
+function expandHiddenSection(): void {
+  fireEvent.click(screen.getByRole('button', { name: /^Hidden \(/ }))
+}
+
+describe('the hidden-host section with a very large imported config', () => {
+  const lastHost = `node-${IMPORTED_HOST_COUNT - 1}`
+
+  // Why: a hidden host is one ~/.ssh/config keeps re-importing, so this section grows with the
+  // config and used to draw a card per host outside the windowed list.
+  it('draws a bounded page of hidden hosts and says how many it left out', () => {
+    act(() => {
+      root.render(<SettingsScrollerHarness targets={hiddenConfigTargets()} />)
+    })
+    expect(rowLabels()).toEqual([])
+    act(expandHiddenSection)
+    const labels = rowLabels()
+    expect(labels).toHaveLength(HOST_LIST_ROW_LIMIT)
+    expect(labels[0]).toBe('node-00000')
+    expect(labels).not.toContain(lastHost)
+    expect(screen.getByText(/more hosts\. Search by name/)).toBeTruthy()
+  })
+
+  // The search is the pane's own filter, which narrows the targets before this list sees them, so
+  // a host past the cap is reached by filtering rather than by a second box inside the section.
+  it('shows a host past the cap once the pane filter narrows the list to it', () => {
+    act(() => {
+      root.render(<SettingsScrollerHarness targets={hiddenConfigTargets()} />)
+    })
+    act(expandHiddenSection)
+    act(() => {
+      root.render(
+        <SettingsScrollerHarness
+          targets={hiddenConfigTargets().filter((target) => target.label === lastHost)}
+          filterQuery={lastHost}
+        />
+      )
+    })
+    expect(rowLabels()).toEqual([lastHost])
+    expect(screen.queryByText(/more hosts\. Search by name/)).toBeNull()
+  })
+
+  // SshPane's filter keeps every match, and typing a name that is a prefix of 60 others would
+  // otherwise show the first 50 of them in input order — with the host actually typed absent.
+  it('ranks the exact name first when 60 others share its prefix', () => {
+    const hidden = [
+      ...Array.from({ length: 60 }, (_, index) => ({
+        ...configTarget(index),
+        label: `prod-${String(index).padStart(2, '0')}`,
+        hidden: true
+      })),
+      { ...configTarget(900), id: 'ssh-prod', label: 'prod', hidden: true }
+    ]
+    act(() => {
+      root.render(<SettingsScrollerHarness targets={hidden} filterQuery="prod" />)
+    })
+    act(expandHiddenSection)
+    expect(rowLabels()[0]).toBe('prod')
+    expect(rowLabels()).toHaveLength(HOST_LIST_ROW_LIMIT)
+    expect(screen.getByText(/more hosts\. Search by name/)).toBeTruthy()
   })
 })
