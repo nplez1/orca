@@ -1,0 +1,79 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { expect, it } from 'vitest'
+
+const ROOT = new URL('../../', import.meta.url)
+const read = (path) => readFileSync(new URL(path, ROOT), 'utf8')
+
+function section(text, heading) {
+  const lines = text.split('\n')
+  const start = lines.indexOf(heading)
+  expect(start, `missing heading: ${heading}`).toBeGreaterThan(-1)
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '))
+  return lines.slice(start + 1, end === -1 ? undefined : end)
+}
+
+const entries = (lines) => lines.filter((line) => /^- \*\*\d{4}-\d{2}-\d{2}/.test(line))
+
+/** Why the fenced blocks only: prose is allowed to mention a mistake the commands must not repeat. */
+function codeBlocks(text) {
+  const blocks = []
+  let current = null
+  for (const line of text.split('\n')) {
+    if (line.trimStart().startsWith('```')) {
+      if (current) {
+        blocks.push(current.join('\n'))
+        current = null
+      } else {
+        current = []
+      }
+    } else if (current) {
+      current.push(line)
+    }
+  }
+  return blocks
+}
+
+it('keeps the sync log readable by policy, not by good intentions', () => {
+  const patches = read('LOCAL-PATCHES.md')
+  const syncLog = section(patches, '### Sync log')
+
+  expect(syncLog.join('\n')).toContain('local/sync/sync-log-archive.md')
+  expect(entries(syncLog).length).toBeLessThanOrEqual(3)
+  expect(entries(syncLog).length).toBeGreaterThan(0)
+
+  const archive = new URL('local/sync/sync-log-archive.md', ROOT)
+  expect(existsSync(archive)).toBe(true)
+  expect(entries(readFileSync(archive, 'utf8').split('\n')).length).toBeGreaterThan(
+    entries(syncLog).length
+  )
+})
+
+it('documents the release-line sync as a merge, which is what the runbook runs', () => {
+  const patches = read('LOCAL-PATCHES.md')
+  const syncing = section(patches, '## Syncing with upstream').join('\n')
+
+  expect(syncing).toContain('git merge upstream/main')
+  expect(syncing).not.toContain('git rebase origin/main')
+  expect(read('UPSTREAM-SYNC-RUNBOOK.md')).toContain('git merge upstream/main')
+})
+
+it('derives every shared /tmp path instead of naming a fixed one', () => {
+  const fixedRedirect = />{1,2}\s*\/tmp\/[A-Za-z0-9_.-]+/
+  const fixedName = /\/tmp\/(modified\.txt|upstream-changed\.txt|body\.md)/
+
+  for (const file of ['LOCAL-PATCHES.md', 'BRANCHES.md', 'UPSTREAM-SYNC-RUNBOOK.md', 'AGENTS.md']) {
+    for (const block of codeBlocks(read(file))) {
+      expect(block, file).not.toMatch(fixedRedirect)
+      expect(block, file).not.toMatch(fixedName)
+    }
+  }
+  expect(codeBlocks(read('LOCAL-PATCHES.md')).join('\n')).toContain('mktemp')
+  expect(read('local/open-pr.mjs')).not.toContain('/tmp/body.md')
+})
+
+it('states the fork PR base the hook and the script both enforce', () => {
+  const hook = read('.husky/commit-msg')
+
+  expect(hook).toContain('nplez1/main')
+  expect(hook).not.toContain('PR branches are cut from origin/main')
+})
