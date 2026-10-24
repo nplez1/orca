@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
-const { appMock, autoUpdaterMock, moduleFactories, resetUpdaterMocks } = await vi.hoisted(
-  async () => (await import('./updater-test-harness')).createUpdaterMocks()
-)
+const { appMock, autoUpdaterMock, recordUpdaterLifecycleMock, moduleFactories, resetUpdaterMocks } =
+  await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -41,6 +40,13 @@ describe('updater main-window lifecycle', () => {
 
     expect(() => checkForUpdatesFromMenu()).not.toThrow()
     expect(send).not.toHaveBeenCalled()
+    // Why: the fixture's send throws once destroyed, so "no throw" alone would also be satisfied by
+    // the catch alone — a send must not have been attempted at all.
+    expect(recordUpdaterLifecycleMock).not.toHaveBeenCalledWith(
+      'renderer_send_failed',
+      expect.anything(),
+      expect.anything()
+    )
   })
 
   it('skips the send while only the renderer is gone', async () => {
@@ -53,6 +59,11 @@ describe('updater main-window lifecycle', () => {
 
     expect(() => checkForUpdatesFromMenu()).not.toThrow()
     expect(send).not.toHaveBeenCalled()
+    expect(recordUpdaterLifecycleMock).not.toHaveBeenCalledWith(
+      'renderer_send_failed',
+      expect.anything(),
+      expect.anything()
+    )
   })
 
   it('swallows a send that fails as the window is being torn down', async () => {
@@ -65,6 +76,11 @@ describe('updater main-window lifecycle', () => {
 
     expect(() => checkForUpdatesFromMenu()).not.toThrow()
     expect(send).toHaveBeenCalledWith('updater:status', NOT_AVAILABLE)
+    expect(recordUpdaterLifecycleMock).toHaveBeenCalledWith(
+      'renderer_send_failed',
+      { channel: 'updater:status', errorType: 'Error' },
+      { level: 'warn', message: 'Updater could not send to the main window' }
+    )
   })
 
   it('replays the status that landed while no window was bound to the replacement window', async () => {
@@ -112,7 +128,9 @@ describe('updater main-window lifecycle', () => {
 
     first.close()
     const replacementSend = vi.fn()
-    setupAutoUpdater(createUpdaterMainWindow(replacementSend), {})
+    setupAutoUpdater(createUpdaterMainWindow(replacementSend), {
+      getLastUpdateCheckAt: () => Date.now()
+    })
 
     expect(replacementSend).toHaveBeenCalledWith('updater:status', { state: 'idle' })
   })
