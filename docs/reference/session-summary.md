@@ -168,6 +168,17 @@ folded here.
   error rather than substituting one. The same open also carries the pane's session identity
   (see “The viewer's identity travels with the request”), so a host whose own row for that
   pane is missing or path-less folds the session the client is actually showing.
+- **The host trusts the path the request names.** Where a host has no row of its own for the
+  pane, it folds the transcript path the client sent, exactly as it would fold its own hook's
+  path — the same trust level as a terminal it was asked to run, and the same file the client
+  could already read. The alternative, refusing any path the request names, is what made a host
+  with no row report nothing at all. The path is normalized like any relayed metadata
+  (`normalizeAgentProviderSession` rejects control characters).
+- **A pane key that does not match a host row is not fatal any more.** Both lookups still
+  compare `paneKey` exactly, while the hook server re-keys rows through `resolvePaneKeyAlias`;
+  an aliased key therefore misses the host's row. With the request identity that miss now costs
+  nothing — the fold proceeds on the identity the client sent instead of reporting that it
+  cannot read a transcript it was never asked to find.
 - **A paired host that predates these methods** answers `method_not_found`, which the pane
   reports as "Update Orca there to summarize its sessions" — a remedy, not a failed fold.
   Older servers are the normal case, since they update on their own schedule.

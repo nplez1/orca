@@ -278,8 +278,8 @@ function unavailableTranscriptReason(
   kind: 'unreadable' | 'empty' = 'unreadable'
 ): string {
   const agent = session.agentType ?? 'agent'
-  // Why first: "found nothing" is a claim about a search this build never ran for an agent
-  // whose transcript format it cannot decode, and it sends the reader looking for a file.
+  // Why first: "found nothing" is a claim about a search this build may never have run, and it
+  // sends the reader looking for a file that a format it cannot decode would be in.
   if (session.agentType && canReadTranscript && !canReadTranscript(session.agentType)) {
     return `Orca has no transcript reader for ${agent} sessions yet.`
   }
@@ -288,5 +288,5 @@ function unavailableTranscriptReason(
   }
   return session.providerSession?.transcriptPath
     ? `The ${agent} transcript this session reported is not readable here.`
-    : `No ${agent} transcript was found for this session.`
+    : `Orca could not locate this ${agent} session's transcript.`
 }

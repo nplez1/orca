@@ -832,3 +832,53 @@ describe('SessionSummaryService stale ledger with a request-only identity', () =
     await waitFor(() => updates.some((u) => u.status === 'ready'))
   })
 })
+
+// The reason a known session produced nothing: an agent this build cannot decode must not be
+// described as a session whose transcript was not found, which sends the reader looking for a
+// file in a format the fold cannot read anyway.
+describe('SessionSummaryService unavailable reason', () => {
+  function reasonHarness(canReadTranscript: (agentType: string) => boolean) {
+    const { store } = testStore()
+    const service = new SessionSummaryService({
+      store,
+      readEvents: async () => null,
+      getAgentStatusEntry: () => undefined,
+      canReadTranscript: canReadTranscript,
+      createBrain: () => ({ complete: async () => '{}' }),
+      now: () => 1000
+    })
+    const updates: SessionSummarySnapshot[] = []
+    service.onUpdate((snapshot) => updates.push(snapshot))
+    return { service, updates }
+  }
+
+  it('names an agent this build cannot decode', async () => {
+    const { service, updates } = reasonHarness((agentType) => agentType !== 'amp')
+
+    service.open({
+      paneKey: 'tab:leaf',
+      session: {
+        agentType: 'amp',
+        providerSession: { key: 'session_id', id: 'amp-1', transcriptPath: '/tmp/amp-1.jsonl' }
+      }
+    })
+    await waitFor(() => updates.some((u) => u.status === 'unavailable'))
+
+    expect(updates.find((u) => u.status === 'unavailable')?.error).toContain('no transcript reader')
+  })
+
+  it('says the reported transcript is unreadable when the agent is supported', async () => {
+    const { service, updates } = reasonHarness(() => true)
+
+    service.open({
+      paneKey: 'tab:leaf',
+      session: {
+        agentType: 'pi',
+        providerSession: { key: 'session_id', id: 'pi-1', transcriptPath: '/tmp/pi-1.jsonl' }
+      }
+    })
+    await waitFor(() => updates.some((u) => u.status === 'unavailable'))
+
+    expect(updates.find((u) => u.status === 'unavailable')?.error).toContain('not readable here')
+  })
+})

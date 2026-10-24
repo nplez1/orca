@@ -91,19 +91,37 @@ export type SessionSummarySessionSources = {
  * the live row alone made exactly the quiet sessions the ones that reported "no readable
  * transcript".
  *
- * Precedence follows `resolvePaneAgentSessionId`: a live row's identity is the freshest
- * evidence, and the parked records are what it becomes once the row is dropped.
+ * A live row's identity is the freshest evidence, and the parked records are what it becomes
+ * once the row is dropped. The row only wins when it *names a session*: a rebuilt row can carry
+ * the agent type without any session metadata (its row was deleted when the session parked), and
+ * preferring that shell over a parked identity blanked the pane and remounted it twice.
  */
 export function resolveSessionSummarySessionRef(
   sources: SessionSummarySessionSources
 ): SessionSummarySessionRef | null {
   const live = sources.live
-  if (live?.agentType || live?.providerSession?.id) {
+  if (live?.providerSession?.id) {
     return {
       ...(live.agentType ? { agentType: live.agentType } : {}),
-      ...(live.providerSession ? { providerSession: live.providerSession } : {})
+      providerSession: live.providerSession
     }
   }
+  const parked = resolveParkedSessionRef(sources)
+  if (parked) {
+    // Why the live agent type wins over the parked one: a pane can be relaunched with another
+    // agent, and only the live row knows about the new one. A live row naming a *different*
+    // agent than the parked session makes that session stale, so it is not used at all.
+    return live?.agentType && live.agentType === parked.agentType
+      ? { ...parked, agentType: live.agentType }
+      : parked
+  }
+  return live?.agentType ? { agentType: live.agentType } : null
+}
+
+/** The identity a pane kept after its live row was dropped, if it kept one. */
+function resolveParkedSessionRef(
+  sources: SessionSummarySessionSources
+): SessionSummarySessionRef | null {
   if (sources.sleeping) {
     return {
       agentType: sources.sleeping.agent,
@@ -111,13 +129,14 @@ export function resolveSessionSummarySessionRef(
     }
   }
   const retained = sources.retained
-  if (retained) {
-    return {
-      agentType: retained.agentType,
-      ...(retained.entry.providerSession ? { providerSession: retained.entry.providerSession } : {})
-    }
-  }
-  return null
+  return retained
+    ? {
+        agentType: retained.agentType,
+        ...(retained.entry.providerSession
+          ? { providerSession: retained.entry.providerSession }
+          : {})
+      }
+    : null
 }
 
 /**
