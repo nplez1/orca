@@ -11,10 +11,14 @@ import type { ResolvedSourceControlAiGenerationParams } from '../../shared/sourc
 import type {
   SessionSummaryCloseRequest,
   SessionSummaryOpenRequest,
+  SessionSummarySessionRef,
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
+import { parseSessionSummarySessionRef } from '../../shared/session-summary-types'
 import {
+  mergeSessionRef,
+  hasSessionRef,
   runSessionSummaryFold,
   sessionSummaryIdentityOf,
   type SessionSummaryFoldRunnerDeps
@@ -55,6 +59,8 @@ type PaneRuntime = {
   messageCount: number
   fold: SessionSummarySnapshot['fold']
   foldParams: ResolvedSourceControlAiGenerationParams | null
+  /** The viewer's own record of which session this pane holds, when the request carried it. */
+  identity?: SessionSummarySessionRef
   /** A host-owned pane's last snapshot: that host's ledger, seen cursor and progress. */
   hostSnapshot?: SessionSummarySnapshot
 }
@@ -126,7 +132,13 @@ export class SessionSummaryService {
       requestedHostId: request.executionHostId,
       connectionId: entry?.connectionId
     })
-    const hasSource = Boolean(entry && entry.agentType && entry.providerSession?.id)
+    // Why the request is merged in: the viewer holds the pane, so it can name the session even
+    // when the folding side's row is missing or relayed without a transcript path — the case
+    // that reported "no readable transcript" for a live session. Where this process does hold a
+    // row naming a session, that row still wins: it is its own latest evidence, and a lagging
+    // client id would otherwise brief the previous conversation (#135).
+    const identity = mergeSessionRef(parseSessionSummarySessionRef(request.session), entry)
+    const hasSource = Boolean(identity.agentType && identity.providerSession?.id)
     // Reuse the live runtime: a fold in flight holds the old object and updates it.
     const runtime: PaneRuntime = this.runtimes.get(paneKey) ?? {
       status: 'folding',
@@ -142,9 +154,13 @@ export class SessionSummaryService {
     // Why not carried over: params belong to the open that sent them. A paired client's
     // choice must not survive into this window's next fold of the same pane.
     runtime.foldParams = request.foldParams ?? null
+    // Why cleared: a fresh open must not inherit the previous fold's complaint, which would
+    // otherwise sit under a brief that has since succeeded.
+    runtime.error = undefined
+    runtime.identity = hasSessionRef(identity) ? identity : undefined
     this.runtimes.set(paneKey, runtime)
     this.leases.touch(paneKey)
-    this.resetStaleLedger(paneKey, host, entry)
+    this.resetStaleLedger(paneKey, host, identity)
 
     if (runtime.status !== 'folding') {
       return this.snapshot(paneKey)
@@ -177,18 +193,18 @@ export class SessionSummaryService {
   private resetStaleLedger(
     paneKey: string,
     host: SessionSummaryTranscriptHost,
-    entry: SessionSummaryStatusEntry | undefined
+    identity: SessionSummarySessionRef
   ): void {
     if (host.kind === 'runtime') {
       return
     }
     const stored = this.deps.store.get(paneKey)
-    // Why require an entry: this client clears status rows on reconnect, and an absent row
-    // yields a null identity that differs from every stored one — deleting a good ledger.
-    if (!stored || !entry) {
+    // Why require an identity: this client clears status rows on reconnect, and an absent
+    // one yields a null identity that differs from every stored one — deleting a good ledger.
+    if (!stored || !identity.providerSession?.id) {
       return
     }
-    if (this.identityChanged(stored.identity, sessionSummaryIdentityOf(entry))) {
+    if (this.identityChanged(stored.identity, sessionSummaryIdentityOf(identity))) {
       this.deps.store.delete(paneKey)
     }
   }
@@ -256,7 +272,16 @@ export class SessionSummaryService {
     a: SessionSummaryStoreEntry['identity'],
     b: SessionSummaryStoreEntry['identity']
   ): boolean {
-    return a.providerSessionId !== b.providerSessionId || a.transcriptPath !== b.transcriptPath
+    if (a.providerSessionId !== b.providerSessionId) {
+      return true
+    }
+    // Why: a side without a path knows less, it does not know something different. Treating a
+    // missing path as a change dropped a good ledger and its seen cursor whenever the identity
+    // came from a request that named only the session id.
+    if (!a.transcriptPath || !b.transcriptPath) {
+      return false
+    }
+    return a.transcriptPath !== b.transcriptPath
   }
 
   private runLocalFold(paneKey: string, host: SessionSummaryTranscriptHost): Promise<void> {
@@ -273,6 +298,7 @@ export class SessionSummaryService {
       deps: this.deps,
       paneKey,
       host,
+      ...(runtime?.identity ? { requestedSession: runtime.identity } : {}),
       foldParams: runtime?.foldParams ?? null,
       signal: controller.signal,
       callbacks: {
@@ -311,7 +337,11 @@ export class SessionSummaryService {
     this.hostFolds.open({
       paneKey,
       environmentId,
-      foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null
+      foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null,
+      // Why send it: the host's own row for this pane may be absent (the client owns the
+      // layout) or relayed without a transcript path, and a host that cannot read its row
+      // answered "no readable transcript" for a session it was running the whole time.
+      ...(runtime.identity ? { session: runtime.identity } : {})
     })
   }
 

@@ -5,7 +5,10 @@
 // extract, or a write. Nothing is applied on failure, and completed chunk extracts are
 // kept so a retry resumes instead of restarting.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentType } from '../../shared/agent-status-types'
 import type {
+  SessionSummarySessionRef,
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
@@ -29,6 +32,12 @@ export type SessionSummaryFoldRunnerDeps = {
     signal: AbortSignal
   }) => Promise<SessionSummarySourceEvent[] | null>
   getAgentStatusEntry: (paneKey: string) => SessionSummaryStatusEntry | undefined
+  /**
+   * Whether this build can decode that agent's transcript at all. Injected rather than
+   * imported so the runner stays the orchestrator and the transcript module stays the reader;
+   * it only decides which sentence an empty fold gets.
+   */
+  canReadTranscript?: (agentType: AgentType) => boolean
   createBrain: (params: ResolvedSourceControlAiGenerationParams | null) => SessionFoldBrain
   now: () => number
 }
@@ -44,12 +53,61 @@ export type SessionSummaryFoldCallbacks = {
 }
 
 export function sessionSummaryIdentityOf(
-  entry: SessionSummaryStatusEntry | undefined
+  entry: SessionSummarySessionRef | undefined
 ): SessionSummaryStoreEntry['identity'] {
   return {
     providerSessionId: entry?.providerSession?.id ?? null,
     transcriptPath: entry?.providerSession?.transcriptPath ?? null
   }
+}
+
+/**
+ * The identity a fold should use: this process's own row, with the viewer's request filling
+ * what the row cannot say.
+ *
+ * Why the request is a filler and not an override: the viewer is the one process guaranteed
+ * to know *which* session the reader is looking at, which is exactly what a paired host or a
+ * reconnected client was missing when it answered "no readable transcript" for a live
+ * session. But where this process holds a row that names a session, that row is its own
+ * latest evidence (hooks land here), and letting a lagging client id override it would brief
+ * the previous conversation — the failure #135 is about.
+ */
+export function mergeSessionRef(
+  requested: SessionSummarySessionRef | null | undefined,
+  entry: SessionSummarySessionRef | undefined
+): SessionSummarySessionRef {
+  const chosen = mergeProviderSession(entry?.providerSession, requested?.providerSession)
+  // Why paired with its session: an agent type from one side next to a session from the other
+  // describes a conversation neither side has — Pi's transcript read with Claude's parser — so
+  // the type always comes from whichever side supplied the session.
+  const agentType = chosen.fromEntry
+    ? (entry?.agentType ?? requested?.agentType)
+    : (requested?.agentType ?? entry?.agentType)
+  return {
+    ...(agentType ? { agentType } : {}),
+    ...(chosen.providerSession ? { providerSession: chosen.providerSession } : {})
+  }
+}
+
+/** The row's session when it names one; its missing transcript path from the request. */
+function mergeProviderSession(
+  local: AgentProviderSessionMetadata | undefined,
+  requested: AgentProviderSessionMetadata | undefined
+): { providerSession: AgentProviderSessionMetadata | undefined; fromEntry: boolean } {
+  if (!local) {
+    return { providerSession: requested, fromEntry: false }
+  }
+  if (local.transcriptPath || !requested?.transcriptPath || requested.id !== local.id) {
+    return { providerSession: local, fromEntry: true }
+  }
+  return {
+    providerSession: { ...local, transcriptPath: requested.transcriptPath },
+    fromEntry: true
+  }
+}
+
+export function hasSessionRef(ref: SessionSummarySessionRef): boolean {
+  return Boolean(ref.agentType || ref.providerSession)
 }
 
 /** Fold a pane's new events. Resolves when the fold settles; never throws. */
@@ -58,25 +116,32 @@ export async function runSessionSummaryFold(args: {
   callbacks: SessionSummaryFoldCallbacks
   paneKey: string
   host: SessionSummaryTranscriptHost
+  /** The viewer's own record of the session; it fills in what this process's row cannot say. */
+  requestedSession?: SessionSummarySessionRef
   foldParams: ResolvedSourceControlAiGenerationParams | null
   signal: AbortSignal
 }): Promise<void> {
   const { deps, callbacks, paneKey, host, signal } = args
   const report = callbacks.onStatus
   try {
-    const entry = deps.getAgentStatusEntry(paneKey)
-    const identity = sessionSummaryIdentityOf(entry)
+    const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
+    const identity = sessionSummaryIdentityOf(session)
     const events = await deps.readEvents({
-      identity: {
-        ...(entry?.agentType ? { agentType: entry.agentType } : {}),
-        ...(entry?.providerSession ? { providerSession: entry.providerSession } : {})
-      },
+      identity: session,
       host,
       signal
     })
     signal.throwIfAborted()
     if (!events) {
-      report({ status: 'unavailable', fold: IDLE_FOLD })
+      report({
+        status: 'unavailable',
+        fold: IDLE_FOLD,
+        // Why: "no readable transcript yet" is true for a session that has not written one,
+        // and misleading for one whose transcript exists somewhere this fold cannot read.
+        ...(session.providerSession?.id
+          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript) }
+          : {})
+      })
       return
     }
     const stored = storedEntry(deps, paneKey, identity)
@@ -89,7 +154,10 @@ export async function runSessionSummaryFold(args: {
         // No readable content yet is 'unavailable', not a summary of nothing.
         status: events.length === 0 ? 'unavailable' : 'ready',
         fold: IDLE_FOLD,
-        messageCount: events.length
+        messageCount: events.length,
+        ...(events.length === 0
+          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript, 'empty') }
+          : {})
       })
       return
     }
@@ -127,7 +195,8 @@ export async function runSessionSummaryFold(args: {
     }
     // Completed chunk extracts survive a failure — but only once a fold has produced a
     // ledger, since an unproduced one is never written. A first fold's chunks are lost.
-    const failedIdentity = sessionSummaryIdentityOf(deps.getAgentStatusEntry(paneKey))
+    const failedSession = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
+    const failedIdentity = sessionSummaryIdentityOf(failedSession)
     const failedStored = storedEntry(deps, paneKey, failedIdentity)
     persist(deps, paneKey, failedIdentity, failedStored, failedStored.messageCount)
     report({
@@ -197,4 +266,27 @@ function freshStoreEntry(
     seenThrough: 0,
     updatedAt: now
   }
+}
+
+/**
+ * Why a known session produced no events: the reader needs the difference between "this
+ * session has not written a transcript yet" and "the transcript is not where its host said".
+ */
+function unavailableTranscriptReason(
+  session: SessionSummarySessionRef,
+  canReadTranscript: ((agentType: AgentType) => boolean) | undefined,
+  kind: 'unreadable' | 'empty' = 'unreadable'
+): string {
+  const agent = session.agentType ?? 'agent'
+  // Why first: "found nothing" is a claim about a search this build may never have run, and it
+  // sends the reader looking for a file that a format it cannot decode would be in.
+  if (session.agentType && canReadTranscript && !canReadTranscript(session.agentType)) {
+    return `Orca has no transcript reader for ${agent} sessions yet.`
+  }
+  if (kind === 'empty') {
+    return `The ${agent} session has no messages in its transcript yet.`
+  }
+  return session.providerSession?.transcriptPath
+    ? `The ${agent} transcript this session reported is not readable here.`
+    : `Orca could not locate this ${agent} session's transcript.`
 }

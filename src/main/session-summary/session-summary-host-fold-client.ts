@@ -11,6 +11,7 @@ import {
 } from '../../shared/rpc-contract/session-summary-params'
 import {
   SESSION_SUMMARY_HOST_OUTDATED_MESSAGE,
+  type SessionSummarySessionRef,
   type SessionSummarySnapshot
 } from '../../shared/session-summary-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
@@ -21,6 +22,8 @@ export type SessionSummaryHostFoldClient = {
     environmentId: string
     paneKey: string
     foldParams: ResolvedSourceControlAiGenerationParams | null
+    /** The viewer's own record of which session is on screen, when it knows one. */
+    session?: SessionSummarySessionRef
   }) => Promise<SessionSummarySnapshot>
   peek: (args: { environmentId: string; paneKey: string }) => Promise<SessionSummarySnapshot>
   close: (args: {
@@ -53,14 +56,17 @@ export function createSessionSummaryHostFoldClient(deps: {
     }
   }
   return {
-    open: async ({ environmentId, paneKey, foldParams }) =>
+    open: async ({ environmentId, paneKey, foldParams, session }) =>
       asSnapshot(
         await call(
           environmentId,
           'sessionSummary.openOnHost',
           SessionSummaryOpenOnHostParams.parse({
             paneKey,
-            foldParams: portableFoldParams(foldParams)
+            foldParams: portableFoldParams(foldParams),
+            // Why sent: a host that cannot read its own row for this pane would otherwise
+            // answer "no readable transcript" for a session it is running right now.
+            session: session ?? null
           })
         )
       ),

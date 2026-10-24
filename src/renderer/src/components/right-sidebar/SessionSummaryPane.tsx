@@ -5,11 +5,11 @@ import { translate } from '@/i18n/i18n'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
-import { useAppStore } from '@/store'
 import {
   useSessionSummaryExecutionHostId,
   useSessionSummaryHostSupported,
   useSessionSummaryPaneKey,
+  useSessionSummarySessionRef,
   hasSessionSummaryBridge
 } from './session-summary-subject'
 
@@ -22,7 +22,11 @@ function SessionSummarySubjectBody({
   executionHostId: string | null
   isOpen: boolean
 }): React.JSX.Element {
-  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId)
+  // Why the pane's own records: this window is the process holding the pane, so what it knows
+  // about the session outranks the folding side's row — which may be absent (a paired host
+  // that only runs the PTY) or relayed without the agent's transcript path.
+  const session = useSessionSummarySessionRef(paneKey)
+  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId, session)
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 
   return (
@@ -67,10 +71,9 @@ export default function SessionSummaryPane({
   const hostSupported = useSessionSummaryHostSupported()
   // A new agent session can start inside the pane the user is already focused on, so the
   // key includes its identity: the service resets the ledger on open(), and without this the
-  // pane would keep briefing the previous conversation.
-  const sessionId = useAppStore((state) =>
-    paneKey ? (state.agentStatusByPaneKey[paneKey]?.providerSession?.id ?? '') : ''
-  )
+  // pane would keep briefing the previous conversation. Read from the same resolver as the
+  // request, so a session that parked its identity still keys the pane.
+  const sessionId = useSessionSummarySessionRef(paneKey)?.providerSession?.id ?? ''
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

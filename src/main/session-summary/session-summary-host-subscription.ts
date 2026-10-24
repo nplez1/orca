@@ -11,7 +11,10 @@
 // idle window, "still running? / what is the ledger now?" is all the pane needs, and a
 // reconnecting client resumes against the same host state with nothing to tear down.
 import type { SessionSummaryHostFoldClient } from './session-summary-host-fold-client'
-import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
+import type {
+  SessionSummarySessionRef,
+  SessionSummarySnapshot
+} from '../../shared/session-summary-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
 
 const DEFAULT_POLL_INTERVAL_MS = 600
@@ -64,6 +67,7 @@ export class SessionSummaryHostFoldSubscription {
     paneKey: string
     environmentId: string
     foldParams: ResolvedSourceControlAiGenerationParams | null
+    session?: SessionSummarySessionRef
   }): void {
     const state = this.stateFor(args.paneKey, args.environmentId)
     if (state.leases === 0 && state.unleasedViewers === 0 && state.inflight.size === 0) {
@@ -151,6 +155,7 @@ export class SessionSummaryHostFoldSubscription {
       paneKey: string
       environmentId: string
       foldParams: ResolvedSourceControlAiGenerationParams | null
+      session?: SessionSummarySessionRef
     },
     state: PaneHostState,
     seq: number,
@@ -160,7 +165,8 @@ export class SessionSummaryHostFoldSubscription {
       const snapshot = await this.deps.hostFold.open({
         environmentId: args.environmentId,
         paneKey: args.paneKey,
-        foldParams: args.foldParams
+        foldParams: args.foldParams,
+        ...(args.session ? { session: args.session } : {})
       })
       const queued = state.inflight.get(seq)?.queuedClose ?? null
       state.inflight.delete(seq)

@@ -52,7 +52,7 @@ resolves that file per agent type; the fold turns it into a structured ledger.
 The fold reads a transcript only for agents it can name a file for, and each agent's file is
 found a different way:
 
-- **Native-chat agents** (Claude/OpenClaude, Codex, Grok, OMP) go through
+- **Native-chat agents** (Claude/OpenClaude, Codex, Grok, OMP, OpenCode/ZCode) go through
   `native-chat/session-file-resolver.ts`, which takes the hook's `transcript_path` when it is
   host-readable and otherwise searches the agent's own roots by session id.
 - **Pi and Prime Agent** post `session_file` on every hook, so the reported path _is_ the
@@ -60,11 +60,34 @@ found a different way:
   path exists.
 - **Copilot** reports no path, but its `session_id` is the name of its session directory:
   `$COPILOT_HOME/session-state/<id>/events.jsonl`.
+- **Every other agent** is read from the path its own hook reported, with the AI Vault parser
+  for that agent. There is no allowlist to add an entry to: `resolveHookPathParser` accepts any
+  agent `AI_VAULT_AGENTS` can decode, because the parsers are already agent-generic
+  (`parseAgentSessionFile` dispatches on `candidate.agent`).
 
-Every other agent type returns null and the pane says so. Adding one means naming its parser in
-`HOOK_RESOLVED_TRANSCRIPT_AGENTS` and reaching a readable file — the AI Vault parsers are
-agent-generic (`parseAgentSessionFile` dispatches on `candidate.agent`), so nothing else changes.
+What that widening does **not** do is give every agent a transcript. An agent is only readable
+when a path can be found for it, and the agents whose hooks report only an id — Gemini, Cursor,
+Droid, Kimi, Kiro, ZCode, DSH, Antigravity, OpenCode 2, Devin, JCode, Hermes — have no root
+search here, so they still resolve nothing and the pane says so. Agents whose hooks report a
+path (Claude, Codex, Qoder, CodeBuddy, Qwen, Muse, Pi, Prime Agent, OMP) and Copilot (whose
+session id names its directory) are the ones that fold today. Closing that gap means a
+session-id search over each agent's own roots — the same idea as
+`native-chat/session-file-resolver.ts` — and is not implemented.
 
+- **The viewer's identity travels with the request.** `open` carries the session the viewer
+  has on screen (`SessionSummarySessionRef`: agent type and provider session), taken from the
+  pane's records in the _viewer's_ store — the live row, then the parked sleeping record, then
+  the retained entry, because an idle Pi session is identity-only and keeps no live row
+  (`resolveSessionSummarySessionRef`). The identity is the half a fold cannot do without, and
+  the process that folds is not always the process holding the row: a paired host runs the PTY
+  while the client owns the layout, and a client clears its rows on reconnect. Both then read
+  no identity and reported "no readable transcript" for a session that was running the whole
+  time. `mergeSessionRef` lets this process's own row win wherever it names a session (its own
+  latest evidence, and folding a lagging client id would brief the previous conversation —
+  #135), takes the agent type from whichever side supplied the session, and fills a missing
+  transcript path from the request. An older caller sending nothing keeps the previous
+  behaviour, and an older _host_ ignores the field, so a paired host must run this build for
+  its panes to benefit.
 - **Lazy by construction.** Opening the pane starts the fold; closing it cancels in-flight
   work. Nothing runs for sessions nobody opens, so there is no background LLM spend.
 - **Cheap facts are always available.** State, timestamps and event counts come from the
@@ -142,7 +165,20 @@ folded here.
 - **The request carries the chosen agent.** `foldParams` is resolved from the requesting
   client's Settings → Agents and sent with the open, so a host never spawns an agent the
   reader did not choose. A host without that CLI installed fails the fold with its own
-  error rather than substituting one.
+  error rather than substituting one. The same open also carries the pane's session identity
+  (see “The viewer's identity travels with the request”), so a host whose own row for that
+  pane is missing or path-less folds the session the client is actually showing.
+- **The host trusts the path the request names.** Where a host has no row of its own for the
+  pane, it folds the transcript path the client sent, exactly as it would fold its own hook's
+  path — the same trust level as a terminal it was asked to run, and the same file the client
+  could already read. The alternative, refusing any path the request names, is what made a host
+  with no row report nothing at all. The path is normalized like any relayed metadata
+  (`normalizeAgentProviderSession` rejects control characters).
+- **A pane key that does not match a host row is not fatal any more.** Both lookups still
+  compare `paneKey` exactly, while the hook server re-keys rows through `resolvePaneKeyAlias`;
+  an aliased key therefore misses the host's row. With the request identity that miss now costs
+  nothing — the fold proceeds on the identity the client sent instead of reporting that it
+  cannot read a transcript it was never asked to find.
 - **A paired host that predates these methods** answers `method_not_found`, which the pane
   reports as "Update Orca there to summarize its sessions" — a remedy, not a failed fold.
   Older servers are the normal case, since they update on their own schedule.
@@ -181,6 +217,11 @@ folded here.
 | `unavailable`      | no readable transcript, or a readable one with no messages yet             |
 | `failed`           | the fold, the transcript read, or the host call failed; `error` says which |
 | `unsupported-host` | a host id this build cannot place, so nothing is read or folded            |
+
+An `unavailable` snapshot carries an `error` naming which cause applies — nothing written yet, a
+transcript this fold could not reach where its host reported it, or an agent whose transcript
+format this build cannot decode at all (`canReadAgentTranscript`). One message for all three left
+the reader no way to tell a fresh session from a misreported one.
 
 A failed refresh over an existing brief still shows that brief: the header reads
 "Couldn't refresh — showing the last summary" unless a real backlog is waiting, and the body

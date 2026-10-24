@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SessionSummarySnapshot } from '../../../../shared/session-summary-types'
+import type {
+  SessionSummarySessionRef,
+  SessionSummarySnapshot
+} from '../../../../shared/session-summary-types'
 
 /**
  * Summary data for a pane. The fold only runs while `open` is true — open()
@@ -9,12 +12,19 @@ import type { SessionSummarySnapshot } from '../../../../shared/session-summary-
 export function useSessionSummary(
   paneKey: string,
   open: boolean,
-  executionHostId?: string | null
+  executionHostId?: string | null,
+  session?: SessionSummarySessionRef | null
 ): SessionSummarySnapshot | null {
   const [snapshot, setSnapshot] = useState<SessionSummarySnapshot | null>(null)
   // Timeline length displayed at any point this view was open: what the next
   // "since you last looked" cursor advances to on close.
   const seenCountRef = useRef(0)
+  // Why scalars: the identity is an object literal from the store on every render, so it
+  // cannot be an effect dependency without restarting the fold on each one.
+  const sessionAgentType = session?.agentType ?? ''
+  const sessionKey = session?.providerSession?.key ?? 'session_id'
+  const sessionId = session?.providerSession?.id ?? ''
+  const sessionTranscriptPath = session?.providerSession?.transcriptPath ?? ''
 
   useEffect(() => {
     if (!open) {
@@ -35,7 +45,25 @@ export function useSessionSummary(
     void window.api.sessionSummary
       .open({
         paneKey,
-        ...(executionHostId ? { executionHostId } : {})
+        ...(executionHostId ? { executionHostId } : {}),
+        // Why: this window holds the pane, so it is the one process that always knows which
+        // session is on screen — including when the folding side's own row is absent.
+        ...(sessionAgentType || sessionId
+          ? {
+              session: {
+                ...(sessionAgentType ? { agentType: sessionAgentType } : {}),
+                ...(sessionId
+                  ? {
+                      providerSession: {
+                        key: sessionKey,
+                        id: sessionId,
+                        ...(sessionTranscriptPath ? { transcriptPath: sessionTranscriptPath } : {})
+                      }
+                    }
+                  : {})
+              }
+            }
+          : {})
       })
       .then(accept)
     return () => {
@@ -43,7 +71,15 @@ export function useSessionSummary(
       unsubscribe()
       window.api.sessionSummary.close({ paneKey, seenTimelineCount: seenCountRef.current })
     }
-  }, [paneKey, open, executionHostId])
+  }, [
+    paneKey,
+    open,
+    executionHostId,
+    sessionAgentType,
+    sessionKey,
+    sessionId,
+    sessionTranscriptPath
+  ])
 
   return snapshot?.paneKey === paneKey ? snapshot : null
 }

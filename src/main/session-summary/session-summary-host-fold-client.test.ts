@@ -29,9 +29,38 @@ describe('createSessionSummaryHostFoldClient', () => {
 
     expect(call).toHaveBeenCalledWith('env-1', 'sessionSummary.openOnHost', {
       paneKey: 'tab-1:leaf-1',
-      foldParams: { agentId: 'claude', model: 'sonnet' }
+      foldParams: { agentId: 'claude', model: 'sonnet' },
+      session: null
     })
     expect(result.paneKey).toBe('tab-1:leaf-1')
+  })
+
+  // The host may have no row for a pane whose layout lives on the client, and it was then
+  // answering "no readable transcript" for a session it was running the whole time.
+  it("carries the viewer's own session identity to the host", async () => {
+    const call = vi.fn(async () => snapshot())
+    const client = createSessionSummaryHostFoldClient({ call })
+    const session = {
+      agentType: 'pi' as const,
+      providerSession: {
+        key: 'session_id' as const,
+        id: 'pi-session-1',
+        transcriptPath: '/home/user/.pi/agent/sessions/--srv-code--/pi-session-1.jsonl'
+      }
+    }
+
+    await client.open({
+      environmentId: 'env-1',
+      paneKey: 'tab-1:leaf-1',
+      foldParams: null,
+      session
+    })
+
+    expect(call).toHaveBeenCalledWith('env-1', 'sessionSummary.openOnHost', {
+      paneKey: 'tab-1:leaf-1',
+      foldParams: null,
+      session
+    })
   })
 
   it('peeks at the host fold without restarting it', async () => {

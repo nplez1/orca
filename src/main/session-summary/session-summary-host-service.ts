@@ -13,7 +13,10 @@ import { agentHookServer } from '../agent-hooks/server'
 import { createAgentCliSessionFoldBrain } from './session-summary-agent-cli-fold-brain'
 import { SessionSummaryService } from './session-summary-service'
 import { SessionSummaryStore } from './session-summary-store'
-import { readSessionSummaryTranscriptEvents } from './session-summary-transcript-source'
+import {
+  canReadAgentTranscript,
+  readSessionSummaryTranscriptEvents
+} from './session-summary-transcript-source'
 
 const FOLD_PARAMS_STRING_FIELDS = [
   'thinkingLevel',
@@ -88,6 +91,7 @@ export function sessionSummaryHostService(): SessionSummaryService {
     readEvents: ({ identity, signal }) => readSessionSummaryTranscriptEvents({ identity, signal }),
     getAgentStatusEntry: (paneKey) =>
       agentHookServer.getStatusSnapshot().find((entry) => entry.paneKey === paneKey),
+    canReadTranscript: canReadAgentTranscript,
     createBrain: (params) =>
       createAgentCliSessionFoldBrain({
         // Why no settings fallback: the client that opened this pane resolved the agent

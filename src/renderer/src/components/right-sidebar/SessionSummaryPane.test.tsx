@@ -2,7 +2,10 @@
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionSummarySnapshot } from '../../../../shared/session-summary-types'
+import type {
+  SessionSummarySessionRef,
+  SessionSummarySnapshot
+} from '../../../../shared/session-summary-types'
 import SessionSummaryPane from './SessionSummaryPane'
 
 const mocks = vi.hoisted(() => {
@@ -12,12 +15,14 @@ const mocks = vi.hoisted(() => {
     hasBridge: boolean
     executionHostId: string | null
     hostSupported: boolean
+    session: SessionSummarySessionRef | null
   } = {
     paneKey: null,
     snapshot: null,
     hasBridge: true,
     executionHostId: 'local',
-    hostSupported: true
+    hostSupported: true,
+    session: null
   }
   return state
 })
@@ -26,6 +31,7 @@ vi.mock('./session-summary-subject', () => ({
   useSessionSummaryPaneKey: () => mocks.paneKey,
   useSessionSummaryExecutionHostId: () => mocks.executionHostId,
   useSessionSummaryHostSupported: () => mocks.hostSupported,
+  useSessionSummarySessionRef: () => mocks.session,
   hasSessionSummaryBridge: () => mocks.hasBridge
 }))
 vi.mock('@/components/activity/use-session-summary', () => ({
@@ -66,6 +72,7 @@ describe('SessionSummaryPane', () => {
     mocks.hasBridge = true
     mocks.executionHostId = 'local'
     mocks.hostSupported = true
+    mocks.session = null
   })
 
   it('asks the user to focus an agent when none is focused', () => {

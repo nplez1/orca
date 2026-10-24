@@ -18,8 +18,13 @@ const SessionSummaryPaneParams = z.object({
 /** Loose on the wire; `parseSessionSummaryFoldParams` narrows it on the host. */
 const SessionSummaryFoldParamsOnWire = z.record(z.string(), z.unknown()).nullish()
 
+/** Loose on the wire too; `parseSessionSummarySessionRef` narrows it on the host. */
+const SessionSummarySessionOnWire = z.record(z.string(), z.unknown()).nullish()
+
 export const SessionSummaryOpenOnHostParams = SessionSummaryPaneParams.extend({
-  foldParams: SessionSummaryFoldParamsOnWire
+  foldParams: SessionSummaryFoldParamsOnWire,
+  /** Which session the viewer has on screen, when the host's own row cannot say. */
+  session: SessionSummarySessionOnWire
 })
 
 export const SessionSummarySnapshotOnHostParams = SessionSummaryPaneParams
