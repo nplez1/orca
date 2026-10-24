@@ -785,7 +785,10 @@ gate should never have been running at all — upstream's own unit lane excludes
   the manifest invariants: no wildcard entries, no duplicate keys, a class, an owner and evidence on
   every entry, no entry for a quarantined file, and `observedRun` closing its own arithmetic. It sits
   beside `tests/tools/lint-gate.test.mjs` rather than in `local/`, because `tests/tools/**` is the one
-  place the unit suite collects a fork-local tool's tests.
+  place the unit suite collects a fork-local tool's tests. The judging itself moved to
+  `local/unit-gate-judgement.mjs`: pure functions over a report, imported by both the gate and its
+  tests, because one file carrying the run and the meaning of its report outgrew this fork's 600-line
+  budget.
 
 § 2 and § 4 of the issue were already resolved by the 2026-10-21 and 2026-10-22 syncs — the eight
 stale entries were pruned then, and both formerly-unlisted reds pass — so what is left here is § 1,
@@ -793,6 +796,23 @@ stale entries were pruned then, and both formerly-unlisted reds pass — so what
 pruning: `LOCAL-PATCHES.md` is the history of _why_ a class was red, not a reason to keep an entry
 that has stopped reproducing. Same shape as `local(lint)` above: this file is the evidence, the JSON
 is the assertion.
+
+**The first full run on this branch found one red the base had, not this branch.** The manifest said
+32 entries and the run said 32 plus `src/main/ipc/worktrees-windows.test.ts › resolves the Git username
+when the configured prefix consumes it`: `a8ca9685a3` (#170) gave the branch-prefix login the repo's
+pinned gh account, so `resolveLocalGitUsername` takes a second argument, and that upstream case still
+asserted the one-argument call. Nothing in this branch touches the file — `git diff --stat
+b094309766..nplez1/main` does not list it — so it was repaired in the same shape as the two above
+rather than recorded.
+
+Verdict, on the revision that ships (`098d3ea4a3`):
+
+```
+Unit gate @098d3ea4a3 (clean): PASS — 135786 passed; 31 failed (31 allowlisted, 0 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 80 upstream-quarantined file(s) not run; 2 fork-local test file(s) passed; 2472 s
+```
+
+No entry was stale and none was unseen, which is the check that the tightening was faithful: the 31
+names are exactly the 31 failures, with no wildcard left to absorb an unknown one.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 

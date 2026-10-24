@@ -339,8 +339,12 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   2026-10-19 reorganisation deleted, so it was inert and the real module loaded; the `TypeError: {}
   is not iterable` rejections had a separate cause — the renderer reclaim bridge, fixed in
   `2368ed38da`. Both files are fork-owned, so nothing goes upstream.
-- **Verified:** see the PR body — `pnpm tc`, the focused suites, `check:code-quality:changed`, the full
-  gate verdict for the shipped revision, and the Opus review round.
+- **Verified:** `pnpm tc` clean; `check:code-quality:changed` clean; the focused suites for every file
+  it touches; the full gate at `098d3ea4a3` — `PASS — 135786 passed; 31 failed (31 allowlisted, 0
+  unexpected); 0 flaky; 0 unhandled; 80 upstream-quarantined file(s) not run; 2 fork-local test
+  file(s) passed; 2472 s`. Reviewed by Opus 5.5, high: R1 (4 SHOULD-FIX), delta R2 (1 SHOULD-FIX),
+  narrow R3 (2 MINOR, both fixed) — clean of BLOCKER/SHOULD-FIX at the shipped revision. See the PR
+  body for the full record.
 
 ### nplez1/Hide-hosts — PR #9, **merged** (2026-09-19)
 
