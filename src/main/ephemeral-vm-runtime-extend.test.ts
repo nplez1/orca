@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./ipc/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: mocks.getRuntimeRecipeContext
 }))
-vi.mock('./ipc/runtime-environments', () => ({
+vi.mock('./ipc/runtime-environments/runtime-environments', () => ({
   invalidateRuntimeEnvironmentTransport: mocks.invalidateRuntimeEnvironmentTransport
 }))
 vi.mock('./ephemeral-vm/runtime-ssh', () => ({
