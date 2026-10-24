@@ -20,6 +20,7 @@ import {
   mergeSessionRef,
   hasSessionRef,
   runSessionSummaryFold,
+  sessionSummaryIdentityChanged,
   sessionSummaryIdentityOf,
   type SessionSummaryFoldRunnerDeps
 } from './session-summary-fold-runner'
@@ -31,7 +32,8 @@ import {
   IDLE_FOLD,
   type SessionSummaryStatusEntry
 } from './session-summary-snapshot'
-import type { SessionSummaryStoreEntry } from './session-summary-store'
+import { isStoredBriefReusable } from './session-summary-brief-freshness'
+import { recordSessionSummarySeenCursor } from './session-summary-seen-cursor'
 import {
   resolveSessionSummaryTranscriptHost,
   type SessionSummaryTranscriptHost
@@ -151,6 +153,26 @@ export class SessionSummaryService {
     // Re-open always (re)starts a fold: status is 'folding' until it settles,
     // even when a stale ledger is on display.
     runtime.status = this.initialStatus(host, hasSource)
+    // Why: re-entering the pane is not a request to spend a model call again. A brief that is
+    // younger than the caller's freshness window, or a row that has not been updated since the
+    // fold, already answers the question the reader came back for.
+    if (
+      host.kind !== 'runtime' &&
+      isStoredBriefReusable({
+        revalidateWithinMs: request.revalidateWithinMs,
+        foldedAt: this.deps.store.get(paneKey)?.ledger.foldedAt,
+        entry,
+        now: this.deps.now()
+      })
+    ) {
+      runtime.status = 'ready'
+      runtime.fold = IDLE_FOLD
+      runtime.hostSnapshot = undefined
+      this.runtimes.set(paneKey, runtime)
+      this.leases.touch(paneKey)
+      this.emit(paneKey)
+      return this.snapshot(paneKey)
+    }
     // Why not carried over: params belong to the open that sent them. A paired client's
     // choice must not survive into this window's next fold of the same pane.
     runtime.foldParams = request.foldParams ?? null
@@ -204,7 +226,7 @@ export class SessionSummaryService {
     if (!stored || !identity.providerSession?.id) {
       return
     }
-    if (this.identityChanged(stored.identity, sessionSummaryIdentityOf(identity))) {
+    if (sessionSummaryIdentityChanged(stored.identity, sessionSummaryIdentityOf(identity))) {
       this.deps.store.delete(paneKey)
     }
   }
@@ -225,37 +247,19 @@ export class SessionSummaryService {
     }
     // Recorded on every close, whoever else still holds the pane: the reader who reached
     // furthest keeps their place even if another viewer never returns its lease.
-    this.advanceSeenCursor(paneKey, request.seenTimelineCount, runtime)
-    // Why refcount: a second viewer of the same pane is still reading. Aborting here would
-    // end its fold, stop its polling, and move its place in the timeline on its behalf.
+    recordSessionSummarySeenCursor({
+      store: this.deps.store,
+      paneKey,
+      seenTimelineCount: request.seenTimelineCount,
+      hostOwnsCursor: runtime?.host.kind === 'runtime',
+      now: this.deps.now()
+    })
+    // Why refcount: a second viewer is still reading, and aborting would end its fold too.
     if (this.leases.release(paneKey) > 0) {
       // Another viewer is still reading: leave its fold and its polling alone.
       return
     }
     this.releasePane(paneKey)
-  }
-
-  /** Records how far the reader got; the cursor never moves backwards. */
-  private advanceSeenCursor(
-    paneKey: string,
-    seenTimelineCount: number,
-    runtime: PaneRuntime | undefined
-  ): void {
-    if (runtime?.host.kind === 'runtime') {
-      return // The host owns its own cursor.
-    }
-    const stored = this.deps.store.get(paneKey)
-    if (!stored) {
-      return
-    }
-    const seenThrough = Math.max(
-      stored.seenThrough,
-      Math.min(Math.max(0, Math.floor(seenTimelineCount)), stored.ledger.timeline.length)
-    )
-    if (seenThrough === stored.seenThrough) {
-      return
-    }
-    this.deps.store.set(paneKey, { ...stored, seenThrough, updatedAt: this.deps.now() })
   }
 
   /** Drops every lease on the pane and stops its work. */
@@ -266,22 +270,6 @@ export class SessionSummaryService {
     this.folds.get(paneKey)?.abort()
     this.folds.delete(paneKey)
     this.runtimes.delete(paneKey)
-  }
-
-  private identityChanged(
-    a: SessionSummaryStoreEntry['identity'],
-    b: SessionSummaryStoreEntry['identity']
-  ): boolean {
-    if (a.providerSessionId !== b.providerSessionId) {
-      return true
-    }
-    // Why: a side without a path knows less, it does not know something different. Treating a
-    // missing path as a change dropped a good ledger and its seen cursor whenever the identity
-    // came from a request that named only the session id.
-    if (!a.transcriptPath || !b.transcriptPath) {
-      return false
-    }
-    return a.transcriptPath !== b.transcriptPath
   }
 
   private runLocalFold(paneKey: string, host: SessionSummaryTranscriptHost): Promise<void> {

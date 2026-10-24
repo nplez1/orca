@@ -86,11 +86,15 @@ describe('resolveSessionSummaryHeaderState', () => {
         ledger: {
           goal: null,
           plan: [],
-          inProgress: 'wiring',
+          inProgress: { text: 'wiring', sourceIndex: 2 },
           done: [],
           blockers: [],
           decisions: [],
           timeline: [],
+          reportSince: null,
+          reportFull: null,
+          lastUserMessageIndex: null,
+          userMessageCount: 1,
           foldedThrough: 4,
           foldedAt: 1
         },
@@ -130,6 +134,10 @@ describe('resolveSessionSummaryHeaderState', () => {
           blockers: [],
           decisions: [],
           timeline: [],
+          reportSince: null,
+          reportFull: null,
+          lastUserMessageIndex: null,
+          userMessageCount: 1,
           foldedThrough: 4,
           foldedAt: 1
         },

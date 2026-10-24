@@ -2,6 +2,7 @@
 // Facts update in place; the timeline is append-only (entries are counted by
 // index for "since you last looked", so rewrites would move the cursor).
 import type {
+  SessionSummaryFact,
   SessionSummaryLedger,
   SessionSummaryLedgerDelta,
   SessionSummaryTimelineDeltaEntry,
@@ -22,6 +23,10 @@ export function emptySessionSummaryLedger(): SessionSummaryLedger {
     blockers: [],
     decisions: [],
     timeline: [],
+    reportSince: null,
+    reportFull: null,
+    lastUserMessageIndex: null,
+    userMessageCount: 0,
     foldedThrough: 0,
     foldedAt: null
   }
@@ -51,15 +56,48 @@ function normalizeText(value: unknown): string | null {
     : trimmed
 }
 
-function normalizeTextList(value: unknown): string[] {
+/**
+ * One fact, with the message index it came from.
+ *
+ * A bare string is accepted as well: an extract that ignored the `sourceIndex` request still
+ * says something true, and `fallbackSourceIndex` places it at the slice it was read from — a
+ * fact with no index could never appear in the "since your last message" window.
+ */
+function normalizeFact(
+  value: unknown,
+  fallbackSourceIndex: number | null
+): SessionSummaryFact | null {
+  if (typeof value === 'string') {
+    const text = normalizeText(value)
+    return text === null ? null : { text, sourceIndex: fallbackSourceIndex }
+  }
+  if (!isRecord(value)) {
+    return null
+  }
+  const text = normalizeText(value.text)
+  if (text === null) {
+    return null
+  }
+  const raw = value.sourceIndex
+  const sourceIndex =
+    typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
+      ? Math.floor(raw)
+      : fallbackSourceIndex
+  return { text, sourceIndex }
+}
+
+function normalizeFactList(
+  value: unknown,
+  fallbackSourceIndex: number | null
+): SessionSummaryFact[] {
   if (!Array.isArray(value)) {
     return []
   }
-  const out: string[] = []
+  const out: SessionSummaryFact[] = []
   for (const item of value) {
-    const text = normalizeText(item)
-    if (text !== null && !out.includes(text)) {
-      out.push(text)
+    const fact = normalizeFact(item, fallbackSourceIndex)
+    if (fact !== null && !out.some((existing) => existing.text === fact.text)) {
+      out.push(fact)
     }
     if (out.length >= SESSION_SUMMARY_LIST_MAX_ITEMS) {
       break
@@ -100,30 +138,39 @@ function normalizeTimeline(value: unknown): SessionSummaryTimelineDeltaEntry[] {
   return out
 }
 
-/** Normalize an untrusted (model-produced) delta. Null when nothing usable is present. */
-export function normalizeSessionSummaryDelta(value: unknown): SessionSummaryLedgerDelta | null {
+/**
+ * Normalize an untrusted (model-produced) delta. Null when nothing usable is present.
+ *
+ * `fallbackSourceIndex` is the first transcript message of the slice this extract read, and it
+ * places any fact the model did not index.
+ */
+export function normalizeSessionSummaryDelta(
+  value: unknown,
+  fallbackSourceIndex: number | null = null
+): SessionSummaryLedgerDelta | null {
   if (!isRecord(value)) {
     return null
   }
   const obj = value
   const delta: SessionSummaryLedgerDelta = {}
   if ('goal' in obj) {
-    delta.goal = normalizeText(obj.goal)
+    delta.goal = obj.goal === null ? null : normalizeFact(obj.goal, fallbackSourceIndex)
   }
   if ('inProgress' in obj) {
-    delta.inProgress = normalizeText(obj.inProgress)
+    delta.inProgress =
+      obj.inProgress === null ? null : normalizeFact(obj.inProgress, fallbackSourceIndex)
   }
   if ('plan' in obj) {
-    delta.plan = normalizeTextList(obj.plan)
+    delta.plan = normalizeFactList(obj.plan, fallbackSourceIndex)
   }
   if ('done' in obj) {
-    delta.done = normalizeTextList(obj.done)
+    delta.done = normalizeFactList(obj.done, fallbackSourceIndex)
   }
   if ('blockers' in obj) {
-    delta.blockers = normalizeTextList(obj.blockers)
+    delta.blockers = normalizeFactList(obj.blockers, fallbackSourceIndex)
   }
   if ('decisions' in obj) {
-    delta.decisions = normalizeTextList(obj.decisions)
+    delta.decisions = normalizeFactList(obj.decisions, fallbackSourceIndex)
   }
   if ('timeline' in obj) {
     delta.timeline = normalizeTimeline(obj.timeline)
@@ -131,12 +178,26 @@ export function normalizeSessionSummaryDelta(value: unknown): SessionSummaryLedg
   return Object.keys(delta).length > 0 ? delta : null
 }
 
-function mergeTextLists(...lists: string[][]): string[] {
-  const out: string[] = []
+/**
+ * Ordered union by text, keeping the *earliest* message index each fact was seen at.
+ *
+ * Why the earliest: a fact restated in a later chunk did not become news when it was repeated,
+ * and the "since your last message" window is computed from these indexes.
+ */
+function mergeFactLists(...lists: SessionSummaryFact[][]): SessionSummaryFact[] {
+  const out: SessionSummaryFact[] = []
   for (const list of lists) {
-    for (const item of list) {
-      if (!out.includes(item)) {
-        out.push(item)
+    for (const fact of list) {
+      const existing = out.find((item) => item.text === fact.text)
+      if (!existing) {
+        out.push(fact)
+        continue
+      }
+      if (fact.sourceIndex === null) {
+        continue
+      }
+      if (existing.sourceIndex === null || fact.sourceIndex < existing.sourceIndex) {
+        existing.sourceIndex = fact.sourceIndex
       }
     }
   }
@@ -160,16 +221,16 @@ export function mergeSessionSummaryDeltas(
       merged.inProgress = delta.inProgress
     }
     if (delta.plan) {
-      merged.plan = mergeTextLists(merged.plan ?? [], delta.plan)
+      merged.plan = mergeFactLists(merged.plan ?? [], delta.plan)
     }
     if (delta.done) {
-      merged.done = mergeTextLists(merged.done ?? [], delta.done)
+      merged.done = mergeFactLists(merged.done ?? [], delta.done)
     }
     if (delta.blockers) {
-      merged.blockers = mergeTextLists(merged.blockers ?? [], delta.blockers)
+      merged.blockers = mergeFactLists(merged.blockers ?? [], delta.blockers)
     }
     if (delta.decisions) {
-      merged.decisions = mergeTextLists(merged.decisions ?? [], delta.decisions)
+      merged.decisions = mergeFactLists(merged.decisions ?? [], delta.decisions)
     }
     if (delta.timeline) {
       merged.timeline = [...(merged.timeline ?? []), ...delta.timeline]
@@ -187,16 +248,18 @@ export function applySessionSummaryDelta(
   ledger: SessionSummaryLedger,
   delta: SessionSummaryLedgerDelta,
   foldedThrough: number,
-  foldedAt: number
+  foldedAt: number,
+  lastUserMessageIndex: number | null = ledger.lastUserMessageIndex,
+  userMessageCount: number = ledger.userMessageCount
 ): SessionSummaryLedger {
   return {
     goal: 'goal' in delta ? (delta.goal ?? null) : ledger.goal,
-    plan: delta.plan ? mergeTextLists(ledger.plan, delta.plan) : ledger.plan,
+    plan: delta.plan ? mergeFactLists(ledger.plan, delta.plan) : ledger.plan,
     inProgress: 'inProgress' in delta ? (delta.inProgress ?? null) : ledger.inProgress,
-    done: delta.done ? mergeTextLists(ledger.done, delta.done) : ledger.done,
-    blockers: delta.blockers ? mergeTextLists(ledger.blockers, delta.blockers) : ledger.blockers,
+    done: delta.done ? mergeFactLists(ledger.done, delta.done) : ledger.done,
+    blockers: delta.blockers ? mergeFactLists(ledger.blockers, delta.blockers) : ledger.blockers,
     decisions: delta.decisions
-      ? mergeTextLists(ledger.decisions, delta.decisions)
+      ? mergeFactLists(ledger.decisions, delta.decisions)
       : ledger.decisions,
     timeline: [
       ...ledger.timeline,
@@ -205,6 +268,12 @@ export function applySessionSummaryDelta(
         id: `${entry.sourceIndex}-${entry.kind}-${ledger.timeline.length + index}`
       }))
     ],
+    // Carried, not derived: reports are written by the fold's report step, and a delta apply
+    // (which also runs for facts alone) must not silently drop them.
+    reportSince: ledger.reportSince,
+    reportFull: ledger.reportFull,
+    lastUserMessageIndex,
+    userMessageCount,
     foldedThrough: Math.max(ledger.foldedThrough, foldedThrough),
     foldedAt
   }

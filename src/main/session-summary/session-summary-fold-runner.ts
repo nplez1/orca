@@ -106,6 +106,26 @@ function mergeProviderSession(
   }
 }
 
+/**
+ * Whether two stored identities describe different conversations.
+ *
+ * A side without a transcript path knows less, it does not know something different: treating a
+ * missing path as a change dropped a good ledger and its seen cursor whenever the identity came
+ * from a request that named only the session id.
+ */
+export function sessionSummaryIdentityChanged(
+  a: SessionSummaryStoreEntry['identity'],
+  b: SessionSummaryStoreEntry['identity']
+): boolean {
+  if (a.providerSessionId !== b.providerSessionId) {
+    return true
+  }
+  if (!a.transcriptPath || !b.transcriptPath) {
+    return false
+  }
+  return a.transcriptPath !== b.transcriptPath
+}
+
 export function hasSessionRef(ref: SessionSummarySessionRef): boolean {
   return Boolean(ref.agentType || ref.providerSession)
 }

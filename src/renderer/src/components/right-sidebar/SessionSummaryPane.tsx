@@ -1,5 +1,5 @@
 import React from 'react'
-import { Info, StickyNote } from 'lucide-react'
+import { Info, RefreshCw, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
@@ -26,7 +26,12 @@ function SessionSummarySubjectBody({
   // about the session outranks the folding side's row — which may be absent (a paired host
   // that only runs the PTY) or relayed without the agent's transcript path.
   const session = useSessionSummarySessionRef(paneKey)
-  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId, session)
+  const { snapshot, refresh, refreshing } = useSessionSummary(
+    paneKey,
+    isOpen,
+    executionHostId,
+    session
+  )
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 
   return (
@@ -47,6 +52,21 @@ function SessionSummarySubjectBody({
         {folding ? (
           <span className="h-3 w-1.5 shrink-0 animate-pulse rounded-sm bg-muted-foreground/70" />
         ) : null}
+        {/* Why a button: the fold spends a model call, so it runs on a timer rather than on
+            every chunk the agent produces — this is the "now, please" the reader controls. */}
+        <button
+          type="button"
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label={translate('activity.sessionSummary.refresh', 'Refresh summary')}
+          title={translate('activity.sessionSummary.refresh', 'Refresh summary')}
+          className={cn(
+            'shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground',
+            refreshing && 'animate-spin opacity-60'
+          )}
+        >
+          <RefreshCw className="size-3.5" aria-hidden="true" />
+        </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <div className="px-4 py-3">

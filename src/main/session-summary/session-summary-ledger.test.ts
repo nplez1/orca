@@ -11,6 +11,8 @@ import {
   SESSION_SUMMARY_TEXT_MAX_LENGTH
 } from '../../shared/session-summary-types'
 
+const fact = (text: string, sourceIndex: number | null) => ({ text, sourceIndex })
+
 describe('normalizeSessionSummaryDelta', () => {
   it('rejects non-objects and empty deltas', () => {
     expect(normalizeSessionSummaryDelta(null)).toBeNull()
@@ -20,15 +22,31 @@ describe('normalizeSessionSummaryDelta', () => {
   })
 
   it('distinguishes absent fields from explicit null', () => {
-    const delta = normalizeSessionSummaryDelta({ goal: null })
-    expect(delta).toEqual({ goal: null })
-    expect(normalizeSessionSummaryDelta({ done: ['a'] })).toEqual({ done: ['a'] })
+    expect(normalizeSessionSummaryDelta({ goal: null })).toEqual({ goal: null })
+    expect(normalizeSessionSummaryDelta({ done: ['a'] })).toEqual({
+      done: [fact('a', null)]
+    })
+  })
+
+  // Why the fallback: the "since your last message" window is computed from these indexes, so a
+  // fact the model left unindexed is still placed — at the slice it was read from.
+  it('places an unindexed fact at the slice it was read from', () => {
+    const delta = normalizeSessionSummaryDelta({ done: ['no index'] }, 12)
+    expect(delta?.done).toEqual([fact('no index', 12)])
+  })
+
+  it('keeps a fact index the model did supply', () => {
+    const delta = normalizeSessionSummaryDelta(
+      { done: [fact('indexed', 40), { text: 'unindexed', sourceIndex: -1 }] },
+      12
+    )
+    expect(delta?.done).toEqual([fact('indexed', 40), fact('unindexed', 12)])
   })
 
   it('normalizes text, lists, and timeline entries with caps', () => {
     const longText = 'x'.repeat(SESSION_SUMMARY_TEXT_MAX_LENGTH * 2)
     const delta = normalizeSessionSummaryDelta({
-      goal: `  ${longText}  `,
+      goal: { text: `  ${longText}  `, sourceIndex: 2 },
       plan: ['keep', 'keep', '', 42, ...Array.from({ length: 30 }, (_, i) => `step ${i}`)],
       timeline: [
         { kind: 'milestone', text: 'shipped', sourceIndex: 3 },
@@ -37,10 +55,11 @@ describe('normalizeSessionSummaryDelta', () => {
         { kind: 'error', text: 'boom', sourceIndex: -5 }
       ]
     })
-    expect(delta?.goal).toHaveLength(SESSION_SUMMARY_TEXT_MAX_LENGTH)
-    expect(delta?.goal?.endsWith('…')).toBe(true)
+    expect(delta?.goal?.text).toHaveLength(SESSION_SUMMARY_TEXT_MAX_LENGTH)
+    expect(delta?.goal?.text.endsWith('…')).toBe(true)
+    expect(delta?.goal?.sourceIndex).toBe(2)
     expect(delta?.plan).toHaveLength(SESSION_SUMMARY_LIST_MAX_ITEMS)
-    expect(delta?.plan?.[0]).toBe('keep')
+    expect(delta?.plan?.[0]).toEqual(fact('keep', null))
     expect(delta?.timeline).toEqual([
       { kind: 'milestone', text: 'shipped', sourceIndex: 3 },
       { kind: 'error', text: 'boom', sourceIndex: 0 }
@@ -52,21 +71,22 @@ describe('mergeSessionSummaryDeltas', () => {
   it('lets the latest chunk revision win scalars and unions lists in order', () => {
     const merged = mergeSessionSummaryDeltas([
       {
-        goal: 'first goal',
-        inProgress: 'a',
-        done: ['x', 'y'],
+        goal: fact('first goal', 1),
+        inProgress: fact('a', 1),
+        done: [fact('x', 1), fact('y', 2)],
         timeline: [{ kind: 'milestone', text: 't1', sourceIndex: 1 }]
       },
       {
-        inProgress: 'b',
-        done: ['y', 'z'],
+        inProgress: fact('b', 2),
+        done: [fact('y', 9), fact('z', 3)],
         timeline: [{ kind: 'decision', text: 't2', sourceIndex: 2 }]
       },
-      { goal: null, done: ['z'] }
+      { goal: null, done: [fact('z', 4)] }
     ])
     expect(merged.goal).toBeNull()
-    expect(merged.inProgress).toBe('b')
-    expect(merged.done).toEqual(['x', 'y', 'z'])
+    expect(merged.inProgress).toEqual(fact('b', 2))
+    // y keeps its *first* index: a fact restated later did not become news when it was repeated.
+    expect(merged.done).toEqual([fact('x', 1), fact('y', 2), fact('z', 3)])
     expect(merged.timeline).toHaveLength(2)
     expect(merged.timeline?.[0].text).toBe('t1')
     expect(merged.timeline?.[1].text).toBe('t2')
@@ -75,13 +95,17 @@ describe('mergeSessionSummaryDeltas', () => {
 
 describe('applySessionSummaryDelta', () => {
   it('leaves absent fields untouched and clears on explicit null', () => {
-    const base = { ...emptySessionSummaryLedger(), goal: 'old', inProgress: 'working' }
-    const untouched = applySessionSummaryDelta(base, { done: ['a'] }, 5, 100)
-    expect(untouched.goal).toBe('old')
-    expect(untouched.inProgress).toBe('working')
+    const base = {
+      ...emptySessionSummaryLedger(),
+      goal: fact('old', 1),
+      inProgress: fact('working', 2)
+    }
+    const untouched = applySessionSummaryDelta(base, { done: [fact('a', 3)] }, 5, 100)
+    expect(untouched.goal).toEqual(fact('old', 1))
+    expect(untouched.inProgress).toEqual(fact('working', 2))
     const cleared = applySessionSummaryDelta(base, { goal: null }, 5, 100)
     expect(cleared.goal).toBeNull()
-    expect(cleared.inProgress).toBe('working')
+    expect(cleared.inProgress).toEqual(fact('working', 2))
   })
 
   it('appends to the timeline without rewriting history and advances foldedThrough', () => {
@@ -100,6 +124,19 @@ describe('applySessionSummaryDelta', () => {
     expect(base.timeline).toHaveLength(1)
     expect(next.foldedThrough).toBe(7)
     expect(next.foldedAt).toBe(100)
+  })
+
+  it('records the reader’s place and the reports a fold already wrote', () => {
+    const base: ReturnType<typeof emptySessionSummaryLedger> = {
+      ...emptySessionSummaryLedger(),
+      reportSince: { text: 'since', through: 4 },
+      reportFull: { text: 'full', through: 4 }
+    }
+    const next = applySessionSummaryDelta(base, { done: [fact('a', 5)] }, 6, 100, 5, 2)
+    expect(next.lastUserMessageIndex).toBe(5)
+    expect(next.userMessageCount).toBe(2)
+    expect(next.reportSince).toEqual({ text: 'since', through: 4 })
+    expect(next.reportFull).toEqual({ text: 'full', through: 4 })
   })
 })
 

@@ -99,14 +99,51 @@ session-id search over each agent's own roots — the same idea as
   most 24k chars or 40 events (`session-summary-fold.ts`), extracted in parallel and merged
   deterministically. Completed extracts are cached, so a fold that is cancelled or fails
   resumes instead of restarting.
+- **Two written reports, not one accumulated one.** After the chunk extracts, one more call
+  rewrites both prose reports from (previous reports + this batch): `reportSince` (what changed
+  since the reader last spoke to the agent) and `reportFull` (a whole-session progress report).
+  Accumulating prose is what turned the brief into a play-by-play; rewriting keeps the full
+  report short however long the session gets, and because its input is the previous report plus
+  one batch, it stays a few hundred tokens. A failed rewrite keeps the previous reports and does
+  not fail the fold — the facts and timeline already landed.
+- **Every fact carries the message it came from.** `SessionSummaryFact` is `{ text, sourceIndex }`
+  for `goal`, `inProgress`, `plan`, `done`, `blockers` and `decisions`, and a fact the extract did
+  not index is placed at the first message of the slice that produced it. That index is the only
+  thing needed to draw the window below, so both views cost neither a second fold nor a second
+  read.
+- **The window is the reader's last message, not the last time they looked.** The fold records
+  `lastUserMessageIndex` (and `userMessageCount`) from the transcript's own `user` events. The
+  pane shows, by default, what happened _after_ that message. The old behaviour moved a cursor
+  when the pane closed, which measured looking rather than interacting: a pane left open all day
+  reported a day of work as already read. `seenThrough` is still recorded and sent by the close
+  RPC for older peers, but no view reads it.
 - **Atomic.** A failed or unparseable chunk keeps the last good ledger and retries next time.
   Completed chunk extracts are kept for that retry only once a fold has produced a ledger —
   an unproduced one is never stored, so a first fold's chunks are lost with it.
-- **Delta-first.** Timeline entries are append-only and counted, so a per-session last-seen
-  cursor produces the "Since you last looked" section.
+- **The pane opens as a brief, not a log.** The title is the whole-session goal, then the ledger
+  (facts) and the timeline, both collapsed by default, then the written report
+  (`components/activity/session-summary-ledger-view.tsx`). One switch — _Show the full session_ —
+  swaps the whole-session report and every fact in; it is a re-render, not a fold. When the reader
+  has spoken to the agent only once, the window _is_ the session: the fold then writes one report
+  (`since: null`) and the pane offers no switch between two identical halves.
+
+### When it folds
+
+The fold spends a model call, so it runs on signals, not on every chunk the agent produces:
+
+| Trigger                                                   | Rule                                                                                                                  |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Opening the pane (first time, or a session with no brief) | folds                                                                                                                 |
+| Coming back to the tab                                    | folds only when the brief is older than **5 minutes** _and_ the agent's row has moved since it (`revalidateWithinMs`) |
+| Pane visible while the agent works                        | at most **once an hour**, and only when the row was updated after the last fold                                       |
+| The refresh button                                        | always folds (a fold with no new events never reaches the model, so it is cheap)                                      |
+
+A pane nobody is looking at never folds; the hourly timer exists only while the pane is open.
 
 The ledger cache is `session-summaries.json` under `userData`, written atomically. It is a
-rebuildable cache: deleting it costs one fold per session, never state.
+rebuildable cache: deleting it costs one fold per session, never state. Its `version` covers the
+_shape_ of a ledger, so a shape change (facts gaining `sourceIndex`, reports arriving) discards
+every entry rather than carrying a migration forever.
 
 The agent, model, and thinking effort that fold a summary are their own setting —
 **Settings → Agents → Session summaries** (`sessionSummaryAi`), which reuses the agent/model

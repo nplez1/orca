@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SessionSummarySnapshot } from '../../../../shared/session-summary-types'
+import type {
+  SessionSummarySessionRef,
+  SessionSummarySnapshot
+} from '../../../../shared/session-summary-types'
 import { useSessionSummary } from './use-session-summary'
 
 const PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
@@ -41,7 +44,9 @@ describe('useSessionSummary', () => {
 
     expect(open.mock.calls[0]?.[0]).toEqual({
       paneKey: PANE_KEY,
-      executionHostId: 'runtime:env-1'
+      executionHostId: 'runtime:env-1',
+      // Re-entering the pane asks for the stored brief unless it is older than the window.
+      revalidateWithinMs: 5 * 60_000
     })
   })
 
@@ -98,10 +103,11 @@ describe('useSessionSummary', () => {
       providerSession: { key: 'session_id' as const, id: 'pi-session-1' }
     }
 
+    const initialProps: { session: SessionSummarySessionRef | null } = { session: null }
     const { rerender } = renderHook(
-      (props: { session: typeof session | null }) =>
+      (props: { session: SessionSummarySessionRef | null }) =>
         useSessionSummary(PANE_KEY, true, 'local', props.session),
-      { initialProps: { session: null } }
+      { initialProps }
     )
     await waitFor(() => expect(open).toHaveBeenCalledTimes(1))
     expect(open.mock.calls[0]?.[0]).not.toHaveProperty('session')
@@ -118,6 +124,6 @@ describe('useSessionSummary', () => {
     installBridge()
 
     const { result } = renderHook(() => useSessionSummary(PANE_KEY, true, 'runtime:env-1'))
-    await waitFor(() => expect(result.current?.paneKey).toBe(PANE_KEY))
+    await waitFor(() => expect(result.current.snapshot?.paneKey).toBe(PANE_KEY))
   })
 })

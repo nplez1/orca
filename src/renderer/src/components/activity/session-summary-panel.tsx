@@ -14,7 +14,7 @@ import { useSessionSummary } from './use-session-summary'
  *  this strip is kept so the pane still renders correctly if the view returns. */
 export function SessionSummaryPanel({ paneKey }: { paneKey: string }): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const snapshot = useSessionSummary(paneKey, expanded)
+  const { snapshot } = useSessionSummary(paneKey, expanded)
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 
   return (
