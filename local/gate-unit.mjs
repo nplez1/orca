@@ -23,7 +23,6 @@
  * Exit: 0 pass, 1 fail, 2 usage or environment problem.
  */
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
   existsSync,
   globSync,
@@ -39,6 +38,12 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
+import {
+  allowlistFingerprint,
+  cachedVerdictPath,
+  formatVerdict,
+  unitGateCacheDir
+} from './gate-verdict-cache.mjs'
 import {
   NO_RERUN,
   allowlistEntries,
@@ -60,9 +65,6 @@ const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
 const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
-// Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
-// is not a directory and the gate could not record the verdict it just computed.
-const CACHE_DIR = join(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'), 'orca-gate')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
 const RUN_VITEST = join(ROOT, 'config', 'scripts', 'run-vitest.mjs')
@@ -318,24 +320,14 @@ function rerunIsolation(file, reportPath, timeoutMs) {
   }
 }
 
-function formatSummary(result) {
-  const counts = result.counts
-  const unhandledBlocking = result.unhandled?.blocking?.length ?? 0
-  const quarantined = result.quarantined?.count ?? 0
-  const forkTests = result.forkTests ?? { files: 0, passed: false }
-  const parts = [
-    `${counts.passed} passed`,
-    `${counts.failed} failed (${counts.known} allowlisted, ${result.unexpected.length} unexpected)`,
-    `${result.flaky.length} flaky re-run passed`,
-    `${unhandledBlocking} unhandled error headline(s)`,
-    `${quarantined} upstream-quarantined file(s) not run`,
-    `${forkTests.files} fork-local test file(s) ${forkTests.passed ? 'passed' : 'FAILED'}`
-  ]
-  return `Unit gate @${result.revision.slice(0, 10)} (${result.clean ? 'clean' : 'dirty'}): ${result.exitCode === 0 ? 'PASS' : 'FAIL'} — ${parts.join('; ')}; ${(result.elapsedMs / 1000).toFixed(0)} s`
-}
-
 function reportResult(result) {
-  console.log(formatSummary(result))
+  console.log(formatVerdict(result))
+  const forkTests = result.forkTests ?? { files: 0, passed: false }
+  // Why a detail line and not part of the summary: `formatVerdict` is shared with `local/open-pr.mjs`,
+  // which quotes it back in a PR body, so the one-line shape stays the shared one.
+  console.log(
+    `  fork-local tests (node --test): ${forkTests.files} file(s) ${forkTests.passed ? 'passed' : 'FAILED'}`
+  )
   for (const item of result.known) {
     const entry = item.entry
     console.log(
@@ -542,25 +534,28 @@ function evaluate(options, { reportPath, logPath, dir }) {
 function main() {
   const options = parseArgs(process.argv.slice(2))
   requireCleanTree(options.allowDirty)
-  const allowlistHash = createHash('sha256')
-    .update(readFileSync(options.allowlist))
-    .digest('hex')
-    .slice(0, 12)
+  const allowlistHash = allowlistFingerprint(readFileSync(options.allowlist))
   const revision = git(['rev-parse', 'HEAD'])
-  const cachePath = revision
-    ? join(CACHE_DIR, `${revision.slice(0, 12)}-${allowlistHash}.json`)
-    : null
+  // Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
+  // is not a directory and the gate could not record the verdict it just computed.
+  const cacheDir = unitGateCacheDir(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'))
+  const cachePath = revision ? cachedVerdictPath(cacheDir, revision, allowlistHash) : null
   // A cached verdict is only reused for the gate's own no-argument run: a forwarded selector
   // describes a different suite, so it must not read or write the revision's verdict.
   const cacheable = options.cache && options.vitestArgs.length === 0 && cachePath !== null
 
   if (cacheable && existsSync(cachePath)) {
     const cached = readJsonFile(cachePath, 'cached verdict')
-    console.log(
-      'gate-unit: cached verdict for this revision and allowlist (pass --no-cache to re-run)'
-    )
-    reportResult(cached)
-    process.exit(cached.exitCode)
+    // Why a dirty verdict is not reused: it says nothing about the revision, and reusing it would make
+    // the gate's own advice ("re-run on a committed tree") impossible to follow.
+    if (cached.clean === true) {
+      console.log(
+        'gate-unit: cached verdict for this revision and allowlist (pass --no-cache to re-run)'
+      )
+      reportResult(cached)
+      process.exit(cached.exitCode)
+    }
+    console.log('gate-unit: ignoring the cached verdict — it was produced on a dirty tree')
   }
 
   const dir = mkdtempSync(join(tmpdir(), 'orca-gate-'))
@@ -570,8 +565,10 @@ function main() {
     logPath: join(dir, 'run.log')
   })
 
-  if (cacheable) {
-    mkdirSync(CACHE_DIR, { recursive: true })
+  // Why only a clean tree writes: a verdict from `--allow-dirty` is about a tree, not a revision, so
+  // it must never become the verdict a PR is opened on.
+  if (cacheable && result.clean === true) {
+    mkdirSync(cacheDir, { recursive: true })
     writeFileSync(cachePath, `${JSON.stringify(result, null, 2)}\n`)
   }
   reportResult(result)

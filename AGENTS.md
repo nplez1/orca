@@ -99,7 +99,24 @@ The body path is `mktemp`-derived on purpose: several agents run at once on one 
 `/tmp`, and a fixed `/tmp/body.md` has already collided between two of them.
 
 It defaults to fork `nplez1/orca` / base `nplez1/main`, requires `--upstream` to leave the fork, and
-refuses a head that does not descend from its base.
+refuses a head that does not descend from its base. The base is resolved against the remote the PR
+targets (`upstream` for an upstream PR, `origin` otherwise), because the two track different branches,
+and an upstream head carrying any `local(` commit — or any fork-owned path (`local/`,
+`LOCAL-PATCHES.md`, `BRANCHES.md`, `UPSTREAM-SYNC-RUNBOOK.md`, `.husky/commit-msg`) — is refused
+outright.
+
+**Both PR gates are read by that script.** It refuses to open a fork PR for a revision with no cached
+unit-gate PASS (`orca-queue node local/gate-unit.mjs` writes one per revision) and any PR whose body
+has no review claim line:
+
+```
+Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2
+```
+
+`--waive-gate <1|2>:<reason>` records a deliberate exception, prints it, and expects the PR body to
+state it. Gate 1 is fork-local, so an upstream PR carries no verdict for it and always needs an
+explicit `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead
+of aborting, so the decision can be inspected before the ~20-minute run.
 
 Why the ancestry check matters: the two branches called `main` are different lines. A head cut from
 `main` and opened against `nplez1/main` looks like a small diff locally but carries every fork-only
@@ -107,7 +124,10 @@ patch as a reversion — that is where the ~300k-line PRs came from.
 
 ## Branch state
 
-- `node local/branch-status.mjs` — live SHAs and PR state. **Source of truth.**
+- `node local/branch-status.mjs` — live SHAs and PR state. **Source of truth.** The inventory is derived
+  from `refs/heads/nplez1`, `origin/nplez1/*` and the fork's own heads, and PR state is read from both
+  `nplez1/orca` and `stablyai/orca`; `--local-only` skips the network. A dependency key that matches no
+  branch is reported rather than ignored.
 - [`BRANCHES.md`](./BRANCHES.md) — why each branch exists, what blocks it, dependency order. Read before
   any PR or branch work. It records what the script cannot know; if the two disagree, the script is right.
 - [`LOCAL-PATCHES.md`](./LOCAL-PATCHES.md) — the fork-only patch series.
