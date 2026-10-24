@@ -79,7 +79,7 @@ export async function spawnCommandCapture(
           terminateAtStalledDeadline({
             overrunMs,
             isSettled: () => settled,
-            hasExited: () => child.exitCode !== null || child.signalCode !== null,
+            hasExited: () => child.exitCode != null || child.signalCode != null,
             terminate: () => terminateAtDeadline(overrunMs)
           })
         }, timeoutMs)
