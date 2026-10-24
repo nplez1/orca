@@ -1531,6 +1531,15 @@ re-couples the two destructive actions; dropping the queue loses the lifecycle s
 **Do not:** give `queueWorkspaceDelete` a sixth flag for `deleteRemoteBranch`. The `run` callback
 already sees the raw `params`, which is where the fork reads it.
 
+**Correction (2026-10-23).** The flag rule was read too widely at first: the _key_ still has to carry
+the choice. `queueWorkspaceDelete` normalized only the four `RemovalFlag`s before keying the delete,
+so `getRuntimeWorktreeRemovalOptionsKey` always produced `…:keep-remote-branch` and the queue handed
+a `deleteRemoteBranch: true` retry the pending keep-the-branch delete's reply
+(`workspace-lifecycle-queue.ts` shares a reply on an equal key), skipping the `git push --delete`
+silently. `requested` now takes the field for the key only — `removal` still carries four flags, and
+the value still reaches the removal through `run`. Two deletes that differ only in this choice must
+not coalesce; `workspace-lifecycle-commands.test.ts` pins both directions.
+
 ### Agent-hook listener: the fork's guards stay and carry upstream's `incomingProcess`
 
 **Paths:** `src/shared/agent-hook-listener.ts`, `src/shared/agent-hook-listener/inherited-pane-owner-guard.ts`

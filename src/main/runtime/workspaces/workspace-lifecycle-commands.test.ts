@@ -112,6 +112,63 @@ describe('workspace lifecycle commands', () => {
     expect(ran).toBe(true)
   })
 
+  it('refuses a delete that differs from the pending one only in the remote-branch choice', async () => {
+    const queue = new WorkspaceLifecycleQueue()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const keeping = queueWorkspaceDelete(
+      runtime(queue),
+      'feature',
+      undefined,
+      { ...removal, deleteRemoteBranch: false },
+      () => gate
+    )
+    await flush()
+    const deleting = queueWorkspaceDelete(
+      runtime(queue),
+      'feature',
+      undefined,
+      { ...removal, deleteRemoteBranch: true },
+      async () => 'joined'
+    )
+    // Why awaited this way: the refusal settles in a microtask, so the handler has to be attached
+    // before the queue is flushed or the rejection is reported as unhandled.
+    const refused = expect(deleting).rejects.toThrow(
+      'Worktree deletion already in progress: feature'
+    )
+    await flush()
+    await refused
+    release()
+    await keeping
+  })
+
+  it('joins a retry that asks for the same remote-branch choice', async () => {
+    const queue = new WorkspaceLifecycleQueue()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const deleting = queueWorkspaceDelete(
+      runtime(queue),
+      'feature',
+      undefined,
+      { ...removal, deleteRemoteBranch: true },
+      async () => {
+        await gate
+        return 'deleted'
+      }
+    )
+    await flush()
+    const retry = queueWorkspaceDelete(
+      runtime(queue),
+      'feature',
+      undefined,
+      { ...removal, deleteRemoteBranch: true },
+      async () => 'not this one'
+    )
+    await flush()
+    release()
+    await expect(Promise.all([deleting, retry])).resolves.toEqual(['deleted', 'deleted'])
+  })
+
   it('reads lost contact the same way for sleep, close and delete', async () => {
     expect(terminalLostContact(new Error('terminal_liveness_unavailable'))).toBe(true)
     expect(terminalLostContact(new Error('terminal_worktree_sleep_failed'))).toBe(false)
