@@ -187,7 +187,7 @@ export function queueWorkspaceDelete<T>(
   runtime: LifecycleRuntime & ObservingRuntime,
   selector: string,
   hostId: string | undefined,
-  requested: Partial<Record<RemovalFlag, boolean>>,
+  requested: Partial<Record<RemovalFlag, boolean>> & { deleteRemoteBranch?: boolean },
   /** Called with the normalized flags, plus the caller's host when it named one. */
   run: (removal: Record<RemovalFlag, boolean> & { hostId?: string }) => Promise<T>
 ): Promise<T> {
@@ -198,7 +198,13 @@ export function queueWorkspaceDelete<T>(
     allowFailedArchiveHook: requested.allowFailedArchiveHook === true
   }
   const options: LifecycleDeleteOptions = {
-    key: getRuntimeWorktreeRemovalOptionsKey(removal),
+    // Why the remote-branch choice is keyed but not a flag: deleting the branch and keeping it are
+    // different operations, so a retry must not join the other's reply — while the choice reaches
+    // the removal through `run`, not through the flags a retry is normalized from.
+    key: getRuntimeWorktreeRemovalOptionsKey({
+      ...removal,
+      deleteRemoteBranch: requested.deleteRemoteBranch === true
+    }),
     force: removal.allowUnverifiedPtyStop,
     label: getExplicitWorktreeIdSelector(selector) ?? selector
   }

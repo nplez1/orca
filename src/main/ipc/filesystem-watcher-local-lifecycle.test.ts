@@ -1,13 +1,9 @@
 import { createWatcherSender } from './filesystem-watcher-test-sender'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { handleMock, getSshFilesystemProviderMock, providerRegistrationListeners } = vi.hoisted(
-  () => ({
-    handleMock: vi.fn(),
-    getSshFilesystemProviderMock: vi.fn(),
-    providerRegistrationListeners: new Set<(connectionId: string) => void>()
-  })
-)
+const { handleMock } = vi.hoisted(() => ({
+  handleMock: vi.fn()
+}))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -25,14 +21,6 @@ vi.mock('@parcel/watcher', () => ({
 
 vi.mock('./filesystem-watcher-wsl', () => ({
   createWslWatcher: vi.fn()
-}))
-
-vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock,
-  onSshFilesystemProviderRegistered: (listener: (connectionId: string) => void) => {
-    providerRegistrationListeners.add(listener)
-    return () => providerRegistrationListeners.delete(listener)
-  }
 }))
 
 import { closeAllWatchers } from './filesystem-watcher-shutdown'
@@ -64,7 +52,6 @@ describe('registerFilesystemWatcherHandlers', () => {
   beforeEach(async () => {
     vi.useRealTimers()
     handleMock.mockReset()
-    getSshFilesystemProviderMock.mockReset()
     vi.mocked(stat).mockReset()
     vi.mocked(subscribeParcelWatcher).mockReset()
     vi.mocked(createWslWatcher).mockReset()

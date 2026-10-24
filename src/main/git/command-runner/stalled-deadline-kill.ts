@@ -1,9 +1,12 @@
 import type { ActiveSpan } from '../../observability/tracer'
 
 /**
- * Why: a `setTimeout` cannot fire early, so however late it fires is a measured
- * main-thread stall. Below this the lateness is ordinary timer jitter.
+ * Why: a `setTimeout` cannot fire ahead of the loop clock it was scheduled on, so lateness is what
+ * the timer measured; a negative value is that clock's millisecond rounding, not an honored
+ * deadline. Below this the lateness is ordinary timer jitter rather than a block.
  */
+// Why a copy of `BLOCKED_DEADLINE_OVERRUN_MS` in `@orca/process-host`'s `process-deadline.ts` and not an
+// import: several suites mock that module, and a new export they do not provide fails the whole suite.
 export const STALLED_DEADLINE_OVERRUN_MS = 100
 
 /**
@@ -36,7 +39,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Why on the span: the trace is where a stall-induced timeout has to be distinguishable from a hung git. */
+/** Why on the span: the trace is where a timeout whose deadline fired late has to be distinguishable from a hung git. */
 export function recordDeadlineOverrunOnSpan(span: ActiveSpan | undefined, error: unknown): void {
   const overrunMs = deadlineOverrunOf(error)
   if (overrunMs !== null) {
@@ -45,29 +48,43 @@ export function recordDeadlineOverrunOnSpan(span: ActiveSpan | undefined, error:
 }
 
 /**
- * Kill a child at its deadline unless the timer itself fired late.
+ * Kill a child at its deadline unless the exit it was waiting for has already arrived.
  *
  * Why (#155): timers run before I/O callbacks in the same loop turn, so after a
  * stall the overdue deadline timer fires before Node handles the exit of a child
  * that already finished. Killing there reports a millisecond-long `git remote`
- * as a 30s timeout, and one stall becomes a burst of them. A late deadline is
- * therefore proof the deadline was not honored in real time, so the child gets a
- * bounded drain window first; one still running after it has genuinely overrun.
+ * as a 30s timeout, and one stall becomes a burst of them. A 0 ms timer fires in
+ * the next iteration's timers phase, after this iteration has polled I/O, so an
+ * exit the stall hid has been delivered by then. A timer that fired on time takes
+ * no turn — `overrunMs` only measures this timer's lateness, so a long block
+ * ending just past the deadline still reads as on time; that residual is taken
+ * so no caller's own deadlines move.
+ * An exited child still gets the bounded drain window, since a grandchild can
+ * hold a pipe open.
  */
 export function terminateAtStalledDeadline(params: {
   overrunMs: number
   isSettled: () => boolean
+  hasExited: () => boolean
   terminate: () => void
 }): void {
-  const { overrunMs, isSettled, terminate } = params
-  if (!isStalledDeadlineOverrun(overrunMs)) {
+  const { overrunMs, isSettled, hasExited, terminate } = params
+  if (!isStalledDeadlineOverrun(overrunMs) && !hasExited()) {
     terminate()
     return
   }
-  const drain = setTimeout(() => {
-    if (!isSettled()) {
-      terminate()
+  setTimeout(() => {
+    if (isSettled()) {
+      return
     }
-  }, HIDDEN_EXIT_DRAIN_GRACE_MS)
-  drain.unref?.()
+    setTimeout(() => {
+      // Why one more turn: a second stall can land inside the drain, and its timers phase would
+      // again run before the poll that delivers the child's `close`.
+      setTimeout(() => {
+        if (!isSettled()) {
+          terminate()
+        }
+      }, 0).unref?.()
+    }, HIDDEN_EXIT_DRAIN_GRACE_MS).unref?.()
+  }, 0).unref?.()
 }

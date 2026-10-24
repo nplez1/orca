@@ -16,14 +16,32 @@ describe('terminateAtStalledDeadline', () => {
     vi.useRealTimers()
   })
 
-  it('kills immediately when the loop honored the deadline', () => {
+  it('kills on the spot when the deadline fired on time and nothing exited', () => {
+    // Why no turn here: an on-time deadline leaves no backlog, and every caller's own deadlines
+    // hang off this instant.
     const terminate = vi.fn()
     terminateAtStalledDeadline({
       overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
       isSettled: () => false,
+      hasExited: () => false,
       terminate
     })
     expect(terminate).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds the kill below the threshold once the child has exited', async () => {
+    // Why below the threshold: the lateness only says the timer fired late. Whether the exit was
+    // already observed is what decides the kill, so a short stall must not kill a finished command.
+    const terminate = vi.fn()
+    terminateAtStalledDeadline({
+      overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
+      isSettled: () => false,
+      hasExited: () => true,
+      terminate
+    })
+    expect(terminate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(terminate).not.toHaveBeenCalled()
   })
 
   it('gives a late deadline a drain window before killing', async () => {
@@ -31,11 +49,15 @@ describe('terminateAtStalledDeadline', () => {
     terminateAtStalledDeadline({
       overrunMs: 387_550,
       isSettled: () => false,
+      hasExited: () => false,
       terminate
     })
+    await vi.advanceTimersByTimeAsync(0)
     expect(terminate).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(HIDDEN_EXIT_DRAIN_GRACE_MS - 1)
     expect(terminate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    // The drain checks for a settled child one turn later, after the poll phase.
     await vi.advanceTimersByTimeAsync(1)
     expect(terminate).toHaveBeenCalledTimes(1)
   })
@@ -46,6 +68,7 @@ describe('terminateAtStalledDeadline', () => {
     terminateAtStalledDeadline({
       overrunMs: 387_550,
       isSettled: () => settled,
+      hasExited: () => false,
       terminate
     })
     settled = true
