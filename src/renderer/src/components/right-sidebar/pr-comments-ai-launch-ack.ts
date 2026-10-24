@@ -9,15 +9,13 @@ import {
 } from './pr-comment-fixing-reply-body'
 
 export type PRCommentAiLaunchAckCounts = {
-  resolved: number
   replied: number
-  skipped: number
+  /** Groups this path deliberately left untouched, so their threads stay open. */
+  leftOpen: number
   failed: number
 }
 
 export type PRCommentAiLaunchAckDeps = {
-  /** Resolve a host thread. Always called against the threadId snapshotted at launch. */
-  resolveThread: (threadId: string) => Promise<boolean>
   /** Provider supports posting a reply (GitHub in the Checks panel today). */
   canReply: boolean
   /**
@@ -135,9 +133,8 @@ export function checksPanelReviewStableKey(asyncResultKey: string): string {
 export const PR_COMMENT_ACK_MAX_CONCURRENCY = 4
 
 const EMPTY_ACK_COUNTS: PRCommentAiLaunchAckCounts = {
-  resolved: 0,
   replied: 0,
-  skipped: 0,
+  leftOpen: 0,
   failed: 0
 }
 
@@ -170,7 +167,7 @@ const NO_BATCHED_CONVERSATION_REPLY: BatchedConversationReply = {
   handled: new Set()
 }
 
-/** Groups that need a posted reply because the host cannot close them for us. */
+/** Groups that get an acknowledgement reply: the ones the host cannot close for us. */
 export function getPRCommentGroupsNeedingReply(
   groups: readonly PRCommentGroup[]
 ): PRCommentGroup[] {
@@ -183,17 +180,19 @@ export function hasPRCommentGroupNeedingReply(groups: readonly PRCommentGroup[])
 }
 
 /**
- * After launching an agent for selected review feedback, acknowledge every selection
- * exactly once: host-resolvable threads are resolved, and anything the host cannot close
- * gets a fixing reply (one nested reply per review thread, one combined conversation
- * comment for everything with no nested-reply endpoint).
+ * After launching an agent for selected review feedback, acknowledge the selection without
+ * touching review state: a thread the host could resolve is left open for the user to close,
+ * and a comment with no resolution endpoint (review summary, CodeRabbit, plain conversation
+ * comment, thread the user already resolved) gets a fixing reply so the selection is not
+ * silently dropped.
  *
- * Why resolve instead of reply: a resolved thread collapses on the host, which *is* the
- * acknowledgement — an extra "Fixing." comment only adds noise to a thread the user can
- * already see is handled.
+ * Why no resolve: closing a thread is the user's verdict that the reviewer's concern is
+ * actually handled. Resolving it here marked comments addressed before the agent had done
+ * anything — and kept them marked when it failed (#166) — so this path must never write
+ * review state. Nothing in the reply path below can.
  *
- * Every host call targets state snapshotted at launch, so a slow agent start or the user
- * navigating away can no longer silently drop the resolve. Groups run through a bounded pool.
+ * Every reply targets host state snapshotted at launch, so a slow agent start or the user
+ * navigating away cannot misfile it. Groups run through a bounded pool.
  */
 export async function acknowledgePRCommentsAfterAiLaunch(args: {
   groups: readonly PRCommentGroup[]
@@ -216,9 +215,8 @@ export async function acknowledgePRCommentsAfterAiLaunch(args: {
 
   return [batch.counts, ...perGroup].reduce<PRCommentAiLaunchAckCounts>(
     (totals, counts) => ({
-      resolved: totals.resolved + counts.resolved,
       replied: totals.replied + counts.replied,
-      skipped: totals.skipped + counts.skipped,
+      leftOpen: totals.leftOpen + counts.leftOpen,
       failed: totals.failed + counts.failed
     }),
     EMPTY_ACK_COUNTS
@@ -249,17 +247,15 @@ async function acknowledgePRCommentGroup(
 ): Promise<PRCommentAiLaunchAckCounts> {
   const counts = { ...EMPTY_ACK_COUNTS }
 
+  // Why: a thread the host can close is left for the user to close — this path posts nothing
+  // for it, so it cannot claim the feedback is addressed.
   if (isResolvablePRCommentGroup(group)) {
-    if (await deps.resolveThread(group.threadId)) {
-      counts.resolved += 1
-    } else {
-      counts.failed += 1
-    }
+    counts.leftOpen += 1
     return counts
   }
 
   if (!deps.canReply) {
-    counts.skipped += 1
+    counts.leftOpen += 1
     return counts
   }
   // The combined conversation post already covered this group and counted itself.
@@ -288,40 +284,23 @@ async function postInThreadFixingReply(
 }
 
 /**
- * Snapshotted at queue time so the post-launch ack does not depend on live React state.
- * Resolving a thread only needs the PR handle — prRepo is optional on resolveReviewThread,
- * so a PR cache entry without it must still be able to ack by resolving.
+ * Snapshotted at queue time so the post-launch reply does not depend on live React state.
+ * The reply endpoints need prRepo, so a PR cache entry without it cannot be replied to.
  */
-export type PendingPRCommentAiAckGithubResolveTarget = {
+export type PendingPRCommentAiAckGithubTarget = {
   repoPath: string
   repoId: string
   prNumber: number
-  prRepo?: NonNullable<PRInfo['prRepo']>
-}
-
-/** The reply endpoints genuinely need prRepo, so they get the stricter target. */
-export type PendingPRCommentAiAckGithubTarget = PendingPRCommentAiAckGithubResolveTarget & {
   prRepo: NonNullable<PRInfo['prRepo']>
 }
 
-/** Snapshotted at queue time so the post-launch ack does not depend on live React state. */
-export type PendingPRCommentAiAckGitlabTarget = {
-  repoPath: string
-  repoId: string
-  iid: number
-  /** The MR's credential host, pinned at launch; repo ids can repeat across hosts. */
-  ownerHostId: string
-}
-
-/** What a queued comment-resolution launch must still ack once its prompt is delivered. */
+/** What a queued comment-resolution launch must still reply to once its prompt is delivered. */
 export type PendingPRCommentAiAck = {
   reviewContextKey: string
   provider: HostedReviewInfo['provider']
   selectedGroups: PRCommentGroup[]
   /** Reply target: requires prRepo. */
   githubTarget?: PendingPRCommentAiAckGithubTarget
-  githubResolveTarget?: PendingPRCommentAiAckGithubResolveTarget
-  gitlabTarget?: PendingPRCommentAiAckGitlabTarget
 }
 
 /** Durable pending ack payload so dialog close / re-renders cannot drop it before launch. */

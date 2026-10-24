@@ -9694,11 +9694,6 @@
             "786e3c143f": "Excluir",
             "653c105ecc": "Mais ações de PR",
             "f316a8ca2b": "Nenhum comentário não resolvido selecionado.",
-            "d00ebdc402": "Resolver {{value0}} Comentários Com IA",
-            "5eb2163b6b": "Revise o prompt antes de iniciar um agente. Depois que o prompt for entregue, o Orca resolve as threads do host selecionadas e responde aos comentários que não conseguir resolver.",
-            "f273f2271c": "Agente iniciado. Marcados {{value0}} como resolvidos, respondidos {{value1}}, ignorados {{value2}}, falharam {{value3}}.{{value4}}",
-            "aa95b81a3a": "Agente iniciado. Marcados {{value0}} como resolvidos, respondidos {{value1}}, ignorados {{value2}}, falharam {{value3}}.",
-            "495b2f8c4b": "Agente iniciado, mas não foi possível resolver ou responder os comentários selecionados.",
             "3c3ad3a1d2": "Agente iniciado. Nenhum comentário selecionado pode ser marcado como resolvido no host.",
             "review": {
               "auto_retry": "O Orca vai tentar novamente às {{time}}.",
@@ -9710,7 +9705,6 @@
               "branch": "Sincronizar Branch"
             },
             "7e4b2a19c0": "Não foi possível resolver o PR do GitHub para responder.",
-            "430f1a62d4": "Não foi possível resolver a thread selecionada no host.",
             "updateReactionFailed": "Falha ao atualizar a reação.",
             "gitlabMoreActions": "Mais ações de MR",
             "gitlabUnlink": "Desvincular MR",
