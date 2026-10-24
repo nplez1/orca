@@ -18,15 +18,15 @@ This fork carries two different kinds of content on one branch:
 - **A patch series** — the `local(...)` commits (identity, updater, CI, build, hooks, docs, vm,
   skills, terminal, agents). Small, self-contained, and genuinely fork-only.
 
-For years every sync rebased *both*. That is where the cost comes from: a rebase pays once per commit
-*per collision*, so `service-full-cycle-preparation.ts` — seven fork commits, all touching a file
+For years every sync rebased _both_. That is where the cost comes from: a rebase pays once per commit
+_per collision_, so `service-full-cycle-preparation.ts` — seven fork commits, all touching a file
 upstream also changed — stopped the 2026-10-05 rebase three separate times, re-deciding the same
 thing each time.
 
 **Decision (2026-10-05): merge upstream into the release line; keep rebase for the patch series and
 for feature branches.** The deciding cost is repeated resolution, not a measured speedup:
 
-- A rebase stops once per commit *per collision*, so the same file stops it several times and each
+- A rebase stops once per commit _per collision_, so the same file stops it several times and each
   stop re-decides a question already settled.
 - A merge presents one conflict set for the whole pending delta, resolved once per file. On the
   50-commit delta pending at that date, `node local/sync/conflicts.mjs --merge-tree <old-tip>
@@ -50,7 +50,7 @@ Still true either way, so do not "fix" these:
 - `.github/workflows/fork-release.yml` stamps `<package.json version>-np.${GITHUB_RUN_NUMBER}` —
   history shape is irrelevant to versioning.
 - `local/open-pr.mjs` requires a PR head to descend from its base, and the base must be an ancestor
-  of the head *as it stands now*. A merge line preserves ancestry; a stale PR head does not, so a
+  of the head _as it stands now_. A merge line preserves ancestry; a stale PR head does not, so a
   branch cut before any sync needs its own catch-up before it can be opened.
 
 ## The tools
@@ -67,7 +67,7 @@ node local/sync/identity-sweep.mjs [--json|--fix]
 node local/sync/curate.mjs --plan | --write-manifest                # plan a curated patch series; never builds a branch
 ```
 
-`local/sync/convergence-ledger.md` is not a script: it is the durable record of *which side wins*
+`local/sync/convergence-ledger.md` is not a script: it is the durable record of _which side wins_
 per subsystem, seeded from the decisions of every sync so far. `conflicts.mjs` prints the entries
 matching each conflicted path, which is what stops the same convergence question being re-litigated
 every few months.
@@ -127,7 +127,7 @@ what has to be re-applied onto `:2:`. Resolve, `git add`, then `GIT_EDITOR=true 
 
 **In a merge**, it is the other way round: `:2:` (`ours`) is our line, `:3:` (`theirs`) is upstream,
 and `:1:` is the common ancestor. Stage 3 is the incoming upstream file, and the resolution for the
-*merged* tree is what you stage with `git add` before `git merge --continue`.
+_merged_ tree is what you stage with `git add` before `git merge --continue`.
 
 **`--ours` / `--theirs` name the opposite pair of sides in a merge than in a rebase.** In a merge
 `--ours` is our line and `--theirs` is upstream; in a rebase `--ours` is the base being rebased onto
@@ -205,10 +205,10 @@ answer into the ledger** in the same commit. Decisions already taken are in
    from 95 files to 481. Read the `CONFLICT` lines deliberately; `conflicts.mjs --merge-tree` does.
 10. **A red the next commit owns is expected, and is not a finding.** Commits in this fork's series
     have shipped a syntax error a later commit fixes (a half-applied edit, a displaced comma, a
-    doubled `]`) and test mocks that lag the commit adding them. In a *rebase*, treat such a red as
+    doubled `]`) and test mocks that lag the commit adding them. In a _rebase_, treat such a red as
     transient only after checking that a later commit in the range owns it (`git log -S`, or the
     file at the tip) — and never chase it, because fixing it mid-series conflicts with the commit
-    that owns the fix. In a *merge* there is no such class: every red is real. This is the single
+    that owns the fix. In a _merge_ there is no such class: every red is real. This is the single
     biggest reason a mid-sync `pnpm tc` was unusable during the 2026-10-05 rebase.
 11. **Upstream can move while you are syncing.** It advanced 50 commits during the 2026-10-05 sync.
     Record the base you actually rebased onto, re-fetch before pushing, and expect the next sync to
@@ -222,8 +222,17 @@ node local/sync/post-sync.mjs
 
 That runs the integration checks in one pass: conflict markers, the fork identity sweep, the
 derived catalogs (regenerate + both localization verifiers), the builder config loading, the five
-update-feed references still naming `nplez1/orca`, the lost-content diff, and `pnpm tc`. For a
-**rebase**, also run the patch review:
+update-feed references still naming `nplez1/orca`, the lost-content diff, and `pnpm tc`.
+
+A merge can also re-enable workflows **at the repository**, which no tree diff shows: new upstream
+workflows arrive enabled and an edited file comes back on even though the fork had disabled it. Sweep
+before handing off to the release:
+
+```bash
+node local/check-actions-enablement.mjs --fix
+```
+
+For a **rebase**, also run the patch review:
 
 ```bash
 # Nothing of ours was silently lost. A MODIFIED file upstream never touched is a red flag
