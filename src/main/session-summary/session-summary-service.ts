@@ -132,9 +132,11 @@ export class SessionSummaryService {
       requestedHostId: request.executionHostId,
       connectionId: entry?.connectionId
     })
-    // Why the request wins: the viewer is the process holding the pane, so it knows which
-    // session is on screen even when the folding side's row is missing, stale, or relayed
-    // without a transcript path. The row is the fallback, not the source of truth.
+    // Why the request is merged in: the viewer holds the pane, so it can name the session even
+    // when the folding side's row is missing or relayed without a transcript path — the case
+    // that reported "no readable transcript" for a live session. Where this process does hold a
+    // row naming a session, that row still wins: it is its own latest evidence, and a lagging
+    // client id would otherwise brief the previous conversation (#135).
     const identity = mergeSessionRef(parseSessionSummarySessionRef(request.session), entry)
     const hasSource = Boolean(identity.agentType && identity.providerSession?.id)
     // Reuse the live runtime: a fold in flight holds the old object and updates it.
@@ -270,7 +272,16 @@ export class SessionSummaryService {
     a: SessionSummaryStoreEntry['identity'],
     b: SessionSummaryStoreEntry['identity']
   ): boolean {
-    return a.providerSessionId !== b.providerSessionId || a.transcriptPath !== b.transcriptPath
+    if (a.providerSessionId !== b.providerSessionId) {
+      return true
+    }
+    // Why: a side without a path knows less, it does not know something different. Treating a
+    // missing path as a change dropped a good ledger and its seen cursor whenever the identity
+    // came from a request that named only the session id.
+    if (!a.transcriptPath || !b.transcriptPath) {
+      return false
+    }
+    return a.transcriptPath !== b.transcriptPath
   }
 
   private runLocalFold(paneKey: string, host: SessionSummaryTranscriptHost): Promise<void> {

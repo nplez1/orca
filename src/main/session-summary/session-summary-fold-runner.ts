@@ -6,6 +6,7 @@
 // kept so a retry resumes instead of restarting.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentType } from '../../shared/agent-status-types'
 import type {
   SessionSummarySessionRef,
   SessionSummarySnapshot,
@@ -31,6 +32,12 @@ export type SessionSummaryFoldRunnerDeps = {
     signal: AbortSignal
   }) => Promise<SessionSummarySourceEvent[] | null>
   getAgentStatusEntry: (paneKey: string) => SessionSummaryStatusEntry | undefined
+  /**
+   * Whether this build can decode that agent's transcript at all. Injected rather than
+   * imported so the runner stays the orchestrator and the transcript module stays the reader;
+   * it only decides which sentence an empty fold gets.
+   */
+  canReadTranscript?: (agentType: AgentType) => boolean
   createBrain: (params: ResolvedSourceControlAiGenerationParams | null) => SessionFoldBrain
   now: () => number
 }
@@ -69,11 +76,16 @@ export function mergeSessionRef(
   requested: SessionSummarySessionRef | null | undefined,
   entry: SessionSummarySessionRef | undefined
 ): SessionSummarySessionRef {
-  const agentType = entry?.agentType ?? requested?.agentType
-  const providerSession = mergeProviderSession(entry?.providerSession, requested?.providerSession)
+  const chosen = mergeProviderSession(entry?.providerSession, requested?.providerSession)
+  // Why paired with its session: an agent type from one side next to a session from the other
+  // describes a conversation neither side has — Pi's transcript read with Claude's parser — so
+  // the type always comes from whichever side supplied the session.
+  const agentType = chosen.fromEntry
+    ? (entry?.agentType ?? requested?.agentType)
+    : (requested?.agentType ?? entry?.agentType)
   return {
     ...(agentType ? { agentType } : {}),
-    ...(providerSession ? { providerSession } : {})
+    ...(chosen.providerSession ? { providerSession: chosen.providerSession } : {})
   }
 }
 
@@ -81,14 +93,17 @@ export function mergeSessionRef(
 function mergeProviderSession(
   local: AgentProviderSessionMetadata | undefined,
   requested: AgentProviderSessionMetadata | undefined
-): AgentProviderSessionMetadata | undefined {
+): { providerSession: AgentProviderSessionMetadata | undefined; fromEntry: boolean } {
   if (!local) {
-    return requested
+    return { providerSession: requested, fromEntry: false }
   }
   if (local.transcriptPath || !requested?.transcriptPath || requested.id !== local.id) {
-    return local
+    return { providerSession: local, fromEntry: true }
   }
-  return { ...local, transcriptPath: requested.transcriptPath }
+  return {
+    providerSession: { ...local, transcriptPath: requested.transcriptPath },
+    fromEntry: true
+  }
 }
 
 export function hasSessionRef(ref: SessionSummarySessionRef): boolean {
@@ -123,7 +138,9 @@ export async function runSessionSummaryFold(args: {
         fold: IDLE_FOLD,
         // Why: "no readable transcript yet" is true for a session that has not written one,
         // and misleading for one whose transcript exists somewhere this fold cannot read.
-        ...(session.providerSession?.id ? { error: unavailableTranscriptReason(session) } : {})
+        ...(session.providerSession?.id
+          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript) }
+          : {})
       })
       return
     }
@@ -138,7 +155,9 @@ export async function runSessionSummaryFold(args: {
         status: events.length === 0 ? 'unavailable' : 'ready',
         fold: IDLE_FOLD,
         messageCount: events.length,
-        ...(events.length === 0 ? { error: unavailableTranscriptReason(session, 'empty') } : {})
+        ...(events.length === 0
+          ? { error: unavailableTranscriptReason(session, deps.canReadTranscript, 'empty') }
+          : {})
       })
       return
     }
@@ -255,9 +274,15 @@ function freshStoreEntry(
  */
 function unavailableTranscriptReason(
   session: SessionSummarySessionRef,
+  canReadTranscript: ((agentType: AgentType) => boolean) | undefined,
   kind: 'unreadable' | 'empty' = 'unreadable'
 ): string {
   const agent = session.agentType ?? 'agent'
+  // Why first: "found nothing" is a claim about a search this build never ran for an agent
+  // whose transcript format it cannot decode, and it sends the reader looking for a file.
+  if (session.agentType && canReadTranscript && !canReadTranscript(session.agentType)) {
+    return `Orca has no transcript reader for ${agent} sessions yet.`
+  }
   if (kind === 'empty') {
     return `The ${agent} session has no messages in its transcript yet.`
   }

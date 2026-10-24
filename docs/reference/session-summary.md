@@ -63,19 +63,31 @@ found a different way:
 - **Every other agent** is read from the path its own hook reported, with the AI Vault parser
   for that agent. There is no allowlist to add an entry to: `resolveHookPathParser` accepts any
   agent `AI_VAULT_AGENTS` can decode, because the parsers are already agent-generic
-  (`parseAgentSessionFile` dispatches on `candidate.agent`) and the only thing an allowlist
-  achieved was reporting "no readable transcript" for agents whose path was handed over.
-  An agent whose hook reports no path and which has no synthesized location (Amp, Command
-  Code) still returns null and the pane says so.
+  (`parseAgentSessionFile` dispatches on `candidate.agent`).
+
+What that widening does **not** do is give every agent a transcript. An agent is only readable
+when a path can be found for it, and the agents whose hooks report only an id — Gemini, Cursor,
+Droid, Kimi, Kiro, ZCode, DSH, Antigravity, OpenCode 2, Devin, JCode, Hermes — have no root
+search here, so they still resolve nothing and the pane says so. Agents whose hooks report a
+path (Claude, Codex, Qoder, CodeBuddy, Qwen, Muse, Pi, Prime Agent, OMP) and Copilot (whose
+session id names its directory) are the ones that fold today. Closing that gap means a
+session-id search over each agent's own roots — the same idea as
+`native-chat/session-file-resolver.ts` — and is not implemented.
 
 - **The viewer's identity travels with the request.** `open` carries the session the viewer
   has on screen (`SessionSummarySessionRef`: agent type and provider session), taken from the
-  pane's row in the _viewer's_ store. The identity is the half a fold cannot do without, and
+  pane's records in the _viewer's_ store — the live row, then the parked sleeping record, then
+  the retained entry, because an idle Pi session is identity-only and keeps no live row
+  (`resolveSessionSummarySessionRef`). The identity is the half a fold cannot do without, and
   the process that folds is not always the process holding the row: a paired host runs the PTY
   while the client owns the layout, and a client clears its rows on reconnect. Both then read
   no identity and reported "no readable transcript" for a session that was running the whole
-  time. The request wins where the viewer speaks and this process's row fills in the rest
-  (`mergeSessionRef`), so an older caller sending nothing keeps the previous behaviour.
+  time. `mergeSessionRef` lets this process's own row win wherever it names a session (its own
+  latest evidence, and folding a lagging client id would brief the previous conversation —
+  #135), takes the agent type from whichever side supplied the session, and fills a missing
+  transcript path from the request. An older caller sending nothing keeps the previous
+  behaviour, and an older _host_ ignores the field, so a paired host must run this build for
+  its panes to benefit.
 - **Lazy by construction.** Opening the pane starts the fold; closing it cancels in-flight
   work. Nothing runs for sessions nobody opens, so there is no background LLM spend.
 - **Cheap facts are always available.** State, timestamps and event counts come from the
@@ -195,9 +207,10 @@ folded here.
 | `failed`           | the fold, the transcript read, or the host call failed; `error` says which |
 | `unsupported-host` | a host id this build cannot place, so nothing is read or folded            |
 
-An `unavailable` snapshot carries an `error` naming which of its two causes applies — nothing
-written yet, or a transcript this fold could not reach where its host reported it. One message
-for both left the reader no way to tell a fresh session from a misreported one.
+An `unavailable` snapshot carries an `error` naming which cause applies — nothing written yet, a
+transcript this fold could not reach where its host reported it, or an agent whose transcript
+format this build cannot decode at all (`canReadAgentTranscript`). One message for all three left
+the reader no way to tell a fresh session from a misreported one.
 
 A failed refresh over an existing brief still shows that brief: the header reads
 "Couldn't refresh — showing the last summary" unless a real backlog is waiting, and the body

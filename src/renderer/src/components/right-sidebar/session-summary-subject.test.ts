@@ -4,6 +4,7 @@ import { makePaneKey } from '../../../../shared/stable-pane-id'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { RetainedAgentEntry } from '@/store/slices/agent-status'
 import {
+  resolveSessionSummarySessionRef,
   selectSessionSummaryPaneKey,
   type SessionSummarySubjectState
 } from './session-summary-subject'
@@ -135,5 +136,78 @@ describe('selectSessionSummaryPaneKey', () => {
     })
 
     expect(selectSessionSummaryPaneKey(state, OTHER_WORKTREE_ID)).toBeNull()
+  })
+})
+
+describe('resolveSessionSummarySessionRef', () => {
+  const piSession = {
+    key: 'session_id' as const,
+    id: 'pi-session-1',
+    transcriptPath: '/home/user/.pi/agent/sessions/--srv-code--/pi-session-1.jsonl'
+  }
+
+  it('prefers the live row, which is the freshest evidence', () => {
+    expect(
+      resolveSessionSummarySessionRef({
+        live: makeAgentStatusEntry(PANE_KEY, 1_000, {
+          agentType: 'claude',
+          providerSession: { key: 'session_id', id: 'claude-1' }
+        }),
+        sleeping: {
+          paneKey: PANE_KEY,
+          worktreeId: WORKTREE_ID,
+          agent: 'pi',
+          providerSession: piSession,
+          prompt: '',
+          state: 'done',
+          capturedAt: 1,
+          updatedAt: 1
+        }
+      })
+    ).toEqual({
+      agentType: 'claude',
+      providerSession: { key: 'session_id', id: 'claude-1' }
+    })
+  })
+
+  // The reported bug: an idle Pi session is identity-only, so the renderer drops its live row
+  // and parks the identity here — and the pane then reported "no readable transcript".
+  it('finds the identity a sleeping record kept when the live row is gone', () => {
+    expect(
+      resolveSessionSummarySessionRef({
+        live: undefined,
+        sleeping: {
+          paneKey: PANE_KEY,
+          worktreeId: WORKTREE_ID,
+          agent: 'pi',
+          providerSession: piSession,
+          prompt: '',
+          state: 'done',
+          capturedAt: 1,
+          updatedAt: 1
+        }
+      })
+    ).toEqual({ agentType: 'pi', providerSession: piSession })
+  })
+
+  it('falls back to a retained entry for a finished pane', () => {
+    expect(
+      resolveSessionSummarySessionRef({
+        retained: {
+          entry: makeAgentStatusEntry(PANE_KEY, 1_000, {
+            agentType: 'pi',
+            providerSession: piSession
+          }),
+          worktreeId: WORKTREE_ID,
+          tab: makeTab(TAB_ID),
+          agentType: 'pi',
+          startedAt: 1
+        }
+      })
+    ).toEqual({ agentType: 'pi', providerSession: piSession })
+  })
+
+  it('reports no identity when the pane holds no agent at all', () => {
+    expect(resolveSessionSummarySessionRef({})).toBeNull()
   })
 })

@@ -676,6 +676,17 @@ describe('SessionSummaryService viewer-supplied identity', () => {
     })
   })
 
+  // Why the agent type follows its session: Pi's transcript read with Claude's parser is a
+  // conversation neither side has, and it can still produce a wrong brief.
+  it('takes the agent type from the side that supplied the session', async () => {
+    const { service, updates, reads } = identityHarness({ agentType: 'claude' })
+
+    service.open({ paneKey: 'tab:leaf', session: piSession })
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
+
+    expect(reads[0]).toEqual(piSession)
+  })
+
   // Why the failing read is named: one message for "nothing written yet" and "not where its
   // host said it was" left the reader with no way to tell the two apart.
   it('names why a known session produced no transcript', async () => {
@@ -768,5 +779,56 @@ describe('SessionSummaryService host open carries the viewer identity', () => {
 
     expect(opened[0]).toBeNull()
     service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
+  })
+})
+
+// The stale-ledger guard: a request identity that names the session but not its transcript path
+// contradicts nothing, so the ledger and its seen cursor must survive the re-open.
+describe('SessionSummaryService stale ledger with a request-only identity', () => {
+  it('keeps a ledger the request cannot contradict', async () => {
+    const { store } = testStore()
+    let currentEntry: SessionSummaryStatusEntry | undefined = {
+      agentType: 'pi',
+      providerSession: {
+        key: 'session_id',
+        id: 'pi-1',
+        transcriptPath: '/tmp/pi-1.jsonl'
+      }
+    }
+    const service = new SessionSummaryService({
+      store,
+      readEvents: async () => events(3),
+      getAgentStatusEntry: () => currentEntry,
+      createBrain: () => ({
+        complete: async () =>
+          JSON.stringify({
+            inProgress: 'folding',
+            timeline: [
+              { kind: 'milestone', text: 'a', sourceIndex: 0 },
+              { kind: 'milestone', text: 'b', sourceIndex: 1 },
+              { kind: 'milestone', text: 'c', sourceIndex: 2 }
+            ]
+          })
+      }),
+      now: () => 1000
+    })
+    const updates: SessionSummarySnapshot[] = []
+    service.onUpdate((snapshot) => updates.push(snapshot))
+    service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
+    service.close({ paneKey: 'tab:leaf', seenTimelineCount: 2 })
+
+    // The row goes away (an idle Pi session parks its identity), so the next open is driven by
+    // the request alone — with the same session id and no path.
+    currentEntry = undefined
+    updates.length = 0
+    service.open({
+      paneKey: 'tab:leaf',
+      session: { agentType: 'pi', providerSession: { key: 'session_id', id: 'pi-1' } }
+    })
+
+    expect(store.get('tab:leaf')?.ledger.foldedThrough).toBe(3)
+    expect(store.get('tab:leaf')?.seenThrough).toBe(2)
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
   })
 })

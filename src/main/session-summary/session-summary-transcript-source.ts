@@ -87,6 +87,17 @@ export async function readSessionSummaryTranscriptEvents(args: {
  * own hook, so no root search applies, and Copilot's synthesized session directory
  * is skipped because the remote home directory is not knowable here.
  */
+/**
+ * Whether this build can decode that agent's transcript at all.
+ *
+ * Asked when a fold finds nothing, so the pane can say "we cannot read this agent" instead of
+ * claiming to have searched for a file that a format this build does not implement would be
+ * in.
+ */
+export function canReadAgentTranscript(agentType: AgentType): boolean {
+  return resolveHookPathParser(agentType) !== null
+}
+
 export function resolveRemoteTranscriptParser(agentType: AgentType): AiVaultAgent | null {
   const parser = resolveHookPathParser(agentType)
   // Why copilot is excluded: with no hook path it is located by joining the session id
