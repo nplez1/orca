@@ -16,14 +16,31 @@ describe('terminateAtStalledDeadline', () => {
     vi.useRealTimers()
   })
 
-  it('kills immediately when the loop honored the deadline', () => {
+  it('kills once the poll phase shows nothing settled', async () => {
     const terminate = vi.fn()
     terminateAtStalledDeadline({
       overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
       isSettled: () => false,
       terminate
     })
+    expect(terminate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(0)
     expect(terminate).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the child alone when the exit it waited for had already arrived', async () => {
+    const terminate = vi.fn()
+    let settled = false
+    terminateAtStalledDeadline({
+      // Why below the threshold: the lateness only says the timer fired late. Whether an exit was
+      // already queued is what decides the kill, so a short stall must not kill a finished child.
+      overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
+      isSettled: () => settled,
+      terminate
+    })
+    settled = true
+    await vi.advanceTimersByTimeAsync(0)
+    expect(terminate).not.toHaveBeenCalled()
   })
 
   it('gives a late deadline a drain window before killing', async () => {
@@ -33,6 +50,7 @@ describe('terminateAtStalledDeadline', () => {
       isSettled: () => false,
       terminate
     })
+    await vi.advanceTimersByTimeAsync(0)
     expect(terminate).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(HIDDEN_EXIT_DRAIN_GRACE_MS - 1)
     expect(terminate).not.toHaveBeenCalled()

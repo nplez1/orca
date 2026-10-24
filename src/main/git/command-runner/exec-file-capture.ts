@@ -71,7 +71,10 @@ export async function execFileCaptureToTermination(
     options.onDeadlineKill?.()
   }
   const error = result.timedOut
-    ? (options.createTimeoutError?.() ?? new Error(`${command} timed out.`))
+    ? Object.assign(
+        options.createTimeoutError?.() ?? new Error(`${command} timed out.`),
+        deadlineOverrunMetadata(result.deadlineOverrunMs ?? 0)
+      )
     : new Error(
         options.signal?.aborted
           ? 'The operation was aborted.'

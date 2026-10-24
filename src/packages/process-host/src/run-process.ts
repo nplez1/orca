@@ -1,15 +1,12 @@
-import {
-  spawn as nodeSpawn,
-  spawnSync as nodeSpawnSync,
-  type ChildProcess
-} from 'node:child_process'
-import { resolveSpawn, type ResolvedSpawn } from './spawn-resolution'
+import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
+import { resolveSpawn } from './spawn-resolution'
 import { forceTerminateProcessTree, signalProcessTree } from './process-tree-termination'
 import { inFlightWindowsTreeKill } from './windows-tree-kill'
 
 import { hasSpawnObserver, notifySpawnObserver } from './spawn-observer'
 import { createOutputSink } from './bounded-output-sink'
 import { createChildTerminationReporter } from './child-termination-reporter'
+import { scheduleDeadlineKill } from './process-deadline'
 
 export { WindowsCmdLineBreakError } from './windows-command-line'
 
@@ -38,6 +35,7 @@ const PROCESS_EXIT_GRACE_MS = 2_000
  * reports would otherwise leave the promise pending for the app's lifetime.
  */
 const BARRIER_UNVERIFIED_EXIT_GRACE_MS = 10_000
+export { BLOCKED_DEADLINE_DRAIN_MS, BLOCKED_DEADLINE_OVERRUN_MS } from './process-deadline'
 
 /**
  * Start a child process. Use for long-lived or streaming children.
@@ -92,6 +90,7 @@ export function runProcess(
     const stdout = createOutputSink(maxOutputBytes, outputCapture)
     const stderr = createOutputSink(maxOutputBytes, outputCapture)
     let timedOut = false
+    let deadlineOverrunMs: number | null = null
     let settled = false
     let barrierStopping = false
     let barrierAttemptComplete = false
@@ -107,9 +106,9 @@ export function runProcess(
         return
       }
       settled = true
-      clearTimeout(timer)
       clearTimeout(graceTimer)
       clearTimeout(barrierDeadlineTimer)
+      deadline?.cancel()
       spec.signal?.removeEventListener('abort', onAbort)
       act()
     }
@@ -162,6 +161,9 @@ export function runProcess(
           ...(spec.captureStdoutAsBytes ? { stdoutBytes: stdout.buffer() } : {}),
           stderr: stderr.text(),
           timedOut,
+          ...(deadlineOverrunMs === null
+            ? {}
+            : { deadlineOverrunMs: Math.round(deadlineOverrunMs) }),
           outputTruncated: stdout.truncated() || stderr.truncated()
         })
       )
@@ -278,14 +280,20 @@ export function runProcess(
       graceTimer.unref?.()
     }
 
-    const timer =
+    const killAtDeadline = (overrunMs: number): void => {
+      timedOut = true
+      deadlineOverrunMs = overrunMs
+      stopAndSettle()
+    }
+
+    const deadline =
       spec.timeoutMs === null
         ? undefined
-        : setTimeout(() => {
-            timedOut = true
-            stopAndSettle()
-          }, spec.timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS)
-    timer?.unref?.()
+        : scheduleDeadlineKill({
+            deadlineMs: spec.timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS,
+            isSettled: () => settled,
+            kill: killAtDeadline
+          })
 
     // Why the same escalation: an aborted caller has stopped waiting, so an
     // unkillable child must not keep the promise alive on their behalf either.
@@ -345,56 +353,4 @@ function terminate(child: ChildProcess, signal?: NodeJS.Signals): void {
   }
 }
 
-/**
- * Synchronous variant, for the call sites that genuinely cannot await — CLI
- * entry points and teardown paths that run while the event loop is stopping.
- *
- * Prefer `runProcess`. This exists so those callers still get the Windows
- * invariants (hidden console, correct `.cmd` argv) instead of reaching for
- * `execFileSync` and re-deciding them.
- */
-export function runProcessSync(spec: ProcessSpec): ProcessResult {
-  const resolved = resolveSpawn(spec, process.platform)
-  // Diagnostics only: spawnSync holds the calling thread until the child exits,
-  // so the whole call is the block, reported even when it throws.
-  const spawnStartedAt = hasSpawnObserver() ? performance.now() : null
-  try {
-    return runResolvedProcessSync(spec, resolved)
-  } finally {
-    if (spawnStartedAt !== null) {
-      notifySpawnObserver(resolved.file, resolved.args, performance.now() - spawnStartedAt)
-    }
-  }
-}
-
-function runResolvedProcessSync(spec: ProcessSpec, resolved: ResolvedSpawn): ProcessResult {
-  const result = nodeSpawnSync(resolved.file, [...resolved.args], {
-    ...resolved.options,
-    input: spec.input,
-    timeout: spec.timeoutMs === null ? undefined : (spec.timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS),
-    maxBuffer: spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
-    // Keep raw output without applying the nonexistent 'buffer' encoding to string stdin.
-    encoding: null
-  })
-  const timedOut = result.error
-    ? 'code' in result.error && result.error.code === 'ETIMEDOUT'
-    : false
-  if (result.error && !timedOut) {
-    throw result.error
-  }
-  return {
-    code: result.status,
-    signal: result.signal,
-    stdout: spec.captureStdoutAsBytes ? '' : (result.stdout?.toString('utf8') ?? ''),
-    ...(spec.captureStdoutAsBytes ? { stdoutBytes: result.stdout ?? Buffer.alloc(0) } : {}),
-    stderr: result.stderr?.toString('utf8') ?? '',
-    // Why always false: spawnSync reports an overrun as an ENOBUFS error, and
-    // the guard above rethrows it, so no truncated result reaches this point.
-    outputTruncated: false,
-    // Why ETIMEDOUT and not the signal: a timeout kills with SIGTERM, but so
-    // does anything else that terminates the child, and only a timeout also
-    // sets this error. Reading the signal alone reports a deliberately
-    // stopped process as having timed out, which callers retry.
-    timedOut
-  }
-}
+export { runProcessSync } from './run-process-sync'
