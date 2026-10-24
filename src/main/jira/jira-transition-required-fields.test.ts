@@ -30,6 +30,13 @@ const entry = {
   site: { id: 'site-1', siteUrl: 'https://jira.example.com' },
   authorization: 'token'
 }
+const COMPONENTS_TRANSITION_FIELD = {
+  required: true,
+  name: 'Component/s',
+  // A site reporting the reference item type rather than `string` must land here too.
+  schema: { type: 'array', items: 'component', system: 'components' }
+}
+
 const transition = {
   id: '31',
   name: 'Close',
@@ -78,7 +85,7 @@ describe('required Jira transition fields', () => {
                 components: {
                   required: true,
                   name: 'Component/s',
-                  schema: { type: 'array', items: 'string' }
+                  schema: { type: 'array', items: 'string', system: 'components' }
                 },
                 customfield_10002: {
                   required: true,
@@ -89,6 +96,12 @@ describe('required Jira transition fields', () => {
             }
           ]
         }
+      }
+      if (path.endsWith('/components')) {
+        return [{ id: '10400', name: 'Web' }]
+      }
+      if (path.endsWith('?fields=project')) {
+        return { fields: { project: { key: 'APP', name: 'Alpha' } } }
       }
       return {
         fields: {
@@ -101,10 +114,13 @@ describe('required Jira transition fields', () => {
     const { listTransitions } = await import('./jira-transition-queries')
     const [loaded] = await listTransitions('APP-1', 'site-1')
     const byKey = Object.fromEntries((loaded.fields ?? []).map((field) => [field.key, field]))
+    // Why the id: the screen's form now offers the project's components, so the draft
+    // holds what its picker submits and the name stays the readable hint beside it.
     expect(byKey.components).toMatchObject({
       hasCurrentValue: true,
-      currentValue: 'Web',
-      currentDisplayValue: 'Web'
+      currentValue: '10400',
+      currentDisplayValue: 'Web',
+      allowedValues: [{ id: '10400', name: 'Web' }]
     })
     expect(byKey.customfield_10002).toMatchObject({
       hasCurrentValue: true,
@@ -113,9 +129,74 @@ describe('required Jira transition fields', () => {
     // Why: an unset field carries no value, so it stays the user's to fill.
     expect(byKey.resolution?.hasCurrentValue).toBeUndefined()
     expect(byKey.resolution?.currentValue).toBeUndefined()
-    expect(jiraRequest.mock.calls[1]?.[1]).toBe(
+    expect(jiraRequest.mock.calls.map((call) => call[1])).toEqual([
+      '/rest/api/3/issue/APP-1/transitions?expand=transitions.fields',
+      // Why the project read: the issue key's prefix is not proof of the project.
+      '/rest/api/3/issue/APP-1?fields=project',
+      '/rest/api/3/project/APP/components',
       '/rest/api/3/issue/APP-1?fields=resolution,components,customfield_10002'
-    )
+    ])
+  })
+
+  it('keeps the text box when the issue project cannot be read', async () => {
+    // Why: without a project there is no list to offer, and guessing one from the key
+    // would offer another project's components after the issue moved.
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [{ ...transition, fields: { components: COMPONENTS_TRANSITION_FIELD } }]
+        }
+      }
+      if (path.endsWith('?fields=project')) {
+        throw new JiraApiError('Forbidden', 403)
+      }
+      return { fields: {} }
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { listTransitions } = await import('./jira-transition-queries')
+
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+    warn.mockRestore()
+
+    expect(loaded.fields?.[0]?.allowedValues).toBeUndefined()
+    expect(jiraRequest.mock.calls.map((call) => call[1])).toEqual([
+      '/rest/api/3/issue/APP-1/transitions?expand=transitions.fields',
+      '/rest/api/3/issue/APP-1?fields=project',
+      // The value read still runs; it just has no list to draft an id against.
+      '/rest/api/3/issue/APP-1?fields=components'
+    ])
+  })
+
+  it('reads no project list for a screen that holds only string arrays', async () => {
+    // Why: the value read must not grow two extra requests on every transition dialog.
+    jiraRequest.mockImplementation(async (_entry, path) => {
+      if (path.endsWith('?expand=transitions.fields')) {
+        return {
+          transitions: [
+            {
+              ...transition,
+              fields: {
+                customfield_10002: {
+                  required: true,
+                  name: 'Team',
+                  schema: { type: 'array', items: 'string', custom: 'com.pyxis:team' }
+                }
+              }
+            }
+          ]
+        }
+      }
+      return { fields: { customfield_10002: ['team-1'] } }
+    })
+    const { listTransitions } = await import('./jira-transition-queries')
+
+    const [loaded] = await listTransitions('APP-1', 'site-1')
+
+    expect(loaded.fields?.[0]?.allowedValues).toBeUndefined()
+    expect(jiraRequest.mock.calls.map((call) => call[1])).toEqual([
+      '/rest/api/3/issue/APP-1/transitions?expand=transitions.fields',
+      '/rest/api/3/issue/APP-1?fields=customfield_10002'
+    ])
   })
 
   it('marks a filled field that no control can seed as filled all the same', async () => {

@@ -22,6 +22,7 @@ import {
   type JiraPagedResponse,
   type JiraRecord
 } from './jira-record-pages'
+import { readProjectFieldOptions, withJiraProjectFieldOptions } from './jira-project-field-options'
 
 export async function listIssueTypes(
   projectIdOrKey: string,
@@ -102,7 +103,10 @@ export async function listCreateFields(
       }
       startAt += asFiniteNumber(response.maxResults) ?? maxResults
     }
-    return fields
+    // Components and versions report no allowedValues in createmeta, so their list is
+    // read from the project resource; see jira-project-field-options.
+    const options = await readProjectFieldOptions(entry, projectIdOrKey, fields)
+    return fields.map((field) => withJiraProjectFieldOptions(field, options))
   } catch (error) {
     if (isAuthError(error)) {
       clearToken(entry.site.id)

@@ -36,6 +36,19 @@ function textField(value: string): JiraEditableField {
 
 afterEach(cleanup)
 
+// Component/s as Jira reports it: `array/items: string` whose entries are references,
+// with the project's own component list standing in for the allowedValues Jira omits.
+const COMPONENTS_FIELD: JiraCreateField = {
+  key: 'components',
+  name: 'Component/s',
+  required: false,
+  schema: { type: 'array', items: 'string', system: 'components' },
+  allowedValues: [
+    { id: '10400', name: 'Web' },
+    { id: '10401', name: 'Platform' }
+  ]
+}
+
 const QES_FIELD: JiraCreateField = {
   key: 'customfield_13',
   name: 'QEs',
@@ -161,6 +174,69 @@ describe('JiraIssueEditFieldsDialog', () => {
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
         customFields: { customfield_2: 'new' },
+        userFieldKeys: [],
+        textFieldKeys: []
+      })
+    )
+  })
+
+  // Issue #162: a bare string array is rejected for Component/s, so the form has to
+  // submit a reference per entry.
+  it('submits a components change as object references', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[{ field: COMPONENTS_FIELD, value: '10400', displayName: 'Web' }]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={onSubmit}
+      />
+    )
+
+    const trigger = screen.getByRole('combobox')
+    expect(trigger.textContent).toContain('Web')
+    expect(trigger.textContent).not.toContain('10400')
+
+    await user.click(trigger)
+    await user.click(await screen.findByRole('option', { name: 'Platform' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        customFields: { components: [{ id: '10400' }, { id: '10401' }] },
+        userFieldKeys: [],
+        textFieldKeys: []
+      })
+    )
+  })
+
+  it('clears every component by submitting an empty array', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue({ ok: true })
+    render(
+      <JiraIssueEditFieldsDialog
+        open
+        onOpenChange={vi.fn()}
+        issue={issue}
+        fields={[{ field: COMPONENTS_FIELD, value: '10400', displayName: 'Web' }]}
+        providerSettings={providerSettings}
+        submitting={false}
+        onSubmit={onSubmit}
+      />
+    )
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: 'Web' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        // Jira clears an array field with an empty array, not null.
+        customFields: { components: [] },
         userFieldKeys: [],
         textFieldKeys: []
       })

@@ -699,6 +699,57 @@ value read and its failure path), `task-page-jira-board-view.test.tsx` / `jira-i
 `task-page/jira/Board.test.tsx` (the shared form's submit label). A sync that restores upstream's
 `unsupported` kind turns all of them red.
 
+### `local(jira)`: components and versions are submitted as references, never as bare strings
+
+Issue #162. Jira reports Component/s (and Affects/Fix Version/s) as `schema: {type: 'array', items:
+'string'}`, so `resolveJiraFieldControlKind` gave them the free-text list and
+`buildJiraCreateFieldValue`'s array branch submitted `{components: ['Web', 'Platform']}`. Jira takes a
+reference per entry (`{id}`), so the field could never be set — on the edit form and on a transition
+screen that requires it, which share that builder (`ffad67a863` made the attempt happen at all rather
+than blocking the transition first). Neither `createmeta` nor `editmeta` supplies `allowedValues` for
+these fields, which is why the shape was never resolvable.
+
+The general fix from the issue, taken as written:
+
+- `src/shared/jira-field-rendering.ts` — `JiraObjectListFieldKind` (`'components' | 'versions'`) and
+  `resolveJiraObjectListFieldKind`, keyed off `schema.system` with the field key as the fallback a
+  custom field cannot hijack. `resolveJiraFieldControlKind` decides on that reference shape **before**
+  any `items` branch, because sites report `items: string` and `items: component`/`version` for the same
+  three fields; it returns `optionList` once the project's list is attached and `textList` when it is
+  not.
+- `src/main/jira/jira-project-field-options.ts` — **new.** `readProjectFieldOptions` reads
+  `GET /project/{key}/components` and `/versions`, only for the kinds a field actually needs
+  (`needsProjectFieldOptions`: reference shape, no `allowedValues` of its own — a site-scoped list wins)
+  and only when Jira sent none. Archived and id-less version entries are dropped, as Jira's own picker
+  does. Best effort: a failed read leaves the kind out, the field keeps its text box, and the submission
+  sends `{name}` — so a denied permission or an older host degrades to the issue's option (2) instead of
+  failing; an auth failure is rethrown so a dead token cannot read as "this project has no components".
+  `readIssueProjectKey` asks Jira for the issue's `project` rather than splitting the key: a moved issue
+  keeps answering to its old key, and an id-shaped key would be taken for a project id. No project key
+  means no list.
+- `jira-issue-create-metadata.ts` / `jira-issue-edit-metadata.ts` / `jira-transition-queries.ts` attach
+  those lists before the existing value read, which only drafts a component as the id Jira accepts once
+  the list can match it. The edit form now offers the three system fields too — nothing else in the
+  detail view writes them — while `labels`, `summary` and every other system field stay excluded.
+- `src/renderer/src/components/task-page-jira-create-fields.ts` — the array branch submits `{id}` per
+  entry (by name when the project list does not name it) for these three keys only, so Team and labels,
+  which really are string arrays, are untouched.
+
+No new IPC channel or RPC method: the reads happen inside the three existing metadata calls, so a host
+and a client on either side of this change stay compatible. An older host yields no `allowedValues`, and
+the new client sends `{name}`; a newer host with an older client yields a list whose names the old
+builder already maps back to `{id}`.
+
+Tests: `src/main/jira/jira-project-field-options.test.ts` (which lists are read, the archived filter,
+the project read, the failure paths, auth rethrow), `jira-field-rendering.test.ts` (object-list vs
+genuine string list, both item types), `task-page-jira-create-fields.test.ts` (the submitted reference
+array, the name fallback, untouched fields), `jira-issue-edit-metadata.test.ts` (a component drafts as
+its id; no list without a project), `jira-transition-required-fields.test.ts` (the project and list reads
+before the value read, and no list read for a screen without these fields),
+`jira-issue-edit-fields-dialog.test.tsx` and `jira-transition-fields-form.test.tsx` (the payload from
+both forms, and `[]` as the clear), plus `JiraIssueWorkspace.transition-source.test.tsx`, which used to
+pin the bare string.
+
 ### `local(test)`: a bun-pool timeout failure can read as `Errors 1: EISDIR` instead of a failing test
 
 Symptom worth recognising, because it reads as a crash rather than a failure and cost a session half an

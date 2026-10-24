@@ -340,6 +340,29 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Note:** the `$electron` skill `AGENTS.md` names for rendered-UI checks is not installed in this
   worktree, so the new section's layout has no live screenshot. PR body says so under Visual Proof.
 
+### nplez1/jira-object-array-fields — issue #162
+
+- **Why:** issue #162 — Orca submitted array-of-object Jira fields (Component/s, Affects/Fix
+  Version/s) as bare string arrays, which Jira rejects, so the value could never be set from the edit
+  form or from a transition screen that requires it.
+- **Shape:** the general fix the issue offers first. A new host module reads the project's
+  `components`/`versions` lists (the project itself read from Jira, not split off the key) and attaches
+  them as `allowedValues` on those three system fields in createmeta, editmeta and transition metadata,
+  which turns them into the existing multi-select that submits `{id}` per entry; without a list the
+  field keeps its text box and submits `{name}`. The edit form now offers the three system fields
+  (nothing else in the detail view writes them). No new IPC or RPC method, so mixed host/client versions
+  stay compatible. 17 files, 2 new modules.
+- **Targets:** fork issue #162 (`Fixes #162`). Not upstream-bound.
+- **Verified:** `pnpm tc`, changed-code quality gate (0 findings), targeted `oxlint`, `src/main/jira` +
+  `src/shared/jira` (585 tests) plus the renderer Jira suites (553), and the Jira IPC/RPC/CLI suites
+  (129). `pnpm lint` stops at four repo-wide ratchets (`id-only-store-write`, `repo-host-read`,
+  `workspace-record-read`, `host-list-render`) whose flagged files are all untouched by this branch and
+  whose offending lines exist at the base commit: red on `nplez1/main` already, not caused here.
+  `JiraIssueWorkspace.transition-source.test.tsx` used to pin the bare-string payload and now pins the
+  name reference. Two Opus review rounds (high): round 1 found one BLOCKER (the control gate keyed off
+  `items: string`, which some sites do not report) and one SHOULD-FIX (project guessed from the issue
+  key); both fixed, round 2 (delta) clean with no BLOCKER/SHOULD-FIX left.
+
 ### nplez1/main
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only

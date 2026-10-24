@@ -199,6 +199,81 @@ describe('buildJiraCreateFieldValue', () => {
   })
 })
 
+describe('buildJiraCreateFieldValue for components and versions', () => {
+  // The bug: these fields hold references, so a bare string array is rejected by Jira.
+  function componentsField(overrides: Partial<JiraCreateField> = {}): JiraCreateField {
+    return field({
+      key: 'components',
+      name: 'Component/s',
+      required: false,
+      schema: { type: 'array', items: 'string', system: 'components' },
+      ...overrides
+    })
+  }
+
+  it('submits the ids its project list resolved', () => {
+    const components = componentsField({
+      allowedValues: [
+        { id: '10400', name: 'Web' },
+        { id: '10401', name: 'Platform' }
+      ]
+    })
+
+    expect(buildJiraCreateFieldValue(components, '10400, 10401')).toEqual([
+      { id: '10400' },
+      { id: '10401' }
+    ])
+    // A draft a host from before the picker seeded is a name list, not an id list.
+    expect(buildJiraCreateFieldValue(components, 'Web, Platform')).toEqual([
+      { id: '10400' },
+      { id: '10401' }
+    ])
+  })
+
+  it('falls back to a name reference when no project list was read', () => {
+    // Without allowedValues a text box is all there is; the entries still have to be
+    // references, because Jira reads a bare string as a component id error.
+    expect(buildJiraCreateFieldValue(componentsField(), 'Web, Platform')).toEqual([
+      { name: 'Web' },
+      { name: 'Platform' }
+    ])
+  })
+
+  it('submits a name reference for a token the list does not name', () => {
+    const components = componentsField({ allowedValues: [{ id: '10400', name: 'Web' }] })
+    expect(buildJiraCreateFieldValue(components, '10400, Retired')).toEqual([
+      { id: '10400' },
+      { name: 'Retired' }
+    ])
+  })
+
+  it('leaves the versions and fixVersions fields on the same reference shape', () => {
+    const versions = field({
+      key: 'fixVersions',
+      schema: { type: 'array', items: 'string', system: 'fixVersions' },
+      allowedValues: [{ id: '10100', name: '1.0' }]
+    })
+    expect(buildJiraCreateFieldValue(versions, '1.0')).toEqual([{ id: '10100' }])
+  })
+
+  it('keeps a genuine string array as strings', () => {
+    // Team and labels really are string arrays; rewriting those would break them.
+    const labels = field({ key: 'labels', schema: { type: 'array', items: 'string' } })
+    const team = field({
+      key: 'customfield_10002',
+      schema: { type: 'array', items: 'string', custom: 'com.pyxis:team' }
+    })
+    expect(buildJiraCreateFieldValue(labels, 'a, b')).toEqual(['a', 'b'])
+    expect(buildJiraCreateFieldValue(team, 'team-1, team-2')).toEqual(['team-1', 'team-2'])
+  })
+
+  it('still leaves an untouched field out of the submission', () => {
+    // The ffad67a863 rule: a field the user did not fill is never re-submitted.
+    expect(buildJiraCreateFieldValue(componentsField(), '   ')).toBeUndefined()
+    expect(buildJiraCreateCustomFields([componentsField()], {})).toBeUndefined()
+  })
+})
+
 describe('buildJiraCreateCustomFields', () => {
   it('returns undefined when every field resolves to undefined', () => {
     expect(buildJiraCreateCustomFields([field({ key: 'a' })], {})).toBeUndefined()

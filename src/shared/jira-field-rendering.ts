@@ -3,6 +3,37 @@ import type { JiraCreateField } from './jira-types'
 const STORY_POINTS_CUSTOM_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
 const NUMBER_CUSTOM_TYPE = 'com.atlassian.jira.plugin.system.customfieldtypes:float'
 
+/**
+ * The project-scoped reference lists Jira reports as `array/items: string` even though
+ * every entry the issue holds is an object. Components, versions and fixVersions are
+ * the whole set: a bare string is rejected for them, so each entry has to be submitted
+ * as a reference and the site's own project list is the only place its ids come from.
+ * `versions` and `fixVersions` read the same project list, so one kind covers both.
+ */
+export type JiraObjectListFieldKind = 'components' | 'versions'
+
+const JIRA_OBJECT_LIST_SYSTEM_FIELDS = new Map<string, JiraObjectListFieldKind>([
+  ['components', 'components'],
+  ['versions', 'versions'],
+  ['fixVersions', 'versions']
+])
+
+/**
+ * Which project list a field needs, or null when its value is genuinely a string list
+ * (labels, Team). Read from `schema.system`, falling back to the field key because a
+ * custom field carries `custom` instead and these three system keys are stable across
+ * Cloud and Server/DC.
+ */
+export function resolveJiraObjectListFieldKind(
+  field: JiraCreateField
+): JiraObjectListFieldKind | null {
+  if (field.schema?.type !== 'array') {
+    return null
+  }
+  const system = field.schema.system || (field.schema.custom ? '' : field.key)
+  return JIRA_OBJECT_LIST_SYSTEM_FIELDS.get(system) ?? null
+}
+
 /** The control Orca renders for a Jira field's schema. */
 export type JiraFieldControlKind =
   | 'user'
@@ -26,11 +57,18 @@ export function resolveJiraFieldControlKind(field: JiraCreateField): JiraFieldCo
   const items = field.schema?.items
   const custom = field.schema?.custom ?? ''
   const hasOptions = Boolean(field.allowedValues?.length)
+  const objectListKind = resolveJiraObjectListFieldKind(field)
   if (type === 'user') {
     return 'user'
   }
   if (type === 'array' && items === 'user') {
     return 'userList'
+  }
+  // Why before the `items` branches: Jira reports these three as `items: string` on some
+  // sites and `items: component`/`items: version` on others, so the reference shape — not
+  // the item type — is what decides the control.
+  if (objectListKind !== null) {
+    return hasOptions ? 'optionList' : 'textList'
   }
   if (type === 'array' && items === 'string') {
     return 'textList'
