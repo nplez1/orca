@@ -40,6 +40,7 @@ import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
 import {
+  NO_RERUN,
   allowlistEntries,
   collectCases,
   collectedQuarantinedFiles,
@@ -47,8 +48,8 @@ import {
   judgeUnhandled,
   prunableEntries,
   quarantinedEntryProblems,
-  repoPath,
-  reproducedFailures
+  reproducedFailures,
+  reportForFile
 } from './unit-gate-judgement.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -278,7 +279,7 @@ function closeSyncSafe(fd) {
 }
 
 /**
- * One isolated re-run of a file, reported as the tests that failed inside it.
+ * One isolated re-run of a file, reported as the tests that passed and failed inside it.
  *
  * Why per test rather than per file: the file's own allowlisted reds still fail when it runs alone,
  * so "the file exited non-zero" cannot tell a load flake from a real break once entries are named.
@@ -306,28 +307,16 @@ function rerunIsolation(file, reportPath, timeoutMs) {
     if (step.timedOut || !existsSync(reportPath)) {
       return NO_RERUN
     }
-    let report
     try {
-      report = JSON.parse(readFileSync(reportPath, 'utf8'))
+      return reportForFile(JSON.parse(readFileSync(reportPath, 'utf8')), file)
     } catch {
       // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
       return NO_RERUN
-    }
-    const cases = collectCases(report)
-    return {
-      complete: true,
-      failures: new Set(cases.failures.map((failure) => failure.test)),
-      passes: new Set(cases.passes.map((pass) => pass.test)),
-      filePassed: (report.testResults ?? []).some(
-        (entry) => repoPath(entry.name) === file && entry.status === 'passed'
-      )
     }
   } finally {
     closeSyncSafe(logFd)
   }
 }
-
-const NO_RERUN = { complete: false, failures: new Set(), passes: new Set(), filePassed: false }
 
 function formatSummary(result) {
   const counts = result.counts
@@ -456,7 +445,8 @@ function evaluate(options, { reportPath, logPath, dir }) {
     stale = judged.stale
     unseen = prunableEntries(judged.unseen, report, {
       full: fullRun,
-      complete: run.outcome === 'complete'
+      // Why the test count: a report with no tests proves nothing about any entry.
+      complete: run.outcome === 'complete' && (Number(report.numTotalTests) || 0) > 0
     })
     // Why not `numFailedTests`: it counts cases only, so a file that failed to collect would be
     // missing from it while it is very much a failure of this run.

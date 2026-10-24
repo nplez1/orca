@@ -11,7 +11,8 @@ import {
   prunableEntries,
   quarantinedEntryProblems,
   repoPath,
-  reproducedFailures
+  reproducedFailures,
+  reportForFile
 } from '../../local/unit-gate-judgement.mjs'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -130,7 +131,8 @@ describe('the run a verdict is computed from', () => {
     expect(repoPath('/elsewhere/thing.test.ts')).toBe('/elsewhere/thing.test.ts')
     expect(repoPath(THING)).toBe('src/main/thing.test.ts')
     // Why: a sibling checkout whose name starts with this one's must not read as inside it.
-    expect(repoPath(`${ROOT}-x/src/main/thing.test.ts`)).toBe(`${ROOT}-x/src/main/thing.test.ts`)
+    const sibling = `${ROOT}-x/src/main/thing.test.ts`
+    expect(repoPath(sibling)).toBe(sibling.replaceAll('\\', '/'))
   })
 })
 
@@ -171,6 +173,19 @@ describe('the isolated re-run', () => {
     expect(kept.map((failure) => failure.test)).toEqual(['came back'])
   })
 
+  it('does not waive a test the same report also failed, or one a hook broke under', () => {
+    const both = reproducedFailures(
+      failures,
+      rerun({ passes: new Set(['went away']), failures: new Set(['went away']) })
+    )
+    expect(both.map((failure) => failure.test)).toEqual(['came back', 'went away'])
+    const hook = reproducedFailures(
+      failures,
+      rerun({ passes: new Set(['went away']), failures: new Set(['(suite)']) })
+    )
+    expect(hook.map((failure) => failure.test)).toEqual(['came back', 'went away'])
+  })
+
   it('keeps a failure the re-run never reported, because absence is not evidence', () => {
     expect(reproducedFailures(failures, rerun()).map((failure) => failure.test)).toEqual([
       'came back',
@@ -188,6 +203,35 @@ describe('the isolated re-run', () => {
     const suite = [{ file: 'src/main/thing.test.ts', test: '(suite)', detail: 'collect' }]
     expect(reproducedFailures(suite, rerun())).toHaveLength(1)
     expect(reproducedFailures(suite, rerun({ filePassed: true }))).toHaveLength(0)
+  })
+
+  it('reads one file out of a report the selector over-matched', () => {
+    const report = {
+      numTotalTests: 2,
+      testResults: [
+        {
+          name: THING,
+          status: 'failed',
+          assertionResults: [
+            { fullName: 'a', title: 'a', status: 'passed' },
+            { fullName: 'b', title: 'b', status: 'failed', failureMessages: ['boom'] }
+          ]
+        },
+        {
+          name: `${THING}x`,
+          status: 'passed',
+          assertionResults: [{ fullName: 'c', title: 'c', status: 'passed' }]
+        }
+      ]
+    }
+    const summary = reportForFile(report, 'src/main/thing.test.ts')
+    expect([...summary.passes]).toEqual(['a'])
+    expect([...summary.failures]).toEqual(['b'])
+    expect(summary.filePassed).toBe(false)
+    expect(
+      reportForFile({ testResults: [{ name: THING, status: 'passed' }] }, 'src/main/thing.test.ts')
+        .filePassed
+    ).toBe(true)
   })
 })
 

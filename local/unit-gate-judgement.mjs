@@ -126,19 +126,56 @@ export function allowlistEntries(manifest) {
 }
 
 /**
+ * Whether a re-run's report says the file itself passed, so no failure in it may be waived.
+ */
+export const NO_RERUN = Object.freeze({
+  complete: false,
+  failures: new Set(),
+  passes: new Set(),
+  filePassed: false
+})
+
+/**
+ * What one file's report says about that file: its failing tests, its passing tests, and whether the
+ * file itself passed. Filtered by path because a positional selector is a substring match, so
+ * `thing.test.ts` also collects `thing.test.tsx`.
+ */
+export function reportForFile(report, file) {
+  const cases = collectCases(report ?? {})
+  return {
+    complete: true,
+    failures: new Set(
+      cases.failures.filter((failure) => failure.file === file).map((failure) => failure.test)
+    ),
+    passes: new Set(cases.passes.filter((pass) => pass.file === file).map((pass) => pass.test)),
+    filePassed: (report?.testResults ?? []).some(
+      (entry) => repoPath(entry.name) === file && entry.status === 'passed'
+    )
+  }
+}
+
+/**
  * Which of a file's unexpected failures survived its isolated re-run, and so are real.
  *
  * Why "did it pass" rather than "did it fail again": a test the re-run never reported is not
  * evidence, and it is the common shape — a collect error replaces every case with one `(suite)`
- * entry, a failing `beforeAll` reports its cases as skipped. Only a pass waives a failure.
+ * entry, a failing `beforeAll` reports its cases as skipped. Only a pass waives a failure, and a
+ * pass does not waive one the same report also failed or a hook broke under.
  */
 export function reproducedFailures(failures, rerun) {
   if (!rerun.complete) {
     return failures
   }
-  return failures.filter((failure) =>
-    failure.test === '(suite)' ? !rerun.filePassed : !rerun.passes.has(failure.test)
-  )
+  return failures.filter((failure) => {
+    if (failure.test === '(suite)') {
+      return !rerun.filePassed
+    }
+    return (
+      !rerun.passes.has(failure.test) ||
+      rerun.failures.has(failure.test) ||
+      rerun.failures.has('(suite)')
+    )
+  })
 }
 
 /**
