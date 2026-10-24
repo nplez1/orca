@@ -22,7 +22,22 @@ function SessionSummarySubjectBody({
   executionHostId: string | null
   isOpen: boolean
 }): React.JSX.Element {
-  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId)
+  // Why the pane's own row: this window is the process holding the pane, so its record of the
+  // session outranks the folding side's row — which may be absent (a paired host that only
+  // runs the PTY) or relayed without the agent's transcript path. Selected as primitives so
+  // a store update cannot hand the hook a new identity object on every render.
+  const agentType = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.agentType ?? '')
+  const providerSession = useAppStore(
+    (state) => state.agentStatusByPaneKey[paneKey]?.providerSession
+  )
+  const session =
+    agentType || providerSession?.id
+      ? {
+          ...(agentType ? { agentType } : {}),
+          ...(providerSession ? { providerSession } : {})
+        }
+      : null
+  const snapshot = useSessionSummary(paneKey, isOpen, executionHostId, session)
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 
   return (

@@ -5,7 +5,9 @@
 // extract, or a write. Nothing is applied on failure, and completed chunk extracts are
 // kept so a retry resumes instead of restarting.
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
 import type {
+  SessionSummarySessionRef,
   SessionSummarySnapshot,
   SessionSummaryStatus
 } from '../../shared/session-summary-types'
@@ -44,12 +46,53 @@ export type SessionSummaryFoldCallbacks = {
 }
 
 export function sessionSummaryIdentityOf(
-  entry: SessionSummaryStatusEntry | undefined
+  entry: SessionSummarySessionRef | undefined
 ): SessionSummaryStoreEntry['identity'] {
   return {
     providerSessionId: entry?.providerSession?.id ?? null,
     transcriptPath: entry?.providerSession?.transcriptPath ?? null
   }
+}
+
+/**
+ * The identity a fold should use: this process's own row, with the viewer's request filling
+ * what the row cannot say.
+ *
+ * Why the request is a filler and not an override: the viewer is the one process guaranteed
+ * to know *which* session the reader is looking at, which is exactly what a paired host or a
+ * reconnected client was missing when it answered "no readable transcript" for a live
+ * session. But where this process holds a row that names a session, that row is its own
+ * latest evidence (hooks land here), and letting a lagging client id override it would brief
+ * the previous conversation — the failure #135 is about.
+ */
+export function mergeSessionRef(
+  requested: SessionSummarySessionRef | null | undefined,
+  entry: SessionSummarySessionRef | undefined
+): SessionSummarySessionRef {
+  const agentType = entry?.agentType ?? requested?.agentType
+  const providerSession = mergeProviderSession(entry?.providerSession, requested?.providerSession)
+  return {
+    ...(agentType ? { agentType } : {}),
+    ...(providerSession ? { providerSession } : {})
+  }
+}
+
+/** The row's session when it names one; its missing transcript path from the request. */
+function mergeProviderSession(
+  local: AgentProviderSessionMetadata | undefined,
+  requested: AgentProviderSessionMetadata | undefined
+): AgentProviderSessionMetadata | undefined {
+  if (!local) {
+    return requested
+  }
+  if (local.transcriptPath || !requested?.transcriptPath || requested.id !== local.id) {
+    return local
+  }
+  return { ...local, transcriptPath: requested.transcriptPath }
+}
+
+export function hasSessionRef(ref: SessionSummarySessionRef): boolean {
+  return Boolean(ref.agentType || ref.providerSession)
 }
 
 /** Fold a pane's new events. Resolves when the fold settles; never throws. */
@@ -58,25 +101,30 @@ export async function runSessionSummaryFold(args: {
   callbacks: SessionSummaryFoldCallbacks
   paneKey: string
   host: SessionSummaryTranscriptHost
+  /** The viewer's own record of the session; it fills in what this process's row cannot say. */
+  requestedSession?: SessionSummarySessionRef
   foldParams: ResolvedSourceControlAiGenerationParams | null
   signal: AbortSignal
 }): Promise<void> {
   const { deps, callbacks, paneKey, host, signal } = args
   const report = callbacks.onStatus
   try {
-    const entry = deps.getAgentStatusEntry(paneKey)
-    const identity = sessionSummaryIdentityOf(entry)
+    const session = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
+    const identity = sessionSummaryIdentityOf(session)
     const events = await deps.readEvents({
-      identity: {
-        ...(entry?.agentType ? { agentType: entry.agentType } : {}),
-        ...(entry?.providerSession ? { providerSession: entry.providerSession } : {})
-      },
+      identity: session,
       host,
       signal
     })
     signal.throwIfAborted()
     if (!events) {
-      report({ status: 'unavailable', fold: IDLE_FOLD })
+      report({
+        status: 'unavailable',
+        fold: IDLE_FOLD,
+        // Why: "no readable transcript yet" is true for a session that has not written one,
+        // and misleading for one whose transcript exists somewhere this fold cannot read.
+        ...(session.providerSession?.id ? { error: unavailableTranscriptReason(session) } : {})
+      })
       return
     }
     const stored = storedEntry(deps, paneKey, identity)
@@ -89,7 +137,8 @@ export async function runSessionSummaryFold(args: {
         // No readable content yet is 'unavailable', not a summary of nothing.
         status: events.length === 0 ? 'unavailable' : 'ready',
         fold: IDLE_FOLD,
-        messageCount: events.length
+        messageCount: events.length,
+        ...(events.length === 0 ? { error: unavailableTranscriptReason(session, 'empty') } : {})
       })
       return
     }
@@ -127,7 +176,8 @@ export async function runSessionSummaryFold(args: {
     }
     // Completed chunk extracts survive a failure — but only once a fold has produced a
     // ledger, since an unproduced one is never written. A first fold's chunks are lost.
-    const failedIdentity = sessionSummaryIdentityOf(deps.getAgentStatusEntry(paneKey))
+    const failedSession = mergeSessionRef(args.requestedSession, deps.getAgentStatusEntry(paneKey))
+    const failedIdentity = sessionSummaryIdentityOf(failedSession)
     const failedStored = storedEntry(deps, paneKey, failedIdentity)
     persist(deps, paneKey, failedIdentity, failedStored, failedStored.messageCount)
     report({
@@ -197,4 +247,21 @@ function freshStoreEntry(
     seenThrough: 0,
     updatedAt: now
   }
+}
+
+/**
+ * Why a known session produced no events: the reader needs the difference between "this
+ * session has not written a transcript yet" and "the transcript is not where its host said".
+ */
+function unavailableTranscriptReason(
+  session: SessionSummarySessionRef,
+  kind: 'unreadable' | 'empty' = 'unreadable'
+): string {
+  const agent = session.agentType ?? 'agent'
+  if (kind === 'empty') {
+    return `The ${agent} session has no messages in its transcript yet.`
+  }
+  return session.providerSession?.transcriptPath
+    ? `The ${agent} transcript this session reported is not readable here.`
+    : `No ${agent} transcript was found for this session.`
 }

@@ -10,6 +10,7 @@ import {
   sessionSummaryHostService,
   parseSessionSummaryFoldParams
 } from '../../../session-summary/session-summary-host-service'
+import { parseSessionSummarySessionRef } from '../../../../shared/session-summary-types'
 import {
   SessionSummaryCloseOnHostParams,
   SessionSummaryOpenOnHostParams,
@@ -29,7 +30,14 @@ export const SESSION_SUMMARY_RPC_METHODS = [
       if (!foldParams) {
         throw new Error('The requesting window did not name a usable summarization agent.')
       }
-      return sessionSummaryHostService().open({ paneKey: params.paneKey, foldParams })
+      // Why forwarded: the client holds the pane's layout, so its record of which session
+      // is on screen outranks a host row that may be absent or relayed without a path.
+      const session = parseSessionSummarySessionRef(params.session)
+      return sessionSummaryHostService().open({
+        paneKey: params.paneKey,
+        foldParams,
+        ...(session ? { session } : {})
+      })
     }
   }),
   defineMethod({

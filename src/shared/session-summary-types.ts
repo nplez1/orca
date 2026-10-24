@@ -1,6 +1,10 @@
 // Session summary: a materialized view over an agent session's transcript,
 // folded only while the user reads the summary pane. See docs/reference/session-summary.md.
 import type { AgentStatusState, AgentType } from './agent-status-types'
+import {
+  normalizeAgentProviderSession,
+  type AgentProviderSessionMetadata
+} from './agent-session-resume'
 import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
 
 export const SESSION_SUMMARY_TIMELINE_KINDS = [
@@ -104,6 +108,22 @@ export type SessionSummaryOpenRequest = {
   executionHostId?: string
   /** Fold-brain configuration, resolved from the user's text-generation settings. */
   foldParams?: ResolvedSourceControlAiGenerationParams | null
+  /**
+   * The session the viewer has on screen, as the viewer's own store knows it.
+   *
+   * Why it travels: the process that folds is often not the process that holds the row.
+   * A paired host folds panes whose status rows live on the client, and this desktop folds
+   * panes whose rows were cleared on reconnect — both then read no identity at all and
+   * reported "no readable transcript" for a session sitting right in front of the reader.
+   * Absent means "use this process's own row", which stays the rule for older callers.
+   */
+  session?: SessionSummarySessionRef
+}
+
+/** The identity half of a status row: which agent, and which of its sessions. */
+export type SessionSummarySessionRef = {
+  agentType?: AgentType
+  providerSession?: AgentProviderSessionMetadata
 }
 
 export type SessionSummaryCloseRequest = {
@@ -140,4 +160,30 @@ export function isSessionSummaryCloseRequest(value: unknown): value is SessionSu
     typeof value.paneKey === 'string' &&
     typeof value.seenTimelineCount === 'number'
   )
+}
+
+/**
+ * A requested session identity, narrowed to what a fold can use.
+ *
+ * Checked rather than cast: the request crosses a process boundary (and, for a paired
+ * host, a machine boundary), and an identity the folding side cannot read is worse than
+ * none — it would make the pane claim a session it cannot brief.
+ */
+export function parseSessionSummarySessionRef(value: unknown): SessionSummarySessionRef | null {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (!isRecord(value)) {
+    return null
+  }
+  const providerSession = normalizeAgentProviderSession(value.providerSession)
+  const agentType: AgentType | undefined =
+    typeof value.agentType === 'string' ? value.agentType : undefined
+  if (!providerSession) {
+    return agentType ? { agentType } : null
+  }
+  return {
+    ...(agentType ? { agentType } : {}),
+    providerSession
+  }
 }

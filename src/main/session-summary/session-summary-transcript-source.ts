@@ -5,6 +5,7 @@ import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentType } from '../../shared/agent-status-types'
 import type { AiVaultAgent } from '../../shared/ai-vault-types'
+import { isAiVaultAgent } from '../../shared/ai-vault-types'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
 import {
   resolveNativeChatTranscriptAgent,
@@ -30,16 +31,23 @@ const CANDIDATE_AGENTS: Record<NativeChatTranscriptAgent, AiVaultAgent> = {
 }
 
 /**
- * Transcript agents outside the native-chat set, which resolves its own paths.
+ * The parser for an agent that reported its own transcript path.
  *
- * Pi and Prime Agent post `session_file` on every hook, so the reported path is
- * the CLI's own artifact. Copilot reports no path at all, but names its session
- * directory after the session id the hook carries.
+ * Any agent AI Vault can decode qualifies: the hook named a file this process can open, so
+ * the only question left is which decoder reads it. An allowlist here was the reason every
+ * agent outside the native-chat set reported "no readable transcript" even when its hook
+ * handed over the path — the parsers existed, the dispatch did not.
  */
-const HOOK_RESOLVED_TRANSCRIPT_AGENTS: Partial<Record<AgentType, AiVaultAgent>> = {
-  pi: 'pi',
-  'prime-agent': 'prime-agent',
-  copilot: 'copilot'
+function resolveHookPathParser(agentType: AgentType): AiVaultAgent | null {
+  const transcriptAgent = resolveNativeChatTranscriptAgent(agentType)
+  if (transcriptAgent) {
+    return CANDIDATE_AGENTS[transcriptAgent]
+  }
+  // Why: OpenClaude writes the Claude transcript format and layout.
+  if (agentType === 'openclaude') {
+    return 'claude'
+  }
+  return isAiVaultAgent(agentType) ? agentType : null
 }
 
 /** Copilot's own id shape; anything else must not be joined onto a root path. */
@@ -80,11 +88,9 @@ export async function readSessionSummaryTranscriptEvents(args: {
  * is skipped because the remote home directory is not knowable here.
  */
 export function resolveRemoteTranscriptParser(agentType: AgentType): AiVaultAgent | null {
-  const transcriptAgent = resolveNativeChatTranscriptAgent(agentType)
-  if (transcriptAgent) {
-    return CANDIDATE_AGENTS[transcriptAgent]
-  }
-  const parser = HOOK_RESOLVED_TRANSCRIPT_AGENTS[agentType]
+  const parser = resolveHookPathParser(agentType)
+  // Why copilot is excluded: with no hook path it is located by joining the session id
+  // onto this machine's sessions root, which is not the remote host's root.
   return parser && parser !== 'copilot' ? parser : null
 }
 
@@ -163,7 +169,7 @@ async function resolveTranscriptSource(
     return path ? { path, parser: CANDIDATE_AGENTS[transcriptAgent] } : null
   }
 
-  const parser = HOOK_RESOLVED_TRANSCRIPT_AGENTS[agentType]
+  const parser = resolveHookPathParser(agentType)
   if (!parser) {
     return null
   }

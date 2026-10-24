@@ -240,12 +240,19 @@ export function SessionSummaryLedgerView({
   }
   if (snapshot?.status === 'unavailable') {
     return (
-      <p className="text-xs text-muted-foreground">
-        {translate(
-          'activity.sessionSummary.unavailable',
-          'No readable transcript for this session yet.'
-        )}
-      </p>
+      <>
+        <p className="text-xs text-muted-foreground">
+          {translate(
+            'activity.sessionSummary.unavailable',
+            'No readable transcript for this session yet.'
+          )}
+        </p>
+        {/* Why: names which of the two it is — nothing written yet, or a transcript this
+            fold could not reach — instead of one message for both. */}
+        {snapshot.error ? (
+          <p className="mt-1 break-words text-xs text-muted-foreground">{snapshot.error}</p>
+        ) : null}
+      </>
     )
   }
   return <SummarySkeleton />
