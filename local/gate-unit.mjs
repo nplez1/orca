@@ -8,6 +8,11 @@
  * not changed returns immediately — which is what stops the run-seven-times-per-session pattern
  * the 2026-10-14 session log recorded.
  *
+ * Two things it runs beyond the suite. It runs the set upstream's own unit lane runs, by setting the
+ * switch `config/vitest.config.ts` reads for `UNIT_EXCLUDE` rather than `defaultExclude`: a file
+ * upstream quarantines is not a red this fork owes an allowlist entry for. And it runs the
+ * fork-local `node --test` files, which sit outside `UNIT_INCLUDE` and so were in no lane at all.
+ *
  * Upstream's own runs never call this: `.github/workflows/unit-tests.yml` keeps Vitest's exit code,
  * and `local/check-unit-shard-verdict.mjs` stays the per-shard CI verdict. This is the local gate
  * described in `AGENTS.md` § PR gate 1.
@@ -18,10 +23,20 @@
  * Exit: 0 pass, 1 fail, 2 usage or environment problem.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  closeSync,
+  openSync,
+  readFileSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
 import {
   allowlistFingerprint,
@@ -29,8 +44,26 @@ import {
   formatVerdict,
   unitGateCacheDir
 } from './gate-verdict-cache.mjs'
+import {
+  NO_RERUN,
+  allowlistEntries,
+  collectCases,
+  collectedQuarantinedFiles,
+  judge,
+  judgeUnhandled,
+  prunableEntries,
+  quarantinedEntryProblems,
+  reproducedFailures,
+  reportForFile
+} from './unit-gate-judgement.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
+/** Why this switch: the unit and PR workflows set it, and it is what makes `config/vitest.config.ts`
+ *  apply upstream's `UNIT_EXCLUDE` instead of `defaultExclude`. */
+const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
+/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
+const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
+const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000
 const MAX_SUMMARY_LIST = 12
@@ -110,121 +143,6 @@ function readJsonFile(path, what) {
   }
 }
 
-/** Entries are file-level (`*` or absent) unless they name a test. */
-function allowlistEntries(manifest) {
-  const entries = Array.isArray(manifest.entries) ? manifest.entries : []
-  return entries.map((entry) => {
-    const file = String(entry.file).replaceAll('\\', '/')
-    const test = entry.test === undefined || entry.test === '*' ? null : String(entry.test)
-    return {
-      file,
-      test,
-      class: String(entry.class ?? 'unclassified'),
-      owner: String(entry.owner ?? 'unattributed'),
-      flaky: entry.flaky === true,
-      key: test === null ? `${file} › *` : `${file} › ${test}`
-    }
-  })
-}
-
-export function repoPath(name) {
-  const normalised = String(name ?? '').replaceAll('\\', '/')
-  return normalised.startsWith(ROOT) ? relative(ROOT, normalised).replaceAll('\\', '/') : normalised
-}
-
-function firstLine(message) {
-  const line = String(message ?? '')
-    .replace(/^Error:\s*/, '')
-    .split('\n')[0]
-    .trim()
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line
-}
-
-/**
- * Vitest's JSON reporter is jest-shaped: one entry per file in `testResults`, one per case in
- * `assertionResults`. A file can fail without a failing assertion (collect/import error), so that
- * is recorded as a `(suite)` failure rather than being lost.
- */
-export function collectCases(report) {
-  const failures = []
-  const passes = []
-  for (const file of report.testResults ?? []) {
-    const path = repoPath(file.name)
-    let sawFailedCase = false
-    for (const assertion of file.assertionResults ?? []) {
-      const test = String(assertion.fullName || assertion.title || '(unnamed)')
-      if (assertion.status === 'failed') {
-        sawFailedCase = true
-        failures.push({ file: path, test, detail: firstLine(assertion.failureMessages) })
-      } else if (assertion.status === 'passed') {
-        passes.push({ file: path, test })
-      }
-    }
-    if (!sawFailedCase && file.status === 'failed') {
-      failures.push({
-        file: path,
-        test: '(suite)',
-        detail: firstLine(file.message) || 'the file failed without a failing case'
-      })
-    }
-  }
-  return { failures, passes }
-}
-
-export function judge(entries, failures, passes) {
-  const known = []
-  const unexpected = []
-  for (const failure of failures) {
-    const entry = entries.find(
-      (candidate) =>
-        candidate.file === failure.file &&
-        (candidate.test === null || candidate.test === failure.test)
-    )
-    if (entry) {
-      known.push({ failure, entry })
-    } else {
-      unexpected.push(failure)
-    }
-  }
-  // Why the failure set is consulted: a file-level entry matches one failing case while other
-  // cases in the same file pass, which must not read as "this entry is stale".
-  const matched = new Set(known.map((item) => item.entry.key))
-  const stale = entries.filter(
-    (entry) =>
-      !matched.has(entry.key) &&
-      passes.some(
-        (pass) => pass.file === entry.file && (entry.test === null || entry.test === pass.test)
-      )
-  )
-  const failingFiles = new Set(failures.map((failure) => failure.file))
-  const unseen = entries.filter((entry) => !failingFiles.has(entry.file))
-  return { known, unexpected, stale, unseen }
-}
-
-/** An unhandled error is a claim about the run, not about one test, so it is matched by headline. */
-/**
- * An unhandled error is a claim about the run, not about one test, so it is matched by headline and
- * collapsed: one suite can raise the same rejection 28 times, and 28 identical lines is noise.
- */
-export function judgeUnhandled(headlines, entries) {
-  const declared = Array.isArray(entries) ? entries : []
-  const counts = new Map()
-  for (const headline of headlines) {
-    counts.set(headline, (counts.get(headline) ?? 0) + 1)
-  }
-  const known = []
-  const blocking = []
-  for (const [headline, count] of counts) {
-    const entry = declared.find((candidate) => String(candidate.headline) === headline)
-    if (entry) {
-      known.push({ ...entry, headline, count })
-    } else {
-      blocking.push({ headline, count })
-    }
-  }
-  return { known, blocking }
-}
-
 /**
  * The file is inside the branch's own diff when it appears between the merge-base and HEAD. Without
  * a resolvable base the answer is `unknown`, and a flaky pass is never waived on `unknown`.
@@ -241,11 +159,13 @@ function branchDiff() {
   return null
 }
 
-function runStep(label, program, args, logFd, timeoutMs) {
+function runStep(label, program, args, logFd, timeoutMs, env) {
   process.stderr.write(`gate-unit: ${label}\n`)
   const started = Date.now()
   const result = spawnSync(program, args, {
     cwd: ROOT,
+    // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
+    env: env ? { ...process.env, ...env } : process.env,
     stdio: ['ignore', logFd, logFd],
     timeout: timeoutMs,
     killSignal: 'SIGKILL'
@@ -254,25 +174,75 @@ function runStep(label, program, args, logFd, timeoutMs) {
   return { status: result.status, timedOut, elapsedMs: Date.now() - started }
 }
 
-function runSuite({ reportPath, logPath, timeoutMs, vitestArgs }) {
+function normalise(name) {
+  return String(name ?? '').replaceAll('\\', '/')
+}
+
+/**
+ * Files `UNIT_INCLUDE` collects but `UNIT_EXCLUDE` drops. Upstream's unit lane does not run them
+ * either, so a red there is not this fork's to record — but a gate that quietly stopped applying the
+ * exclusion would look green for the wrong reason, which is why the run is checked against this list.
+ */
+export function quarantinedFiles(root = ROOT) {
+  const included = new Set(globSync(UNIT_INCLUDE, { cwd: root }).map(normalise))
+  const collected = globSync(UNIT_INCLUDE, { cwd: root, exclude: UNIT_EXCLUDE }).map(normalise)
+  const runnable = new Set(collected)
+  return [...included].filter((file) => !runnable.has(file)).sort()
+}
+
+export function forkTestFiles(root = ROOT) {
+  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
+    .map(normalise)
+    .sort()
+}
+
+function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
   const logFd = openSync(logPath, 'w')
   let elapsedMs = 0
+  let forkTestsPassed = true
   try {
-    for (const [label, program, args] of [
-      ['build:packages', 'pnpm', ['run', 'build:packages']],
-      [
-        'ensure native runtime',
-        'node',
-        [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
-      ]
+    // Why first: it costs a second and its failure would invalidate any verdict the suite produced.
+    // Why its own deadline: a hung sync test must not cost the suite's whole hour before it starts.
+    const forkStep =
+      forkTests.length === 0
+        ? { status: 0, timedOut: false, elapsedMs: 0 }
+        : runStep(
+            'fork-local tests',
+            process.execPath,
+            ['--test', ...forkTests],
+            logFd,
+            Math.min(timeoutMs, FORK_TEST_TIMEOUT_MS)
+          )
+    elapsedMs += forkStep.elapsedMs
+    if (forkStep.timedOut) {
+      return { outcome: 'timed-out', elapsedMs, forkTestsPassed: false }
+    }
+    if (forkStep.status !== 0) {
+      return { outcome: 'fork-local tests failed', elapsedMs, forkTestsPassed: false }
+    }
+    // Why objects: a heterogeneous tuple array widens `label` to `string | string[]` under the
+    // fork's type-aware lint, which then rejects it inside the failure template.
+    for (const preparation of [
+      { label: 'build:packages', program: 'pnpm', args: ['run', 'build:packages'] },
+      {
+        label: 'ensure native runtime',
+        program: 'node',
+        args: [join(ROOT, 'config', 'scripts', 'ensure-native-runtime.mjs'), '--runtime=node']
+      }
     ]) {
-      const step = runStep(label, program, args, logFd, timeoutMs)
+      const step = runStep(
+        preparation.label,
+        preparation.program,
+        preparation.args,
+        logFd,
+        timeoutMs
+      )
       elapsedMs += step.elapsedMs
       if (step.timedOut) {
-        return { outcome: 'timed-out', elapsedMs }
+        return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
       }
       if (step.status !== 0) {
-        return { outcome: `${label} failed`, elapsedMs }
+        return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
       }
     }
     const suite = runStep(
@@ -289,13 +259,14 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs }) {
         ...vitestArgs
       ],
       logFd,
-      timeoutMs
+      timeoutMs,
+      UNIT_LANE_ENV
     )
     elapsedMs += suite.elapsedMs
     if (suite.timedOut) {
-      return { outcome: 'timed-out', elapsedMs }
+      return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
     }
-    return { outcome: 'complete', status: suite.status, elapsedMs }
+    return { outcome: 'complete', status: suite.status, elapsedMs, forkTestsPassed }
   } finally {
     closeSyncSafe(logFd)
   }
@@ -309,17 +280,41 @@ function closeSyncSafe(fd) {
   }
 }
 
-function rerunIsolation(file, dir, timeoutMs) {
-  const logFd = openSync(join(dir, 'isolation.log'), 'a')
+/**
+ * One isolated re-run of a file, reported as the tests that passed and failed inside it.
+ *
+ * Why per test rather than per file: the file's own allowlisted reds still fail when it runs alone,
+ * so "the file exited non-zero" cannot tell a load flake from a real break once entries are named.
+ * A missing report is not evidence of anything, so it reads as "every failure reproduced".
+ */
+function rerunIsolation(file, reportPath, timeoutMs) {
+  const logFd = openSync(join(reportPath, '..', 'isolation.log'), 'a')
   try {
     const step = runStep(
       `isolation re-run ${file}`,
       'node',
-      [RUN_VITEST, 'run', '--config', 'config/vitest.config.ts', '--reporter=dot', file],
+      [
+        RUN_VITEST,
+        'run',
+        '--config',
+        'config/vitest.config.ts',
+        '--reporter=json',
+        `--outputFile.json=${reportPath}`,
+        file
+      ],
       logFd,
-      timeoutMs
+      timeoutMs,
+      UNIT_LANE_ENV
     )
-    return step.status === 0 && !step.timedOut
+    if (step.timedOut || !existsSync(reportPath)) {
+      return NO_RERUN
+    }
+    try {
+      return reportForFile(JSON.parse(readFileSync(reportPath, 'utf8')), file)
+    } catch {
+      // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
+      return NO_RERUN
+    }
   } finally {
     closeSyncSafe(logFd)
   }
@@ -327,6 +322,12 @@ function rerunIsolation(file, dir, timeoutMs) {
 
 function reportResult(result) {
   console.log(formatVerdict(result))
+  const forkTests = result.forkTests ?? { files: 0, passed: false }
+  // Why a detail line and not part of the summary: `formatVerdict` is shared with `local/open-pr.mjs`,
+  // which quotes it back in a PR body, so the one-line shape stays the shared one.
+  console.log(
+    `  fork-local tests (node --test): ${forkTests.files} file(s) ${forkTests.passed ? 'passed' : 'FAILED'}`
+  )
   for (const item of result.known) {
     const entry = item.entry
     console.log(
@@ -339,18 +340,28 @@ function reportResult(result) {
   if (result.unexpected.length > MAX_SUMMARY_LIST) {
     console.log(`  …and ${result.unexpected.length - MAX_SUMMARY_LIST} more unexpected failure(s)`)
   }
-  for (const file of result.flaky) {
+  for (const entry of result.flaky) {
     console.log(
-      `  ${file.inDiff ? 'FLAKY, but in this branch diff — not waived' : 'FLAKY, not ours'}: ${file.file}`
+      `  ${entry.inDiff ? 'FLAKY, but in this branch diff — not waived' : 'FLAKY, not ours'}: ${entry.file} › ${entry.test}`
     )
   }
   for (const entry of result.stale) {
     console.log(`  stale entry (passed in this run) — prune ${entry.key}`)
   }
   for (const entry of result.unseen) {
+    console.log(`  unseen entry (nothing in this run matched it) — prune or re-name: ${entry.key}`)
+  }
+  if (result.filtered) {
+    console.log('  unseen entries are not judged when a selector filters the run')
+  }
+  const quarantined = result.quarantined?.files ?? []
+  if (quarantined.length) {
     console.log(
-      `  unseen entry (did not fail in this run) — prune if the file no longer reds: ${entry.key}`
+      `  upstream-quarantined (UNIT_EXCLUDE, not run): ${quarantined.length} file(s) — ${quarantined.slice(0, MAX_SUMMARY_LIST).join(', ')}`
     )
+    if (quarantined.length > MAX_SUMMARY_LIST) {
+      console.log(`  …and ${quarantined.length - MAX_SUMMARY_LIST} more quarantined file(s)`)
+    }
   }
   for (const entry of result.unhandled?.known ?? []) {
     console.log(`  known unhandled error (×${entry.count}): ${entry.headline}`)
@@ -373,18 +384,31 @@ function evaluate(options, { reportPath, logPath, dir }) {
     process.exit(2)
   }
   const manifest = readJsonFile(options.allowlist, 'known-red allowlist')
+  // Why: a forwarded selector describes a different suite, so every entry outside it matches nothing.
+  // Reporting those as unseen would invite pruning an entry the full run needs.
+  const fullRun = options.vitestArgs.length === 0
   const entries = allowlistEntries(manifest)
+  const quarantined = quarantinedFiles()
+  const forkTests = forkTestFiles()
   const run = runSuite({
     reportPath,
     logPath,
     timeoutMs: options.timeoutMs,
-    vitestArgs: options.vitestArgs
+    vitestArgs: options.vitestArgs,
+    forkTests
   })
 
   const problems = []
   if (run.outcome !== 'complete') {
     problems.push(`the suite did not run to completion: ${run.outcome}`)
   }
+  const quarantinedSet = new Set(quarantined)
+  if (forkTests.length === 0) {
+    problems.push(
+      'no fork-local test file matched local/**/*.test.mjs, so that lane proved nothing'
+    )
+  }
+  problems.push(...quarantinedEntryProblems(entries, quarantinedSet))
   let report = null
   if (existsSync(reportPath)) {
     try {
@@ -411,11 +435,23 @@ function evaluate(options, { reportPath, logPath, dir }) {
     known = judged.known
     unexpected = judged.unexpected
     stale = judged.stale
-    unseen = judged.unseen
+    unseen = prunableEntries(judged.unseen, report, {
+      full: fullRun,
+      // Why the test count: a report with no tests proves nothing about any entry.
+      complete: run.outcome === 'complete' && (Number(report.numTotalTests) || 0) > 0
+    })
     // Why not `numFailedTests`: it counts cases only, so a file that failed to collect would be
     // missing from it while it is very much a failure of this run.
     counts.failed = cases.failures.length
     counts.known = known.length
+    // Why: a verdict that silently stopped excluding them would still look green, and the reason
+    // would be a switch in a config file rather than anything about the code being shipped.
+    const ranQuarantined = collectedQuarantinedFiles(report, quarantinedSet)
+    if (ranQuarantined.length) {
+      problems.push(
+        `the run collected ${ranQuarantined.length} upstream-quarantined file(s), so UNIT_EXCLUDE did not apply: ${ranQuarantined.slice(0, MAX_SUMMARY_LIST).join(', ')}`
+      )
+    }
   }
 
   const logText = existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
@@ -434,23 +470,36 @@ function evaluate(options, { reportPath, logPath, dir }) {
     )
   }
 
-  // A failure outside the allowlist gets one isolated re-run. A pass there is a load-order flake —
-  // a different claim from "this change broke it" — so it is waived unless the file is in the diff.
+  // A failure outside the allowlist gets one isolated re-run. A failure that does not come back is
+  // a load-order flake — a different claim from "this change broke it" — so it is waived unless the
+  // file is in the diff. Judged per test: the file's allowlisted reds still fail when it runs alone.
   const diff = branchDiff()
   const flaky = []
-  const stillFailing = new Set()
-  for (const file of new Set(unexpected.map((failure) => failure.file))) {
-    if (rerunIsolation(file, dir, options.timeoutMs)) {
-      flaky.push({ file, inDiff: diff ? diff.files.has(file) : true })
-    } else {
-      stillFailing.add(file)
+  const blocking = []
+  const unexpectedByFile = new Map()
+  for (const failure of unexpected) {
+    const list = unexpectedByFile.get(failure.file) ?? []
+    list.push(failure)
+    unexpectedByFile.set(failure.file, list)
+  }
+  let isolationIndex = 0
+  for (const [file, failures] of unexpectedByFile) {
+    isolationIndex += 1
+    const rerun = rerunIsolation(
+      file,
+      join(dir, `isolation-${isolationIndex}.json`),
+      options.timeoutMs
+    )
+    const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
+    const inDiff = diff ? diff.files.has(file) : true
+    for (const failure of failures) {
+      if (reproduced.has(failure.test) || inDiff) {
+        blocking.push(failure)
+      } else {
+        flaky.push({ file, test: failure.test, inDiff })
+      }
     }
   }
-  const blocking = unexpected.filter(
-    (failure) =>
-      stillFailing.has(failure.file) ||
-      flaky.some((entry) => entry.file === failure.file && entry.inDiff)
-  )
 
   const exitCode = blocking.length === 0 && problems.length === 0 ? 0 : 1
   return {
@@ -462,6 +511,7 @@ function evaluate(options, { reportPath, logPath, dir }) {
     flaky,
     stale,
     unseen,
+    filtered: !fullRun,
     problems,
     unhandled: {
       tolerated: tolerated.length,
@@ -472,6 +522,8 @@ function evaluate(options, { reportPath, logPath, dir }) {
       blocking: judgedUnhandled.blocking
     },
     elapsedMs: run.elapsedMs ?? 0,
+    forkTests: { files: forkTests.length, passed: run.forkTestsPassed !== false },
+    quarantined: { count: quarantined.length, files: quarantined },
     logPath,
     diffBase: diff?.base ?? null,
     exitCode,

@@ -440,7 +440,9 @@ describe('registerWorktreeHandlers – Windows path handling', () => {
       name: 'improve-dashboard'
     })
 
-    expect(resolveLocalGitUsernameMock).toHaveBeenCalledWith('C:\\repo')
+    // Why the second argument: the branch-prefix login now follows the repo's pinned gh account
+    // (`resolveLocalGitUsername(repoPath, ghAccount)`), and this repo has no binding.
+    expect(resolveLocalGitUsernameMock).toHaveBeenCalledWith('C:\\repo', undefined)
     expect(addWorktreeMock).toHaveBeenCalledWith(
       'C:\\repo',
       'C:\\workspaces\\improve-dashboard',

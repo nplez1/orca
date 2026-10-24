@@ -112,6 +112,7 @@ origin/main
 nplez1/main  ── this fork's own line: everything above, plus fork-only patches
                 └── nplez1/Hide-hosts
                 └── nplez1/Bundled-Skills-Target
+                └── nplez1/issue-151
 ```
 
 `nplez1/Bundled-Skills-Target` carries fork issue #99 plus the install half of #94: the published
@@ -325,6 +326,31 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   before the renderer can accept them. 12 files, but only +33/−7 of production change.
 - **Verified:** typecheck, 1,860 tests.
 - **Note:** 7 files here are the splitting agent's harness adaptations.
+
+### nplez1/issue-151 — the known-red allowlist (fork issue #151)
+
+- **Why:** gate 1's allowlist had drifted into the shapes its own note warns against: 20 file-level
+  wildcards that also mask a _new_ failure in the same file, eight entries stale, and two reds outside
+  the file so the gate could not produce a verdict at all. Three of the entries also named files
+  upstream's own unit lane excludes, which the gate was nonetheless running.
+- **Shape:** `local/gate-unit.mjs` runs the unit lane's file set (`ORCA_BALANCE_UNIT_SHARDS=1` →
+  `UNIT_EXCLUDE`, 80 files here), asserts the report collected none of them, refuses an allowlist entry
+  for a quarantined file, and runs the fork-local `local/**/*.test.mjs` lane that nothing else reached.
+  The manifest is 31 named entries whose arithmetic closes. Two reds the tightening surfaced were
+  repaired rather than recorded (`pane-screen-prompt.spec.ts` asserted `null` where the implementation
+  documents `undefined`; a privileged-CLI case linked an `orca` launcher the fork ships as `orca-np`),
+  and `tests/tools/unit-gate.test.mjs` pins the judging rules and the manifest invariants.
+- **Already done by earlier syncs:** § 2 (the eight stale entries were pruned at the 2026-10-21
+  reconciliation) and § 4 (both formerly-unlisted reds pass). The re-diagnosis is in
+  [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(test)`: the extend test's mock named a path the
+  2026-10-19 reorganisation deleted, so it was inert and the real module loaded; the `TypeError: {}
+  is not iterable` rejections had a separate cause — the renderer reclaim bridge, fixed in
+  `2368ed38da`. Both files are fork-owned, so nothing goes upstream.
+- **Verified:** `pnpm tc` clean; `check:code-quality:changed` clean; the focused suites for every file
+  it touches; the full gate PASS with no stale or unseen entry. Reviewed by Opus 5.5, high, over three
+  rounds (R1: 4 SHOULD-FIX; delta R2: 1 SHOULD-FIX; narrow R3: 2 MINOR) plus a resolution round on the
+  `nplez1/main` merge — clean of BLOCKER/SHOULD-FIX. The verdict line for the shipped revision is in
+  the PR body, since `local/open-pr.mjs` requires a cached PASS for the exact head.
 
 ### nplez1/Hide-hosts — PR #9, **merged** (2026-09-19)
 

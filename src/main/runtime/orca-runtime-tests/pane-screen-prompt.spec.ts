@@ -84,9 +84,10 @@ describe('the screen prompt a pane is holding', () => {
     expect(runtime.readPaneScreenPrompt(paneKey)).toBeNull()
   })
 
-  it('answers null for a pane it cannot bind to a terminal', async () => {
+  it('answers undefined for a pane it cannot bind to a terminal', async () => {
     const { runtime } = await terminalRuntime()
-    // Why: a closed pane must not throw into the hook store's deferred read.
-    expect(runtime.readPaneScreenPrompt('tab-gone:leaf-gone')).toBeNull()
+    // Why undefined and not null: a pane with no terminal is "cannot see it", which the store must
+    // not read as "no dialog" — and a closed pane must not throw into its deferred read either.
+    expect(runtime.readPaneScreenPrompt('tab-gone:leaf-gone')).toBeUndefined()
   })
 })
