@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const { appMock, autoUpdaterMock, chooseLocalBuildMock, moduleFactories, resetUpdaterMocks } =
@@ -29,8 +30,7 @@ describe('updater SQLite downgrade protection', () => {
         appMock.getVersion.mockReturnValue('1.4.221')
         const send = vi.fn()
         const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The mocked updater only reads webContents.send from this window fixture.
-        setupAutoUpdater({ webContents: { send } } as never, {
+        setupAutoUpdater(createUpdaterMainWindow(send), {
           getLastUpdateCheckAt: () => Date.now()
         })
         autoUpdaterMock.setFeedURL.mockClear()
@@ -58,8 +58,7 @@ describe('updater SQLite downgrade protection', () => {
       chooseLocalBuildMock.mockResolvedValue({ version: '1.4.213', close })
       const send = vi.fn()
       const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The mocked updater only reads webContents.send from this window fixture.
-      setupAutoUpdater({ webContents: { send } } as never, {
+      setupAutoUpdater(createUpdaterMainWindow(send), {
         getLastUpdateCheckAt: () => Date.now()
       })
       checkForUpdatesFromMenu({ localBuild: true })

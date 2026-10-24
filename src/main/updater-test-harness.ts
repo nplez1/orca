@@ -4,7 +4,7 @@ import type { Mock } from 'vitest'
 import { clearTrackedRealTimers, trackRealTimers } from './updater-test-timer-tracking'
 
 /** Loose spy signature for the electron/electron-updater calls the suites only assert on. */
-type UpdaterSpy = Mock<(...args: unknown[]) => unknown>
+export type UpdaterSpy = Mock<(...args: unknown[]) => unknown>
 type LinuxPackageType = 'deb' | 'rpm' | 'non-root' | 'unusable'
 
 type AutoUpdaterMock = {
