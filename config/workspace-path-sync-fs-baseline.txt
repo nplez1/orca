@@ -1,0 +1,15 @@
+# Synchronous fs probes on a workspace or repository path, per file, in production src/main.
+# Each one blocks the main event loop for as long as the repo volume takes to answer: on a
+# stalled external drive or network mount every Orca window freezes until it does (issue #157).
+# This is a RATCHET: counts may only go DOWN. Remove the sync probe, do not raise the row.
+# Prune after fixing one: pnpm check:workspace-path-sync-fs-ratchet --prune
+# Detection is lexical (see the script): an argument named something else is invisible to it, and
+# sync writes are out of scope. Rows below that say "app data" are not workspace paths at all.
+1 src/main/folder-upgrade-worktree-path.ts # realpaths the repo while worktree listing merges, and those merges are sync by construction
+2 src/main/hooks.ts # hasHooksFile and hasUnrecognizedOrcaYamlKeys read <repo>/orca.yaml synchronously inside hook resolution; loadHooks does too, through a yamlPath local this gate cannot see
+2 src/main/node-runtime/managed-runtime-release-install.ts # app data: the fork managed runtime folder, not a workspace path
+2 src/main/node-runtime/managed-runtime-release.ts # app data: the fork managed runtime folder, not a workspace path
+1 src/main/persistence/restoring-sessions/floating-workspace-normalization.ts # realpaths persisted floating-workspace cwds during the synchronous persisted-state load
+1 src/main/persistence/tracking-repos/worktree-metadata-normalization.ts # the 30-day stale-meta GC runs inside the same synchronous persisted-state load
+2 src/main/rate-limits/hidden-rate-limit-pty-cwd.ts # app data: the user-data directory of the hidden usage PTY, not a workspace path
+1 src/main/server/serve-pairing-output.ts # serves the paired server own checkout at start, not a workspace

@@ -222,13 +222,14 @@ export function upsertHookTrustEntriesInContent(
   return upsertHookTrustContent(existingContent, entries)
 }
 
+/** `canonicalProjectPath` is the realpath the caller resolved; this builder never touches the disk. */
 export function upsertProjectTrustLevel(
   configPath: string,
-  projectPath: string,
+  canonicalProjectPath: string,
   trustLevel: CodexProjectTrustLevel
 ): void {
   const existing = readTomlForMutation(configPath)
-  const updated = upsertProjectTrustLevelInContent(existing, projectPath, trustLevel)
+  const updated = upsertProjectTrustLevelInContent(existing, canonicalProjectPath, trustLevel)
   if (updated !== existing) {
     writeConfigAtomically(configPath, updated)
   }
@@ -236,11 +237,10 @@ export function upsertProjectTrustLevel(
 
 export function upsertProjectTrustLevelInContent(
   existingContent: string,
-  projectPath: string,
-  trustLevel: CodexProjectTrustLevel,
-  options?: { alreadyCanonical?: boolean }
+  canonicalProjectPath: string,
+  trustLevel: CodexProjectTrustLevel
 ): string {
-  return upsertProjectTrustContent(existingContent, projectPath, trustLevel, options)
+  return upsertProjectTrustContent(existingContent, canonicalProjectPath, trustLevel)
 }
 
 export function escapeTomlString(value: string): string {

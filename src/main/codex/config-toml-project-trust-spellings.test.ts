@@ -21,9 +21,7 @@ const HEADER_SPELLINGS = [
 ]
 
 function upsertTrusted(content: string, projectPath = PROJECT): string {
-  return upsertProjectTrustLevelInContent(content, projectPath, 'trusted', {
-    alreadyCanonical: true
-  })
+  return upsertProjectTrustLevelInContent(content, projectPath, 'trusted')
 }
 
 describe('project trust writes recognise every spelling of the project table', () => {

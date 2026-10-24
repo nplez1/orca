@@ -11,6 +11,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type * as FsPromises from 'node:fs/promises'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
 import { runCodexAppServerSession } from './codex/codex-app-server-session'
@@ -20,6 +21,37 @@ const testState = {
   userDataDir: '',
   previousUserDataPath: undefined as string | undefined
 }
+
+// Why: the trust writers canonicalize the workspace with an awaited realpath, so a test that holds
+// the Codex config lane cannot tell "queued behind it" from "has not finished realpathing yet". This
+// parks the realpath for one chosen path so the queue attempt is observable.
+type RealpathGate = {
+  gatedPath: string | undefined
+  arrived: (() => void) | undefined
+  released: Promise<void>
+}
+
+const realpathGate = vi.hoisted((): RealpathGate => ({
+  gatedPath: undefined,
+  arrived: undefined,
+  released: Promise.resolve()
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>()
+  return {
+    ...actual,
+    realpath: async (path: string) => {
+      const real = await actual.realpath(path)
+      if (realpathGate.gatedPath === path) {
+        realpathGate.gatedPath = undefined
+        realpathGate.arrived?.()
+        await realpathGate.released
+      }
+      return real
+    }
+  }
+})
 
 vi.mock('electron', () => ({
   app: {
@@ -73,10 +105,10 @@ afterEach(() => {
 })
 
 describe('markCursorWorkspaceTrusted', () => {
-  it('writes ~/.cursor/projects/<slug>/.workspace-trusted with the cwd payload', () => {
+  it('writes ~/.cursor/projects/<slug>/.workspace-trusted with the cwd payload', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-cursor-ws-'))
     try {
-      markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      await markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
       const projectsDir = join(testState.fakeHomeDir, '.cursor', 'projects')
       const slugDirs = readdirSync(projectsDir)
       expect(slugDirs.length).toBe(1)
@@ -90,15 +122,15 @@ describe('markCursorWorkspaceTrusted', () => {
     }
   })
 
-  it('is idempotent — re-marking the same workspace does not overwrite trustedAt', () => {
+  it('is idempotent — re-marking the same workspace does not overwrite trustedAt', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-cursor-ws-'))
     try {
-      markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      await markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
       const projectsDir = join(testState.fakeHomeDir, '.cursor', 'projects')
       const slugDirs = readdirSync(projectsDir)
       const trustFile = join(projectsDir, slugDirs[0], '.workspace-trusted')
       const firstPayload = readFileSync(trustFile, 'utf-8')
-      markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      await markCursorWorkspaceTrusted(workspace, testState.fakeHomeDir)
       const secondPayload = readFileSync(trustFile, 'utf-8')
       expect(secondPayload).toBe(firstPayload)
     } finally {
@@ -108,10 +140,10 @@ describe('markCursorWorkspaceTrusted', () => {
 })
 
 describe('markCopilotFolderTrusted', () => {
-  it('appends the workspace to trustedFolders in ~/.copilot/config.json', () => {
+  it('appends the workspace to trustedFolders in ~/.copilot/config.json', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-copilot-ws-'))
     try {
-      markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
+      await markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
       const configPath = join(testState.fakeHomeDir, '.copilot', 'config.json')
       expect(existsSync(configPath)).toBe(true)
       const parsed = JSON.parse(readFileSync(configPath, 'utf-8'))
@@ -123,7 +155,29 @@ describe('markCopilotFolderTrusted', () => {
     }
   })
 
-  it('keeps a token-bearing config.json owner-only', () => {
+  it('keeps both entries when two workspaces are trusted at once', async () => {
+    // Why: the realpath awaits made this a read-modify-write across a suspension. Read N entries,
+    // both write N+1, and one workspace silently loses its trust entry and sees the prompt.
+    const first = mkdtempSync(join(tmpdir(), 'orca-copilot-ws-'))
+    const second = mkdtempSync(join(tmpdir(), 'orca-copilot-ws-'))
+    try {
+      await Promise.all([
+        markCopilotFolderTrusted(first, testState.fakeHomeDir),
+        markCopilotFolderTrusted(second, testState.fakeHomeDir)
+      ])
+      const parsed = JSON.parse(
+        readFileSync(join(testState.fakeHomeDir, '.copilot', 'config.json'), 'utf-8')
+      )
+      expect(parsed.trustedFolders).toEqual(
+        expect.arrayContaining([realpathSync(first), realpathSync(second)])
+      )
+    } finally {
+      rmSync(first, { recursive: true, force: true })
+      rmSync(second, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps a token-bearing config.json owner-only', async () => {
     if (process.platform === 'win32') {
       return
     }
@@ -136,7 +190,7 @@ describe('markCopilotFolderTrusted', () => {
       writeFileSync(configPath, JSON.stringify({ copilotTokens: { a: 'secret' } }), {
         mode: 0o600
       })
-      markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
+      await markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
       expect(statSync(configPath).mode & 0o777).toBe(0o600)
       expect(JSON.parse(readFileSync(configPath, 'utf-8')).copilotTokens).toEqual({ a: 'secret' })
     } finally {
@@ -145,14 +199,14 @@ describe('markCopilotFolderTrusted', () => {
     }
   })
 
-  it('creates a missing config.json owner-only', () => {
+  it('creates a missing config.json owner-only', async () => {
     if (process.platform === 'win32') {
       return
     }
     const workspace = mkdtempSync(join(tmpdir(), 'orca-copilot-ws-'))
     const originalUmask = process.umask(0o022)
     try {
-      markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
+      await markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
       const configPath = join(testState.fakeHomeDir, '.copilot', 'config.json')
       expect(statSync(configPath).mode & 0o777).toBe(0o600)
     } finally {
@@ -161,7 +215,7 @@ describe('markCopilotFolderTrusted', () => {
     }
   })
 
-  it('preserves existing config keys and dedups already-trusted folders', () => {
+  it('preserves existing config keys and dedups already-trusted folders', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-copilot-ws-'))
     const realpath = realpathSync(workspace)
     try {
@@ -173,7 +227,7 @@ describe('markCopilotFolderTrusted', () => {
           trustedFolders: [realpath]
         })
       )
-      markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
+      await markCopilotFolderTrusted(workspace, testState.fakeHomeDir)
       const parsed = JSON.parse(
         readFileSync(join(testState.fakeHomeDir, '.copilot', 'config.json'), 'utf-8')
       )
@@ -186,10 +240,10 @@ describe('markCopilotFolderTrusted', () => {
 })
 
 describe('markAntigravityWorkspaceTrusted', () => {
-  it('appends the workspace to trustedWorkspaces in ~/.gemini/antigravity-cli/settings.json', () => {
+  it('appends the workspace to trustedWorkspaces in ~/.gemini/antigravity-cli/settings.json', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-agy-ws-'))
     try {
-      markAntigravityWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      await markAntigravityWorkspaceTrusted(workspace, testState.fakeHomeDir)
       const configPath = join(testState.fakeHomeDir, '.gemini', 'antigravity-cli', 'settings.json')
       expect(existsSync(configPath)).toBe(true)
       const parsed = JSON.parse(readFileSync(configPath, 'utf-8'))
@@ -201,9 +255,23 @@ describe('markAntigravityWorkspaceTrusted', () => {
     }
   })
 
+  it('leaves a settings.json whose top level is not an object alone', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-agy-ws-'))
+    const configDir = join(testState.fakeHomeDir, '.gemini', 'antigravity-cli')
+    try {
+      mkdirSync(configDir, { recursive: true })
+      writeFileSync(join(configDir, 'settings.json'), '[]')
+      await markAntigravityWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      // Why: not a config this path can extend — writing over it would drop whatever agy keeps there.
+      expect(readFileSync(join(configDir, 'settings.json'), 'utf-8')).toBe('[]')
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
   // Why: the same settings.json also carries model, permissions and toolPermission. A
   // clobbering write here would silently reset the user's agy configuration.
-  it('preserves sibling settings keys and dedups an already-trusted workspace', () => {
+  it('preserves sibling settings keys and dedups an already-trusted workspace', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'orca-agy-ws-'))
     const realpath = realpathSync(workspace)
     try {
@@ -216,7 +284,7 @@ describe('markAntigravityWorkspaceTrusted', () => {
           trustedWorkspaces: [realpath]
         })
       )
-      markAntigravityWorkspaceTrusted(workspace, testState.fakeHomeDir)
+      await markAntigravityWorkspaceTrusted(workspace, testState.fakeHomeDir)
       const parsed = JSON.parse(
         readFileSync(
           join(testState.fakeHomeDir, '.gemini', 'antigravity-cli', 'settings.json'),
@@ -233,13 +301,13 @@ describe('markAntigravityWorkspaceTrusted', () => {
 
   // Why: agy's trust is exact-path, not inherited — a parent entry does not cover a child,
   // which is what makes the per-worktree preflight necessary at all.
-  it('adds a child worktree even when its parent is already trusted', () => {
+  it('adds a child worktree even when its parent is already trusted', async () => {
     const parent = mkdtempSync(join(tmpdir(), 'orca-agy-parent-'))
     const child = join(parent, 'child-worktree')
     try {
       mkdirSync(child, { recursive: true })
-      markAntigravityWorkspaceTrusted(parent, testState.fakeHomeDir)
-      markAntigravityWorkspaceTrusted(child, testState.fakeHomeDir)
+      await markAntigravityWorkspaceTrusted(parent, testState.fakeHomeDir)
+      await markAntigravityWorkspaceTrusted(child, testState.fakeHomeDir)
       const parsed = JSON.parse(
         readFileSync(
           join(testState.fakeHomeDir, '.gemini', 'antigravity-cli', 'settings.json'),
@@ -265,13 +333,22 @@ describe('markCodexProjectTrusted', () => {
     const grantHoldingTheFile = new Promise<void>((resolve) => {
       releaseGrant = resolve
     })
+    const realpathArrived = Promise.withResolvers<void>()
+    const releaseRealpath = Promise.withResolvers<void>()
+    realpathGate.gatedPath = workspace
+    realpathGate.arrived = realpathArrived.resolve
+    realpathGate.released = releaseRealpath.promise
     try {
       const held = runExclusivelyForCodexTrustConfig(configPath, () => grantHoldingTheFile)
       const marked = markCodexProjectTrusted(
         workspace,
         getLocalCodexTrustConfigFiles(testState.fakeHomeDir)
       )
-      await Promise.resolve()
+      await realpathArrived.promise
+      releaseRealpath.resolve()
+      // Real turns, not one microtask: the write must have reached the lane for the absence below
+      // to mean "queued" rather than "still realpathing".
+      await new Promise((resolve) => setImmediate(resolve))
       expect(existsSync(configPath)).toBe(false)
 
       releaseGrant()
@@ -279,6 +356,9 @@ describe('markCodexProjectTrusted', () => {
       await marked
       expect(readFileSync(configPath, 'utf-8')).toContain('trust_level = "trusted"')
     } finally {
+      realpathGate.gatedPath = undefined
+      realpathGate.arrived = undefined
+      realpathGate.released = Promise.resolve()
       rmSync(workspace, { recursive: true, force: true })
     }
   })

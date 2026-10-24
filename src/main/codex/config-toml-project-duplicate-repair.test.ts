@@ -70,9 +70,7 @@ describe('repairing configs broken by #22592', () => {
       ''
     ].join('\n')
 
-    const updated = upsertProjectTrustLevelInContent(broken, '/repo-b', 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent(broken, '/repo-b', 'trusted')
 
     expect(updated).toBe(
       [
@@ -142,12 +140,8 @@ describe('repairing configs broken by #22592', () => {
       ''
     ].join('\n')
 
-    const first = upsertProjectTrustLevelInContent(broken, '/repo-d', 'trusted', {
-      alreadyCanonical: true
-    })
-    const second = upsertProjectTrustLevelInContent(broken, '/repo-d', 'trusted', {
-      alreadyCanonical: true
-    })
+    const first = upsertProjectTrustLevelInContent(broken, '/repo-d', 'trusted')
+    const second = upsertProjectTrustLevelInContent(broken, '/repo-d', 'trusted')
 
     expect(first).toBe(broken)
     expect(second).toBe(broken)
