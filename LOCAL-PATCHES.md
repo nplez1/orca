@@ -936,7 +936,8 @@ pnpm run sync:localization-runtime-catalog
   - **`queueWorkspaceDelete` lands inside the fork's extracted `worktree.rm`.** Upstream routes the
     delete through the workspace lifecycle queue; the fork had extracted the method for max-lines.
     Both stay, and `deleteRemoteBranch` rides through the `run` callback rather than a sixth
-    `RemovalFlag`. On the renderer side, `confirmedDiscards` is computed inside
+    `RemovalFlag` — while the lifecycle delete **key** is widened with it, so a retry that asks for
+    the other remote-branch choice cannot join the pending delete's reply. On the renderer side, `confirmedDiscards` is computed inside
     `useDeleteWorktreeDialogActions` from an `unsavedTargets` argument.
   - **The agent-hook guards stay and carry upstream's `incomingProcess`.** `isInheritedPaneOwnerEvent`
     gained the parameter and forwards it to `resolveAgentStatusIdentity`; `readAgentProcessIdentity`
