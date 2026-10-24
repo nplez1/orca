@@ -396,6 +396,33 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   `items: string`, which some sites do not report) and one SHOULD-FIX (project guessed from the issue
   key); both fixed, round 2 (delta) clean with no BLOCKER/SHOULD-FIX left.
 
+### nplez1/gate-unit-verdict — issue #150
+
+- **Why:** issue #150 — `local/gate-unit.mjs` is gate 1 of the fork PR process, and it could report a
+  PASS it never earned. Of its five items, item 1 (linked-worktree cache directory) had already landed
+  in #160, the dirty-verdict half of item 3 in #177, and the missing `closeSync` import with the
+  judgement module and its tests in #178. What was still open: Vitest's exit status was returned and
+  never read, the cache key said nothing about the toolchains the machine-bound test classes depend on,
+  and the flake waiver consulted only the test file.
+- **Shape:** 9 files — 5 code (1 new) and 2 tests, plus the two docs. `local/gate-unit.mjs` reads the
+  exit status through the rule `check-unit-shard-verdict.mjs` already applies to a CI shard, records
+  `gateInputs` and compares it on read, refuses to record a run that is dirty, selected, incomplete or
+  stale relative to HEAD, and never reads the cache under `--allow-dirty`. `local/gate-verdict-cache.mjs`
+  carries the record/reuse decisions and the inputs fingerprint, so `open-pr` refuses a verdict recorded
+  against a different toolchain, and the summary line marks a forwarded selector as a subset run.
+  `local/unit-gate-judgement.mjs` gains the two fail-closed rules. `local/gate-flake-coupling.mjs` (new,
+  split out to stay under oxlint's 600-line budget) couples a test to itself, its sibling module, its one
+  level of imports, and the harness `sharedHarnessPaths` derives from the config and the runner. Tests:
+  `tests/tools/gate-unit.test.mjs` (new, 24 cases over the fail-closed, cache and coupling rules) and two
+  cases in `tests/tools/open-pr.test.mjs` (the gate-inputs refusal, and that both readers fingerprint the
+  same bytes).
+- **Targets:** fork issue #150 (`Fixes #150`). Not upstream-bound — every file is `local/` or
+  `tests/tools/`.
+- **Verified:** see the PR body for the final numbers and the review rounds. The shared `orca-queue` lock
+  was held by other worktrees' full unit gates for most of this branch's verification window, so the
+  focused suites were run directly with `node config/scripts/run-vitest.mjs` (the same runner `pnpm test`
+  uses) and `pnpm tc` ran through the lock.
+
 ### nplez1/main
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only
