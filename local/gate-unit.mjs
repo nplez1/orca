@@ -4,9 +4,15 @@
  *
  * Runs the full unit suite once and turns it into a verdict: a failure listed in
  * `local/unit-known-red.json` is reported but does not fail the gate, a failure outside it does.
- * The verdict is cached per (revision, allowlist), so re-running the gate on a revision that has
- * not changed returns immediately — which is what stops the run-seven-times-per-session pattern
- * the 2026-10-14 session log recorded.
+ * Anything the run cannot account for fails closed: a non-zero exit that no failure and no unhandled
+ * error explains, and a declared unhandled count that does not match what could be read — the rule
+ * `decideUnitShardVerdict` applies to a CI shard.
+ *
+ * The verdict is cached per (revision, allowlist) and records the gate inputs it was computed against
+ * — its own scripts, `config/.bun-version`, and the installed node and bun — so re-running the gate on
+ * a revision that has not changed returns immediately, which is what stops the
+ * run-seven-times-per-session pattern the 2026-10-14 session log recorded, while a verdict from a
+ * different toolchain is not reused.
  *
  * Two things it runs beyond the suite. It runs the set upstream's own unit lane runs, by setting the
  * switch `config/vitest.config.ts` reads for `UNIT_EXCLUDE` rather than `defaultExclude`: a file
@@ -38,23 +44,31 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
+import { flakeWaiver } from './gate-flake-coupling.mjs'
 import {
+  GATE_INPUT_PATHS,
   allowlistFingerprint,
   cachedVerdictPath,
+  cachedVerdictProblem,
   formatVerdict,
-  unitGateCacheDir
+  gateInputsFingerprint,
+  toolchainVersions,
+  unitGateCacheDir,
+  verdictRecordProblem
 } from './gate-verdict-cache.mjs'
 import {
   NO_RERUN,
   allowlistEntries,
   collectCases,
   collectedQuarantinedFiles,
+  declaredUnhandledMismatch,
   judge,
   judgeUnhandled,
   prunableEntries,
   quarantinedEntryProblems,
+  reportForFile,
   reproducedFailures,
-  reportForFile
+  unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -171,7 +185,14 @@ function runStep(label, program, args, logFd, timeoutMs, env) {
     killSignal: 'SIGKILL'
   })
   const timedOut = result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGKILL'
-  return { status: result.status, timedOut, elapsedMs: Date.now() - started }
+  // Why the error: a spawn that never started (ENOENT, EACCES) has a null status, which would
+  // otherwise read as a clean exit of zero. `timedOut` is the one error that has its own outcome.
+  return {
+    status: result.status,
+    timedOut,
+    error: timedOut ? null : (result.error?.message ?? null),
+    elapsedMs: Date.now() - started
+  }
 }
 
 function normalise(name) {
@@ -217,6 +238,13 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
     if (forkStep.timedOut) {
       return { outcome: 'timed-out', elapsedMs, forkTestsPassed: false }
     }
+    if (forkStep.error) {
+      return {
+        outcome: `fork-local tests could not run: ${String(forkStep.error)}`,
+        elapsedMs,
+        forkTestsPassed: false
+      }
+    }
     if (forkStep.status !== 0) {
       return { outcome: 'fork-local tests failed', elapsedMs, forkTestsPassed: false }
     }
@@ -240,6 +268,13 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
       elapsedMs += step.elapsedMs
       if (step.timedOut) {
         return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
+      }
+      if (step.error) {
+        return {
+          outcome: `${preparation.label} could not run: ${String(step.error)}`,
+          elapsedMs,
+          forkTestsPassed
+        }
       }
       if (step.status !== 0) {
         return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
@@ -265,6 +300,13 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
     elapsedMs += suite.elapsedMs
     if (suite.timedOut) {
       return { outcome: 'timed-out', elapsedMs, forkTestsPassed }
+    }
+    if (suite.error) {
+      return {
+        outcome: `the full unit suite could not run: ${String(suite.error)}`,
+        elapsedMs,
+        forkTestsPassed
+      }
     }
     return { outcome: 'complete', status: suite.status, elapsedMs, forkTestsPassed }
   } finally {
@@ -335,15 +377,16 @@ function reportResult(result) {
     )
   }
   for (const failure of result.unexpected.slice(0, MAX_SUMMARY_LIST)) {
-    console.log(`  UNEXPECTED: ${failure.file} › ${failure.test} — ${failure.detail}`)
+    const why = failure.notWaived
+      ? ` — FLAKY in isolation, but ${failure.notWaived} is in this branch diff`
+      : ` — ${failure.detail}`
+    console.log(`  UNEXPECTED: ${failure.file} › ${failure.test}${why}`)
   }
   if (result.unexpected.length > MAX_SUMMARY_LIST) {
     console.log(`  …and ${result.unexpected.length - MAX_SUMMARY_LIST} more unexpected failure(s)`)
   }
   for (const entry of result.flaky) {
-    console.log(
-      `  ${entry.inDiff ? 'FLAKY, but in this branch diff — not waived' : 'FLAKY, not ours'}: ${entry.file} › ${entry.test}`
-    )
+    console.log(`  FLAKY, not ours: ${entry.file} › ${entry.test}`)
   }
   for (const entry of result.stale) {
     console.log(`  stale entry (passed in this run) — prune ${entry.key}`)
@@ -375,6 +418,23 @@ function reportResult(result) {
   if (result.logPath) {
     console.log(`  log: ${result.logPath}`)
   }
+}
+
+function readText(path) {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/** The gate inputs of the tree being gated; a clean tree is the revision, so this is its inputs. */
+function currentGateInputs() {
+  const files = {}
+  for (const path of GATE_INPUT_PATHS) {
+    files[path] = readText(join(ROOT, path))
+  }
+  return gateInputsFingerprint({ files, toolchain: toolchainVersions() })
 }
 
 function evaluate(options, { reportPath, logPath, dir }) {
@@ -464,10 +524,21 @@ function evaluate(options, { reportPath, logPath, dir }) {
   for (const item of judgedUnhandled.blocking) {
     problems.push(`unhandled error (×${item.count}): ${item.headline}`)
   }
-  if (unhandled.declaredCount !== null && unhandled.declaredCount > unhandled.headlines.length) {
-    problems.push(
-      `Vitest declared ${unhandled.declaredCount} unhandled error(s) but only ${unhandled.headlines.length} could be read; failing closed`
-    )
+  const unhandledMismatch = declaredUnhandledMismatch(
+    unhandled.declaredCount,
+    unhandled.headlines.length
+  )
+  if (unhandledMismatch) {
+    problems.push(unhandledMismatch)
+  }
+  const exitProblem = unexplainedSuiteExit({
+    outcome: run.outcome,
+    status: run.status,
+    failedCount: counts.failed,
+    unhandledCount: unhandled.headlines.length
+  })
+  if (exitProblem) {
+    problems.push(exitProblem)
   }
 
   // A failure outside the allowlist gets one isolated re-run. A failure that does not come back is
@@ -491,12 +562,22 @@ function evaluate(options, { reportPath, logPath, dir }) {
       options.timeoutMs
     )
     const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
-    const inDiff = diff ? diff.files.has(file) : true
+    // Why not `diff.files.has(file)`: a branch that changes `src/x.ts`, the module beside a test, an
+    // imported module, or the harness every test runs under breaks `x.test.ts` without the test file
+    // itself being in the diff.
+    const waiver = flakeWaiver(file, diff?.files ?? null)
     for (const failure of failures) {
-      if (reproduced.has(failure.test) || inDiff) {
+      if (reproduced.has(failure.test)) {
         blocking.push(failure)
+      } else if (waiver.inDiff) {
+        // Why the reason travels with the failure: a per-test row that passed in isolation and was
+        // still refused reads as a plain UNEXPECTED failure unless the coupling says why.
+        blocking.push({
+          ...failure,
+          notWaived: waiver.matched ?? 'the branch diff could not be resolved'
+        })
       } else {
-        flaky.push({ file, test: failure.test, inDiff })
+        flaky.push({ file, test: failure.test })
       }
     }
   }
@@ -505,6 +586,9 @@ function evaluate(options, { reportPath, logPath, dir }) {
   return {
     revision,
     clean: !options.allowDirty,
+    // Why on the verdict: a subset run prints the same summary shape as gate 1 otherwise.
+    selectors: options.vitestArgs,
+    outcome: run.outcome,
     counts,
     known,
     unexpected: blocking,
@@ -535,27 +619,37 @@ function main() {
   const options = parseArgs(process.argv.slice(2))
   requireCleanTree(options.allowDirty)
   const allowlistHash = allowlistFingerprint(readFileSync(options.allowlist))
+  const gateInputs = currentGateInputs()
   const revision = git(['rev-parse', 'HEAD'])
   // Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
   // is not a directory and the gate could not record the verdict it just computed.
   const cacheDir = unitGateCacheDir(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'))
   const cachePath = revision ? cachedVerdictPath(cacheDir, revision, allowlistHash) : null
-  // A cached verdict is only reused for the gate's own no-argument run: a forwarded selector
-  // describes a different suite, so it must not read or write the revision's verdict.
-  const cacheable = options.cache && options.vitestArgs.length === 0 && cachePath !== null
+  // Why the reuse guard is here and not inside the check: `--no-cache` is the documented way out of a
+  // damaged cache file, so it must not parse one to refuse it, and `--allow-dirty` asks about the tree
+  // rather than about HEAD, so a verdict recorded for HEAD cannot answer it.
+  const mayReuse = options.cache && options.vitestArgs.length === 0 && !options.allowDirty
 
-  if (cacheable && existsSync(cachePath)) {
+  if (mayReuse && cachePath && existsSync(cachePath)) {
     const cached = readJsonFile(cachePath, 'cached verdict')
-    // Why a dirty verdict is not reused: it says nothing about the revision, and reusing it would make
-    // the gate's own advice ("re-run on a committed tree") impossible to follow.
-    if (cached.clean === true) {
+    const problem = cachedVerdictProblem(cached, { revision, gateInputs })
+    if (problem) {
+      console.log(`gate-unit: ignoring the cached verdict — ${problem}`)
+    } else {
       console.log(
-        'gate-unit: cached verdict for this revision and allowlist (pass --no-cache to re-run)'
+        'gate-unit: cached verdict for this revision, allowlist and gate inputs (pass --no-cache to re-run)'
       )
       reportResult(cached)
       process.exit(cached.exitCode)
     }
-    console.log('gate-unit: ignoring the cached verdict — it was produced on a dirty tree')
+  }
+  if (options.allowDirty) {
+    console.log('gate-unit: --allow-dirty, so this verdict is not recorded — it is not about HEAD')
+  }
+  if (options.vitestArgs.length > 0) {
+    console.log(
+      `gate-unit: forwarded selectors -- ${options.vitestArgs.join(' ')} run a subset of the suite; not a gate verdict, and not recorded`
+    )
   }
 
   const dir = mkdtempSync(join(tmpdir(), 'orca-gate-'))
@@ -565,14 +659,25 @@ function main() {
     logPath: join(dir, 'run.log')
   })
 
-  // Why only a clean tree writes: a verdict from `--allow-dirty` is about a tree, not a revision, so
-  // it must never become the verdict a PR is opened on.
-  if (cacheable && result.clean === true) {
+  const verdict = { ...result, gateInputs }
+  // Why re-read HEAD and the tree: the suite takes twenty minutes, and a commit or edit made in that
+  // window would otherwise be recorded as a verdict on the revision it replaced. Why `--no-cache`
+  // still records: a stale or environmental FAIL in the cache could otherwise never be replaced.
+  const recordProblem =
+    result.revision === revision
+      ? verdictRecordProblem(options, result, {
+          headNow: git(['rev-parse', 'HEAD']),
+          treeClean: git(['status', '--porcelain']) === ''
+        })
+      : 'HEAD moved before the run recorded its revision'
+  if (recordProblem) {
+    console.log(`gate-unit: not recording this verdict — ${recordProblem}`)
+  } else if (cachePath) {
     mkdirSync(cacheDir, { recursive: true })
-    writeFileSync(cachePath, `${JSON.stringify(result, null, 2)}\n`)
+    writeFileSync(cachePath, `${JSON.stringify(verdict, null, 2)}\n`)
   }
-  reportResult(result)
-  process.exit(result.exitCode)
+  reportResult(verdict)
+  process.exit(verdict.exitCode)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

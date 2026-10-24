@@ -646,6 +646,80 @@ run is reported unseen, which is the prune signal for one observed once and neve
 `test` title over a file-level `*` as soon as the failing name is known — a file-level entry also masks
 a new failure inside that file.
 
+### `local(test)`: the unit-gate verdict fails closed, and caches only what it can prove (#150)
+
+`local/gate-unit.mjs` decides whether a PR may open, and #150 found it could report a PASS it never
+earned. Three of its five items had already landed when this branch was cut: item 1 (the cache
+directory in a linked worktree, where `.git` is a file) in #160, the dirty-verdict half of item 3 in
+#177, which also extracted `local/gate-verdict-cache.mjs` so `gate-unit` and `open-pr` read the same
+cache, and the missing `closeSync` import plus the judgement module and its tests in #178. What this
+branch adds is the rest of items 2, 3 and 4.
+
+**Vitest's exit status is read.** `runSuite` already returned `status` and `evaluate` only ever
+consumed `elapsedMs`, so a non-zero exit that the report did not explain still passed. The issue's
+phrasing — "a run that dies after writing no report" — is not quite the base's failure mode: a run that
+writes no report already failed, and a preparation step that never started already read as `failed`
+because a null status satisfies `status !== 0`. What was never read is the status itself, so a run that
+wrote a clean report and then exited non-zero was green, and a suite that never spawned read as
+`complete` until the missing report caught it one line later. The rule is the CI twin's: a non-zero exit fails the gate
+only when neither the report nor the log explains it (`unexplainedSuiteExit`, in
+`local/unit-gate-judgement.mjs`). Two smaller tightenings went with it: the declared-vs-read unhandled
+count is `!==` rather than `>`, matching `check-unit-shard-verdict.mjs` — a log that yields more
+headlines than Vitest declared is a moved log shape too — and a step that could not be spawned now
+names the step instead of reading as `failed`.
+
+The limit is worth stating, because it is the one part of item 2 left open: a run that writes a
+_partial_ report and exits non-zero still has failures for the exit to explain, and every red-set run on
+this machine has allowlisted failures, so `unexplainedSuiteExit` fires only for a run with no failure
+and no unhandled error at all. Catching the partial case means comparing the report's totals against the
+files it lists, which Vitest does not keep consistent enough to fail a PR over.
+
+**What is recorded, and what is reused, is a decision with a reason.** `--no-cache` forces a re-run
+_and still records it_ — the only way a stale or environmental FAIL in the cache can be replaced — and
+it does not parse the cache file, so it stays the way out of a damaged one. `--allow-dirty` neither
+reads the cache nor records, because both would answer about the tree rather than HEAD; forwarded
+selectors record nothing either. Before writing, the gate re-reads HEAD and the tree: the suite takes
+twenty minutes, and a commit or edit made in that window would otherwise be recorded as a verdict on
+the revision it replaced.
+
+**A verdict says what it was computed against.** The cache file name stays `(revision, allowlist)` — the
+path `open-pr` and `gate-unit` both derive — so the gate inputs live _inside_ the record: `gateInputs`,
+a `gateInputsFingerprint` over `GATE_INPUT_PATHS` (the gate script, its coupling module, the shared cache
+module, the shard-verdict parser, `config/.bun-version`) plus the installed node and bun versions. The
+machine-bound `sqlite-binding` and `host-toolchain` classes depend on exactly those, and a bun upgrade
+moves them without moving HEAD. `gate-unit` re-runs on a mismatch and `open-pr` refuses the stale verdict
+with that reason, fingerprinting the inputs at the commit as it already does for the allowlist. A record
+with no revision, or from a gate that never wrote `gateInputs`, fails closed.
+
+**A forwarded selector cannot be quoted as gate 1.** `-- <vitest args>` still runs — it is the useful
+way to iterate — but `formatVerdict` (shared with `open-pr`, which quotes it back into a PR body) now
+carries `partial: -- <args>` and `NOT a gate-1 verdict: forwarded selectors ran a subset of the suite`.
+
+**A flaky pass is waived only when nothing coupled to the test changed.** The per-test isolated re-run
+from #178 stayed a real signal, but the waiver asked only whether the _test_ file was in the diff, so a
+branch that changed `src/x.ts` and broke `x.test.ts` one run in ten was waived as "not ours".
+`local/gate-flake-coupling.mjs` (split out to stay under oxlint's 600-line budget) couples a test to
+itself, the module it sits beside, its imports (one level, relative or `@renderer/`/`@`), and the whole
+harness: `SHARED_TEST_INPUTS` plus whatever `config/vitest.config.ts` and `config/scripts/run-vitest.mjs`
+import (`sharedHarnessPaths`). The derived half is the fix for the first hand list, which missed the
+node-runtime pool, the runtime sequencer and the runtime file set — precisely the files a branch that
+re-seats PTY tests would change, which is the harness change no test file names in its own imports. Two
+harness inputs are not imports the parser can see and are listed by hand: `config/dark-build-switches.cjs`
+(loaded through `createRequire(import.meta.url)(…)`) and `src/packages/process-host/` (the runner's one
+bare workspace import, coupled as a directory so any file in that package counts). A diff that cannot be
+resolved is never waived. A per-test row that passed its isolated re-run and was still refused says so in
+the summary — `FLAKY in isolation, but <file> is in this branch diff` — so a coupling it did not expect is
+visible instead of reading as a plain UNEXPECTED failure.
+
+Limits, recorded rather than hidden: imports are followed one level, and a workspace-package specifier
+(`@orca/…`) other than process-host is skipped rather than guessed. Each can only waive a flake a branch
+caused, never refuse one it did not.
+
+**Tests.** `tests/tools/gate-unit.test.mjs` (24 cases) covers the fail-closed rules, the record and reuse
+decisions, the summary line and the coupling rule; `tests/tools/open-pr.test.mjs` gains the case its
+fixtures needed for the gate-inputs contract. #178 had already added `tests/tools/unit-gate.test.mjs` for
+the judgement module, so those cases are not duplicated here.
+
 ### `local(ratchets)`: `pnpm lint` was red on `nplez1/main` (#161)
 
 `pnpm lint` failed on this fork's own default branch. The ratchets that failed are upstream's

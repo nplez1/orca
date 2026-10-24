@@ -33,9 +33,12 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import {
+  GATE_INPUT_PATHS,
   allowlistFingerprint,
   formatVerdict,
+  gateInputsFingerprint,
   readCachedVerdict,
+  toolchainVersions,
   unitGateCacheDir
 } from './gate-verdict-cache.mjs'
 
@@ -219,13 +222,31 @@ export function allowlistAtHead(head, gitRaw = runRaw) {
   }
 }
 
+/**
+ * The gate inputs as they are at `head`: the scripts and the bun pin from the commit, the toolchains
+ * from this machine. Why from the commit and not the working tree: a verdict is about a revision, and
+ * `gate-unit` fingerprints the tree only because it refuses to run on a dirty one.
+ */
+export function gateInputsAtHead(head, gitRaw = runRaw) {
+  const files = {}
+  for (const path of GATE_INPUT_PATHS) {
+    try {
+      files[path] = gitRaw('git', ['show', `${head}:${path}`])
+    } catch {
+      files[path] = ''
+    }
+  }
+  return gateInputsFingerprint({ files, toolchain: toolchainVersions() })
+}
+
 export function unitGateVerdict(
   head,
   {
     gitDir = tryGit(['rev-parse', '--absolute-git-dir']),
     // Why from the commit and not the working tree: an uncommitted allowlist would fingerprint a red
     // set that is not part of the revision being shipped.
-    allowlistText = allowlistAtHead(head)
+    allowlistText = allowlistAtHead(head),
+    gateInputs
   } = {}
 ) {
   if (allowlistText === null) {
@@ -254,6 +275,18 @@ export function unitGateVerdict(
       reason:
         `gate 1's cached verdict for ${head.slice(0, 10)} was produced on a dirty tree, so it is not ` +
         `a verdict on this revision. Re-run the gate on a committed tree.`
+    }
+  }
+  // Why: the same revision on a different bun or node is a different run of the machine-bound test
+  // classes, so the cached PASS is about a runtime this machine no longer has.
+  const inputs = gateInputs ?? gateInputsAtHead(head)
+  if (verdict.gateInputs !== inputs) {
+    return {
+      ok: false,
+      reason:
+        `gate 1's cached verdict for ${head.slice(0, 10)} was produced with different gate inputs ` +
+        `(the gate scripts, config/.bun-version, or the installed node and bun), so it is not a ` +
+        `verdict on this revision. Re-run it: orca-queue node local/gate-unit.mjs`
     }
   }
   if (verdict.exitCode !== 0) {
