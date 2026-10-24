@@ -806,14 +806,16 @@ asserted the one-argument call. Nothing in this branch touches the file — `git
 b094309766..nplez1/main` does not list it — so it was repaired in the same shape as the two above
 rather than recorded.
 
-Verdict, on the revision that ships (`098d3ea4a3`):
+The first full run after the tightening (`098d3ea4a3`, before PR #177 landed) passed:
 
 ```
 Unit gate @098d3ea4a3 (clean): PASS — 135786 passed; 31 failed (31 allowlisted, 0 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 80 upstream-quarantined file(s) not run; 2 fork-local test file(s) passed; 2472 s
 ```
 
 No entry was stale and none was unseen, which is the check that the tightening was faithful: the 31
-names are exactly the 31 failures, with no wildcard left to absorb an unknown one.
+names are exactly the 31 failures, with no wildcard left to absorb an unknown one. The verdict for the
+revision that ships is in the PR body, because `local/open-pr.mjs` now requires a cached PASS for the
+exact head revision and this file changing is what changes that revision's cache key.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
