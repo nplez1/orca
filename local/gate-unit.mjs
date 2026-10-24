@@ -28,8 +28,8 @@ import {
   globSync,
   mkdirSync,
   mkdtempSync,
-  openSync,
   closeSync,
+  openSync,
   readFileSync,
   writeFileSync
 } from 'node:fs'
