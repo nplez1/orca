@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type { UpdaterRendererChannel } from './updater-types'
-import { UpdaterState } from './updater-state'
+import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
+import { INITIAL_UPDATE_STATUS, UpdaterState } from './updater-state'
 
 /** Owns the main-window binding every updater send and window-parented dialog goes through. */
 export abstract class UpdaterWindowBinding extends UpdaterState {
@@ -11,9 +12,9 @@ export abstract class UpdaterWindowBinding extends UpdaterState {
   protected bindMainWindow(mainWindow: BrowserWindow): void {
     this.mainWindowRef = mainWindow
     mainWindow.once('closed', () => this.releaseMainWindow(mainWindow))
-    // Why: a status that landed while the previous window was gone was recorded but never sent; the
-    // untouched default is already the renderer's own initial status, so replaying it is only noise.
-    if (this.currentStatus.state !== 'idle') {
+    // Why: only the untouched default is skipped — the renderer already starts from it, while every
+    // recorded status, idle included, is one the new renderer has no other way to learn.
+    if (this.currentStatus !== INITIAL_UPDATE_STATUS) {
       this.sendToMainWindow('updater:status', this.currentStatus)
     }
   }
@@ -40,8 +41,14 @@ export abstract class UpdaterWindowBinding extends UpdaterState {
     try {
       target.webContents.send(channel, ...args)
       return true
-    } catch {
-      // Why: the window can go away between the guard and the send; the next bind replays currentStatus.
+    } catch (error) {
+      // Why: the window can go away between the guard and the send; the next bind replays the status,
+      // and the failure stays visible instead of disappearing silently.
+      recordUpdaterLifecycle(
+        'renderer_send_failed',
+        { channel, errorType: error instanceof Error ? error.name : typeof error },
+        { level: 'warn', message: 'Updater could not send to the main window' }
+      )
       return false
     }
   }
