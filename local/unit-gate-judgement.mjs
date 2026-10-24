@@ -210,3 +210,26 @@ export function collectedQuarantinedFiles(report, quarantined) {
     .map((file) => repoPath(file.name))
     .filter((file) => set.has(file))
 }
+
+/**
+ * Vitest exits non-zero for a failing test, so its status alone proves nothing — it proves something
+ * only when nothing else explains it. Same rule as `decideUnitShardVerdict`, which fails a shard that
+ * failed without the tolerated teardown race.
+ */
+export function unexplainedSuiteExit({ outcome, status, failedCount, unhandledCount }) {
+  if (outcome !== 'complete') {
+    return `the suite did not run to completion: ${outcome}`
+  }
+  if (status === 0 || failedCount > 0 || unhandledCount > 0) {
+    return null
+  }
+  return `the suite exited ${status === null ? 'without a status' : status} and neither the report nor the log explains it; failing closed`
+}
+
+/** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */
+export function declaredUnhandledMismatch(declaredCount, readableCount) {
+  if (declaredCount === null || declaredCount === readableCount) {
+    return null
+  }
+  return `Vitest declared ${declaredCount} unhandled error(s) but ${readableCount} could be read; failing closed`
+}

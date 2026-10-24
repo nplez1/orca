@@ -4,8 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import {
+  GATE_INPUT_PATHS,
   allowlistFingerprint,
   cachedVerdictPath,
+  gateInputsFingerprint,
+  toolchainVersions,
   unitGateCacheDir
 } from '../../local/gate-verdict-cache.mjs'
 import {
@@ -14,6 +17,7 @@ import {
   TARGETS,
   allowlistAtHead,
   evaluateGates,
+  gateInputsAtHead,
   forkOnlyPathsIn,
   forkOnlySubjects,
   localCommitsIn,
@@ -53,10 +57,13 @@ function gateFixture(verdict) {
   return { gitDir }
 }
 
+const TEST_INPUTS = 'test-gate-inputs'
+
 function passingVerdict(overrides = {}) {
   return {
     revision: REVISION,
     clean: true,
+    gateInputs: TEST_INPUTS,
     exitCode: 0,
     counts: { passed: 12378, failed: 11, known: 11 },
     unexpected: [],
@@ -170,17 +177,32 @@ it('finds a fork-owned path even when the commit that carried it is worded norma
   expect(FORK_OWNED_PATHS).toContain('LOCAL-PATCHES.md')
 })
 
+/** The fixtures record `TEST_INPUTS`, so the lookup is given the same value it would compute. */
+function gateVerdict(head, options) {
+  return unitGateVerdict(head, { gateInputs: TEST_INPUTS, ...options })
+}
+
+it('refuses a verdict recorded against different gate inputs', () => {
+  // The same revision on a different bun or node is a different run of the machine-bound classes,
+  // so a PASS recorded before the upgrade is not a verdict on this checkout.
+  const { gitDir } = gateFixture(passingVerdict())
+  expect(gateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST })).toMatchObject({ ok: true })
+  expect(
+    gateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST, gateInputs: 'other-inputs' })
+  ).toMatchObject({ ok: false, reason: expect.stringContaining('different gate inputs') })
+})
+
 it('passes gate 1 only on a cached PASS for this exact revision', () => {
   const { gitDir } = gateFixture(passingVerdict())
 
-  const result = unitGateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST })
+  const result = gateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST })
   expect(result.ok).toBe(true)
   expect(result.verdict.counts.passed).toBe(12378)
 })
 
 it('refuses gate 1 with no verdict, a failing verdict, a dirty verdict, or another revision', () => {
   const missing = gateFixture(null)
-  expect(unitGateVerdict(REVISION, { ...missing, allowlistText: ALLOWLIST })).toMatchObject({
+  expect(gateVerdict(REVISION, { ...missing, allowlistText: ALLOWLIST })).toMatchObject({
     ok: false,
     reason: expect.stringContaining('no cached unit-gate verdict')
   })
@@ -188,21 +210,35 @@ it('refuses gate 1 with no verdict, a failing verdict, a dirty verdict, or anoth
   const failing = gateFixture(
     passingVerdict({ exitCode: 1, unexpected: [{ file: 'src/x.test.ts', test: 'x' }] })
   )
-  expect(unitGateVerdict(REVISION, { ...failing, allowlistText: ALLOWLIST })).toMatchObject({
+  expect(gateVerdict(REVISION, { ...failing, allowlistText: ALLOWLIST })).toMatchObject({
     ok: false,
     reason: expect.stringContaining('gate 1 FAILED')
   })
 
   const dirty = gateFixture(passingVerdict({ clean: false }))
-  expect(unitGateVerdict(REVISION, { ...dirty, allowlistText: ALLOWLIST })).toMatchObject({
+  expect(gateVerdict(REVISION, { ...dirty, allowlistText: ALLOWLIST })).toMatchObject({
     ok: false,
     reason: expect.stringContaining('dirty tree')
   })
 
   const otherRevision = gateFixture(passingVerdict({ revision: 'b'.repeat(40) }))
-  expect(unitGateVerdict(REVISION, { ...otherRevision, allowlistText: ALLOWLIST })).toMatchObject({
+  expect(gateVerdict(REVISION, { ...otherRevision, allowlistText: ALLOWLIST })).toMatchObject({
     ok: false
   })
+})
+
+it('fingerprints the gate inputs from the commit, byte for byte, as gate-unit does from the tree', () => {
+  // The cross-reader bug this guards is the one already recorded for the allowlist: two scripts
+  // hashing the same bytes differently means every fork PR looks like it has no verdict. Read from
+  // the commit, like `allowlistAtHead`, so a work in progress does not fail the test.
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const files = {}
+  for (const path of GATE_INPUT_PATHS) {
+    files[path] = execFileSync('git', ['show', `${head}:${path}`], { encoding: 'utf8' })
+  }
+  expect(gateInputsAtHead(head)).toBe(
+    gateInputsFingerprint({ files, toolchain: toolchainVersions() })
+  )
 })
 
 it('hashes the committed allowlist with exactly the bytes gate-unit hashes', () => {
@@ -224,16 +260,16 @@ it('fingerprints the allowlist in the commit, not the one in the working tree', 
   const permissive = '{"entries":[{"file":"src/x.test.ts"}]}\n'
   expect(permissive).not.toBe(ALLOWLIST)
 
-  expect(unitGateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST })).toMatchObject({
+  expect(gateVerdict(REVISION, { gitDir, allowlistText: ALLOWLIST })).toMatchObject({
     ok: true
   })
-  expect(unitGateVerdict(REVISION, { gitDir, allowlistText: permissive })).toMatchObject({
+  expect(gateVerdict(REVISION, { gitDir, allowlistText: permissive })).toMatchObject({
     ok: false
   })
 })
 
 it('refuses gate 1 when the commit has no allowlist to fingerprint', () => {
-  expect(unitGateVerdict(REVISION, { gitDir: tempDir(), allowlistText: null })).toMatchObject({
+  expect(gateVerdict(REVISION, { gitDir: tempDir(), allowlistText: null })).toMatchObject({
     ok: false,
     reason: expect.stringContaining('cannot read local/unit-known-red.json')
   })
@@ -264,7 +300,7 @@ it('reports both gates together, so one refusal does not hide the other', () => 
     waivers: new Map(),
     head: REVISION,
     body: 'Fixes #152\n',
-    gateOne: { gitDir, allowlistText: ALLOWLIST }
+    gateOne: { gitDir, allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS }
   })
 
   expect(result.problems).toEqual([expect.stringContaining('needs a review claim')])
@@ -274,7 +310,7 @@ it('reports both gates together, so one refusal does not hide the other', () => 
     waivers: new Map(),
     head: REVISION,
     body: 'Fixes #152\n',
-    gateOne: { gitDir: tempDir(), allowlistText: ALLOWLIST }
+    gateOne: { gitDir: tempDir(), allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS }
   })
   expect(both.problems).toHaveLength(2)
 })
