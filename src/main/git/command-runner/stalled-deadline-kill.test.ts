@@ -16,11 +16,12 @@ describe('terminateAtStalledDeadline', () => {
     vi.useRealTimers()
   })
 
-  it('kills once the poll phase shows nothing settled', async () => {
+  it('kills once the poll phase shows nothing exited', async () => {
     const terminate = vi.fn()
     terminateAtStalledDeadline({
       overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
       isSettled: () => false,
+      hasExited: () => false,
       terminate
     })
     expect(terminate).not.toHaveBeenCalled()
@@ -28,17 +29,16 @@ describe('terminateAtStalledDeadline', () => {
     expect(terminate).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves the child alone when the exit it waited for had already arrived', async () => {
+  it('holds the kill below the threshold once the child has exited', async () => {
+    // Why below the threshold: the lateness only says the timer fired late. Whether the exit was
+    // already observed is what decides the kill, so a short stall must not kill a finished command.
     const terminate = vi.fn()
-    let settled = false
     terminateAtStalledDeadline({
-      // Why below the threshold: the lateness only says the timer fired late. Whether an exit was
-      // already queued is what decides the kill, so a short stall must not kill a finished child.
       overrunMs: STALLED_DEADLINE_OVERRUN_MS - 1,
-      isSettled: () => settled,
+      isSettled: () => false,
+      hasExited: () => true,
       terminate
     })
-    settled = true
     await vi.advanceTimersByTimeAsync(0)
     expect(terminate).not.toHaveBeenCalled()
   })
@@ -48,12 +48,15 @@ describe('terminateAtStalledDeadline', () => {
     terminateAtStalledDeadline({
       overrunMs: 387_550,
       isSettled: () => false,
+      hasExited: () => false,
       terminate
     })
     await vi.advanceTimersByTimeAsync(0)
     expect(terminate).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(HIDDEN_EXIT_DRAIN_GRACE_MS - 1)
     expect(terminate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    // The drain checks for a settled child one turn later, after the poll phase.
     await vi.advanceTimersByTimeAsync(1)
     expect(terminate).toHaveBeenCalledTimes(1)
   })
@@ -64,6 +67,7 @@ describe('terminateAtStalledDeadline', () => {
     terminateAtStalledDeadline({
       overrunMs: 387_550,
       isSettled: () => settled,
+      hasExited: () => false,
       terminate
     })
     settled = true

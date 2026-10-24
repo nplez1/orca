@@ -52,30 +52,35 @@ export function recordDeadlineOverrunOnSpan(span: ActiveSpan | undefined, error:
  * Why (#155): timers run before I/O callbacks in the same loop turn, so after a
  * stall the overdue deadline timer fires before Node handles the exit of a child
  * that already finished. Killing there reports a millisecond-long `git remote`
- * as a 30s timeout, and one stall becomes a burst of them. The settle check
- * therefore runs after the poll phase rather than in the timer: only a child
- * still running there was genuinely at its deadline, and one whose loop was
- * stalled gets a bounded drain window first, because the stall may have parked
- * it on a full pipe instead of letting it exit.
+ * as a 30s timeout, and one stall becomes a burst of them. The decision is
+ * therefore taken one turn later, after the poll phase; `hasExited` answers it
+ * rather than `isSettled`, because `close` — what settles the capture — waits on
+ * the stdio pipes and arrives a phase after the immediate. An exited child still
+ * gets the bounded drain window, since a grandchild can hold a pipe open.
  */
 export function terminateAtStalledDeadline(params: {
   overrunMs: number
   isSettled: () => boolean
+  hasExited: () => boolean
   terminate: () => void
 }): void {
-  const { overrunMs, isSettled, terminate } = params
+  const { overrunMs, isSettled, hasExited, terminate } = params
   setImmediate(() => {
     if (isSettled()) {
       return
     }
-    if (!isStalledDeadlineOverrun(overrunMs)) {
+    if (!isStalledDeadlineOverrun(overrunMs) && !hasExited()) {
       terminate()
       return
     }
     const drain = setTimeout(() => {
-      if (!isSettled()) {
-        terminate()
-      }
+      // Why the same turn again: a second stall can land inside the drain, and the timers phase
+      // still runs before the poll that would deliver the child's `close`.
+      setImmediate(() => {
+        if (!isSettled()) {
+          terminate()
+        }
+      })
     }, HIDDEN_EXIT_DRAIN_GRACE_MS)
     drain.unref?.()
   }).unref?.()
