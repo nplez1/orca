@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest'
 import {
   allowlistEntries,
   collectCases,
+  collectedQuarantinedFiles,
   forkTestFiles,
   judge,
   judgeUnhandled,
+  quarantinedEntryProblems,
   quarantinedFiles,
   repoPath
 } from '../../local/gate-unit.mjs'
@@ -68,7 +70,7 @@ describe('an entry covers exactly what it names', () => {
     expect(judged.unexpected).toEqual([])
   })
 
-  it('reports an entry that passed as stale and one whose file never failed as unseen', () => {
+  it('reports an entry that passed as stale and a dead one as unseen', () => {
     const entries = allowlistEntries({
       entries: [
         { file: 'src/main/thing.test.ts', test: 'now green', class: 'c', owner: 'o' },
@@ -84,6 +86,19 @@ describe('an entry covers exactly what it names', () => {
     const judged = judge(entries, cases.failures, cases.passes)
     expect(judged.stale.map((entry) => entry.key)).toEqual(['src/main/thing.test.ts › now green'])
     expect(judged.unseen.map((entry) => entry.key)).toEqual(['src/main/gone.test.ts › *'])
+  })
+
+  it('reports a named entry a rename left behind, even while its file still reds', () => {
+    const entries = allowlistEntries({
+      entries: [{ file: 'src/main/thing.test.ts', test: 'the old title', class: 'c', owner: 'o' }]
+    })
+    const cases = collectCases(reportFor([{ test: 'the new title', status: 'failed' }]))
+    const judged = judge(entries, cases.failures, cases.passes)
+    expect(judged.unexpected.map((failure) => failure.test)).toEqual(['the new title'])
+    expect(judged.stale).toEqual([])
+    expect(judged.unseen.map((entry) => entry.key)).toEqual([
+      'src/main/thing.test.ts › the old title'
+    ])
   })
 })
 
@@ -113,6 +128,25 @@ describe('the run a verdict is computed from', () => {
   it('leaves a path outside the checkout as it found it', () => {
     expect(repoPath('/elsewhere/thing.test.ts')).toBe('/elsewhere/thing.test.ts')
     expect(repoPath(THING)).toBe('src/main/thing.test.ts')
+  })
+})
+
+describe('the upstream-quarantined set', () => {
+  it('refuses an entry for a file the gate never runs', () => {
+    const entries = allowlistEntries({
+      entries: [{ file: 'src/main/thing.test.ts', test: 't', class: 'c', owner: 'o' }]
+    })
+    expect(quarantinedEntryProblems(entries, ['src/main/thing.test.ts'])).toEqual([
+      'allowlist entry for a file the gate does not run (UNIT_EXCLUDE): src/main/thing.test.ts › t'
+    ])
+    expect(quarantinedEntryProblems(entries, ['src/main/other.test.ts'])).toEqual([])
+  })
+
+  it('catches a run that collected one anyway, which means the exclusion stopped applying', () => {
+    const report = { testResults: [{ name: THING }, { name: join(ROOT, 'tests', 'e2e', 'x.ts') }] }
+    expect(collectedQuarantinedFiles(report, ['tests/e2e/x.ts'])).toEqual(['tests/e2e/x.ts'])
+    expect(collectedQuarantinedFiles(report, [])).toEqual([])
+    expect(collectedQuarantinedFiles({}, ['tests/e2e/x.ts'])).toEqual([])
   })
 })
 
@@ -156,5 +190,6 @@ describe('the known-red manifest', () => {
     const run = manifest.observedRun
     expect(run.allowlisted + run.upstreamQuarantined + run.fixed).toBe(run.failingRecords)
     expect(run.allowlisted).toBe(manifest.entries.length)
+    expect(run.fixed).toBe(run.repairedCases.length)
   })
 })
