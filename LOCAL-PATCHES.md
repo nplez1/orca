@@ -599,9 +599,9 @@ What it deliberately does not do:
 The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
 files, and two files that are red on their own and so are deliberately **not** listed —
 `src/main/ephemeral-vm-runtime-extend.test.ts` (its `vi.mock` for `./ssh/targets/ssh-target-registry`
-answered only `getSshConnectionManager` — all that `ephemeral-vm-runtime-extend.ts:22` imports — while
-a `vi.mock` replaces the module for every transitive importer, and the SSH and ledger modules that
-module reaches read `getSshTargetRegistryStore` through it) and
+answered only `getSshConnectionManager`, which is all `ephemeral-vm-runtime-extend.ts:22` imports;
+a `vi.mock` replaces the module for every transitive importer, and the modules the real
+`./ipc/runtime-environments` graph pulls in read `getSshTargetRegistryStore` through it) and
 `src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts` (an `fs` read the test asserts must not
 happen does happen). Both reproduce in a scoped two-file run.
 
@@ -615,14 +615,22 @@ mock. Eight entries whose failures stopped reproducing were pruned, and
 `mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) — the same
 `host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
 
-**The 28 rejections were a second cause, not that one** (fork issue #151 § 4). The
-`TypeError: {} is not iterable` headline came from
-`src/renderer/src/hooks/ipc-events/ephemeral-vm-reclaim-ipc-bridge.ts`, which iterated whatever
-`api.listRuntimes()` answered from a fire-and-forget start caller; `2368ed38da` made a non-list answer
-mean "nothing to reconcile". The two symptoms shared a run and nothing else, and the recorded sentence
-welded them because of that. The rule the mock actually has to satisfy is the one the import graph
-sets: `ephemeral-vm-runtime-extend.ts:22` reads only `getSshConnectionManager`, so a `vi.mock` that is
-complete for the module under test can still be incomplete for everything that module reaches.
+**Re-diagnosed for fork issue #151 § 4, and the recorded cause was wrong.** Two corrections:
+
+- `ephemeral-vm-runtime-extend.test.ts:23` mocked `./ipc/runtime-environments`, a path that stopped
+  existing in the 2026-10-19 module reorganisation — the code imports
+  `./ipc/runtime-environments/runtime-environments` (`ephemeral-vm-runtime-extend.ts:16`), and the
+  directory has no `index.ts`, so the mock was inert and the real module loaded with everything it
+  reaches. That is how a registry-mock gap surfaced thirty frames away. The mock now names the module
+  the code imports.
+- The `TypeError: {} is not iterable` rejections were **not** the mock at all:
+  `src/renderer/src/hooks/ipc-events/ephemeral-vm-reclaim-ipc-bridge.ts` iterated whatever
+  `api.listRuntimes()` answered from a fire-and-forget start caller, and `2368ed38da` made a non-list
+  answer mean "nothing to reconcile". The recorded sentence welded the two because they appeared in
+  the same run.
+
+Both files are this fork's own (`902955072a` is fork PR #81 and is not in `upstream/main`), so there
+was nothing to send upstream, contrary to the issue's premise.
 
 Two local prerequisites decide whether a run's failures are real, and both are install artifacts:
 `mobile/node_modules` (without it the mobile type-aware pass reports upstream's own files) and the
@@ -731,11 +739,11 @@ evidence and the JSON the assertion, as with the unit red set.
 `local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was
 file-level (`"test": "*"`), which also covers a _new_ failure in that file, and three named files the
 gate should never have been running at all — upstream's own unit lane excludes them
-(`config/scripts/ci-unit-files.mjs:17-24`). What changed:
+(`config/scripts/ci-unit-files.mjs:18`, `:37` and `:51`). What changed:
 
-- **32 named entries instead of 15 wildcards.** The names come from a reconciliation run over the
-  allowlisted files, recorded in the JSON's `observedRun`, whose arithmetic now closes at 38 records:
-  32 allowlisted, 5 upstream-quarantined and 1 fixed. Tightening is safe by construction — a name
+- **31 named entries instead of 15 wildcards.** The names come from a reconciliation run over the
+  allowlisted files, recorded in the JSON's `observedRun`, whose arithmetic closes at 38 records:
+  31 allowlisted, 5 upstream-quarantined and 2 repaired. Tightening is safe by construction — a name
   matches exactly what the wildcard matched in that run — and it is what makes the next red in those
   files visible instead of absorbed.
 - **The gate runs the unit lane's file set.** `local/gate-unit.mjs` sets `ORCA_BALANCE_UNIT_SHARDS=1`
@@ -750,24 +758,39 @@ gate should never have been running at all — upstream's own unit lane excludes
   `UNIT_INCLUDE` by upstream's definition, so `local/sync/lib/*.test.mjs` matched no lane at all (fork
   issue #151 § 5). The gate runs them first — 35 tests in 0.7 s — before `build:packages` and the
   suite, so a broken sync tool cannot produce a verdict about anything else.
-- **`the screen prompt a pane is holding answers null for a pane it cannot bind to a terminal` was
-  fixed, not recorded.** Tightening is what surfaced it: it asserted `null` where
-  `src/main/runtime/terminal/wait/terminal-pane-screen-prompt.ts:15-20` documents `undefined` ("cannot
-  see it" is not "no dialog"), in the same fork commit (`3526000b5c`) that added both, so it had never
-  passed. Recorded as a red it would have hidden the next real break in a 1,476-case file.
+- **Two reds tightening surfaced were repaired, not recorded.** The wildcard hid both:
+  - `the screen prompt a pane is holding answers null for a pane it cannot bind to a terminal`
+    asserted `null` where `src/main/runtime/terminal/wait/terminal-pane-screen-prompt.ts:15-20`
+    documents `undefined` ("cannot see it" is not "no dialog"), in the same fork commit
+    (`3526000b5c`) that added both, so it had never passed.
+  - `macOS privileged CLI command transaction repairs an unreadable link to an older Orca launcher`
+    linked `/Applications/Old Orca.app/…/bin/orca` while the fork ships `orca-np`
+    (`cli-install-constants.ts:6`), and `isManagedSymlinkTarget` rejects a name mismatch
+    (`cli-command-inspection.ts:117`) — so the installer read its own launcher as a foreign command.
+    The two sibling cases in that file already use `orca-np`; this one arrived later from upstream.
+    Not a `/private/var` path case, and not upstream's to fix: owner is the identity patch, and it
+    cost one hunk. Recorded as a red it would have hidden the next real break in those files.
+- **The isolation re-run is judged per test, not per file.** A file with named reds still exits
+  non-zero when re-run alone, so "the file failed again" cannot separate a load flake from a real
+  break once entries are named. The re-run writes its own JSON report and a failure is only
+  reproduced when that same test failed there; a missing report counts as reproduced (fail closed).
+- **A named entry can no longer go quietly dead.** `unseen` used to mean "the file did not fail",
+  which cannot happen to a dead entry whose file still reds elsewhere. It is now "nothing in the run
+  matched this entry and it is not stale", which also catches a renamed or deleted case.
 - **A manifest test.** `tests/tools/unit-gate.test.mjs` pins the judging rules the verdict rests on (a
-  named entry does not cover its neighbours, a collect failure counts as a failure, unhandled
-  headlines collapse and count) and the manifest invariants: no wildcard entries, no duplicate keys, a
-  class, an owner and evidence on every entry, no entry for a quarantined file, and `observedRun`
-  closing its own arithmetic. It sits beside `tests/tools/lint-gate.test.mjs` rather than in `local/`,
-  because `tests/tools/**` is the one place the unit suite collects a fork-local tool's tests. Two
-  entries also gained the `owner: upstream` they were missing: both are upstream files that this fork
-  never touched.
+  named entry does not cover its neighbours, a rename leaves a dead entry visible, a collect failure
+  counts as a failure, unhandled headlines collapse and count, and both quarantine checks fire) and
+  the manifest invariants: no wildcard entries, no duplicate keys, a class, an owner and evidence on
+  every entry, no entry for a quarantined file, and `observedRun` closing its own arithmetic. It sits
+  beside `tests/tools/lint-gate.test.mjs` rather than in `local/`, because `tests/tools/**` is the one
+  place the unit suite collects a fork-local tool's tests.
 
 § 2 and § 4 of the issue were already resolved by the 2026-10-21 and 2026-10-22 syncs — the eight
 stale entries were pruned then, and both formerly-unlisted reds pass — so what is left here is § 1,
-§ 3, § 5 and the correction to the extend-test diagnosis recorded above. Same shape as
-`local(lint)` above: `LOCAL-PATCHES.md` is the evidence, the JSON is the assertion.
+§ 3, § 5 and the re-diagnosis recorded above. The contradiction § 2 names is resolved in favour of
+pruning: `LOCAL-PATCHES.md` is the history of _why_ a class was red, not a reason to keep an entry
+that has stopped reproducing. Same shape as `local(lint)` above: this file is the evidence, the JSON
+is the assertion.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 

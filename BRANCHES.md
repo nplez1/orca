@@ -329,13 +329,16 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
 - **Shape:** `local/gate-unit.mjs` runs the unit lane's file set (`ORCA_BALANCE_UNIT_SHARDS=1` →
   `UNIT_EXCLUDE`, 80 files here), asserts the report collected none of them, refuses an allowlist entry
   for a quarantined file, and runs the fork-local `local/**/*.test.mjs` lane that nothing else reached.
-  The manifest is 32 named entries whose arithmetic closes; the one red the tightening surfaced is
-  fixed (`pane-screen-prompt.spec.ts` asserted `null` where the implementation documents `undefined`),
+  The manifest is 31 named entries whose arithmetic closes. Two reds the tightening surfaced were
+  repaired rather than recorded (`pane-screen-prompt.spec.ts` asserted `null` where the implementation
+  documents `undefined`; a privileged-CLI case linked an `orca` launcher the fork ships as `orca-np`),
   and `tests/tools/unit-gate.test.mjs` pins the judging rules and the manifest invariants.
 - **Already done by earlier syncs:** § 2 (the eight stale entries were pruned at the 2026-10-21
-  reconciliation) and § 4 (both formerly-unlisted reds pass). The issue's correction to the recorded
-  extend-test diagnosis is in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(test)`: the 28 `TypeError:
-  {} is not iterable` rejections had a second cause, the renderer reclaim bridge, fixed in `2368ed38da`.
+  reconciliation) and § 4 (both formerly-unlisted reds pass). The re-diagnosis is in
+  [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(test)`: the extend test's mock named a path the
+  2026-10-19 reorganisation deleted, so it was inert and the real module loaded; the `TypeError: {}
+  is not iterable` rejections had a separate cause — the renderer reclaim bridge, fixed in
+  `2368ed38da`. Both files are fork-owned, so nothing goes upstream.
 - **Verified:** see the PR body — `pnpm tc`, the focused suites, `check:code-quality:changed`, the full
   gate verdict for the shipped revision, and the Opus review round.
 
