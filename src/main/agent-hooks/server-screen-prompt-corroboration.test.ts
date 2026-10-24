@@ -48,6 +48,16 @@ function row(
   }
 }
 
+function piRow(
+  overrides: Partial<EnrichedAgentHookEventPayload> = {}
+): EnrichedAgentHookEventPayload {
+  return row('working', {
+    source: 'pi',
+    payload: { state: 'working', prompt: 'fix the summary pane', agentType: 'pi' },
+    ...overrides
+  })
+}
+
 describe('the row a screen dialog implies', () => {
   it('repaints a working Copilot row as a wait', () => {
     const armed = row('working')
@@ -132,6 +142,27 @@ describe('the row a screen dialog implies', () => {
     })
     expect(
       screenPromptRow(claude, claude, { reason: 'agent-approval-prompt', since: 1_200 })
+    ).toBeNull()
+  })
+
+  it('repaints a pi row that landed under a card older than the row', () => {
+    // Why the turn is the clock: pi keeps posting while its card goes unanswered (a reload's
+    // agent_start, a child settling), and each post replaces the wait the card earned. Measured
+    // shape: a question open 08:44:04-09:02:10 kept its wait for 3m31s, then read working for the
+    // remaining 14m35s. The card predates that row but not the turn it belongs to.
+    const armed = piRow({ receivedAt: 2_000 })
+    const next = screenPromptRow(armed, armed, {
+      reason: 'agent-interactive-prompt',
+      since: 1_200
+    })
+    expect(next?.payload.state).toBe('waiting')
+    expect(next?.hookEventName).toBe('screen_prompt')
+  })
+
+  it('does not read a pi card painted before this turn', () => {
+    const armed = piRow({ turnStartedAt: 1_300 })
+    expect(
+      screenPromptRow(armed, armed, { reason: 'agent-interactive-prompt', since: 1_200 })
     ).toBeNull()
   })
 

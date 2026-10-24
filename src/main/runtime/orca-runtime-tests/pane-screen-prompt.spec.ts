@@ -39,7 +39,7 @@ describe('the screen prompt a pane is holding', () => {
   it('reads the approval dialog out of the pane it belongs to', async () => {
     const { runtime, paneKey } = await terminalRuntime()
     runtime.onPtyData('pty-screen', APPROVAL_DIALOG, 1_000)
-    expect(runtime.readPaneScreenPrompt(paneKey)).toMatchObject({
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toMatchObject({
       reason: 'agent-approval-prompt',
       // Why the stamp: a dialog gained before the turn opened is discarded by the store's reader, so
       // the scan's own clock has to reach it — a null one would silently disable that check.
@@ -67,7 +67,7 @@ describe('the screen prompt a pane is holding', () => {
     // That, and not a hook, is what ends the wait in practice.
     const { runtime, paneKey } = await terminalRuntime()
     runtime.onPtyData('pty-screen', APPROVAL_DIALOG, 1_000)
-    expect(runtime.readPaneScreenPrompt(paneKey)?.reason).toBe('agent-approval-prompt')
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')?.reason).toBe('agent-approval-prompt')
     runtime.onPtyData(
       'pty-screen',
       Array.from({ length: 14 }, (_, index) => `  step ${index + 1}: reading the diff\r\n`).join(
@@ -75,19 +75,83 @@ describe('the screen prompt a pane is holding', () => {
       ),
       1_100
     )
-    expect(runtime.readPaneScreenPrompt(paneKey)).toBeNull()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toBeNull()
   })
 
   it('answers null for a pane showing ordinary output', async () => {
     const { runtime, paneKey } = await terminalRuntime()
     runtime.onPtyData('pty-screen', '  ✓ 12 tests passed\r\n  compiling…\r\n', 1_000)
-    expect(runtime.readPaneScreenPrompt(paneKey)).toBeNull()
+    expect(runtime.readPaneScreenPrompt(paneKey, 'copilot')).toBeNull()
   })
 
   it('answers undefined for a pane it cannot bind to a terminal', async () => {
     const { runtime } = await terminalRuntime()
     // Why undefined and not null: a pane with no terminal is "cannot see it", which the store must
     // not read as "no dialog" — and a closed pane must not throw into its deferred read either.
-    expect(runtime.readPaneScreenPrompt('tab-gone:leaf-gone')).toBeUndefined()
+    expect(runtime.readPaneScreenPrompt('tab-gone:leaf-gone', 'copilot')).toBeUndefined()
+  })
+})
+
+/** Pi's ask card, as the emulator's grid holds it: Pi-Bolt 1.0.0 `ask_user_question` over a 100x30
+ *  PTY. The card is painted inside the alternate screen with cursor addressing, which is why the
+ *  tail-text lane reads no dialog for pi and this lane reads the grid instead. */
+const PI_ASK_CARD = [
+  ' Ask Colour',
+  '  Colour',
+  ' Which colour do you prefer most?',
+  ' ❯ 1. Blue',
+  ' Enter to select · ↑/↓ to navigate · Esc to cancel · Ctrl+] to collapse',
+  ''
+].join('\r\n')
+
+async function piTerminalRuntime() {
+  const spawn = vi.fn().mockResolvedValue({ id: 'pty-screen' })
+  const runtime = new OrcaRuntimeService(store)
+  runtime.setPtyController({
+    spawn,
+    write: () => true,
+    kill: () => true,
+    getForegroundProcess: async () => null
+  })
+  await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { command: 'pi', title: 'worker' })
+  const paneKey = expectStablePaneKeyEnv(spawnedPtyEnv(spawn.mock.calls[0]?.[0]))
+  return { runtime, paneKey }
+}
+
+describe('the ask card a pi pane is holding', () => {
+  it('reads the card from the rendered grid', async () => {
+    const { runtime, paneKey } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_ASK_CARD, 1_000)
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')?.reason).toBe('agent-interactive-prompt')
+  })
+
+  it('stamps the card with its first sighting, not with the read that found it again', async () => {
+    // Why: pi keeps posting while the card waits, and the row those posts leave behind is newer than
+    // the card. First-seen is the only clock that proves the card belongs to the turn in flight.
+    const { runtime, paneKey } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_ASK_CARD, 1_000)
+    const first = runtime.readPaneScreenPrompt(paneKey, 'pi')
+    const again = runtime.readPaneScreenPrompt(paneKey, 'pi')
+    expect(first?.since).toBe(again?.since)
+  })
+
+  it('stops reading the card once the grid no longer holds it', async () => {
+    const { runtime, paneKey } = await piTerminalRuntime()
+    runtime.onPtyData('pty-screen', PI_ASK_CARD, 1_000)
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).not.toBeNull()
+    runtime.onPtyData('pty-screen', '\x1b[2J\x1b[H  ✓ 12 tests passed\r\n', 2_000)
+    // Why null and not undefined: the grid was read and held no card, which is the evidence that
+    // ends the wait — unlike an unreadable grid, which must not.
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
+  })
+
+  it('claims no wait for a dialog whose wording pi does not paint on a card', async () => {
+    const { runtime, paneKey } = await piTerminalRuntime()
+    runtime.onPtyData(
+      'pty-screen',
+      ' Do you trust this workspace?\r\n Press enter to confirm\r\n',
+      1_000
+    )
+    expect(runtime.readPaneScreenPrompt(paneKey, 'pi')).toBeNull()
   })
 })
