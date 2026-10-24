@@ -8,6 +8,11 @@
  * not changed returns immediately — which is what stops the run-seven-times-per-session pattern
  * the 2026-10-14 session log recorded.
  *
+ * Two things it runs beyond the suite. It runs the set upstream's own unit lane runs, by setting the
+ * switch `config/vitest.config.ts` reads for `UNIT_EXCLUDE` rather than `defaultExclude`: a file
+ * upstream quarantines is not a red this fork owes an allowlist entry for. And it runs the
+ * fork-local `node --test` files, which sit outside `UNIT_INCLUDE` and so were in no lane at all.
+ *
  * Upstream's own runs never call this: `.github/workflows/unit-tests.yml` keeps Vitest's exit code,
  * and `local/check-unit-shard-verdict.mjs` stays the per-shard CI verdict. This is the local gate
  * described in `AGENTS.md` § PR gate 1.
@@ -19,13 +24,27 @@
  */
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
+/** Why this switch: the unit and PR workflows set it, and it is what makes `config/vitest.config.ts`
+ *  apply upstream's `UNIT_EXCLUDE` instead of `defaultExclude`. */
+const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
+/** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
+const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
 // Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
 // is not a directory and the gate could not record the verdict it just computed.
@@ -109,7 +128,7 @@ function readJsonFile(path, what) {
 }
 
 /** Entries are file-level (`*` or absent) unless they name a test. */
-function allowlistEntries(manifest) {
+export function allowlistEntries(manifest) {
   const entries = Array.isArray(manifest.entries) ? manifest.entries : []
   return entries.map((entry) => {
     const file = String(entry.file).replaceAll('\\', '/')
@@ -239,11 +258,13 @@ function branchDiff() {
   return null
 }
 
-function runStep(label, program, args, logFd, timeoutMs) {
+function runStep(label, program, args, logFd, timeoutMs, env) {
   process.stderr.write(`gate-unit: ${label}\n`)
   const started = Date.now()
   const result = spawnSync(program, args, {
     cwd: ROOT,
+    // Why the merge rather than a bare env: PATH and the Bun pin have to survive the overlay.
+    env: env ? { ...process.env, ...env } : process.env,
     stdio: ['ignore', logFd, logFd],
     timeout: timeoutMs,
     killSignal: 'SIGKILL'
@@ -252,10 +273,44 @@ function runStep(label, program, args, logFd, timeoutMs) {
   return { status: result.status, timedOut, elapsedMs: Date.now() - started }
 }
 
-function runSuite({ reportPath, logPath, timeoutMs, vitestArgs }) {
+function normalise(name) {
+  return String(name ?? '').replaceAll('\\', '/')
+}
+
+/**
+ * Files `UNIT_INCLUDE` collects but `UNIT_EXCLUDE` drops. Upstream's unit lane does not run them
+ * either, so a red there is not this fork's to record — but a gate that quietly stopped applying the
+ * exclusion would look green for the wrong reason, which is why the run is checked against this list.
+ */
+export function quarantinedFiles(root = ROOT) {
+  const included = new Set(globSync(UNIT_INCLUDE, { cwd: root }).map(normalise))
+  const collected = globSync(UNIT_INCLUDE, { cwd: root, exclude: UNIT_EXCLUDE }).map(normalise)
+  const runnable = new Set(collected)
+  return [...included].filter((file) => !runnable.has(file)).sort()
+}
+
+export function forkTestFiles(root = ROOT) {
+  return globSync(FORK_TEST_INCLUDE, { cwd: root, exclude: ['**/node_modules/**'] })
+    .map(normalise)
+    .sort()
+}
+
+function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
   const logFd = openSync(logPath, 'w')
   let elapsedMs = 0
   try {
+    // Why first: it costs a second and its failure would invalidate any verdict the suite produced.
+    const forkStep =
+      forkTests.length === 0
+        ? { status: 0, timedOut: false, elapsedMs: 0 }
+        : runStep('fork-local tests', process.execPath, ['--test', ...forkTests], logFd, timeoutMs)
+    elapsedMs += forkStep.elapsedMs
+    if (forkStep.timedOut) {
+      return { outcome: 'timed-out', elapsedMs }
+    }
+    if (forkStep.status !== 0) {
+      return { outcome: 'fork-local tests failed', elapsedMs }
+    }
     for (const [label, program, args] of [
       ['build:packages', 'pnpm', ['run', 'build:packages']],
       [
@@ -287,7 +342,8 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs }) {
         ...vitestArgs
       ],
       logFd,
-      timeoutMs
+      timeoutMs,
+      UNIT_LANE_ENV
     )
     elapsedMs += suite.elapsedMs
     if (suite.timedOut) {
@@ -326,11 +382,15 @@ function rerunIsolation(file, dir, timeoutMs) {
 function formatSummary(result) {
   const counts = result.counts
   const unhandledBlocking = result.unhandled?.blocking?.length ?? 0
+  const quarantined = result.quarantined?.count ?? 0
+  const forkTests = result.forkTests ?? { files: 0, passed: false }
   const parts = [
     `${counts.passed} passed`,
     `${counts.failed} failed (${counts.known} allowlisted, ${result.unexpected.length} unexpected)`,
     `${result.flaky.length} flaky re-run passed`,
-    `${unhandledBlocking} unhandled error headline(s)`
+    `${unhandledBlocking} unhandled error headline(s)`,
+    `${quarantined} upstream-quarantined file(s) not run`,
+    `${forkTests.files} fork-local test file(s) ${forkTests.passed ? 'passed' : 'FAILED'}`
   ]
   return `Unit gate @${result.revision.slice(0, 10)} (${result.clean ? 'clean' : 'dirty'}): ${result.exitCode === 0 ? 'PASS' : 'FAIL'} — ${parts.join('; ')}; ${(result.elapsedMs / 1000).toFixed(0)} s`
 }
@@ -362,6 +422,12 @@ function reportResult(result) {
       `  unseen entry (did not fail in this run) — prune if the file no longer reds: ${entry.key}`
     )
   }
+  const quarantined = result.quarantined?.files ?? []
+  if (quarantined.length) {
+    console.log(
+      `  upstream-quarantined (UNIT_EXCLUDE, not run): ${quarantined.length} file(s) — ${quarantined.slice(0, MAX_SUMMARY_LIST).join(', ')}`
+    )
+  }
   for (const entry of result.unhandled?.known ?? []) {
     console.log(`  known unhandled error (×${entry.count}): ${entry.headline}`)
   }
@@ -384,16 +450,30 @@ function evaluate(options, { reportPath, logPath, dir }) {
   }
   const manifest = readJsonFile(options.allowlist, 'known-red allowlist')
   const entries = allowlistEntries(manifest)
+  const quarantined = quarantinedFiles()
+  const forkTests = forkTestFiles()
   const run = runSuite({
     reportPath,
     logPath,
     timeoutMs: options.timeoutMs,
-    vitestArgs: options.vitestArgs
+    vitestArgs: options.vitestArgs,
+    forkTests
   })
 
   const problems = []
   if (run.outcome !== 'complete') {
     problems.push(`the suite did not run to completion: ${run.outcome}`)
+  }
+  const quarantinedSet = new Set(quarantined)
+  if (forkTests.length === 0) {
+    problems.push(
+      'no fork-local test file matched local/**/*.test.mjs, so that lane proved nothing'
+    )
+  }
+  for (const entry of entries) {
+    if (quarantinedSet.has(entry.file)) {
+      problems.push(`allowlist entry for a file the gate does not run (UNIT_EXCLUDE): ${entry.key}`)
+    }
   }
   let report = null
   if (existsSync(reportPath)) {
@@ -426,6 +506,16 @@ function evaluate(options, { reportPath, logPath, dir }) {
     // missing from it while it is very much a failure of this run.
     counts.failed = cases.failures.length
     counts.known = known.length
+    // Why: a verdict that silently stopped excluding them would still look green, and the reason
+    // would be a switch in a config file rather than anything about the code being shipped.
+    const ranQuarantined = (report.testResults ?? [])
+      .map((file) => repoPath(file.name))
+      .filter((file) => quarantinedSet.has(file))
+    if (ranQuarantined.length) {
+      problems.push(
+        `the run collected ${ranQuarantined.length} upstream-quarantined file(s), so UNIT_EXCLUDE did not apply: ${ranQuarantined.slice(0, MAX_SUMMARY_LIST).join(', ')}`
+      )
+    }
   }
 
   const logText = existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
@@ -482,6 +572,8 @@ function evaluate(options, { reportPath, logPath, dir }) {
       blocking: judgedUnhandled.blocking
     },
     elapsedMs: run.elapsedMs ?? 0,
+    forkTests: { files: forkTests.length, passed: run.outcome === 'complete' },
+    quarantined: { count: quarantined.length, files: quarantined },
     logPath,
     diffBase: diff?.base ?? null,
     exitCode,
