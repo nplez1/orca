@@ -146,20 +146,21 @@ describe('the row a screen dialog implies', () => {
   })
 
   it('repaints a pi row that landed under a card older than the row', () => {
-    // Why the turn is the clock: pi keeps posting while its card goes unanswered (a reload's
-    // agent_start, a child settling), and each post replaces the wait the card earned. Measured
-    // shape: a question open 08:44:04-09:02:10 kept its wait for 3m31s, then read working for the
-    // remaining 14m35s. The card predates that row but not the turn it belongs to.
-    const armed = piRow({ receivedAt: 2_000 })
+    // Why the currency flag: pi's own title marker says the card is open now, which outranks any
+    // gained stamp - including a turn start the store could not pin.
+    const armed = piRow({ receivedAt: 2_000, turnStartedAt: undefined })
     const next = screenPromptRow(armed, armed, {
       reason: 'agent-interactive-prompt',
-      since: 1_200
+      since: 1_200,
+      current: true
     })
     expect(next?.payload.state).toBe('waiting')
     expect(next?.hookEventName).toBe('screen_prompt')
   })
 
-  it('does not read a pi card painted before this turn', () => {
+  it('still discards an observation that claims no currency and predates the turn', () => {
+    // Why: only a reader that checked the pane's own marker may set `current`; a bare screen read
+    // stays held to the turn clock, the way Copilot's necessarily is.
     const armed = piRow({ turnStartedAt: 1_300 })
     expect(
       screenPromptRow(armed, armed, { reason: 'agent-interactive-prompt', since: 1_200 })
@@ -439,5 +440,64 @@ describe('the corroboration loop', () => {
     loop.clearAll()
     vi.advanceTimersByTime(10_000)
     expect(reads).toBe(0)
+  })
+})
+
+describe('a Pi card the store only learns about from the screen', () => {
+  let userDataPath: string
+  let server: AgentHookServer
+  let card: { reason: 'agent-interactive-prompt'; since: number } | null
+  let askedTypes: (string | undefined)[]
+
+  beforeEach(async () => {
+    userDataPath = mkdtempSync(join(tmpdir(), 'orca-pi-screen-prompt-'))
+    card = null
+    askedTypes = []
+    server = new AgentHookServer()
+    await server.start({ env: 'production', userDataPath })
+    // Why the agent gate: the reader has two lanes and only the pi one can see a pi card. This fails
+    // as a false negative if the store stops passing the row's agent type through.
+    server.setScreenPromptReader((paneKey, agentType) => {
+      askedTypes.push(agentType)
+      return paneKey === PANE && agentType === 'pi' && card
+        ? { ...card, current: true, since: Date.now() }
+        : null
+    })
+  })
+
+  afterEach(() => {
+    server.stop()
+    rmSync(userDataPath, { recursive: true, force: true })
+  })
+
+  function states(): string[] {
+    return server.getStatusSnapshotForPane(PANE).map((entry) => entry.state)
+  }
+
+  async function postPi(payload: Record<string, unknown>): Promise<void> {
+    await postHookEvent(server, buildBody(payload), '/hook/pi')
+  }
+
+  it('repaints a working pi row while its card is up, and releases it when the card goes', async () => {
+    card = { reason: 'agent-interactive-prompt', since: 0 }
+    await postPi({ hook_event_name: 'before_agent_start', prompt: 'fix the summary pane' })
+    await postPi({ hook_event_name: 'message_end', role: 'assistant', text: 'now the service' })
+    await vi.waitFor(() => expect(states()).toEqual(['waiting']), { timeout: 4_000 })
+    // Why the recorded argument: the wait above would pass for any lane if the reader ignored it.
+    expect(askedTypes).toContain('pi')
+
+    card = null
+    await vi.waitFor(() => expect(states()).toEqual(['working']), { timeout: 4_000 })
+  })
+
+  it('re-asserts the wait after a later post overwrites it, which is the bug', async () => {
+    card = { reason: 'agent-interactive-prompt', since: 0 }
+    await postPi({ hook_event_name: 'before_agent_start', prompt: 'fix the summary pane' })
+    await vi.waitFor(() => expect(states()).toEqual(['waiting']), { timeout: 4_000 })
+
+    // Why this post: any pi event that lands under an unanswered card replaces the wait with
+    // `working`, and before the screen lane nothing restored it until the card closed.
+    await postPi({ hook_event_name: 'tool_execution_start', tool_name: 'read' })
+    await vi.waitFor(() => expect(states()).toEqual(['waiting']), { timeout: 4_000 })
   })
 })

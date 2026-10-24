@@ -71,4 +71,13 @@ describe('pi ask-card gained stamp', () => {
     expect(gained.observe('pty-2', CARD_GRID, 4_000)?.since).toBe(4_000)
     expect(gained.observe('pty-1', CARD_GRID, 6_000)?.since).toBe(1_000)
   })
+
+  it('drops a pane it is told to forget, so its next card starts a new clock', () => {
+    // Why: the pane's own title can withdraw the claim while the grid still shows a footer-shaped
+    // line, and the next real card must not inherit a stamp from that.
+    const gained = new PiAskDialogScreenGained()
+    gained.observe('pty-1', CARD_GRID, 1_000)
+    gained.forget('pty-1')
+    expect(gained.observe('pty-1', CARD_GRID, 8_000)?.since).toBe(8_000)
+  })
 })

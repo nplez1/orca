@@ -5,6 +5,11 @@ export type ScreenPromptObservation = {
   reason: RuntimeTerminalWaitBlockedReason
   /** When the tail gained this wording. Older than the turn means it is not this turn's wait. */
   since: number
+  /** The pane's own live marker says this dialog is open right now: pi's `π !` title, painted for as
+   *  long as a dialog holds the pane and never for scrollback. Set only by a reader that checked the
+   *  marker, and it outranks `since` - a card the pane itself still claims cannot be scrollback, and
+   *  a turn whose start the store could not pin would otherwise reject a live wait. */
+  current?: boolean
 }
 
 /** The blocked-text reasons that only match while a person is being asked something: an approval
@@ -50,6 +55,6 @@ export function isScreenPromptForRow(
   return (
     screen !== null &&
     isScreenInteractivePromptReason(screen.reason) &&
-    screen.since >= (row.turnStartedAt ?? row.receivedAt)
+    (screen.current === true || screen.since >= (row.turnStartedAt ?? row.receivedAt))
   )
 }

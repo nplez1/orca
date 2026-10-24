@@ -29,11 +29,11 @@ export function showsPiAskDialogScreen(lines: readonly string[]): boolean {
 /**
  * When each pane's grid first gained a pi card.
  *
- * Why its own clock: the wait a card implies has to be provable against the row that claims the
- * pane is working, and that row is often *newer* than the card — pi keeps posting (`agent_start`
- * after a reload, a child ending, a model stamp) while the card sits unanswered, and every one of
- * those posts replaces the `waiting` row the card earned. First-seen is therefore the only stamp
- * that says "this dialog predates the claim that the pane is working".
+ * Why its own clock: the wait a card implies has to be argued against the row that claims the pane is
+ * working, and that row is often *newer* than the card - pi keeps posting (`agent_start` after a
+ * reload, a child ending, a model stamp) while the card sits unanswered, and every one of those posts
+ * replaces the `waiting` row the card earned. When the card appeared is therefore the stamp that says
+ * "this dialog predates the claim that the pane is working".
  *
  * Why absence clears: a card that leaves the grid was answered, cancelled, or scrolled away, and a
  * wait must never outlive the dialog that justified it.
@@ -52,7 +52,7 @@ export class PiAskDialogScreenGained {
       return undefined
     }
     if (!showsPiAskDialogScreen(lines)) {
-      this.sinceByPtyId.delete(ptyId)
+      this.forget(ptyId)
       return null
     }
     const since = this.sinceByPtyId.get(ptyId) ?? now
@@ -66,5 +66,10 @@ export class PiAskDialogScreenGained {
     }
     this.sinceByPtyId.set(ptyId, since)
     return { reason: 'agent-interactive-prompt', since }
+  }
+
+  /** Drops a pane's stamp without reading its grid - the pane's own title withdrew the claim. */
+  forget(ptyId: string): void {
+    this.sinceByPtyId.delete(ptyId)
   }
 }
