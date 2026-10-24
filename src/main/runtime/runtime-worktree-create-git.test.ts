@@ -24,6 +24,30 @@ describe('getLocalGitHubPrForBranch', () => {
     })
   })
 
+  it('routes the PR lookup through the repo pinned account on the host', async () => {
+    await getLocalGitHubPrForBranch('/repo', 'app', {
+      ghAccount: { host: 'github.com', user: 'Alice' }
+    })
+
+    expect(getPRForBranchMock).toHaveBeenCalledWith('/repo', 'app', null, null, null, {
+      localGitExecOptions: { ghAccount: { host: 'github.com', user: 'Alice' } }
+    })
+  })
+
+  it('carries the WSL route and the pinned account together', async () => {
+    await getLocalGitHubPrForBranch('/repo', 'app', {
+      wslDistro: 'Ubuntu',
+      ghAccount: { host: 'github.acme.com', user: 'Bob' }
+    })
+
+    expect(getPRForBranchMock).toHaveBeenCalledWith('/repo', 'app', null, null, null, {
+      localGitExecOptions: {
+        wslDistro: 'Ubuntu',
+        ghAccount: { host: 'github.acme.com', user: 'Bob' }
+      }
+    })
+  })
+
   it('uses the plain lookup without project git options', async () => {
     await getLocalGitHubPrForBranch('/repo', 'app', {})
 

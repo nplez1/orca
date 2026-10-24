@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type * as UpdaterModule from './updater'
 import type { LinuxRootPackageType, UpdateStatus } from '../shared/update-status-types'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
@@ -64,7 +65,7 @@ describe('updater Linux root packages', () => {
     })
     const send = vi.fn()
     const updater = await loadUpdaterModule()
-    updater.setupAutoUpdater({ webContents: { send } } as never, {
+    updater.setupAutoUpdater(createUpdaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now(),
       installMode
     })

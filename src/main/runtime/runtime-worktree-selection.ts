@@ -6,6 +6,7 @@ import {
 } from '../../shared/execution-host'
 import { splitWorktreeId } from '../../shared/worktree/id'
 import type { GitPushTarget } from '../../shared/worktree/types'
+import type { GhAccountBinding } from '../../shared/github/account-binding'
 
 export type RuntimeWorktreeRemovalTarget = {
   id: string
@@ -109,6 +110,9 @@ export function getExplicitWorktreeIdSelector(selector: string | undefined): str
   return id.length > 0 ? id : null
 }
 
-export function hasLocalGitOptions(gitOptions: { wslDistro?: string }): boolean {
+export function hasLocalGitOptions(gitOptions: {
+  wslDistro?: string
+  ghAccount?: GhAccountBinding
+}): boolean {
   return Object.keys(gitOptions).length > 0
 }

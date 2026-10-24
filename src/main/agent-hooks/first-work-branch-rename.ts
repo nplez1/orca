@@ -270,7 +270,7 @@ async function runAutoRename(
     )
   }
 
-  const username = (await resolveLocalGitUsername(repo.path)) || null
+  const username = (await resolveLocalGitUsername(repo.path, repo.ghAccount)) || null
   // The model sometimes echoes the configured prefix (e.g. `tmchow/...`); strip it to avoid double-prefixing.
   const slug = stripConfiguredBranchPrefix(
     generated.slug,

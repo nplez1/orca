@@ -6,7 +6,11 @@ import type {
   JiraIssue,
   JiraUser
 } from '../../../shared/jira-types'
-import { isJiraTextAreaField, isJiraUserField } from '../../../shared/jira-field-rendering'
+import {
+  isJiraTextAreaField,
+  isJiraUserField,
+  resolveJiraObjectListFieldKind
+} from '../../../shared/jira-field-rendering'
 import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { buildJiraCreateFieldValue } from '@/components/task-page-jira-create-fields'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
@@ -103,7 +107,9 @@ function EditFieldsForm({
         continue
       }
       if (!draft.trim()) {
-        customFields[key] = null
+        // Why [] for a components/versions field: it is an array of references, and Jira
+        // clears an array field with an empty array.
+        customFields[key] = resolveJiraObjectListFieldKind(entry.field) !== null ? [] : null
         continue
       }
       const value = buildJiraCreateFieldValue(entry.field, draft)

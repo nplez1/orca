@@ -1,4 +1,3 @@
-import { realpathSync } from 'node:fs'
 import type { CodexProjectTrustLevel } from './config-toml-trust'
 import { normalizeCodexTrustProjectPath } from './codex-trust-identity'
 import {
@@ -14,16 +13,17 @@ import {
 import { findProjectTrustLevelEntries } from './config-toml-project-trust-level'
 import { repairOrcaDuplicateTrustTables } from './config-toml-project-duplicate-repair'
 
+/**
+ * Writes `trustLevel` for `canonicalProjectPath` — the caller resolves it off the main thread, because
+ * realpath on a workspace path probes the repo's volume and a stalled one must not freeze the app.
+ */
 export function upsertProjectTrustContent(
   existingContent: string,
-  projectPath: string,
-  trustLevel: CodexProjectTrustLevel,
-  options?: { alreadyCanonical?: boolean }
+  canonicalProjectPath: string,
+  trustLevel: CodexProjectTrustLevel
 ): string {
   const existing = repairOrcaDuplicateTrustTables(stripLeadingBom(existingContent))
-  const trustedProjectPath = options?.alreadyCanonical
-    ? projectPath
-    : canonicalizeLocalProjectPath(projectPath)
+  const trustedProjectPath = canonicalProjectPath
   const headerLineEnd = findProjectHeaderLineEnd(existing, trustedProjectPath)
   const eol = existing.includes('\r\n') ? '\r\n' : '\n'
   const trustLine = `trust_level = "${trustLevel}"`
@@ -42,14 +42,6 @@ export function upsertProjectTrustContent(
     )
   }
   return `${existing.slice(0, headerLineEnd)}${eol}${trustLine}${existing.slice(headerLineEnd)}`
-}
-
-function canonicalizeLocalProjectPath(projectPath: string): string {
-  try {
-    return realpathSync.native(projectPath)
-  } catch {
-    return projectPath
-  }
 }
 
 function appendProjectTrustBlock(

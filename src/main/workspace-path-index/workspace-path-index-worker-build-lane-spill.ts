@@ -4,8 +4,8 @@ import type { WorkspacePathCatalogBuilder } from '../../shared/workspace-path-ca
 import type { WorkspacePathCatalogOverlayBuilder } from '../../shared/workspace-path-catalog-overlay'
 import type { WorkspacePathSearchPathSet } from '../../shared/workspace-path-search-contract'
 import type { WorkspacePathSearchInstrumentationEvent } from '../../shared/workspace-path-search-instrumentation'
+import { cleanStaleWorkspacePathCatalogSpillDirectories } from './workspace-path-catalog-spill-sweep'
 import {
-  cleanStaleWorkspacePathCatalogSpillDirectories,
   prepareWorkspacePathCatalogSpillDirectory,
   removeWorkspacePathCatalogSpill
 } from './workspace-path-catalog-spill'

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { installNetRequestFetchAdapter } from './updater-net-request.fixture'
 import { publishingIncident } from './updater-prerelease-feed-reproduction.fixture'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
@@ -192,11 +193,11 @@ describe('updater check failure handling', () => {
     makeBenignCheckFailure('Unable to find latest version on GitHub')
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdatesFromMenu()
 
     await vi.advanceTimersByTimeAsync(0)
@@ -226,11 +227,11 @@ describe('updater check failure handling', () => {
     makeBenignCheckFailure('Cannot find channel "latest-mac.yml" update info: HttpError: 404')
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdatesFromMenu()
     await vi.waitFor(() => {
       const statuses = sendMock.mock.calls
@@ -269,10 +270,10 @@ describe('updater check failure handling', () => {
       respondWithNotReadyRelease({ assetStatus, manifestStatus, manifestText })
       const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       const sendMock = vi.fn()
-      const mainWindow = { webContents: { send: sendMock } }
+      const mainWindow = createUpdaterMainWindow(sendMock)
       const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
 
-      setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+      setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
       checkForUpdatesFromMenu()
 
       await vi.waitFor(() => {
@@ -294,11 +295,11 @@ describe('updater check failure handling', () => {
     makeBenignCheckFailure('Unable to find latest version on GitHub')
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater, checkForUpdates } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdates()
 
     await vi.advanceTimersByTimeAsync(0)
@@ -327,10 +328,10 @@ describe('updater check failure handling', () => {
     })
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
     const { setupAutoUpdater, checkForUpdates, getUpdateStatus } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdates()
     await vi.waitFor(() => {
       expect(netFetchMock).toHaveBeenCalledTimes(2)
@@ -352,11 +353,11 @@ describe('updater check failure handling', () => {
     makeBenignCheckFailure('Unable to find latest version on GitHub')
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater, checkForUpdates } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, { getLastUpdateCheckAt: () => Date.now() })
+    setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
     checkForUpdates()
     await vi.advanceTimersByTimeAsync(0)
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)

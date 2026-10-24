@@ -2,6 +2,7 @@ import os from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as TracerModule from './observability/tracer'
 import type * as UpdaterModule from './updater'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
@@ -152,7 +153,7 @@ function installSpan(): CapturedSpan | undefined {
 
 /** Drives the updater to `downloaded`, the only state `quitAndInstall` acts on. */
 async function reachDownloaded(): Promise<typeof UpdaterModule> {
-  const mainWindow = { webContents: { send: vi.fn() } }
+  const mainWindow = createUpdaterMainWindow()
   autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
   // Why: resetModules gives each test a fresh module graph, so the sink must be installed on the
   // same tracer instance updater.ts will import.
@@ -160,7 +161,7 @@ async function reachDownloaded(): Promise<typeof UpdaterModule> {
   tracer.setActiveSink(capturingSink())
   const updater = await loadUpdaterModule()
 
-  updater.setupAutoUpdater(mainWindow as never)
+  updater.setupAutoUpdater(mainWindow)
   await vi.advanceTimersByTimeAsync(0)
   await vi.waitFor(() => {
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)

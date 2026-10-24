@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { delimiter } from 'node:path'
+import type * as FsPromises from 'node:fs/promises'
 import type * as MacosTccLoginShell from './macos-tcc-login-shell'
 import { stripLegacyTerminalShimEnv } from '../pty/legacy-terminal-shim-dir'
 
 const {
   existsSyncMock,
   statSyncMock,
+  statMock,
   accessSyncMock,
   mkdirSyncMock,
   writeFileSyncMock,
@@ -20,6 +22,7 @@ const {
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   statSyncMock: vi.fn(),
+  statMock: vi.fn(),
   accessSyncMock: vi.fn(),
   mkdirSyncMock: vi.fn(),
   writeFileSyncMock: vi.fn(),
@@ -43,6 +46,11 @@ vi.mock('fs', () => ({
   renameSync: vi.fn(),
   rmSync: vi.fn(),
   constants: { X_OK: 1 }
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => ({
+  ...(await importOriginal<typeof FsPromises>()),
+  stat: statMock
 }))
 
 vi.mock('electron', () => ({
@@ -135,6 +143,7 @@ describe('LocalPtyProvider', () => {
     applyLocalPtyProviderMockDefaults({
       existsSyncMock,
       statSyncMock,
+      statMock,
       accessSyncMock,
       mkdirSyncMock,
       writeFileSyncMock,

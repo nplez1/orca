@@ -1,5 +1,8 @@
 import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
-import { isJiraTextAreaField } from '../../../shared/jira-field-rendering'
+import {
+  isJiraTextAreaField,
+  resolveJiraObjectListFieldKind
+} from '../../../shared/jira-field-rendering'
 import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
 
 // 'assignee' is system here because the dialog renders a dedicated picker for it.
@@ -89,6 +92,15 @@ export function buildJiraCreateFieldValue(field: JiraCreateField, draftValue: st
   }
   if (field.schema?.type === 'array') {
     const parts = splitJiraFieldDraft(trimmed)
+    // Why references for these: components and versions say `items: string` but Jira
+    // holds an object per entry and rejects a bare string, so each part goes in as a
+    // reference — the id when the project's list names it, the name otherwise.
+    if (resolveJiraObjectListFieldKind(field) !== null) {
+      return parts.map((part) => {
+        const option = findJiraCreateAllowedValue(field, part)
+        return option?.id ? { id: option.id } : { name: part }
+      })
+    }
     if (field.allowedValues?.length) {
       return parts.map((part) =>
         getJiraCreateOptionPayload(findJiraCreateAllowedValue(field, part), part)

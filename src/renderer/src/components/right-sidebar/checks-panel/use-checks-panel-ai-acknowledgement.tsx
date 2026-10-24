@@ -13,14 +13,9 @@ import {
 } from '../pr-comments-ai-launch-ack'
 import type { ChecksPanelControllerState } from './use-checks-panel-controller-state'
 import type { ChecksPanelReviewDataState } from './use-checks-panel-review-data'
-import type { ChecksPanelPollingState } from './use-checks-panel-polling'
-import { buildSnapshottedThreadResolver } from '../pr-comment-snapshotted-thread-resolver'
-import { markPRCommentThreadResolved } from '../pr-comment-thread-resolution'
-import { resolveGitLabMRDiscussionForChecks } from './gitlab-review-client'
 import { clearPRCommentsListSelection } from '../pr-comments-list-selection'
 import { translate } from '@/i18n/i18n'
 import type { ChecksAgentComposerState } from './panel-state-types'
-import type { ChecksPanelReview } from '../checks-panel-review'
 
 type ChecksPanelAiAcknowledgementInput = Pick<
   ChecksPanelControllerState,
@@ -31,14 +26,12 @@ type ChecksPanelAiAcknowledgementInput = Pick<
   | 'commentsRef'
   | 'commentsSelectionClearTokenRef'
   | 'pendingCommentResolutionRef'
-  | 'resolveReviewThread'
   | 'setCommentResolutionAckBusyNow'
   | 'setComments'
   | 'setCommentsSelectionClearRequest'
   | 'commentResolutionLaunchAcceptedRef'
 > &
-  Pick<ChecksPanelReviewDataState, 'fetchComments'> &
-  Pick<ChecksPanelPollingState, 'fetchGitLabDetails'>
+  Pick<ChecksPanelReviewDataState, 'fetchComments'>
 
 export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgementInput) {
   const {
@@ -49,9 +42,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
     commentsRef,
     commentsSelectionClearTokenRef,
     fetchComments,
-    fetchGitLabDetails,
     pendingCommentResolutionRef,
-    resolveReviewThread,
     setCommentResolutionAckBusyNow,
     setComments,
     setCommentsSelectionClearRequest,
@@ -69,63 +60,37 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
     [commentsSelectionClearTokenRef, setCommentsSelectionClearRequest]
   )
 
-  const refreshCommentsAfterBulkResolve = useCallback(
-    async (provider: ChecksPanelReview['provider']): Promise<void> => {
-      if (provider === 'gitlab') {
-        await fetchGitLabDetails({ commitAsCurrent: true })
-        return
-      }
-      await fetchComments({ force: true })
-    },
-    [fetchComments, fetchGitLabDetails]
-  )
+  const refreshCommentsAfterReplies = useCallback(async (): Promise<void> => {
+    await fetchComments({ force: true })
+  }, [fetchComments])
 
-  const resolveSelectedThreadsAfterLaunch = useCallback(
+  const replyToSelectedCommentsAfterLaunch = useCallback(
     async (resolution: NonNullable<ChecksAgentComposerState['commentResolution']>) => {
       clearSentCommentSelection(resolution.reviewContextKey)
-      // Why: ignore headSha churn; only abort resolve/UI refresh if the user left this PR/panel.
+      // Why: ignore headSha churn; only abort the UI refresh if the user left this PR/panel.
       const launchStableKey = checksPanelReviewStableKey(resolution.reviewContextKey)
       // Why: the host calls keep the snapshotted target, but every UI mutation must belong
       // to the review the panel is showing now — otherwise replies land in another PR's list.
       const isPanelStillOnLaunchReview = (): boolean =>
         checksPanelReviewStableKey(asyncResultKeyRef.current) === launchStableKey
       const githubTarget = resolution.githubTarget
+      // Why: GitHub is the only provider Orca replies on today; MR threads and GitHub threads
+      // the host can resolve are left open for the user, with no host write at all.
       const canReplyOnHost = resolution.provider === 'github' && githubTarget != null
-      // Why: only GitHub posts fixing replies today; a GitLab MR reaching replied=0 is expected,
-      // and a missing reply target only matters when something in the selection needs a reply.
+      // Why: a PR with no reply target cannot be answered; only report it when something in the
+      // selection would otherwise have been replied to.
       let lastHostError =
         resolution.provider === 'github' &&
         githubTarget == null &&
         hasPRCommentGroupNeedingReply(resolution.selectedGroups)
           ? translate(
               'auto.components.right.sidebar.ChecksPanel.7e4b2a19c0',
-              'Could not resolve the GitHub PR to reply on.'
+              'Could not identify the GitHub PR to reply on.'
             )
           : undefined
-      const resolveSnapshottedThread = buildSnapshottedThreadResolver({
-        provider: resolution.provider,
-        githubResolveTarget: resolution.githubResolveTarget,
-        gitlabTarget: resolution.gitlabTarget,
-        resolveReviewThread,
-        resolveGitLabDiscussion: resolveGitLabMRDiscussionForChecks,
-        isPanelStillOnLaunchReview,
-        onResolvedOptimistically: (threadId) => {
-          setComments((prev) => markPRCommentThreadResolved(prev, threadId, true))
-        },
-        onResolveFailed: ({ threadId, error }) => {
-          lastHostError =
-            error ||
-            translate(
-              'auto.components.right.sidebar.ChecksPanel.430f1a62d4',
-              'Could not resolve the selected thread on the host.'
-            )
-          console.warn('Post-launch thread resolve failed:', threadId, error)
-        }
-      })
       const counts = await acknowledgePRCommentsAfterAiLaunch({
         groups: resolution.selectedGroups,
         deps: {
-          resolveThread: resolveSnapshottedThread,
           canReply: canReplyOnHost,
           replyInThread: async (comment, body) => {
             if (!githubTarget || !canPostPRReviewThreadReply(comment)) {
@@ -209,12 +174,12 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
         }
       })
 
-      if (isPanelStillOnLaunchReview()) {
-        await refreshCommentsAfterBulkResolve(resolution.provider)
+      if (canReplyOnHost && isPanelStillOnLaunchReview()) {
+        await refreshCommentsAfterReplies()
       }
 
       // Why: surface the underlying API error when replies were possible but none landed.
-      // Resolvable threads are acked by resolving, so replied=0 is correct when nothing needed one.
+      // Threads that need no reply are left open by design, so replied=0 is not a failure there.
       const repliedNoneDespiteHostSupport =
         canReplyOnHost &&
         counts.replied === 0 &&
@@ -223,13 +188,12 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
         toast.error(
           translate(
             'auto.components.right.sidebar.ChecksPanel.f273f2271c',
-            'Started the agent. Marked {{value0}} resolved, replied to {{value1}}, skipped {{value2}}, failed {{value3}}.{{value4}}',
+            'Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.{{value3}}',
             {
-              value0: counts.resolved,
-              value1: counts.replied,
-              value2: counts.skipped,
-              value3: counts.failed,
-              value4: lastHostError ? ` ${lastHostError}` : ''
+              value0: counts.replied,
+              value1: counts.leftOpen,
+              value2: counts.failed,
+              value3: lastHostError ? ` ${lastHostError}` : ''
             }
           )
         )
@@ -238,12 +202,11 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       toast.success(
         translate(
           'auto.components.right.sidebar.ChecksPanel.aa95b81a3a',
-          'Started the agent. Marked {{value0}} resolved, replied to {{value1}}, skipped {{value2}}, failed {{value3}}.',
+          'Started the agent. Replied to {{value0}}, left {{value1}} open, failed {{value2}}.',
           {
-            value0: counts.resolved,
-            value1: counts.replied,
-            value2: counts.skipped,
-            value3: counts.failed
+            value0: counts.replied,
+            value1: counts.leftOpen,
+            value2: counts.failed
           }
         )
       )
@@ -252,8 +215,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       addPRConversationComment,
       addPRReviewCommentReply,
       clearSentCommentSelection,
-      refreshCommentsAfterBulkResolve,
-      resolveReviewThread,
+      refreshCommentsAfterReplies,
       commentsRef,
       setComments,
       asyncResultKeyRef
@@ -262,7 +224,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
 
   /**
    * Tab created: park the payload so panel churn during submit-after-ready cannot drop it.
-   * Posts nothing — fixing replies and resolves are irreversible and wait for delivery.
+   * Posts nothing — fixing replies are irreversible and wait for delivery.
    */
   const claimPendingCommentResolutionForLaunch = useCallback((): void => {
     const pendingResolution = takePendingPRCommentAiAck() ?? pendingCommentResolutionRef.current
@@ -311,19 +273,19 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       return
     }
     setCommentResolutionAckBusyNow(true)
-    void resolveSelectedThreadsAfterLaunch(resolution)
+    void replyToSelectedCommentsAfterLaunch(resolution)
       .catch((err) => {
-        console.warn('Failed to resolve/reply on selected review comments after AI launch:', err)
+        console.warn('Failed to reply on selected review comments after AI launch:', err)
         toast.error(
           translate(
             'auto.components.right.sidebar.ChecksPanel.495b2f8c4b',
-            'Started the agent, but could not resolve or reply on the selected comments.'
+            'Started the agent, but could not reply on the selected comments.'
           )
         )
       })
       .finally(() => setCommentResolutionAckBusyNow(false))
   }, [
-    resolveSelectedThreadsAfterLaunch,
+    replyToSelectedCommentsAfterLaunch,
     setCommentResolutionAckBusyNow,
     claimedCommentResolutionRef,
     pendingCommentResolutionRef,
@@ -356,8 +318,8 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
   }, [])
   return {
     clearSentCommentSelection,
-    refreshCommentsAfterBulkResolve,
-    resolveSelectedThreadsAfterLaunch,
+    refreshCommentsAfterReplies,
+    replyToSelectedCommentsAfterLaunch,
     handleLaunchAccepted,
     handleLaunchAborted,
     consumeClaimedCommentResolutionAfterDeliveryRef

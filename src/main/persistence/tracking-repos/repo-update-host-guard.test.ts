@@ -121,3 +121,63 @@ describe('updateRepo host guard', () => {
     expect(errors).toEqual([])
   })
 })
+
+describe('relocateRepoPath host guard', () => {
+  let errors: string[]
+
+  beforeEach(() => {
+    errors = []
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.map(String).join(' '))
+    })
+  })
+
+  it('moves the addressed row when two hosts publish the same repo id', () => {
+    const peer = makeRepo({
+      id: 'repo-1',
+      path: '/code/peer',
+      executionHostId: 'ssh:peer'
+    })
+    const local = makeRepo({ id: 'repo-1', path: '/code/local' })
+    // Why peer first: an id-only lookup finds this row, so the assertion below has to fail if the
+    // host stops being part of the lookup.
+    const { operations, state, scheduleSave } = makeOperations([peer, local])
+
+    const result = operations.relocateRepoPath(local, '/ws/project/main')
+
+    expect(result?.path).toBe('/ws/project/main')
+    expect(state.repos.map((repo) => repo.path)).toEqual(['/code/peer', '/ws/project/main'])
+    expect(scheduleSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('never rewrites a same-id row that carries the checkout elsewhere', () => {
+    const local = makeRepo({ id: 'repo-1', path: '/code/local' })
+    const peer = makeRepo({
+      id: 'repo-1',
+      path: '/code/peer',
+      executionHostId: 'ssh:peer'
+    })
+    const { operations, state, scheduleSave } = makeOperations([local, peer])
+
+    // The path belongs to one machine, so a target naming any other host finds no row to move.
+    expect(
+      operations.relocateRepoPath({ id: 'repo-1', executionHostId: 'ssh:elsewhere' }, '/ws/main')
+    ).toBeNull()
+    expect(state.repos.map((repo) => repo.path)).toEqual(['/code/local', '/code/peer'])
+    expect(scheduleSave).not.toHaveBeenCalled()
+    expect(errors[0]).toContain('ssh:elsewhere')
+  })
+
+  it('keeps a folder-upgrade locator in step with the moved checkout', () => {
+    const repo = makeRepo({
+      id: 'repo-1',
+      path: '/code/project',
+      folderUpgradeGitRootPath: '/code/project'
+    })
+    const { operations } = makeOperations([repo])
+
+    expect(operations.relocateRepoPath(repo, '/ws/project/main')?.folderUpgradeGitRootPath).toBe(
+      '/ws/project/main'
+    )
+  })
+})

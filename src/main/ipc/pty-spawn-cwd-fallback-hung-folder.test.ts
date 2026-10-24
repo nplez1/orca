@@ -80,7 +80,7 @@ const { handlers, mainWindow } = setupPtyIpcSuite()
 
 beforeEach(() => {
   statMock.mockReset()
-  // The provider still validates through the suite's statSync fake; the folder check reads stat.
+  // Both the folder check and the provider's cwd validation read stat; statSync stays unused.
   statMock.mockImplementation(async () => directoryStats)
 })
 
@@ -119,7 +119,8 @@ describe('pty:spawn with the worktree-folder fallback on a mount that stopped an
 
     await spawnWithWorktreeFallback(outsideCwd)
 
-    expect(statMock.mock.calls.map(([path]) => path)).toEqual([outsideCwd])
+    // Why distinct paths: the provider validates the chosen cwd through the same async probe.
+    expect([...new Set(statMock.mock.calls.map(([path]) => path))]).toEqual([outsideCwd])
     const [, , options] = spawnMock.mock.calls.at(-1) as [string, string[], { cwd: string }]
     expect(options.cwd).toBe(outsideCwd)
   })
@@ -135,7 +136,8 @@ describe('pty:spawn with the worktree-folder fallback on a mount that stopped an
 
     const result = await spawnWithWorktreeFallback(SAVED_CWD)
 
-    expect(statMock.mock.calls.map(([path]) => path)).toEqual([SAVED_CWD, WORKTREE])
+    // Why distinct paths: the provider validates the fallback cwd through the same async probe.
+    expect([...new Set(statMock.mock.calls.map(([path]) => path))]).toEqual([SAVED_CWD, WORKTREE])
     expect(result).toMatchObject({ startupCwdFallback: { kind: 'worktree', cwd: WORKTREE } })
   })
 })

@@ -6,6 +6,7 @@ import { resolveSelectedLocalCommand } from '../../ipc/command-path-resolver'
 import type { WslProcessGroupTermination } from '../wsl-process-group-termination'
 import { createAbortError } from './abort-error'
 import { killSpawnedCommandTree } from './spawned-command-tree-kill'
+import { deadlineOverrunMetadata, terminateAtStalledDeadline } from './stalled-deadline-kill'
 import { DEFAULT_GIT_MAX_BUFFER } from './git-exec-options'
 import type { GitAdmissionTier } from './git-exec-options'
 
@@ -245,12 +246,16 @@ export function execFileCapture(
 
     // Why: Node's timeout waits forever on signal-ignoring CLIs; enforce our own deadline with bounded tree cleanup.
     if (options.timeout && options.timeout > 0) {
-      timer = setTimeout(() => {
+      const deadlineAt = performance.now() + options.timeout
+      const terminateAtDeadline = (overrunMs: number): void => {
         if (settled || terminating) {
           return
         }
         terminating = true
-        const timeoutError = options.createTimeoutError?.() ?? new Error(`${command} timed out.`)
+        const timeoutError = Object.assign(
+          options.createTimeoutError?.() ?? new Error(`${command} timed out.`),
+          deadlineOverrunMetadata(overrunMs)
+        )
         if (!child) {
           terminating = false
           finish(timeoutError)
@@ -259,6 +264,17 @@ export function execFileCapture(
         void killSpawnedCommandTree(child).then(() => {
           terminating = false
           finish(timeoutError)
+        })
+      }
+      timer = setTimeout(() => {
+        if (settled || terminating) {
+          return
+        }
+        const overrunMs = performance.now() - deadlineAt
+        terminateAtStalledDeadline({
+          overrunMs,
+          isSettled: () => settled || terminating,
+          terminate: () => terminateAtDeadline(overrunMs)
         })
       }, options.timeout)
     }

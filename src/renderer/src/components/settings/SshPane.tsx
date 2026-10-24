@@ -331,6 +331,7 @@ export function SshPane({ addTargetIntentSignal }: SshPaneProps): React.JSX.Elem
             ) : (
               <SshTargetList
                 targets={visibleTargets}
+                filterQuery={filter}
                 totalBySource={totalBySource}
                 connectionStates={sshConnectionStates}
                 testingIds={testingIds}

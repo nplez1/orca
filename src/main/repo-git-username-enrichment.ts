@@ -51,7 +51,10 @@ async function enrichRepoGitUsernamesInBackground(
   let changed = false
   for (const repo of candidates) {
     attemptedLocations.add(getRepoLocationKey(repo))
-    const { username, authoritative } = await resolveLocalGitUsernameDetailed(repo.path)
+    const { username, authoritative } = await resolveLocalGitUsernameDetailed(
+      repo.path,
+      repo.ghAccount
+    )
     // Why: a non-authoritative '' means a probe timed out and says nothing
     // about the account — keep the persisted value. An authoritative result
     // (including '') is the current truth: it must also CLEAR a stale

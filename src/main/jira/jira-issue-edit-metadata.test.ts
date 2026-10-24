@@ -240,6 +240,110 @@ describe('Jira issue edit metadata', () => {
     expect(field.displayName).toBeUndefined()
   })
 
+  it('drafts a components field as the ids the project list matches', async () => {
+    // The issue names Component/s directly: it is a system field, so it only reaches
+    // this form now, and only as a reference the project's own list can resolve.
+    jiraRequestMock.mockImplementation(async (_entry, path: string) => {
+      if (path.endsWith('/components')) {
+        return [
+          { id: '10400', name: 'Web' },
+          { id: '10401', name: 'Platform' }
+        ]
+      }
+      return {
+        fields: {
+          project: { key: 'ALP', name: 'Alpha' },
+          components: [{ id: '10401', name: 'Platform' }]
+        },
+        editmeta: {
+          fields: {
+            components: {
+              name: 'Component/s',
+              required: false,
+              schema: { type: 'array', items: 'string', system: 'components' },
+              operations: ['set', 'add', 'remove']
+            },
+            // A system field that holds strings, offered nowhere.
+            labels: {
+              name: 'Labels',
+              required: false,
+              schema: { type: 'array', items: 'string', system: 'labels' },
+              operations: ['set']
+            }
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const fields = await listEditFields('ALP-1', 'site-1')
+
+    expect(fields.map((entry) => entry.field.key)).toEqual(['components'])
+    expect(fields[0]?.field.allowedValues).toEqual([
+      { id: '10400', name: 'Web' },
+      { id: '10401', name: 'Platform' }
+    ])
+    expect(fields[0]).toMatchObject({ value: '10401', displayName: 'Platform' })
+    // The project comes from the issue read, so no key guessing is needed.
+    expect(jiraRequestMock.mock.calls[1]?.[1]).toBe('/rest/api/3/project/ALP/components')
+  })
+
+  it('offers a reference field whatever item type the site reports', async () => {
+    // Sites report `items: string` or `items: version` for the same field, and the control
+    // must not be decided by the item type.
+    jiraRequestMock.mockImplementation(async (_entry, path: string) => {
+      if (path.endsWith('/versions')) {
+        return [{ id: '10100', name: '1.0' }]
+      }
+      return {
+        fields: { project: { key: 'ALP' }, fixVersions: [{ id: '10100', name: '1.0' }] },
+        editmeta: {
+          fields: {
+            fixVersions: {
+              name: 'Fix Version/s',
+              required: false,
+              schema: { type: 'array', items: 'version', system: 'fixVersions' },
+              operations: ['set']
+            }
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const fields = await listEditFields('ALP-1', 'site-1')
+
+    expect(fields.map((entry) => entry.field.key)).toEqual(['fixVersions'])
+    expect(fields[0]?.field.allowedValues).toEqual([{ id: '10100', name: '1.0' }])
+    expect(fields[0]?.value).toBe('10100')
+    expect(jiraRequestMock.mock.calls[1]?.[1]).toBe('/rest/api/3/project/ALP/versions')
+  })
+
+  it('keeps the text box when the edit read names no project', async () => {
+    // Why: without a project there is no list to read, and guessing one from the issue
+    // key would offer another project's components to an issue that has moved.
+    jiraRequestMock.mockResolvedValue({
+      fields: { components: [{ id: '10401', name: 'Platform' }] },
+      editmeta: {
+        fields: {
+          components: {
+            name: 'Component/s',
+            required: false,
+            schema: { type: 'array', items: 'string', system: 'components' },
+            operations: ['set']
+          }
+        }
+      }
+    })
+    const { listEditFields } = await import('./issues')
+
+    const [field] = await listEditFields('ALP-1', 'site-1')
+
+    expect(field?.field.allowedValues).toBeUndefined()
+    expect(field?.value).toBe('Platform')
+    expect(jiraRequestMock).toHaveBeenCalledTimes(1)
+  })
+
   it('returns nothing when no site is connected', async () => {
     getClientsMock.mockReturnValue([])
     const { listEditFields } = await import('./issues')

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   escapeTomlString,
@@ -33,17 +33,19 @@ describe('upsertProjectTrustLevel', () => {
     )
   })
 
-  it('uses Codex canonicalized project paths when the project exists', () => {
+  it('writes the canonical project path its caller resolved, without probing the disk itself', () => {
     const nestedDir = join(tmpDir, 'nested')
     const projectDir = join(tmpDir, 'project')
     mkdirSync(nestedDir)
     mkdirSync(projectDir)
     const aliasedProjectPath = join(nestedDir, '..', 'project')
-    const trustedPath = realpathSync.native(aliasedProjectPath)
-    const trustedTomlPath = escapeTomlString(trustedPath)
 
+    // Why: the builder takes the caller's canonical form verbatim — markCodexProjectTrusted
+    // resolves it asynchronously so a stalled workspace volume cannot block the main thread.
     expect(upsertProjectTrustLevelInContent('', aliasedProjectPath, 'trusted')).toBe(
-      [`[projects."${trustedTomlPath}"]`, 'trust_level = "trusted"', ''].join('\n')
+      [`[projects."${escapeTomlString(aliasedProjectPath)}"]`, 'trust_level = "trusted"', ''].join(
+        '\n'
+      )
     )
   })
 
@@ -138,9 +140,7 @@ describe('upsertProjectTrustLevel', () => {
   it('updates a Codex literal-string Windows project block without duplicating it', () => {
     const original = ["[projects.'c:\\gemini_etl']", 'trust_level = "untrusted"', ''].join('\n')
 
-    const updated = upsertProjectTrustLevelInContent(original, 'c:\\gemini_etl', 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent(original, 'c:\\gemini_etl', 'trusted')
 
     expect(updated.match(/\[projects\./g)).toHaveLength(1)
     expect(updated).toContain("[projects.'c:\\gemini_etl']")
@@ -167,9 +167,7 @@ describe('upsertProjectTrustLevel', () => {
   ])('matches $name by decoded Windows path value', ({ existingPath, incomingPath }) => {
     const original = [`[projects.'${existingPath}']`, 'trust_level = "untrusted"', ''].join('\n')
 
-    const updated = upsertProjectTrustLevelInContent(original, incomingPath, 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent(original, incomingPath, 'trusted')
 
     expect(updated.match(/\[projects\./g)).toHaveLength(1)
     expect(updated).toContain(`[projects.'${existingPath}']`)
@@ -182,9 +180,7 @@ describe('upsertProjectTrustLevel', () => {
     const incomingPath = '\\\\wsl$\\Ubuntu\\home\\u\\repo'
     const original = [`[projects.'${existingPath}']`, 'trust_level = "untrusted"', ''].join('\n')
 
-    const updated = upsertProjectTrustLevelInContent(original, incomingPath, 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent(original, incomingPath, 'trusted')
 
     expect(updated.match(/\[projects\./g)).toHaveLength(2)
     expect(updated).toContain(`[projects.'${existingPath}']`)
@@ -205,8 +201,7 @@ describe('upsertProjectTrustLevel', () => {
     const updated = upsertProjectTrustLevelInContent(
       original,
       '\\\\wsl.localhost\\Ubuntu\\home\\u\\proj',
-      'trusted',
-      { alreadyCanonical: true }
+      'trusted'
     )
 
     expect(updated.match(/\[projects\./g)).toHaveLength(1)
@@ -219,9 +214,7 @@ describe('upsertProjectTrustLevel', () => {
     const projectPath = '/tmp/with"quote\\and-backslash'
     const original = [`[projects.'${projectPath}']`, 'trust_level = "untrusted"', ''].join('\n')
 
-    const updated = upsertProjectTrustLevelInContent(original, projectPath, 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent(original, projectPath, 'trusted')
 
     expect(updated.match(/\[projects\./g)).toHaveLength(1)
     expect(updated).toContain(`[projects.'${projectPath}']`)
@@ -230,9 +223,7 @@ describe('upsertProjectTrustLevel', () => {
 
   it('preserves an already-canonical remote Windows project path', () => {
     // Why: SSH paths resolve on the remote; local realpath would canonicalize the wrong machine.
-    const updated = upsertProjectTrustLevelInContent('', 'C:/Users/nw/repo', 'trusted', {
-      alreadyCanonical: true
-    })
+    const updated = upsertProjectTrustLevelInContent('', 'C:/Users/nw/repo', 'trusted')
 
     expect(updated).toBe(
       ['[projects."C:/Users/nw/repo"]', 'trust_level = "trusted"', ''].join('\n')

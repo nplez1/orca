@@ -2,7 +2,6 @@
 // an opaque ENOENT. Split from local-pty-utils to keep that file under its line
 // cap; the async path carries the cancellation contract described below.
 
-import { existsSync, statSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { release } from 'node:os'
 import { isWslUncPath, uncRouteKey } from '../../shared/wsl-paths'
@@ -92,18 +91,10 @@ function throwMissingWorkingDirectory(cwd: string): never {
  * Rejects with a descriptive Error if not.
  */
 export async function validateWorkingDirectory(cwd: string, signal?: AbortSignal): Promise<void> {
-  // Why: the distro probe spawns wsl.exe (~70 ms warm, 300+ ms for a stopped
-  // distro), so it must never run synchronously on the main process.
-  if (isWslUncPath(cwd)) {
-    return validateWorkingDirectoryAsync(cwd, { signal })
-  }
-
-  if (!existsSync(cwd)) {
-    throwMissingWorkingDirectory(cwd)
-  }
-  if (!statSync(cwd).isDirectory()) {
-    throw new Error(`Working directory "${cwd}" is not a directory.`)
-  }
+  // Why no local fast path: a native path is only fast while its volume answers. When the repo
+  // sits on a stalled disk or a dead mount, a sync stat freezes every window for as long as the
+  // volume takes, so both routes share the same off-thread probe.
+  return validateWorkingDirectoryAsync(cwd, { signal })
 }
 
 /**

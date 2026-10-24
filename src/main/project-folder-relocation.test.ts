@@ -186,7 +186,7 @@ describe('relocatePrimaryCheckout', () => {
     expect(deps.moveDirectory).toHaveBeenCalledWith('/Code/homelab', '/ws/homelab/main')
     // Repair before the records: the linked worktrees still point at the old main checkout.
     expect(deps.repairWorktrees).toHaveBeenCalledWith('/ws/homelab/main')
-    expect(deps.setRepoPath).toHaveBeenCalledWith('repo-1', '/ws/homelab/main')
+    expect(deps.setRepoPath).toHaveBeenCalledWith('/ws/homelab/main')
     expect(deps.migrateWorktreeIdentity).toHaveBeenCalledWith(
       'repo-1::/Code/homelab',
       'repo-1::/ws/homelab/main'

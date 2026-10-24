@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateStatus } from '../shared/update-status-types'
 import type * as UpdaterModule from './updater'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
@@ -150,7 +151,7 @@ describe('linux package recovery actions', () => {
   }> => {
     const send = vi.fn()
     const updater = await loadUpdaterModule()
-    updater.setupAutoUpdater({ webContents: { send } } as never, {
+    updater.setupAutoUpdater(createUpdaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     return { send, updater }

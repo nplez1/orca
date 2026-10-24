@@ -3,6 +3,7 @@ import type { Store } from './persistence'
 import type { Project } from '../shared/project-types'
 import type { Repo } from '../shared/repo-types'
 import {
+  getLocalProjectGhExecOptions,
   getLocalProjectGitExecOptions,
   getWorktreeCreatePrefetchGitOptions,
   getWorktreeMirrorDistro,
@@ -59,6 +60,39 @@ function makeStore(project: Project): Store {
 describe('project runtime git options', () => {
   afterEach(() => {
     _resetWslCachesForTests()
+  })
+
+  describe('getLocalProjectGhExecOptions', () => {
+    const binding = { host: 'github.com', user: 'Alice' }
+
+    it('carries the repo account binding into gh execution options', () => {
+      const options = withPlatform('darwin', () =>
+        getLocalProjectGhExecOptions(makeStore(makeProject()), makeRepo({ ghAccount: binding }))
+      )
+
+      expect(options).toEqual({ ghAccount: binding })
+    })
+
+    it('keeps the WSL route beside the binding', () => {
+      _setWslCachesForTests({ available: true, distros: ['Ubuntu'] })
+      const project = makeProject({
+        localWindowsRuntimePreference: { kind: 'wsl', distro: 'Ubuntu' }
+      })
+
+      const options = withPlatform('win32', () =>
+        getLocalProjectGhExecOptions(makeStore(project), makeRepo({ ghAccount: binding }))
+      )
+
+      expect(options).toEqual({ wslDistro: 'Ubuntu', ghAccount: binding })
+    })
+
+    it('omits the binding for an ambient-login repo', () => {
+      const options = withPlatform('darwin', () =>
+        getLocalProjectGhExecOptions(makeStore(makeProject()), makeRepo())
+      )
+
+      expect(options).toEqual({})
+    })
   })
 
   it('does not probe or repair WSL git routing before capability caches exist', () => {

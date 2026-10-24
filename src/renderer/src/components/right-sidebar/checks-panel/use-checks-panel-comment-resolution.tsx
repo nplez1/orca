@@ -189,9 +189,9 @@ export function useChecksPanelCommentResolution(model: ChecksPanelCommentResolut
           : !repo
             ? 'Select a repository before launching an AI action.'
             : activeReview.provider === 'github' && !prNumber
-              ? 'Open a GitHub PR before resolving comments.'
+              ? 'Open a GitHub PR before sending comments to an agent.'
               : activeReview.provider === 'gitlab' && !activeGitLabReview
-                ? 'Open a GitLab MR before resolving comments.'
+                ? 'Open a GitLab MR before sending comments to an agent.'
                 : undefined
   return {
     handleResolve,

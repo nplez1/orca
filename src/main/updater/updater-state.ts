@@ -42,9 +42,12 @@ export class ReleaseFeedPreflightError extends Error {
   }
 }
 
+// Why: a new window's renderer starts from this same status, so it is the only one worth skipping on bind.
+export const INITIAL_UPDATE_STATUS: UpdateStatus = { state: 'idle' }
+
 export abstract class UpdaterState {
   protected mainWindowRef: BrowserWindow | null = null
-  protected currentStatus: UpdateStatus = { state: 'idle' }
+  protected currentStatus: UpdateStatus = INITIAL_UPDATE_STATUS
   protected userInitiatedCheck = false
   protected onBeforeQuitCleanup: (() => void | Promise<void>) | null = null
   protected onBeforeQuitFailure: PreQuitCleanupFailureMode = 'continue'

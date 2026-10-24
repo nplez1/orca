@@ -16,7 +16,8 @@ has since landed.
 - `publisherName` dropped, so unsigned Windows installers update themselves.
 - `.github/workflows/fork-release.yml` registered and active.
 - Actions enabled on the fork; `nplez1/main` is the default branch, which is what makes a
-  `workflow_dispatch` workflow runnable at all.
+  `workflow_dispatch` workflow runnable at all. That is repository state, not tree state — a merge can
+  flip it back, so re-check it after every merge (Step 0.5).
 - Pushing works over `ssh://git@ssh.github.com:443/...` (port 22 is blocked on this network).
 
 ## Step 0 — validate the pipeline unsigned first (already done; skip unless the workflow changes)
@@ -37,6 +38,29 @@ A published release should appear with `latest-mac.yml`, the `.zip`, the `.dmg`,
 `orca-windows-setup.exe`, and a body that opens with a generated change summary (see
 [Release notes](#release-notes--read-the-draft-before-it-goes-live) below). Keep that release; it is
 also your rollback artifact.
+
+## Step 0.5 — after every upstream merge, re-check Actions enablement
+
+**Why:** upstream's Actions fleet is disabled at the repository, not in the tree (the `local(ci)`
+entry in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) records it), so nothing in a merge diff shows that
+state. A sync that adds a workflow brings it in **enabled**, and a workflow file upstream edits comes
+back enabled even though this fork had turned it off. An enabled workflow with a `pull_request`,
+`push`, or `schedule` trigger then spends minutes on every PR — `dependency-security.yml` came back
+this way on 2026-10-23 and was firing on any PR that touched a lockfile.
+
+Only `fork-release.yml` and `fork-upstream-tags.yml` must be active; the seven other entries the
+script knows (`zcode-account-contract`, the two benchmarks, `ci-cache-warmup-platform-jobs`,
+`qualified-orcad-template`, `layout-owner-e2e`, `dev-channel-win-publish`) are
+`workflow_dispatch`/`workflow_call`-only and inert.
+
+```bash
+node local/check-actions-enablement.mjs          # report; exit 1 on drift
+node local/check-actions-enablement.mjs --fix    # disable everything outside the fork's live list
+```
+
+Run it after any sync that touches `.github/workflows/**`, and once more **before** triggering a
+release — a workflow that came back enabled during the sync will otherwise start its own run on the
+release push.
 
 ## Step 1 — the five secrets
 

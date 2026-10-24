@@ -3,6 +3,7 @@ import { recordSubprocessSpawn } from '../../diagnostics/main-thread-churn-probe
 import { getSpawnArgsForWindows } from '../../win32-utils'
 import { createAbortError } from './abort-error'
 import { killSpawnedCommandTree } from './spawned-command-tree-kill'
+import { deadlineOverrunMetadata, terminateAtStalledDeadline } from './stalled-deadline-kill'
 
 export type CommandExecOptions = {
   cwd?: string
@@ -66,11 +67,21 @@ export async function spawnCommandCapture(
       }
       resolve({ stdout, stderr })
     }
-    timer = options.timeout
+    const timeoutMs = options.timeout
+    const deadlineAt = timeoutMs === undefined ? 0 : performance.now() + timeoutMs
+    const terminateAtDeadline = (overrunMs: number): void => {
+      void killSpawnedCommandTree(child)
+      finish(Object.assign(new Error(`${command} timed out.`), deadlineOverrunMetadata(overrunMs)))
+    }
+    timer = timeoutMs
       ? setTimeout(() => {
-          void killSpawnedCommandTree(child)
-          finish(new Error(`${command} timed out.`))
-        }, options.timeout)
+          const overrunMs = performance.now() - deadlineAt
+          terminateAtStalledDeadline({
+            overrunMs,
+            isSettled: () => settled,
+            terminate: () => terminateAtDeadline(overrunMs)
+          })
+        }, timeoutMs)
       : null
     options.signal?.addEventListener('abort', onAbort, { once: true })
     function onStdoutData(chunk: Buffer): void {

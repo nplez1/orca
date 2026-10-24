@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
 
 const {
@@ -34,11 +35,11 @@ describe('updater', () => {
 
   it('does not load or configure electron-updater during dev setup', async () => {
     appMock.isPackaged = false
-    const mainWindow = { webContents: { send: vi.fn() } }
+    const mainWindow = createUpdaterMainWindow()
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow)
 
     // Why: E2E dev-mode launches use a default app version that makes electron-updater throw during module load.
     expect(autoUpdaterMock.updateConfigPath).toBeUndefined()
@@ -48,12 +49,12 @@ describe('updater', () => {
   })
 
   it('runs a startup check immediately when the last background check is stale', async () => {
-    const mainWindow = { webContents: { send: vi.fn() } }
+    const mainWindow = createUpdaterMainWindow()
     const setLastUpdateCheckAt = vi.fn()
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => Date.now() - 25 * 60 * 60 * 1000,
       setLastUpdateCheckAt
     })
@@ -65,13 +66,13 @@ describe('updater', () => {
   })
 
   it('starts nudge polling only after updater initialization is complete', async () => {
-    const mainWindow = { webContents: { send: vi.fn() } }
+    const mainWindow = createUpdaterMainWindow()
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })
     shouldApplyNudgeMock.mockReturnValue(true)
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow)
 
     expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledTimes(1)
     expect(autoUpdaterMock.on).toHaveBeenCalled()
@@ -88,12 +89,12 @@ describe('updater', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-03T12:00:00Z'))
 
-    const mainWindow = { webContents: { send: vi.fn() } }
+    const mainWindow = createUpdaterMainWindow()
     const setLastUpdateCheckAt = vi.fn()
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => Date.now() - 23 * 60 * 60 * 1000,
       setLastUpdateCheckAt
     })
@@ -112,13 +113,13 @@ describe('updater', () => {
 
   it('deduplicates rapid focus-triggered daily checks before checking status arrives', async () => {
     let lastUpdateCheckAt = Date.now()
-    const mainWindow = { webContents: { send: vi.fn() } }
+    const mainWindow = createUpdaterMainWindow()
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => new Promise(() => {}))
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => lastUpdateCheckAt
     })
 
@@ -135,7 +136,7 @@ describe('updater', () => {
     let lastUpdateCheckAt = Date.now()
     const setLastUpdateCheckAt = vi.fn()
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
@@ -147,7 +148,7 @@ describe('updater', () => {
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => lastUpdateCheckAt,
       setLastUpdateCheckAt
     })
@@ -178,11 +179,11 @@ describe('updater', () => {
     })
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => null,
       setLastUpdateCheckAt: vi.fn()
     })
@@ -214,14 +215,14 @@ describe('updater', () => {
 
     const sendMock = vi.fn()
     const setLastUpdateCheckAt = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
     const { setupAutoUpdater } = await loadUpdaterModule()
 
     // Why: a startup check also arms its own 24h timer, which would fire at the same boundary as the
     // reschedule under test; entering 23h in makes the startup timer fire the check itself, so only
     // the result handler's re-arm can produce a check 24h later.
-    setupAutoUpdater(mainWindow as never, {
+    setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => Date.now() - 23 * 60 * 60 * 1000,
       setLastUpdateCheckAt
     })
@@ -260,9 +261,9 @@ describe('updater', () => {
     const { setupAutoUpdater } = await loadUpdaterModule()
 
     const sendMock = vi.fn()
-    const mainWindow = { webContents: { send: sendMock } }
+    const mainWindow = createUpdaterMainWindow(sendMock)
 
-    setupAutoUpdater(mainWindow as never)
+    setupAutoUpdater(mainWindow)
 
     expect((autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature).toBeUndefined()
   })

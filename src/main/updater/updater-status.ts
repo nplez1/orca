@@ -2,9 +2,9 @@ import { loadElectronAutoUpdater, type ElectronAutoUpdater } from '../electron-u
 import { statusesEqual } from '../updater-fallback'
 import type { UpdateCheckOptions, UpdateStatus } from '../../shared/update-status-types'
 import type { UpdateCheckVariant } from './updater-types'
-import { UpdaterState as BaseUpdaterState } from './updater-state'
+import { UpdaterWindowBinding } from './updater-window-binding'
 
-export abstract class UpdaterStatus extends BaseUpdaterState {
+export abstract class UpdaterStatus extends UpdaterWindowBinding {
   protected getAutoUpdater(): ElectronAutoUpdater {
     if (!this.autoUpdater) {
       this.autoUpdater = loadElectronAutoUpdater()
@@ -165,7 +165,7 @@ export abstract class UpdaterStatus extends BaseUpdaterState {
       // Why: a forced status must still land before the queued check restarts the cycle.
       if (options?.force) {
         this.currentStatus = decoratedStatus
-        this.mainWindowRef?.webContents.send('updater:status', decoratedStatus)
+        this.sendToMainWindow('updater:status', decoratedStatus)
       }
       this.launchPendingUserInitiatedCheckAfterInFlight(pendingUserInitiatedCheckVariant)
       return
@@ -174,7 +174,7 @@ export abstract class UpdaterStatus extends BaseUpdaterState {
       return
     }
     this.currentStatus = decoratedStatus
-    this.mainWindowRef?.webContents.send('updater:status', decoratedStatus)
+    this.sendToMainWindow('updater:status', decoratedStatus)
   }
 
   protected abstract finishActiveUpdateCheckAttempt(): void

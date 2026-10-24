@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { markQoderWorkspaceTrusted } from './qoder/workspace-trust'
@@ -72,9 +72,11 @@ export const AGENT_TRUST_KEYED_BY_START_FOLDER: Record<AgentTrustPreset, boolean
 }
 
 // Why resolve() too: Claude stores it, and it collapses `..` even where realpath fails.
-function withResolvedForm(path: string): string[] {
+// Why async: realpath on the workspace path is a probe of the repo's volume; a stalled one would
+// freeze the app on the launch path this guard runs on.
+async function withResolvedForm(path: string): Promise<string[]> {
   try {
-    return [path, resolve(path), realpathSync.native(path)]
+    return [path, resolve(path), await realpath(path)]
   } catch {
     return [path, resolve(path)]
   }
@@ -84,9 +86,10 @@ function withResolvedForm(path: string): string[] {
  * Whether trust stored for `storedPath` would cover a home: it is a root, a home or a folder
  * above one. Both sides are compared given and resolved, since the writers store the realpath.
  */
-function wouldTrustAHome(storedPath: string, homes: readonly string[]): boolean {
-  const homeForms = homes.flatMap(withResolvedForm)
-  return withResolvedForm(storedPath).some((form) => isTooBroadToPreTrust(form, homeForms))
+async function wouldTrustAHome(storedPath: string, homes: readonly string[]): Promise<boolean> {
+  const homeForms = (await Promise.all(homes.map(withResolvedForm))).flat()
+  const storedForms = await withResolvedForm(storedPath)
+  return storedForms.some((form) => isTooBroadToPreTrust(form, homeForms))
 }
 
 async function writePreset(
@@ -118,6 +121,25 @@ async function writePreset(
 }
 
 /**
+ * The home guard and then the write. Chained rather than awaited apart so the launch's deadline
+ * bounds the guard too: its realpath probes run on the workspace's volume, and a stalled one must
+ * not hold the agent launch open — past the deadline the agent merely asks.
+ */
+async function writePresetAfterHomeGuard(
+  preset: AgentTrustPreset,
+  storedPath: string,
+  host: WorkspaceTrustHost
+): Promise<void> {
+  if (AGENT_TRUST_INHERITS_FROM_A_HOME[preset]) {
+    const homes = host.homes.filter((home): home is string => Boolean(home))
+    if (homes.length === 0 || (await wouldTrustAHome(storedPath, homes))) {
+      return
+    }
+  }
+  await writePreset(preset, storedPath, host)
+}
+
+/**
  * The one place a preset's trust is written, on the host that runs the agent. For an agent that
  * inherits trust from a home, refuses when the path the writer would store covers a home. Never
  * throws or waits past the host's deadline: any failure or miss means the agent asks.
@@ -129,17 +151,10 @@ export async function applyWorkspaceTrustOnThisHost(
 ): Promise<void> {
   try {
     const host = describeHost()
-    if (AGENT_TRUST_INHERITS_FROM_A_HOME[preset]) {
-      const homes = host.homes.filter((home): home is string => Boolean(home))
-      if (homes.length === 0 || wouldTrustAHome(workspacePath, homes)) {
-        return
-      }
-    }
-    await awaitAgentTrustWriteWithinDeadline(writePreset(preset, workspacePath, host), {
-      preset,
-      workspacePath,
-      deadlineMs: host.deadlineMs
-    })
+    await awaitAgentTrustWriteWithinDeadline(
+      writePresetAfterHomeGuard(preset, workspacePath, host),
+      { preset, workspacePath, deadlineMs: host.deadlineMs }
+    )
   } catch (error) {
     console.warn(
       `[agent-trust] ${preset} trust for ${workspacePath} failed; the agent will ask`,

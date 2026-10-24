@@ -4,10 +4,11 @@
 import { worktreeCreateGit } from '../git/worktree-create-git-executor'
 import { getStoredRepoExecutionHostId } from '../repo-execution-host'
 import type { BrowserWindow } from 'electron'
-import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { GitAdmissionTier } from '../../shared/rpc-contract/git-admission-tier-params'
+import type { LocalGitExecOptions } from '../github/github-repository-identity'
 import type { Repo } from '../../shared/repo-types'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type {
@@ -133,6 +134,7 @@ import {
   type WorktreeCreateTimingRecorder
 } from '../worktree-create-timing'
 import {
+  getLocalProjectGhExecOptions,
   getLocalProjectGitExecOptions,
   getLocalProjectWorktreeGitOptions,
   getWorktreeMirrorDistro
@@ -552,14 +554,14 @@ async function canCheckoutExistingLocalBranch(
   return !worktrees.some((worktree) => normalizeLocalBranchName(worktree.branch) === branchName)
 }
 
-function hasLocalGitOptions(gitOptions: { wslDistro?: string }): boolean {
+function hasLocalGitOptions(gitOptions: LocalGitExecOptions): boolean {
   return Object.keys(gitOptions).length > 0
 }
 
 function getLocalGitHubPrForBranch(
   repoPath: string,
   branchName: string,
-  gitOptions: { wslDistro?: string }
+  gitOptions: LocalGitExecOptions
 ): ReturnType<typeof getPRForBranch> {
   return hasLocalGitOptions(gitOptions)
     ? getPRForBranch(repoPath, branchName, null, null, null, { localGitExecOptions: gitOptions })
@@ -1077,6 +1079,19 @@ export function createLocalWorktree(
     })
 }
 
+/**
+ * Whether `worktreePath` is already on disk, for name allocation. Same answer `existsSync` gave — any
+ * error means absent — asked off the main thread so a stalled repo volume cannot freeze the app.
+ */
+async function worktreePathTaken(worktreePath: string): Promise<boolean> {
+  try {
+    await stat(worktreePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function performLocalWorktreeCreate(
   args: CreateWorktreeArgsWithSystemProvenance,
   repo: Repo,
@@ -1095,6 +1110,8 @@ async function performLocalWorktreeCreate(
   )
   const localGitExecOptions = getLocalProjectGitExecOptions(store, repo)
   const localWorktreeGitOptions = getLocalProjectWorktreeGitOptions(store, repo)
+  // Why: the branch→PR collision probes are gh calls; run them as the repo's pinned account.
+  const localGhExecOptions = getLocalProjectGhExecOptions(store, repo)
   timing.recordExecutionHost(localWorktreeCreateExecutionHost(localGitExecOptions))
   const hasLocalWorktreeGitOptions = Object.keys(localWorktreeGitOptions).length > 0
   const localWorktreeGitOptionArgs: [] | [{ wslDistro?: string }] = hasLocalWorktreeGitOptions
@@ -1128,7 +1145,7 @@ async function performLocalWorktreeCreate(
   // both before awaiting removes one serial git/config round trip from create.
   const usernamePromise =
     !args.branchNameOverride && settings.branchPrefix === 'git-username'
-      ? resolveLocalGitUsername(repo.path)
+      ? resolveLocalGitUsername(repo.path, repo.ghAccount)
       : Promise.resolve('')
   const baseBranchPromise = resolveWorktreeCreateBase({
     requestedBaseBranch: args.baseBranch,
@@ -1354,7 +1371,7 @@ async function performLocalWorktreeCreate(
               lastExistingPR = await getLocalGitHubPrForBranch(
                 repo.path,
                 branchName,
-                localWorktreeGitOptions
+                localGhExecOptions
               )
             } catch {
               lookupFailed = true
@@ -1399,7 +1416,7 @@ async function performLocalWorktreeCreate(
           lastExistingPR = await getLocalGitHubPrForBranch(
             repo.path,
             branchName,
-            localWorktreeGitOptions
+            localGhExecOptions
           )
         } catch {
           // GitHub API may be unreachable, rate-limited, or token missing
@@ -1417,7 +1434,7 @@ async function performLocalWorktreeCreate(
       // Why the pending check: Git may already have deleted the directory while Orca still owns
       // the path until its removal settles; take the next name instead of racing it.
       if (
-        existsSync(worktreePath) ||
+        (await worktreePathTaken(worktreePath)) ||
         findPendingWorktreeRemovalConflict(repo.path, { worktreePath })
       ) {
         continue

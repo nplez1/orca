@@ -1,4 +1,5 @@
 import type { RepoKind } from '../repo-types'
+import type { GhAccountBinding } from './account-binding'
 import type { CheckStatus, PRInfo, PRMergeableState, PRState } from './pull-request-types'
 
 /**
@@ -78,6 +79,8 @@ export type GitHubPRRefreshCandidate = GitHubPRRefreshAlias & {
   cachedMergeStateStatus?: string | null
   localGitOptions?: {
     wslDistro?: string
+    /** Why: branch→PR lookups must run as the repo's pinned account, or a bound user's PRs read as absent. */
+    ghAccount?: GhAccountBinding
   }
 }
 

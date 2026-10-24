@@ -113,7 +113,9 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
 
   setupAutoUpdater(mainWindow: BrowserWindow | null, opts?: UpdaterSetupOptions): void {
     // Why keep: headless serve sets up without a window; a later window attach must not be undone.
-    this.mainWindowRef = mainWindow ?? this.mainWindowRef
+    if (mainWindow) {
+      this.bindMainWindow(mainWindow)
+    }
     this.onBeforeQuitCleanup = opts?.onBeforeQuit ?? null
     this.onBeforeQuitFailure = opts?.onBeforeQuitFailure ?? 'continue'
     this.persistLastUpdateCheckAt = opts?.setLastUpdateCheckAt ?? null
