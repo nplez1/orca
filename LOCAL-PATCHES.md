@@ -599,19 +599,30 @@ What it deliberately does not do:
 The first reconciled run (2026-10-21, `1a64dbe2f6`) found 29 failing cases: 24 allowlisted across nine
 files, and two files that are red on their own and so are deliberately **not** listed —
 `src/main/ephemeral-vm-runtime-extend.test.ts` (its `vi.mock` for `./ssh/targets/ssh-target-registry`
-does not define `getSshTargetRegistryStore`, which also produces the run's 28 `TypeError: {} is not
-iterable` rejections from `ephemeral-vm-reclaim-ipc-bridge.ts:115`) and
+answered only `getSshConnectionManager` — all that `ephemeral-vm-runtime-extend.ts:22` imports — while
+a `vi.mock` replaces the module for every transitive importer, and the SSH and ledger modules that
+module reaches read `getSshTargetRegistryStore` through it) and
 `src/main/ai-vault/session-scanner-scope-cwd-facts.test.ts` (an `fs` read the test asserts must not
 happen does happen). Both reproduce in a scoped two-file run.
 
 **2026-10-21 (the `bbc8303b47` merge) — both are fixed, so nothing is left unlisted.** The ephemeral
 mock now answers `getSshTargetRegistryStore: () => null`, the registry's own "no host registered"
-answer, which clears the suite's 28 unhandled rejections with it; the session-scanner case passes and
-was never listed. The merge's own full run (@`51f09025ca`) passed 134,537 cases with 35 allowlisted
-failures and **one** unexpected one, that mock. Eight entries whose failures stopped reproducing were
-pruned, and `config/scripts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases
-execute calls `mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) —
-the same `host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
+answer, so every transitive importer of the mocked module gets the registry's real answer instead of
+`undefined`; the session-scanner case passes and was never listed. The merge's own full run
+(@`51f09025ca`) passed 134,537 cases with 35 allowlisted failures and **one** unexpected one, that
+mock. Eight entries whose failures stopped reproducing were pruned, and
+`config/scripts/ci-managed-ssh-execution.test.mjs` was added: the workflow step its cases execute calls
+`mapfile`, which macOS's `/bin/bash` 3.2 does not have (the ubuntu runners ship bash 5) — the same
+`host-toolchain` class as the `pr-auxiliary-preflight-admission` entries.
+
+**The 28 rejections were a second cause, not that one** (fork issue #151 § 4). The
+`TypeError: {} is not iterable` headline came from
+`src/renderer/src/hooks/ipc-events/ephemeral-vm-reclaim-ipc-bridge.ts`, which iterated whatever
+`api.listRuntimes()` answered from a fire-and-forget start caller; `2368ed38da` made a non-list answer
+mean "nothing to reconcile". The two symptoms shared a run and nothing else, and the recorded sentence
+welded them because of that. The rule the mock actually has to satisfy is the one the import graph
+sets: `ephemeral-vm-runtime-extend.ts:22` reads only `getSshConnectionManager`, so a `vi.mock` that is
+complete for the module under test can still be incomplete for everything that module reaches.
 
 Two local prerequisites decide whether a run's failures are real, and both are install artifacts:
 `mobile/node_modules` (without it the mobile type-aware pass reports upstream's own files) and the
@@ -623,6 +634,46 @@ same commit as the red set. An entry that passes is reported stale; an entry tha
 run is reported unseen, which is the prune signal for one observed once and never reproduced. Prefer a
 `test` title over a file-level `*` as soon as the failing name is known — a file-level entry also masks
 a new failure inside that file.
+
+### `local(test)`: fork issue #151 — the allowlist names tests, runs the unit lane's file set, and has its own lane
+
+`local/unit-known-red.json` had drifted into the two shapes its own note warns against: every entry was
+file-level (`"test": "*"`), which also covers a _new_ failure in that file, and three named files the
+gate should never have been running at all — upstream's own unit lane excludes them
+(`config/scripts/ci-unit-files.mjs:17-24`). What changed:
+
+- **32 named entries instead of 15 wildcards.** The names come from a reconciliation run over the
+  allowlisted files, recorded in the JSON's `observedRun`, whose arithmetic now closes: 32 allowlisted
+  - 5 upstream-quarantined + 1 fixed = 38 records. Tightening is safe by construction — a name matches
+    exactly what the wildcard matched in that run — and it is what makes the next red in those files
+    visible instead of absorbed.
+- **The gate runs the unit lane's file set.** `local/gate-unit.mjs` sets `ORCA_BALANCE_UNIT_SHARDS=1`
+  for its suite, the switch `config/vitest.config.ts:13` already reads to apply `UNIT_EXCLUDE` instead
+  of `defaultExclude` — 80 files here, the electron, node-pty, live-shell and cross-version-wire ones.
+  A `--exclude` flag cannot do it: every project in that config sets `extends: false`, so a root-level
+  CLI exclude never reaches them (measured: the file still ran). Because parity with the unit lane is
+  a switch rather than an argument, the gate also asserts the report collected none of the 80 and
+  fails closed if one appears, and it refuses an allowlist entry for a quarantined file rather than
+  letting it sit dead — a manifest entry that can never match is the same rot as a stale one.
+- **The fork-local lane runs somewhere.** `local/**/*.test.mjs` are `node --test` files and sit outside
+  `UNIT_INCLUDE` by upstream's definition, so `local/sync/lib/*.test.mjs` matched no lane at all (fork
+  issue #151 § 5). The gate runs them first — 35 tests in 0.7 s — before `build:packages` and the
+  suite, so a broken sync tool cannot produce a verdict about anything else.
+- **`the screen prompt a pane is holding answers null for a pane it cannot bind to a terminal` was
+  fixed, not recorded.** Tightening is what surfaced it: it asserted `null` where
+  `src/main/runtime/terminal/wait/terminal-pane-screen-prompt.ts:15-20` documents `undefined` ("cannot
+  see it" is not "no dialog"), in the same fork commit (`3526000b5c`) that added both, so it had never
+  passed. Recorded as a red it would have hidden the next real break in a 1,476-case file.
+- **A manifest test.** `local/gate-unit.test.mjs` pins the judging rules the verdict rests on (a named
+  entry does not cover its neighbours, a collect failure counts as a failure, unhandled headlines
+  collapse and count) and the manifest invariants: no wildcard entries, no duplicate keys, a class, an
+  owner and evidence on every entry, no entry for a quarantined file, and `observedRun` closing its own
+  arithmetic. Two entries also gained the `owner: upstream` they were missing: both are upstream files
+  that this fork never touched.
+
+§ 2 and § 4 of the issue were already resolved by the 2026-10-21 and 2026-10-22 syncs — the eight
+stale entries were pruned then, and both formerly-unlisted reds pass — so what is left here is § 1,
+§ 3, § 5 and the correction to the extend-test diagnosis recorded above.
 
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 

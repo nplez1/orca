@@ -106,6 +106,7 @@ origin/main
 nplez1/main  ── this fork's own line: everything above, plus fork-only patches
                 └── nplez1/Hide-hosts
                 └── nplez1/Bundled-Skills-Target
+                └── nplez1/issue-151
 ```
 
 `nplez1/Bundled-Skills-Target` carries fork issue #99 plus the install half of #94: the published
@@ -318,6 +319,25 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   before the renderer can accept them. 12 files, but only +33/−7 of production change.
 - **Verified:** typecheck, 1,860 tests.
 - **Note:** 7 files here are the splitting agent's harness adaptations.
+
+### nplez1/issue-151 — the known-red allowlist (fork issue #151)
+
+- **Why:** gate 1's allowlist had drifted into the shapes its own note warns against: 20 file-level
+  wildcards that also mask a _new_ failure in the same file, eight entries stale, and two reds outside
+  the file so the gate could not produce a verdict at all. Three of the entries also named files
+  upstream's own unit lane excludes, which the gate was nonetheless running.
+- **Shape:** `local/gate-unit.mjs` runs the unit lane's file set (`ORCA_BALANCE_UNIT_SHARDS=1` →
+  `UNIT_EXCLUDE`, 80 files here), asserts the report collected none of them, refuses an allowlist entry
+  for a quarantined file, and runs the fork-local `local/**/*.test.mjs` lane that nothing else reached.
+  The manifest is 32 named entries whose arithmetic closes; the one red the tightening surfaced is
+  fixed (`pane-screen-prompt.spec.ts` asserted `null` where the implementation documents `undefined`),
+  and `local/gate-unit.test.mjs` pins the judging rules and the manifest invariants.
+- **Already done by earlier syncs:** § 2 (the eight stale entries were pruned at the 2026-10-21
+  reconciliation) and § 4 (both formerly-unlisted reds pass). The issue's correction to the recorded
+  extend-test diagnosis is in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) § `local(test)`: the 28 `TypeError:
+  {} is not iterable` rejections had a second cause, the renderer reclaim bridge, fixed in `2368ed38da`.
+- **Verified:** see the PR body — `pnpm tc`, the focused suites, `check:code-quality:changed`, the full
+  gate verdict for the shipped revision, and the Opus review round.
 
 ### nplez1/Hide-hosts — PR #9, **merged** (2026-09-19)
 
