@@ -1,6 +1,9 @@
 import { useShallow } from 'zustand/react/shallow'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
-import { isWorkspaceEmptiedOnPurpose } from '@/lib/workspace-emptied-on-purpose'
+import {
+  hasFreshClosedTabRecord,
+  hasNoRenderableWorkspaceContent
+} from '@/lib/workspace-emptied-on-purpose'
 import type { BrowserTab as BrowserTabState } from '../../../../shared/browser-workspace-types'
 import type { Tab, TabGroup } from '../../../../shared/tab-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
@@ -60,30 +63,23 @@ export function useTabGroupWorkspaceModel({
 
   const { closeItem, closeMany } = useTabGroupTabCloseCommands({ worktreeId })
 
-  const closedTabTombstones = useAppStore((state) => state.closedTerminalTabTombstonesByTabId)
-  const agentStatusEpoch = useAppStore((state) => state.agentStatusEpoch)
-
   // Why: closing a workspace's last tab keeps it selected and lands on the empty-tabs surface
   // instead of the landing page, so the pane has to know it has nothing left to show (#96). The
   // close record is what separates that from an empty workspace whose first tab is still arriving
   // — a fresh worktree, a host-owned list still mirroring, a chat launch waiting on its host —
-  // which must not flash the surface.
-  const showsEmptyWorkspaceState =
-    worktreeState.unifiedTabs.length === 0 &&
-    worktreeState.terminalTabs.length === 0 &&
-    worktreeState.browserTabs.length === 0 &&
-    !worktreeState.openFiles.some((file) => file.worktreeId === worktreeId) &&
-    isWorkspaceEmptiedOnPurpose(
-      {
-        tabsByWorktree: { [worktreeId]: worktreeState.terminalTabs },
-        unifiedTabsByWorktree: { [worktreeId]: worktreeState.unifiedTabs },
-        browserTabsByWorktree: { [worktreeId]: worktreeState.browserTabs },
-        openFiles: worktreeState.openFiles,
-        ...(closedTabTombstones ? { closedTerminalTabTombstonesByTabId: closedTabTombstones } : {})
-      },
-      worktreeId,
-      getAgentStatusEpochNow(agentStatusEpoch ?? 0)
-    )
+  // which must not flash the surface. Read as one selector so the pane re-renders only when this
+  // workspace's verdict changes, not on every close anywhere. The row check matters: a workspace
+  // this build never initialized has no terminal row, the same absence the seeder reads.
+  const showsEmptyWorkspaceState = useAppStore(
+    (state) =>
+      hasNoRenderableWorkspaceContent(state, worktreeId) &&
+      Object.hasOwn(state.tabsByWorktree, worktreeId) &&
+      hasFreshClosedTabRecord(
+        state.closedTerminalTabTombstonesByTabId,
+        worktreeId,
+        getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
+      )
+  )
 
   const { closeGroup, closeAllEditorTabsInGroup, closeOthers, closeToRight, closeToLeft } =
     useTabGroupCloseScopeCommands({

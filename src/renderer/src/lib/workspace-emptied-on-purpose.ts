@@ -1,7 +1,5 @@
-import {
-  isTerminalWorkspaceEmptiedOnPurpose,
-  type ClosedTerminalTabTombstonesByTabId
-} from '../../../shared/closed-terminal-tab-tombstones'
+import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../shared/closed-terminal-tab-tombstones'
+import type { ClosedTerminalTabTombstonesByTabId } from '../../../shared/closed-terminal-tab-tombstones'
 
 type TabRow = readonly { id: string }[]
 
@@ -28,6 +26,19 @@ export function hasNoRenderableWorkspaceContent(
   )
 }
 
+/** A tab of this workspace was closed on purpose, and the record has not expired. */
+export function hasFreshClosedTabRecord(
+  closedTerminalTabTombstonesByTabId: ClosedTerminalTabTombstonesByTabId | undefined,
+  worktreeId: string,
+  now: number
+): boolean {
+  return Object.values(closedTerminalTabTombstonesByTabId ?? {}).some(
+    (record) =>
+      record.worktreeId === worktreeId &&
+      now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS
+  )
+}
+
 /**
  * The user emptied this workspace: nothing is left to render and its last tab was closed on
  * purpose, so the absence of a surface is the empty-tabs state rather than sleep (#96).
@@ -41,19 +52,9 @@ export function isWorkspaceEmptiedOnPurpose(
   worktreeId: string,
   now: number
 ): boolean {
-  const tabsByWorktree = state.tabsByWorktree
-  if (!tabsByWorktree || !hasNoRenderableWorkspaceContent(state, worktreeId)) {
-    return false
-  }
-  return isTerminalWorkspaceEmptiedOnPurpose(
-    {
-      tabsByWorktree,
-      ...(state.closedTerminalTabTombstonesByTabId
-        ? { closedTerminalTabTombstonesByTabId: state.closedTerminalTabTombstonesByTabId }
-        : {})
-    },
-    worktreeId,
-    now
+  return (
+    hasNoRenderableWorkspaceContent(state, worktreeId) &&
+    hasFreshClosedTabRecord(state.closedTerminalTabTombstonesByTabId, worktreeId, now)
   )
 }
 

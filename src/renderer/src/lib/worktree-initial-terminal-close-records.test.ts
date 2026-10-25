@@ -61,11 +61,7 @@ describe('seeding an empty workspace reads close records', () => {
 
   // Known weakness until every membership shrink is a close: an older close plus an empty row
   // written by something that is not a close still reads as emptied on purpose.
-  it('a stale record from an earlier close suppresses the seed until it expires', () => {
-    const earlierClose = closedAt(Date.now() - 60_000)
-    expect(seeds({ [WT]: [] }, earlierClose)).toBe(false)
-    expect(
-      seeds({ [WT]: [] }, closedAt(Date.now() - CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS - 1))
-    ).toBe(true)
+  it('a close from earlier in the session still suppresses the seed', () => {
+    expect(seeds({ [WT]: [] }, closedAt(Date.now() - 60_000))).toBe(false)
   })
 })

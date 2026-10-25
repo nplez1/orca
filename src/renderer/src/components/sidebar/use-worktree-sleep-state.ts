@@ -198,10 +198,15 @@ export function useWorktreeIdsWithEmptySurface(enabled = true): ReadonlySet<stri
     const now = getAgentStatusEpochNow(agentStatusEpoch ?? 0)
     const emptied = new Set<string>()
     for (const record of Object.values(tombstoneByTabId ?? {})) {
+      // Why skip: the predicate scans every record, so a workspace with many closes would
+      // otherwise be re-checked once per record of its own.
       if (
-        now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS &&
-        isWorkspaceEmptiedOnPurpose(content, record.worktreeId, now)
+        emptied.has(record.worktreeId) ||
+        now - record.closedAt > CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS
       ) {
+        continue
+      }
+      if (isWorkspaceEmptiedOnPurpose(content, record.worktreeId, now)) {
         emptied.add(record.worktreeId)
       }
     }
