@@ -1,7 +1,7 @@
 // The prompt for extracting one slice of an agent session transcript.
 //
-// Every model-facing prompt in Orca lives under `src/shared/ai-prompts/`, one module per
-// operation, so the wording can be read and changed in one place. `index.ts` lists them all.
+// Prompt text lives under `src/shared/ai-prompts/`, one module per operation, so the wording can
+// be read and changed in one place. `index.ts` lists them and names any still assembled elsewhere.
 import {
   SESSION_SUMMARY_EVENT_TEXT_MAX_CHARS,
   type SessionSummaryChunkRange,
@@ -12,7 +12,7 @@ export const CHUNK_EXTRACT_INSTRUCTIONS = `You are summarizing a slice of an age
 Produce a JSON object with exactly these keys:
 - "goal": string or null — the objective the agent is working toward, if discernible
 - "plan": string[] — steps the agent laid out (at most 5, earliest first)
-- "inProgress": string | null — what the agent is doing at the END of this slice
+- "inProgress": string or null — what the agent is doing at the END of this slice
 - "done": string[] — completed milestones (at most 5)
 - "blockers": string[] — errors, failed approaches, things awaiting input (at most 5)
 - "decisions": string[] — notable choices made (at most 5)

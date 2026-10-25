@@ -1,7 +1,7 @@
 // The prompt for generating a pull request's title and body.
 //
-// Every model-facing prompt in Orca lives under `src/shared/ai-prompts/`, one module per
-// operation, so the wording can be read and changed in one place. `index.ts` lists them all.
+// Prompt text lives under `src/shared/ai-prompts/`, one module per operation, so the wording can
+// be read and changed in one place. `index.ts` lists them and names any still assembled elsewhere.
 import { truncateDiffForPrompt } from '../commit-message-prompt'
 import type { HostedReviewProvider } from '../hosted-review'
 import type { PullRequestDraftContext, PullRequestLinkedIssue } from '../pull-request-generation'

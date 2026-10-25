@@ -35,6 +35,7 @@ export type AiPromptEntry = {
   purpose: string
   /** Where the prompt is consumed, for the reader who wants the surrounding flow. */
   usedBy: string
+  /** For discovery only: each builder keeps its own checked signature, so this field erases it. */
   buildPrompt: (...args: never[]) => string
 }
 
@@ -42,21 +43,21 @@ export const AI_PROMPTS: readonly AiPromptEntry[] = [
   {
     id: 'commit-message',
     purpose: 'A single git commit message from the staged diff.',
-    usedBy: 'Source Control AI → commit message (main/text-generation)',
+    usedBy: 'Source Control AI → commit message (main/text-generation, renderer dialog)',
     buildPrompt: (context: CommitMessageDraftContext, customPrompt: string) =>
       buildCommitMessagePrompt(context, customPrompt)
   },
   {
     id: 'pull-request-fields',
     purpose: 'A pull request base, title, body and draft flag, as compact JSON.',
-    usedBy: 'Source Control AI → pull request details (main/text-generation)',
+    usedBy: 'Source Control AI → pull request details (main/text-generation, renderer dialog)',
     buildPrompt: (context: PullRequestDraftContext, customPrompt: string) =>
       buildPullRequestFieldsPrompt(context, customPrompt)
   },
   {
     id: 'branch-name',
     purpose: 'A short branch name for the work in front of the user.',
-    usedBy: 'Source Control AI → branch name (main/text-generation)',
+    usedBy: 'Source Control AI → branch name (main/text-generation, branch settings)',
     buildPrompt: (context: BranchNameWorkContext, customPrompt: string) =>
       buildBranchNamePrompt(context, customPrompt)
   },
@@ -78,7 +79,7 @@ export const AI_PROMPTS: readonly AiPromptEntry[] = [
       absoluteFrom: number
     ) => buildSessionSummaryChunkPrompt(events, range, absoluteFrom)
   }
-] as const
+]
 
 /**
  * Prompts that are still assembled where they are consumed.
