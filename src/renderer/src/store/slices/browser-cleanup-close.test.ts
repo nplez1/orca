@@ -123,16 +123,16 @@ describe('closeBrowserTab with reason cleanup', () => {
     expect(s.unifiedTabsByWorktree[WT] ?? []).toEqual([])
   })
 
-  // Why: the landing-screen fallback is the correct answer for a real close, so pin that the
-  // cleanup carve-out did not disable it for everyone.
-  it('still returns to the landing state when the user closes the only tab', async () => {
+  // Why: the emptied-workspace answer is the empty-tabs surface for a real close too, so pin that
+  // the cleanup carve-out did not become the only path that keeps the selection (#96).
+  it('keeps the worktree active when the user closes the only tab', async () => {
     const { store, workspaceId } = await storeWithOnlyBrowserTab()
 
     store.getState().closeBrowserTab(workspaceId)
 
     await settled()
 
-    expect(store.getState().activeWorktreeId).toBeNull()
+    expect(store.getState().activeWorktreeId).toBe(WT)
   })
 
   // Why: the staged page's host tab was never minted, so a tabClose would either 404 or, worse,

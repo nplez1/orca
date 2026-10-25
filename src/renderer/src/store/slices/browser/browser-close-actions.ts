@@ -13,7 +13,6 @@ import { closeRemoteBrowserPageInOwningEnvironment } from './browser-remote-clos
 import { releaseDocPreviewGrant } from '@/lib/doc-preview-grants'
 import { destroyWorkspaceWebviews } from '../browser-webview-cleanup'
 import { omitRecordKeys } from '../worktrees/teardown/record-key-omission'
-import { landOnEmptiedWorktree } from '../tabs/tabs-close-actions'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/layout-owner-switch'
 import { forgetDesktopCreatedServerTab } from '@/lib/desktop-created-server-tabs'
 import {
@@ -211,11 +210,7 @@ export function createBrowserCloseActions(
           if (workspaceItem) {
             get().closeUnifiedTab(
               workspaceItem.id,
-              isCleanup
-                ? { preserveWorktreeSelection: true, recordInteraction: false }
-                : options?.preserveWorktreeSelection
-                  ? { preserveWorktreeSelection: true }
-                  : undefined
+              isCleanup ? { recordInteraction: false } : undefined
             )
           }
         }
@@ -250,20 +245,10 @@ export function createBrowserCloseActions(
         }
       }
       // Switch point: main closes the tab first; today's close then runs over the tab as drawn.
-      const owningWorktreeId = ORCA_LAYOUT_OWNER_IS_MAIN
-        ? findWorkspace(get().browserTabsByWorktree, tabId)?.worktreeId
-        : undefined
       if (
         ORCA_LAYOUT_OWNER_IS_MAIN &&
-        closeBrowserTabThroughLayoutOwner(
-          get,
-          tabId,
-          isCleanup ? 'cleanup' : 'user',
-          (drawn) => closeHere(drawn),
-          // As today's tab-bar close: a cleanup keeps the selection and counts no interaction.
-          isCleanup || options?.preserveWorktreeSelection || !owningWorktreeId
-            ? undefined
-            : () => landOnEmptiedWorktree(set, get, owningWorktreeId)
+        closeBrowserTabThroughLayoutOwner(get, tabId, isCleanup ? 'cleanup' : 'user', (drawn) =>
+          closeHere(drawn)
         )
       ) {
         if (!isCleanup) {
@@ -274,13 +259,13 @@ export function createBrowserCloseActions(
       closeHere()
     },
 
-    shutdownWorktreeBrowsers: (worktreeId, options) => {
+    shutdownWorktreeBrowsers: (worktreeId) => {
       const workspaces = get().browserTabsByWorktree[worktreeId] ?? []
       // Why: snapshot before the loop — closeBrowserTab empties the array, so set() below couldn't recompute hadBrowserTabs.
       const hadBrowserTabs = workspaces.length > 0
       for (const workspace of workspaces) {
         const browserPagesByWorkspace = get().browserPagesByWorkspace
-        get().closeBrowserTab(workspace.id, options)
+        get().closeBrowserTab(workspace.id)
         destroyWorkspaceWebviews(browserPagesByWorkspace, workspace.id)
       }
       set((s) => {

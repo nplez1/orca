@@ -48,8 +48,7 @@ export function closeBrowserTabThroughLayoutOwner(
   get: BrowserSliceGet,
   browserTabId: string,
   reason: 'user' | 'cleanup',
-  closeHere: (drawn?: DrawnBrowserTab) => void,
-  landIfEmptied?: () => boolean
+  closeHere: (drawn?: DrawnBrowserTab) => void
 ): boolean {
   const state = get()
   const entry = Object.values(state.unifiedTabsByWorktree)
@@ -84,7 +83,6 @@ export function closeBrowserTabThroughLayoutOwner(
     nextActiveTabId,
     recordClose: reason,
     closeHere: () => closeHere(),
-    closed: () => closeHere(drawn),
-    ...(landIfEmptied ? { landIfEmptied } : {})
+    closed: () => closeHere(drawn)
   })
 }

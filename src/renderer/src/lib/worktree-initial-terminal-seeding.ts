@@ -63,10 +63,10 @@ export function reseedGatedEmptyWorkspace(
     undefined,
     undefined,
     undefined,
-    {
-      reseedEmptiedWorkspace: true,
-      ...(seedUserDefaultSurface ? { seedUserDefaultSurface: true } : {})
-    }
+    // Why: a gate that reports the workspace empty has to leave a workspace the user emptied on its
+    // empty-tabs surface, not seed the shell they just closed (#96). A workspace this build never
+    // initialized has no close record and still seeds.
+    seedUserDefaultSurface ? { seedUserDefaultSurface: true } : undefined
   )
 }
 
@@ -88,10 +88,7 @@ export function ensureFolderWorkspaceInitialTerminal(
     undefined,
     undefined,
     undefined,
-    {
-      reseedEmptiedWorkspace: providesInitialSurface !== true,
-      ...(seedUserDefaultSurface ? { seedUserDefaultSurface: true } : {})
-    }
+    seedUserDefaultSurface ? { seedUserDefaultSurface: true } : undefined
   )
   return primaryTabId
 }
@@ -196,18 +193,15 @@ export function ensureWorktreeHasInitialTerminal(
     )
     return null
   }
-  // Why: only startup hydration honours the closed-last-tab tombstone. Every explicit
-  // activation (sidebar, palette, automation resume, wake) re-seeds a surface instead,
-  // because closing the last terminal normally deactivates the workspace too
-  // (terminal-tab-actions.ts closeTerminalTab, plus leaveWorktreeIfEmpty for split-group
-  // closes) — so reaching here through an activation means the user asked for it back.
-  // The paths that do leave it active stay safe: a runtime-owned close returns before that
-  // deactivation, but while that session is live the host owns terminal creation and this
-  // bails out above; an editor/browser survivor keeps renderableTabCount non-zero, so no
-  // terminal is added; and closeTabPreservingPty (use-terminal-pane-lifecycle.ts) skips both
-  // deactivation hooks for pane moves and retirement, where re-seeding is the wanted outcome.
-  const shouldHonourClosedTerminalTombstone =
-    isTerminalWorkspaceEmptiedOnPurpose(store, worktreeId) && opts?.reseedEmptiedWorkspace !== true
+  // Why: the closed-last-tab tombstone is honoured on every path. An emptied workspace stays
+  // selected with its empty-tabs surface, so re-activating it must land there rather than seeding a
+  // shell the user just closed (#96). The paths that genuinely need a surface create one of their
+  // own: workspace creation, startup restore with a sequenced startup, setup/issue work
+  // (`hasExplicitLaunchWork` below) and a startup terminal asked for by name. An editor/browser
+  // survivor keeps renderableTabCount non-zero, so no terminal is added; and closeTabPreservingPty
+  // (use-terminal-pane-lifecycle.ts) skips both close hooks for pane moves and retirement, where
+  // re-seeding is the wanted outcome.
+  const shouldHonourClosedTerminalTombstone = isTerminalWorkspaceEmptiedOnPurpose(store, worktreeId)
   // Why: an execution host that has not answered is not a host with no terminals; seeding into that
   // gap is what adds a tab per launch (STA-4658). Explicit launch work below is a request to create
   // a terminal now, so it stays ungated.

@@ -168,7 +168,7 @@ describe('setActiveWorktree', () => {
     expect(s.activeTabType).toBe('browser')
   })
 
-  it('returns to the landing state when closing the last terminal tab in the active worktree', () => {
+  it('keeps the worktree selected when closing the last terminal tab in it', () => {
     const store = createTestStore()
     const wt = 'repo1::/path/wt1'
     const groupId = 'group-1'
@@ -218,7 +218,8 @@ describe('setActiveWorktree', () => {
     store.getState().closeTab(tabId)
 
     const s = store.getState()
-    expect(s.activeWorktreeId).toBeNull()
+    // Why: an emptied workspace stays selected and renders its own empty-tabs surface (#96).
+    expect(s.activeWorktreeId).toBe(wt)
     expect(s.activeTabId).toBeNull()
     expect(s.tabsByWorktree[wt]).toEqual([])
     expect(s.unifiedTabsByWorktree[wt]).toEqual([])

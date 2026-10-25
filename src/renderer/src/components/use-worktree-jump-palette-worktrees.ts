@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { getStructuredChatWorktreeIds } from '@/components/sidebar/visible-worktree-activity-inputs'
 import { applyWorkspaceKindFilters } from '@/components/sidebar/visible-worktree-kind-filters'
+import { useWorktreeIdsWithEmptySurface } from '@/components/sidebar/use-worktree-sleep-state'
 import { filterWorkspaceRows } from '../../../shared/workspace-view/workspace-row-filters'
 import { buildDesktopWorkspaceRowFactReader } from '@/components/sidebar/desktop-workspace-row-facts'
 import { sortWorktreesSmart } from '../../../shared/sidebar-list/smart-sort'
@@ -87,6 +88,9 @@ export function useWorktreeJumpPaletteWorktrees({
     unifiedTabsByWorktree,
     structuredChatSleptAtByPaneKey
   )
+  // Why: the palette applies the same "Hide sleeping" filter as the sidebar, so an emptied
+  // workspace — or the one on screen with nothing to render — has to stay findable there too (#96).
+  const emptySurfaceWorktreeIds = useWorktreeIdsWithEmptySurface(!showSleepingWorkspaces)
   const kindFilteredWorktrees = useMemo(
     () =>
       applyWorkspaceKindFilters(workspaces, {
@@ -122,7 +126,10 @@ export function useWorktreeJumpPaletteWorktrees({
         ptyIdsByTabId,
         browserTabsByWorktree,
         worktreeIdsWithLiveAgent,
-        worktreeIdsWithStructuredChat
+        worktreeIdsWithStructuredChat,
+        ...(emptySurfaceWorktreeIds
+          ? { sleepingSweepExemptWorktreeIds: emptySurfaceWorktreeIds }
+          : {})
       })
     )
     return filterPredicate ? visible.filter(filterPredicate.matchesWorktree) : visible
@@ -140,6 +147,7 @@ export function useWorktreeJumpPaletteWorktrees({
     ptyIdsByTabId,
     repoMap,
     defaultHostId,
+    emptySurfaceWorktreeIds,
     showSleepingWorkspaces,
     tabsByWorktree,
     worktreeIdsWithLiveAgent,

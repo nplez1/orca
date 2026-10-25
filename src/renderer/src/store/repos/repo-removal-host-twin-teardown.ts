@@ -150,7 +150,7 @@ export function closeRemovedHostTwinState(
       get().closeBrowserTab(browserTabId, { reason: 'cleanup' })
     }
     for (const tabId of removed?.otherTabIds ?? []) {
-      get().closeUnifiedTab(tabId, { preserveWorktreeSelection: true })
+      get().closeUnifiedTab(tabId)
     }
   }
 }

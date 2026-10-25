@@ -69,8 +69,6 @@ export type ContentTabClose = {
   recordClose?: 'user' | 'cleanup'
   /** The window's own cleanup once main's frame dropped the tab, before the selection moves. */
   closed?: () => void
-  /** Lands an emptied active worktree on the welcome screen; true when it did. */
-  landIfEmptied?: () => boolean
 }
 
 /**
@@ -105,9 +103,7 @@ export function closeContentTabThroughLayoutOwner(
     // Waiters first: a closeFile's content cleanup must not undo the selection.
     settle(tab.id)
     close.closed?.()
-    if (!close.landIfEmptied?.()) {
-      selectAfterClose(get, tab, close.nextActiveTabId)
-    }
+    selectAfterClose(get, tab, close.nextActiveTabId)
   }
   const closeAsToday = (): void => {
     closingAsToday.add(tab.id)
