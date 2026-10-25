@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetAgentStatusEpochClockForTests } from '@/lib/agent-status-epoch-clock'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { structuredAgentSessionPaneKey } from '../../../../shared/structured-agent-session-projection'
 import type { Tab } from '../../../../shared/tab-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import {
@@ -13,6 +14,7 @@ import {
 const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 
 type MockState = {
+  activeWorktreeId?: string | null
   tabsByWorktree: Record<string, TerminalTab[]>
   closedTerminalTabTombstonesByTabId: Record<string, { closedAt: number; worktreeId: string }>
   browserTabsByWorktree: Record<string, { id: string }[]>
@@ -238,6 +240,41 @@ describe('useIsSleepingWorktree', () => {
     }
 
     expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>true</span>')
+  })
+
+  it('keeps a slept structured chat asleep even when a terminal was closed here', () => {
+    // Regression: the close record alone used to make any workspace with no terminals read awake,
+    // so sleeping a chat workspace silently removed it from the glyph, the filter and the reveal.
+    const worktreeId = 'repo1::/path/wt1'
+    const chatTab = makeUnifiedTab({
+      id: 'chat-1',
+      worktreeId,
+      contentType: 'agent-session',
+      agentSessionAgent: 'codex'
+    })
+    const paneKey = structuredAgentSessionPaneKey(chatTab.id, chatTab.entityId)
+    mockState = {
+      ...mockState,
+      tabsByWorktree: { [worktreeId]: [] },
+      closedTerminalTabTombstonesByTabId: { closed: { closedAt: 1_000, worktreeId } },
+      unifiedTabsByWorktree: { [worktreeId]: [chatTab] },
+      structuredChatSleptAtByPaneKey: { [paneKey]: 1_500 }
+    }
+
+    expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>true</span>')
+  })
+
+  it('keeps the workspace on screen awake when it has nothing left to render', () => {
+    // A workspace the user is looking at with no tabs is its empty-tabs state, whatever emptied it
+    // — the chat, browser and editor closes that write no terminal close record included (#96).
+    const worktreeId = 'repo1::/path/wt1'
+    mockState = {
+      ...mockState,
+      activeWorktreeId: worktreeId,
+      tabsByWorktree: { [worktreeId]: [] }
+    }
+
+    expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>false</span>')
   })
 
   it('stops treating the workspace as awake once its close record expires', () => {

@@ -42,7 +42,7 @@ vi.mock('./useTabGroupWorkspaceModel', () => ({
       newTerminalTab: mocks.newTerminalTab
     },
     editorItems: [],
-    isEmptyWorkspace: true,
+    showsEmptyWorkspaceState: true,
     tabBarOrder: [],
     terminalTabs: [],
     groupTabs: [],

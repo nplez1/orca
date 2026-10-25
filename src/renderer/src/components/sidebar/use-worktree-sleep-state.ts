@@ -2,8 +2,12 @@ import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
 import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import {
+  isActiveEmptyWorkspace,
+  isWorkspaceEmptiedOnPurpose
+} from '@/lib/workspace-emptied-on-purpose'
 import { getWorktreeIdsWithStructuredChat } from './visible-worktree-activity-inputs'
-import { isTerminalWorkspaceEmptiedOnPurpose } from '../../../../shared/closed-terminal-tab-tombstones'
+import { CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS } from '../../../../shared/closed-terminal-tab-tombstones'
 import type { ClosedTerminalTabTombstonesByTabId } from '../../../../shared/closed-terminal-tab-tombstones'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { Tab } from '../../../../shared/tab-types'
@@ -17,12 +21,14 @@ type TabLike = { id: string }
 // Why optional: suites mount cards with partial store mocks, and the shared
 // predicate already reads a missing slice as empty.
 type SleepStateInput = {
+  activeWorktreeId?: string | null
   agentStatusByPaneKey?: Record<string, AgentStatusEntry> | null
   agentStatusEpoch?: number
   tabsByWorktree?: Record<string, readonly TabLike[]> | null
   ptyIdsByTabId?: Record<string, string[]> | null
   browserTabsByWorktree?: Record<string, readonly TabLike[]> | null
   unifiedTabsByWorktree?: Record<string, Tab[]> | null
+  openFiles?: readonly { worktreeId: string }[] | null
   structuredChatSleptAtByPaneKey?: StructuredChatSleptAtByPaneKey
   closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
 }
@@ -77,12 +83,11 @@ function selectWorktreeIdsWithLiveAgent(state: SleepStateInput): ReadonlySet<str
  * are asleep.
  */
 export function selectIsSleepingWorktree(state: SleepStateInput, worktreeId: string): boolean {
-  // Why first: a workspace the user emptied on purpose has no surfaces by design, so the absence
-  // of a live terminal is the empty-tabs state, not sleep (#96).
-  if (isEmptiedOnPurpose(state, worktreeId, getAgentStatusEpochNow(state.agentStatusEpoch ?? 0))) {
-    return false
-  }
+  // Why first: a workspace the user emptied on purpose, or the one on screen with nothing left to
+  // render, has no surfaces by design — that absence is the empty-tabs state, not sleep (#96).
   if (
+    isEmptiedOnPurpose(state, worktreeId) ||
+    isActiveEmptyWorkspace(state, worktreeId) ||
     hasUnknownStructuredChat(
       state.unifiedTabsByWorktree?.[worktreeId],
       state.structuredChatSleptAtByPaneKey
@@ -105,24 +110,53 @@ export function selectIsSleepingWorktree(state: SleepStateInput, worktreeId: str
 
 /**
  * Why its own predicate: the glyph, the "Hide sleeping" sweep and the auto-unhide all have to agree
- * that an emptied workspace is awake; the tombstone record is what tells an empty row with a closed
- * tab (the user emptied it) from an empty row this build never initialized.
+ * that an emptied workspace is awake; the close record is what tells an empty workspace the user
+ * emptied from one this build never initialized.
  */
-function isEmptiedOnPurpose(state: SleepStateInput, worktreeId: string, now: number): boolean {
-  const tabsByWorktree = state.tabsByWorktree
-  if (tabsByWorktree === null || tabsByWorktree === undefined) {
+function isEmptiedOnPurpose(state: SleepStateInput, worktreeId: string): boolean {
+  if (!selectWorktreeIdsWithClosedTab(state).has(worktreeId)) {
     return false
   }
-  return isTerminalWorkspaceEmptiedOnPurpose(
-    {
-      tabsByWorktree,
-      ...(state.closedTerminalTabTombstonesByTabId
-        ? { closedTerminalTabTombstonesByTabId: state.closedTerminalTabTombstonesByTabId }
-        : {})
-    },
-    worktreeId,
-    now
-  )
+  return isWorkspaceEmptiedOnPurpose(state, worktreeId, agentStatusNow(state))
+}
+
+function agentStatusNow(state: SleepStateInput): number {
+  return getAgentStatusEpochNow(state.agentStatusEpoch ?? 0)
+}
+
+type ClosedTabGeneration = {
+  closedTerminalTabTombstonesByTabId: SleepStateInput['closedTerminalTabTombstonesByTabId']
+  agentStatusNow: number
+  worktreeIds: ReadonlySet<string>
+}
+
+let closedTabGeneration: ClosedTabGeneration | null = null
+
+/** Why cached like the live-agent set: every mounted card re-runs its selector on every store
+ *  write, and this scan walks up to one host's cap of close records. Keyed on the map's identity
+ *  plus the status epoch, so it rebuilds exactly when a record or its TTL verdict can change. */
+function selectWorktreeIdsWithClosedTab(state: SleepStateInput): ReadonlySet<string> {
+  const now = agentStatusNow(state)
+  if (
+    closedTabGeneration &&
+    closedTabGeneration.closedTerminalTabTombstonesByTabId ===
+      state.closedTerminalTabTombstonesByTabId &&
+    closedTabGeneration.agentStatusNow === now
+  ) {
+    return closedTabGeneration.worktreeIds
+  }
+  const worktreeIds = new Set<string>()
+  for (const record of Object.values(state.closedTerminalTabTombstonesByTabId ?? {})) {
+    if (now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS) {
+      worktreeIds.add(record.worktreeId)
+    }
+  }
+  closedTabGeneration = {
+    closedTerminalTabTombstonesByTabId: state.closedTerminalTabTombstonesByTabId,
+    agentStatusNow: now,
+    worktreeIds
+  }
+  return worktreeIds
 }
 
 export function useIsSleepingWorktree(worktreeId: string): boolean {
@@ -130,41 +164,64 @@ export function useIsSleepingWorktree(worktreeId: string): boolean {
 }
 
 /**
- * Workspace ids the user emptied on purpose. They are awake with nothing to show, so neither the
- * sleeping glyph nor the "Hide sleeping" sweep may treat them as asleep (#96). `enabled: false`
- * skips the scan entirely — with sleeping rows shown there is no sweep to exempt them from.
+ * Workspace ids that are awake with nothing to show, so neither the sleeping glyph nor the "Hide
+ * sleeping" sweep may treat them as asleep (#96): the workspaces the user emptied, plus the one on
+ * screen when it has nothing left to render. `enabled: false` skips the scan entirely — with
+ * sleeping rows shown there is no sweep to exempt them from.
  */
-export function useWorktreeIdsEmptiedOnPurpose(enabled = true): ReadonlySet<string> | undefined {
+export function useWorktreeIdsWithEmptySurface(enabled = true): ReadonlySet<string> | undefined {
+  const activeWorktreeId = useAppStore((state) => (enabled ? state.activeWorktreeId : null))
   const tabsByWorktree = useAppStore((state) => (enabled ? state.tabsByWorktree : null))
+  const unifiedTabsByWorktree = useAppStore((state) =>
+    enabled ? state.unifiedTabsByWorktree : null
+  )
+  const browserTabsByWorktree = useAppStore((state) =>
+    enabled ? state.browserTabsByWorktree : null
+  )
+  const openFiles = useAppStore((state) => (enabled ? state.openFiles : null))
   const tombstoneByTabId = useAppStore((state) =>
     enabled ? state.closedTerminalTabTombstonesByTabId : undefined
   )
+  const agentStatusEpoch = useAppStore((state) => (enabled ? state.agentStatusEpoch : undefined))
   return useMemo(() => {
     if (!enabled) {
       return undefined
     }
+    const content = {
+      activeWorktreeId,
+      tabsByWorktree,
+      unifiedTabsByWorktree,
+      browserTabsByWorktree,
+      openFiles,
+      ...(tombstoneByTabId ? { closedTerminalTabTombstonesByTabId: tombstoneByTabId } : {})
+    }
+    const now = getAgentStatusEpochNow(agentStatusEpoch ?? 0)
     const emptied = new Set<string>()
-    const candidates = new Set(
-      Object.values(tombstoneByTabId ?? {}).map((record) => record.worktreeId)
-    )
-    // Why wall time: a record older than the TTL stopped meaning "someone emptied this".
-    // oxlint-disable-next-line react/purity -- an expired record is the one input a memo cannot derive from the store.
-    const now = Date.now()
-    for (const worktreeId of candidates) {
+    for (const record of Object.values(tombstoneByTabId ?? {})) {
       if (
-        isEmptiedOnPurpose(
-          { tabsByWorktree, closedTerminalTabTombstonesByTabId: tombstoneByTabId },
-          worktreeId,
-          now
-        )
+        now - record.closedAt <= CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS &&
+        isWorkspaceEmptiedOnPurpose(content, record.worktreeId, now)
       ) {
-        emptied.add(worktreeId)
+        emptied.add(record.worktreeId)
       }
     }
+    if (activeWorktreeId && isActiveEmptyWorkspace(content, activeWorktreeId)) {
+      emptied.add(activeWorktreeId)
+    }
     return emptied
-  }, [enabled, tabsByWorktree, tombstoneByTabId])
+  }, [
+    activeWorktreeId,
+    agentStatusEpoch,
+    browserTabsByWorktree,
+    enabled,
+    openFiles,
+    tabsByWorktree,
+    tombstoneByTabId,
+    unifiedTabsByWorktree
+  ])
 }
 
 export function resetWorktreeSleepStateCacheForTests(): void {
   liveAgentGeneration = null
+  closedTabGeneration = null
 }

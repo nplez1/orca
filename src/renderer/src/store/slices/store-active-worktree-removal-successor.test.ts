@@ -96,7 +96,7 @@ describe('deleting the active workspace', () => {
     expect(vi.mocked(activateAndRevealWorktree).mock.calls[0][0]).toBe(sibling.id)
   })
 
-  it('respects a user closing the last browser tab after startup dropped its row', async () => {
+  it('keeps a workspace open when the user closes its last browser tab after startup dropped its row', async () => {
     const store = setup()
     layoutMain = await drawTabsFromMain(store)
     const tabId = store.getState().createBrowserTab(active.id, 'https://example.com')
@@ -105,7 +105,8 @@ describe('deleting the active workspace', () => {
     store.getState().closeBrowserTab(tabId.id)
     await layoutMain.settle()
     await Promise.resolve()
-    expect(store.getState().activeWorktreeId).toBeNull()
+    // Closing the last tab leaves the workspace selected on its empty-tabs surface (#96).
+    expect(store.getState().activeWorktreeId).toBe(active.id)
     expect(activateAndRevealWorktree).not.toHaveBeenCalled()
   })
 
@@ -125,11 +126,11 @@ describe('deleting the active workspace', () => {
     expect(vi.mocked(activateAndRevealWorktree).mock.calls[0]?.[0]).toBe(sibling.id)
   })
 
-  it('stays on Landing when an SSH host is forgotten after its last PTY exited', async () => {
+  it('stays on the emptied workspace when an SSH host is forgotten after its last PTY exited', async () => {
     const store = setup()
     const tab = store.getState().createTab(active.id)
     store.getState().closeTab(tab.id, { reason: 'pty-exit' })
-    expect(store.getState().activeWorktreeId).toBeNull()
+    expect(store.getState().activeWorktreeId).toBe(active.id)
     await clearSshHostWorkspaces(resolution, 'forget-local')
     expect(activateAndRevealWorktree).not.toHaveBeenCalled()
   })

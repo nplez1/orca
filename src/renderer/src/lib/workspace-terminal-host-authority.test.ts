@@ -181,20 +181,9 @@ describe('workspace terminal seeding authority', () => {
       }
     })
 
-    // Startup restore passes no reseed option; only an explicit activation does.
+    // Re-activating it lands on its empty-tabs surface rather than re-seeding the shell (#96).
     expect(ensureWorktreeHasInitialTerminal(store.getState(), SSH_WORKTREE_ID)).toBeNull()
     expect(terminalTabCount(store, SSH_WORKTREE_ID)).toBe(0)
-    expect(
-      ensureWorktreeHasInitialTerminal(
-        store.getState(),
-        SSH_WORKTREE_ID,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { reseedEmptiedWorkspace: true }
-      )
-    ).toBeTruthy()
   })
 
   it('leaves terminal creation to the host of a paired runtime workspace', () => {

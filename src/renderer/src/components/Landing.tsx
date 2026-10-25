@@ -10,12 +10,12 @@ import {
 } from './landing-preflight-dismissal'
 import { ShortcutKeyCombo } from './ShortcutKeyCombo'
 import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
-import logo from '../../../../resources/logo.svg'
 import { translate } from '@/i18n/i18n'
 import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight-issues'
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { GitHubStarButton } from './GitHubStarButton'
 import { useOrcaStarState } from './orca-star-state'
+import { OrcaBrandMark } from './OrcaBrandMark'
 
 type ShortcutItem = {
   id: string
@@ -137,19 +137,10 @@ export default function Landing(): React.JSX.Element {
     <div className="absolute inset-0 flex items-center justify-center bg-background">
       <div className="w-full max-w-lg px-6">
         <div className="flex flex-col items-center gap-4 py-8">
-          <div
-            className="flex items-center justify-center size-20 rounded-2xl border border-border/80 shadow-lg shadow-black/40"
-            style={{ backgroundColor: '#12181e' }}
-          >
-            <img
-              src={logo}
-              alt={translate('auto.components.Landing.520304a067', 'Orca logo')}
-              className="size-12"
-            />
-          </div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            {translate('auto.components.Landing.6ca6ff404e', 'ORCA')}
-          </h1>
+          <OrcaBrandMark
+            logoAlt={translate('auto.components.Landing.520304a067', 'Orca logo')}
+            title={translate('auto.components.Landing.6ca6ff404e', 'ORCA')}
+          />
 
           {preflightIssues.length > 0 && <PreflightBanner issues={preflightIssues} repos={repos} />}
 

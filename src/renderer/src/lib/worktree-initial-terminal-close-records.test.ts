@@ -15,14 +15,13 @@ registerWorktreeActivationReset()
 
 const WT = 'wt-1'
 
-/** Startup hydration's seeding decision: no reseed opt-in, so only the row and records decide. */
+/** Startup hydration's seeding decision: only the row and the close records decide. */
 function seeds(
   tabsByWorktree: Record<string, { id: string }[]>,
-  closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId,
-  opts?: { reseedEmptiedWorkspace?: boolean }
+  closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
 ): boolean {
   const store = createMockStore({ tabsByWorktree, closedTerminalTabTombstonesByTabId })
-  ensureWorktreeHasInitialTerminal(store, WT, undefined, undefined, undefined, undefined, opts)
+  ensureWorktreeHasInitialTerminal(store, WT)
   return store.createTab.mock.calls.length > 0
 }
 
@@ -62,9 +61,11 @@ describe('seeding an empty workspace reads close records', () => {
 
   // Known weakness until every membership shrink is a close: an older close plus an empty row
   // written by something that is not a close still reads as emptied on purpose.
-  it('a stale record from an earlier close suppresses the startup seed; activation reseeds', () => {
+  it('a stale record from an earlier close suppresses the seed until it expires', () => {
     const earlierClose = closedAt(Date.now() - 60_000)
     expect(seeds({ [WT]: [] }, earlierClose)).toBe(false)
-    expect(seeds({ [WT]: [] }, earlierClose, { reseedEmptiedWorkspace: true })).toBe(true)
+    expect(
+      seeds({ [WT]: [] }, closedAt(Date.now() - CLOSED_TERMINAL_TAB_TOMBSTONE_TTL_MS - 1))
+    ).toBe(true)
   })
 })

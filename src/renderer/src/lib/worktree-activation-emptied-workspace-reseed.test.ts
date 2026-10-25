@@ -13,6 +13,7 @@ import {
   makeCreatedAgentWorktree as makeWorktree,
   seedEmptyActivatableWorktree
 } from '@/lib/worktree-activation-created-agent.test-fixture'
+import { makeTerminalTab } from '@/components/worktree-jump-palette-test-fixtures'
 import { waitForWorktreeAgentActivationGateForTests } from './worktree-agent-activation-gate'
 
 // Main's answer to the window's layout commands, as a switch-on build sends them.
@@ -141,7 +142,7 @@ describe('activating a workspace whose last terminal was closed', () => {
     expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
   })
 
-  it('does not double-seed when another recovery creates a tab before the gate settles', async () => {
+  it('does not double-seed when another surface lands before the gate settles', async () => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
     seedClosedLastTerminal(worktree.id)
@@ -157,20 +158,18 @@ describe('activating a workspace whose last terminal was closed', () => {
     vi.spyOn(activationGate, 'gateWorktreeAgentActivation').mockReturnValue(pendingGate)
 
     activateAndRevealWorktree(worktree.id, { agent: 'codex', notifyHostRuntime: false })
-    const recoveredTabId = ensureWorktreeHasInitialTerminal(
-      useAppStore.getState(),
-      worktree.id,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      { reseedEmptiedWorkspace: true }
-    )
+    // A host-published tab arrives while the gate is still deciding.
+    useAppStore.setState((state) => ({
+      tabsByWorktree: {
+        ...state.tabsByWorktree,
+        [worktree.id]: [makeTerminalTab('host-tab', worktree.id, 'published')]
+      }
+    }))
     resolveGate('empty')
     await pendingGate
 
     expect(useAppStore.getState().tabsByWorktree[worktree.id]).toHaveLength(1)
-    expect(useAppStore.getState().tabsByWorktree[worktree.id]?.[0]?.id).toBe(recoveredTabId)
+    expect(useAppStore.getState().tabsByWorktree[worktree.id]?.[0]?.id).toBe('host-tab')
   })
 
   it('stays empty when the workspace is opened from elsewhere', () => {

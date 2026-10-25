@@ -9,8 +9,8 @@ import { hasGitHubBackedProject } from '@/components/landing-preflight-issues'
 import { GitHubStarButton } from '@/components/GitHubStarButton'
 import { useOrcaStarState } from '@/components/orca-star-state'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
+import { OrcaBrandMark } from '@/components/OrcaBrandMark'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import logo from '../../../../../resources/logo.svg'
 
 type ShortcutItem = { id: string; shortcut: ShortcutKeyComboDetails; action: string }
 
@@ -70,19 +70,10 @@ export function WorkspaceEmptyState({
     >
       <div className="w-full max-w-lg px-6">
         <div className="flex flex-col items-center gap-4 py-8">
-          <div
-            className="flex items-center justify-center size-20 rounded-2xl border border-border/80 shadow-lg shadow-black/40"
-            style={{ backgroundColor: '#12181e' }}
-          >
-            <img
-              src={logo}
-              alt={translate('auto.components.workspaceEmptyState.logo', 'Orca logo')}
-              className="size-12"
-            />
-          </div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            {translate('auto.components.workspaceEmptyState.title', 'ORCA')}
-          </h1>
+          <OrcaBrandMark
+            logoAlt={translate('auto.components.workspaceEmptyState.logo', 'Orca logo')}
+            title={translate('auto.components.workspaceEmptyState.title', 'ORCA')}
+          />
 
           <p className="text-sm text-muted-foreground text-center">
             {translate(

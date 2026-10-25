@@ -81,7 +81,7 @@ export default function TabGroupPanel({
     browserItems,
     commands,
     editorItems,
-    isEmptyWorkspace,
+    showsEmptyWorkspaceState,
     tabBarOrder,
     terminalTabs
   } = model
@@ -386,7 +386,7 @@ export default function TabGroupPanel({
         {/* Why: terminal/browser/simulator/structured-chat panes render at the worktree level; tab activation only changes overlay visibility and never remounts a live surface. */}
         {/* Why the tab strip stays: it owns the "+" create entry, so the empty workspace keeps a way
             to open its first tab without the landing page's detour (#96). */}
-        {isEmptyWorkspace && isVisible && tabStrip === 'attached' ? (
+        {showsEmptyWorkspaceState && isVisible && tabStrip === 'attached' ? (
           <WorkspaceEmptyState
             worktreeId={worktreeId}
             onNewTerminal={commands.newTerminalTab}
