@@ -50,6 +50,8 @@ export function installOrcaRuntimeOwnedControllers(
     getStore: () => runtime.store,
     resolveRepo: (...args) => runtime.managedWorktreeQueries.resolveRepoForConnection(...args),
     notifyReposChanged: () => runtime.notifyReposChanged(),
+    // Why: a folder delete announces the same removal a worktree does, so its consumers wake.
+    emitWorktreeLifecycle: (event) => runtime.emitWorktreeLifecycle(event),
     resolveFolderConnectionId: (workspace) => runtime.resolveFolderWorkspaceConnectionId(workspace),
     teardownFolderWorkspacePtys: (worktreeId, connectionId) =>
       teardownFolderWorkspacePtys(
