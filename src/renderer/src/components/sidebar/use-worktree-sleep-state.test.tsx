@@ -14,6 +14,7 @@ const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 
 type MockState = {
   tabsByWorktree: Record<string, TerminalTab[]>
+  closedTerminalTabTombstonesByTabId: Record<string, { closedAt: number; worktreeId: string }>
   browserTabsByWorktree: Record<string, { id: string }[]>
   unifiedTabsByWorktree: Record<string, Tab[]>
   structuredChatSleptAtByPaneKey: Record<string, number>
@@ -95,6 +96,7 @@ describe('useIsSleepingWorktree', () => {
     vi.spyOn(Date, 'now').mockReturnValue(2_000)
     mockState = {
       tabsByWorktree: {},
+      closedTerminalTabTombstonesByTabId: {},
       browserTabsByWorktree: {},
       unifiedTabsByWorktree: {},
       structuredChatSleptAtByPaneKey: {},
@@ -210,6 +212,42 @@ describe('useIsSleepingWorktree', () => {
       ...mockState,
       tabsByWorktree: { [worktreeId]: [makeTab('tab-1', worktreeId)] },
       ptyIdsByTabId: {}
+    }
+
+    expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>true</span>')
+  })
+
+  // Why: an emptied workspace has no surfaces by design, so it is awake with its empty-tabs surface
+  // on screen — only the close record tells it apart from one that was never initialized (#96).
+  it('treats a workspace whose last tab was closed as awake', () => {
+    const worktreeId = 'repo1::/path/wt1'
+    mockState = {
+      ...mockState,
+      tabsByWorktree: { [worktreeId]: [] },
+      closedTerminalTabTombstonesByTabId: { closed: { closedAt: 1_000, worktreeId } }
+    }
+
+    expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>false</span>')
+  })
+
+  it('still treats an empty row with no close record as sleeping', () => {
+    const worktreeId = 'repo1::/path/wt1'
+    mockState = {
+      ...mockState,
+      tabsByWorktree: { [worktreeId]: [] }
+    }
+
+    expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>true</span>')
+  })
+
+  it('stops treating the workspace as awake once its close record expires', () => {
+    const worktreeId = 'repo1::/path/wt1'
+    mockState = {
+      ...mockState,
+      tabsByWorktree: { [worktreeId]: [] },
+      closedTerminalTabTombstonesByTabId: {
+        closed: { closedAt: 2_000 - 31 * 24 * 60 * 60 * 1000, worktreeId }
+      }
     }
 
     expect(renderToStaticMarkup(<SleepProbe worktreeId={worktreeId} />)).toBe('<span>true</span>')

@@ -17,6 +17,7 @@ import {
 import { resolveVisibleWorkspaceHostIds } from '../../../../../../shared/workspace-view/workspace-host-visibility'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import { isTerminalWorkspaceEmptiedOnPurpose } from '../../../../../../shared/closed-terminal-tab-tombstones'
 import {
   getWorktreeExecutionHostId,
   getSettingsFocusedExecutionHostId,
@@ -102,11 +103,17 @@ const REVEAL_WORKSPACE: Record<keyof WorkspaceRowFilters, (context: RevealContex
   hideSleepingWorkspaces: ({ state, worktree }) => {
     const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
     const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(state.browserTabsByWorktree)
+    const agentStatusNow = getAgentStatusEpochNow(state.agentStatusEpoch)
     const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
       state.agentStatusByPaneKey,
       tabsByWorktree,
-      getAgentStatusEpochNow(state.agentStatusEpoch)
+      agentStatusNow
     )
+    // Why: an emptied workspace is awake with nothing to show, so revealing it must not read as
+    // waking a slept one and flip the user's "Hide sleeping" preference off (#96).
+    if (isTerminalWorkspaceEmptiedOnPurpose(state, worktree.id, agentStatusNow)) {
+      return
+    }
     if (
       !isSleepingSweepExempt(worktree.isMainWorktree, state.alwaysShowDefaultBranchWorkspace) &&
       isInactiveWorkspace(

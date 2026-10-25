@@ -58,6 +58,14 @@ export function useTabGroupWorkspaceModel({
 
   const { closeItem, closeMany } = useTabGroupTabCloseCommands({ worktreeId })
 
+  // Why: closing a workspace's last tab keeps it selected and lands on the empty-tabs surface
+  // instead of the landing page, so the pane has to know it has nothing left to show (#96).
+  const isEmptyWorkspace =
+    worktreeState.unifiedTabs.length === 0 &&
+    worktreeState.terminalTabs.length === 0 &&
+    worktreeState.browserTabs.length === 0 &&
+    !worktreeState.openFiles.some((file) => file.worktreeId === worktreeId)
+
   const { closeGroup, closeAllEditorTabsInGroup, closeOthers, closeToRight, closeToLeft } =
     useTabGroupCloseScopeCommands({
       groupId,
@@ -79,6 +87,7 @@ export function useTabGroupWorkspaceModel({
   return {
     group,
     activeTab,
+    isEmptyWorkspace,
     browserItems,
     editorItems,
     agentSessionItems,

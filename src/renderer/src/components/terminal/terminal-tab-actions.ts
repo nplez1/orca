@@ -20,7 +20,6 @@ import {
   shouldConfirmRunningTerminalClose
 } from './running-terminal-close-guard'
 import { closeLocalTerminalTabState } from './close-local-terminal-tab-state'
-import { runAsAutomaticDeselection } from '@/store/active-worktree-deselection-intent'
 import { getTerminalIncarnationHandle } from './terminal-close-incarnation'
 import {
   getWorktreeTerminalTabIds,
@@ -232,13 +231,14 @@ export function closeTerminalTab(
       : {})
   })
   if (terminalCountBeforeClose <= 1 && state.activeWorktreeId === owningWorktreeId) {
-    // Why: re-read after the close — closeUnifiedTab may have already deactivated or
-    // repaired the surface, and the pre-close snapshot must not clobber that outcome.
+    // Why: re-read after the close — closeUnifiedTab may have already repaired the surface, and
+    // the pre-close snapshot must not clobber that outcome.
     const current = useAppStore.getState()
     if (current.activeWorktreeId === owningWorktreeId) {
       // Why: agent-session and simulator tabs render without a terminal/editor/browser
-      // entity, so only the unified renderable count can prove the worktree is empty
-      // (mirrors leaveWorktreeIfEmpty in workspace-emptied-reaction.ts).
+      // entity, so only the unified renderable count can prove the worktree is empty.
+      // Why no deselect: an emptied worktree stays selected and renders its empty-tabs
+      // surface, so there is no landing page to fall back to (#96).
       const { renderableTabCount } = current.reconcileWorktreeTabModel(owningWorktreeId)
       if (renderableTabCount === 0) {
         const worktreeFile = current.openFiles.find((f) => f.worktreeId === owningWorktreeId)
@@ -250,10 +250,6 @@ export function closeTerminalTab(
           if (browserTab) {
             current.setActiveBrowserTab(browserTab.id)
             current.setActiveTabType('browser', owningWorktreeId)
-          } else if (options?.reason === 'pty-exit') {
-            runAsAutomaticDeselection(() => current.setActiveWorktree(null))
-          } else {
-            current.setActiveWorktree(null)
           }
         }
       }

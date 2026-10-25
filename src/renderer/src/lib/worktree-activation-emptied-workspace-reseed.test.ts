@@ -59,8 +59,10 @@ describe('activating a workspace whose last terminal was closed', () => {
     expect(useAppStore.getState().tabsByWorktree[worktree.id] ?? []).toHaveLength(expectedTabCount)
   })
 
+  // Why: a gate that reports the workspace empty no longer seeds it. The tombstone says the user
+  // emptied this workspace, so the answer is the empty-tabs surface, not the shell they closed (#96).
   it.each([true, false])(
-    'forwards providesInitialSurface=%s through the async activation gate',
+    'leaves a gate-reported empty workspace empty when providesInitialSurface=%s',
     async (providesInitialSurface) => {
       const worktree = makeWorktree()
       seedEmptyActivatableWorktree(worktree)
@@ -79,21 +81,18 @@ describe('activating a workspace whose last terminal was closed', () => {
       })
       await gate.mock.results[0]?.value
 
-      expect(useAppStore.getState().tabsByWorktree[worktree.id]).toHaveLength(
-        providesInitialSurface ? 0 : 1
-      )
+      expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
     }
   )
 
-  // An empty gate invalidates agent-based suppression; only an explicit caller surface survives.
+  // An empty gate invalidates agent-based suppression; the tombstone survives either way.
   it.each([
-    ['an agent selection', { agent: 'codex' as const }, 1],
+    ['an agent selection', { agent: 'codex' as const }],
     [
       'an agent selection whose caller promised its own surface',
-      { agent: 'codex' as const, providesInitialSurface: true },
-      0
+      { agent: 'codex' as const, providesInitialSurface: true }
     ]
-  ])('re-seeds a gate-reported empty workspace for %s', async (_label, selection, expectedTabs) => {
+  ])('leaves a gate-reported empty workspace empty for %s', async (_label, selection) => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
     seedClosedLastTerminal(worktree.id)
@@ -113,7 +112,7 @@ describe('activating a workspace whose last terminal was closed', () => {
 
     // The gate owns seeding for this activation, so the synchronous call never returns a tab.
     expect(result === false ? null : result.primaryTabId).toBeNull()
-    expect(useAppStore.getState().tabsByWorktree[worktree.id] ?? []).toHaveLength(expectedTabs)
+    expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
   })
 
   it('lets the latest caller surface supersede an older callback on the shared gate', async () => {
@@ -174,7 +173,7 @@ describe('activating a workspace whose last terminal was closed', () => {
     expect(useAppStore.getState().tabsByWorktree[worktree.id]?.[0]?.id).toBe(recoveredTabId)
   })
 
-  it('re-seeds a terminal when the workspace is opened from elsewhere', () => {
+  it('stays empty when the workspace is opened from elsewhere', () => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
     seedClosedLastTerminal(worktree.id)
@@ -182,13 +181,13 @@ describe('activating a workspace whose last terminal was closed', () => {
     const result = activateAndRevealWorktree(worktree.id, { notifyHostRuntime: false })
 
     expect(result).not.toBe(false)
-    expect(result === false ? null : result.primaryTabId).toBeTruthy()
-    expect(useAppStore.getState().tabsByWorktree[worktree.id]).toHaveLength(1)
+    expect(result === false ? null : result.primaryTabId).toBeNull()
+    expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
   })
 
-  // Why: hydration restores an emptied workspace as active, so the user is already looking at the
-  // blank pane when they click its row. Suppressing the re-seed there strands them on the bug.
-  it('re-seeds when the restored active workspace is reopened on the same host', () => {
+  // Why: activation now lands an emptied workspace on its empty-tabs surface instead of seeding a
+  // shell the user just closed, including when hydration restored it as the active workspace (#96).
+  it('stays empty when the restored active workspace is reopened on the same host', () => {
     const worktree = makeWorktree()
     seedEmptyActivatableWorktree(worktree)
     seedClosedLastTerminal(worktree.id)
@@ -203,13 +202,12 @@ describe('activating a workspace whose last terminal was closed', () => {
       notifyHostRuntime: false
     })
 
-    expect(useAppStore.getState().tabsByWorktree[worktree.id]).toHaveLength(1)
+    expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
   })
 
-  // Why: entry points disagree about whether to pass a host for the same local workspace — the
-  // sidebar derives 'local', the Cmd+J palette passes nothing. Re-seeding no longer reads the
-  // host at all; this guards against reintroducing a host-sensitive carve-out.
-  it('re-seeds identically whether or not the caller passes an execution host', () => {
+  // Why: the carve-out is the tombstone, not the caller — an execution host must not change the
+  // outcome, and neither must the absence of one.
+  it('stays empty whether or not the caller passes an execution host', () => {
     for (const opts of [{}, { executionHostId: 'local' as const }]) {
       const worktree = makeWorktree()
       seedEmptyActivatableWorktree(worktree)
@@ -222,7 +220,7 @@ describe('activating a workspace whose last terminal was closed', () => {
 
       activateAndRevealWorktree(worktree.id, { ...opts, notifyHostRuntime: false })
 
-      expect(useAppStore.getState().tabsByWorktree[worktree.id]).toHaveLength(1)
+      expect(useAppStore.getState().tabsByWorktree[worktree.id]).toEqual([])
     }
   })
 
@@ -349,6 +347,16 @@ function seedEmptiedFolderWorkspaceOnTwoHosts(): void {
   expect(useAppStore.getState().reconcileWorktreeTabModel(FOLDER_KEY).renderableTabCount).toBe(0)
 }
 
+/** The same row after main recorded the close that emptied it — a deliberate emptying, which is
+ *  what `isTerminalWorkspaceEmptiedOnPurpose` keys on. */
+function recordFolderWorkspaceLastTerminalClosed(): void {
+  useAppStore.setState({
+    closedTerminalTabTombstonesByTabId: {
+      closed: { closedAt: Date.now(), worktreeId: FOLDER_KEY }
+    }
+  })
+}
+
 describe('activating a folder workspace whose last terminal was closed', () => {
   it.each([
     ['Blank Terminal', null, 1],
@@ -440,17 +448,19 @@ describe('activating a folder workspace whose last terminal was closed', () => {
     }
   )
 
-  it('re-seeds a terminal when the workspace is opened', () => {
+  it('stays empty when the workspace the user emptied is opened', () => {
     seedEmptiedFolderWorkspaceOnTwoHosts()
+    recordFolderWorkspaceLastTerminalClosed()
 
     const result = activateAndRevealFolderWorkspace(FOLDER_ID, { executionHostId: 'local' })
 
     expect(result).not.toBe(false)
-    expect(useAppStore.getState().tabsByWorktree[FOLDER_KEY]).toHaveLength(1)
+    expect(useAppStore.getState().tabsByWorktree[FOLDER_KEY] ?? []).toEqual([])
   })
 
-  it('re-seeds when the restored active folder workspace is reopened on the same host', () => {
+  it('stays empty when the restored active folder workspace is reopened on the same host', () => {
     seedEmptiedFolderWorkspaceOnTwoHosts()
+    recordFolderWorkspaceLastTerminalClosed()
     useAppStore.setState({
       activeWorktreeId: FOLDER_KEY,
       activeWorkspaceExecutionHostId: 'local'
@@ -458,7 +468,7 @@ describe('activating a folder workspace whose last terminal was closed', () => {
 
     activateAndRevealFolderWorkspace(FOLDER_ID, { executionHostId: 'local' })
 
-    expect(useAppStore.getState().tabsByWorktree[FOLDER_KEY]).toHaveLength(1)
+    expect(useAppStore.getState().tabsByWorktree[FOLDER_KEY] ?? []).toEqual([])
   })
 
   // Why: the opt-out must mean the same thing on both workspace shapes, or routing a

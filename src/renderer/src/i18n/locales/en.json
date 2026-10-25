@@ -19452,6 +19452,15 @@
         "cancelled": "This plain SSH terminal was closed before it started.",
         "terminalUnavailable": "Orca couldn’t open a terminal here.",
         "openHint": "Keeps you working on the host while Orca can’t set up there."
+      },
+      "workspaceEmptyState": {
+        "agentShortcut": "New agent tab",
+        "terminalShortcut": "New terminal tab",
+        "logo": "Orca logo",
+        "title": "ORCA",
+        "description": "This workspace has no open tabs.",
+        "newAgent": "New {{agent}} agent",
+        "newTerminal": "New terminal"
       }
     },
     "i18n": {

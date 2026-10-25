@@ -127,13 +127,14 @@ describe('closeTerminalTab kill-all routing', () => {
     expect(state.createTab).not.toHaveBeenCalled()
   })
 
-  it('deactivates after the last active terminal when no other content exists', () => {
+  // Why: the emptied worktree stays selected and renders its own empty-tabs surface (#96).
+  it('keeps the active terminal worktree selected when no other content exists', () => {
     const state = baseState()
     getStateMock.mockReturnValue(state)
 
     closeTerminalTab('terminal-1', { force: true })
 
-    expect(state.setActiveWorktree).toHaveBeenCalledWith(null)
+    expect(state.setActiveWorktree).not.toHaveBeenCalled()
     expect(state.setActiveFile).not.toHaveBeenCalled()
     expect(state.setActiveBrowserTab).not.toHaveBeenCalled()
     expect(state.createTab).not.toHaveBeenCalled()

@@ -276,8 +276,7 @@ export function activateAndRevealWorktree(
             ...(opts?.backendStartupTerminalSpawned ? { backendStartupTerminalSpawned: true } : {}),
             ...(opts?.createNewTerminalForStartup ? { createNewTerminalForStartup: true } : {}),
             ...(providesInitialSurface ? { callerProvidesSurface: true } : {}),
-            ...(seedUserDefaultSurface ? { seedUserDefaultSurface: true } : {}),
-            reseedEmptiedWorkspace: !providesInitialSurface
+            ...(seedUserDefaultSurface ? { seedUserDefaultSurface: true } : {})
           }
         )
   if (primaryTabId && opts?.initialCwd) {

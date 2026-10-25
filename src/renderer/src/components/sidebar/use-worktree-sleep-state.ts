@@ -1,7 +1,10 @@
+import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
 import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
 import { getWorktreeIdsWithStructuredChat } from './visible-worktree-activity-inputs'
+import { isTerminalWorkspaceEmptiedOnPurpose } from '../../../../shared/closed-terminal-tab-tombstones'
+import type { ClosedTerminalTabTombstonesByTabId } from '../../../../shared/closed-terminal-tab-tombstones'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { Tab } from '../../../../shared/tab-types'
 import {
@@ -21,6 +24,7 @@ type SleepStateInput = {
   browserTabsByWorktree?: Record<string, readonly TabLike[]> | null
   unifiedTabsByWorktree?: Record<string, Tab[]> | null
   structuredChatSleptAtByPaneKey?: StructuredChatSleptAtByPaneKey
+  closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
 }
 
 type LiveAgentGeneration = {
@@ -73,6 +77,11 @@ function selectWorktreeIdsWithLiveAgent(state: SleepStateInput): ReadonlySet<str
  * are asleep.
  */
 export function selectIsSleepingWorktree(state: SleepStateInput, worktreeId: string): boolean {
+  // Why first: a workspace the user emptied on purpose has no surfaces by design, so the absence
+  // of a live terminal is the empty-tabs state, not sleep (#96).
+  if (isEmptiedOnPurpose(state, worktreeId, getAgentStatusEpochNow(state.agentStatusEpoch ?? 0))) {
+    return false
+  }
   if (
     hasUnknownStructuredChat(
       state.unifiedTabsByWorktree?.[worktreeId],
@@ -94,8 +103,66 @@ export function selectIsSleepingWorktree(state: SleepStateInput, worktreeId: str
   )
 }
 
+/**
+ * Why its own predicate: the glyph, the "Hide sleeping" sweep and the auto-unhide all have to agree
+ * that an emptied workspace is awake; the tombstone record is what tells an empty row with a closed
+ * tab (the user emptied it) from an empty row this build never initialized.
+ */
+function isEmptiedOnPurpose(state: SleepStateInput, worktreeId: string, now: number): boolean {
+  const tabsByWorktree = state.tabsByWorktree
+  if (tabsByWorktree === null || tabsByWorktree === undefined) {
+    return false
+  }
+  return isTerminalWorkspaceEmptiedOnPurpose(
+    {
+      tabsByWorktree,
+      ...(state.closedTerminalTabTombstonesByTabId
+        ? { closedTerminalTabTombstonesByTabId: state.closedTerminalTabTombstonesByTabId }
+        : {})
+    },
+    worktreeId,
+    now
+  )
+}
+
 export function useIsSleepingWorktree(worktreeId: string): boolean {
   return useAppStore((state) => selectIsSleepingWorktree(state, worktreeId))
+}
+
+/**
+ * Workspace ids the user emptied on purpose. They are awake with nothing to show, so neither the
+ * sleeping glyph nor the "Hide sleeping" sweep may treat them as asleep (#96). `enabled: false`
+ * skips the scan entirely — with sleeping rows shown there is no sweep to exempt them from.
+ */
+export function useWorktreeIdsEmptiedOnPurpose(enabled = true): ReadonlySet<string> | undefined {
+  const tabsByWorktree = useAppStore((state) => (enabled ? state.tabsByWorktree : null))
+  const tombstoneByTabId = useAppStore((state) =>
+    enabled ? state.closedTerminalTabTombstonesByTabId : undefined
+  )
+  return useMemo(() => {
+    if (!enabled) {
+      return undefined
+    }
+    const emptied = new Set<string>()
+    const candidates = new Set(
+      Object.values(tombstoneByTabId ?? {}).map((record) => record.worktreeId)
+    )
+    // Why wall time: a record older than the TTL stopped meaning "someone emptied this".
+    // oxlint-disable-next-line react/purity -- an expired record is the one input a memo cannot derive from the store.
+    const now = Date.now()
+    for (const worktreeId of candidates) {
+      if (
+        isEmptiedOnPurpose(
+          { tabsByWorktree, closedTerminalTabTombstonesByTabId: tombstoneByTabId },
+          worktreeId,
+          now
+        )
+      ) {
+        emptied.add(worktreeId)
+      }
+    }
+    return emptied
+  }, [enabled, tabsByWorktree, tombstoneByTabId])
 }
 
 export function resetWorktreeSleepStateCacheForTests(): void {

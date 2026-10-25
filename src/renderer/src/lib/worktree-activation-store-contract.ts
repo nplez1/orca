@@ -60,11 +60,11 @@ export type InitialTerminalOptions = {
   backendStartupTerminalSpawned?: boolean
   /** Create a preserved fallback startup beside setup/default terminals. */
   createNewTerminalForStartup?: boolean
-  /** Why: an explicit empty terminal row is a "user closed the last tab" tombstone. Startup
-   *  hydration honours it through Terminal.tsx's passive auto-create (which never calls this
-   *  function), but opening the workspace on purpose (sidebar, palette, automation "Resume
-   *  workspace", wake) has to hand back a usable surface. Activation sets this unless the
-   *  caller says it provides its own surface; background worktree creation leaves it unset. */
+  // Why: an explicit empty terminal row is a "user closed the last tab" tombstone, and every
+  // activation honours it. Opening an emptied workspace lands on its empty-tabs surface with the
+  // actions that open the first tab — never on an implicitly seeded shell (#96). Work that
+  // genuinely needs a surface seeds through startup, creation or setup work instead; setting this
+  // forces the seed past the tombstone.
   reseedEmptiedWorkspace?: boolean
   /** Set by callers that open their own primary surface (a structured native chat session).
    *  Setup/issue work still runs, but work that needs no host terminal must not seed a shell

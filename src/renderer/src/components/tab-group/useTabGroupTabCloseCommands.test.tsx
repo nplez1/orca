@@ -172,7 +172,6 @@ describe('closing a browser workspace owned by more than one runtime environment
     expect(mocks.destroyWorkspaceWebviews).toHaveBeenCalled()
     expect(closeBrowserTab).toHaveBeenCalledWith('workspace-a', { reason: 'cleanup' })
     expect(closeUnifiedTab).toHaveBeenCalledWith('unified-browser', {
-      preserveWorktreeSelection: true,
       recordInteraction: false
     })
   })
@@ -194,8 +193,9 @@ describe('closing a browser workspace owned by more than one runtime environment
   })
 
   // Why: the bail above is only correct if it is narrow. Making it unconditional reads the same in
-  // the staged test, so pin the case it must not swallow — a real X on the last real browser tab.
-  it('leaves the worktree when a real close empties it', () => {
+  // the staged test, so pin the case it must not swallow — a real X on the last real browser tab
+  // still closes the tab, and now leaves the worktree selected with nothing in it (#96).
+  it('keeps the worktree selected when a real close empties it', () => {
     mocks.isWebRuntimeSessionActive.mockReturnValue(false)
     const setActiveWorktree = vi.fn()
     useAppStore.setState({
@@ -207,7 +207,7 @@ describe('closing a browser workspace owned by more than one runtime environment
     commands().closeItem('unified-browser')
 
     expect(closeBrowserTab).toHaveBeenCalledWith('workspace-a', undefined)
-    expect(setActiveWorktree).toHaveBeenCalledWith(null)
+    expect(setActiveWorktree).not.toHaveBeenCalled()
   })
 
   // Why: closeMany runs the plan per item, so a staged tab and a real host-mirrored one in the

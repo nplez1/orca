@@ -8,6 +8,9 @@ import { TabBarQuickCommandsButton } from '../tab-bar/TabBarQuickCommandsButton'
 import { TabGroupPaneActionsMenu } from './TabGroupPaneActionsMenu'
 import { useTabGroupWorkspaceModel } from './useTabGroupWorkspaceModel'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
+import { launchDefaultAgentInNewTab } from '../tab-bar/launch-default-agent-in-new-tab'
+import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { WorkspaceEmptyState } from '../workspace-empty-state/WorkspaceEmptyState'
 import { resolveGroupTabFromVisibleId } from './tab-group-visible-id'
 import { getTabPaneBodyDroppableId, type HoveredTabInsertion } from './useTabDragSplit'
 import { tabGroupBodyAnchorName } from './tab-group-body-anchor'
@@ -16,6 +19,7 @@ import { observeTabGroupBodyGridSize } from '@/runtime/sync-runtime-graph'
 import { translate } from '@/i18n/i18n'
 import type { TabGroup } from '../../../../shared/tab-types'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import { useClientHostedBrowserRows } from '@/lib/pane-manager/client-hosted-browser-row-state'
 import { resolveClientHostedBrowserRowStripGroupId } from '../tab-bar/client-hosted-browser-row-strip-placement'
 import { useEditorGroupFileDropOwner } from '../editor/use-editor-group-file-drop-owner'
@@ -77,6 +81,7 @@ export default function TabGroupPanel({
     browserItems,
     commands,
     editorItems,
+    isEmptyWorkspace,
     tabBarOrder,
     terminalTabs
   } = model
@@ -117,6 +122,19 @@ export default function TabGroupPanel({
     [groupId, setBodyDropRef]
   )
   const attachEditorFileDropOwner = useEditorGroupFileDropOwner({ worktreeId, groupId })
+  const launchDefaultAgent = useCallback(
+    (agent: TuiAgent): void => {
+      launchDefaultAgentInNewTab(agent, {
+        worktreeId,
+        groupId,
+        onLocalTerminal: focusTerminalTabSurface,
+        // Why empty: a host-published launch activates its own tab once it arrives; there is no
+        // menu here whose close would need to hand focus back.
+        onHostTerminal: () => {}
+      })
+    },
+    [groupId, worktreeId]
+  )
   // Why: per-group anchor-name lets the worktree-level overlay position panes via CSS anchor positioning, so moving a tab between groups re-targets the anchor instead of remounting xterm (loses alt-screen TUI state) or reloading `<webview>`.
   const bodyAnchorName = tabGroupBodyAnchorName(groupId)
   // Why: memoize so a fresh style object each render doesn't break downstream memoization keyed on referential equality.
@@ -366,6 +384,15 @@ export default function TabGroupPanel({
           )}
 
         {/* Why: terminal/browser/simulator/structured-chat panes render at the worktree level; tab activation only changes overlay visibility and never remounts a live surface. */}
+        {/* Why the tab strip stays: it owns the "+" create entry, so the empty workspace keeps a way
+            to open its first tab without the landing page's detour (#96). */}
+        {isEmptyWorkspace && isVisible && tabStrip === 'attached' ? (
+          <WorkspaceEmptyState
+            worktreeId={worktreeId}
+            onNewTerminal={commands.newTerminalTab}
+            onNewAgent={launchDefaultAgent}
+          />
+        ) : null}
       </div>
     </div>
   )

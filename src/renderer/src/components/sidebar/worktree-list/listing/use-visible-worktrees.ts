@@ -3,6 +3,7 @@ import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../../shared/sidebar-in
 import { useAppStore } from '@/store'
 import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
 import { getWorktreeIdsWithLiveAgent } from '@/lib/worktree-activity-state'
+import { useWorktreeIdsEmptiedOnPurpose } from '../../use-worktree-sleep-state'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
@@ -96,7 +97,7 @@ export function useVisibleSidebarWorktrees(args: {
           agentStatusNow
         )
   }, [agentStatusEpoch, agentStatusNow, showSleepingWorkspaces, tabsByWorktree])
-  const sleepingSweepExemptWorktreeIds = useSleepingSweepRetention({
+  const retainedSweepWorktreeIds = useSleepingSweepRetention({
     enabled: !showSleepingWorkspaces,
     worktreesByRepo,
     tabsByWorktree,
@@ -105,6 +106,18 @@ export function useVisibleSidebarWorktrees(args: {
     worktreeIdsWithLiveAgent,
     worktreeIdsWithStructuredChat
   })
+  const emptiedOnPurposeWorktreeIds = useWorktreeIdsEmptiedOnPurpose(!showSleepingWorkspaces)
+  // Why union: an emptied workspace is awake with nothing to show, so "Hide sleeping" must keep its
+  // row; the retention pass above only covers workspaces still holding tabs through a PTY gap (#96).
+  const sleepingSweepExemptWorktreeIds = useMemo(() => {
+    if (!retainedSweepWorktreeIds) {
+      return emptiedOnPurposeWorktreeIds
+    }
+    if (!emptiedOnPurposeWorktreeIds) {
+      return retainedSweepWorktreeIds
+    }
+    return new Set([...retainedSweepWorktreeIds, ...emptiedOnPurposeWorktreeIds])
+  }, [emptiedOnPurposeWorktreeIds, retainedSweepWorktreeIds])
 
   const recomputedVisibleWorktrees = useMemo(() => {
     return computeVisibleWorktrees(worktreesByRepo, sortedIds, {

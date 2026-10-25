@@ -30,11 +30,9 @@ export function closeWorkspaceBrowserTab(worktreeId: string, workspaceId: string
     visibleTabId: tabId ?? workspaceId,
     focusedEnvironmentId: owner.kind === 'resolved' ? owner.environmentId : null
   })
-  // Cleanup closes must preserve workspace selection at both teardown sites.
+  // Cleanup closes count no interaction.
   const cleanupOptions =
-    plan.localCloseReason === 'cleanup'
-      ? { preserveWorktreeSelection: true, recordInteraction: false }
-      : undefined
+    plan.localCloseReason === 'cleanup' ? { recordInteraction: false } : undefined
   if (plan.closesLocally) {
     // Announce the MRU page selection before guest teardown triggers focus fallback.
     closeBrowserTab(

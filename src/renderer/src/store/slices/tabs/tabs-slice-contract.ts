@@ -104,8 +104,6 @@ export type TabsSlice = {
   closeUnifiedTab: (
     tabId: string,
     opts?: {
-      /** Keep the worktree selected even if this empties it — for closes the user did not ask for. */
-      preserveWorktreeSelection?: boolean
       recordInteraction?: boolean
       terminalRetirementHandled?: boolean
     }
