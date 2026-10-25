@@ -68,6 +68,7 @@ export class SessionSummaryHostFoldSubscription {
     environmentId: string
     foldParams: ResolvedSourceControlAiGenerationParams | null
     session?: SessionSummarySessionRef
+    revalidateWithinMs?: number
   }): void {
     const state = this.stateFor(args.paneKey, args.environmentId)
     if (state.leases === 0 && state.unleasedViewers === 0 && state.inflight.size === 0) {
@@ -156,6 +157,7 @@ export class SessionSummaryHostFoldSubscription {
       environmentId: string
       foldParams: ResolvedSourceControlAiGenerationParams | null
       session?: SessionSummarySessionRef
+      revalidateWithinMs?: number
     },
     state: PaneHostState,
     seq: number,
@@ -166,7 +168,8 @@ export class SessionSummaryHostFoldSubscription {
         environmentId: args.environmentId,
         paneKey: args.paneKey,
         foldParams: args.foldParams,
-        ...(args.session ? { session: args.session } : {})
+        ...(args.session ? { session: args.session } : {}),
+        ...(args.revalidateWithinMs ? { revalidateWithinMs: args.revalidateWithinMs } : {})
       })
       const queued = state.inflight.get(seq)?.queuedClose ?? null
       state.inflight.delete(seq)

@@ -89,10 +89,11 @@ describe('foldSessionSummaryEvents', () => {
     })
     expect(result.totalChunks).toBe(2)
     expect(result.ledger.foldedThrough).toBe(45)
-    // The slice's first message places a fact the extract did not index.
+    // A fact the extract did not index lands at its slice's last message, so it is inside the
+    // "since your last message" window rather than on its boundary.
     expect(result.ledger.done).toEqual([
-      { text: 'chunk 1', sourceIndex: 0 },
-      { text: 'chunk 2', sourceIndex: 40 }
+      { text: 'chunk 1', sourceIndex: 39 },
+      { text: 'chunk 2', sourceIndex: 44 }
     ])
     expect(result.ledger.timeline.map((entry) => entry.text)).toEqual(['m1', 'm2'])
     // Both reports are written by the same second call, so the toggle costs nothing later.
@@ -130,7 +131,7 @@ describe('foldSessionSummaryEvents', () => {
     expect(calls).toBe(1)
     expect(result.ledger.done).toEqual([
       { text: 'cached', sourceIndex: 0 },
-      { text: 'fresh', sourceIndex: 40 }
+      { text: 'fresh', sourceIndex: 44 }
     ])
   })
 

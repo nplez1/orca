@@ -30,7 +30,8 @@ describe('createSessionSummaryHostFoldClient', () => {
     expect(call).toHaveBeenCalledWith('env-1', 'sessionSummary.openOnHost', {
       paneKey: 'tab-1:leaf-1',
       foldParams: { agentId: 'claude', model: 'sonnet' },
-      session: null
+      session: null,
+      revalidateWithinMs: null
     })
     expect(result.paneKey).toBe('tab-1:leaf-1')
   })
@@ -59,7 +60,8 @@ describe('createSessionSummaryHostFoldClient', () => {
     expect(call).toHaveBeenCalledWith('env-1', 'sessionSummary.openOnHost', {
       paneKey: 'tab-1:leaf-1',
       foldParams: null,
-      session
+      session,
+      revalidateWithinMs: null
     })
   })
 

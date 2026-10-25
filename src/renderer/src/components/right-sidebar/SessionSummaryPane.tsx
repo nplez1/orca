@@ -5,6 +5,7 @@ import { translate } from '@/i18n/i18n'
 import { SessionSummaryLedgerView } from '@/components/activity/session-summary-ledger-view'
 import { resolveSessionSummaryHeaderState } from '@/components/activity/session-summary-presentation'
 import { useSessionSummary } from '@/components/activity/use-session-summary'
+import { useAppStore } from '@/store'
 import {
   useSessionSummaryExecutionHostId,
   useSessionSummaryHostSupported,
@@ -26,11 +27,13 @@ function SessionSummarySubjectBody({
   // about the session outranks the folding side's row — which may be absent (a paired host
   // that only runs the PTY) or relayed without the agent's transcript path.
   const session = useSessionSummarySessionRef(paneKey)
+  const agentUpdatedAt = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.updatedAt ?? 0)
   const { snapshot, refresh, refreshing } = useSessionSummary(
     paneKey,
     isOpen,
     executionHostId,
-    session
+    session,
+    agentUpdatedAt
   )
   const { hint, folding } = resolveSessionSummaryHeaderState(snapshot)
 

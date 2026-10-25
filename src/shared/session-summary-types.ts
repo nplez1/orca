@@ -165,6 +165,14 @@ export type SessionSummaryOpenRequest = {
    */
   revalidateWithinMs?: number
   /**
+   * This viewer already holds the pane's lease — a refresh or an auto-fold, not a new viewer.
+   *
+   * Why on the request: `open` is what takes a lease, and one lease per *request* would outlive
+   * the single `close` an unmount sends, so cancel-on-close would stop working after the first
+   * manual refresh (and a paired host's polling would never stop).
+   */
+  sameViewer?: boolean
+  /**
    * The session the viewer has on screen, as the viewer's own store knows it.
    *
    * Why it travels: the process that folds is often not the process that holds the row.

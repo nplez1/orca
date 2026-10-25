@@ -36,7 +36,8 @@ export const SESSION_SUMMARY_RPC_METHODS = [
       return sessionSummaryHostService().open({
         paneKey: params.paneKey,
         foldParams,
-        ...(session ? { session } : {})
+        ...(session ? { session } : {}),
+        ...(params.revalidateWithinMs ? { revalidateWithinMs: params.revalidateWithinMs } : {})
       })
     }
   }),

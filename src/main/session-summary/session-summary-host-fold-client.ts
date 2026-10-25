@@ -16,6 +16,7 @@ import {
 } from '../../shared/session-summary-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
 import { isUnknownSessionSearchMethod } from '../../shared/ai-vault-search-client'
+import { coerceRelayedLedger } from './session-summary-relayed-ledger'
 
 export type SessionSummaryHostFoldClient = {
   open: (args: {
@@ -24,6 +25,8 @@ export type SessionSummaryHostFoldClient = {
     foldParams: ResolvedSourceControlAiGenerationParams | null
     /** The viewer's own record of which session is on screen, when it knows one. */
     session?: SessionSummarySessionRef
+    /** The reader's freshness window; the host decides whether its brief is still current. */
+    revalidateWithinMs?: number
   }) => Promise<SessionSummarySnapshot>
   peek: (args: { environmentId: string; paneKey: string }) => Promise<SessionSummarySnapshot>
   close: (args: {
@@ -56,7 +59,7 @@ export function createSessionSummaryHostFoldClient(deps: {
     }
   }
   return {
-    open: async ({ environmentId, paneKey, foldParams, session }) =>
+    open: async ({ environmentId, paneKey, foldParams, session, revalidateWithinMs }) =>
       asSnapshot(
         await call(
           environmentId,
@@ -66,7 +69,8 @@ export function createSessionSummaryHostFoldClient(deps: {
             foldParams: portableFoldParams(foldParams),
             // Why sent: a host that cannot read its own row for this pane would otherwise
             // answer "no readable transcript" for a session it is running right now.
-            session: session ?? null
+            session: session ?? null,
+            revalidateWithinMs: revalidateWithinMs ?? null
           })
         )
       ),
@@ -130,5 +134,8 @@ function asSnapshot(value: unknown): SessionSummarySnapshot {
     throw new Error('host returned an invalid session summary snapshot')
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fields above are the ones the polling loop and the pane branch on; a host running this same code returns this same type, and anything else throws here rather than reaching the pane.
-  return value as SessionSummarySnapshot
+  const snapshot = value as SessionSummarySnapshot
+  // Why coerce: a host on another version relays facts as bare strings and no window boundary,
+  // and rendering that as-is shows an object where the brief should be and hides every fact.
+  return { ...snapshot, ledger: coerceRelayedLedger(snapshot.ledger) }
 }

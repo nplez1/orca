@@ -37,7 +37,9 @@ export function useSessionSummary(
   paneKey: string,
   open: boolean,
   executionHostId?: string | null,
-  session?: SessionSummarySessionRef | null
+  session?: SessionSummarySessionRef | null,
+  /** The agent row's own update time, which is what "the agent produced something" means. */
+  agentUpdatedAt?: number
 ): SessionSummaryView {
   const [snapshot, setSnapshot] = useState<SessionSummarySnapshot | null>(null)
   const seenCountRef = useRef(0)
@@ -50,6 +52,8 @@ export function useSessionSummary(
   // Reads the latest snapshot without tearing down and recreating the auto-refresh timer.
   const snapshotRef = useRef<SessionSummarySnapshot | null>(null)
   snapshotRef.current = snapshot
+  const agentUpdatedAtRef = useRef<number | undefined>(agentUpdatedAt)
+  agentUpdatedAtRef.current = agentUpdatedAt
 
   const accept = useCallback(
     (next: SessionSummarySnapshot): void => {
@@ -65,12 +69,15 @@ export function useSessionSummary(
   )
 
   const request = useCallback(
-    (revalidateWithinMs: number): void => {
+    (revalidateWithinMs: number, sameViewer: boolean): void => {
       void window.api.sessionSummary
         .open({
           paneKey,
           ...(executionHostId ? { executionHostId } : {}),
           ...(revalidateWithinMs > 0 ? { revalidateWithinMs } : {}),
+          // Why: a refresh is the same reader asking again, not a second viewer. Taking a lease
+          // per request would outlive the one close an unmount sends.
+          ...(sameViewer ? { sameViewer } : {}),
           // Why: this window holds the pane, so it is the one process that always knows which
           // session is on screen — including when the folding side's own row is absent.
           ...(sessionAgentType || sessionId
@@ -116,7 +123,7 @@ export function useSessionSummary(
       }
     })
     // The freshness window: re-entering the pane usually means "show me the brief I left".
-    request(REVALIDATE_WITHIN_MS)
+    request(REVALIDATE_WITHIN_MS, false)
     return () => {
       cancelled = true
       unsubscribe()
@@ -133,16 +140,18 @@ export function useSessionSummary(
     const timer = setInterval(() => {
       const current = snapshotRef.current
       const foldedAt = current?.ledger?.foldedAt ?? 0
-      const agentUpdatedAt = current?.facts?.updatedAt ?? 0
-      if (!current?.ledger || agentUpdatedAt <= foldedAt) {
+      // Why the live row and not `facts.updatedAt`: snapshots are only pushed on open and on
+      // fold progress, so the one inside the snapshot is frozen at the last fold and the gate
+      // would never pass. The store row keeps moving with the agent.
+      if (!current?.ledger || (agentUpdatedAtRef.current ?? 0) <= foldedAt) {
         return
       }
-      request(0)
+      request(0, true)
     }, SESSION_SUMMARY_AUTO_REFRESH_MS)
     return () => clearInterval(timer)
   }, [open, request])
 
-  const refresh = useCallback((): void => request(0), [request])
+  const refresh = useCallback((): void => request(0, true), [request])
 
   return {
     snapshot: snapshot?.paneKey === paneKey ? snapshot : null,

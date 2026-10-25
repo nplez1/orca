@@ -150,29 +150,6 @@ export class SessionSummaryService {
       foldParams: null
     }
     runtime.host = host
-    // Re-open always (re)starts a fold: status is 'folding' until it settles,
-    // even when a stale ledger is on display.
-    runtime.status = this.initialStatus(host, hasSource)
-    // Why: re-entering the pane is not a request to spend a model call again. A brief that is
-    // younger than the caller's freshness window, or a row that has not been updated since the
-    // fold, already answers the question the reader came back for.
-    if (
-      host.kind !== 'runtime' &&
-      isStoredBriefReusable({
-        revalidateWithinMs: request.revalidateWithinMs,
-        foldedAt: this.deps.store.get(paneKey)?.ledger.foldedAt,
-        entry,
-        now: this.deps.now()
-      })
-    ) {
-      runtime.status = 'ready'
-      runtime.fold = IDLE_FOLD
-      runtime.hostSnapshot = undefined
-      this.runtimes.set(paneKey, runtime)
-      this.leases.touch(paneKey)
-      this.emit(paneKey)
-      return this.snapshot(paneKey)
-    }
     // Why not carried over: params belong to the open that sent them. A paired client's
     // choice must not survive into this window's next fold of the same pane.
     runtime.foldParams = request.foldParams ?? null
@@ -180,15 +157,43 @@ export class SessionSummaryService {
     // otherwise sit under a brief that has since succeeded.
     runtime.error = undefined
     runtime.identity = hasSessionRef(identity) ? identity : undefined
-    this.runtimes.set(paneKey, runtime)
-    this.leases.touch(paneKey)
+    // Why one lease per viewer, not per request: a refresh or an hourly auto-fold is the same
+    // reader asking again. Taking a lease for it would outlive the single close an unmount
+    // sends, and the pane's cancel-on-close would never fire.
+    if (!request.sameViewer) {
+      this.leases.touch(paneKey)
+    }
+    // Why before the freshness check: a ledger that belongs to a different conversation must be
+    // dropped before anything decides it is fresh enough to show.
     this.resetStaleLedger(paneKey, host, identity)
+    runtime.status = this.initialStatus(host, hasSource)
+    this.runtimes.set(paneKey, runtime)
 
+    // Why: re-entering the pane is not a request to spend a model call again. A brief that is
+    // younger than the caller's freshness window, or a row that has not been updated since the
+    // fold, already answers the question the reader came back for.
+    if (
+      !runtime.fold.running &&
+      isStoredBriefReusable({
+        revalidateWithinMs: request.revalidateWithinMs,
+        foldedAt: this.deps.store.get(paneKey)?.ledger.foldedAt,
+        identity: sessionSummaryIdentityOf(identity),
+        entry,
+        now: this.deps.now()
+      })
+    ) {
+      runtime.status = 'ready'
+      runtime.fold = IDLE_FOLD
+      runtime.hostSnapshot = undefined
+      this.emit(paneKey)
+      return this.snapshot(paneKey)
+    }
+    // A host this build cannot place, or an agent with no transcript at all: nothing to fold.
     if (runtime.status !== 'folding') {
       return this.snapshot(paneKey)
     }
     if (host.kind === 'runtime') {
-      this.startHostFold(paneKey, runtime, host.environmentId)
+      this.startHostFold(paneKey, runtime, host.environmentId, request.revalidateWithinMs)
     } else if (!this.folds.has(paneKey)) {
       void this.runLocalFold(paneKey, host)
     }
@@ -311,7 +316,12 @@ export class SessionSummaryService {
     })
   }
 
-  private startHostFold(paneKey: string, runtime: PaneRuntime, environmentId: string): void {
+  private startHostFold(
+    paneKey: string,
+    runtime: PaneRuntime,
+    environmentId: string,
+    revalidateWithinMs: number | undefined
+  ): void {
     if (!this.hostFolds) {
       // A host never folds for a pane it does not own, so this is a build without the
       // paired-host bridge rather than a failure of this session.
@@ -326,6 +336,9 @@ export class SessionSummaryService {
       paneKey,
       environmentId,
       foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null,
+      // Why forwarded: the host owns its own brief cache, so only the host can decide whether
+      // the brief the reader is coming back to is fresh enough.
+      ...(revalidateWithinMs && revalidateWithinMs > 0 ? { revalidateWithinMs } : {}),
       // Why send it: the host's own row for this pane may be absent (the client owns the
       // layout) or relayed without a transcript path, and a host that cannot read its row
       // answered "no readable transcript" for a session it was running the whole time.

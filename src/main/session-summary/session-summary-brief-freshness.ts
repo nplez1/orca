@@ -13,6 +13,8 @@ import type { SessionSummaryStatusEntry } from './session-summary-snapshot'
 export function isStoredBriefReusable(args: {
   revalidateWithinMs: number | undefined
   foldedAt: number | null | undefined
+  /** The identity the stored brief must describe; a different conversation is never reusable. */
+  identity?: { providerSessionId: string | null; transcriptPath: string | null }
   entry: SessionSummaryStatusEntry | undefined
   now: number
 }): boolean {
@@ -24,8 +26,18 @@ export function isStoredBriefReusable(args: {
   if (foldedAt === null || foldedAt === undefined) {
     return false
   }
-  // Nothing happened since the fold: the brief is current however old it is.
-  if ((args.entry?.updatedAt ?? 0) <= foldedAt) {
+  if (
+    args.identity &&
+    args.identity.providerSessionId !== null &&
+    args.entry?.providerSession?.id &&
+    args.identity.providerSessionId !== args.entry.providerSession.id
+  ) {
+    return false
+  }
+  const agentUpdatedAt = args.entry?.updatedAt
+  // Why require a positive stamp: a row that is gone says nothing, and treating "unknown" as
+  // "nothing happened" would reuse a brief forever for a session that resumed later.
+  if (agentUpdatedAt !== undefined && agentUpdatedAt > 0 && agentUpdatedAt <= foldedAt) {
     return true
   }
   return args.now - foldedAt <= within

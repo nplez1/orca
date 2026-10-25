@@ -33,7 +33,20 @@ export type SessionSummaryReportInput = {
   windowRestarted: boolean
   /** User messages so far; 1 means the window covers the whole session. */
   userMessageCount: number
+  /**
+   * The reader's last message, after this batch.
+   *
+   * Why the model is told it: the batch usually straddles the boundary — it contains the
+   * reader's message and the work before it — so the facts alone cannot say which half is
+   * "since". Without this the two reports covered the same ground, which is the one thing the
+   * reader asked them not to do.
+   */
+  lastUserMessageIndex: number | null
 }
+
+/** A timeline entry's text as it goes into the report prompt: bounded, not re-read wholesale. */
+const REPORT_TIMELINE_MAX_ENTRIES = 40
+const REPORT_TIMELINE_TEXT_MAX_CHARS = 200
 
 export function buildSessionSummaryReportPrompt(input: SessionSummaryReportInput): string {
   const lines: string[] = []
@@ -44,10 +57,11 @@ export function buildSessionSummaryReportPrompt(input: SessionSummaryReportInput
       'The reader has sent a new message to the agent, so "since" starts from that message.'
     )
   }
+  const windowIndex = input.lastUserMessageIndex
   lines.push(
-    input.userMessageCount <= 1
+    input.userMessageCount <= 1 || windowIndex === null
       ? 'The reader has spoken to the agent only once, so "since" and "full" cover the same ground: set "since" to null.'
-      : `The reader has spoken to the agent ${input.userMessageCount} times.`
+      : `The reader has spoken to the agent ${input.userMessageCount} times. "since" covers only messages after [#${windowIndex}], their last message; anything at or before it belongs to "full" alone.`
   )
   const facts: string[] = []
   const pushFact = (label: string, text: string, index: number | null): void => {
@@ -70,13 +84,16 @@ export function buildSessionSummaryReportPrompt(input: SessionSummaryReportInput
     }
   }
   lines.push('', 'Facts folded in this batch:', ...(facts.length > 0 ? facts : ['(none)']))
-  lines.push(
-    '',
-    'Timeline of this batch:',
-    ...(input.timeline.length > 0
-      ? input.timeline.map((entry) => `[#${entry.sourceIndex} ${entry.kind}] ${entry.text}`)
-      : ['(none)'])
-  )
+  // Why bounded: a long backlog merges many chunks, and an unbounded timeline is the one part of
+  // this prompt that grows with the session rather than with the batch.
+  const timeline = input.timeline.slice(-REPORT_TIMELINE_MAX_ENTRIES).map((entry) => {
+    const text =
+      entry.text.length > REPORT_TIMELINE_TEXT_MAX_CHARS
+        ? `${entry.text.slice(0, REPORT_TIMELINE_TEXT_MAX_CHARS)}…`
+        : entry.text
+    return `[#${entry.sourceIndex} ${entry.kind}] ${text}`
+  })
+  lines.push('', 'Timeline of this batch:', ...(timeline.length > 0 ? timeline : ['(none)']))
   return `${REPORT_INSTRUCTIONS}\n\n${lines.join('\n')}`
 }
 
@@ -121,6 +138,7 @@ export async function rewriteReports(args: {
   through: number
   windowRestarted: boolean
   userMessageCount: number
+  lastUserMessageIndex: number | null
 }): Promise<{ since: SessionSummaryReport | null; full: SessionSummaryReport } | null> {
   try {
     const raw = await args.brain.complete({
@@ -130,12 +148,19 @@ export async function rewriteReports(args: {
         delta: args.merged,
         timeline: args.merged.timeline ?? [],
         windowRestarted: args.windowRestarted,
-        userMessageCount: args.userMessageCount
+        userMessageCount: args.userMessageCount,
+        lastUserMessageIndex: args.lastUserMessageIndex
       }),
       signal: args.signal
     })
     args.signal.throwIfAborted()
-    return parseSessionSummaryReports(raw, args.through)
+    const parsed = parseSessionSummaryReports(raw, args.through)
+    if (!parsed) {
+      return null
+    }
+    // Why enforced here and not trusted to the prompt: with one interaction the window is the
+    // session, and two reports that say the same thing give the reader a switch with no meaning.
+    return args.userMessageCount <= 1 ? { since: null, full: parsed.full } : parsed
   } catch (error) {
     if (args.signal.aborted) {
       throw error

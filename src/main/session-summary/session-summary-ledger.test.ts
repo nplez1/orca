@@ -12,6 +12,7 @@ import {
 } from '../../shared/session-summary-types'
 
 const fact = (text: string, sourceIndex: number | null) => ({ text, sourceIndex })
+const slice = (from: number, to: number) => ({ min: from, max: to, fallback: to })
 
 describe('normalizeSessionSummaryDelta', () => {
   it('rejects non-objects and empty deltas', () => {
@@ -29,18 +30,28 @@ describe('normalizeSessionSummaryDelta', () => {
   })
 
   // Why the fallback: the "since your last message" window is computed from these indexes, so a
-  // fact the model left unindexed is still placed — at the slice it was read from.
+  // fact the model left unindexed is still placed — at the slice's last message, because a slice
+  // usually opens with the reader's own message and placing facts there hides the whole slice.
   it('places an unindexed fact at the slice it was read from', () => {
-    const delta = normalizeSessionSummaryDelta({ done: ['no index'] }, 12)
-    expect(delta?.done).toEqual([fact('no index', 12)])
+    const delta = normalizeSessionSummaryDelta({ done: ['no index'] }, slice(10, 49))
+    expect(delta?.done).toEqual([fact('no index', 49)])
   })
 
   it('keeps a fact index the model did supply', () => {
     const delta = normalizeSessionSummaryDelta(
       { done: [fact('indexed', 40), { text: 'unindexed', sourceIndex: -1 }] },
-      12
+      slice(10, 49)
     )
-    expect(delta?.done).toEqual([fact('indexed', 40), fact('unindexed', 12)])
+    expect(delta?.done).toEqual([fact('indexed', 40), fact('unindexed', 49)])
+  })
+
+  // A slice-relative answer would put the whole slice before the reader's last message.
+  it('rejects an index outside the slice instead of trusting it', () => {
+    const delta = normalizeSessionSummaryDelta(
+      { done: [fact('slice relative', 0), fact('past the end', 500)] },
+      slice(10, 49)
+    )
+    expect(delta?.done).toEqual([fact('slice relative', 49), fact('past the end', 49)])
   })
 
   it('normalizes text, lists, and timeline entries with caps', () => {
@@ -103,9 +114,12 @@ describe('applySessionSummaryDelta', () => {
     const untouched = applySessionSummaryDelta(base, { done: [fact('a', 3)] }, 5, 100)
     expect(untouched.goal).toEqual(fact('old', 1))
     expect(untouched.inProgress).toEqual(fact('working', 2))
+    // A goal is replaced, never unset: a later chunk with no opinion must not erase the title.
     const cleared = applySessionSummaryDelta(base, { goal: null }, 5, 100)
-    expect(cleared.goal).toBeNull()
-    expect(cleared.inProgress).toEqual(fact('working', 2))
+    expect(cleared.goal).toEqual(fact('old', 1))
+    const replaced = applySessionSummaryDelta(base, { goal: fact('new', 4) }, 5, 100)
+    expect(replaced.goal).toEqual(fact('new', 4))
+    expect(replaced.inProgress).toEqual(fact('working', 2))
   })
 
   it('appends to the timeline without rewriting history and advances foldedThrough', () => {

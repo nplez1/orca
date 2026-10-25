@@ -111,6 +111,13 @@ session-id search over each agent's own roots — the same idea as
   not index is placed at the first message of the slice that produced it. That index is the only
   thing needed to draw the window below, so both views cost neither a second fold nor a second
   read.
+- **Unindexed facts belong to the slice's last message, and indexes outside the slice are
+  rejected.** A model that answers with a slice-relative index (`0` for the first message it saw)
+  would otherwise put a whole slice before the reader's last message and hide it from the window;
+  the slice's last message is the conservative placement, because a slice usually opens with the
+  reader's own message.
+- **A `goal` is replaced, never unset.** A later chunk that says nothing about it leaves the
+  title alone — the reader asked for a top-line title, and one silent chunk used to erase it.
 - **The window is the reader's last message, not the last time they looked.** The fold records
   `lastUserMessageIndex` (and `userMessageCount`) from the transcript's own `user` events. The
   pane shows, by default, what happened _after_ that message. The old behaviour moved a cursor
@@ -121,7 +128,7 @@ session-id search over each agent's own roots — the same idea as
   Completed chunk extracts are kept for that retry only once a fold has produced a ledger —
   an unproduced one is never stored, so a first fold's chunks are lost with it.
 - **The pane opens as a brief, not a log.** The title is the whole-session goal, then the ledger
-  (facts) and the timeline, both collapsed by default, then the written report
+  (facts) — collapsed by default — then the written report, then the timeline, also collapsed
   (`components/activity/session-summary-ledger-view.tsx`). One switch — _Show the full session_ —
   swaps the whole-session report and every fact in; it is a re-render, not a fold. When the reader
   has spoken to the agent only once, the window _is_ the session: the fold then writes one report
@@ -139,6 +146,18 @@ The fold spends a model call, so it runs on signals, not on every chunk the agen
 | The refresh button                                        | always folds (a fold with no new events never reaches the model, so it is cheap)                                      |
 
 A pane nobody is looking at never folds; the hourly timer exists only while the pane is open.
+
+Two details that are easy to get wrong, and are load-bearing:
+
+- **A refresh is the same viewer.** `open` takes the pane's lease, so a refresh or an auto-fold
+  sends `sameViewer` and takes none: one lease per _viewer_, one close per unmount. A lease per
+  request would outlive that close and cancel-on-close would stop working after the first click.
+- **A paired host runs the same freshness rule.** The window travels with `openOnHost` because
+  the brief being reused lives in the host's own cache; only the host can age it. A relayed
+  ledger is also coerced on arrival (`session-summary-relayed-ledger.ts`), because a host on an
+  older build relays facts as bare strings and no boundary — read as-is, that hides every fact.
+  The reverse (a _new_ host relaying to an older desktop) is not repairable from this side, so a
+  paired pair should update together.
 
 The ledger cache is `session-summaries.json` under `userData`, written atomically. It is a
 rebuildable cache: deleting it costs one fold per session, never state. Its `version` covers the

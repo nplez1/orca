@@ -165,11 +165,14 @@ export async function foldSessionSummaryEvents(args: {
         signal
       })
       signal.throwIfAborted()
-      // The slice's first message places any fact the model did not index.
-      const delta = normalizeSessionSummaryDelta(
-        extractSessionSummaryJson(raw),
-        baseIndex + range.from
-      )
+      // A fact the model did not index is placed at the slice's *last* message, not its first:
+      // a slice usually opens with the reader's own message, and placing facts on that boundary
+      // hid the whole slice from the "since your last message" window.
+      const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
+        min: baseIndex + range.from,
+        max: baseIndex + Math.max(range.from, range.to - 1),
+        fallback: baseIndex + Math.max(range.from, range.to - 1)
+      })
       if (!delta) {
         throw new Error('fold extract returned no usable JSON')
       }
@@ -200,10 +203,20 @@ export async function foldSessionSummaryEvents(args: {
     merged,
     through: folded.foldedThrough,
     windowRestarted: readerMessages.lastUserMessageIndex !== ledger.lastUserMessageIndex,
-    userMessageCount: readerMessages.userMessageCount
+    userMessageCount: readerMessages.userMessageCount,
+    lastUserMessageIndex: readerMessages.lastUserMessageIndex
   })
+  // Why drop a carried-over "since" when the window moved: the previous one describes work the
+  // reader has now spoken over, and a failed rewrite must not relabel it "since your last message".
+  const reportSince = reports
+    ? reports.since
+    : readerMessages.lastUserMessageIndex === ledger.lastUserMessageIndex
+      ? ledger.reportSince
+      : null
   return {
-    ledger: reports ? { ...folded, reportSince: reports.since, reportFull: reports.full } : folded,
+    ledger: reports
+      ? { ...folded, reportSince, reportFull: reports.full }
+      : { ...folded, reportSince },
     completedChunks: ranges.length,
     totalChunks: ranges.length
   }

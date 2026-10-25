@@ -57,19 +57,32 @@ function normalizeText(value: unknown): string | null {
 }
 
 /**
+ * The transcript indexes an extract's facts may legitimately name.
+ *
+ * A model that answers with a slice-relative index (0 for the first message of its slice) would
+ * otherwise place every fact in that slice *before* the reader's last message and hide the whole
+ * slice from the window, so an out-of-range index falls back to the slice's own placement.
+ */
+export type SessionSummaryFactIndexRange = {
+  min: number
+  max: number
+  /** Where an unindexed or out-of-range fact goes: the slice's last message. */
+  fallback: number
+}
+
+/**
  * One fact, with the message index it came from.
  *
- * A bare string is accepted as well: an extract that ignored the `sourceIndex` request still
- * says something true, and `fallbackSourceIndex` places it at the slice it was read from — a
- * fact with no index could never appear in the "since your last message" window.
+ * A bare string is accepted as well: an extract that ignored the `sourceIndex` request still says
+ * something true, and the slice's placement puts it in the window rather than outside it.
  */
 function normalizeFact(
   value: unknown,
-  fallbackSourceIndex: number | null
+  indexes: SessionSummaryFactIndexRange | null
 ): SessionSummaryFact | null {
   if (typeof value === 'string') {
     const text = normalizeText(value)
-    return text === null ? null : { text, sourceIndex: fallbackSourceIndex }
+    return text === null ? null : { text, sourceIndex: indexes?.fallback ?? null }
   }
   if (!isRecord(value)) {
     return null
@@ -79,23 +92,24 @@ function normalizeFact(
     return null
   }
   const raw = value.sourceIndex
-  const sourceIndex =
-    typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
-      ? Math.floor(raw)
-      : fallbackSourceIndex
-  return { text, sourceIndex }
+  const claimed =
+    typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : null
+  // No slice range (a caller applying a delta outside the fold) can only trust what it is given.
+  const inRange =
+    claimed !== null && (indexes === null || (claimed >= indexes.min && claimed <= indexes.max))
+  return { text, sourceIndex: inRange ? claimed : (indexes?.fallback ?? null) }
 }
 
 function normalizeFactList(
   value: unknown,
-  fallbackSourceIndex: number | null
+  indexes: SessionSummaryFactIndexRange | null
 ): SessionSummaryFact[] {
   if (!Array.isArray(value)) {
     return []
   }
   const out: SessionSummaryFact[] = []
   for (const item of value) {
-    const fact = normalizeFact(item, fallbackSourceIndex)
+    const fact = normalizeFact(item, indexes)
     if (fact !== null && !out.some((existing) => existing.text === fact.text)) {
       out.push(fact)
     }
@@ -141,12 +155,12 @@ function normalizeTimeline(value: unknown): SessionSummaryTimelineDeltaEntry[] {
 /**
  * Normalize an untrusted (model-produced) delta. Null when nothing usable is present.
  *
- * `fallbackSourceIndex` is the first transcript message of the slice this extract read, and it
- * places any fact the model did not index.
+ * `indexes` is the transcript range this extract read; it places any fact the model did not
+ * index and rejects an index outside the slice.
  */
 export function normalizeSessionSummaryDelta(
   value: unknown,
-  fallbackSourceIndex: number | null = null
+  indexes: SessionSummaryFactIndexRange | null = null
 ): SessionSummaryLedgerDelta | null {
   if (!isRecord(value)) {
     return null
@@ -154,23 +168,22 @@ export function normalizeSessionSummaryDelta(
   const obj = value
   const delta: SessionSummaryLedgerDelta = {}
   if ('goal' in obj) {
-    delta.goal = obj.goal === null ? null : normalizeFact(obj.goal, fallbackSourceIndex)
+    delta.goal = obj.goal === null ? null : normalizeFact(obj.goal, indexes)
   }
   if ('inProgress' in obj) {
-    delta.inProgress =
-      obj.inProgress === null ? null : normalizeFact(obj.inProgress, fallbackSourceIndex)
+    delta.inProgress = obj.inProgress === null ? null : normalizeFact(obj.inProgress, indexes)
   }
   if ('plan' in obj) {
-    delta.plan = normalizeFactList(obj.plan, fallbackSourceIndex)
+    delta.plan = normalizeFactList(obj.plan, indexes)
   }
   if ('done' in obj) {
-    delta.done = normalizeFactList(obj.done, fallbackSourceIndex)
+    delta.done = normalizeFactList(obj.done, indexes)
   }
   if ('blockers' in obj) {
-    delta.blockers = normalizeFactList(obj.blockers, fallbackSourceIndex)
+    delta.blockers = normalizeFactList(obj.blockers, indexes)
   }
   if ('decisions' in obj) {
-    delta.decisions = normalizeFactList(obj.decisions, fallbackSourceIndex)
+    delta.decisions = normalizeFactList(obj.decisions, indexes)
   }
   if ('timeline' in obj) {
     delta.timeline = normalizeTimeline(obj.timeline)
@@ -253,7 +266,9 @@ export function applySessionSummaryDelta(
   userMessageCount: number = ledger.userMessageCount
 ): SessionSummaryLedger {
   return {
-    goal: 'goal' in delta ? (delta.goal ?? null) : ledger.goal,
+    // Why the last non-null wins: a later chunk that says nothing about the goal must not erase
+    // the title. A goal is replaced, never unset, so an explicit null is "no opinion", not "none".
+    goal: delta.goal ?? ledger.goal,
     plan: delta.plan ? mergeFactLists(ledger.plan, delta.plan) : ledger.plan,
     inProgress: 'inProgress' in delta ? (delta.inProgress ?? null) : ledger.inProgress,
     done: delta.done ? mergeFactLists(ledger.done, delta.done) : ledger.done,

@@ -24,7 +24,9 @@ const SessionSummarySessionOnWire = z.record(z.string(), z.unknown()).nullish()
 export const SessionSummaryOpenOnHostParams = SessionSummaryPaneParams.extend({
   foldParams: SessionSummaryFoldParamsOnWire,
   /** Which session the viewer has on screen, when the host's own row cannot say. */
-  session: SessionSummarySessionOnWire
+  session: SessionSummarySessionOnWire,
+  /** The reader's freshness window; the host owns the brief cache this decides about. */
+  revalidateWithinMs: z.number().int().nonnegative().nullish()
 })
 
 export const SessionSummarySnapshotOnHostParams = SessionSummaryPaneParams
