@@ -227,7 +227,9 @@ export function mergeSessionSummaryDeltas(
 ): SessionSummaryLedgerDelta {
   const merged: SessionSummaryLedgerDelta = { timeline: [] }
   for (const delta of deltas) {
-    if ('goal' in delta) {
+    // Why only a real opinion: chunks are merged in order, and a later chunk that says nothing
+    // about the goal used to erase the one an earlier chunk had just found.
+    if (delta.goal) {
       merged.goal = delta.goal
     }
     if ('inProgress' in delta) {
@@ -254,8 +256,9 @@ export function mergeSessionSummaryDeltas(
 
 /**
  * Apply a (merged) delta to a ledger. Pure: returns a new ledger whose
- * `foldedThrough` has advanced to `foldedThrough`. Absent delta fields leave
- * their ledger field untouched; explicit null clears the scalar.
+ * `foldedThrough` has advanced to `foldedThrough`. Absent delta fields leave their ledger field
+ * untouched; an explicit null clears `inProgress`, and leaves `goal` alone — a goal is replaced,
+ * never unset, so the title survives a chunk that has nothing to say about it.
  */
 export function applySessionSummaryDelta(
   ledger: SessionSummaryLedger,

@@ -107,10 +107,10 @@ session-id search over each agent's own roots — the same idea as
   one batch, it stays a few hundred tokens. A failed rewrite keeps the previous reports and does
   not fail the fold — the facts and timeline already landed.
 - **Every fact carries the message it came from.** `SessionSummaryFact` is `{ text, sourceIndex }`
-  for `goal`, `inProgress`, `plan`, `done`, `blockers` and `decisions`, and a fact the extract did
-  not index is placed at the first message of the slice that produced it. That index is the only
-  thing needed to draw the window below, so both views cost neither a second fold nor a second
-  read.
+  for `goal`, `inProgress`, `plan`, `done`, `blockers` and `decisions`; a fact the extract did not
+  index — or indexed outside its own slice — is placed at the slice's _last_ message. That index is
+  the only thing needed to draw the window below, so both views cost neither a second fold nor a
+  second read.
 - **Unindexed facts belong to the slice's last message, and indexes outside the slice are
   rejected.** A model that answers with a slice-relative index (`0` for the first message it saw)
   would otherwise put a whole slice before the reader's last message and hide it from the window;

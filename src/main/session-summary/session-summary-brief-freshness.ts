@@ -13,8 +13,9 @@ import type { SessionSummaryStatusEntry } from './session-summary-snapshot'
 export function isStoredBriefReusable(args: {
   revalidateWithinMs: number | undefined
   foldedAt: number | null | undefined
-  /** The identity the stored brief must describe; a different conversation is never reusable. */
-  identity?: { providerSessionId: string | null; transcriptPath: string | null }
+  /** The session the stored brief describes, and the one being asked about. */
+  storedIdentity?: { providerSessionId: string | null; transcriptPath: string | null }
+  currentIdentity?: { providerSessionId: string | null; transcriptPath: string | null }
   entry: SessionSummaryStatusEntry | undefined
   now: number
 }): boolean {
@@ -26,12 +27,9 @@ export function isStoredBriefReusable(args: {
   if (foldedAt === null || foldedAt === undefined) {
     return false
   }
-  if (
-    args.identity &&
-    args.identity.providerSessionId !== null &&
-    args.entry?.providerSession?.id &&
-    args.identity.providerSessionId !== args.entry.providerSession.id
-  ) {
+  const stored = args.storedIdentity?.providerSessionId
+  const current = args.currentIdentity?.providerSessionId
+  if (stored && current && stored !== current) {
     return false
   }
   const agentUpdatedAt = args.entry?.updatedAt

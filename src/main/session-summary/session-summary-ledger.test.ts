@@ -92,9 +92,10 @@ describe('mergeSessionSummaryDeltas', () => {
         done: [fact('y', 9), fact('z', 3)],
         timeline: [{ kind: 'decision', text: 't2', sourceIndex: 2 }]
       },
+      // A later chunk with nothing to say about the goal must not erase what an earlier one found.
       { goal: null, done: [fact('z', 4)] }
     ])
-    expect(merged.goal).toBeNull()
+    expect(merged.goal).toEqual(fact('first goal', 1))
     expect(merged.inProgress).toEqual(fact('b', 2))
     // y keeps its *first* index: a fact restated later did not become news when it was repeated.
     expect(merged.done).toEqual([fact('x', 1), fact('y', 2), fact('z', 3)])

@@ -6,6 +6,7 @@ import { SessionSummaryService } from './session-summary-service'
 import { SessionSummaryStore } from './session-summary-store'
 import type { SessionSummaryStatusEntry } from './session-summary-service'
 import type { SessionSummarySourceEvent } from './session-summary-fold'
+import { emptySessionSummaryLedger } from './session-summary-ledger'
 
 function events(count: number): SessionSummarySourceEvent[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -116,12 +117,14 @@ describe('SessionSummaryService fresh-brief reuse', () => {
     h.service.open({ paneKey: 'tab:leaf', sameViewer: true })
     await waitFor(() => h.reads() > readsBefore)
 
-    // One viewer, one lease: the mont's single close must be enough to stop the pane's work.
+    // One viewer, one lease: the unmount's single close has to be enough to stop the pane's work.
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
-    const readsAfterClose = h.reads()
-    h.service.open({ paneKey: 'tab:leaf', sameViewer: true })
-    // No runtime survives the close, so this open starts from scratch rather than reusing one.
-    expect(readsAfterClose).toBeLessThanOrEqual(h.reads())
+    expect(h.service.peek('tab:leaf').fold.running).toBe(false)
+    // The close must have released the pane: an unconditional open then folds from scratch
+    // instead of reporting on a fold the closed pane was still running.
+    const beforeReopen = h.reads()
+    h.service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => h.reads() > beforeReopen)
   })
 
   // A row that is gone says nothing about the transcript. Treating "unknown" as "nothing
@@ -146,12 +149,29 @@ describe('SessionSummaryService fresh-brief reuse', () => {
   })
 })
 
-// A failed report rewrite keeps the previous prose, but only when it still describes the same
-// window: a "since your last message" sentence from before the reader's latest message would be
-// labelled as news about work they have already spoken over.
+// A failed report rewrite keeps the previous prose only when it still describes the same window:
+// a sentence written before the reader's latest message would be labelled as news about work they
+// have already spoken over.
 describe('SessionSummaryService report staleness', () => {
-  it('drops the previous "since" when the reader has spoken since it was written', async () => {
+  it('drops a previous "since" when the reader has spoken since it was written', async () => {
     const store = testStore()
+    // What a previous successful fold left behind: a brief, and a window at message 2.
+    store.set('tab:leaf', {
+      identity: { providerSessionId: 'pi-1', transcriptPath: '/tmp/pi-1.jsonl' },
+      ledger: {
+        ...emptySessionSummaryLedger(),
+        reportSince: { text: 'work since message 2', through: 3 },
+        reportFull: { text: 'whole session', through: 3 },
+        lastUserMessageIndex: 2,
+        userMessageCount: 1,
+        foldedThrough: 3,
+        foldedAt: Date.now() - 60_000
+      },
+      chunkCache: {},
+      messageCount: 3,
+      seenThrough: 0,
+      updatedAt: Date.now() - 60_000
+    })
     const service = new SessionSummaryService({
       store,
       readEvents: async () => events(6),
@@ -172,11 +192,12 @@ describe('SessionSummaryService report staleness', () => {
     service.open({ paneKey: 'tab:leaf' })
     await waitFor(() => updates.some((u) => u.status === 'ready'))
 
-    // Reports never landed (the phase failed), so there is nothing stale to show either way.
     const ready = updates.find((u) => u.status === 'ready')
+    // The reader's message is inside this batch, so the old "since" no longer describes the window.
+    expect(ready?.ledger?.lastUserMessageIndex).toBeGreaterThan(2)
     expect(ready?.ledger?.reportSince).toBeNull()
-    expect(ready?.ledger?.reportFull).toBeNull()
-    // The facts still landed: a failed rewrite must not fail the batch.
+    // The whole-session report is about no particular window, so it survives.
+    expect(ready?.ledger?.reportFull?.text).toBe('whole session')
     expect(ready?.ledger?.foldedThrough).toBe(6)
   })
 })

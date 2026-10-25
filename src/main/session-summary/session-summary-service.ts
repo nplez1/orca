@@ -173,11 +173,13 @@ export class SessionSummaryService {
     // younger than the caller's freshness window, or a row that has not been updated since the
     // fold, already answers the question the reader came back for.
     if (
+      host.kind !== 'runtime' &&
       !runtime.fold.running &&
       isStoredBriefReusable({
         revalidateWithinMs: request.revalidateWithinMs,
         foldedAt: this.deps.store.get(paneKey)?.ledger.foldedAt,
-        identity: sessionSummaryIdentityOf(identity),
+        storedIdentity: this.deps.store.get(paneKey)?.identity,
+        currentIdentity: sessionSummaryIdentityOf(identity),
         entry,
         now: this.deps.now()
       })
@@ -193,7 +195,7 @@ export class SessionSummaryService {
       return this.snapshot(paneKey)
     }
     if (host.kind === 'runtime') {
-      this.startHostFold(paneKey, runtime, host.environmentId, request.revalidateWithinMs)
+      this.startHostFold(paneKey, runtime, host.environmentId, request)
     } else if (!this.folds.has(paneKey)) {
       void this.runLocalFold(paneKey, host)
     }
@@ -320,7 +322,7 @@ export class SessionSummaryService {
     paneKey: string,
     runtime: PaneRuntime,
     environmentId: string,
-    revalidateWithinMs: number | undefined
+    request: SessionSummaryOpenRequest
   ): void {
     if (!this.hostFolds) {
       // A host never folds for a pane it does not own, so this is a build without the
@@ -337,8 +339,12 @@ export class SessionSummaryService {
       environmentId,
       foldParams: runtime.foldParams ?? this.deps.resolveFoldParams?.() ?? null,
       // Why forwarded: the host owns its own brief cache, so only the host can decide whether
-      // the brief the reader is coming back to is fresh enough.
-      ...(revalidateWithinMs && revalidateWithinMs > 0 ? { revalidateWithinMs } : {}),
+      // the brief the reader is coming back to is fresh enough — and only the host can tell a
+      // refresh from a second viewer, which is what keeps its lease count honest.
+      ...(request.revalidateWithinMs && request.revalidateWithinMs > 0
+        ? { revalidateWithinMs: request.revalidateWithinMs }
+        : {}),
+      ...(request.sameViewer ? { sameViewer: true } : {}),
       // Why send it: the host's own row for this pane may be absent (the client owns the
       // layout) or relayed without a transcript path, and a host that cannot read its row
       // answered "no readable transcript" for a session it was running the whole time.

@@ -69,6 +69,7 @@ export class SessionSummaryHostFoldSubscription {
     foldParams: ResolvedSourceControlAiGenerationParams | null
     session?: SessionSummarySessionRef
     revalidateWithinMs?: number
+    sameViewer?: boolean
   }): void {
     const state = this.stateFor(args.paneKey, args.environmentId)
     if (state.leases === 0 && state.unleasedViewers === 0 && state.inflight.size === 0) {
@@ -158,6 +159,7 @@ export class SessionSummaryHostFoldSubscription {
       foldParams: ResolvedSourceControlAiGenerationParams | null
       session?: SessionSummarySessionRef
       revalidateWithinMs?: number
+      sameViewer?: boolean
     },
     state: PaneHostState,
     seq: number,
@@ -169,13 +171,18 @@ export class SessionSummaryHostFoldSubscription {
         paneKey: args.paneKey,
         foldParams: args.foldParams,
         ...(args.session ? { session: args.session } : {}),
-        ...(args.revalidateWithinMs ? { revalidateWithinMs: args.revalidateWithinMs } : {})
+        ...(args.revalidateWithinMs ? { revalidateWithinMs: args.revalidateWithinMs } : {}),
+        ...(args.sameViewer ? { sameViewer: true } : {})
       })
       const queued = state.inflight.get(seq)?.queuedClose ?? null
       state.inflight.delete(seq)
       // Why count before checking currency: the host took this lease whatever this pane is
-      // showing now, and a lease nobody accounts for is a fold nobody can stop.
-      state.leases += 1
+      // showing now, and a lease nobody accounts for is a fold nobody can stop. A refresh from a
+      // viewer that already holds one replaces it rather than stacking a second, which no close
+      // would ever return.
+      if (!args.sameViewer || state.leases === 0) {
+        state.leases += 1
+      }
       if (queued !== null) {
         state.leases -= 1
         this.sendClose({

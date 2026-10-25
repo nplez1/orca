@@ -142,6 +142,14 @@ export async function foldSessionSummaryEvents(args: {
   events: readonly SessionSummarySourceEvent[]
   signal: AbortSignal
   cache?: SessionSummaryChunkCache
+  /**
+   * When the transcript these events came from was read.
+   *
+   * Why the caller's clock and not `Date.now()` here: the freshness rule compares it with the
+   * agent row's `updatedAt`, so stamping it after the model calls marks work that landed during
+   * the fold as already folded — and the stale brief is then reused at any age.
+   */
+  readAt?: number
   onProgress?: (result: SessionSummaryFoldResult) => void
 }): Promise<SessionSummaryFoldResult> {
   const { brain, ledger, events, signal, cache } = args
@@ -189,13 +197,14 @@ export async function foldSessionSummaryEvents(args: {
     ledger,
     merged,
     baseIndex + events.length,
-    Date.now(),
+    args.readAt ?? Date.now(),
     readerMessages.lastUserMessageIndex,
     readerMessages.userMessageCount
   )
   // Why a second call and not a projection of the facts: a progress report is prose, and the
-  // whole point of it is to be shorter and better organised than the facts are. It rewrites the
-  // previous report, so its input stays a few hundred tokens however long the session gets.
+  // whole point of it is to be shorter and better organised than the facts are. Its input is the
+  // previous reports plus this batch, and the prompt caps the timeline share of that, so it grows
+  // with the batch rather than with the session.
   const reports = await rewriteReports({
     brain,
     signal,

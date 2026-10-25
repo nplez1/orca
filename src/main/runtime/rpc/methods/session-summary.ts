@@ -37,7 +37,8 @@ export const SESSION_SUMMARY_RPC_METHODS = [
         paneKey: params.paneKey,
         foldParams,
         ...(session ? { session } : {}),
-        ...(params.revalidateWithinMs ? { revalidateWithinMs: params.revalidateWithinMs } : {})
+        ...(params.revalidateWithinMs ? { revalidateWithinMs: params.revalidateWithinMs } : {}),
+        ...(params.sameViewer ? { sameViewer: true } : {})
       })
     }
   }),

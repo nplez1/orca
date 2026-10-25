@@ -27,6 +27,8 @@ export type SessionSummaryHostFoldClient = {
     session?: SessionSummarySessionRef
     /** The reader's freshness window; the host decides whether its brief is still current. */
     revalidateWithinMs?: number
+    /** A refresh from a viewer that already holds the pane's lease there. */
+    sameViewer?: boolean
   }) => Promise<SessionSummarySnapshot>
   peek: (args: { environmentId: string; paneKey: string }) => Promise<SessionSummarySnapshot>
   close: (args: {
@@ -59,7 +61,7 @@ export function createSessionSummaryHostFoldClient(deps: {
     }
   }
   return {
-    open: async ({ environmentId, paneKey, foldParams, session, revalidateWithinMs }) =>
+    open: async ({ environmentId, paneKey, foldParams, session, revalidateWithinMs, sameViewer }) =>
       asSnapshot(
         await call(
           environmentId,
@@ -70,7 +72,8 @@ export function createSessionSummaryHostFoldClient(deps: {
             // Why sent: a host that cannot read its own row for this pane would otherwise
             // answer "no readable transcript" for a session it is running right now.
             session: session ?? null,
-            revalidateWithinMs: revalidateWithinMs ?? null
+            revalidateWithinMs: revalidateWithinMs ?? null,
+            sameViewer: sameViewer ?? null
           })
         )
       ),

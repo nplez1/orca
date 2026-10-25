@@ -31,7 +31,8 @@ describe('createSessionSummaryHostFoldClient', () => {
       paneKey: 'tab-1:leaf-1',
       foldParams: { agentId: 'claude', model: 'sonnet' },
       session: null,
-      revalidateWithinMs: null
+      revalidateWithinMs: null,
+      sameViewer: null
     })
     expect(result.paneKey).toBe('tab-1:leaf-1')
   })
@@ -61,7 +62,8 @@ describe('createSessionSummaryHostFoldClient', () => {
       paneKey: 'tab-1:leaf-1',
       foldParams: null,
       session,
-      revalidateWithinMs: null
+      revalidateWithinMs: null,
+      sameViewer: null
     })
   })
 

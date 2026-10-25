@@ -151,6 +151,7 @@ export async function runSessionSummaryFold(args: {
       host,
       signal
     })
+    const eventsReadAt = deps.now()
     signal.throwIfAborted()
     if (!events) {
       report({
@@ -186,6 +187,7 @@ export async function runSessionSummaryFold(args: {
       ledger: stored.ledger,
       events: newEvents,
       signal,
+      readAt: eventsReadAt,
       cache: chunkCacheFor(stored),
       onProgress: (progress) =>
         report({
