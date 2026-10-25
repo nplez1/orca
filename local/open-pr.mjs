@@ -13,10 +13,12 @@
 // is resolved against the remote the PR targets — `upstream` for an upstream PR, `origin`
 // otherwise — because the two remotes track different branches.
 //
-// Why both PR gates are read here: AGENTS.md makes one full unit run with a verdict and one Opus
-// review conditions of opening a PR, and a rule that nothing reads is advisory. This refuses a
-// head with no cached unit-gate PASS and a body with no review claim. `--waive-gate <n>:<reason>`
-// records a deliberate exception, prints it, and expects the PR body to state it.
+// Why both PR gates are read here: AGENTS.md makes the PR's own verification and one Opus review
+// conditions of opening a PR, and a rule that nothing reads is advisory. This refuses a body with no
+// review claim, and a head with no cached unit-gate PASS *when the change is global enough that a
+// targeted run proves nothing* — the full suite itself moved to the release gate, so requiring it per
+// branch is what made agents run it five times a session. `--waive-gate <n>:<reason>` records a
+// deliberate exception, prints it, and expects the PR body to state it.
 //
 //   body=$(mktemp "${TMPDIR:-/tmp}/orca-pr-body.XXXXXX")
 //   node local/open-pr.mjs --title "fix(git): ..." --body-file "$body"
@@ -124,8 +126,11 @@ export function usage() {
   --dry-run           print the gh command instead of running it, and report a gate refusal
                       instead of aborting on it
 
-Gate 1 needs a cached PASS from \`orca-queue node local/gate-unit.mjs\` for this exact revision. It
-is fork-local, so an upstream PR always needs \`--waive-gate 1:\` with the reason. Gate 2 needs a
+Gate 1 needs a cached PASS from \`orca-queue node local/gate-unit.mjs\` only when the change is
+global: a build, workspace, config or \`src/packages\` / \`src/shared\` input, or any path outside
+the source, test, doc, fork-tooling, workflow and agent trees. An ordinary \`src/\` change is verified
+by its targeted tests instead. Gate 1 is fork-local either way, so an upstream PR always needs \`--waive-gate 1:\`
+with the reason. Gate 2 needs a
 line in the body shaped like:
   ${REVIEW_CLAIM_EXAMPLE}
 `
@@ -313,7 +318,14 @@ export function requireUnitGate(head, options) {
  * The decision both gates make, separated from printing and exiting so it can be tested: `problems`
  * is what the PR boundary refuses on, `passes` is what it reports, `waived` is what a person chose.
  */
-export function evaluateGates({ upstream, waivers = new Map(), head, body, gateOne = {} } = {}) {
+export function evaluateGates({
+  upstream,
+  waivers = new Map(),
+  head,
+  body,
+  gateOne = {},
+  changedPaths = null
+} = {}) {
   const problems = []
   const passes = []
   if (!waivers.has(1)) {
@@ -323,11 +335,16 @@ export function evaluateGates({ upstream, waivers = new Map(), head, body, gateO
           `  --waive-gate 1:"upstream PR, gated by upstream CI"`
       )
     } else {
-      const result = unitGateVerdict(head, gateOne)
-      if (result.ok) {
-        passes.push(`gate 1 PASS — ${formatVerdict(result.verdict)}`)
+      const scope = needsFullUnitGate(changedPaths)
+      if (!scope.required) {
+        passes.push(`gate 1 not required — ${scope.why}`)
       } else {
-        problems.push(result.reason)
+        const result = unitGateVerdict(head, gateOne)
+        if (result.ok) {
+          passes.push(`gate 1 PASS — ${formatVerdict(result.verdict)}`)
+        } else {
+          problems.push(`${result.reason}\n(${scope.why})`)
+        }
       }
     }
   }
@@ -352,6 +369,80 @@ export const FORK_OWNED_PATHS = [
   'UPSTREAM-SYNC-RUNBOOK.md',
   '.husky/commit-msg'
 ]
+
+/**
+ * The changed paths a PR will show. Exported and injectable for the same reason `forkOnlyPathsIn` is:
+ * the `--no-renames` flag is the fix for a real hole, and a hole that is only described in a comment
+ * comes back the next time someone tidies the call.
+ */
+export function changedPathsIn(range, gitRun = git) {
+  return gitRun(['diff', '--name-only', '--no-renames', range])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+/**
+ * Paths whose change makes a targeted test run prove nothing: the build, the workspace definition,
+ * config every project reads, and the two `src` trees every process imports. Why a fixed list and
+ * not `selectUnitFiles`: that needs the reverse-import graph (globs plus the TypeScript API), which
+ * costs minutes in a PR opener and would answer "run all 13,064 files" for nearly every input.
+ * Measured on the last 40 commits, `src/shared` or `src/packages` changes in 15 of them, so this
+ * keeps the full gate on the ~37% of changes with real blast radius and drops it from the rest.
+ */
+export const GLOBAL_CHANGE_PATHS = [
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'config/',
+  'src/packages/',
+  'src/shared/'
+]
+
+/** Paths that cannot change unit-suite behaviour on their own, so they need no suite run. */
+const TARGETED_PATHS = [
+  /^src\//,
+  /^tests\//,
+  /^docs\//,
+  /^local\//,
+  /^\.github\//,
+  /^\.agents\//,
+  /\.md$/
+]
+
+function isGlobalChange(path) {
+  if (GLOBAL_CHANGE_PATHS.some((global) => path === global || path.startsWith(global))) {
+    return true
+  }
+  // Why tsconfig separately: every project reads it, and a file name is not a directory prefix.
+  if (/^tsconfig[^/]*\.json$/.test(path)) {
+    return true
+  }
+  return !TARGETED_PATHS.some((pattern) => pattern.test(path))
+}
+
+/**
+ * Whether this diff needs the full suite before a PR, or whether targeted tests are the verification.
+ * Fails closed: no changed-path evidence means the full gate, because a silent skip is the failure
+ * mode this boundary exists to prevent.
+ */
+export function needsFullUnitGate(changedPaths) {
+  if (!Array.isArray(changedPaths)) {
+    return { required: true, why: 'no changed-path evidence, so the change is unproven' }
+  }
+  // Why filter before deciding: an unreadable diff and a diff that is genuinely empty must not both
+  // read as "nothing global changed", and only the second should ever be a statement about the code.
+  const paths = changedPaths.filter((path) => typeof path === 'string' && path.length > 0)
+  if (paths.length === 0) {
+    return { required: true, why: 'no changed-path evidence, so the change is unproven' }
+  }
+  const global = paths.filter(isGlobalChange)
+  if (global.length > 0) {
+    const more = global.length > 1 ? ` (+${global.length - 1} more)` : ''
+    return { required: true, why: `${global[0]}${more} is a global input` }
+  }
+  return { required: false, why: 'every changed path is covered by targeted tests' }
+}
 
 /**
  * Why a path check on top of the subject check: the subject prefix is a convention, and a squash or
@@ -464,7 +555,10 @@ function main() {
     upstream: options.upstream,
     waivers,
     head: branchHead,
-    body: readFileSync(options.bodyFile, 'utf8')
+    body: readFileSync(options.bodyFile, 'utf8'),
+    // Why three dots: the merge-base diff is what the PR will show, so a branch that has already
+    // pulled the base in must not look global because of the base's own files.
+    changedPaths: changedPathsIn(`${baseCommit}...${branchHead}`)
   })
   for (const line of gateResult.passes) {
     console.log(`open-pr: ${line}`)

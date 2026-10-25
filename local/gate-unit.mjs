@@ -21,7 +21,7 @@
  *
  * Upstream's own runs never call this: `.github/workflows/unit-tests.yml` keeps Vitest's exit code,
  * and `local/check-unit-shard-verdict.mjs` stays the per-shard CI verdict. This is the local gate
- * described in `AGENTS.md` § PR gate 1.
+ * described in `AGENTS.md` § Release gate.
  *
  * Usage: node local/gate-unit.mjs [--allowlist PATH] [--no-cache] [--allow-dirty]
  *                                 [--timeout-ms N] [-- <vitest args>]

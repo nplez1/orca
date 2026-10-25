@@ -78,6 +78,36 @@ The certificate must be **Developer ID Application**, created from a CSR generat
 Access and exported **with its private key**. `config/scripts/verify-macos-release-env.mjs` fails the
 run if any of the five is missing, before the build starts.
 
+## Step 1.5 — the unit gate, on the revision being released
+
+This is where the full unit suite runs. It is deliberately **not** a PR gate any more, except for a diff
+carrying a global input (`AGENTS.md` § Verification tiers): requiring it per branch is what had agents
+running it five times a session.
+
+```bash
+orca-queue node local/gate-unit.mjs   # full suite + known-red verdict, cached per revision
+pnpm tc                               # must be clean; nothing to allowlist here
+orca-queue node local/gate-lint.mjs
+```
+
+- `gate-unit` must report **PASS**. A failure listed in `local/unit-known-red.json` does not fail it;
+  anything outside that list does, and so does a non-zero exit the run cannot account for.
+- The verdict is cached per (revision, allowlist, gate inputs) under `.git/orca-gate/`, so re-running
+  on an unchanged revision returns the same answer immediately. Do not re-run to chase green.
+- Paste its summary line into the release notes. That line is the claim this step makes checkable.
+
+Check the nightly before cutting, not after:
+
+```bash
+gh run list --workflow fork-main-tests.yml -L1 --repo nplez1/orca
+```
+
+A red there is a failure the Mac's allowlist cannot see, because the Linux runner has its own red set.
+Triage it first. If that nightly is green on the exact commit being released, record it in the release
+notes — it covers the Linux runtime better than the local gate does, though the local gate is still
+the only one that exercises the darwin-bound classes, so substituting it is a judgement call and not
+something to do silently.
+
 ## Step 2 — publish the first signed release
 
 ```bash
