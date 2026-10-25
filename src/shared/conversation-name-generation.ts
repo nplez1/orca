@@ -11,7 +11,6 @@ export function clampConversationNameFirstPrompt(firstPrompt: string): string {
   return sliceAtCodeUnitLimit(firstPrompt.trim(), MAX_FIRST_PROMPT_LENGTH)
 }
 
-/** The naming request's first line; Session History reads it to hide these one-shot runs. */
 export const CONVERSATION_NAME_PROMPT_OPENING = "Name this chat from the user's first request."
 
 export function sanitizeGeneratedConversationName(raw: string): string | null {

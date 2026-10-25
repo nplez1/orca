@@ -1,7 +1,7 @@
 // The prompt for naming a branch from the work in front of the user.
 //
-// Every model-facing prompt in Orca lives under `src/shared/ai-prompts/`, one module per
-// operation, so the wording can be read and changed in one place. `index.ts` lists them all.
+// Prompt text lives under `src/shared/ai-prompts/`, one module per operation, so the wording can
+// be read and changed in one place. `index.ts` lists them and names any still assembled elsewhere.
 import type { BranchNameWorkContext } from '../branch-name-from-work'
 
 export function buildBranchNamePrompt(context: BranchNameWorkContext, customPrompt = ''): string {

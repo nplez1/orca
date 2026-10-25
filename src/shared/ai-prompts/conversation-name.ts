@@ -1,7 +1,7 @@
 // The prompt for naming a chat after the user's first request.
 //
-// Every model-facing prompt in Orca lives under `src/shared/ai-prompts/`, one module per
-// operation, so the wording can be read and changed in one place. `index.ts` lists them all.
+// Prompt text lives under `src/shared/ai-prompts/`, one module per operation, so the wording can
+// be read and changed in one place. `index.ts` lists them and names any still assembled elsewhere.
 import {
   MAX_GENERATED_NAME_LENGTH,
   clampConversationNameFirstPrompt,
