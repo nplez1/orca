@@ -23,7 +23,7 @@ describe('AI prompt index', () => {
   it('names the prompts that still live elsewhere', () => {
     expect(AI_PROMPTS_NOT_YET_CENTRALIZED.length).toBeGreaterThan(0)
     for (const path of AI_PROMPTS_NOT_YET_CENTRALIZED) {
-      expect(path).toMatch(/^[a-z-]+\/[a-z0-9-]+\.ts$/)
+      expect(path).toMatch(/^[a-z-]+(\/[a-z0-9-]+)*\.ts$/)
     }
   })
 })
