@@ -50,9 +50,9 @@ describe.skipIf(skip)('real pinned-Node launcher lifecycle', () => {
       },
       stdin: {
         contents: `
-          import {handoffToBundledOrcad, isRunningAsBundledOrcadRuntime, OrcadBundledRuntimeError} from './orcad-bundled-runtime'
-          import {installOrcadShutdownSignals} from './orcad-lifecycle'
-          import {resolveOrcadExitCode} from './orcad-exit-code'
+          import {handoffToBundledOrcad, isRunningAsBundledOrcadRuntime, OrcadBundledRuntimeError} from './src/main/orcad/orcad-bundled-runtime'
+          import {installOrcadShutdownSignals} from './src/main/orcad/orcad-lifecycle'
+          import {resolveOrcadExitCode} from './src/main/orcad/orcad-exit-code'
           import {writeFile} from 'node:fs/promises'
           process.env.ORCA_TEST_ROLE = isRunningAsBundledOrcadRuntime(__dirname) ? 'runtime' : 'launcher'
           if (process.env.ORCA_TEST_ROLE !== 'runtime') {

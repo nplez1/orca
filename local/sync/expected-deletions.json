@@ -5,11 +5,32 @@
     "and fails when an export has no surviving reference. That is the right default: a module disappearing",
     "is exactly when a caller can leave with it. This file is how a reviewed supersession is recorded so",
     "the check can pass without weakening it.",
-    "Each entry must name the live replacement and the evidence for calling it a superset \u2014 the check",
+    "Each entry must name the live replacement and the evidence for calling it a superset — the check",
     "prints this, so the next sync inherits the reasoning instead of re-deriving it.",
     "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed.",
     "Entries are therefore per sync: a previous sync's acknowledgements are pruned once their deletion is",
     "no longer part of the tip..HEAD range."
   ],
-  "acknowledged": {}
+  "acknowledged": {
+    "src/main/runtime/session-lifecycle/projection/window-wake-sleep-record.ts": {
+      "supersededBy": "src/main/runtime/session-lifecycle/projection/sleep-record-pane-claim.ts",
+      "evidence": "Upstream's 2026-10-25 rewrite of the sleep-record pane claim moved the module and dropped the fork's claimWindowWakeRecordForPane/isWindowWakeSleepRecord helpers; the sibling export markResumedRecordLive carried over and still has 3 references, so the module's live surface moved rather than vanished."
+    },
+    "src/renderer/src/components/task-page-linear-cache-selectors.ts": {
+      "supersededBy": "src/renderer/src/components/task-page/linear/task-page-linear-cache-selectors.ts",
+      "evidence": "Upstream grouped the task-page Linear modules under task-page/linear/. The old path's findTaskPageLinearDrawerIssue has no caller in the merged tree; the drawer issue is resolved through the grouped selectors module instead."
+    },
+    "src/renderer/src/components/use-task-page-linear-collection-effects.ts": {
+      "supersededBy": "src/renderer/src/components/task-page/linear/use-task-page-linear-collection-effects.ts",
+      "evidence": "Same task-page/linear/ grouping. The TaskPageLinearCollectionEffectsPreludeModel type was folded into the grouped module's own state shape and has no importer anywhere in the merged tree."
+    },
+    "src/renderer/src/lib/linear-agent-skill-update-command.ts": {
+      "supersededBy": "src/renderer/src/lib/agent-feature-install-commands.ts (buildAgentFeatureSkillInstallCommand)",
+      "evidence": "The fork built its Linear skill command in a local helper; upstream replaced that with the shared builder, which every surviving caller now uses (AgentSkillSetupPanel, WslLinearAgentSkillInstallCta, FeatureWallBrowserAction, AgentCapabilitiesSetupAction). Upstream's is a superset: it still pins to the build's commit, and ORCA_SKILLS_REPOSITORY_URL keeps the fork's nplez1/orca pin."
+    },
+    "src/shared/remote-runtime-shared-control-connection-actions.ts": {
+      "supersededBy": "src/shared/remote-runtime/control/remote-runtime-shared-control-connection-actions.ts",
+      "evidence": "Upstream grouped the remote-runtime modules under remote-runtime/control/. closeSharedControlSubscription lost its caller in that rewrite; the grouped module owns the subscription lifecycle now."
+    }
+  }
 }

@@ -15,8 +15,8 @@ beforeAll(async () => {
   await build({
     stdin: {
       contents: `
-        import { startOfLastNonBlankLines } from './terminal-wait-tail-window';
-        import { detectTerminalWaitBlockedReason, isKnownReadyPromptPreview } from './terminal-wait-detection';
+        import { startOfLastNonBlankLines } from './src/main/runtime/terminal-wait-tail-window';
+        import { detectTerminalWaitBlockedReason, isKnownReadyPromptPreview } from './src/main/runtime/terminal-wait-detection';
         const tails = ['', '\\n', '\\n\\n', '\\ntext', '\\ntext\\n', '\\n \\t\\ntext\\n\\n'];
         process.stdout.write(JSON.stringify({
           offsets: tails.map(value => startOfLastNonBlankLines(value, 12)),
