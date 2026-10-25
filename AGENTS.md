@@ -105,17 +105,25 @@ and an upstream head carrying any `local(` commit — or any fork-owned path (`l
 `LOCAL-PATCHES.md`, `BRANCHES.md`, `UPSTREAM-SYNC-RUNBOOK.md`, `.husky/commit-msg`) — is refused
 outright.
 
-**Both PR gates are read by that script.** It refuses to open a fork PR for a revision with no cached
-unit-gate PASS (`orca-queue node local/gate-unit.mjs` writes one per revision) and any PR whose body
-has no review claim line:
+**Both PR gates are read by that script.** It refuses any PR whose body has no review claim line:
 
 ```
 Reviewed by Opus 5.5, high: R1 (2 blocking fixed), delta clean on R2
 ```
 
+Gate 1 is **diff-scope dependent**, because the full unit suite moved off the PR boundary and onto the
+nightly `fork-main-tests.yml` lane plus the release gate (`AGENTS.md` § Verification tiers). The script
+requires a cached unit-gate PASS for this exact revision (`orca-queue node local/gate-unit.mjs` writes
+one per revision) only when a changed path is a **global input** — `package.json`, the lockfiles,
+`config/**`, a root `tsconfig*.json`, `src/packages/**`, `src/shared/**`, or anything outside the
+source, test, doc, fork-tooling and workflow trees. An ordinary `src/` change is verified by its
+targeted tests, and the script prints `gate 1 not required` instead of demanding a suite run. Measured
+on the last 40 commits, 15 touched `src/shared` or `src/packages`, so roughly a third of changes still
+carry the full gate — the third with the blast radius.
+
 `--waive-gate <1|2>:<reason>` records a deliberate exception, prints it, and expects the PR body to
-state it. Gate 1 is fork-local, so an upstream PR carries no verdict for it and always needs an
-explicit `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead
+state it. Gate 1 is fork-local either way, so an upstream PR carries no verdict for it and always needs
+an explicit `--waive-gate 1:"upstream PR, gated by upstream CI"`. `--dry-run` reports a refusal instead
 of aborting, so the decision can be inspected before the ~20-minute run.
 
 Why the ancestry check matters: the two branches called `main` are different lines. A head cut from

@@ -14,8 +14,18 @@ import { execFileSync } from 'node:child_process'
 
 const REPO = 'nplez1/orca'
 
-// Must stay enabled: the release build and the daily v* tag mirror.
-const REQUIRED = ['.github/workflows/fork-release.yml', '.github/workflows/fork-upstream-tags.yml']
+// Must stay enabled: the release build, the daily v* tag mirror, and the nightly full unit suite.
+const REQUIRED = [
+  '.github/workflows/fork-release.yml',
+  '.github/workflows/fork-upstream-tags.yml',
+  // Why the unit lane is required and not merely allowed: `AGENTS.md` moved the full unit suite off
+  // the PR boundary and onto this nightly lane, so with it disabled nothing verifies `nplez1/main`
+  // between merges — a cross-cutting break sits on the release line until someone runs the release
+  // gate by hand. Treating "disabled" as drift is the whole point: this is the backstop, and a
+  // backstop nobody notices is off is not one. ~50 billed minutes a night (5 shards bill at once) is
+  // the accepted cost; see LOCAL-PATCHES.md § local(ci) before changing it.
+  '.github/workflows/fork-main-tests.yml'
+]
 
 // Inert without a manual dispatch or a caller — active is fine, disabled is also fine.
 const ALLOWED_INERT = [

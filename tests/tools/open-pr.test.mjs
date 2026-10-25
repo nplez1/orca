@@ -16,11 +16,13 @@ import {
   REVIEW_CLAIM_EXAMPLE,
   TARGETS,
   allowlistAtHead,
+  changedPathsIn,
   evaluateGates,
   gateInputsAtHead,
   forkOnlyPathsIn,
   forkOnlySubjects,
   localCommitsIn,
+  needsFullUnitGate,
   parseArgs,
   parseGateWaivers,
   reviewClaim,
@@ -313,6 +315,116 @@ it('reports both gates together, so one refusal does not hide the other', () => 
     gateOne: { gitDir: tempDir(), allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS }
   })
   expect(both.problems).toHaveLength(2)
+})
+
+it('returns changed paths as an array, not newline-joined text', () => {
+  // The caller that forgot this threw "changedPathsIn(...).split is not a function" on every run,
+  // --dry-run included. Nothing here executes main(), so pin the contract the caller depends on.
+  const result = changedPathsIn('base...head', () => 'src/main/a.ts\nlocal/open-pr.mjs\n\n')
+
+  expect(Array.isArray(result)).toBe(true)
+  expect(result).toEqual(['src/main/a.ts', 'local/open-pr.mjs'])
+})
+
+it('lists both sides of a rename, so a move out of src/shared still reads as global', () => {
+  // A stub for the flag, and then the real behaviour, because the flag is only worth anything if
+  // git actually reports the old path: `git diff` alone lists just the destination.
+  const seen = []
+  changedPathsIn('a...b', (args) => {
+    seen.push(args)
+    return 'src/shared/ipc.ts\nsrc/main/ipc.ts\n\n'
+  })
+  expect(seen[0]).toEqual(['diff', '--name-only', '--no-renames', 'a...b'])
+
+  const repo = tempDir()
+  const run = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+  run('init', '-q', '.')
+  run('config', 'user.email', 't@example.com')
+  run('config', 'user.name', 't')
+  mkdirSync(join(repo, 'src/shared'), { recursive: true })
+  mkdirSync(join(repo, 'src/main'), { recursive: true })
+  writeFileSync(join(repo, 'src/shared/ipc.ts'), 'x\n')
+  run('add', '-A')
+  run('commit', '-qm', 'base')
+  run('mv', 'src/shared/ipc.ts', 'src/main/ipc.ts')
+  run('add', '-A')
+  run('commit', '-qm', 'move')
+
+  const gitRun = (args) => run(...args)
+  expect(changedPathsIn('HEAD~1...HEAD', gitRun)).toEqual(['src/main/ipc.ts', 'src/shared/ipc.ts'])
+  expect(needsFullUnitGate(changedPathsIn('HEAD~1...HEAD', gitRun))).toMatchObject({
+    required: true
+  })
+})
+
+it('needs the full suite only when a changed path is global', () => {
+  // Why these four groups: an ordinary change, a path that is in `src` but imported by every process,
+  // a path that only documents or tests, and evidence that is missing rather than global.
+  const targeted = [
+    ['src/main/foo.ts', 'src/main/foo.test.ts'],
+    ['src/renderer/src/a.tsx'],
+    ['docs/STYLEGUIDE.md', 'AGENTS.md'],
+    ['local/gate-unit.mjs', 'tests/tools/gate-unit.test.mjs'],
+    ['.github/workflows/pr.yml']
+  ]
+  for (const paths of targeted) {
+    expect(needsFullUnitGate(paths), paths.join(',')).toMatchObject({ required: false })
+  }
+
+  const global = [
+    ['src/shared/ipc-contract.ts'],
+    ['src/packages/process-host/src/index.ts'],
+    ['package.json'],
+    ['pnpm-lock.yaml'],
+    ['config/vitest.config.ts'],
+    ['tsconfig.node.json'],
+    ['e2e/foo.ts'],
+    ['scripts/build.mjs']
+  ]
+  for (const paths of global) {
+    expect(needsFullUnitGate(paths), paths.join(',')).toMatchObject({ required: true })
+  }
+
+  // Why null and a rubbish element: an unreadable diff must not read as "nothing global changed".
+  expect(needsFullUnitGate(null)).toMatchObject({ required: true })
+  expect(needsFullUnitGate([])).toMatchObject({ required: true })
+  expect(needsFullUnitGate([undefined])).toMatchObject({ required: true })
+})
+
+it('skips gate 1 for a targeted diff and names a global one when it refuses', () => {
+  const skipped = evaluateGates({
+    waivers: new Map(),
+    head: REVISION,
+    body: REVIEW_CLAIM_EXAMPLE,
+    gateOne: { gitDir: tempDir(), allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS },
+    changedPaths: ['src/main/foo.ts', 'src/main/foo.test.ts']
+  })
+  expect(skipped.problems).toEqual([])
+  expect(skipped.passes[0]).toContain('gate 1 not required')
+
+  // Why the reason is appended: a refusal that says "no verdict" without saying "because this
+  // touched package.json" sends the reader looking for a cache bug instead of a suite run.
+  const refused = evaluateGates({
+    waivers: new Map(),
+    head: REVISION,
+    body: REVIEW_CLAIM_EXAMPLE,
+    gateOne: { gitDir: tempDir(), allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS },
+    changedPaths: ['package.json', 'src/main/foo.ts']
+  })
+  expect(refused.problems[0]).toContain('no cached unit-gate verdict')
+  expect(refused.problems[0]).toContain('package.json')
+
+  // And the same global diff still passes when the verdict is there.
+  const { gitDir } = gateFixture(passingVerdict())
+  const passed = evaluateGates({
+    waivers: new Map(),
+    head: REVISION,
+    body: REVIEW_CLAIM_EXAMPLE,
+    gateOne: { gitDir, allowlistText: ALLOWLIST, gateInputs: TEST_INPUTS },
+    changedPaths: ['package.json']
+  })
+  expect(passed.problems).toEqual([])
+  expect(passed.passes[0]).toContain('gate 1 PASS')
 })
 
 it('refuses a malformed waiver before it fetches anything', () => {

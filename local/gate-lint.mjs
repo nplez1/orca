@@ -8,7 +8,7 @@
  * own and turns the set of failures into a verdict: a failure listed in
  * `local/lint-known-red.json` is reported but does not fail the gate, a failure outside it does.
  *
- * Same shape as `local/gate-unit.mjs` for the unit suite (AGENTS.md § PR gate 1), and the same
+ * Same shape as `local/gate-unit.mjs` for the unit suite (AGENTS.md § Release gate), and the same
  * rule: `LOCAL-PATCHES.md` stays the evidence, `local/lint-known-red.json` stays the assertion, and
  * both change in the commit that adds or removes an entry.
  *

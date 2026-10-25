@@ -891,6 +891,40 @@ names are exactly the 31 failures, with no wildcard left to absorb an unknown on
 revision that ships is in the PR body, because `local/open-pr.mjs` now requires a cached PASS for the
 exact head revision and this file changing is what changes that revision's cache key.
 
+### `local(test)`: gate 1 asks for the full suite only when the change is global
+
+The full unit suite moved off the PR boundary. Requiring it per branch is what produced 257 gate
+invocations and 45 runs over four minutes across 47 sessions between 2026-10-21 and 10-24 — 26.9 h of
+summed tool wall clock, a median of 28 minutes a run, and one session that spent 10.3 h of a 20.5 h
+span inside it. That measurement, per-turn transcript data from `~/.pi/agent/sessions`, is the evidence
+for the change; `AGENTS.md` § Verification tiers is the resulting rule.
+
+What replaced it:
+
+- **PR time:** targeted tests for the changed area, `pnpm tc`, `local/gate-lint.mjs`, and the one Opus
+  review. No full suite unless the diff carries a global input.
+- **`local/open-pr.mjs`:** `needsFullUnitGate(changedPaths)` decides whether gate 1 still demands a
+  cached PASS. It fails closed (no changed-path evidence ⇒ full gate) and calls a path global when it
+  is `package.json`, a lockfile, `config/**`, a root `tsconfig*.json`, `src/packages/**`,
+  `src/shared/**`, or outside the source/test/doc/fork-tooling/workflow trees. Why a fixed list rather
+  than `selectUnitFiles`: that needs the reverse-import graph — globs plus the TypeScript API — which
+  costs minutes in a PR opener and answers "run all 13,064 files" for nearly every input. Measured on
+  the last 40 commits, 15 touch `src/shared` or `src/packages`, so the gate still applies to ~37% of
+  changes: the ones with real cross-process blast radius.
+- **Nightly:** `fork-main-tests.yml`, see `local(ci)` below.
+- **Release:** `RELEASE-RUNBOOK.md` Step 1.5, which is now the only place the suite is unconditionally
+  mandatory.
+
+Two claims this change rests on were measured rather than assumed, after review challenged them:
+`build:packages` takes 1.0 s, so the 21.2 h of `pnpm tc` is the node/cli/web projects and queue wait,
+not a build-cache opportunity; and the 15–19 min runs that looked like cold setup in a new worktree were
+the `orca-queue` lock, not compilation. A third claim survived a bad retraction of my own: review doubted
+that the shim's `VITEST_MAX_WORKERS=2` cap did anything, grepping this repo finds no reader (true — the
+reader is Vitest's `resolveConfig`, which assigns `resolved.maxWorkers` from that variable), so the cap
+is real and the export stays. It is narrower than it first looked: the fork's custom `node-runtime` pool
+never reads `maxWorkers`, and `orca-queue node local/gate-unit.mjs` bypasses the shim entirely, so the
+gate's own full run is uncapped — deliberately, since the queue makes it the only heavy run on the box.
+
 ### `local(renderer)`: `ai-vault-session-refresh.ts` was over the `max-lines` budget — resolved
 
 The branch tip was red with an unmodified working tree (`oxlint`: 303 lines against a 300 budget,
@@ -1455,10 +1489,17 @@ would leave the workflow listed and re-enabled at the first `workflow_dispatch` 
 file. A disabled workflow keeps receiving file updates from sync and stays off until someone turns
 it back on — which is what a fork wants, and why this is documented here instead of patched.
 
-**Live on purpose — these two must stay enabled:**
+**Live on purpose — these three must stay enabled:**
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
+- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. This is the backstop the
+  PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
+  `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
+  as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
+  concurrently — ~1,500 min/month against the account's ~10,000, which is the accepted cost. Check the
+  real figure with `gh api repos/nplez1/orca/actions/workflows` and the run history before adding any
+  further lane; the whole fleet being on is what burned nearly the full month in a few days.
 
 **Also left enabled, and inert without a manual dispatch:** `zcode-account-contract.yml`,
 `unit-module-cache-benchmark.yml`, `windows-native-preparation-benchmark.yml`, and the three
@@ -1470,8 +1511,11 @@ Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`,
 
 **The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
 on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as
-mergeable, so the pre-PR gates in `AGENTS.md` (full `pnpm tc` / `lint` / `test` plus the review) are
-the only thing standing between a change and `nplez1/main` — nothing in CI backstops a skipped run.
+mergeable, so the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`,
+`gate-lint`, plus the review) are the only thing standing between a change and `nplez1/main` — nothing
+in CI backstops a skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all;
+it runs nightly on `fork-main-tests.yml` and again at the release gate, and the failure window that
+choice accepts is a cross-cutting break sitting on the release line until one of those two runs.
 
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
