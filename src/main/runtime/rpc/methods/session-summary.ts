@@ -10,6 +10,7 @@ import {
   sessionSummaryHostService,
   parseSessionSummaryFoldParams
 } from '../../../session-summary/session-summary-host-service'
+import { parseSessionSummarySessionRef } from '../../../../shared/session-summary-types'
 import {
   SessionSummaryCloseOnHostParams,
   SessionSummaryOpenOnHostParams,
@@ -29,7 +30,16 @@ export const SESSION_SUMMARY_RPC_METHODS = [
       if (!foldParams) {
         throw new Error('The requesting window did not name a usable summarization agent.')
       }
-      return sessionSummaryHostService().open({ paneKey: params.paneKey, foldParams })
+      // Why forwarded: the client holds the pane's layout, so it can name a session this host
+      // has no row for. `mergeSessionRef` keeps the host's own row wherever that row names one.
+      const session = parseSessionSummarySessionRef(params.session)
+      return sessionSummaryHostService().open({
+        paneKey: params.paneKey,
+        foldParams,
+        ...(session ? { session } : {}),
+        ...(params.revalidateWithinMs ? { revalidateWithinMs: params.revalidateWithinMs } : {}),
+        ...(params.sameViewer ? { sameViewer: true } : {})
+      })
     }
   }),
   defineMethod({

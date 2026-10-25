@@ -25,7 +25,19 @@ export type SessionSummaryStoreEntry = {
 
 const MAX_ENTRIES = 200
 
-type SessionSummaryStoreFile = { entries: Record<string, SessionSummaryStoreEntry> }
+/**
+ * Bumped when a ledger's *shape* changes, so every cached ledger is discarded and folded again.
+ *
+ * v2: facts carry the transcript index they came from (`SessionSummaryFact`), which is what the
+ * pane's "since your last message" window is computed from. A v1 ledger has no indexes, so it
+ * cannot answer that question and is worth less than one re-fold.
+ */
+const STORE_VERSION = 2
+
+type SessionSummaryStoreFile = {
+  version?: number
+  entries: Record<string, SessionSummaryStoreEntry>
+}
 
 // Values are unvalidated on purpose: this is a rebuildable cache, and a bad
 // entry surfaces as an empty ledger rather than a load failure.
@@ -76,7 +88,13 @@ export class SessionSummaryStore {
   private load(): void {
     try {
       const parsed: unknown = JSON.parse(readFileSync(this.filePath, 'utf8'))
-      this.entries = isSessionSummaryStoreFile(parsed) ? parsed.entries : {}
+      if (!isSessionSummaryStoreFile(parsed)) {
+        this.entries = {}
+        return
+      }
+      // Why drop rather than migrate: this is a rebuildable cache, so one fold per session
+      // costs less than a migration path that has to stay correct forever.
+      this.entries = parsed.version === STORE_VERSION ? parsed.entries : {}
     } catch {
       // Missing or corrupt cache: start empty; the ledger is rebuildable.
       this.entries = {}
@@ -89,7 +107,10 @@ export class SessionSummaryStore {
       const tmpPath = `${this.filePath}.tmp`
       writeFileSync(
         tmpPath,
-        JSON.stringify({ entries: this.entries } satisfies SessionSummaryStoreFile)
+        JSON.stringify({
+          version: STORE_VERSION,
+          entries: this.entries
+        } satisfies SessionSummaryStoreFile)
       )
       renameSync(tmpPath, this.filePath)
     } catch (error) {

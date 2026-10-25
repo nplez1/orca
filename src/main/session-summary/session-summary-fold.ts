@@ -1,7 +1,10 @@
 // Fold protocol: bounded transcript slices → per-chunk extracts (in parallel)
-// → one deterministic merge. A failed or unparseable extract fails the whole
-// fold so the caller keeps the last good ledger; completed chunk extracts are
-// cacheable so a cancelled fold resumes instead of restarting.
+// → one deterministic merge → one report rewrite.
+//
+// A failed or unparseable extract fails the whole fold so the caller keeps the last good
+// ledger; completed chunk extracts are cacheable so a cancelled fold resumes instead of
+// restarting. The report rewrite is the second phase (`session-summary-report.ts`) and its
+// failure is survivable: facts without prose still beat losing the batch.
 import type {
   SessionSummaryLedger,
   SessionSummaryLedgerDelta
@@ -11,6 +14,8 @@ import {
   mergeSessionSummaryDeltas,
   normalizeSessionSummaryDelta
 } from './session-summary-ledger'
+import { extractSessionSummaryJson } from './session-summary-json'
+import { rewriteReports } from './session-summary-report'
 
 export type SessionSummarySourceEvent = {
   role: 'user' | 'assistant' | 'tool'
@@ -58,57 +63,19 @@ export function buildSessionSummaryChunks(
   return ranges
 }
 
-/** Pull the first JSON object out of a model reply (tolerates code fences and prose). */
-export function extractSessionSummaryJson(text: string): unknown {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text)
-  const candidate = fenced?.[1] ?? text
-  const start = candidate.indexOf('{')
-  if (start === -1) {
-    return null
-  }
-  let depth = 0
-  let inString = false
-  let escaped = false
-  for (let index = start; index < candidate.length; index += 1) {
-    const char = candidate[index]
-    if (inString) {
-      if (escaped) {
-        escaped = false
-      } else if (char === '\\') {
-        escaped = true
-      } else if (char === '"') {
-        inString = false
-      }
-      continue
-    }
-    if (char === '"') {
-      inString = true
-    } else if (char === '{') {
-      depth += 1
-    } else if (char === '}') {
-      depth -= 1
-      if (depth === 0) {
-        try {
-          return JSON.parse(candidate.slice(start, index + 1))
-        } catch {
-          return null
-        }
-      }
-    }
-  }
-  return null
-}
+export { extractSessionSummaryJson }
 
 const CHUNK_EXTRACT_INSTRUCTIONS = `You are summarizing a slice of an agent coding session transcript.
+Every fact is an object { "text": string, "sourceIndex": number } where "sourceIndex" is the message index shown in the transcript below for the message the fact came from.
 Produce a JSON object with exactly these keys:
-- "goal": string or null — the objective the agent is working toward, if discernible
-- "plan": string[] — steps the agent laid out (at most 5, earliest first)
-- "inProgress": string or null — what the agent is doing at the END of this slice
-- "done": string[] — completed milestones (at most 5)
-- "blockers": string[] — errors, failed approaches, things awaiting input (at most 5)
-- "decisions": string[] — notable choices made (at most 5)
-- "timeline": array of { "kind": one of "milestone"|"decision"|"error"|"needs-input"|"tool-burst"|"user-input", "text": one short sentence, "sourceIndex": number } — the notable events of this slice, chronological, at most 10. Use the message index shown in the transcript below for "sourceIndex".
-Rules: respond with ONLY the JSON object. Use plain lowercase text. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.`
+- "goal": fact or null — the objective the agent is working toward, if discernible
+- "plan": fact[] — steps the agent laid out (at most 5, earliest first)
+- "inProgress": fact or null — what the agent is doing at the END of this slice
+- "done": fact[] — completed milestones (at most 5)
+- "blockers": fact[] — errors, failed approaches, things awaiting input (at most 5)
+- "decisions": fact[] — notable choices made (at most 5)
+- "timeline": array of { "kind": one of "milestone"|"decision"|"error"|"needs-input"|"tool-burst"|"user-input", "text": one short sentence, "sourceIndex": number } — the notable events of this slice, chronological, at most 10.
+Rules: respond with ONLY the JSON object. Use plain lowercase text. Keep each "text" to one short sentence. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.`
 
 function renderChunkTranscript(
   events: readonly SessionSummarySourceEvent[],
@@ -135,6 +102,29 @@ export function buildSessionSummaryChunkPrompt(
   return `${CHUNK_EXTRACT_INSTRUCTIONS}\n\nTranscript slice:\n${renderChunkTranscript(events, range, absoluteFrom)}`
 }
 
+/**
+ * Where the reader's own last message sits, after folding this batch.
+ *
+ * This is the "since I last interacted" line, and it is derived here rather than stored by the
+ * UI: the transcript is the one artifact every host folds, and it survives a restart, a
+ * reconnect and a paired host, which a "the pane was closed at 14:02" cursor does not.
+ */
+function readerMessagesAfter(
+  ledger: SessionSummaryLedger,
+  events: readonly SessionSummarySourceEvent[],
+  baseIndex: number
+): { lastUserMessageIndex: number | null; userMessageCount: number } {
+  let lastUserMessageIndex = ledger.lastUserMessageIndex
+  let userMessageCount = ledger.userMessageCount
+  for (let index = 0; index < events.length; index += 1) {
+    if (events[index].role === 'user') {
+      lastUserMessageIndex = baseIndex + index
+      userMessageCount += 1
+    }
+  }
+  return { lastUserMessageIndex, userMessageCount }
+}
+
 export type SessionSummaryFoldResult = {
   ledger: SessionSummaryLedger
   completedChunks: number
@@ -152,6 +142,14 @@ export async function foldSessionSummaryEvents(args: {
   events: readonly SessionSummarySourceEvent[]
   signal: AbortSignal
   cache?: SessionSummaryChunkCache
+  /**
+   * When the transcript these events came from was read.
+   *
+   * Why the caller's clock and not `Date.now()` here: the freshness rule compares it with the
+   * agent row's `updatedAt`, so stamping it after the model calls marks work that landed during
+   * the fold as already folded — and the stale brief is then reused at any age.
+   */
+  readAt?: number
   onProgress?: (result: SessionSummaryFoldResult) => void
 }): Promise<SessionSummaryFoldResult> {
   const { brain, ledger, events, signal, cache } = args
@@ -175,7 +173,14 @@ export async function foldSessionSummaryEvents(args: {
         signal
       })
       signal.throwIfAborted()
-      const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw))
+      // A fact the model did not index is placed at the slice's *last* message, not its first:
+      // a slice usually opens with the reader's own message, and placing facts on that boundary
+      // hid the whole slice from the "since your last message" window.
+      const delta = normalizeSessionSummaryDelta(extractSessionSummaryJson(raw), {
+        min: baseIndex + range.from,
+        max: baseIndex + Math.max(range.from, range.to - 1),
+        fallback: baseIndex + Math.max(range.from, range.to - 1)
+      })
       if (!delta) {
         throw new Error('fold extract returned no usable JSON')
       }
@@ -187,6 +192,41 @@ export async function foldSessionSummaryEvents(args: {
   )
 
   const merged = mergeSessionSummaryDeltas(deltas)
-  const folded = applySessionSummaryDelta(ledger, merged, baseIndex + events.length, Date.now())
-  return { ledger: folded, completedChunks: ranges.length, totalChunks: ranges.length }
+  const readerMessages = readerMessagesAfter(ledger, events, baseIndex)
+  const folded = applySessionSummaryDelta(
+    ledger,
+    merged,
+    baseIndex + events.length,
+    args.readAt ?? Date.now(),
+    readerMessages.lastUserMessageIndex,
+    readerMessages.userMessageCount
+  )
+  // Why a second call and not a projection of the facts: a progress report is prose, and the
+  // whole point of it is to be shorter and better organised than the facts are. Its input is the
+  // previous reports plus this batch, and the prompt caps the timeline share of that, so it grows
+  // with the batch rather than with the session.
+  const reports = await rewriteReports({
+    brain,
+    signal,
+    ledger,
+    merged,
+    through: folded.foldedThrough,
+    windowRestarted: readerMessages.lastUserMessageIndex !== ledger.lastUserMessageIndex,
+    userMessageCount: readerMessages.userMessageCount,
+    lastUserMessageIndex: readerMessages.lastUserMessageIndex
+  })
+  // Why drop a carried-over "since" when the window moved: the previous one describes work the
+  // reader has now spoken over, and a failed rewrite must not relabel it "since your last message".
+  const reportSince = reports
+    ? reports.since
+    : readerMessages.lastUserMessageIndex === ledger.lastUserMessageIndex
+      ? ledger.reportSince
+      : null
+  return {
+    ledger: reports
+      ? { ...folded, reportSince, reportFull: reports.full }
+      : { ...folded, reportSince },
+    completedChunks: ranges.length,
+    totalChunks: ranges.length
+  }
 }

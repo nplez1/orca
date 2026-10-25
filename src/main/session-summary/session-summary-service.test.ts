@@ -62,6 +62,11 @@ function harness(
   const brain: SessionFoldBrain = {
     complete: async ({ prompt, signal }) => {
       brainPrompts.push(prompt)
+      // The fold's report phase is a second prompt; answering it here keeps the two phases
+      // separate so a test can assert on either.
+      if (prompt.startsWith('You write short progress reports')) {
+        return JSON.stringify({ since: 'since-report', full: 'full-report' })
+      }
       return brainReply(prompt, signal)
     }
   }
@@ -238,8 +243,9 @@ describe('SessionSummaryService', () => {
     expect(reopened.seenThrough).toBe(1)
     await waitFor(() => updates.some((u) => u.status === 'ready'))
     // Only the four unseen messages were folded.
-    expect(brainPrompts.at(-1)).toContain('[#5 assistant] message 5')
-    expect(brainPrompts.at(-1)).not.toContain('[#4 user]')
+    const chunkPrompt = brainPrompts.findLast((prompt) => prompt.includes('Transcript slice:'))
+    expect(chunkPrompt).toContain('[#5 assistant] message 5')
+    expect(chunkPrompt).not.toContain('[#4 user]')
     const ready = updates.find((u) => u.status === 'ready')
     expect(ready?.ledger?.foldedThrough).toBe(9)
     expect(ready?.ledger?.timeline.map((entry) => entry.text)).toContain('next')
@@ -261,6 +267,22 @@ describe('SessionSummaryService', () => {
     expect(reopened.ledger?.foldedThrough ?? 0).toBe(0)
     await waitFor(() => updates.some((u) => u.status === 'ready'))
     expect(updates.find((u) => u.status === 'ready')?.ledger?.foldedThrough).toBe(3)
+  })
+
+  // Both reports are written during the fold, so the pane's window/full switch is a
+  // re-render: one report answers "since my last message", the other the whole session.
+  it('stores both reports a fold wrote', async () => {
+    const { store } = testStore()
+    const { service, updates } = harness(store, events(5))
+    service.open({ paneKey: 'tab:leaf' })
+    await waitFor(() => updates.some((u) => u.status === 'ready'))
+
+    const ready = updates.find((u) => u.status === 'ready')
+    expect(ready?.ledger?.reportFull?.text).toBe('full-report')
+    // events(5) starts with a user message and alternates: three reader messages in total.
+    expect(ready?.ledger?.reportSince?.text).toBe('since-report')
+    expect(ready?.ledger?.userMessageCount).toBe(3)
+    expect(store.get('tab:leaf')?.ledger.reportFull?.text).toBe('full-report')
   })
 
   it('keeps the last good ledger when a fold fails', async () => {
@@ -285,6 +307,7 @@ describe('SessionSummaryService host routing', () => {
     hostReads: { host: SessionSummaryTranscriptHost }[]
     hostFoldCalls: string[]
     receivedFoldParams: unknown[]
+    receivedSessions: unknown[]
     setHostSnapshot: (snapshot: SessionSummarySnapshot | null) => void
   }
 
@@ -311,6 +334,7 @@ describe('SessionSummaryService host routing', () => {
     const hostReads: { host: SessionSummaryTranscriptHost }[] = []
     const hostFoldCalls: string[] = []
     const receivedFoldParams: unknown[] = []
+    const receivedSessions: unknown[] = []
     const updates: SessionSummarySnapshot[] = []
     const service = new SessionSummaryService({
       store: args.store,
@@ -323,9 +347,10 @@ describe('SessionSummaryService host routing', () => {
         complete: async () => JSON.stringify({ inProgress: 'folding' })
       }),
       hostFold: {
-        open: async ({ environmentId, paneKey, foldParams }) => {
+        open: async ({ environmentId, paneKey, foldParams, session }) => {
           hostFoldCalls.push(`open:${environmentId}:${paneKey}`)
           receivedFoldParams.push(foldParams)
+          receivedSessions.push(session ?? null)
           if (args.foldFails) {
             throw args.foldFails
           }
@@ -350,6 +375,7 @@ describe('SessionSummaryService host routing', () => {
       hostReads,
       hostFoldCalls,
       receivedFoldParams,
+      receivedSessions,
       brainPrompts: [],
       setEvents: () => {},
       setEntry: () => {},
@@ -368,13 +394,17 @@ describe('SessionSummaryService host routing', () => {
       ledger:
         status === 'ready'
           ? {
-              goal: 'Summmarized on the host',
+              goal: { text: 'Summmarized on the host', sourceIndex: 1 },
               plan: [],
               inProgress: null,
               done: [],
               blockers: [],
               decisions: [],
               timeline: [],
+              reportSince: null,
+              reportFull: { text: 'Summarized on the host.', through: 3 },
+              lastUserMessageIndex: 0,
+              userMessageCount: 1,
               foldedThrough: 3,
               foldedAt: 1
             }

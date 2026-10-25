@@ -2,7 +2,10 @@
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionSummarySnapshot } from '../../../../shared/session-summary-types'
+import type {
+  SessionSummarySessionRef,
+  SessionSummarySnapshot
+} from '../../../../shared/session-summary-types'
 import SessionSummaryPane from './SessionSummaryPane'
 
 const mocks = vi.hoisted(() => {
@@ -12,12 +15,14 @@ const mocks = vi.hoisted(() => {
     hasBridge: boolean
     executionHostId: string | null
     hostSupported: boolean
+    session: SessionSummarySessionRef | null
   } = {
     paneKey: null,
     snapshot: null,
     hasBridge: true,
     executionHostId: 'local',
-    hostSupported: true
+    hostSupported: true,
+    session: null
   }
   return state
 })
@@ -26,10 +31,11 @@ vi.mock('./session-summary-subject', () => ({
   useSessionSummaryPaneKey: () => mocks.paneKey,
   useSessionSummaryExecutionHostId: () => mocks.executionHostId,
   useSessionSummaryHostSupported: () => mocks.hostSupported,
+  useSessionSummarySessionRef: () => mocks.session,
   hasSessionSummaryBridge: () => mocks.hasBridge
 }))
 vi.mock('@/components/activity/use-session-summary', () => ({
-  useSessionSummary: () => mocks.snapshot
+  useSessionSummary: () => ({ snapshot: mocks.snapshot, refresh: () => {}, refreshing: false })
 }))
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback?: string) => fallback ?? _key
@@ -43,13 +49,17 @@ function readySnapshot(overrides: Partial<SessionSummarySnapshot> = {}): Session
     status: 'ready',
     facts: null,
     ledger: {
-      goal: 'Ship the summary pane',
+      goal: { text: 'Ship the summary pane', sourceIndex: 1 },
       plan: [],
-      inProgress: 'Wiring the right-sidebar tab',
-      done: ['Moved the ledger view out of the activity strip'],
+      inProgress: { text: 'Wiring the right-sidebar tab', sourceIndex: 3 },
+      done: [{ text: 'Moved the ledger view out of the activity strip', sourceIndex: 2 }],
       blockers: [],
       decisions: [],
       timeline: [],
+      reportSince: null,
+      reportFull: { text: 'Shipping the summary pane.', through: 4 },
+      lastUserMessageIndex: 0,
+      userMessageCount: 1,
       foldedThrough: 4,
       foldedAt: 1_000
     },
@@ -66,6 +76,7 @@ describe('SessionSummaryPane', () => {
     mocks.hasBridge = true
     mocks.executionHostId = 'local'
     mocks.hostSupported = true
+    mocks.session = null
   })
 
   it('asks the user to focus an agent when none is focused', () => {
@@ -110,8 +121,22 @@ describe('SessionSummaryPane', () => {
     expect(markup).toContain('Session summary')
     expect(markup).toContain('Up to date')
     expect(markup).toContain('lucide-sticky-note')
-    expect(markup).toContain('Wiring the right-sidebar tab')
-    expect(markup).toContain('Moved the ledger view out of the activity strip')
+    // The title is the whole-session goal, and the report is the written summary.
+    expect(markup).toContain('Ship the summary pane')
+    expect(markup).toContain('Shipping the summary pane.')
+    // The ledger and the timeline start collapsed: the pane opens as a brief, not a log.
+    expect(markup).toContain('Ledger')
+    expect(markup).not.toContain('Moved the ledger view out of the activity strip')
+  })
+
+  it('offers a manual refresh, which is the only fold the reader drives', () => {
+    mocks.paneKey = PANE_KEY
+    mocks.snapshot = readySnapshot()
+
+    const markup = renderToStaticMarkup(<SessionSummaryPane isVisible />)
+
+    expect(markup).toContain('aria-label="Refresh summary"')
+    expect(markup).toContain('lucide-refresh-cw')
   })
 
   it('reports a running fold in the header', () => {
@@ -159,6 +184,10 @@ describe('SessionSummaryPane', () => {
         blockers: [],
         decisions: [],
         timeline: [],
+        reportSince: null,
+        reportFull: null,
+        lastUserMessageIndex: null,
+        userMessageCount: 1,
         foldedThrough: 4,
         foldedAt: 1
       }

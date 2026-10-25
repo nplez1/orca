@@ -22,6 +22,7 @@ import {
   resolveSessionSummaryFoldParams,
   type SessionSummaryFoldSettings
 } from '../session-summary/session-summary-fold-params'
+import { canReadAgentTranscript } from '../session-summary/session-summary-transcript-source'
 import { SessionSummaryService } from '../session-summary/session-summary-service'
 import { SessionSummaryStore } from '../session-summary/session-summary-store'
 import type { SessionSummaryEventReaderDeps } from '../session-summary/session-summary-event-reader'
@@ -46,6 +47,7 @@ export function createSessionSummaryService(
     }),
     getAgentStatusEntry: (paneKey) =>
       agentHookServer.getStatusSnapshot().find((entry) => entry.paneKey === paneKey),
+    canReadTranscript: canReadAgentTranscript,
     createBrain: (params) =>
       createAgentCliSessionFoldBrain({
         // Request params are an explicit override; the user's text-generation

@@ -20,7 +20,14 @@ function events(count: number): SessionSummarySourceEvent[] {
 
 function jsonBrain(handler: (prompt: string) => unknown): SessionFoldBrain {
   return {
-    complete: async ({ prompt }) => JSON.stringify(handler(prompt))
+    complete: async ({ prompt }) => {
+      // The fold's second phase asks for the two prose reports; a JSON-only brain would
+      // otherwise count as a chunk call and answer with a chunk extract.
+      if (prompt.startsWith('You write short progress reports')) {
+        return JSON.stringify({ since: 'since text', full: 'full text' })
+      }
+      return JSON.stringify(handler(prompt))
+    }
   }
 }
 
@@ -82,8 +89,19 @@ describe('foldSessionSummaryEvents', () => {
     })
     expect(result.totalChunks).toBe(2)
     expect(result.ledger.foldedThrough).toBe(45)
-    expect(result.ledger.done).toEqual(['chunk 1', 'chunk 2'])
+    // A fact the extract did not index lands at its slice's last message, so it is inside the
+    // "since your last message" window rather than on its boundary.
+    expect(result.ledger.done).toEqual([
+      { text: 'chunk 1', sourceIndex: 39 },
+      { text: 'chunk 2', sourceIndex: 44 }
+    ])
     expect(result.ledger.timeline.map((entry) => entry.text)).toEqual(['m1', 'm2'])
+    // Both reports are written by the same second call, so the toggle costs nothing later.
+    expect(result.ledger.reportFull?.text).toBe('full text')
+    expect(result.ledger.reportSince?.text).toBe('since text')
+    // events(45) alternates user/assistant from a user message: 23 reader messages.
+    expect(result.ledger.userMessageCount).toBe(23)
+    expect(result.ledger.lastUserMessageIndex).toBe(44)
     // The second chunk sees later message indexes than the first.
     expect(seenPrompts[0]).toContain('#0 user')
     expect(seenPrompts[1]).toContain('#40 ')
@@ -91,7 +109,7 @@ describe('foldSessionSummaryEvents', () => {
 
   it('reuses cached chunk extracts instead of calling the brain again', async () => {
     const cacheStore = new Map<string, SessionSummaryLedgerDelta>()
-    cacheStore.set('0-40', { done: ['cached'], timeline: [] })
+    cacheStore.set('0-40', { done: [{ text: 'cached', sourceIndex: 0 }], timeline: [] })
     let calls = 0
     const brain = jsonBrain(() => {
       calls += 1
@@ -109,8 +127,12 @@ describe('foldSessionSummaryEvents', () => {
         }
       }
     })
+    // One chunk extract, plus the report rewrite that is not a chunk call.
     expect(calls).toBe(1)
-    expect(result.ledger.done).toEqual(['cached', 'fresh'])
+    expect(result.ledger.done).toEqual([
+      { text: 'cached', sourceIndex: 0 },
+      { text: 'fresh', sourceIndex: 44 }
+    ])
   })
 
   it('applies nothing when a chunk extract fails', async () => {

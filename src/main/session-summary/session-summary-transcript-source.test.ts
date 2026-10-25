@@ -158,20 +158,56 @@ describe('readSessionSummaryTranscriptEvents', () => {
     expect(events).toBeNull()
   })
 
-  it('returns null for an agent whose transcript the fold cannot parse', async () => {
+  it('returns null for an agent whose transcript has no parser', async () => {
     const dir = await tempDir()
-    const transcriptPath = join(dir, 'gemini.json')
-    await writeFile(transcriptPath, '{}')
+    const transcriptPath = join(dir, 'amp-session.jsonl')
+    await writeFile(transcriptPath, '{}\n')
     const { readSessionSummaryTranscriptEvents } = await loadSource()
 
     const events = await readSessionSummaryTranscriptEvents({
       identity: {
-        agentType: 'gemini',
-        providerSession: { key: 'session_id', id: 'gemini-1', transcriptPath }
+        agentType: 'amp',
+        providerSession: { key: 'session_id', id: 'amp-1', transcriptPath }
       },
       signal: signal()
     })
 
     expect(events).toBeNull()
+  })
+
+  // Why: the fold's dispatch used to be an allowlist of three agents, so every other agent
+  // reported "no readable transcript" even when its hook handed over the path it was writing.
+  it('reads an agent outside the native-chat set from its hook-reported path', async () => {
+    const dir = await tempDir()
+    const transcriptPath = join(dir, 'droid-session.jsonl')
+    await writeFile(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: 'system',
+          session_id: 'droid-1',
+          timestamp: '2026-05-01T10:09:00.000Z',
+          cwd: '/tmp/droid'
+        }),
+        JSON.stringify({
+          type: 'message',
+          session_id: 'droid-1',
+          timestamp: '2026-05-01T10:09:01.000Z',
+          role: 'user',
+          text: 'Why is the pane empty?'
+        })
+      ].join('\n')
+    )
+    const { readSessionSummaryTranscriptEvents } = await loadSource()
+
+    const events = await readSessionSummaryTranscriptEvents({
+      identity: {
+        agentType: 'droid',
+        providerSession: { key: 'session_id', id: 'droid-1', transcriptPath }
+      },
+      signal: signal()
+    })
+
+    expect(events?.map((event) => event.text)).toEqual(['Why is the pane empty?'])
   })
 })
