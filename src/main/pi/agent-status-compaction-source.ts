@@ -28,7 +28,7 @@ export function getPiAgentStatusCompactionHandlerSourceLines(kind: PiAgentKind):
     '  }',
     '',
     "  onStatus('session_before_compact', (event, ctx) => {",
-    '    if (replyFinishedAt === undefined || isHeldByChildren()) return',
+    '    if (replyFinishedAt === undefined || isHeldByChildren() || piAsyncSubagentHasLiveRuns()) return',
     // Why: overflow recovery retries the turn and queued messages continue it after the compaction.
     "    if (event?.willRetry === true || event?.reason === 'overflow') return",
     "    if (typeof ctx?.hasPendingMessages === 'function' && ctx.hasPendingMessages()) return",
