@@ -1,19 +1,16 @@
+import { buildCommitMessagePrompt } from '../../shared/ai-prompts/commit-message'
+import { buildPullRequestFieldsPrompt } from '../../shared/ai-prompts/pull-request'
+import { buildBranchNamePrompt } from '../../shared/ai-prompts/branch-name'
 import {
-  buildCommitMessagePrompt,
   splitGeneratedCommitMessage,
   type CommitMessageDraftContext
 } from '../../shared/commit-message-generation'
 import {
-  buildPullRequestFieldsPrompt,
   parseGeneratedPullRequestFields,
   type GeneratedPullRequestFields,
   type PullRequestDraftContext
 } from '../../shared/pull-request-generation'
-import {
-  buildBranchNamePrompt,
-  sanitizeBranchSlug,
-  type BranchNameWorkContext
-} from '../../shared/branch-name-from-work'
+import { sanitizeBranchSlug, type BranchNameWorkContext } from '../../shared/branch-name-from-work'
 import {
   cleanGeneratedCommitMessage,
   stripPrefilledReasoningPreamble

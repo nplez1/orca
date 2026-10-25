@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { buildConversationNamePrompt } from './ai-prompts/conversation-name'
 import {
-  buildConversationNamePrompt,
   clampConversationNameFirstPrompt,
   sanitizeGeneratedConversationName
 } from './conversation-name-generation'

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildConversationNamePrompt } from '../../shared/conversation-name-generation'
+import { buildConversationNamePrompt } from '../../shared/ai-prompts/conversation-name'
 import { scanAiVaultSessions } from './session-scanner'
 import { isolatedScanRoots, writeJsonlFile } from './session-scanner-test-fixtures'
 

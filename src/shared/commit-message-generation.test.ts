@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildCommitMessagePrompt, splitGeneratedCommitMessage } from './commit-message-generation'
+import { buildCommitMessagePrompt } from './ai-prompts/commit-message'
+import { splitGeneratedCommitMessage } from './commit-message-generation'
 
 afterEach(() => {
   vi.restoreAllMocks()
