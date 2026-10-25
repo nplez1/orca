@@ -67,9 +67,6 @@ export {
   shouldSetDisplayName
 } from './worktree-display-name'
 
-/**
- * Ensure a target path is within the workspace directory (prevent path traversal).
- */
 export function ensurePathWithinWorkspace(targetPath: string, workspaceDir: string): string {
   const resolvedWorkspaceDir = resolve(workspaceDir)
   const resolvedTargetPath = resolve(targetPath)
@@ -82,16 +79,7 @@ export function ensurePathWithinWorkspace(targetPath: string, workspaceDir: stri
   return resolvedTargetPath
 }
 
-/**
- * Compute the filesystem path where the worktree directory will be created.
- *
- * Why WSL special case: when the repo lives on a WSL filesystem, worktrees
- * must also live on the WSL filesystem. Creating them on the Windows side
- * (/mnt/c/...) would be extremely slow due to cross-filesystem I/O and
- * the terminal would open a Windows shell instead of WSL. We mirror the
- * Windows workspace layout inside ~/orca/workspaces on the WSL filesystem
- * (e.g. \\wsl.localhost\Ubuntu\home\user\orca\workspaces\repo\feature).
- */
+/** Keep WSL worktrees on the distro filesystem to avoid cross-filesystem I/O and Windows-shell startup. */
 export function computeWorktreePath(
   sanitizedName: string,
   repoPath: string,
@@ -106,8 +94,6 @@ export function computeWorktreePath(
   )
 }
 
-/** Layout half shared by both computeWorktreePath variants, so the sync and async paths cannot
- *  disagree on placement once the root is resolved. */
 function computeWorktreePathFromWorkspaceRoot(
   sanitizedName: string,
   repoPath: string,
@@ -124,8 +110,7 @@ function computeWorktreePathFromWorkspaceRoot(
   return pathOps.join(workspaceRoot, sanitizedName)
 }
 
-/** Async twin of computeWorktreePath. Same result; resolves the WSL home without blocking the main
- *  thread, so callers never freeze the app on a stopped distro. */
+/** Resolve WSL home asynchronously so a stopped distro cannot block main. */
 export async function computeWorktreePathAsync(
   sanitizedName: string,
   repoPath: string,
@@ -139,10 +124,7 @@ export async function computeWorktreePathAsync(
   )
 }
 
-/** Async twin of computeWorkspaceRoot. Same result; the WSL home probe spawns `wsl.exe`, so
- *  background preparation uses this variant rather than blocking the Electron main thread for up
- *  to the probe timeout. The sync twin below still serves callers that cannot await (allowed-roots
- *  resolution, CLI create, watch targets, worktree trash). */
+/** Async WSL home probes avoid blocking main; synchronous callers retain the matching resolver below. */
 export async function computeWorkspaceRootAsync(
   repoPath: string,
   settings: WorkspaceRootSettings
@@ -159,6 +141,32 @@ export async function computeWorkspaceRootAsync(
   )
 }
 
+/**
+ * For authorization: never waits more than `deadlineMs` for a WSL home. Past it the root falls back
+ * as if the home were unknown, while the probe keeps running and fills the cache for later checks.
+ */
+export async function computeWorkspaceRootWithin(
+  repoPath: string,
+  settings: WorkspaceRootSettings,
+  deadlineMs: number
+): Promise<string> {
+  const distro = mirrorDistroForWorkspaceRoot(repoPath, settings)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), deadlineMs)
+  })
+  try {
+    const home = distro ? await Promise.race([getWslHomeAsync(distro), deadline]) : null
+    return projectContainerRoot(
+      workspaceRootForMirrorHome(repoPath, settings.workspaceDir, home),
+      repoPath,
+      settings
+    )
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export function computeWorkspaceRoot(repoPath: string, settings: WorkspaceRootSettings): string {
   const distro = mirrorDistroForWorkspaceRoot(repoPath, settings)
   return projectContainerRoot(
@@ -168,8 +176,14 @@ export function computeWorkspaceRoot(repoPath: string, settings: WorkspaceRootSe
   )
 }
 
-/** Distro to mirror the workspace root into, or undefined when the configured root is used as-is.
- *  Shared by both resolvers so the sync and async paths can never disagree on placement. */
+/** Whether the workspace root mirrors into a WSL home, which only a wsl.exe probe can resolve. */
+export function workspaceRootMirrorsIntoWsl(
+  repoPath: string,
+  settings: { workspaceDir: string; wslMirrorDistro?: string }
+): boolean {
+  return mirrorDistroForWorkspaceRoot(repoPath, settings) !== undefined
+}
+
 function mirrorDistroForWorkspaceRoot(
   repoPath: string,
   settings: { workspaceDir: string; wslMirrorDistro?: string }
@@ -185,10 +199,7 @@ function workspaceRootForMirrorHome(
   workspaceDir: string,
   wslHome: string | null
 ): string {
-  // Why: WSL UNC paths are still Windows paths from Node's perspective.
-  // Mirror absolute local desktop workspace roots inside the distro so
-  // terminals stay on the WSL filesystem; repo-relative roots can resolve
-  // directly against the WSL repo path.
+  // Desktop absolute roots must mirror into WSL; repo-relative roots already resolve inside the distro.
   return wslHome
     ? win32.join(wslHome, 'orca', 'workspaces')
     : resolveWorkspaceDirForRepo(repoPath, workspaceDir)
@@ -206,8 +217,7 @@ export function computeRemoteWorktreePath(
   ) {
     return computeWorktreePath(sanitizedName, repoPath, settings)
   }
-  // Why: absolute global workspaceDir values belong to the desktop machine.
-  // SSH falls back to repo-qualified sibling paths so origin/main is not shared.
+  // Desktop absolute roots cannot apply to SSH hosts; qualify sibling paths per repo.
   const pathOps = getRuntimePathOps(repoPath, repoPath)
   const repoName = pathOps.basename(repoPath).replace(/\.git$/, '')
   return pathOps.join(repoPath, '..', `${repoName}-${sanitizedName}`)
@@ -285,15 +295,7 @@ function getRepoWorktreeBasePath(repo: Pick<Repo, 'worktreeBasePath'>): string |
   return trimmed || undefined
 }
 
-/**
- * Which distro's filesystem this repo's worktrees belong on, if any.
- *
- * A repo already inside WSL names its own distro. A repo on a Windows drive
- * names none — but if this project's git runs in WSL, its worktrees still
- * belong on the Linux side: `git status` stats every working-tree file, and
- * doing that across the 9p mount is ~20x slower than the same clean tree on
- * ext4 (`git worktree add` ~26x), with only the gitdir left on the Windows drive.
- */
+/** Prefer WSL filesystem for WSL-owned repos or Windows-drive repos executed by WSL Git, avoiding slow 9p stats. */
 function resolveMirrorDistro(
   repoPath: string,
   settings: { wslMirrorDistro?: string }

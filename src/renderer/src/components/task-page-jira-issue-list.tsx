@@ -4,8 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { Worktree } from '../../../shared/worktree/types'
-import type { JiraListColumn } from './jira-list-columns'
-import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira/jira-types'
 import { groupJiraIssuesByStatus, type TaskPageJiraIssueSection } from './task-page-jira-grouping'
 import type { TaskPageJiraSprintOptions } from './task-page-jira-sprint-cell'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
@@ -14,6 +13,7 @@ import {
   type JiraIssueWorkspaceAttachmentIndex
 } from '@/lib/jira-issue-workspace-attachment'
 import { JiraIssueRow } from './task-page-jira-issue-row'
+import type { JiraListColumn } from './jira-list-columns'
 
 // Re-exported so the board sections can group through the same production function.
 export { groupJiraIssuesByStatus, type TaskPageJiraIssueSection }

@@ -4,7 +4,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
-import type { JiraEditableField, JiraIssue } from '../../../shared/jira-types'
+import type { JiraEditableField, JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraIssueStoryPointsControl } from './jira-issue-story-points-control'
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))

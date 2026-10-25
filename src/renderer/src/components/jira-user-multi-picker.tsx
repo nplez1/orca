@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Check, ChevronsUpDown, LoaderCircle } from 'lucide-react'
-import type { JiraUser } from '../../../shared/jira-types'
+import type { JiraUser } from '../../../shared/jira/jira-types'
 import { splitJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { useJiraUserSearch } from '@/components/jira-user-picker'
 import { Button } from '@/components/ui/button'

@@ -8,8 +8,10 @@ import {
   isDirectClaudeCommand,
   type ClaudeAgentTeamsMode
 } from '../../shared/claude-agent-teams-tmux-compat'
+import { getAppEnvironment, hasAppEnvironment } from '../../shared/app-environment'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'
 import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import { getBundledLauncherPath } from '../cli/bundled-cli-launcher-path'
 import { resolvePathEnvKey } from '../pty/windows-path-segment-merge'
 
 export type ClaudeAgentTeamsLaunchPlan = {
@@ -66,17 +68,32 @@ export function resolveClaudeAgentTeamsShimBin(
 ): string | null {
   // Why: Windows callers pass an env spelt `Path`; reading only `PATH` there would find no CLI at all.
   const pathValue = env[resolvePathEnvKey(env, process.platform)]
-  const override = env.ORCA_AGENT_TEAMS_SHIM_BIN
-  if (override) {
-    // Why: a bare override name would be resolved by the shim's shell against its cwd, so qualify it or ignore it.
-    const qualified = isAbsolute(override) ? override : findExecutableOnPath(override, pathValue)
-    if (qualified) {
-      return qualified
-    }
+  const rawOverride = env.ORCA_AGENT_TEAMS_SHIM_BIN
+  // Why: a bare override name would be resolved by the shim's shell against its cwd, so qualify it or ignore it.
+  const override = rawOverride
+    ? isAbsolute(rawOverride)
+      ? rawOverride
+      : findExecutableOnPath(rawOverride, pathValue)
+    : null
+  // Why: with a team id the value was inherited from an older leader pane and may name a stale GUI binary.
+  const inheritedFromTeam = Boolean(env.ORCA_AGENT_TEAMS_TEAM_ID)
+  if (override && !inheritedFromTeam) {
+    return override
   }
-  const bundled = bundledLauncherPath()
+  // Why first: a headless host has no resources dir, and the PATH fallback below can then find
+  // the AppImage's Electron binary, which boots the GUI instead of the CLI.
+  const hostLauncher = hasAppEnvironment() ? getAppEnvironment().getCliLauncherPath?.() : null
+  if (hostLauncher && isAbsolute(hostLauncher) && isExecutableFile(hostLauncher)) {
+    return hostLauncher
+  }
+  const bundled = process.resourcesPath
+    ? getBundledLauncherPath(process.platform, process.resourcesPath)
+    : null
   if (bundled && isExecutableFile(bundled)) {
     return bundled
+  }
+  if (override) {
+    return override
   }
   return (
     findExecutableOnPath(process.platform === 'win32' ? 'orca-dev.cmd' : 'orca-dev', pathValue) ??
@@ -86,22 +103,6 @@ export function resolveClaudeAgentTeamsShimBin(
 
 function defaultShimRoot(): string {
   return join(homedir(), HOME_DIRECTORY_NAME, 'claude-agent-teams-bin')
-}
-
-function bundledLauncherPath(): string | null {
-  if (!process.resourcesPath) {
-    return null
-  }
-  if (process.platform === 'darwin') {
-    return join(process.resourcesPath, 'bin', 'orca')
-  }
-  if (process.platform === 'linux') {
-    return join(process.resourcesPath, 'bin', 'orca-ide')
-  }
-  if (process.platform === 'win32') {
-    return join(process.resourcesPath, 'bin', 'orca-np.exe')
-  }
-  return null
 }
 
 function findExecutableOnPath(command: string, pathValue: string | undefined): string | null {

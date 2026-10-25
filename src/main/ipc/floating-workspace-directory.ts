@@ -27,7 +27,7 @@ function expandHomePath(input: string, home: string): string {
 }
 
 function resolveFloatingWorkspaceInput(input: string): string {
-  // Why the environment port: the headless runtime resolves this too, and it has no Electron app.
+  // Headless runtime uses this path resolver without an Electron app.
   const home = getAppEnvironment().getPath('home')
   const expanded = expandHomePath(input, home)
   return path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(home, expanded)
@@ -73,10 +73,7 @@ function isTrustedFloatingWorkspaceDirectory(
   return getTrustedFloatingWorkspaceDirectories(settings).has(path.resolve(canonicalDirPath))
 }
 
-/**
- * The app-data folder older builds kept floating markdown notes in. Upstream's desktop root check
- * still names it, and notes that could not be moved stay there.
- */
+/** Default folder for floating Markdown documents. */
 export function getDefaultFloatingWorkspacePath(): string {
   // Why the environment port: the headless runtime resolves this too, and it has no Electron app.
   return path.join(getAppEnvironment().getPath('userData'), LEGACY_FLOATING_NOTES_DIRNAME)
@@ -177,6 +174,7 @@ export async function resolveFloatingTerminalCwd(
     return ensureFloatingWorkspaceDirectory()
   }
 
+  // Only picker-approved directories may become terminal cwd.
   if (isTrustedFloatingWorkspaceDirectory(canonicalCwd, store.getSettings())) {
     // Why: picker-approved directories are persisted as explicit grants, so a
     // restart can restore file creation access without trusting arbitrary text.

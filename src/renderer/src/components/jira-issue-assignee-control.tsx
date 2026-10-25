@@ -12,7 +12,7 @@ import {
   type TaskSourceContext
 } from '../../../shared/task-source-context'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
-import type { JiraIssue, JiraIssueUpdate, JiraUser } from '../../../shared/jira-types'
+import type { JiraIssue, JiraIssueUpdate, JiraUser } from '../../../shared/jira/jira-types'
 
 /**
  * Why one order for both groups: upstream sorts candidate rows by name, and the fork's pinned

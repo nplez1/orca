@@ -1,4 +1,5 @@
 import type { RuntimeStatus } from '../../../shared/runtime-types'
+import { isRuntimeStatusCompatible } from './runtime-protocol-compat'
 
 const RUNTIME_COMPATIBILITY_CACHE_MAX = 32
 const RECENT_RUNTIME_COMPATIBILITY_FAILURE_TTL_MS = 60_000
@@ -104,6 +105,18 @@ export function clearRecentRuntimeCompatibilityFailure(
     // positive capability verdict must not route a structured request to the replacement.
     runtimeCompatibilityChecks.delete(trimmed)
     notifyWorkspacePathSearchCapabilityInvalidation(trimmed)
+    // Why (STA-11921): the host publishes a probe's answer before settling it, so the detached
+    // probe never records it; the published answer is the proof synchronous readers need.
+    const answersPendingProbe = cached.failedAt === null && !cached.provenCompatible
+    if (observedStatus && answersPendingProbe && isRuntimeStatusCompatible(observedStatus)) {
+      rememberRuntimeEnvironmentCompatibility(trimmed, {
+        check: Promise.resolve(),
+        failedAt: null,
+        provenCompatible: true,
+        status: observedStatus,
+        statusCheckedAt: Date.now()
+      })
+    }
   }
 }
 

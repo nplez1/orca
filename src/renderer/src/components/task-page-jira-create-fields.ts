@@ -1,4 +1,4 @@
-import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
+import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../../shared/jira/jira-types'
 import {
   isJiraTextAreaField,
   resolveJiraObjectListFieldKind
@@ -89,6 +89,9 @@ export function buildJiraCreateFieldValue(field: JiraCreateField, draftValue: st
   const trimmed = draftValue.trim()
   if (!trimmed) {
     return undefined
+  }
+  if (isJiraScalarUserCreateField(field)) {
+    return trimmed
   }
   if (field.schema?.type === 'array') {
     const parts = splitJiraFieldDraft(trimmed)

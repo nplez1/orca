@@ -1,4 +1,4 @@
-import type { JiraCreateField } from './jira-types'
+import type { JiraCreateField } from './jira/jira-types'
 
 const STORY_POINTS_CUSTOM_TYPE = 'com.pyxis.greenhopper.jira:jsw-story-points'
 const NUMBER_CUSTOM_TYPE = 'com.atlassian.jira.plugin.system.customfieldtypes:float'

@@ -7,7 +7,7 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
-} from '../../../shared/jira-transition-fields'
+} from '../../../shared/jira/jira-transition-fields'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome
@@ -18,7 +18,7 @@ import type {
   JiraIssueUpdate,
   JiraMutationResult,
   JiraTransition
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 
 type Props = {
   issue: JiraIssue

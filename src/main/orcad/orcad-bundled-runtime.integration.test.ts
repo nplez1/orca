@@ -21,8 +21,8 @@ beforeEach(async () => {
   await build({
     stdin: {
       contents: `
-        import { handoffToBundledOrcad, OrcadBundledRuntimeError } from './src/main/orcad/orcad-bundled-runtime'
-        import { installOrcadShutdownSignals, flushOrcadProfileStoreForShutdown } from './src/main/orcad/orcad-lifecycle'
+        import { handoffToBundledOrcad, OrcadBundledRuntimeError } from './orcad-bundled-runtime'
+        import { installOrcadShutdownSignals, flushOrcadProfileStoreForShutdown } from './orcad-lifecycle'
         import { writeFile } from 'node:fs/promises'
         if (process.env.ORCA_TEST_HANDOFF_CHILD === '1') {
           if (process.env.ORCA_TEST_HANDOFF_DURABLE === '1') {

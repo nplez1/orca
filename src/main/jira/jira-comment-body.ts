@@ -1,4 +1,4 @@
-import type { JiraSite } from '../../shared/jira-types'
+import type { JiraSite } from '../../shared/jira/jira-types'
 import type { JiraRecord } from './jira-record-pages'
 
 /** What the composer's editor can emit, plus the characters a user types. */

@@ -1,4 +1,4 @@
-import type { JiraPriority } from '../../../shared/jira-types'
+import type { JiraPriority } from '../../../shared/jira/jira-types'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getJiraPrioritySeverity } from './task-page-jira-priority-tone'

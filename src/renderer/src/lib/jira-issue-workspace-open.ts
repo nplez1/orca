@@ -10,7 +10,7 @@ import {
 import { folderWorkspaceToWorktree } from '../../../shared/folder-workspace-worktree'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { findJiraIssueWorkspaceAttachmentForIssue } from '@/lib/jira-issue-workspace-attachment'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import type { Worktree } from '../../../shared/worktree/types'
 

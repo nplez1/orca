@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JiraClientForSite } from './authenticated-request'
-import type { JiraCreateField } from '../../shared/jira-types'
+import type { JiraCreateField } from '../../shared/jira/jira-types'
 
 const { clearTokenMock, isAuthErrorMock, jiraRequestMock } = vi.hoisted(() => ({
   clearTokenMock: vi.fn(),

@@ -6,6 +6,7 @@ import {
   isFolderWorkspacePathError
 } from '@/lib/folder-workspace-path-status'
 import { Button } from '@/components/ui/button'
+import { agentLaunchErrorText, isAgentLaunchOnlyError } from './agent-launch-pane-notice-text'
 import {
   hasClientEnvironmentFooter,
   stripClientEnvironmentFooter
@@ -154,11 +155,13 @@ function isSshHostStateTerminalError(error: string): boolean {
 }
 
 /** Swaps raw daemon-boundary codes for copy a user can act on. */
-export function humanizeTerminalError(error: string): string {
+export function humanizeTerminalError(error: string, agentId?: string | null): string {
   if (isSshSignInRequiredTerminalError(error)) {
     return describeSshSignInRequiredTerminalError(error)
   }
-  let humanized = humanizeFolderWorkspacePathErrors(localizeTerminalSpawnHints(error))
+  let humanized = humanizeFolderWorkspacePathErrors(
+    localizeTerminalSpawnHints(agentLaunchErrorText(error, agentId) ?? error)
+  )
   if (humanized.includes(PANE_OWNER_UNVERIFIED_MARKER)) {
     const explanation = isPaneOwnerUnverifiedError(humanized)
       ? translate(
@@ -221,6 +224,7 @@ export function humanizeTerminalError(error: string): string {
 
 export function TerminalErrorToast({
   error,
+  agentId,
   paneOnClient = true,
   onDismiss,
   onRestartDaemon,
@@ -228,6 +232,7 @@ export function TerminalErrorToast({
   onOpenNewTerminal
 }: {
   error: string
+  agentId?: string | null
   /** False for a pane on an SSH or remote host, or one whose host is not yet known. */
   paneOnClient?: boolean
   onDismiss: () => void
@@ -246,9 +251,10 @@ export function TerminalErrorToast({
     !ssh &&
     !paneOwnerUnverified &&
     !showDaemonRestart &&
+    !isAgentLaunchOnlyError(error) &&
     !isExplainedTerminalError(error) &&
     !isFolderWorkspacePathOnlyError(error)
-  const humanizedError = humanizeTerminalError(error)
+  const humanizedError = humanizeTerminalError(error, agentId)
   // Why: the toast appends its own linked request, so the host's plain-text one would repeat it.
   const displayError = showIssueLink
     ? withoutTerminalSpawnIssueRequest(humanizedError)

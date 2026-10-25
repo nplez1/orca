@@ -56,6 +56,7 @@ export function normalizeLoadedGlobalSettings(
     stampPrimarySelectionTerminalDefaults,
     migratedDisabledTuiAgents,
     migratedAgentYoloDefaults,
+    migratedAgentPermission,
     migratedWindowsRuntimeDefault,
     migratedLocalAccountRuntime,
     loadedCompactWorktreeCards,
@@ -152,7 +153,8 @@ export function normalizeLoadedGlobalSettings(
     nativeChatShellEnvironmentVariables: normalizeNativeChatShellEnvironmentVariables(
       parsed.settings?.nativeChatShellEnvironmentVariables
     ),
-    // Why: the next settings save stores the seed; until then a reload derives the same one.
+    // Why: the next settings save stores the seed; until then a reload derives the same one. Read
+    // from the Arguments as saved, before their permission flags moved into the stored choice.
     agentNativeChatPermissionModes: normalizeAgentNativeChatPermissionModes(
       parsed.settings?.agentNativeChatPermissionModes
     ),
@@ -175,6 +177,7 @@ export function normalizeLoadedGlobalSettings(
       parsed.settings?.disabledUsageProviders
     ),
     ...migratedAgentYoloDefaults,
+    ...migratedAgentPermission,
     claudeAgentTeamsDefaultDisabledMigrated: true,
     sshRemoteCliControlExistingHostsMigrated: true,
     openInApplications: normalizeOpenInApplications(parsed.settings?.openInApplications, {

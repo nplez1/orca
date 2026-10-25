@@ -4,7 +4,7 @@ import type {
   JiraIssue,
   JiraIssueUpdate,
   JiraTransition
-} from '../../../../../shared/jira-types'
+} from '../../../../../shared/jira/jira-types'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionSubmitOutcome

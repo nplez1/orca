@@ -1,7 +1,4 @@
-// Why: review thread resolution status + thread IDs are GraphQL-only (REST pulls/{n}/comments omits them).
-// And why `reviews(last:)`: a 100-review cap has to keep the most recent submissions, or a
-// long-running PR's latest decision is the entry that gets cut off and the panel's verdict block
-// contradicts `reviewDecision`. Node order is chronological either way.
+// REST review comments omit thread IDs and resolution status; fetch them through GraphQL.
 export const REVIEW_THREADS_QUERY = `
 query($owner: String!, $repo: String!, $pr: Int!) {
   repository(owner: $owner, name: $repo) {

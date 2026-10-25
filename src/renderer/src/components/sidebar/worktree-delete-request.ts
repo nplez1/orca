@@ -30,6 +30,8 @@ export type WorktreeDeleteWithToastOptions = {
   deleteRemoteBranch?: boolean
   snapshotPruneBatchId?: string
   confirmedDiscards?: ConfirmedUnsavedDiscards
+  /** Throws when the confirmed workspace is gone; runs before every destructive send. */
+  assertBeforeDispatch?: () => void
 }
 
 export function toWorktreeDeleteIdentities(

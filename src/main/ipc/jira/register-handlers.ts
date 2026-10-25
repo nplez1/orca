@@ -15,6 +15,7 @@ import {
   normalizeJiraSiteId,
   normalizeJiraSiteSelection
 } from './ipc-params'
+import { normalizeIssueUpdate } from '../jira-issue-update-payload'
 import { addIssueComment, createIssue, updateIssue } from '../../jira/jira-issue-mutations'
 import { getIssue, getIssueSummary } from '../../jira/jira-issue-read'
 import { getIssueComments } from '../../jira/jira-issue-comments'
@@ -29,14 +30,12 @@ import type {
   JiraIssueListFilters,
   JiraIssueUpdate,
   JiraSiteSelection
-} from '../../../shared/jira-types'
-import { normalizeIssueUpdate } from '../jira-issue-update-payload'
+} from '../../../shared/jira/jira-types'
 
 const VALID_FILTERS = new Set<JiraIssueFilter>(['assigned', 'reported', 'all', 'done'])
 const issueSummaryRequests = new JiraCancellableRequests()
 const searchRequests = new JiraCancellableRequests()
 
-/** Registers every `jira:*` IPC handler on the main process. */
 export function registerJiraHandlers(): void {
   ipcMain.handle('jira:connect', async (_event, args: JiraConnectArgs) => {
     if (
@@ -197,12 +196,17 @@ export function registerJiraHandlers(): void {
         return { ok: false, error: 'Issue key is required.' }
       }
       const updates = normalizeJiraIssueUpdate(args.updates)
-      // Why both narrowers: upstream's checks labelOperations/transitionComment; the
-      // fork's checks customfield_-only customFields, sprintId, and user/text keys.
-      if (!updates || normalizeIssueUpdate(updates) === null) {
+      // Why both narrowers: upstream's rebuilds labelOperations/transitionComment and drops other
+      // keys; the fork's checks customfield_-only customFields, sprintId, and user/text keys.
+      const forkUpdates = normalizeIssueUpdate(args.updates)
+      if (!updates || !forkUpdates) {
         return { ok: false, error: 'Updates object is required.' }
       }
-      return updateIssue(args.key.trim(), updates, normalizeJiraSiteId(args.siteId))
+      return updateIssue(
+        args.key.trim(),
+        { ...forkUpdates, ...updates },
+        normalizeJiraSiteId(args.siteId)
+      )
     }
   )
 

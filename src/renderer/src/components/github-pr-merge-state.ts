@@ -1,12 +1,6 @@
-import type {
-  CheckStatus,
-  PRMergeableState,
-  PRReviewDecision,
-  PRState,
-  ProviderCheckSummary
-} from '../../../shared/github/pull-request-types'
+import type { CheckStatus, ProviderCheckSummary } from '../../../shared/github/pull-request-types'
+import type { GitHubPRAutoMergeAvailabilityInput } from '../../../shared/github/pull-request-auto-merge-availability'
 import {
-  autoMergeActionWhenDirectMergeAvailable,
   resolveGitHubPRAutoMergeAction,
   type GitHubPRAutoMergeAction
 } from '@/components/github-pr-auto-merge-action'
@@ -16,18 +10,11 @@ import {
 } from '@/components/github-pr-admin-bypass'
 import { translate } from '@/i18n/i18n'
 
-export type GitHubPRMergeStateInput = {
-  state: PRState | 'open' | 'closed' | 'merged' | 'draft'
-  mergeable?: PRMergeableState
-  mergeStateStatus?: string | null
-  reviewDecision?: PRReviewDecision | null
+export type GitHubPRMergeStateInput = GitHubPRAutoMergeAvailabilityInput & {
   /** GitHub's viewer-scoped answer to whether this account may waive branch protection. */
   viewerCanMergeAsAdmin?: boolean
   checksStatus?: CheckStatus
   checksSummary?: ProviderCheckSummary
-  autoMergeEnabled?: boolean
-  autoMergeAllowed?: boolean | null
-  mergeQueueRequired?: boolean | null
 }
 
 export type GitHubPRMergeStatePresentation = {
@@ -77,7 +64,7 @@ function passedChecksMergePresentation(
       'Checks passed. Merge eligibility will be checked again before merging.'
     ),
     directMergeAvailable: true,
-    autoMergeAction: autoMergeActionWhenDirectMergeAvailable(autoMergeAction)
+    autoMergeAction
   }
 }
 
@@ -166,6 +153,18 @@ function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRM
       autoMergeAction
     }
   }
+  if (item.mergeable === 'CONFLICTING' || item.mergeStateStatus === 'DIRTY') {
+    return {
+      label: translate('auto.components.github.pr.merge.state.7e8bbe3cd7', 'Conflicts'),
+      tone: DANGER_TONE,
+      tooltip: translate(
+        'auto.components.github.pr.merge.state.b37d45bca9',
+        'GitHub reports merge conflicts'
+      ),
+      directMergeAvailable: false,
+      autoMergeAction
+    }
+  }
   if (item.mergeQueueRequired === true) {
     return {
       label: item.autoMergeEnabled ? 'Auto-merge on' : 'Merge when ready',
@@ -195,18 +194,6 @@ function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRM
       autoMergeAction
     }
   }
-  if (item.mergeable === 'CONFLICTING' || item.mergeStateStatus === 'DIRTY') {
-    return {
-      label: translate('auto.components.github.pr.merge.state.7e8bbe3cd7', 'Conflicts'),
-      tone: DANGER_TONE,
-      tooltip: translate(
-        'auto.components.github.pr.merge.state.b37d45bca9',
-        'GitHub reports merge conflicts'
-      ),
-      directMergeAvailable: false,
-      autoMergeAction
-    }
-  }
   if (item.mergeStateStatus === 'BEHIND') {
     return {
       label: translate('auto.components.github.pr.merge.state.039c072f94', 'Behind'),
@@ -231,7 +218,12 @@ function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRM
       autoMergeAction
     }
   }
-  if (item.mergeable === 'MERGEABLE' || item.mergeStateStatus === 'CLEAN') {
+  if (
+    item.mergeable === 'MERGEABLE' ||
+    item.mergeStateStatus === 'CLEAN' ||
+    item.mergeStateStatus === 'UNSTABLE' ||
+    item.mergeStateStatus === 'HAS_HOOKS'
+  ) {
     const checkState = checksState(item)
     const checkStatus =
       checkState === 'failure'
@@ -265,7 +257,7 @@ function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRM
           ? 'GitHub says this PR can merge and checks passed'
           : 'GitHub says this PR can merge'),
       directMergeAvailable: true,
-      autoMergeAction: autoMergeActionWhenDirectMergeAvailable(autoMergeAction)
+      autoMergeAction
     }
   }
   // Why: GitHub may still report intermediate mergeability while checks are

@@ -1,12 +1,16 @@
 import { useRef, useState } from 'react'
 import type { DragEvent } from 'react'
-import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../../../shared/jira-types'
+import type {
+  JiraBoardColumn,
+  JiraIssue,
+  JiraTransition
+} from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import { getTaskPageJiraBoardTransitionTargets } from '../../task-page-jira-board-model'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
-} from '../../../../../shared/jira-transition-fields'
+} from '../../../../../shared/jira/jira-transition-fields'
 import { jiraListTransitions } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { translate } from '@/i18n/i18n'

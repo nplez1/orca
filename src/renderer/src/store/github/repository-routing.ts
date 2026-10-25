@@ -33,15 +33,14 @@ function findRepoOnRuntimeHost(
 /** The server-side repo for a request already routed to `target`; `null` when it runs here. */
 export function getRuntimeRepoTarget(
   state: Pick<AppState, 'repos'>,
-  repoPath: string,
-  target: RuntimeClientTarget,
-  repoId?: string | null
+  repo: { repoId: string | undefined; repoPath: string },
+  target: RuntimeClientTarget
 ): { target: { kind: 'environment'; environmentId: string }; repo: Repo } | null {
   if (target.kind !== 'environment') {
     return null
   }
-  const repo = findRepoOnRuntimeHost(state.repos, repoPath, target.environmentId, repoId)
-  return repo ? { target, repo } : null
+  const row = findRepoOnRuntimeHost(state.repos, repo.repoPath, target.environmentId, repo.repoId)
+  return row ? { target, repo: row } : null
 }
 
 export function getPRRefreshOwnerRuntimeEnvironmentId(
@@ -67,9 +66,8 @@ export function getPRRefreshRuntimeRepoTarget(
   // Why: PR refreshes must follow the repo owner host, not the Active Server dropdown (a runtime-owned worktree can show while Local is focused).
   return getRuntimeRepoTarget(
     state,
-    candidate.repoPath,
-    runtimeTargetForOwnerEnvironment(ownerRuntimeEnvironmentId),
-    candidate.repoId
+    { repoId: candidate.repoId || undefined, repoPath: candidate.repoPath },
+    runtimeTargetForOwnerEnvironment(ownerRuntimeEnvironmentId)
   )
 }
 

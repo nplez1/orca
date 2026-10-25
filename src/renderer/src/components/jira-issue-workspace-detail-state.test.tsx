@@ -11,7 +11,7 @@ import type {
   JiraSprintAssignment,
   JiraTransition,
   JiraUser
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 import { defaultScopeHost } from '@/lib/default-creation-host'
 import { useJiraIssueWorkspaceDetail } from './jira-issue-workspace-detail-state'
 

@@ -28,32 +28,18 @@ export type SessionSearchInstanceOptions = {
   roots: SessionSearchScanRoots
   resolveRoots?: SessionSearchIndexerOptions['resolveRoots']
   onError?: (error: unknown) => void
-  /** Tests only: shortens the loop so a settings change is observable in one tick. */
   reconcileIntervalMs?: number
 }
 
 type LiveIndex = {
   indexer: SessionSearchIndexer
   engine: SessionSearchEngine
-  /** The engine's own handle; the indexer's store keeps a second, private one. */
+  /** Reader connection; the indexer owns a separate writer connection. */
   db: SyncDatabase
   service: SessionSearchService
 }
 
-/**
- * The one object that holds a host's live indexer and engine, and the three
- * recipes that change them.
- *
- * The indexer is immutable after construction, so there is nothing here that
- * reconfigures one: a settings change is `close()` and a new instance, disabling
- * is `close()` with no replacement, and clearing is `close()`, remove the
- * database, construct again. The new instance's first sweep purges a narrowed
- * window and admits a widened one, so neither of those needs a path of its own.
- *
- * Lives in whichever process runs the transcript reader for this host. Nothing
- * here knows about IPC, Electron or a settings store; the caller supplies the
- * resolved settings and scan roots.
- */
+/** Replace the indexer and reader together when settings change, closing the old pair first. */
 export class SessionSearchInstance {
   private live: LiveIndex | null = null
   private settings: AiVaultSearchSettings = { contentEnabled: false, historyDays: null }
@@ -63,19 +49,17 @@ export class SessionSearchInstance {
     this.onError = options.onError ?? ((error) => console.warn('[ai-vault-search]', error))
   }
 
-  /** True once an indexer exists; false while disabled or while a construction is failing. */
   get running(): boolean {
     return this.live !== null
   }
 
-  /** Close whatever is live and construct from `next`. A no-op change still restarts. */
+  /** Even unchanged settings restart the indexer. */
   apply(next: AiVaultSearchSettings): void {
     this.settings = next
     this.closeLive()
     this.construct()
   }
 
-  /** Throw the index away, then rebuild it if consent still stands. */
   clear(): void {
     this.closeLive()
     removeSessionSearchDatabase(this.options.databasePath)
@@ -91,6 +75,7 @@ export class SessionSearchInstance {
     hostScope?: SessionSearchHostScope
   ): Promise<AiVaultSearchResponse> {
     const live = this.live
+    // Report disabled or not-ready before checking scope so the client can offer the right recovery.
     if (!live) {
       // Consent and readiness are the host's, not the scope's — and the metadata
       // tier is always on wherever an index can exist, so an absent instance is a
@@ -166,7 +151,7 @@ export class SessionSearchInstance {
           : { reconcileIntervalMs: this.options.reconcileIntervalMs })
       })
       db = openSessionSearchDatabase(this.options.databasePath)
-      // Later expiry comes from the indexer purge, which also invalidates page cursors.
+      // Keep pagination stable until an indexer purge expires rows and invalidates cursors.
       const engineOptions = {
         retentionCutoffMs: sessionSearchHistoryCutoffMs(historyDays, Date.now()),
         // The same consent the indexer writes under: with content off there are no
@@ -183,8 +168,7 @@ export class SessionSearchInstance {
       }
       void indexer.start().catch(this.onError)
     } catch (error) {
-      // A failed open must leave nothing half-built: the indexer stakes the
-      // database path when its store opens, and only close() releases it.
+      // Release the writer’s database-path claim if reader construction fails.
       db?.close()
       indexer?.close()
       this.live = null

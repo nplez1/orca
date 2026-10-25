@@ -17,6 +17,7 @@ import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-
 import { OrcaRuntimeWithLinearCommands } from '../integrations/linear/linear-commands'
 
 import type { RuntimeStore } from '../runtime-store-contract'
+import type { WorkspaceSleepPlatform } from '../workspaces/workspace-sleep-platform'
 import type { StatsCollector } from '../../stats/collector'
 
 import type { PrepareClaudeAuth } from '../../ipc/pty/host-env/types'
@@ -37,7 +38,7 @@ import { RuntimeAutomationController } from '../runtime-automation-controller'
 import { RuntimeOrchestrationFederation } from '../runtime-orchestration-federation'
 import { configureAiVaultSessionSources } from '../../ai-vault/cached-session-list'
 import { configureHostReadableTranscriptPathSources } from '../../native-chat/host-readable-transcript-path'
-import { createEphemeralAgentSessionClaimSigner } from '../agent-session-claim-identity'
+import { createEphemeralAgentSessionClaimSigner } from '../agent-session/ownership/agent-session-claim-identity'
 import { registerConptyDa1OverrideInstaller } from '../terminal-model-query-authority'
 import { registerTerminalViewAttributesApplier } from '../terminal-view-attribute-store'
 import { RuntimeMachineName } from '../runtime-machine-name'
@@ -64,6 +65,10 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
     | RuntimeConstructionBindings['readHookCliWriterObservation']
     | null
   declare protected readonly checkHookAgentPresenceFn: HostServices['checkHookAgentPresenceFn']
+  /** Hook-reported provider session changes; null on a host without a hook store. */
+  declare readonly subscribeAgentProviderSessionChangesFn:
+    | RuntimeConstructionBindings['subscribeAgentProviderSessionChanges']
+    | null
   declare protected readonly reconcileAgentStatusForEndedProcessFn: HostServices['reconcileAgentStatusForEndedProcessFn']
   declare protected readonly forgetHookAgentExitFn: HostServices['forgetHookAgentExitFn']
   declare protected readonly dropAgentStatusForRemovedWorktreeFn: HostServices['dropAgentStatusForRemovedWorktreeFn']
@@ -93,6 +98,8 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
 
   protected readonly prepareClaudeAuth?: PrepareClaudeAuth
 
+  readonly workspaceSleepPlatform: WorkspaceSleepPlatform | null
+
   protected readonly getAgentStatusSnapshotForPaneFn:
     | ((paneKey: string) => AgentStatusIpcPayload[])
     | null
@@ -110,11 +117,9 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
     this.store = store
     this.machineName.start()
     this.prepareClaudeAuth = deps?.prepareClaudeAuth
-    // oxlint-disable-next-line typescript/no-this-alias -- SAFETY: Preserve the constructor receiver captured by callbacks.
-    const runtime: this = this
-    installRuntimeFileCommandSurface(runtime, this.fileCommands)
-    installRuntimeGitCommandSurface(runtime, this.gitCommands)
-    installRuntimeRepositoryCommandSurface(runtime, {
+    installRuntimeFileCommandSurface(this, this.fileCommands)
+    installRuntimeGitCommandSurface(this, this.gitCommands)
+    installRuntimeRepositoryCommandSurface(this, {
       projectHostSetups: this.projectHostSetups,
       projectGroups: this.projectGroups,
       nestedRepoImport: this.nestedRepoImport,
@@ -130,7 +135,7 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
       repositoryHooks: this.repositoryHooks,
       repositoryIssueCommand: this.repositoryIssueCommand
     })
-    installRuntimeReviewCommandSurface(runtime, {
+    installRuntimeReviewCommandSurface(this, {
       gitLabQueries: this.gitLabQueryCommands,
       gitLabMutations: this.gitLabMutationCommands,
       gitHubReviewQueries: this.gitHubReviewQueries,
@@ -138,7 +143,7 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
       gitHubIssueComments: this.gitHubIssueComments,
       gitHubProjects: this.gitHubProjectCommands
     })
-    installRuntimeServiceCommandSurface(runtime, {
+    installRuntimeServiceCommandSurface(this, {
       aiVault: this.aiVault,
       sessionSearchSettings: new RuntimeSessionSearchSettingsController(
         store,
@@ -178,13 +183,13 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
         }
       )
     })
-    installRuntimeSkillCommandSurface(runtime, this.skillCommands)
+    installRuntimeSkillCommandSurface(this, this.skillCommands)
     Object.assign(this, this.edgeCommands.surface)
     this.clientSettings = new RuntimeClientSettingsController(store, () =>
       this.notifyReposChanged()
     )
     this.automation = new RuntimeAutomationController(store, {
-      showRepo: (selector) => runtime.showRepo(selector),
+      showRepo: (selector) => this.showRepo(selector),
       showManagedWorktree: (selector) => this.showManagedWorktree(selector)
     })
     // Why: per-device tab selections must survive host restarts, or every phone snaps back to the first tab on return.
@@ -196,8 +201,9 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
       this.store?.setMobileClientTabSelections?.(state)
     })
     this.orchestrationEnvironmentTransport = deps?.orchestrationEnvironmentTransport ?? null
+    this.workspaceSleepPlatform = deps?.workspaceSleepPlatform ?? null
     this.orchestrationFederation = new RuntimeOrchestrationFederation(
-      runtime,
+      this,
       this.orchestrationEnvironmentTransport
     )
     if (stats) {
@@ -217,6 +223,7 @@ export abstract class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCo
       deps?.retireAgentHookCompatibilityAuthority ?? null
     this.readHookCliWriterObservationFn = deps?.readHookCliWriterObservation ?? null
     this.checkHookAgentPresenceFn = deps?.checkHookAgentPresence ?? null
+    this.subscribeAgentProviderSessionChangesFn = deps?.subscribeAgentProviderSessionChanges ?? null
     this.reconcileAgentStatusForEndedProcessFn = deps?.reconcileAgentStatusForEndedProcess ?? null
     this.forgetHookAgentExitFn = deps?.forgetHookAgentExit ?? null
     this.dropAgentStatusForRemovedWorktreeFn = deps?.dropAgentStatusForRemovedWorktree ?? null

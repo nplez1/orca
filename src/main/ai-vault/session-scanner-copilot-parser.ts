@@ -10,11 +10,11 @@ import type {
 import type { TranscriptMessageSink } from './session-transcript-consumers'
 import {
   accumulatorFoldResumeState,
-  addPreviewMessage,
   createAccumulator,
   sessionIdFromFileName,
   updateTimeline
 } from './session-scanner-accumulator'
+import { addSessionText } from './session-scanner-messages'
 import {
   asRecord,
   copilotModelMetricsTotal,
@@ -59,6 +59,12 @@ function consumeCopilotRecordLine(accumulator: SessionAccumulator, line: string)
     // CLI records; a folder_trust message is only the legacy stand-in.
     accumulator.cwd ??= extractString(asRecord(data.context)?.cwd)
     updateTimeline(accumulator, extractString(data.startTime))
+    // Folder-trust notices are optional; session.start records the launch directory.
+    const context = asRecord(data.context)
+    if (context) {
+      accumulator.cwd ??= extractString(context.cwd) ?? extractString(context.gitRoot)
+      accumulator.branch ??= extractString(context.branch)
+    }
     return
   }
   if (record.type === 'session.model_change' && data) {
@@ -79,12 +85,12 @@ function consumeCopilotRecordLine(accumulator: SessionAccumulator, line: string)
     // injected context never becomes the session title, preview, or first prompt.
     const userText = extractString(data.content) ?? extractString(data.transformedContent)
     accumulator.title ??= normalizeTitleText(userText ?? '')
-    addPreviewMessage(accumulator, { role: 'user', text: userText, timestamp: record.timestamp })
+    addSessionText(accumulator, { role: 'user', text: userText, timestamp: record.timestamp })
     return
   }
   if (record.type === 'assistant.message' && data) {
     accumulator.messageCount++
-    addPreviewMessage(accumulator, {
+    addSessionText(accumulator, {
       role: 'assistant',
       text: extractString(data.content),
       timestamp: record.timestamp

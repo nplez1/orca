@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import type { JiraIssue, JiraTransition } from '../../../../../shared/jira-types'
+import type { JiraIssue, JiraTransition } from '../../../../../shared/jira/jira-types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

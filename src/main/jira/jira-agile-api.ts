@@ -1,4 +1,4 @@
-import type { JiraSprint } from '../../shared/jira-types'
+import type { JiraSprint } from '../../shared/jira/jira-types'
 import { asIdentifier, asRecord, asString } from './jira-record-pages'
 
 // The Agile API, served at the same path by Jira Cloud and Server/Data Center.

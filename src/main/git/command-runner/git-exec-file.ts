@@ -5,7 +5,7 @@ import {
 } from '../../../shared/git-fetch-head-lock'
 import { pendingWslDriveCheckoutGitRouting } from '../wsl-drive-checkout-git-routing'
 import type { ResolvedCommand } from './wsl-command-resolution'
-import { annotateWslHostFailure } from './wsl-host-failure'
+import { annotateWslHostFailure, isTransientWslFailure } from './wsl-host-failure'
 import type { GitAdmissionTier, GitExecOptions } from './git-exec-options'
 import { execFileCapture, execFileCaptureToTermination } from './exec-file-capture'
 import { recordDeadlineOverrunOnSpan } from './stalled-deadline-kill'
@@ -29,21 +29,16 @@ import { readCapturedGitBuffer, readCapturedGitString } from './captured-git-out
 import { runUnlessGitCwdKnownMissing } from './missing-git-spawn-cwd'
 import { trackGitWorktreeMutation } from '../git-worktree-mutation-state'
 
-/**
- * Async git command execution. Drop-in replacement for
- * `execFileAsync('git', args, { cwd, encoding, ... })`.
- */
 async function gitExecFileAsyncUnlocked(
   args: string[],
   options: GitExecOptions,
   terminationState: { current: Promise<void> | null }
 ): Promise<{ stdout: string; stderr: string }> {
-  // Why: span the user-visible `git <subcommand>` form, not the resolved binary, so dashboards group by intent.
+  // Trace caller intent rather than the resolved binary so WSL and native commands group together.
   return withGitSpan(
     { args, ...(options.cwd !== undefined ? { cwd: options.cwd } : {}) },
     async (span) => {
       if (options.onStderr && options.terminationBarrier) {
-        // Why: checked before admission; that path's streams belong to runProcess.
         throw new Error('onStderr is not supported with terminationBarrier.')
       }
       const checkoutRoutingReady = pendingWslDriveCheckoutGitRouting(args, options)
@@ -101,6 +96,7 @@ async function gitExecFileAsyncUnlocked(
           signal: options.signal,
           terminationBarrier: options.terminationBarrier,
           admissionTier: options.admissionTier,
+          spawnOnWorkerThread: options.spawnOnWorkerThread,
           onChildTerminated: reportTerminated,
           ...(options.onStderr ? { onStderr: options.onStderr } : {}),
           ...(timeoutMs === undefined
@@ -115,7 +111,7 @@ async function gitExecFileAsyncUnlocked(
               command.termination
             )
           : execFileCapture(command.binary, command.args, captureOptions)
-        // Why: a dead WSL distro fails with an empty stderr, so the span would carry no cause at all.
+        // Add a cause when a dead WSL distro returns empty stderr.
         return captured.catch((error: unknown) => {
           recordDeadlineOverrunOnSpan(span, error)
           throw annotateWslHostFailure(error, command)
@@ -128,6 +124,8 @@ async function gitExecFileAsyncUnlocked(
         } catch (error) {
           if (
             directWslGitExitCode(error, resolved) !== null &&
+            // A WSL service failure says nothing about the direct git environment.
+            !isTransientWslFailure(error) &&
             !isQuietGitControlFlowExit(error) &&
             !options.signal?.aborted
           ) {
@@ -184,7 +182,7 @@ export function gitExecFileAsync(
   const releaseMutation = trackGitWorktreeMutation(args, options)
   const terminationState: { current: Promise<void> | null } = { current: null }
   const command = resolveGitFetchHeadCommand(args, options.cwd)
-  // Why outside the lock and span: a known-missing folder starts no process, so it records no git.exec.
+  // Missing folders start no child and must not record a git.exec span.
   const result = runUnlessGitCwdKnownMissing(options, () =>
     command.needsLock
       ? runWithGitFetchHeadLock(
@@ -205,10 +203,6 @@ export function gitExecFileAsync(
   })
 }
 
-/**
- * Async git command execution that returns a Buffer.
- * Used for reading binary blobs (git show).
- */
 async function gitExecFileAsyncBufferInSpan(
   args: string[],
   options: {
@@ -233,9 +227,7 @@ async function gitExecFileAsyncBufferInSpan(
     if (readEnvironmentReady) {
       await readEnvironmentReady
     }
-    // `git show` is a read, so this normally runs with no shell at all. The fence
-    // still matters for the login-shell fallback: these are raw blob bytes going
-    // straight to the diff/blob viewer, where a banner becomes file content.
+    // Fence fallback login-shell output so rc banners cannot become raw blob content.
     let resolved = resolveGitCommand(args, options, false, true)
     const environmentReady = prepareWindowsHostGitEnvironment(resolved, undefined, options.signal)
     if (environmentReady) {

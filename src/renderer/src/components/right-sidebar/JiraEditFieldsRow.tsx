@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
-import type { JiraEditableField, JiraIssue, JiraIssueUpdate } from '../../../../shared/jira-types'
+import type {
+  JiraEditableField,
+  JiraIssue,
+  JiraIssueUpdate
+} from '../../../../shared/jira/jira-types'
 import {
   JiraIssueEditFieldsDialog,
   type JiraIssueFieldOutcome

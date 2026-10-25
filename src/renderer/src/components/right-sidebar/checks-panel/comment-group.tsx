@@ -53,7 +53,8 @@ export function PRCommentGroupView({
   onDeleteComment,
   onOpenCommentInCode,
   onSetReaction,
-  onQueueForAgent
+  onQueueForAgent,
+  onOpenLocation
 }: {
   group: PRCommentGroup
   botAuthorOverrides: ReadonlySet<string>
@@ -80,6 +81,7 @@ export function PRCommentGroupView({
     reacted: boolean
   ) => Promise<boolean>
   onQueueForAgent?: () => void
+  onOpenLocation?: (path: string, line: number) => void
 }): React.JSX.Element {
   // Reply targets a specific comment id so any comment in a thread — root or
   // nested reply — can be replied to, not just the thread root.
@@ -135,7 +137,8 @@ export function PRCommentGroupView({
     onDeleteComment,
     onOpenCommentInCode,
     onSetReaction,
-    onQueueForAgent
+    onQueueForAgent,
+    onOpenLocation
   }
 
   const content =
@@ -224,7 +227,8 @@ export function ResolvedCommentGroupsSection({
   onEditComment,
   onDeleteComment,
   onOpenCommentInCode,
-  onSetReaction
+  onSetReaction,
+  onOpenLocation
 }: {
   groups: PRCommentGroup[]
   botAuthorOverrides: ReadonlySet<string>
@@ -249,6 +253,7 @@ export function ResolvedCommentGroupsSection({
     content: GitHubReactionContent,
     reacted: boolean
   ) => Promise<boolean>
+  onOpenLocation?: (path: string, line: number) => void
 }): React.JSX.Element | null {
   if (groups.length === 0) {
     return null
@@ -293,6 +298,7 @@ export function ResolvedCommentGroupsSection({
                 onDeleteComment={onDeleteComment}
                 onOpenCommentInCode={onOpenCommentInCode}
                 onSetReaction={onSetReaction}
+                onOpenLocation={onOpenLocation}
               />
             ))}
           </AccordionContent>

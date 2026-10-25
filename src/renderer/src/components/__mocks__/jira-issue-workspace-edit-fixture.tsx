@@ -5,7 +5,7 @@ import type {
   JiraCommentBodyFormat,
   JiraIssue,
   JiraIssueUpdate
-} from '../../../../shared/jira-types'
+} from '../../../../shared/jira/jira-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   getTaskSourceCacheScope,

@@ -7,7 +7,7 @@ import {
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { jiraAddIssueComment, jiraIssueComments } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import type { JiraComment } from '../../../shared/jira-types'
+import type { JiraComment } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
 
 export type JiraIssueCommentsState = {

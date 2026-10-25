@@ -29,9 +29,9 @@ beforeAll(async () => {
   await build({
     stdin: {
       contents: `
-        import { openProfileStateDatabase, openProfileStateDatabaseReadOnly } from './src/main/persistence/profile-state/profile-state-database'
-        import { exportProfileStateJson, importProfileStateJson, readProfileStateRevision } from './src/main/persistence/profile-state/profile-state-documents'
-        import { writeProfileStateBackup } from './src/main/persistence/profile-state/profile-state-backup-job'
+        import { openProfileStateDatabase, openProfileStateDatabaseReadOnly } from './profile-state-database'
+        import { exportProfileStateJson, importProfileStateJson, readProfileStateRevision } from './profile-state-documents'
+        import { writeProfileStateBackup } from './profile-state-backup-job'
         const [op, dbPath, profileId, payloadPath, backupPath] = process.argv.slice(2)
         const runtime = process.versions.bun ? 'bun' : 'node'
         if (op === 'write-unclean') {

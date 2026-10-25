@@ -39,12 +39,7 @@ import { applyManagedDataAccountEnvironment } from '../../../managed-data-accoun
 import { applyOpenCodeStatusPluginEnv, captureOpenCodeSourceConfig } from './opencode-config'
 import { applyCodexRemoteViewerClipboardEnv } from './codex-terminal-clipboard'
 
-/**
- * Mutates `baseEnv` in place with all host-local PTY env vars and returns it.
- *
- * Do NOT call when `args.connectionId` is set (SSH): every injection is host-loopback
- * or references local filesystem paths meaningless to a remote shell.
- */
+/** Mutate host-local PTY environment only for local execution; SSH cannot use these loopback endpoints or filesystem paths. */
 export function buildPtyHostEnv(
   id: string,
   baseEnv: Record<string, string>,
@@ -75,7 +70,7 @@ export function buildPtyHostEnv(
   const hasLaunchCommand =
     typeof launchCommandHint === 'string' && launchCommandHint.trim().length > 0
 
-  // Why: unattended agents must fail instead of looping on OS credential prompts; user terminals keep normal Git behavior.
+  // Unattended agents must fail instead of waiting on OS credential prompts.
   applyTerminalGitCredentialPromptGuard(baseEnv, {
     launchCommand: launchCommandHint,
     isUnattended: opts.launchAgent !== undefined,
@@ -89,7 +84,7 @@ export function buildPtyHostEnv(
     opts.agentStatusHooksEnabled && isTuiAgentEnabled('omp', opts.disabledTuiAgents)
   const shouldInstallPrimeAgentExtensions =
     opts.agentStatusHooksEnabled && isTuiAgentEnabled('prime-agent', opts.disabledTuiAgents)
-  // Why: source shadows are agent-scoped; trusting the other kind's source reintroduces Pi/OMP extension-state shadowing.
+  // Pi/OMP source shadows are agent-scoped to avoid cross-agent extension state.
   const preexistingPiAgentDir = resolvePiAgentSourceDir(baseEnv, 'pi')
   const preexistingOmpAgentDir =
     piAgentKind === 'omp'
@@ -128,14 +123,14 @@ export function buildPtyHostEnv(
     })
   }
 
-  // Why: strip inherited hook coordinates before injecting this PTY's fresh loopback receiver, so nested-terminal callbacks route to the owning pane.
+  // Remove inherited hook coordinates before injecting the owning pane's receiver.
   for (const key of AGENT_HOOK_RUNTIME_ENV_KEYS) {
     delete baseEnv[key]
   }
   if (opts.agentStatusHooksEnabled) {
     Object.assign(baseEnv, agentHookServer.buildPtyEnv())
     if (opts.isWsl === true) {
-      // Why: hook POSTs to 127.0.0.1 die inside WSL's NAT namespace; use the guest-resident relay's endpoint instead of the Windows one.
+      // Windows loopback is outside WSL's NAT namespace; use the guest relay endpoint.
       const distro = opts.wslDistro ?? null
       const wslLaunchKind =
         explicitPiAgentKind === 'pi' || explicitPiAgentKind === 'omp'
@@ -146,7 +141,7 @@ export function buildPtyHostEnv(
       if (guestEndpoint) {
         baseEnv.ORCA_AGENT_HOOK_ENDPOINT = guestEndpoint
       }
-      // Why: OpenCode loads its status plugin from a guest config overlay, so point OPENCODE_CONFIG_DIR at the guest dir the relay materialized.
+      // OpenCode must load status hooks from its guest-resident overlay.
       const opencodeOverlayDir = openCodeAgent
         ? wslHookRelayManager.getOpenCodeOverlayDir(distro, openCodeAgent)
         : null
@@ -163,16 +158,12 @@ export function buildPtyHostEnv(
     }
   }
 
-  // Why: PI_CODING_AGENT_DIR is the user's config/session root; install only Orca-owned extension files, don't override it.
+  // Preserve the user's Pi config/session root; install only Orca-owned extension files.
   if (opts.agentStatusHooksEnabled) {
     clearPiAgentShadowEnv(baseEnv, 'pi')
     clearPiAgentShadowEnv(baseEnv, 'omp')
     clearPiAgentShadowEnv(baseEnv, 'prime-agent')
-    // Why: bare shells historically defaulted to Pi + OMP shadow prep and
-    // created ~/.<agent>/agent even when the user never launches those agents
-    // (#10196). Only create default homes on an explicit Pi/OMP launch;
-    // otherwise install only into an existing agent dir (or userData for OMP
-    // status so a typed `omp` still gets the shell wrapper extension).
+    // Bare shells must not create agent homes; use existing Pi/OMP directories or userData for OMP status (#10196).
     if (shouldInstallPiExtensions && piAgentKind === 'pi') {
       const piEnv = piTitlebarExtensionService.buildPtyEnv(id, preexistingPiAgentDir, 'pi', {
         materializeDefaultHome: explicitPiAgentKind === 'pi'
@@ -210,7 +201,7 @@ export function buildPtyHostEnv(
       exposePiManagedExtensionEnv(baseEnv, 'prime-agent', primeEnv)
     }
   } else {
-    // Why: nested PTYs must not inherit stale source or overlay state from another agent.
+    // Nested PTYs must not inherit another agent's source/overlay state.
     restoreOrStripOverlayEnv(baseEnv, {
       primary: 'PI_CODING_AGENT_DIR',
       overlay: 'ORCA_PI_CODING_AGENT_DIR',
@@ -244,14 +235,14 @@ export function buildPtyHostEnv(
     }
   }
 
-  // Why: keep the Codex home override PTY-scoped so dev/prod Orcas don't share hooks through ~/.codex.
+  // Keep managed Codex home selection PTY-scoped across dev/prod instances.
   if (opts.skipCodexHomeEnv) {
     delete baseEnv.CODEX_HOME
     delete baseEnv.ORCA_CODEX_HOME
     delete baseEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   } else if (opts.selectedCodexHomePath) {
     baseEnv.CODEX_HOME = opts.selectedCodexHomePath
-    // Why: user startup files may re-export CODEX_HOME; shell-ready wrappers restore this runtime home before Codex launches.
+    // Startup files may re-export CODEX_HOME; wrappers restore this pane's selected runtime home.
     baseEnv.ORCA_CODEX_HOME = opts.selectedCodexHomePath
     const preflightCommand = resolveCodexShellLaunchPreflightCommand({
       hooksEnabled:
@@ -274,11 +265,11 @@ export function buildPtyHostEnv(
   }
 
   if (!opts.isWsl) {
-    // Why each native spawn: a codex typed in the pane reads ~/.codex, and Codex may have updated since.
+    // Native panes may run Codex later by typing it; recheck hooks against any updated Codex install.
     scheduleCodexHookReconcile()
   }
 
-  // Why: an inherited copy (e.g. Orca launched from a WSL pane) names another launch's CLI.
+  // An inherited WSL CLI path belongs to another launch.
   delete baseEnv.ORCA_WSL_CLI_DIR
   // Why: the name a managed WSL shell resolves under `ORCA_WSL_CLI_DIR`, never a host path. Taken
   // from the same function that names the launcher it is resolved against.
@@ -323,14 +314,13 @@ export function buildPtyHostEnv(
     const cliCommand = opts.isWsl ? getWslCliCommandName(opts.isPackaged) : 'orca'
     baseEnv.BROWSER = `${cliCommand} open-url --url %s`
   }
-  // Why the browser-relay flag: both mean a headless runtime whose viewer is another machine.
+  // Browser-relayed and SSH-managed headless hosts both have viewers on another machine.
   applyCodexRemoteViewerClipboardEnv(baseEnv, {
     launchAgent: opts.launchAgent,
     viewerIsRemote: opts.routeBrowserOpensToClient === true
   })
 
-  // Why: must run after the prepends above — they re-read PATH from the unscrubbed
-  // process.env when baseEnv carries none, which is the daemon path's normal shape.
+  // Scrub after prepends: sparse daemon env may make them reread unsanitized ambient PATH.
   stripLegacyTerminalShimEnv(baseEnv, process.platform)
 
   if (!opts.isWsl) {

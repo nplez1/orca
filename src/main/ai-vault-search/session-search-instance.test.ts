@@ -155,8 +155,6 @@ it('indexes and answers once the setting is on', async () => {
   expect(errors).toEqual([])
 })
 
-// The whole reason the indexer is immutable: a change is a new instance, and the
-// old one is closed before it exists, so there is never a second writer.
 it('closes the live pair and starts a new one on a settings change', async () => {
   const recent = transcriptPath(RECENT_SESSION_ID)
   const ancient = transcriptPath(ANCIENT_SESSION_ID)
@@ -295,7 +293,6 @@ it('reports not being ready before blaming a scope it does not know', async () =
   const subject = newInstance()
   subject.apply({ contentEnabled: true, historyDays: null })
   await subject.settled()
-  // Consent stands while no index does, which is what `not-ready` names.
   subject.close()
 
   expect(await subject.search({ query: 'anything' }, { kind: 'unknown' })).toEqual({
@@ -318,7 +315,5 @@ it('answers scope-unknown once it is switched on and ready', async () => {
     kind: 'unavailable',
     reason: 'scope-unknown'
   })
-  // The same query answers with hits when no scope is in the way, so the refusal
-  // above is the scope's and not an empty or unreadable index.
   expect(await searchFor('distinctive')).toEqual([RECENT_SESSION_ID])
 })

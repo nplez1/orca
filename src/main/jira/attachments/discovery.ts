@@ -54,7 +54,7 @@ export function selectPreferredAttachmentIds(args: {
   const needing = args.mediaAttrs.filter((attrs) => !(attrs.url && /^https?:\/\//i.test(attrs.url)))
   const needCount = needing.length
   if (needCount === 0) {
-    // Why: no attachment-needing ADF media — skip downloads (do not sweep HTML-only).
+    // HTML-only images must not trigger downloads.
     return { preferredIds: [], fallbackRan: false, needCount: 0 }
   }
 
@@ -64,7 +64,7 @@ export function selectPreferredAttachmentIds(args: {
 
   if (needCount > preferredIds.length) {
     const metas = parseImageAttachmentMetas(args.attachmentField, args.maxBytes)
-    // Why: multiple Jira screenshots often share image.png — assign next unused meta per node.
+    // Screenshots often share image.png; assign each the next unused attachment.
     for (const node of needing) {
       if (preferredIds.length >= (args.maxImages ?? MAX_IMAGES)) {
         break

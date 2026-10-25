@@ -8,7 +8,6 @@ import { getDefaultSourceControlAiSettings } from './source-control-ai-settings'
 import { DEFAULT_APP_ICON_ID } from './app-icon'
 import { DEFAULT_OPEN_IN_APPLICATIONS } from './open-in-applications'
 import { DEFAULT_DISABLED_TUI_AGENTS } from './tui-agent-selection'
-import { DEFAULT_TUI_AGENT_ARGS, DEFAULT_TUI_AGENT_ENV } from './tui-agent-launch-defaults'
 import { UI_LANGUAGE_SYSTEM } from './ui-language'
 import {
   DEFAULT_LEFT_SIDEBAR_TINT_COLOR,
@@ -135,6 +134,7 @@ export function buildDefaultSettings(args: {
     localhostWorktreeLabelsEnabled: false,
     openLinksInAppPreferencePrompted: false,
     openLinksInAppModifierInverts: false,
+    openLinksInAppInBackground: false,
     terminalLinkActionPopoverEnabled: true,
     terminalLinkClickBehavior: 'actions',
     terminalUrlMiddleClickBehavior: 'open',
@@ -145,7 +145,7 @@ export function buildDefaultSettings(args: {
     nativeChatInheritShellEnvironment: true,
     nativeChatShellEnvironmentVariables: [],
     nativeChatSessionOptions: {},
-    // The shipped Claude and Codex arguments carry their bypass flags.
+    // New chats of agents on their own settings; others start in their agent permission.
     nativeChatPermissionMode: 'full-access',
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,
@@ -161,6 +161,7 @@ export function buildDefaultSettings(args: {
     artifactSharingEnabled: false,
     agentSkillSharingEnabled: false,
     nestedWorkerMaxDepth: 1,
+    orchestrationChatErrorEscalationEnabled: true,
     showArtifactsButton: false,
     showSkillsButton: false,
     showMobileButton: true,
@@ -231,9 +232,12 @@ export function buildDefaultSettings(args: {
     geminiCliOAuthEnabled: false,
     disabledUsageProviders: [],
     agentCmdOverrides: {},
-    agentDefaultArgs: { ...DEFAULT_TUI_AGENT_ARGS },
-    agentDefaultEnv: { ...DEFAULT_TUI_AGENT_ENV },
+    // Arguments hold only the user's own text; the permission flag comes from the choice below.
+    agentDefaultArgs: {},
+    agentDefaultEnv: {},
     agentYoloDefaultsMigrated: true,
+    agentPermissionDefault: 'full-access',
+    agentPermissionOverrides: {},
     agentStatusHooksEnabled: true,
     agentWorkspaceTrustEnabled: true,
     codexTerminalServerIsolation: true,

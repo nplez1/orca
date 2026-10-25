@@ -80,7 +80,7 @@ const { handlers, mainWindow } = setupPtyIpcSuite()
 
 beforeEach(() => {
   statMock.mockReset()
-  // Both the folder check and the provider's cwd validation read stat; statSync stays unused.
+  // Provider validation uses sync stat; folder-workspace validation uses async stat.
   statMock.mockImplementation(async () => directoryStats)
 })
 

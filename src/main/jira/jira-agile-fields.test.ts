@@ -7,7 +7,7 @@ import {
   pickJiraFieldSelection
 } from './jira-agile-fields'
 import { mapJiraIssue, mapSprint } from './jira-issue-mapping'
-import type { JiraSite } from '../../shared/jira-types'
+import type { JiraSite } from '../../shared/jira/jira-types'
 
 const { jiraRequestMock, acquireMock, releaseMock } = vi.hoisted(() => ({
   jiraRequestMock: vi.fn(),

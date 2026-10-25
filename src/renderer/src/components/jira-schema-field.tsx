@@ -1,4 +1,4 @@
-import type { JiraCreateField, JiraUser } from '../../../shared/jira-types'
+import type { JiraCreateField, JiraUser } from '../../../shared/jira/jira-types'
 import { resolveJiraFieldControlKind } from '../../../shared/jira-field-rendering'
 import { joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import { JiraOptionMultiSelect, jiraOptionToken } from '@/components/jira-option-multi-select'

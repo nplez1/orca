@@ -1,37 +1,16 @@
 import React from 'react'
-import {
-  LoaderCircle,
-  MessageSquare,
-  Plus,
-  SendHorizontal,
-  SlidersHorizontal,
-  Sparkles,
-  X
-} from 'lucide-react'
+import { LoaderCircle, MessageSquare, Plus, SendHorizontal, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { getPRCommentAudienceEmptyLabel } from '@/lib/pr-comment-audience-labels'
 import { translate } from '@/i18n/i18n'
 import { ResolvedCommentGroupsSection } from './comment-group'
 import { CommentsAudienceTabs } from './comments-audience-tabs'
+import { CommentsDisplayModeMenu } from './comments-display-mode-menu'
 import { CommentsInlineHeadMismatchNotice, CommentsInlineToggle } from './comments-inline-controls'
 import { ReviewVerdictsBlock } from './review-verdicts'
-import {
-  getPRCommentsListDisplayModeLabel,
-  PR_COMMENT_LIST_DISPLAY_MODES,
-  type PRCommentsListDisplayMode,
-  type PRCommentsListProps,
-  useCommentsListState
-} from './use-comments-list-state'
+import { type PRCommentsListProps, useCommentsListState } from './use-comments-list-state'
 
 export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
   const {
@@ -53,7 +32,8 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
     onToggleCommentsInline,
     commentsInlineBlocked,
     commentsInlineHeadMismatch,
-    reviewVerdictsEnabled
+    reviewVerdictsEnabled,
+    onOpenLocation
   } = props
   const {
     presentation,
@@ -223,40 +203,10 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
               </>
             )}
             {listComments.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label={translate(
-                      'auto.components.right.sidebar.checks.panel.content.f5cf324efa',
-                      'Comment display options'
-                    )}
-                  >
-                    <SlidersHorizontal className="size-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="bottom" sideOffset={6}>
-                  <DropdownMenuLabel>
-                    {translate(
-                      'auto.components.right.sidebar.checks.panel.content.5e6e5a13fa',
-                      'View'
-                    )}
-                  </DropdownMenuLabel>
-                  <DropdownMenuRadioGroup
-                    value={displayMode}
-                    onValueChange={(value) => setDisplayMode(value as PRCommentsListDisplayMode)}
-                  >
-                    {PR_COMMENT_LIST_DISPLAY_MODES.map((mode) => (
-                      <DropdownMenuRadioItem key={mode} value={mode}>
-                        {getPRCommentsListDisplayModeLabel(mode)}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <CommentsDisplayModeMenu
+                displayMode={displayMode}
+                onDisplayModeChange={setDisplayMode}
+              />
             )}
             {onAddComment && !isAddingComment && (
               <Tooltip>
@@ -391,6 +341,7 @@ export function PRCommentsList(props: PRCommentsListProps): React.JSX.Element {
                 onEditComment={onEditComment}
                 onDeleteComment={onDeleteComment}
                 onSetReaction={onSetReaction}
+                onOpenLocation={onOpenLocation}
               />
             </>
           )}

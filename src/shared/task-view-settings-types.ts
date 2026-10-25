@@ -1,4 +1,4 @@
-import type { JiraBoardSelection } from './jira-types'
+import type { JiraBoardSelection } from './jira/jira-types'
 import type { TaskProvider } from './task-providers'
 import type { TaskViewPresetId } from './ui-chrome-types'
 

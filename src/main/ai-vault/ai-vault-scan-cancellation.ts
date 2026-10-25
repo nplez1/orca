@@ -7,9 +7,7 @@ export function throwIfAiVaultScanCancelled(signal?: AbortSignal): void {
   throw createAiVaultScanCancelledError()
 }
 
-// Why: the caller must not keep waiting for a leg whose every waiter left. The
-// signal also reaches the transport (the page drain aborts its request), and
-// this race is what stops the 'all'-scope merge from being held by it.
+// RPC cannot abort in-flight work; cancellation releases its waiter while the request settles separately.
 export function abandonRemoteSessionScanOnCancel<T>(
   promise: Promise<T>,
   signal?: AbortSignal
@@ -19,8 +17,7 @@ export function abandonRemoteSessionScanOnCancel<T>(
   }
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) {
-      // The scanner promise already exists; observe it so its later failure is
-      // not an unhandled rejection after this caller walked away.
+      // Observe later failure even though the caller has already cancelled.
       void promise.catch(() => undefined)
       reject(createAiVaultScanCancelledError())
       return

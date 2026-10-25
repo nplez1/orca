@@ -4,7 +4,7 @@ import type {
   JiraIssueType,
   JiraPriority,
   JiraUser
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'
@@ -63,7 +63,6 @@ export async function listIssueTypes(
   }
 }
 
-/** Lists the required create fields for a project and issue type. */
 export async function listCreateFields(
   projectIdOrKey: string,
   issueTypeId: string,
@@ -122,7 +121,6 @@ export async function listCreateFields(
   }
 }
 
-/** Lists the site's issue priorities. */
 export async function listPriorities(
   siteId?: string | null,
   strict = false
@@ -152,11 +150,7 @@ export async function listPriorities(
   }
 }
 
-/**
- * Searches all users on the site. Reporter and user-picker create fields are not
- * limited to assignable users and no issue key exists before create, so neither
- * `/user/assignable/search` variant fits. Returns `[]` when browse-users is denied.
- */
+/** Create user-pickers need all users, not just assignable users; return [] if browse-users is denied. */
 export async function searchUsers(query?: string, siteId?: string | null): Promise<JiraUser[]> {
   const entry = getClients(siteId)[0]
   if (!entry) {
@@ -164,8 +158,7 @@ export async function searchUsers(query?: string, siteId?: string | null): Promi
   }
   const isServer = entry.site.authType === 'server'
   const params = new URLSearchParams({ maxResults: '50' })
-  // Server/DC filters by `username`; `query` is Cloud-only. Server rejects an
-  // empty username, so fall back to the wildcard it accepts for "list everyone".
+  // Server/DC needs username and rejects an empty filter; Cloud uses query.
   params.set(isServer ? 'username' : 'query', query?.trim() || (isServer ? '.' : ''))
   await acquire()
   try {
@@ -179,7 +172,7 @@ export async function searchUsers(query?: string, siteId?: string | null): Promi
       clearToken(entry.site.id)
       throw error
     }
-    // Browse-users permission is optional; the dialog falls back to a text field.
+    // Browse-users permission is optional; the dialog allows explicit known user IDs.
     console.warn('[jira] searchUsers failed:', error)
     return []
   } finally {
@@ -237,7 +230,7 @@ export async function listAssignableUsers(
   return searchAssignableUsers({ issueKey: key }, query, siteId, 'listAssignableUsers', strict)
 }
 
-// Creation has no issue key yet, so assignability is scoped by project.
+// Before creation, assignability is project-scoped because no issue key exists.
 export async function listAssignableUsersForProject(
   projectIdOrKey: string,
   query?: string,

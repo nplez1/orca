@@ -1,4 +1,4 @@
-import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira/jira-types'
 
 export type TaskPageJiraIssueSection = {
   key: string

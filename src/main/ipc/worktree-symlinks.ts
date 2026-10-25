@@ -23,8 +23,7 @@ export async function createWorktreeLinkedPaths(
   await materializeWorktreePaths(primaryPath, worktreePath, paths, 'link', options)
 }
 
-/** Copy `.worktreeinclude`-resolved paths as private per-worktree copies.
- *  Returns entries refused by the copy budget so worktree creation can warn. */
+/** Copy includes independently, isolate per-path failures, and report budget refusals to the creator. */
 export async function createWorktreeCopiedPaths(
   primaryPath: string,
   worktreePath: string,
@@ -34,10 +33,7 @@ export async function createWorktreeCopiedPaths(
   return await materializeWorktreePaths(primaryPath, worktreePath, paths, 'copy', options)
 }
 
-/** Materialize `orca.yaml` `worktree.sharedDirectories` into a fresh worktree.
- *  The default keeps live symlink sharing; APFS modes opt into independent
- *  clones and choose the fallback when clone-copy is unavailable. `apfs-copy`
- *  honors the explicit choice without a copy-size or entry-count cap. */
+/** Shared directories always link; cloning would defeat one-install-for-all dependency sharing. */
 export async function createWorktreeSharedPaths(
   primaryPath: string,
   worktreePath: string,
@@ -65,7 +61,7 @@ export async function createWorktreeSharedPaths(
   return failedPaths
 }
 
-/** Symlink filesystem paths into a new worktree using POSIX-style symlink types. */
+/** Link configured relative paths, creating nested parents and isolating per-path failures. */
 export async function createWorktreeSymlinks(
   primaryPath: string,
   worktreePath: string,

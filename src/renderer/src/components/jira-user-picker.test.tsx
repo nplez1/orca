@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraUser } from '../../../shared/jira-types'
+import type { JiraUser } from '../../../shared/jira/jira-types'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import { JiraUserPicker, splitJiraUserPickerOptions } from './jira-user-picker'
 

@@ -1,4 +1,4 @@
-import type { JiraSprint, JiraSprintAssignment } from '../../shared/jira-types'
+import type { JiraSprint, JiraSprintAssignment } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { jiraRequest, type JiraClientForSite } from './authenticated-request'
 import { clearToken, getSingleClient, isAuthError } from './client'

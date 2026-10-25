@@ -30,7 +30,6 @@ import { getManagedStatusLineCommand, getManagedStatusLineScript } from './statu
 import { refuseProfileAtDefaultHome } from './claude-profile-hook-target'
 import {
   applyManagedHooks,
-  applyManagedStatusLine,
   CLAUDE_HOOK_SETTINGS,
   getManagedScriptFileName,
   getConfigPath,
@@ -39,15 +38,19 @@ import {
   getPosixManagedScriptFileName,
   getRemoteConfigPath,
   getRemoteManagedEventCommand,
-  getStatusLineInstallMarkerPath,
   getStatusLineScriptFileName,
   getStatusLineScriptPath,
-  getStatusLineSlotState,
   findManagedEventHookForms,
   removeManagedHooks,
-  removeManagedStatusLine,
   type ClaudeCompatibleHookSettings
 } from './hook-settings'
+import {
+  applyManagedStatusLine,
+  getStatusLineInstallMarkerPath,
+  getStatusLineSlotState,
+  removeManagedStatusLine
+} from './claude-status-line-slot'
+import { claudeAcceptsExecFormHooks } from './claude-hook-event-versions'
 import {
   getClaudeManagedHookPlan,
   OPENCLAUDE_MANAGED_HOOK_PLAN,
@@ -59,7 +62,6 @@ type ClaudeHookServiceOptions = {
   displayName: string
   settings: ClaudeCompatibleHookSettings
   source?: AgentHookSource
-  /** A Claude-compatible CLI with its own settings file writes a fixed plan, not Claude's version table. */
   hookPlan?: ClaudeManagedHookPlan
 }
 
@@ -96,8 +98,7 @@ export class ClaudeHookService {
     })
   }
 
-  // Why: Claude's settings loader rejects events newer than the running CLI, so its plan follows the
-  // resolved version; OpenClaude and Qoder read their own settings files.
+  // Claude version-gates hook events; compatible CLIs use their own fixed plans.
   private managedHookPlan(options: ClaudeHookInstallOptions): ClaudeManagedHookPlan {
     return this.options.agent === 'claude'
       ? getClaudeManagedHookPlan(options.claudeVersion)
@@ -122,13 +123,13 @@ export class ClaudeHookService {
       }
     }
 
-    // Why: report partial registration instead of a false installed state. Either Windows form
-    // counts: install() registers the `.cmd` hook whenever the exe cannot be placed.
+    // Count either Windows launcher form: installation falls back to .cmd when the exe cannot be placed.
     const exePath = this.usesWindowsEntry ? getWindowsClaudeHookExecutablePath(scriptPath) : null
     const events = this.managedHookPlan(options).install.map((event) => event.eventName)
     const { missing, matchedForms } = findManagedEventHookForms(config, events, (eventName) =>
       [null, exePath].map((path) =>
-        getManagedEventHook(eventName, scriptPath, this.options.settings, path)
+        // An installed exec form proves its CLI accepted it, whatever the probe now reports.
+        getManagedEventHook(eventName, scriptPath, this.options.settings, path, { execForm: true })
       )
     )
     const presentCount = matchedForms.length
@@ -157,7 +158,7 @@ export class ClaudeHookService {
     await (this.usesWindowsEntry
       ? refreshWindowsClaudeHookFiles(scriptPath, payload)
       : refreshManagedScriptIfPresent(scriptPath, payload))
-    // Why: no agent gate — the statusline script only ever exists for claude, so presence is the gate.
+    // Refresh existing statusline scripts without creating new installs.
     await refreshManagedScriptIfPresent(
       getStatusLineScriptPath(this.options.settings),
       getManagedStatusLineScript('local')
@@ -184,9 +185,11 @@ export class ClaudeHookService {
 
     const plan = this.managedHookPlan(options)
     const exePath = this.usesWindowsEntry ? installWindowsClaudeHookExecutable(scriptPath) : null
+    const execForm = claudeAcceptsExecFormHooks(options.claudeVersion)
     let nextConfig = applyManagedHooks(
       config,
-      (eventName) => getManagedEventHook(eventName, scriptPath, this.options.settings, exePath),
+      (eventName) =>
+        getManagedEventHook(eventName, scriptPath, this.options.settings, exePath, { execForm }),
       getManagedScriptFileName(this.options.settings),
       plan
     )
@@ -196,7 +199,7 @@ export class ClaudeHookService {
     } else {
       writeManagedScript(scriptPath, payload)
     }
-    // Why: a profile's statusLine arrives with the settings copy from the default home.
+    // Profiles inherit statusLine from the default-home settings copy.
     if (options.configDir === undefined && plan.statusLine === 'install') {
       nextConfig = this.installManagedStatusLine(nextConfig)
     } else if (options.configDir === undefined && plan.statusLine === 'retire') {
@@ -206,8 +209,7 @@ export class ClaudeHookService {
     return this.getStatus(options)
   }
 
-  // Why: the statusline feed is opportunistic (usage display, not agent status); a user who deleted the
-  // managed entry has opted out, and the marker distinguishes that deletion from a first install.
+  // The marker distinguishes a user-deleted statusline from a first install.
   private installManagedStatusLine(config: HooksConfig): HooksConfig {
     const scriptFileName = getStatusLineScriptFileName(this.options.settings)
     const markerPath = getStatusLineInstallMarkerPath(this.options.settings)
@@ -225,13 +227,12 @@ export class ClaudeHookService {
     try {
       writeFileSync(markerPath, '')
     } catch {
-      // Best-effort: a missing marker only means one future user deletion gets re-installed once.
+      // Marker failure may cause a later user deletion to be reinstalled.
     }
     return next
   }
 
-  // Why: a Claude that predates statusLine discards the whole settings file over Orca's; dropping the
-  // marker with it keeps an upgrade from reading the removal as the user's opt-out.
+  // Older CLIs reject statusLine; clear the marker so an upgrade can reinstall it.
   private retireManagedStatusLine(config: HooksConfig): HooksConfig {
     const { config: next, changed } = removeManagedStatusLine(
       config,
@@ -241,19 +242,18 @@ export class ClaudeHookService {
       try {
         rmSync(getStatusLineInstallMarkerPath(this.options.settings), { force: true })
       } catch {
-        // Best-effort: a stale marker only means one upgrade skips re-adding the statusline.
+        // A stale marker can suppress reinstall after an upgrade.
       }
     }
     return next
   }
 
-  // Why: install the Claude hook on the remote box (via SFTP); POSIX-only by design (Windows-remote deferred).
   async installRemote(
     sftp: SFTPWrapper,
     remoteHome: string,
     options: ClaudeHookInstallOptions = {}
   ): Promise<AgentHookInstallStatus> {
-    // Why: remote Windows is unsupported; local process.platform cannot identify the remote OS.
+    // Remote hook installation targets POSIX hosts regardless of the client platform.
     const remoteConfigPath = getRemoteConfigPath(remoteHome, this.options.settings)
     const remoteScriptFileName = getPosixManagedScriptFileName(this.options.settings)
     const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/${HOME_DIRECTORY_NAME}/agent-hooks/${remoteScriptFileName}`
@@ -270,7 +270,7 @@ export class ClaudeHookService {
         }
       }
 
-      // Why: settings resolve HOME at runtime while SFTP still targets the discovered remote home.
+      // Settings resolve HOME at runtime; SFTP writes to the discovered remote home.
       const nextConfig = applyManagedHooks(
         config,
         (eventName) =>
@@ -279,12 +279,9 @@ export class ClaudeHookService {
         this.managedHookPlan(options)
       )
 
-      // Why: write scripts before settings to avoid settings pointing to missing scripts.
-      // Why: SSH scripts always use POSIX .sh paths, regardless of the local OS.
+      // Publish scripts before settings can reference them.
       await writeManagedScriptRemote(sftp, remoteScriptPath, this.managedScript('posix'))
-      // Why: no statusline install here — this path serves SSH remotes and WSL guests, whose relay hook
-      // listener doesn't route /statusline/claude, and an SSH box's Claude login can be a different
-      // account than the locally selected one, so its usage must not feed the local bar (live feed is host-local only).
+      // Remote relays lack the statusline route, and remote account usage cannot be attributed locally.
       await writeHooksJsonRemote(sftp, remoteConfigPath, nextConfig)
 
       return {
@@ -330,10 +327,10 @@ export class ClaudeHookService {
     }
     if (this.options.agent === 'claude') {
       try {
-        // Why: an Orca-level uninstall resets the opt-out memory so a later re-enable installs the statusline again.
+        // Explicit uninstall resets opt-out memory for a future re-enable.
         rmSync(getStatusLineInstallMarkerPath(this.options.settings), { force: true })
       } catch {
-        // ignore — marker cleanup is best-effort
+        // Marker cleanup is best-effort.
       }
     }
     return this.getStatus()

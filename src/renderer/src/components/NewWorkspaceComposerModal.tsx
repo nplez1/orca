@@ -1,3 +1,4 @@
+import { agentChoicePending } from '@/lib/host-chat-program'
 import type { AgentLaunchSurface } from '@/lib/agent-session-launch-plan'
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
@@ -14,10 +15,12 @@ import AgentSettingsDialog from '@/components/agent/AgentSettingsDialog'
 import type { AddRepoDialogHostedController } from '@/components/sidebar/use-add-repo-hosted-controller'
 import { useComposerState } from '@/hooks/useComposerState'
 import {
+  composerLaunchWorkspace,
   pickQuickWorkspaceAgent,
   resolveQuickWorkspaceAgentSelection
 } from '@/lib/quick-workspace-agent-selection'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
+import { useAgentsOfferedForLaunch } from '@/lib/host-chat-program-acquisition'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
@@ -152,7 +155,8 @@ function QuickTabBody({
     nameInputRef,
     submitQuick,
     createDisabled: formDisabled,
-    selectAddedProjectRepo
+    selectAddedProjectRepo,
+    selectAddedProjectGroup
   } = useComposerState({
     initialName: modalData.prefilledName ?? lockedWorkspaceBranch ?? '',
     // Why: the modal is quick-create only now, so prompt-prefill state is
@@ -202,14 +206,28 @@ function QuickTabBody({
   const [quickAgentOverride, setQuickAgentOverride] = useState<TuiAgent | null | undefined>(
     undefined
   )
-  const preferredQuickAgent = useMemo<TuiAgent | null>(() => {
-    const pref = settings?.defaultTuiAgent
-    return pickQuickWorkspaceAgent(pref, cardProps.detectedAgentIds, settings?.disabledTuiAgents)
-  }, [cardProps.detectedAgentIds, settings?.defaultTuiAgent, settings?.disabledTuiAgents])
+  // The picker rows' workspace when known, so the offered list and the rows read one host.
+  const launchWorkspace =
+    cardProps.agentRows?.target.workspace ?? composerLaunchWorkspace(cardProps)
+  const offeredAgentIds = useAgentsOfferedForLaunch(launchWorkspace, cardProps.detectedAgentIds)
+  const detected = cardProps.detectedAgentIds ? [...cardProps.detectedAgentIds] : null
+  const choicePending = (agent: TuiAgent): boolean =>
+    agentChoicePending(useAppStore.getState(), agent, launchWorkspace, detected)
+  // Pending discovery preserves the existing catalog fallback; current facts settle the default.
+  const preferredQuickAgent = pickQuickWorkspaceAgent(
+    settings?.defaultTuiAgent,
+    cardProps.detectedAgentIds,
+    settings?.disabledTuiAgents,
+    offeredAgentIds,
+    choicePending
+  )
+  // An explicit pick stays valid where it opens as a chat without its CLI.
   const resolvedQuickAgentSelection = resolveQuickWorkspaceAgentSelection({
     quickAgentOverride,
     preferredQuickAgent,
     detectedAgentIds: cardProps.detectedAgentIds,
+    offeredAgentIds,
+    selectedChoiceUnresolved: Boolean(quickAgentOverride && choicePending(quickAgentOverride)),
     disabledTuiAgents: settings?.disabledTuiAgents
   })
   if (resolvedQuickAgentSelection.quickAgentOverride !== quickAgentOverride) {
@@ -218,6 +236,9 @@ function QuickTabBody({
     setQuickAgentOverride(resolvedQuickAgentSelection.quickAgentOverride)
   }
   const quickAgent = resolvedQuickAgentSelection.quickAgent
+  const chipAgentIds =
+    offeredAgentIds &&
+    new Set([...offeredAgentIds, ...(quickAgent && choicePending(quickAgent) ? [quickAgent] : [])])
   const [quickSelectionCleared, setQuickSelectionCleared] = useState(false)
   const quickSetupOnly = quickAgent === null && quickSelectionCleared
 
@@ -305,9 +326,10 @@ function QuickTabBody({
       open: addProjectOpen,
       onOpenChange: setAddProjectOpen,
       onProjectAdded: handleProjectAdded,
+      onProjectGroupImported: selectAddedProjectGroup,
       onCloseAutoFocus: handleAddProjectCloseAutoFocus
     }),
-    [addProjectOpen, handleAddProjectCloseAutoFocus, handleProjectAdded]
+    [addProjectOpen, handleAddProjectCloseAutoFocus, handleProjectAdded, selectAddedProjectGroup]
   )
   const selectedProjectOption = cardProps.projectOptions.find(
     (option) => option.id === cardProps.selectedProjectId
@@ -396,6 +418,8 @@ function QuickTabBody({
         lockedTargetIsSourceHost={lockedTargetIsSourceHost}
         createDisabled={effectiveCreateDisabled}
         impliedTaskSourceUrl={impliedTaskSourceUrl}
+        // Chips list offered agents, keeping a pick whose chat is still being learned.
+        detectedAgentIds={chipAgentIds}
         agentSurfaceRows={
           cardProps.agentRows
             ? {

@@ -5,7 +5,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { JiraIssue } from '../../../../../shared/jira-types'
+import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'

@@ -1,7 +1,7 @@
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { GitPushTarget } from '../../../../shared/worktree/types'
 import type { LocalProjectWorktreeGitOptions } from '../../../project-runtime-git-options'
-import { gitExecFileAsync } from '../../../git/runner'
+import { pruneGitWorktrees } from '../../../git/worktree-prune-guard'
 import { cleanupLocalOrphanedWorktreeDirectory } from '../../../local-orphaned-worktree-cleanup'
 import { cleanupUnusedWorktreePushTargetRemote } from '../../worktree-remote'
 import { preservedBranchCleanupScopeKey } from '../../../../shared/preserved-branch-cleanup'
@@ -35,10 +35,7 @@ export async function cleanupOrphanedLocalWorktreeRemoval(args: {
     (path) => runtime.closeFileWatchersForRemoval(path)
   )
   // Why: remove failed so git still tracks it (.git/worktrees/<name>); prune or the stale entry keeps its branch locked.
-  await gitExecFileAsync(['worktree', 'prune'], {
-    cwd: args.repoPath,
-    ...args.localWorktreeGitOptions
-  }).catch(() => {})
+  await pruneGitWorktrees({ cwd: args.repoPath, ...args.localWorktreeGitOptions }).catch(() => {})
   await cleanupUnusedWorktreePushTargetRemote(
     args.repoPath,
     args.worktreeId,

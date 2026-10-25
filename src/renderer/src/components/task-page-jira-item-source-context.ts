@@ -1,5 +1,5 @@
-import type { JiraIssue, JiraSite } from '../../../shared/jira-types'
-import { parseJiraIssueUrl } from '../../../shared/jira-issue-url'
+import type { JiraIssue, JiraSite } from '../../../shared/jira/jira-types'
+import { parseJiraIssueUrl } from '../../../shared/jira/jira-issue-url'
 import { getJiraAccountLabel } from '@/lib/jira-account-label'
 import {
   normalizeTaskSourceContext,

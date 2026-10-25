@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraCreateField } from '../../../shared/jira-types'
+import type { JiraCreateField } from '../../../shared/jira/jira-types'
 import { JiraSchemaFieldControl } from './jira-schema-field'
 
 vi.mock('@/runtime/runtime-jira-client', () => ({

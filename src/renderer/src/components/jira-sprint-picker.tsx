@@ -11,7 +11,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
 import { matchesCommandTerms } from '@/lib/command-choice-filter'
-import type { JiraSprint } from '../../../shared/jira-types'
+import type { JiraSprint } from '../../../shared/jira/jira-types'
 import { sortJiraSprintsNearToday } from './jira-sprint-sorter'
 
 // Why a sentinel: cmdk cannot select an item whose value is an empty string, and the

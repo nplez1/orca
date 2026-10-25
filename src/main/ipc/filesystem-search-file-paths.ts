@@ -135,11 +135,11 @@ export async function searchQuickOpenFilePaths(
       if (error instanceof RipgrepUnavailableError) {
         throw bundledRipgrepUnavailableError()
       }
-      // Why: a supersede that lands after the scan rejected still owes the caller a cancellation.
+      // Superseding aborts still owe cancellation after a scan rejection.
       if (args.signal?.aborted) {
         throw fileListingCancellationError(args.signal)
       }
-      // Why: one-off fork/exec pressure should not blank Quick Open until the query changes.
+      // Retry transient fork/exec pressure so Quick Open need not wait for another query.
       if (!(error instanceof RipgrepLaunchFailureError) || attempt > 0) {
         throw error
       }

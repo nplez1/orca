@@ -1,4 +1,4 @@
-import type { JiraIssueUpdate } from '../../shared/jira-types'
+import type { JiraIssueUpdate } from '../../shared/jira/jira-types'
 
 function normalizeStringArray(value: unknown): string[] | undefined {
   if (value === undefined) {

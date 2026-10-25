@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 
 import { createGlobalSettingsFixture } from '../../../../../shared/global-settings-test-fixture'
-import type { JiraBoardIssuePageRequest, JiraIssue } from '../../../../../shared/jira-types'
+import type { JiraBoardIssuePageRequest, JiraIssue } from '../../../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { defaultJiraListColumnIds, visibleJiraListColumns } from '../../jira-list-columns'

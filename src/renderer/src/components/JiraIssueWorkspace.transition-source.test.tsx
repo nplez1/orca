@@ -2,7 +2,11 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { JiraConnectionStatus, JiraIssue, JiraTransition } from '../../../shared/jira-types'
+import type {
+  JiraConnectionStatus,
+  JiraIssue,
+  JiraTransition
+} from '../../../shared/jira/jira-types'
 import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { getJiraRuntimeTarget, type RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
 import type { AppState } from '@/store/types'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JiraBoard } from '../../../../shared/jira-types'
+import type { JiraBoard } from '../../../../shared/jira/jira-types'
 import { boardOptionValue, buildJiraBoardOptions } from './jira-settings-combobox-options'
 
 const boards: JiraBoard[] = [

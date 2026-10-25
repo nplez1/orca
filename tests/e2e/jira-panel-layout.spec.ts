@@ -18,8 +18,9 @@ test('Jira titles and sort headings adapt to panel width inside a wide window', 
   // only ever asserted the title floor, and its original 200px expectation already failed
   // there with upstream's columns on a machine with a stable scrollbar gutter (189px
   // measured).
+  let previousDesktopTitleWidth: number | null = null
   for (const width of [500, 860, 1060, 1320]) {
-    await title.evaluate((element, width) => {
+    const panelWidth = await title.evaluate((element, width) => {
       const host =
         element.closest('[role="button"]')?.parentElement?.parentElement?.parentElement
           ?.parentElement?.parentElement
@@ -28,7 +29,9 @@ test('Jira titles and sort headings adapt to panel width inside a wide window', 
       }
       host.style.width = `${width}px`
       host.style.maxWidth = 'none'
+      return host.getBoundingClientRect().width
     }, width)
+    expect(panelWidth).toBe(width)
     // Why the md and lg steps assert the grid's own title floor rather than the 200px
     // this test was calibrated on: with the points column on by default the row's minimum
     // is 830px at md and 1032px at lg, so the title comes close to minmax(180px, 1fr) there
@@ -71,6 +74,11 @@ test('Jira titles and sort headings adapt to panel width inside a wide window', 
       expect(grids[0].filter((_, index) => index !== 1)).toEqual(
         grids[1].filter((_, index) => index !== 1)
       )
+      const titleWidth = await title.evaluate((element) => element.getBoundingClientRect().width)
+      if (previousDesktopTitleWidth !== null) {
+        expect(titleWidth).toBeGreaterThan(previousDesktopTitleWidth)
+      }
+      previousDesktopTitleWidth = titleWidth
     }
   }
 })

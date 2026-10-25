@@ -1,5 +1,5 @@
 import type { DragEvent, JSX } from 'react'
-import type { JiraIssue } from '../../../../../shared/jira-types'
+import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { TaskPageJiraBoardColumn } from '../../task-page-jira-board-model'
 import {

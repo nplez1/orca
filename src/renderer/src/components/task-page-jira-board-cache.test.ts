@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { JiraBoardOverview, JiraIssue } from '../../../shared/jira-types'
+import type { JiraBoardOverview, JiraIssue } from '../../../shared/jira/jira-types'
 import {
   clearTaskPageJiraBoardCache,
   patchTaskPageJiraBoardCache,

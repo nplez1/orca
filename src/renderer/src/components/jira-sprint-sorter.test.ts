@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JiraSprint } from '../../../shared/jira-types'
+import type { JiraSprint } from '../../../shared/jira/jira-types'
 import { sortJiraSprintsNearToday } from './jira-sprint-sorter'
 
 const NOW = Date.parse('2026-10-15T12:00:00.000Z')

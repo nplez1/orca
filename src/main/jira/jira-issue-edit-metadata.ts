@@ -2,7 +2,7 @@ import {
   resolveJiraFieldControlKind,
   resolveJiraObjectListFieldKind
 } from '../../shared/jira-field-rendering'
-import type { JiraCreateField, JiraEditableField } from '../../shared/jira-types'
+import type { JiraCreateField, JiraEditableField } from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { apiBasePath, jiraRequest } from './authenticated-request'
 import { clearToken, getClients, isAuthError } from './client'

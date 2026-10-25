@@ -116,8 +116,7 @@ describe('registerTerminalPreviewHandlers', () => {
 
     await expect(resultPromise).resolves.toEqual({
       snapshot: { data: 'screen', cols: 80, rows: 20, seq: 6 },
-      // A sliced suffix is proven post-snapshot output, so it applies with live
-      // kitty semantics rather than as redelivery.
+      // Sequence-proven suffixes retain live kitty semantics.
       replay: [{ data: 'c', mode: 'live' }]
     })
     expect(runtime.registerRawTerminalViewSubscriber).toHaveBeenCalledWith('p1')
@@ -235,9 +234,7 @@ describe('registerTerminalPreviewHandlers', () => {
     expect(sender.send).not.toHaveBeenCalled()
   })
 
-  // Flags and image must come from ONE capture. Publishing flags from
-  // a separate "current state" read would describe a different stream position,
-  // so replaying the intervening bytes could duplicate or reorder transitions.
+  // Image and kitty flags must share a capture boundary to avoid duplicating replayed transitions.
   it('returns the kitty flags of the capture that produced the returned image', async () => {
     const runtime = makeRuntime()
     const snapshotResolvers: ((snapshot: {
@@ -517,7 +514,6 @@ describe('registerTerminalPreviewHandlers', () => {
     expect(runtime.unregisterRemoteDesktopViewer).toHaveBeenCalledWith('p1', 'terminal-preview:1')
     expect(runtime.unsubscribeResize).toHaveBeenCalledBefore(runtime.unregisterRemoteDesktopViewer)
 
-    // A release is one-shot per claim.
     handlers.get('terminalPreview:unsubscribe')!(eventFor(sender), { ptyId: 'p1' })
     expect(runtime.unregisterRemoteDesktopViewer).toHaveBeenCalledTimes(1)
 

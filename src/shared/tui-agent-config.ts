@@ -1,6 +1,6 @@
 import type { TuiAgent } from './tui-agent'
-import type { TuiAgentConfig } from './tui-agent-config-types'
-import { TUI_AGENT_CONFIG_SOURCE, type TuiAgentConfigSource } from './tui-agent-config-table'
+import type { TuiAgentConfig, TuiAgentConfigSource } from './tui-agent-config-types'
+import { TUI_AGENT_CONFIG_SOURCE } from './tui-agent-config-table'
 
 export type {
   AgentPromptInjectionMode,

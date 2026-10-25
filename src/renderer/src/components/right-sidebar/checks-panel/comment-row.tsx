@@ -11,6 +11,7 @@ import { formatPrCommentRelativeTime } from '../../../../../shared/pr-comment-ti
 import { translate } from '@/i18n/i18n'
 import {
   buildCopyText,
+  CommentLocationLabel,
   CommentMoreMenu,
   CopyButton,
   isMutablePRConversationComment,
@@ -40,7 +41,8 @@ export function CommentRow({
   onDeleteComment,
   onOpenCommentInCode,
   onSetReaction,
-  onQueueForAgent
+  onQueueForAgent,
+  onOpenLocation
 }: {
   comment: PRComment
   botAuthorOverrides: ReadonlySet<string>
@@ -65,6 +67,7 @@ export function CommentRow({
     reacted: boolean
   ) => Promise<boolean>
   onQueueForAgent?: () => void
+  onOpenLocation?: (path: string, line: number) => void
 }): React.JSX.Element {
   const automated = isBotPRComment(comment, botAuthorOverrides)
   const canMutateComment = isMutablePRConversationComment(comment)
@@ -211,31 +214,30 @@ export function CommentRow({
             {translate('auto.components.right.sidebar.checks.panel.content.2ba0a32bdd', 'bot')}
           </span>
         ) : null}
-        {comment.path ? (
-          canOpenInCode ? (
-            <button
-              type="button"
-              className={cn(presentation.pathBadge, 'cursor-pointer transition-colors')}
-              title={comment.path}
-              aria-label={translate(
-                'auto.components.right.sidebar.checks.panel.comment.row.5cca1251df',
-                'Show in code'
-              )}
-              onClick={(event) => {
-                event.stopPropagation()
-                handleOpenInCode?.()
-              }}
-            >
-              {comment.path.split('/').pop()}
-              {formatLineRange(comment) && `:${formatLineRange(comment)}`}
-            </button>
-          ) : (
-            <span className={presentation.pathBadge} title={comment.path}>
-              {comment.path.split('/').pop()}
-              {formatLineRange(comment) && `:${formatLineRange(comment)}`}
-            </span>
-          )
-        ) : null}
+        {canOpenInCode && comment.path ? (
+          <button
+            type="button"
+            className={cn(presentation.pathBadge, 'cursor-pointer transition-colors')}
+            title={comment.path}
+            aria-label={translate(
+              'auto.components.right.sidebar.checks.panel.comment.row.5cca1251df',
+              'Show in code'
+            )}
+            onClick={(event) => {
+              event.stopPropagation()
+              handleOpenInCode?.()
+            }}
+          >
+            {comment.path.split('/').pop()}
+            {formatLineRange(comment) && `:${formatLineRange(comment)}`}
+          </button>
+        ) : (
+          <CommentLocationLabel
+            comment={comment}
+            className={presentation.pathBadge}
+            onOpenLocation={onOpenLocation}
+          />
+        )}
         <PRCommentActionBadge
           actionState={actionState}
           isQueued={isQueued}
@@ -276,11 +278,12 @@ export function CommentRow({
             {translate('auto.components.right.sidebar.checks.panel.content.2ba0a32bdd', 'bot')}
           </span>
         )}
-        {!isReply && comment.path && (
-          <span className={presentation.pathBadge}>
-            {comment.path.split('/').pop()}
-            {formatLineRange(comment) && `:${formatLineRange(comment)}`}
-          </span>
+        {!isReply && (
+          <CommentLocationLabel
+            comment={comment}
+            className={presentation.pathBadge}
+            onOpenLocation={onOpenLocation}
+          />
         )}
         {!isReply ? (
           <PRCommentActionBadge

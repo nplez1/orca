@@ -17,7 +17,7 @@ import {
   getSingleJiraProjectScope,
   loadTaskPageJiraProjectStatusOrder
 } from './task-page-jira-status-order'
-import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira-types'
+import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/jira/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
 
 const { jiraGetProjectStatusOrderMock } = vi.hoisted(() => ({

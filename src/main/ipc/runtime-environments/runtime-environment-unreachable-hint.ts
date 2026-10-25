@@ -1,6 +1,5 @@
-/** What to suggest when a server cannot be reached, chosen by the kind of host that owns it. */
-import { isRemoteRuntimeUnreachableMessage } from '../../../shared/remote-runtime-client-error-classification'
-import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
+import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime/remote-runtime-tailscale-hint'
+import { isRemoteRuntimeUnreachableMessage } from '../../../shared/remote-runtime/remote-runtime-client-error-classification'
 import { classifyRuntimeEnvironmentHost } from '../../../shared/runtime-environment-host-kind'
 import {
   isEphemeralVmRuntimeEnvironment,

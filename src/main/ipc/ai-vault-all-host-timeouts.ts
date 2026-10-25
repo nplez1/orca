@@ -22,8 +22,7 @@ export const AI_VAULT_ALL_HOST_TIMEOUT_MS = {
   // all-hosts view; a server reached over an SSH tunnel walks the same home
   // plus the tunnel's latency, so it gets a real scan budget.
   sshTunneledRuntimeScan: 15_000,
-  // A search reads an index rather than walking a home, but it shares the
-  // connection with the scans, so it gets the SSH scan budget.
+  // Indexed search shares the connection with scans, so use the same SSH budget.
   search: 15_000
 } as const
 

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { MutableRefObject } from 'react'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { TaskPageJiraBoardCachedPage } from './task-page-jira-board-cache'
 
 /**

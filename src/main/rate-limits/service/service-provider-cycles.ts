@@ -96,7 +96,7 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
       return
     }
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
-    if (!options?.force && this.shouldSkipAutomatedClaudeFetch(this.state.claude)) {
+    if (!options?.force && this.shouldSkipAutomatedFetch('claude', this.state.claude)) {
       return
     }
     const claudeTarget = this.claudeFetchTarget

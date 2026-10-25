@@ -107,8 +107,6 @@ describe('AiVaultScanCoordinator', () => {
     expect(signals[0]?.aborted).toBe(true)
     expect(start).toHaveBeenCalledTimes(2)
     resolveForced?.(EMPTY_RESULT)
-    // The first caller never asked to cancel, so someone else's Refresh must
-    // hand it the replacement's result instead of a spurious cancellation.
     await expect(Promise.all([first, forced, joined])).resolves.toEqual([
       EMPTY_RESULT,
       EMPTY_RESULT,
@@ -136,7 +134,6 @@ describe('AiVaultScanCoordinator', () => {
 
       expect(start).toHaveBeenCalledTimes(1)
       resolveScan?.(EMPTY_RESULT)
-      // Both callers settle off the single shared scan instead of preempting it.
       await expect(Promise.all([first, second])).resolves.toEqual([EMPTY_RESULT, EMPTY_RESULT])
     } finally {
       vi.useRealTimers()
@@ -167,8 +164,6 @@ describe('AiVaultScanCoordinator', () => {
       expect(signals[0]?.aborted).toBe(true)
       expect(start).toHaveBeenCalledTimes(2)
       resolveSecond?.(EMPTY_RESULT)
-      // The caller stranded on the hung scan rides the replacement out rather
-      // than being told its own refresh was cancelled.
       await expect(Promise.all([stuck, retry])).resolves.toEqual([EMPTY_RESULT, EMPTY_RESULT])
     } finally {
       vi.useRealTimers()

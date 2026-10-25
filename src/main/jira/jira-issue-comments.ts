@@ -1,5 +1,5 @@
 import { requireStrictJiraSite } from './jira-read-failure'
-import type { JiraComment, JiraSite } from '../../shared/jira-types'
+import type { JiraComment, JiraSite } from '../../shared/jira/jira-types'
 import {
   JIRA_IMAGE_MAX_BYTES,
   JIRA_IMAGE_MAX_REFERENCES,
@@ -42,11 +42,7 @@ function mapComment(
   }
 }
 
-/**
- * Pooled comment media collect: attachment metadata JSON stays under the semaphore.
- * Server/DC comment bodies are wiki markup whose images only appear in
- * `renderedBody`, so that HTML is the id source for a self-hosted site.
- */
+/** Keep metadata JSON under the semaphore; Server/DC wiki !filename! media remains unsupported. */
 async function collectCommentMediaRequest(
   client: JiraClientForSite,
   key: string,
@@ -83,8 +79,7 @@ async function collectCommentMediaRequest(
     return undefined
   }
 
-  // Why: comment media usually references issue-level attachments; pull them once
-  // for the whole thread. Use apiBasePath so Server/DC does not 404 on /rest/api/3.
+  // Comment media shares issue attachments; use the site's API version for Server/DC.
   let attachmentField: unknown
   try {
     const issue = await jiraRequest<JiraRecord>(

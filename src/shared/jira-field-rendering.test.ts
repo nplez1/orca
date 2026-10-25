@@ -4,7 +4,7 @@ import {
   resolveJiraFieldControlKind,
   resolveJiraObjectListFieldKind
 } from './jira-field-rendering'
-import type { JiraCreateField } from './jira-types'
+import type { JiraCreateField } from './jira/jira-types'
 
 const GREENHOPPER = 'com.pyxis.greenhopper.jira:jsw-story-points'
 const FLOAT = 'com.atlassian.jira.plugin.system.customfieldtypes:float'

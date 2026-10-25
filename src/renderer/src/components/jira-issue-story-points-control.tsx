@@ -11,7 +11,7 @@ import type {
   JiraIssue,
   JiraIssueUpdate,
   JiraMutationResult
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 
 const TRIGGER_CLASS =
   'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted/40 disabled:opacity-50'

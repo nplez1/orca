@@ -2,26 +2,16 @@ import type { TransferListItem } from 'node:worker_threads'
 import { LazyWorkerThreadHost, type WorkerThreadFactory } from './lazy-worker-thread-host'
 import { WorkerThreadConcurrentRequestRegistry } from './worker-thread-concurrent-request-registry'
 
-/** FIFO request queue plus bounded out-of-band calls for workers that cooperatively yield. */
+/** Serialize worker calls; failures must never move their work onto the main thread. */
 
 export type WorkerThreadRequestQueueOptions<TRequest> = {
   factory: WorkerThreadFactory
   idleTeardownMs: number
   /** Consecutive deaths after which the remaining queue is failed rather than respawned. */
   maxConsecutiveDeaths: number
-  /**
-   * Omit for an unbounded queue; set it where pile-up is itself the bug.
-   * `describeFull` gets the rejected request so the message can name the work
-   * that was dropped, which is the only detail a log has to identify it.
-   */
+  /** Omit for an unbounded queue. */
   queueCap?: { maxQueuedCalls: number; describeFull: (request: TRequest) => string }
-  /**
-   * Marks a message as liveness for the active call rather than its result.
-   * Omit it and `describeTimeout`'s deadline is a wall clock on the whole call;
-   * supply it and the deadline becomes a no-progress window, re-armed by every
-   * progress message the active call sends. Work that is slow but still moving
-   * must not be killed for being slow.
-   */
+  /** Progress messages restart the active call deadline without settling it. */
   isProgress?: (message: { id: number }) => boolean
   transferList?: (request: TRequest) => readonly TransferListItem[]
   /** The client's own error subclass, so callers can tell "no worker" from a fault. */
@@ -29,12 +19,9 @@ export type WorkerThreadRequestQueueOptions<TRequest> = {
   describeTimeout: (timeoutMs: number) => string
   describeExit: (code: number) => string
   describeCrashLoop: (lastError: string) => string
-  /** First spawn failure only; a repeating one must not repeat the log. */
+  /** Called only on the first spawn failure. */
   onUnavailable: (error: unknown) => void
-  /**
-   * Fail calls closed while a terminated worker has yet to exit, instead of
-   * spawning beside it. For workers whose native calls delay termination.
-   */
+  /** Refuse new work until the terminated worker exits; native calls can delay its exit. */
   awaitRetirement?: boolean
 }
 
@@ -89,12 +76,7 @@ export class WorkerThreadRequestQueue<
     })
   }
 
-  /**
-   * Queue one request and resolve with the worker's matching response.
-   * @param buildRequest - Builds the request body around the correlation id this queue stamps.
-   * @param timeoutMs - Deadline measured from dispatch, not from enqueue.
-   * @returns The worker's response; rejects on timeout, crash, or an unspawnable worker.
-   */
+  /** The timeout starts at dispatch, excluding time queued behind other requests. */
   dispatch(
     buildRequest: (id: number) => TRequest,
     timeoutMs: number,
@@ -115,16 +97,14 @@ export class WorkerThreadRequestQueue<
         reject(refused)
         return
       }
-      // Built before the cap check so a rejection can name the dropped work;
-      // the id it burns is only a correlation token, so a gap costs nothing.
+      // Build before checking capacity so a rejection can identify the dropped work.
       const request = buildRequest(this.nextId++)
       const cap = this.options.queueCap
       if (cap && this.queue.length >= cap.maxQueuedCalls) {
         reject(new Error(cap.describeFull(request)))
         return
       }
-      // A fresh burst from full idle starts new work: clear any death count
-      // carried from a prior burst so the respawn cap can't drain it early.
+      // A new unowned burst must not inherit the previous burst's crash count.
       if (!owner && !this.active && this.queue.length === 0) {
         this.consecutiveDeaths = 0
       }
@@ -242,7 +222,6 @@ export class WorkerThreadRequestQueue<
     if (!call || call.request.id !== response.id) {
       return
     }
-    // Liveness, not a result: keep waiting, but restart the no-progress window.
     if (this.options.isProgress?.(response)) {
       this.armDeadline(call)
       return

@@ -21,7 +21,7 @@ import type {
   JiraSprintAssignment,
   JiraTransition,
   JiraUser
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 import {
   JiraIssueEditFieldsDialog,
   type JiraIssueFieldOutcome

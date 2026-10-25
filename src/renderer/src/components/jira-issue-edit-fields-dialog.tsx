@@ -5,7 +5,7 @@ import type {
   JiraFieldErrors,
   JiraIssue,
   JiraUser
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 import {
   isJiraTextAreaField,
   isJiraUserField,

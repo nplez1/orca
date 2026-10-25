@@ -3,7 +3,7 @@ import type {
   JiraConnectionStatus,
   JiraIssue,
   JiraTransition
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 import type { JiraBoardFilter } from '../../../shared/jira-board-view-preferences'
 
 export type TaskPageJiraBoardFilter = JiraBoardFilter

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { textToAdf } from './adf-markdown'
 import { markdownCommentBody, markdownToAdf, markdownToJiraWiki } from './jira-comment-body'
-import type { JiraSite } from '../../shared/jira-types'
+import type { JiraSite } from '../../shared/jira/jira-types'
 
 function site(overrides: Partial<JiraSite> = {}): JiraSite {
   return {

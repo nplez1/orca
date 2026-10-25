@@ -77,15 +77,13 @@ export async function removeRegisteredLocalWorktree(
     assertNestedWorktreeRemovalApproval([refreshedRegisteredWorktree], [args.expectedCheckout])
   }
   try {
-    // Why: an archive hook can race another Git client that locks the row; recheck before linked-path/watcher/terminal teardown.
+    // Archive hooks can race external Git locks; recheck before destructive teardown.
     assertWorktreeUnlockedForRemoval(refreshedRegisteredWorktree)
   } catch (error) {
     throw new Error(formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false))
   }
 
-  // Why: `orca.yaml` shared directories are symlinked in too, and a
-  // directory-only ignore rule leaves those links untracked, so removal must
-  // tolerate and unlink them exactly like the per-user shared paths.
+  // Repo shared-directory symlinks need the same ignore/unlink policy as user-configured shared paths.
   const linkedPaths = getWorktreeSharedLinkPaths(repo)
   const includePaths = await getConfiguredWorktreeIncludePaths(repo.path)
   await removeStaleWorktreeMaterializationStagingDirectories(canonicalWorktreePath, [
@@ -110,7 +108,7 @@ export async function removeRegisteredLocalWorktree(
     if (!isOrphanCompatiblePreflightError(error)) {
       throw new Error(formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false))
     }
-    // Why: Git can still classify this as an orphan after preflight; keep strict PTY teardown before any recursive fallback deletion.
+    // Git may discover orphaning after preflight; recursive fallback still requires strict PTY teardown.
   }
 
   const removalGate = await withWorktreeRemoveStageSpan('watcher_gate', 'local', async () =>
@@ -118,15 +116,13 @@ export async function removeRegisteredLocalWorktree(
   )
   let accepted = false
   try {
-    // Why: hold the watcher/terminal gate through Git and any recursive fallback so no late spawn recreates a native handle.
-    // Linked-path deletion is destructive too, so PTYs must release every handle before Windows or WSL filesystem cleanup starts.
+    // Fence watcher/spawn installs through linked-path cleanup, Git removal and recursive fallback; PTYs must release handles first.
     await withWorktreeRemoveStageSpan('pty_sweep', 'local', async () => {
       await stopPtysForDestructiveWorktreeRemoval(runtime, args.worktreeId, {
         allowUnverifiedStop: args.allowUnverifiedPtyStop
       })
     })
 
-    // Why: preflight only ignored these paths, not mutated them; keep watcher installs fenced through Git removal.
     if (linkedPaths.length > 0) {
       await removeWorktreeLinkedPaths(canonicalWorktreePath, linkedPaths)
     }
@@ -168,8 +164,7 @@ export async function removeRegisteredLocalWorktree(
     runtime.publishWorktreeRemovalChange(repoId)
     return result
   }
-  // Why detached: every refusal above already ran, and Git's 20-35 s delete must finish even when the
-  // request that asked for it goes away; other views read the host's `removing` marker meanwhile.
+  // After acceptance, deletion must survive request cancellation; other views observe the host's removing marker.
   void startBackgroundWorktreeRemoval({
     removal: {
       worktreeId: args.worktreeId,
@@ -247,7 +242,7 @@ async function finishLocalWorktreeRemoval({
         refreshedRegisteredWorktree.head
       )
     } catch (error) {
-      // Why: Git for Windows can deregister a clean worktree before its recursive filesystem deletion fails transiently.
+      // Git for Windows may deregister before recursive filesystem deletion fails.
       const recoveredRemovalResult = await recoverLocalWindowsWorktreeRemoval({
         error,
         force: args.force ?? false,
@@ -282,7 +277,7 @@ async function finishLocalWorktreeRemoval({
         )
       }
     }
-    // Why: the worktree is unlisted from here on; a scan that began before the removal is overtaken.
+    // Successful unlisting overtakes any scan begun before removal.
     runWorktreeChangeInvalidators(repoId)
     removalCompleted = true
   } finally {

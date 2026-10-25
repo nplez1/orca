@@ -5,7 +5,7 @@ import type {
   JiraBoardOverview,
   JiraBoardIssuePageRequest,
   JiraSiteSelection
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import { acquire, release } from './request-queue'
 import { jiraRequest } from './authenticated-request'
 import { clearToken, getClients, getSingleClient, isAuthError } from './client'

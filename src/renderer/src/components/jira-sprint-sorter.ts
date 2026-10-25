@@ -1,4 +1,4 @@
-import type { JiraSprint } from '../../../shared/jira-types'
+import type { JiraSprint } from '../../../shared/jira/jira-types'
 import { compareNumericLocaleText } from '../../../shared/locale-text-collators'
 
 /**

@@ -31,7 +31,9 @@ import {
   SelectItem
 } from '@/components/ui/select'
 import { JiraSchemaFieldControl } from '@/components/jira-schema-field'
+import { isJiraScalarUserCreateField } from '@/components/task-page-jira-create-fields'
 import { TaskPageJiraIssueAssigneeField } from './IssueAssigneeField'
+import { TaskPageJiraIssueUserField } from './IssueUserField'
 export function TaskPageJiraIssueDialog({
   model
 }: {
@@ -264,18 +266,41 @@ export function TaskPageJiraIssueDialog({
                     <label className="text-[11px] font-medium text-muted-foreground">
                       {field.name}
                     </label>
-                    <JiraSchemaFieldControl
-                      field={field}
-                      value={fieldValue}
-                      fallbackToText
-                      onValueChange={(value) =>
-                        setNewJiraIssueCustomFieldValues((prev) => ({
-                          ...prev,
-                          [field.key]: value
-                        }))
-                      }
-                      disabled={newJiraIssueSubmitting}
-                    />
+                    {isJiraScalarUserCreateField(field) && !field.allowedValues?.length ? (
+                      model.jiraTaskSourceContext ? (
+                        <TaskPageJiraIssueUserField
+                          key={JSON.stringify([
+                            model.providerRuntimeContextKey,
+                            newJiraIssueTargetProjectSelectionKey,
+                            newJiraIssueTargetType?.id
+                          ])}
+                          providerSettings={model.jiraTaskSourceContext}
+                          siteId={newJiraIssueTargetProject?.siteId}
+                          value={fieldValue}
+                          onChange={(id) =>
+                            setNewJiraIssueCustomFieldValues((prev) => ({
+                              ...prev,
+                              [field.key]: id
+                            }))
+                          }
+                          disabled={newJiraIssueSubmitting}
+                          label={field.name}
+                        />
+                      ) : null
+                    ) : (
+                      <JiraSchemaFieldControl
+                        field={field}
+                        value={fieldValue}
+                        fallbackToText
+                        onValueChange={(value) =>
+                          setNewJiraIssueCustomFieldValues((prev) => ({
+                            ...prev,
+                            [field.key]: value
+                          }))
+                        }
+                        disabled={newJiraIssueSubmitting}
+                      />
+                    )}
                   </div>
                 )
               })}

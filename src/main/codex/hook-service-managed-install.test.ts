@@ -50,9 +50,6 @@ function localManagedCodexEvents(): string[] {
 }
 
 describe('CodexHookService', () => {
-  // Why (#16441): install promotes in-Orca approvals into ~/.codex/config.toml
-  // and mirrors that file into the managed home, so holding only the runtime
-  // lane still lets it land inside a real-home grant's capture->restore window.
   it('waits for an in-flight mutation of the system config.toml', async () => {
     const systemCodexHome = join(homes.tmpHome, '.codex')
     mkdirSync(systemCodexHome, { recursive: true })
@@ -157,7 +154,6 @@ describe('CodexHookService', () => {
     const status = await new CodexHookService().install(perAccountHome)
     expect(status.state).toBe('installed')
 
-    // Hooks + trust land in THIS account's home.
     const hooksConfig = JSON.parse(readFileSync(join(perAccountHome, 'hooks.json'), 'utf-8')) as {
       hooks: Record<string, unknown>
     }
@@ -166,11 +162,9 @@ describe('CodexHookService', () => {
     expect(trustConfig).toContain('approval_policy = "on-request"')
     expect(trustConfig).toContain(':permission_request:0:0')
 
-    // The shared runtime mirror is never touched by a per-account install.
     expect(existsSync(join(homes.userDataDir, 'codex-runtime-home', 'home', 'hooks.json'))).toBe(
       false
     )
-    // ~/.codex is only read for canonical config, never mutated with hooks.
     expect(existsSync(join(systemCodexHome, 'hooks.json'))).toBe(false)
   })
 
@@ -200,7 +194,6 @@ describe('CodexHookService', () => {
     expect(Object.keys(hooksConfig)).toEqual(['hooks'])
   })
 
-  // #6078: a spaced profile path must still reach the script through Windows' own cmd.exe.
   it.skipIf(process.platform !== 'win32')(
     'wraps the managed hook command when the profile path contains a space (#6078)',
     async () => {
@@ -231,7 +224,6 @@ describe('CodexHookService', () => {
     }
   )
 
-  // Preserve literal-path quoting when constructing commands for shell metacharacters.
   it.skipIf(process.platform !== 'win32')(
     'quotes the script path when the profile contains cmd metacharacters',
     async () => {
@@ -262,9 +254,6 @@ describe('CodexHookService', () => {
     }
   )
 
-  // Why: the common case — a profile path with no spaces or cmd metacharacters
-  // — must launch the .cmd directly with no PowerShell, restoring the pre-#6078
-  // speed that Codex 0.140's synchronous "Running <event> hook" rows expose.
   it.skipIf(process.platform !== 'win32')(
     'launches the managed .cmd directly when the profile path is cmd-safe',
     async () => {
@@ -276,8 +265,7 @@ describe('CodexHookService', () => {
         readFileSync(join(managedCodexHome, 'hooks.json'), 'utf-8')
       ) as { hooks: Record<string, { hooks?: { command?: string }[] }[]> }
 
-      // Why: the temp home is normally cmd-safe; guard so a runner whose tmpdir
-      // holds an exotic character still asserts the correct (fallback) branch.
+      // Runner temp paths can require the quoting fallback too.
       const command = hooksConfig.hooks.Stop?.[0]?.hooks?.[0]?.command ?? ''
       const cmdSafe = /^[A-Za-z0-9_.:\\~-]+$/.test(
         join(homes.tmpHome, HOME_DIRECTORY_NAME, 'agent-hooks')
@@ -293,9 +281,6 @@ describe('CodexHookService', () => {
     }
   )
 
-  // Why: end-to-end proof the curl-based managed script posts the hook to the
-  // local listener with UTF-8 (CJK) payloads and a worktreeId containing spaces
-  // and a `&` — the cases the replaced PowerShell post and form quoting handled.
   it.skipIf(process.platform !== 'win32')(
     'posts hook payloads via the curl-based managed script preserving UTF-8 and spaced metadata',
     async () => {
@@ -303,9 +288,7 @@ describe('CodexHookService', () => {
       const scriptPath = join(homedir(), HOME_DIRECTORY_NAME, 'agent-hooks', 'codex-hook.cmd')
       expect(existsSync(scriptPath)).toBe(true)
 
-      // Why: resolve when the listener has fully read the hook POST. spawnSync
-      // would block the event loop and starve this handler, so the child is
-      // spawned asynchronously while the server drains the request concurrently.
+      // Spawn asynchronously so the same event loop can receive the hook POST.
       let resolveReceived: (value: { headers: Record<string, unknown>; body: string }) => void
       const receivedPromise = new Promise<{
         headers: Record<string, unknown>
@@ -332,10 +315,7 @@ describe('CodexHookService', () => {
           prompt: '你好世界',
           hook_event_name: 'UserPromptSubmit'
         })
-        // Why: this suite may run inside an Orca-launched terminal whose env
-        // already carries ORCA_AGENT_HOOK_ENDPOINT/PORT/TOKEN. The managed
-        // script sources that endpoint file, so leave it out or the hook posts
-        // to the live Orca instead of this test's listener.
+        // Remove inherited Orca endpoints so the hook cannot post to the running app.
         const cleanEnv = { ...process.env }
         for (const key of Object.keys(cleanEnv)) {
           if (key.startsWith('ORCA_')) {

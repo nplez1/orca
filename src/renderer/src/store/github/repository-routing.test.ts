@@ -24,7 +24,11 @@ describe('getRuntimeRepoTarget', () => {
     const remote = makeRepo('repo-runtime', '/repo', 'runtime:env-1')
 
     expect(
-      getRuntimeRepoTarget({ repos: [local, remote] }, '/repo', remoteTarget, 'repo-runtime')?.repo
+      getRuntimeRepoTarget(
+        { repos: [local, remote] },
+        { repoId: 'repo-runtime', repoPath: '/repo' },
+        remoteTarget
+      )?.repo
     ).toBe(remote)
   })
 
@@ -33,7 +37,11 @@ describe('getRuntimeRepoTarget', () => {
     const byId = makeRepo('repo-runtime', '/elsewhere', 'runtime:env-1')
 
     expect(
-      getRuntimeRepoTarget({ repos: [byPath, byId] }, '/repo', remoteTarget, 'repo-runtime')?.repo
+      getRuntimeRepoTarget(
+        { repos: [byPath, byId] },
+        { repoId: 'repo-runtime', repoPath: '/repo' },
+        remoteTarget
+      )?.repo
     ).toBe(byId)
   })
 
@@ -41,21 +49,35 @@ describe('getRuntimeRepoTarget', () => {
     const remote = makeRepo('repo-runtime', '/repo', 'runtime:env-1')
 
     expect(
-      getRuntimeRepoTarget({ repos: [remote] }, '/repo', remoteTarget, 'repo-local')?.repo
+      getRuntimeRepoTarget(
+        { repos: [remote] },
+        { repoId: 'repo-local', repoPath: '/repo' },
+        remoteTarget
+      )?.repo
     ).toBe(remote)
   })
 
   it('refuses when no row belongs to the target host', () => {
     const local = makeRepo('repo-local', '/repo')
 
-    expect(getRuntimeRepoTarget({ repos: [local] }, '/repo', remoteTarget, 'repo-local')).toBeNull()
+    expect(
+      getRuntimeRepoTarget(
+        { repos: [local] },
+        { repoId: 'repo-local', repoPath: '/repo' },
+        remoteTarget
+      )
+    ).toBeNull()
   })
 
   it('runs here for a target that is not a paired server', () => {
     const local = makeRepo('repo-local', '/repo')
 
     expect(
-      getRuntimeRepoTarget({ repos: [local] }, '/repo', { kind: 'local' }, 'repo-local')
+      getRuntimeRepoTarget(
+        { repos: [local] },
+        { repoId: 'repo-local', repoPath: '/repo' },
+        { kind: 'local' }
+      )
     ).toBeNull()
   })
 })

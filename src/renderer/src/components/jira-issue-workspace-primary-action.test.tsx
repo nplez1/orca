@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { JiraIssueWorkspaceHeader } from './jira-issue-workspace-chrome'
 import { JiraIssueWorkspaceContent } from './jira-issue-workspace-content'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 function issue(): JiraIssue {
   return {

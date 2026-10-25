@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const {
   appMock,
@@ -61,7 +62,7 @@ describe('updater', () => {
       quitAndInstall,
       getUpdateStatus
     } = await loadUpdaterModule()
-    setupAutoUpdater(createUpdaterMainWindow(send), {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now(),
       onBeforeQuit,
       onBeforeQuitFailure: 'abort'

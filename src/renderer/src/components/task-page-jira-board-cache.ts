@@ -1,4 +1,4 @@
-import type { JiraBoardOverview, JiraIssue } from '../../../shared/jira-types'
+import type { JiraBoardOverview, JiraIssue } from '../../../shared/jira/jira-types'
 
 // Why: board reads are paged Jira agile calls that cost several round-trips, so the
 // board keeps its last snapshot in memory. Returning to the board renders this

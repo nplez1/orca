@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraCreateField, JiraEditableField, JiraIssue } from '../../../shared/jira-types'
+import type { JiraCreateField, JiraEditableField, JiraIssue } from '../../../shared/jira/jira-types'
 import { JiraIssueEditFieldsDialog } from './jira-issue-edit-fields-dialog'
 
 vi.mock('@/runtime/runtime-jira-client', () => ({

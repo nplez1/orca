@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
-import type { JiraCreateFieldAllowedValue } from '../../../shared/jira-types'
+import type { JiraCreateFieldAllowedValue } from '../../../shared/jira/jira-types'
 import { splitJiraFieldDraft, joinJiraFieldDraft } from '../../../shared/jira-field-draft'
 import {
   findJiraCreateAllowedValue,

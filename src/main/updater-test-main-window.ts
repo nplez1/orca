@@ -50,3 +50,6 @@ export function createUpdaterMainWindow(send: UpdaterSpy = vi.fn()): UpdaterMain
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake carries only the members the updater binds to, guards and sends through.
   return mainWindow as unknown as UpdaterMainWindowFake
 }
+
+// Upstream's tests name the same fake `updaterMainWindow`; keep one implementation.
+export const updaterMainWindow = createUpdaterMainWindow

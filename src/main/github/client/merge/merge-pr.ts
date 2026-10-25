@@ -12,10 +12,6 @@ import type { PullRequestLookupData } from './../lookup/pull-request-lookup-data
 import { derivePullRequestMergeable } from './../lookup/pull-request-lookup-data'
 import { getRestPRByNumber, getPRByNumber } from './../lookup/pr-number-lookup'
 import { STACK_METADATA_UNAVAILABLE_ERROR } from './../lookup/pr-stack-summary-cache'
-/**
- * Merge a PR by number using gh CLI.
- * method: 'merge' | 'squash' | 'rebase' (default: 'squash')
- */
 export async function mergePR(
   repoPath: string,
   prNumber: number,
@@ -90,7 +86,7 @@ export async function mergePR(
       return { ok: false, error: preflight.error }
     }
 
-    // Don't use --delete-branch: it deletes the local branch, which fails while the worktree is checked out on it.
+    // Deleting the local branch fails while its worktree still has it checked out.
     const args = ['pr', 'merge', String(prNumber), `--${method}`]
     if (ownerRepo) {
       args.push('--repo', `${ownerRepo.owner}/${ownerRepo.repo}`)
@@ -192,7 +188,7 @@ export async function getPRMergePreflight(
         adminBypass: false
       }
     }
-    // Why: conflict summaries shell out to local git; skip for SSH repos until that helper routes through the SSH provider.
+    // Conflict derivation uses local Git and cannot inspect SSH-backed repositories.
     if (
       connectionId ||
       pr.mergeable !== 'CONFLICTING' ||

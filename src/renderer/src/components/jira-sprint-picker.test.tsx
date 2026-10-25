@@ -3,7 +3,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraSprint } from '../../../shared/jira-types'
+import type { JiraSprint } from '../../../shared/jira/jira-types'
 import { JiraSprintPicker } from './jira-sprint-picker'
 
 vi.mock('@/i18n/i18n', () => ({

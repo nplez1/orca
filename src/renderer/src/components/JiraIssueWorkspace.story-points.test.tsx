@@ -11,7 +11,7 @@ import {
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { JiraEditableField } from '../../../shared/jira-types'
+import type { JiraEditableField } from '../../../shared/jira/jira-types'
 
 const POINTS_FIELD_KEY = 'customfield_10016'
 

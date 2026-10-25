@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const { autoUpdaterMock, fetchNewerReleaseTagsMock, moduleFactories, resetUpdaterMocks } =
   await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
@@ -43,8 +43,7 @@ function holdFirstPreflight(): (value: FeedResult) => void {
 
 async function setup() {
   const updater = await loadUpdaterModule()
-  const mainWindow = createUpdaterMainWindow()
-  updater.setupAutoUpdater(mainWindow, { getLastUpdateCheckAt: () => Date.now() })
+  updater.setupAutoUpdater(updaterMainWindow(vi.fn()), { getLastUpdateCheckAt: () => Date.now() })
   return updater
 }
 

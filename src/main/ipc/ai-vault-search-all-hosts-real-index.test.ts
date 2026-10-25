@@ -13,11 +13,7 @@ import type { AiVaultSearchResponse } from '../../shared/ai-vault-search-types'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import { searchAllExecutionHosts, type SessionSearchHostLeg } from './ai-vault-search-all-hosts'
 
-/**
- * Three real indexes over real transcripts, wired as three legs. Everything a
- * merged page claims — every hit exactly once, a purge fencing one host, an
- * unreachable host retried — is checked against the hit sets the indexes hold.
- */
+/** Verify merged hit sets, purge fencing and retries against three independent real transcript indexes. */
 
 const HOST_IDS = ['local', 'ssh:alpha', 'ssh:beta'] as const
 const SESSIONS_PER_HOST = [14, 13, 13] as const
@@ -39,8 +35,7 @@ async function writeSession(harness: SessionSearchIndexerHarness, index: number)
   const sessionId = sessionIdFor(index)
   const path = join(harness.claudeProjectDir, `${sessionId}.jsonl`)
   await mkdir(harness.claudeProjectDir, { recursive: true })
-  // A distinct start index per session gives every hit in the fixture its own
-  // `updatedAt`, so the newest-first order across hosts is total.
+  // Give every hit a distinct timestamp to make cross-host ordering total.
   const lines = claudeLines([`needle transcript ${index}`], sessionId, index * 2)
   await writeFile(path, `${lines.join('\n')}\n`)
   return sessionId
@@ -154,7 +149,6 @@ it('orders a newest merge by recency across hosts, newest first', async () => {
   )
   const updated = response.hits.map((hit) => hit.updatedAt)
   expect(updated).toEqual([...updated].sort().toReversed())
-  // The 20 newest of the 40 are the 20 highest session indexes, which span hosts.
   expect(new Set(response.hits.map((hit) => hit.executionHostId)).size).toBeGreaterThan(1)
 })
 
@@ -175,7 +169,6 @@ it('fences the purged host and keeps the other two paginating', async () => {
   const first = resultsOf(await searchAllExecutionHosts(request, legs()))
   expect(first.hosts?.every((host) => host.outcome === 'searched')).toBe(true)
 
-  // A real purge: the transcript is gone and a full reconcile publishes that.
   const purged = hosts[2]!
   await rm(join(purged.harness.claudeProjectDir, `${purged.sessionIds[0]!}.jsonl`))
   await purged.instance.reconcile()
@@ -196,11 +189,10 @@ it('fences the purged host and keeps the other two paginating', async () => {
     const page = resultsOf(await searchAllExecutionHosts({ ...request, cursor }, legs()))
     seen.push(...keysOf(page))
     cursor = page.page.cursor
-    // A merge that never retires a host would page for ever; fail instead.
+    // Fail boundedly if a host is never retired.
     expect((pages += 1)).toBeLessThan(40)
   }
-  // Beta contributed only what it handed out before the purge; nothing repeats,
-  // and both healthy hosts finished their own hit sets.
+  // Purged beta retains only previously emitted hits; healthy hosts finish without duplicates.
   expect(new Set(seen).size).toBe(seen.length)
   const betaEmitted = keysOf(first).filter((key) => key.startsWith('ssh:beta/'))
   expect([...seen].sort()).toEqual(
@@ -248,7 +240,7 @@ it('reports an unreachable host, keeps hasMore, and picks it up on the retry', a
     const page = resultsOf(await searchAllExecutionHosts({ ...request, cursor }, legs()))
     seen.push(...keysOf(page))
     cursor = page.page.cursor
-    // A merge that never retires a host would page for ever; fail instead.
+    // Fail boundedly if a host is never retired.
     expect((pages += 1)).toBeLessThan(40)
   }
   expect(new Set(seen).size).toBe(seen.length)

@@ -1,4 +1,4 @@
-import type { JiraBoard, JiraBoardSelection } from '../../../../shared/jira-types'
+import type { JiraBoard, JiraBoardSelection } from '../../../../shared/jira/jira-types'
 import type { SettingsComboboxOption } from './SettingsCombobox'
 
 export function boardOptionValue(board: Pick<JiraBoard, 'siteId' | 'id'>): string {

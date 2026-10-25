@@ -6,7 +6,7 @@ export {
   JIRA_USER_FIELDS_UPDATE_REQUIRED_MESSAGE,
   JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
   JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY
-} from './jira-detail-capabilities'
+} from './jira/jira-detail-capabilities'
 // Why: a host without this ignores the textFieldKeys the value shaping relies on,
 // so a plain textarea value would reach Cloud and be rejected. The client falls
 // back to the ADF shape those older hosts already handled.

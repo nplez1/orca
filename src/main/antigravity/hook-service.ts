@@ -40,8 +40,6 @@ import {
 } from './hooks-json-bundle'
 
 function getConfigPath(): string {
-  // Why: Antigravity's hook docs define global hooks in ~/.gemini/config/hooks.json,
-  // not in the CLI settings file used by Gemini CLI.
   return join(homedir(), '.gemini', 'config', 'hooks.json')
 }
 
@@ -61,7 +59,7 @@ function getPosixManagedCommand(scriptPath: string, event: AntigravityEvent): st
   const command = wrapPosixHookCommand(
     scriptPath,
     { ORCA_ANTIGRAVITY_EVENT: event.eventName },
-    // Why: a missing managed script must not brick tools; the guard answers PreToolUse itself instead of staying silent.
+    // Keep tools usable if the managed script disappears: silence denies PreToolUse.
     event.eventName === 'PreToolUse' ? { fallbackStdout: ANTIGRAVITY_PRE_TOOL_USE_DECISION } : {}
   )
   // ACP hosts tokenize the command into argv; the shell must be the executable, not `if`.
@@ -186,8 +184,7 @@ export class AntigravityHookService {
     }
     writeManagedScript(scriptPath, getManagedScript('local', runtimePath))
     if (process.platform === 'win32') {
-      // Why: Antigravity wraps hook commands in cmd.exe. Keeping event env
-      // setup inside event-specific .cmd files avoids nested hooks.json quotes.
+      // Event wrappers avoid nested quoting in cmd.exe hook commands.
       for (const event of ANTIGRAVITY_EVENTS) {
         writeManagedScript(
           getWindowsWrapperScriptPath(event),

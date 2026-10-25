@@ -21,14 +21,14 @@ import {
   classifyTransitionRequirements,
   transitionAllowedValueKey,
   transitionAllowedValueLabel
-} from '../../../shared/jira-transition-fields'
+} from '../../../shared/jira/jira-transition-fields'
 import type {
   JiraCreateField,
   JiraFieldErrors,
   JiraIssueUpdate,
   JiraTransition,
   JiraUser
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 
 export type JiraTransitionSubmitOutcome =
   | { ok: true }

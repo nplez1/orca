@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import type { JiraBoardIssuePage, JiraIssue } from '../../../shared/jira-types'
+import type { JiraBoardIssuePage, JiraIssue } from '../../../shared/jira/jira-types'
 
 function nextStartAt(page: JiraBoardIssuePage): number {
   return page.startAt + page.issues.length

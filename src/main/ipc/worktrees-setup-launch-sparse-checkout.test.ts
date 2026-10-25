@@ -263,7 +263,6 @@ describe('registerWorktreeHandlers', () => {
         sparsePresetId: 'preset-1'
       })
     })
-    // A sparse create can never claim a prepared checkout; say so rather than looking like a miss.
     expect(result.timing?.preparedCheckout).toEqual({
       status: 'miss',
       reason: 'sparse_checkout'

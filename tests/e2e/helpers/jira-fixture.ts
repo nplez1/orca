@@ -1,5 +1,5 @@
 import type { Page } from '@stablyai/playwright-test'
-import type { JiraIssue } from '../../../src/shared/jira-types'
+import type { JiraIssue } from '../../../src/shared/jira/jira-types'
 import { waitForSessionReady } from './store'
 
 export const ISSUE_TITLE = 'Keep planning notes visible while switching between project tasks'

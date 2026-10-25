@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira-types'
+import type { JiraConnectionStatus, JiraIssue, JiraUser } from '../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import JiraIssueWorkspace from './JiraIssueWorkspace'

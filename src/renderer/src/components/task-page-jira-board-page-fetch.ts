@@ -1,4 +1,4 @@
-import type { JiraBoardIssuePage } from '../../../shared/jira-types'
+import type { JiraBoardIssuePage } from '../../../shared/jira/jira-types'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { jiraListBoardIssues } from '@/runtime/runtime-jira-client'
 import type { TaskPageJiraBoardCachedPage } from './task-page-jira-board-cache'

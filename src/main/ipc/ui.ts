@@ -1,9 +1,9 @@
-import { normalizeJiraQuickFilterState } from '../../shared/jira-quick-filters'
+import { normalizeJiraQuickFilterState } from '../../shared/jira/jira-quick-filters'
 import { JiraQuickFilterStateParam } from '../../shared/rpc-contract/jira-quick-filter-params'
 import {
   normalizeJiraSavedFilterState,
   mutateJiraSavedFilterState
-} from '../../shared/jira-saved-filters'
+} from '../../shared/jira/jira-saved-filters'
 import { JiraSavedFilterMutationParam } from '../../shared/rpc-contract/jira-saved-filter-params'
 import { BrowserWindow, ipcMain, webContents, type WebContents } from 'electron'
 import type { Store } from '../persistence'
@@ -34,7 +34,7 @@ export function sendToTrustedUIRenderer(
 export function getTrustedUIRendererWebContents(
   excludedWebContentsId?: number
 ): WebContents | null {
-  // Why: exact targeting avoids waking retained browser/utility windows that cannot consume app UI events.
+  // Target only trusted app UI; retained browser/utility windows cannot consume these events.
   const rendererId = trustedUIRendererWebContentsId
   if (rendererId == null || rendererId === excludedWebContentsId) {
     return null
@@ -100,8 +100,7 @@ export function registerUIHandlers(store: Store): void {
     if (!isTrustedUIRenderer(event.sender)) {
       return
     }
-    // Why: coordinated renderer paste falls back here only after no Orca owner
-    // claims the app-menu action; paste back into the requesting window only.
+    // Unclaimed app-menu paste falls back only to the requesting window.
     const webContents = BrowserWindow.fromWebContents(event.sender)?.webContents
     if (options?.mode === 'paste-and-match-style') {
       webContents?.pasteAndMatchStyle()
@@ -141,7 +140,6 @@ export function isTrustedUIRenderer(sender: WebContents): boolean {
     }
   }
 
-  // Why: packaged fallback must be tied to the created main window id, not any
-  // file:// document that can obtain this IPC channel.
+  // Packaged fallback requires the registered main-window ID, not arbitrary file documents.
   return false
 }

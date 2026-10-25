@@ -77,6 +77,17 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
     }
   }
 
+  /** Runs a pending trailing-edge scan now, so a reader never judges blocked text its stamp lags. */
+  protected flushPendingWaitBlockedCheck(ptyId: string): void {
+    const state = this.waitBlockedCheckStateByPtyId.get(ptyId)
+    if (!state?.timer) {
+      return
+    }
+    clearTimeout(state.timer)
+    state.timer = null
+    this.runWaitBlockedCheck(ptyId, state, Date.now())
+  }
+
   protected runWaitBlockedCheck(ptyId: string, state: WaitBlockedCheckState, at: number): void {
     const pty = this.ptysById.get(ptyId)
     if (!pty) {
@@ -101,6 +112,13 @@ export abstract class OrcaRuntimeWithScheduleWaitBlockedCheck extends OrcaRuntim
       )
     ) {
       pty.waitBlockedAt = at
+      // Why: a trailing-edge stamp lands after onPtyData copied this PTY's stamp to its mirroring
+      // leaves, and a pane-backed wait reads the leaf's, so a blocker painted last went unstamped.
+      for (const leaf of this.getLeavesForPty(ptyId)) {
+        if (leaf.tailBuffer === pty.tailBuffer) {
+          leaf.waitBlockedAt = at
+        }
+      }
       this.recordAgentPromptPermissionObservation(ptyId)
       // Why only these reasons: a startup, trust or update dialog is not a wait on a person, and
       // the store's corroboration reads the same blocked-text layer this scan just matched.

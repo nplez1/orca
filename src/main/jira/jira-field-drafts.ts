@@ -1,6 +1,6 @@
 import { joinJiraFieldDraft } from '../../shared/jira-field-draft'
 import { resolveJiraFieldControlKind } from '../../shared/jira-field-rendering'
-import type { JiraCreateField, JiraEditableField, JiraUser } from '../../shared/jira-types'
+import type { JiraCreateField, JiraEditableField, JiraUser } from '../../shared/jira/jira-types'
 import { adfToMarkdownText } from './adf-markdown'
 import { asRecord, asString } from './jira-record-pages'
 

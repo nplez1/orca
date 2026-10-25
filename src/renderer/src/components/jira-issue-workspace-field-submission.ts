@@ -1,6 +1,6 @@
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-target'
-import type { JiraFieldErrors, JiraIssue } from '../../../shared/jira-types'
+import type { JiraFieldErrors, JiraIssue } from '../../../shared/jira/jira-types'
 import { translate } from '@/i18n/i18n'
 
 /** Applies a custom-field edit and reports Jira's own rejection reasons back to

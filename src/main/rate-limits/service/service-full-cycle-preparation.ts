@@ -106,7 +106,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const miniMaxConfigChanged = currentMiniMaxConfigHash !== this.lastMiniMaxConfigHash
     const miniMaxGeneration = this.syncMiniMaxFetchGeneration(currentMiniMaxConfigHash)
 
-    const antigravityUsageEnabled = this.antigravityUsageEnabledResolver?.() ?? true
+    const antigravityFetchAllowed =
+      (this.antigravityUsageEnabledResolver?.() ?? true) &&
+      (options?.force || !this.shouldSkipAutomatedFetch('antigravity', previousState.antigravity))
 
     const zcodePlanConfigResult = this.resolveZcodePlanConfig()
     const zcodePlanApiKey = zcodePlanConfigResult.config.apiKey
@@ -138,7 +140,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       previousState,
       codexFetchGated,
       codexStateBeforeFetch,
-      antigravityUsageEnabled,
+      antigravityUsageEnabled: antigravityFetchAllowed,
       changed: {
         opencodeGo: opencodeConfigChanged,
         minimax: miniMaxConfigChanged,
@@ -167,13 +169,10 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     )
 
     // Hidden meters avoid the CLI spawn; the separate promise keeps other providers responsive.
-    const antigravityResultPromise = (
-      antigravityUsageEnabled
+    const antigravityResultPromise = trackSettledProviderResult(
+      antigravityFetchAllowed
         ? fetchAntigravityRateLimits({ signal })
         : Promise.resolve(previousState.antigravity ?? antigravityUsageDisabledSnapshot())
-    ).then(
-      (value) => ({ status: 'fulfilled', value }) as const,
-      (reason) => ({ status: 'rejected', reason }) as const
     )
 
     const missingWslCodexHome =
@@ -185,9 +184,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         )
       : trackSettledProviderResult(Promise.resolve(this.disabledUsageProviderSnapshot('grok')))
 
-    // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
+    // Why: automated checks must honor the endpoint's Retry-After even when live display is available.
     const claudeFetchGated =
-      !options?.force && this.shouldSkipAutomatedClaudeFetch(previousState.claude)
+      !options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude)
 
     const [
       claudeResult,

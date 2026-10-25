@@ -18,7 +18,7 @@ import {
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { isRemoteRuntimeUnreachableMessage } from '../../../../../../shared/remote-runtime-client-error-classification'
+import { isRemoteRuntimeUnreachableMessage } from '../../../../../../shared/remote-runtime/remote-runtime-client-error-classification'
 import { isEphemeralVmRuntimeEnvironment } from '../../../../../../shared/runtime-environments'
 import {
   ARCHIVE_HOOK_FAILED_REMOVAL_PREFIX,

@@ -115,7 +115,7 @@ describe('Copilot hook normalization', () => {
     expect(result?.payload.prompt).toBe('raw prompt payload')
   })
 
-  it('captures initialPrompt from Copilot sessionStart payloads', () => {
+  it('infers a prompt from initialPrompt without an event name', () => {
     const result = _internals.normalizeHookPayload(
       'copilot',
       buildBody({ initialPrompt: 'first prompt' }),
@@ -448,7 +448,7 @@ describe('Copilot hook normalization', () => {
       }),
       'production'
     )
-    // Why: keeping toolName would let the compact sidebar show the tool instead of the failure text, hiding the error.
+    // A retained tool name would hide the failure text in compact status cards.
     expect(failed?.payload).toMatchObject({
       state: 'working',
       lastAssistantMessage: 'command not found'
@@ -581,15 +581,18 @@ describe('Copilot hook normalization', () => {
   })
 
   it('later progress clears a prior blocked state for the same pane', () => {
-    _internals.normalizeHookPayload(
+    const blocked = _internals.normalizeHookPayload(
       'copilot',
       buildBody({
-        hook_event_name: 'PermissionRequest',
+        hook_event_name: 'Notification',
+        notification_type: 'permission_prompt',
+        message: 'Allow Bash to run?',
         tool_name: 'bash',
         tool_input: { command: 'pnpm build' }
       }),
       'production'
     )
+    expect(blocked?.payload.state).toBe('blocked')
     const result = _internals.normalizeHookPayload(
       'copilot',
       buildBody({

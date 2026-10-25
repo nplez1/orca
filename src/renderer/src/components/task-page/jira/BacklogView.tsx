@@ -1,4 +1,4 @@
-import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/jira-types'
+import type { JiraIssue, JiraProjectStatusOrder } from '../../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import type { useTaskPageJiraBoard } from '../../use-task-page-jira-board'

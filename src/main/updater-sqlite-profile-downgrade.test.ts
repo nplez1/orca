@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const { appMock, autoUpdaterMock, chooseLocalBuildMock, moduleFactories, resetUpdaterMocks } =
   await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
@@ -30,7 +30,7 @@ describe('updater SQLite downgrade protection', () => {
         appMock.getVersion.mockReturnValue('1.4.221')
         const send = vi.fn()
         const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
-        setupAutoUpdater(createUpdaterMainWindow(send), {
+        setupAutoUpdater(updaterMainWindow(send), {
           getLastUpdateCheckAt: () => Date.now()
         })
         autoUpdaterMock.setFeedURL.mockClear()
@@ -58,7 +58,7 @@ describe('updater SQLite downgrade protection', () => {
       chooseLocalBuildMock.mockResolvedValue({ version: '1.4.213', close })
       const send = vi.fn()
       const { setupAutoUpdater, checkForUpdatesFromMenu } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(send), {
+      setupAutoUpdater(updaterMainWindow(send), {
         getLastUpdateCheckAt: () => Date.now()
       })
       checkForUpdatesFromMenu({ localBuild: true })

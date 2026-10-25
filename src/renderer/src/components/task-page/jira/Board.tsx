@@ -4,7 +4,7 @@ import type {
   JiraBoardSelection,
   JiraIssue,
   JiraProjectStatusOrder
-} from '../../../../../shared/jira-types'
+} from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraBoardModel } from '../../task-page-jira-board-types'
 export type { TaskPageJiraBoardModel } from '../../task-page-jira-board-types'
 import { useTaskPageJiraBoard } from '../../use-task-page-jira-board'

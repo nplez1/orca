@@ -52,7 +52,6 @@ const store = {
   getProfileStorageDirectory: () => join(tmpdir(), 'orca-scan-cache-test')
 } as never
 
-/** Each listing must miss the TTL cache, the way a renderer poll past the window does. */
 function advancePastListingTtl(): void {
   vi.setSystemTime(Date.now() + DETECTED_WORKTREE_SCAN_CACHE_TTL_MS + 1)
 }
@@ -123,7 +122,7 @@ describe('detected worktree scan hygiene gate', () => {
     advancePastListingTtl()
     expect((await listDetectedGitWorktrees(store, repo)).hygieneDue).toBe(false)
 
-    // An external `git worktree remove` nobody notified us about.
+    // Model an external removal with no change notification.
     listRepoWorktreesMock.mockResolvedValue([worktreeAt(repo.path), worktreeAt('/repos/one-wt')])
     advancePastListingTtl()
     await listDetectedGitWorktrees(store, repo)
@@ -145,7 +144,7 @@ describe('detected worktree scan hygiene gate', () => {
 
     expect(pruneMetadataMock).not.toHaveBeenCalled()
     expect(pruneLineageMock).not.toHaveBeenCalled()
-    // Authorized roots are listing state, not hygiene; they must still be refreshed.
+    // Authorization is listing state and refreshes even when hygiene is skipped.
     expect(registerWorktreeRootsMock).toHaveBeenCalledTimes(1)
   })
 

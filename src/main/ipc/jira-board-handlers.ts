@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { JiraBoardIssuePageRequest, JiraSiteSelection } from '../../shared/jira-types'
+import type { JiraBoardIssuePageRequest, JiraSiteSelection } from '../../shared/jira/jira-types'
 import {
   getBoardOverview,
   getIssueSprintAssignment,

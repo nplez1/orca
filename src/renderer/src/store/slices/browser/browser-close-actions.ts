@@ -185,6 +185,7 @@ export function createBrowserCloseActions(
             recentlyClosedBrowserPagesByWorkspace: nextRecentlyClosedBrowserPagesByWorkspace,
             remoteBrowserPageHandlesByPageId: nextRemoteBrowserPageHandlesByPageId,
             browserCertificateFailuresByPageId: nextBrowserCertificateFailuresByPageId,
+            browserAudioMutedTabIds: omitRecordKeys(s.browserAudioMutedTabIds, [tabId]),
             browserAnnotationsByPageId: nextBrowserAnnotationsByPageId,
             browserAnnotationMarkerIdsByPageId: nextBrowserAnnotationMarkerIdsByPageId
           }

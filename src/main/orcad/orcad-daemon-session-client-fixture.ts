@@ -9,9 +9,9 @@ export async function buildDaemonSessionClient(outfile: string): Promise<void> {
   await build({
     stdin: {
       contents: `
-        import { DaemonPtyAdapter } from './src/main/daemon/daemon-pty-adapter'
-        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from './src/main/daemon/daemon-spawner'
-        import { setAppEnvironment } from './src/shared/app-environment'
+        import { DaemonPtyAdapter } from '../daemon/daemon-pty-adapter'
+        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from '../daemon/daemon-spawner'
+        import { setAppEnvironment } from '../../shared/app-environment'
         const [op, runtimeDir, sessionId, marker, cwd] = process.argv.slice(2)
         setAppEnvironment({
           getPath: () => cwd, getAppPath: () => cwd, getVersion: () => 'test', isPackaged: () => true,

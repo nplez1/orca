@@ -15,7 +15,7 @@ import type {
   JiraProjectStatusOrder,
   JiraSiteSelection,
   JiraSprintAssignment
-} from '../../shared/jira-types'
+} from '../../shared/jira/jira-types'
 import type { PreloadApi } from '../api-types'
 
 export const jiraApi = {

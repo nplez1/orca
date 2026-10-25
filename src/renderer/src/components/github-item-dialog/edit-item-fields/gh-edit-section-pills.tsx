@@ -1,6 +1,6 @@
 import type { GitHubAssignableUser } from '../../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
-import type { TaskPageGitHubCloseAction } from '@/components/task-page-github-status-actions'
+import type { TaskPageGitHubCloseAction } from '@/components/task-page/github/task-page-github-status-actions'
 import { GHEditSectionStatusPopover } from './gh-edit-section-status-popover'
 import { GHEditSectionAssigneesPill } from './gh-edit-section-assignees'
 import { GHEditSectionLabelsPill } from './gh-edit-section-labels'

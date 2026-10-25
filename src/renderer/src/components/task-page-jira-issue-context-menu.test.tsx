@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
 import { TaskPageJiraIssueList } from './task-page-jira-issue-list'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 
 const openUrl = vi.fn()
 const writeClipboardText = vi.fn().mockResolvedValue(undefined)

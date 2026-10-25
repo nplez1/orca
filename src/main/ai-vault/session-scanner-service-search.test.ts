@@ -22,12 +22,6 @@ import {
   type AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
 
-/**
- * The child, booted the way a spawn boots it: an init frame and messages, with
- * no renderer, no Electron and no scan request. What this proves is that consent
- * alone constructs the indexer and that every search answer crosses the protocol.
- */
-
 const SESSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 
 let harness: SessionSearchIndexerHarness
@@ -40,7 +34,6 @@ function emit(message: AiVaultServiceParentMessage): void {
   process.emit('message', message, undefined)
 }
 
-/** One request, and the reply the child sent for it, still discriminated by operation. */
 async function call(body: AiVaultServiceRequestBody): Promise<AiVaultServiceResultValue> {
   const id = nextId++
   emit({ ...body, id })

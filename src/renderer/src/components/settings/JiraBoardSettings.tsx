@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { runtimeHostIdFromEnvironmentId } from '../../../../shared/task-source-context'
-import type { JiraBoard, JiraSiteSelection } from '../../../../shared/jira-types'
+import type { JiraBoard, JiraSiteSelection } from '../../../../shared/jira/jira-types'
 import { Button } from '@/components/ui/button'
 import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { Label } from '@/components/ui/label'

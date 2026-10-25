@@ -8,7 +8,7 @@ import { isGitRepoKind } from '../../../../shared/repo-kind'
 import {
   buildSetupHostOptions,
   type SetupHostOption
-} from '@/components/settings/repository-host-setup-options'
+} from '@/components/settings/repository/execution/repository-host-setup-options'
 import { getRepositoryHostSetupsSectionId } from '@/components/settings/repository-settings-targets'
 import { useConfiguredExecutionHostOptions } from '@/hooks/use-configured-execution-host-options'
 

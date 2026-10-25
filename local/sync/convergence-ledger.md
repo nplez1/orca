@@ -794,6 +794,20 @@ collector and `use-merged-sidebar-rows.ts` took the merge policy plus its depend
 2026-10-15 sync — upstream keeps a file at the budget, so the fork's addition is the line that
 moves.
 
+**2026-10-25 addendum.** The merge of `0571e45107` left seven files over budget, none of it
+duplicated comment text (comments do not count toward the cap), so each was split or deduplicated:
+`claude-status-line-slot.ts` took the status-line slot policy out of `src/main/claude/hook-settings.ts`;
+`service-full-cycle-preparation.ts` now wraps the Antigravity promise in the existing
+`trackSettledProviderResult` instead of an inline copy of it; `comments-display-mode-menu.tsx` took
+the triage/timeline dropdown out of `comments-list.tsx`; `agent-status-assistant-text-source.ts` took
+the generated `extractAssistantText` out of `src/main/pi/agent-status-handler-source.ts` (byte-identical
+output); `settings-update-telemetry.ts` took the `settings_changed` and `agent_dashboard_enabled`
+emitters out of `src/main/ipc/settings.ts`; `worktree-set-parent-selector.ts` took upstream's new
+`worktree set` folder-parent and selector-recovery text out of `src/cli/handlers/worktree.ts`
+(upstream sits at exactly 300; the fork's Jira link is the overflow); and
+`index-project-setup-test-fixtures.ts` took the project fixtures and a `legacyProjectSetup` builder
+out of `src/cli/index-project-setup.test.ts`.
+
 ---
 
 ## The Jira product line: upstream's shape, the fork's extra capabilities

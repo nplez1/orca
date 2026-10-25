@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 import { ArrowRight, ExternalLink, FolderOpen } from 'lucide-react'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 import {
   buildJiraIssueRowWorkspaceAction,
   getJiraIssueRowActions,

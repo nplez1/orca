@@ -80,7 +80,7 @@ it('accepts what it produces and refuses what it does not', () => {
   expect(AiVaultSearchSettingsSchema.safeParse({ historyDays: null }).success).toBe(false)
 })
 
-it('treats an unchanged policy as unchanged so a re-save never restarts the index', () => {
+it('compares both enabled state and history bounds', () => {
   expect(
     sameAiVaultSearchSettings(
       { contentEnabled: true, historyDays: 30 },

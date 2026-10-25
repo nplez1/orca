@@ -11,18 +11,5 @@
     "Entries are therefore per sync: a previous sync's acknowledgements are pruned once their deletion is",
     "no longer part of the tip..HEAD range."
   ],
-  "acknowledged": {
-    "mobile/src/session/mobile-native-chat-page-anchoring.ts": {
-      "supersededBy": "mobile/src/session/mobile-native-chat-scroll-anchoring.ts (MobileNativeChatScrollAnchoring)",
-      "reason": "Upstream renamed the page-level anchoring helper to scroll-box terms in this sync (#31339): the merge carries the file as a rename (R078) and only the class name changed, so nothing left with the old name."
-    },
-    "mobile/src/session/mobile-native-chat-page-motion.ts": {
-      "supersededBy": "mobile/src/session/mobile-native-chat-scroll-motion.ts (MobileNativeChatScrollMotion, scrollKeepsPlace, scrollWritesStopMomentum)",
-      "reason": "Same upstream rename: `MobileNativeChatPageObservation` and `pageKeepsPlace` became the scroll-box names (`scrollKeepsPlace`), and the file moved as a rename (R076) with its body intact."
-    },
-    "src/renderer/src/components/use-task-page-gitlab-loading.ts": {
-      "supersededBy": "src/renderer/src/components/task-page/gitlab/use-task-page-gitlab-loading.ts (useTaskPageGitLabLoading, GITLAB_TASK_FETCH_CONCURRENCY)",
-      "reason": "Upstream grouped the task-page GitLab modules under `task-page/gitlab/`; the hook moved as a rename (R092) with both live exports. The fork's `TaskPageGitLabLoadingModel` alias has no importer anywhere in the merged tree, which is why its absence is not a loss."
-    }
-  }
+  "acknowledged": {}
 }

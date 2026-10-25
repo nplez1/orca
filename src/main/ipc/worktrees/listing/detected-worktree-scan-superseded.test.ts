@@ -31,8 +31,13 @@ const {
   listDetectedGitWorktrees
 } = await import('./detected-worktree-scan-cache')
 
-// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the scan reads only id, path and connectionId off the repo row.
-const repo = { id: 'repo-1', path: '/repos/one', displayName: 'one' } as Repo
+const repo: Repo = {
+  id: 'repo-1',
+  path: '/repos/one',
+  displayName: 'one',
+  badgeColor: '#000',
+  addedAt: 0
+}
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the scan calls only the expectation capture; the metadata prune it feeds is mocked above.
 const store = {
   captureNativeLocalWorktreeMetadataScanExpectation: () => ({
@@ -47,7 +52,6 @@ function worktreeAt(path: string): GitWorktreeInfo {
   return { path, head: 'abc', branch: 'main', isBare: false, isMainWorktree: path === repo.path }
 }
 
-/** A scan whose settlement the test controls, so a mutation can land while it is in flight. */
 function deferredScan(): { promise: Promise<GitWorktreeInfo[]>; settle: () => void } {
   let settle!: () => void
   const promise = new Promise<GitWorktreeInfo[]>((resolve) => {
@@ -56,9 +60,7 @@ function deferredScan(): { promise: Promise<GitWorktreeInfo[]>; settle: () => vo
   return { promise, settle }
 }
 
-// Why this suite exists: a worktree created while a listing ran is absent from that listing, and the
-// renderer reads an authoritative absence as a deletion. The scan must carry the fact that a mutation
-// overtook it, for the runner AND for every caller that joined it.
+// Both scan owners and joiners must reject overtaken rows that could falsely delete newly created worktrees.
 describe('detected worktree scan supersession', () => {
   beforeEach(() => {
     listRepoWorktreesMock.mockReset()
@@ -79,7 +81,6 @@ describe('detected worktree scan supersession', () => {
     const joiner = listDetectedGitWorktrees(store, repo)
     expect(listRepoWorktreesMock).toHaveBeenCalledTimes(1)
 
-    // A create finished while the scan was running.
     invalidateDetectedWorktreeScanCache(repo.id)
     inFlight.settle()
 

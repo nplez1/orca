@@ -34,8 +34,7 @@ export async function prepareLocalWorktreeRootForRepo(
       repo.path,
       getWorktreePathSettings(repo, store.getSettings(), getWorktreeMirrorDistro(store, repo))
     )
-    // Why: mkdir touches the current root to preflight macOS TCC, while
-    // access remains scoped by recomputed settings instead of a permanent grant.
+    // Touch the current root to preflight macOS TCC; recomputed settings still scope access.
     await mkdir(root, { recursive: true })
   } catch (error) {
     console.warn(`[worktree-root] failed to prepare worktree root for ${repo.path}:`, error)

@@ -5,7 +5,7 @@ import type {
   JiraIssue,
   JiraIssueUpdate,
   JiraTransition
-} from '../../../../../shared/jira-types'
+} from '../../../../../shared/jira/jira-types'
 import type { JiraTransitionSubmitOutcome } from '../../jira-transition-fields-form'
 import { jiraUpdateIssue } from '@/runtime/runtime-jira-client'
 import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'

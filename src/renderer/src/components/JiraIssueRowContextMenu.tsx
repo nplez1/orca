@@ -8,7 +8,7 @@ import {
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
 import { translate } from '@/i18n/i18n'
-import type { JiraIssue } from '../../../shared/jira-types'
+import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { getJiraIssueRowActions, type JiraIssueRowWorkspaceAction } from './jira-issue-row-actions'
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
 import { JiraPromptTemplatePopover } from './JiraPromptTemplatePopover'

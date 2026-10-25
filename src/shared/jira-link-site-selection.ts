@@ -1,5 +1,5 @@
-import { getJiraSiteIdentityKey } from './jira-issue-url'
-import type { JiraSite, JiraSiteSelection } from './jira-types'
+import { getJiraSiteIdentityKey } from './jira/jira-issue-url'
+import type { JiraSite, JiraSiteSelection } from './jira/jira-types'
 
 /** Why a Jira link could not be pinned to a site. Callers turn these into their
  *  own copy: the dialog translates, the CLI raises a `RuntimeClientError`. */

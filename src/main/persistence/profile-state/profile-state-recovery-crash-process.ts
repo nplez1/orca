@@ -25,12 +25,12 @@ export function buildRecoveryCrashProcess(directory: string): {
   const built = buildSync({
     stdin: {
       contents: `
-        export { acquireProfileStateMaintenance } from './src/main/persistence/profile-state/profile-state-access'
-        export { restoreProfileStateJsonExport } from './src/main/persistence/profile-state/legacy-json/profile-state-recovery'
-        export { restoreProfileStateDatabaseBackup } from './src/main/persistence/profile-state/profile-state-database-recovery'
-        export { openProfileStateDatabase } from './src/main/persistence/profile-state/profile-state-database'
-        export { importProfileStateJson } from './src/main/persistence/profile-state/profile-state-documents'
-        export { invalidateHttp1CompatibilityMarker, writeHttp1CompatibilityMarker } from './src/main/startup/http1-compatibility-marker'
+        export { acquireProfileStateMaintenance } from './profile-state-access'
+        export { restoreProfileStateJsonExport } from './legacy-json/profile-state-recovery'
+        export { restoreProfileStateDatabaseBackup } from './profile-state-database-recovery'
+        export { openProfileStateDatabase } from './profile-state-database'
+        export { importProfileStateJson } from './profile-state-documents'
+        export { invalidateHttp1CompatibilityMarker, writeHttp1CompatibilityMarker } from '../../startup/http1-compatibility-marker'
       `,
       loader: 'ts',
       resolveDir: process.cwd()

@@ -1,5 +1,5 @@
 import type { ReplicatedHostCredential } from '../../shared/host-settings-replication'
-import type { JiraSite } from '../../shared/jira-types'
+import type { JiraSite } from '../../shared/jira/jira-types'
 import {
   deleteToken,
   getSiteFile,

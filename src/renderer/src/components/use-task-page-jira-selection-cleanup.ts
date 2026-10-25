@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { TaskPageLinearCollectionEffectsModel } from './use-task-page-linear-collection-effects'
+import type { TaskPageLinearCollectionEffectsModel } from './task-page/linear/use-task-page-linear-collection-effects'
 
 export type TaskPageJiraSelectionCleanupModel = Pick<
   TaskPageLinearCollectionEffectsModel,

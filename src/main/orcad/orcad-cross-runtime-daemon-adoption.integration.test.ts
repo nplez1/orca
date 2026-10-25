@@ -40,7 +40,6 @@ import {
   getOrcaProfileIndexPath,
   getOrcaProfileStateDatabaseFile
 } from '../orca-profiles/profile-storage-paths'
-import type { SshConnection } from '../ssh/connection/ssh-connection'
 import {
   emptyOrcadActivationRecord,
   orcadGcPinnedDirNames
@@ -65,6 +64,7 @@ import {
   hostServerTarget,
   locatePinnedNodeForTests
 } from './orcad-node-slot-fixture'
+import { unusedSshConnection } from '../ssh/unused-host-transport.test-fixture'
 
 // GC runs its real commands, against this machine instead of an SSH host.
 const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }))
@@ -319,9 +319,9 @@ worker.on('error', (error) => { console.error(error); process.exitCode = 1 })
       stdin: {
         // orcad's own daemon client, playing a paired client's terminal.
         contents: `
-        import { DaemonPtyAdapter } from './src/main/daemon/daemon-pty-adapter'
-        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from './src/main/daemon/daemon-spawner'
-        import { setAppEnvironment } from './src/shared/app-environment'
+        import { DaemonPtyAdapter } from '../daemon/daemon-pty-adapter'
+        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from '../daemon/daemon-spawner'
+        import { setAppEnvironment } from '../../shared/app-environment'
         const [op, runtimeDir, sessionId, marker, cwd] = process.argv.slice(2)
         setAppEnvironment({
           getPath: () => cwd, getAppPath: () => cwd, getVersion: () => 'test', isPackaged: () => true,
@@ -447,8 +447,7 @@ worker.on('error', (error) => { console.error(error); process.exitCode = 1 })
         const record = { ...emptyOrcadActivationRecord(), active: incoming.version }
         expect(orcadGcPinnedDirNames(record)).not.toContain(`orcad-${outgoing.version}`)
         await gcOldOrcadVersions({
-          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: execCommand is replaced by a local shell for every connection access.
-          conn: {} as SshConnection,
+          conn: unusedSshConnection(),
           host,
           remoteHome: caseRoot,
           currentDirAbsPath: incoming.dir,

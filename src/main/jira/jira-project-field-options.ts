@@ -1,4 +1,4 @@
-import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../shared/jira-types'
+import type { JiraCreateField, JiraCreateFieldAllowedValue } from '../../shared/jira/jira-types'
 import {
   resolveJiraObjectListFieldKind,
   type JiraObjectListFieldKind

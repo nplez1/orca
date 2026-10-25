@@ -52,7 +52,7 @@ describe('tui agent startup plans', () => {
       agent: 'claude',
       prompt: '',
       agentArgs: resolveTuiAgentLaunchArgs('claude', {
-        claude: '--dangerously-skip-permissions --model Opus'
+        agentDefaultArgs: { claude: '--dangerously-skip-permissions --model Opus' }
       }),
       cmdOverrides: {},
       platform: 'linux',
@@ -397,7 +397,7 @@ describe('tui agent startup plans', () => {
         cmdOverrides: {},
         platform,
         shell,
-        agentArgs: resolveTuiAgentLaunchArgs('muse', defaults)
+        agentArgs: resolveTuiAgentLaunchArgs('muse', { agentDefaultArgs: defaults })
       })
 
       expect(plan).toMatchObject({
@@ -604,7 +604,7 @@ describe('tui agent startup plans', () => {
       agent: 'opencode',
       prompt: 'fix it',
       cmdOverrides: {},
-      agentArgs: resolveTuiAgentLaunchArgs('opencode', agentDefaultArgs),
+      agentArgs: resolveTuiAgentLaunchArgs('opencode', { agentDefaultArgs }),
       platform: 'linux'
     })
 
@@ -761,7 +761,7 @@ describe('tui agent startup plans', () => {
     })
   })
 
-  it('launches Devin with stdin-after-start prompt delivery', () => {
+  it('launches Devin with the prompt on argv behind a -- separator', () => {
     const plan = buildAgentStartupPlan({
       agent: 'devin',
       prompt: 'fix the tests',
@@ -771,9 +771,10 @@ describe('tui agent startup plans', () => {
     })
     expect(plan).toEqual({
       agent: 'devin',
-      launchCommand: "devin '--permission-mode' 'bypass' '--respect-workspace-trust' 'false'",
+      launchCommand:
+        "devin '--permission-mode' 'bypass' '--respect-workspace-trust' 'false' -- 'fix the tests'",
       expectedProcess: 'devin',
-      followupPrompt: 'fix the tests',
+      followupPrompt: null,
       launchConfig: {
         agentCommand: "devin '--permission-mode' 'bypass' '--respect-workspace-trust' 'false'",
         agentArgs: '--permission-mode bypass --respect-workspace-trust false',

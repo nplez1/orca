@@ -2,7 +2,7 @@
 
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { JiraIssue, JiraSprint } from '../../../shared/jira-types'
+import type { JiraIssue, JiraSprint } from '../../../shared/jira/jira-types'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TaskPageJiraIssueList } from './task-page-jira-issue-list'

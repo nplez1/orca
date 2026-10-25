@@ -1,12 +1,12 @@
 import { parseIssueLinkInput } from '../../shared/issue-link-input'
-import { getJiraSiteIdentityKey, parseJiraIssueUrl } from '../../shared/jira-issue-url'
+import { getJiraSiteIdentityKey, parseJiraIssueUrl } from '../../shared/jira/jira-issue-url'
 import { selectJiraLinkSite, type JiraLinkSiteFailure } from '../../shared/jira-link-site-selection'
 import { buildJiraWorkspaceSource } from '../../shared/new-workspace/workspace-source'
 import {
   ACCOUNT_BACKED_TASK_SOURCE_PROJECT_ID,
   normalizeTaskSourceContext
 } from '../../shared/task-source-context'
-import type { JiraConnectionStatus, JiraIssue, JiraSite } from '../../shared/jira-types'
+import type { JiraConnectionStatus, JiraIssue, JiraSite } from '../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { RuntimeWorktreeRecord } from '../../shared/runtime-types'

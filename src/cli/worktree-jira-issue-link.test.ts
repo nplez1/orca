@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JiraIssue, JiraSite } from '../shared/jira-types'
+import type { JiraIssue, JiraSite } from '../shared/jira/jira-types'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../shared/workspace-linked-item-source-context'
 import type { JiraLinkRpcClient } from './handlers/worktree-jira-issue-link'
 import {

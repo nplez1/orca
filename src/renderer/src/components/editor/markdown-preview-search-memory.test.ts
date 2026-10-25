@@ -14,7 +14,7 @@ beforeAll(async () => {
   await build({
     stdin: {
       contents: `
-        import { findTextMatchRanges } from './src/renderer/src/components/editor/markdown-preview-search';
+        import { findTextMatchRanges } from './markdown-preview-search';
         const size = 600 * 1024;
         const text = 'x'.repeat(size - 6) + 'NEEDLE';
         process.stdout.write(JSON.stringify(findTextMatchRanges(text, 'needle')));

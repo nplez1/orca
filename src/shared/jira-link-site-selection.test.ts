@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { selectJiraLinkSite } from './jira-link-site-selection'
-import type { JiraSite } from './jira-types'
+import type { JiraSite } from './jira/jira-types'
 
 function site(id: string, siteUrl = `https://${id}.atlassian.net`): JiraSite {
   return { id, siteUrl, email: `${id}@example.com`, displayName: id, accountId: id }

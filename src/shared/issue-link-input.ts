@@ -1,5 +1,5 @@
 import { parseGitHubIssueOrPRLink } from './github/links'
-import { JIRA_ISSUE_KEY_PATTERN, parseJiraIssueUrl } from './jira-issue-url'
+import { JIRA_ISSUE_KEY_PATTERN, parseJiraIssueUrl } from './jira/jira-issue-url'
 import { parseLinearIssueInput } from './linear/links'
 import type { WorkspaceSourceProvider } from './new-workspace/workspace-source'
 

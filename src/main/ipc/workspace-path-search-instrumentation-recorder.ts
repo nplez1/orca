@@ -4,7 +4,7 @@ import type {
   WorkspacePathSearchInstrumentationEvent
 } from '../../shared/workspace-path-search-instrumentation'
 import type { QuickOpenFilePathSearchResult } from './filesystem-search-file-paths'
-import { getLocalWatcherRoot } from './filesystem-watcher-paths'
+import { getLocalWatcherRoot } from './filesystem/watchers/filesystem-watcher-paths'
 export type QuickOpenPathSearchInstrumentationRecord = {
   correlationId: WorkspacePathSearchCorrelationId
   workspaceIdentityHash: string

@@ -191,6 +191,7 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     this.inactiveClaudeAccountsGeneration += 1
     this.pruneInactiveClaudeState()
     this.claudeFetchGeneration += 1
+    this.lastClaudeCheckCompletedAt = null
     // Why: a new account/target starts with a clean retry schedule.
     this.activeFailureStreakByProvider.claude = 0
     // Why: statusline posts from the outgoing account's sessions must not land on the incoming account's bar mid-switch.
@@ -209,6 +210,7 @@ export abstract class RateLimitServiceAccountRefresh extends RateLimitServiceIna
     const targetChanged = !this.isSameClaudeTarget(this.claudeFetchTarget, nextTarget)
     this.claudeFetchTarget = nextTarget
     this.claudeFetchGeneration += 1
+    this.lastClaudeCheckCompletedAt = null
     this.activeFailureStreakByProvider.claude = 0
     if (targetChanged) {
       // Why: statusline posts from the outgoing target's sessions must not land on the incoming target's bar mid-switch.

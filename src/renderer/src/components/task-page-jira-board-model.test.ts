@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../shared/jira-types'
+import type { JiraBoardColumn, JiraIssue, JiraTransition } from '../../../shared/jira/jira-types'
 import {
   filterTaskPageJiraBoardIssues,
   getTaskPageJiraBoardTransitionTargets,

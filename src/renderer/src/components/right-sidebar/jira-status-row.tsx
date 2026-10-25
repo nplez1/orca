@@ -20,13 +20,13 @@ import type { RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
-} from '../../../../shared/jira-transition-fields'
+} from '../../../../shared/jira/jira-transition-fields'
 import type {
   JiraFieldErrors,
   JiraIssue,
   JiraIssueUpdate,
   JiraTransition
-} from '../../../../shared/jira-types'
+} from '../../../../shared/jira/jira-types'
 import { IssuePanePropertyRow } from './IssuePanePropertyRow'
 
 const MENU_ITEM_CLASS =

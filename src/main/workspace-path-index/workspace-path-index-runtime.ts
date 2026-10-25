@@ -39,7 +39,7 @@ import {
 import {
   subscribeLocalPathIndexWatcher,
   unsubscribeLocalPathIndexWatcher
-} from '../ipc/filesystem-watcher-local-subscription'
+} from '../ipc/filesystem/watchers/filesystem-watcher-local-subscription'
 import { scheduleWorkspacePathCatalogSpillSweep } from './workspace-path-catalog-spill-sweep'
 
 export const WORKSPACE_PATH_INDEX_LISTING_POLICY_VERSION = 'quick-open-scope-v1'

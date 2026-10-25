@@ -8,7 +8,7 @@ import type {
   JiraBoardIssuePageRequest,
   JiraIssue,
   JiraTransition
-} from '../../../../../shared/jira-types'
+} from '../../../../../shared/jira/jira-types'
 import type { TaskPageJiraBoardModel } from './Board'
 import { TaskPageJiraBoard } from './Board'
 import { buildJiraIssueWorkspaceAttachmentIndex } from '@/lib/jira-issue-workspace-attachment'

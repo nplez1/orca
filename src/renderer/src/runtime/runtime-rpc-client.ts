@@ -30,6 +30,15 @@ export { type RuntimeClientTarget } from '../../../shared/runtime-client-target'
 export { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './runtime-rpc-result'
 export { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 
+/** A pending probe by default; an observed status is proof of itself. */
+function compatibilityEntry(
+  status: RuntimeStatus | null = null,
+  provenCompatible = status !== null
+): RuntimeCompatibilityCacheEntry {
+  const statusCheckedAt = status ? Date.now() : null
+  return { check: Promise.resolve(), failedAt: null, provenCompatible, status, statusCheckedAt }
+}
+
 export async function callRuntimeRpc<TResult>(
   target: RuntimeClientTarget,
   method: string,
@@ -103,13 +112,7 @@ export async function ensureRuntimeEnvironmentCompatible(
     return cached.check
   }
   const previousStatus = runtimeCompatibilityChecks.get(environmentId)?.status ?? null
-  const entry: RuntimeCompatibilityCacheEntry = {
-    check: Promise.resolve(),
-    failedAt: null,
-    provenCompatible: false,
-    status: null,
-    statusCheckedAt: null
-  }
+  const entry = compatibilityEntry()
   const check = (async () => {
     const response = await callRuntimeEnvironmentWithRevision({
       environmentId,
@@ -149,13 +152,7 @@ export async function getRuntimeEnvironmentStatus(
 ): Promise<RuntimeStatus> {
   const trimmed = environmentId.trim()
   const previousStatus = runtimeCompatibilityChecks.get(trimmed)?.status ?? null
-  const entry: RuntimeCompatibilityCacheEntry = {
-    check: Promise.resolve(),
-    failedAt: null,
-    provenCompatible: false,
-    status: null,
-    statusCheckedAt: null
-  }
+  const entry = compatibilityEntry()
   // Why: publish the in-flight probe before awaiting so concurrent cold-cache
   // capability lookups coalesce onto this one status.get (via the cache-hit path
   // in runtimeEnvironmentSupportsCapability) instead of each firing their own.
@@ -237,7 +234,8 @@ export async function runtimeEnvironmentSupportsCapability(
   const status = await getRuntimeEnvironmentStatus(trimmed, timeoutMs)
   const supported = status.capabilities?.includes(capability) === true
   const resolved = runtimeCompatibilityChecks.get(trimmed)
-  if (!supported && resolved?.status === status) {
+  // Why runtimeId: a status publication may have replaced the entry with its own copy.
+  if (!supported && resolved?.status?.runtimeId === status.runtimeId) {
     resolved.statusCheckedAt = null
   }
   return supported

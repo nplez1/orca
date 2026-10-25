@@ -86,6 +86,7 @@ export type PRCommentsListProps = {
     content: GitHubReactionContent,
     reacted: boolean
   ) => Promise<boolean>
+  onOpenLocation?: (path: string, line: number) => void
 }
 
 export function useCommentsListState({
@@ -101,7 +102,8 @@ export function useCommentsListState({
   onDeleteComment,
   onOpenCommentInCode,
   onSetReaction,
-  onResolveSelectedCommentsWithAI
+  onResolveSelectedCommentsWithAI,
+  onOpenLocation
 }: PRCommentsListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const presentation = React.useMemo(() => getPRCommentPresentationClasses(), [])
@@ -311,6 +313,7 @@ export function useCommentsListState({
         onOpenCommentInCode={onOpenCommentInCode}
         onSetReaction={onSetReaction}
         onQueueForAgent={canQueue ? () => addGroupToSelection(groupId) : undefined}
+        onOpenLocation={onOpenLocation}
       />
     )
   }

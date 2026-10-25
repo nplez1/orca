@@ -14,8 +14,7 @@ const permissionStatusTempDir = '/tmp/orca-computer-use-permissions-test'
 const helperAppPath = '/Applications/Orca Computer Use.app'
 const helperInfoPlistPath = join(helperAppPath, 'Contents', 'Info.plist')
 
-// The tccutil reset and the bundle-id read now run through `runProcess`, so the fake child has to
-// be one that promise settles on: stdout, then `close`.
+// runProcess settles after stdout and close; fake children must emit both.
 const plistBuddyStdout = vi.hoisted(() => ({ value: 'com.example.orca.computer-use\n' }))
 
 function fakeChild(stdout: string): Record<string, unknown> {
@@ -260,8 +259,6 @@ describe('openComputerUsePermissions', () => {
         { id: 'screenshots', status: 'not-granted' }
       ]
     })
-    // Argv is asserted exactly; the options belong to the shared spawn chokepoint these now run
-    // through, which owns and tests them.
     const throughChokepoint = expect.objectContaining({ shell: false, windowsHide: true })
     expect(spawn).toHaveBeenCalledWith(
       '/usr/libexec/PlistBuddy',
@@ -278,7 +275,7 @@ describe('openComputerUsePermissions', () => {
       ['reset', 'ScreenCapture', 'com.example.orca.computer-use'],
       throughChokepoint
     )
-    // Why: a sync reset would hold main's event loop for both children.
+    // Keep resets asynchronous so helper commands cannot block the main process.
     expect(spawnSync).not.toHaveBeenCalledWith(
       '/usr/bin/tccutil',
       expect.anything(),

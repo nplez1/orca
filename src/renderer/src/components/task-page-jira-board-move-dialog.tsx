@@ -16,13 +16,13 @@ import {
 import {
   classifyTransitionRequirements,
   rejectedTransitionFieldKeys
-} from '../../../shared/jira-transition-fields'
+} from '../../../shared/jira/jira-transition-fields'
 import type {
   JiraFieldErrors,
   JiraIssue,
   JiraIssueUpdate,
   JiraTransition
-} from '../../../shared/jira-types'
+} from '../../../shared/jira/jira-types'
 
 export type JiraBoardMovePrompt = {
   issue: JiraIssue

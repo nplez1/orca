@@ -171,8 +171,6 @@ async function doctorRecipeWithProvision(
           remediation: buildProvisionFailureRemediation(start.stderr, start.stdout)
         }
       ],
-      // Why: the create script failed — hand the agent the complete output (not a
-      // tail) so it can see what the script printed and why parsing/exit failed.
       provisionTranscript: {
         provision: {
           exitCode: start.exitCode,
@@ -235,8 +233,7 @@ async function doctorRecipeWithProvision(
     })
   }
 
-  // Why: include both stages' full output even on success — the agent can confirm
-  // pairing/teardown looked right, and diagnose a destroy failure without re-running.
+  // Retain both stages for diagnosis even when creation succeeds and teardown fails.
   const provisionTranscript: ProvisionTranscript = {
     provision: {
       exitCode: 0,

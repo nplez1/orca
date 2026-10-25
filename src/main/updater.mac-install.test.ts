@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ServeSupervisorInstallPark from './updater/serve-supervisor-install-park'
 import { createUpdaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const {
   appMock,
@@ -139,7 +140,7 @@ vi.mock('./updater/mac-browser-sidecar-recovery', () => ({
   describeMacUpdateBlockers: describeBrowserBlockersMock
 }))
 
-// Why: no registered serve supervisors here, so every blocker is refused as before parking existed.
+// No serve supervisors are registered, so every blocker is refused.
 vi.mock('./updater/serve-supervisor-install-park', async (importOriginal) => ({
   ...(await importOriginal<typeof ServeSupervisorInstallPark>()),
   parkServeSupervisorsForInstall: (_executable: string, blockers: number[]) => ({
@@ -236,8 +237,7 @@ describe('updater mac install handoff', () => {
       })
       autoUpdaterMock.emit('checking-for-update')
       autoUpdaterMock.emit('update-available', { version: '1.0.61' })
-      // Why: the update-available handler is now async (it awaits fetchChangelog).
-      // Flush microtasks so setAvailableVersion runs before update-downloaded fires.
+      // Let async update-available state land before emitting update-downloaded.
       await vi.advanceTimersByTimeAsync(0)
       downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
@@ -287,7 +287,7 @@ describe('updater mac install handoff', () => {
         checkForUpdatesFromMenu,
         getUpdateStatus
       } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(send))
+      setupAutoUpdater(updaterMainWindow(send))
       await vi.waitFor(() => expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledOnce())
       autoUpdaterMock.emit('checking-for-update')
       autoUpdaterMock.emit('update-available', { version: '1.0.61' })
@@ -406,7 +406,6 @@ describe('updater mac install handoff', () => {
 
       expect(reportDownloaded).not.toHaveBeenCalled()
       await vi.waitFor(() => {
-        // Why: recordUpdaterLifecycle packs metadata into one console line.
         expect(warn).toHaveBeenCalledWith(
           '[updater] Deferred macOS install handoff failed {"errorType":"Error"}'
         )
@@ -432,8 +431,7 @@ describe('updater mac install handoff', () => {
       })
       autoUpdaterMock.emit('checking-for-update')
       autoUpdaterMock.emit('update-available', { version: '1.0.61' })
-      // Why: the update-available handler is now async (it awaits fetchChangelog).
-      // Flush microtasks so setAvailableVersion runs before update-downloaded fires.
+      // Let async update-available state land before emitting update-downloaded.
       await vi.advanceTimersByTimeAsync(0)
       downloadUpdate()
       autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
@@ -466,7 +464,7 @@ describe('updater mac install handoff', () => {
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall, isQuittingForUpdate } =
         await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(send), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(send), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockResolvedValue([9654, 10718])
       let finishDescription: () => void = () => undefined
@@ -526,7 +524,7 @@ describe('updater mac install handoff', () => {
       const onBeforeQuit = vi.fn()
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(send), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(send), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockResolvedValue([9654])
       recoverBrowserSidecarsMock.mockResolvedValue([])
@@ -558,7 +556,7 @@ describe('updater mac install handoff', () => {
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall, isQuittingForUpdate } =
         await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(send), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(send), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockRejectedValue(new Error('probe failed'))
       quitAndInstall()
@@ -591,7 +589,7 @@ describe('updater mac install handoff', () => {
       const onBeforeQuit = vi.fn()
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(vi.fn()), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
       const preventDefault = vi.fn()
       appMock.emit('before-quit', { preventDefault })
@@ -611,7 +609,7 @@ describe('updater mac install handoff', () => {
       const onBeforeQuit = vi.fn()
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(vi.fn()), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
 
       let finishProbe: (pids: number[]) => void = () => {}
@@ -641,7 +639,7 @@ describe('updater mac install handoff', () => {
       vi.useFakeTimers()
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow())
+      setupAutoUpdater(updaterMainWindow(vi.fn()))
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockResolvedValue([9654])
       quitAndInstall()
@@ -669,7 +667,7 @@ describe('updater mac install handoff', () => {
       )
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(), { onBeforeQuit })
+      setupAutoUpdater(updaterMainWindow(vi.fn()), { onBeforeQuit })
       await prepareStagedMacUpdate(downloadUpdate)
       quitAndInstall()
       await vi.advanceTimersByTimeAsync(1000)
@@ -693,7 +691,7 @@ describe('updater mac install handoff', () => {
       vi.useFakeTimers()
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow())
+      setupAutoUpdater(updaterMainWindow(vi.fn()))
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockResolvedValue([9654])
       quitAndInstall()
@@ -726,7 +724,7 @@ describe('updater mac install handoff', () => {
       autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
       const onBeforeQuit = vi.fn().mockRejectedValue(new Error('required cleanup failed'))
       const { setupAutoUpdater, downloadUpdate, quitAndInstall } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow(), {
+      setupAutoUpdater(updaterMainWindow(vi.fn()), {
         onBeforeQuit,
         onBeforeQuitFailure: 'abort'
       })
@@ -755,7 +753,7 @@ describe('updater mac install handoff', () => {
         checkForUpdatesFromMenu,
         getUpdateStatus
       } = await loadUpdaterModule()
-      setupAutoUpdater(createUpdaterMainWindow())
+      setupAutoUpdater(updaterMainWindow(vi.fn()))
       await prepareStagedMacUpdate(downloadUpdate)
       getMacUpdateRunningInstancesMock.mockResolvedValue([9654])
       quitAndInstall()

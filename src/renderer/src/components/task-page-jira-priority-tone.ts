@@ -1,4 +1,4 @@
-import type { JiraPriority } from '../../../shared/jira-types'
+import type { JiraPriority } from '../../../shared/jira/jira-types'
 
 export type JiraPrioritySeverity = 'blocker' | 'critical' | 'major' | 'standard'
 

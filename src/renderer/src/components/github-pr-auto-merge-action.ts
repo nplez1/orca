@@ -1,5 +1,5 @@
 import {
-  canEnableGitHubPRAutoMerge,
+  canShowGitHubPRAutoMergeControl,
   type GitHubPRAutoMergeAvailabilityInput
 } from '../../../shared/github/pull-request-auto-merge-availability'
 import { translate } from '@/i18n/i18n'
@@ -44,7 +44,7 @@ export function resolveGitHubPRAutoMergeAction(
   }
   // Why: GitHub rejects enabling auto-merge on a conflicting PR, so offering it there only yields an
   // error toast; repos that disable auto-merge are suppressed by the shared availability rule.
-  if (!canEnableGitHubPRAutoMerge(item)) {
+  if (!canShowGitHubPRAutoMergeControl(item)) {
     return null
   }
   return {

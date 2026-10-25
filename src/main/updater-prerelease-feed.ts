@@ -130,7 +130,7 @@ function getGitHubReleaseAssetReadiness(assetUrl: string): Promise<ReleaseReadin
     }, FETCH_TIMEOUT_MS)
 
     request.on('redirect', (statusCode) => {
-      // Why: GitHub's 302 proves the asset exists without probing its signed storage URL.
+      // GitHub's redirect proves existence without fetching the signed storage URL.
       settle(statusCode >= 300 && statusCode < 400 ? 'ready' : 'unavailable')
     })
     request.on('response', (response) => {
@@ -180,9 +180,7 @@ async function getReleaseAssetReadiness(tag: string, assetName: string): Promise
 
 async function getPlatformManifestReadiness(tag: string): Promise<ReleaseReadiness> {
   try {
-    // Why: cancelled/draft releases can appear in GitHub's atom feed before
-    // they have updater manifests or the ZIP/exe/AppImage assets referenced by
-    // those manifests. Pinning to those tags makes download clicks 404.
+    // Feed entries may precede manifests or installer assets; do not offer downloads that would 404.
     const manifestUrl = getReleaseManifestUrl(tag)
     const res = await net.fetch(manifestUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
     if (res.status === 404) {
@@ -214,19 +212,7 @@ async function getPlatformManifestReadiness(tag: string): Promise<ReleaseReadine
   }
 }
 
-/**
- * Walks the GitHub releases atom feed and returns the tag of the newest
- * release strictly greater than `currentVersion`.
- *
- * Why: electron-updater's GitHubProvider filters the feed by channel, and
- * GitHub's /latest/download redirect can move between check and download.
- * By resolving the newest tag ourselves and pinning the generic provider at
- * `/releases/download/<tag>`, the manifest and downloaded asset stay tied to
- * the same release.
- *
- * Returns null if the fetch fails, the feed has no parseable tags, or
- * nothing in the feed is newer than `currentVersion`.
- */
+// Concrete tags keep manifests and downloaded assets on the same release.
 type FetchNewerReleaseTagOptions = {
   includePrerelease?: boolean
   releaseFilter?: 'perf'
@@ -267,8 +253,7 @@ export async function fetchNewerReleaseTagsWithReadiness(
     return { tags: [], state: 'unavailable', unavailableReason: 'feed' }
   }
 
-  // Why: perf builds are explicit opt-in; regular prerelease checks should
-  // stay on the main RC/stable series even though perf tags are semver-newer.
+  // Perf builds require explicit opt-in, even when semver considers them newer.
   const candidates =
     options.releaseFilter === 'perf'
       ? tags.filter(({ tag }) => isPerfPrereleaseTag(tag))

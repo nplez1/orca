@@ -1,4 +1,3 @@
-import { claudeBackgroundArgs } from './claude-background-run-isolation'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMIT_MESSAGE_AGENT_SPECS,
@@ -28,26 +27,6 @@ afterEach(() => {
 })
 
 describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
-  it('exposes the installed local agents as commit-message agents', () => {
-    const ids = listCommitMessageAgentIds().sort()
-    expect(ids).toEqual([
-      'amp',
-      'antigravity',
-      'claude',
-      'codex',
-      'copilot',
-      'cursor',
-      'dsh',
-      'jcode',
-      'kimi',
-      'muse',
-      'omp',
-      'opencode',
-      'opencode2',
-      'pi'
-    ])
-  })
-
   it('uses the expected defaults for core agents', () => {
     expect(COMMIT_MESSAGE_AGENT_SPECS.claude?.defaultModelId).toBe('sonnet')
     expect(COMMIT_MESSAGE_AGENT_SPECS.codex?.defaultModelId).toBe('gpt-5.6-terra')
@@ -55,25 +34,22 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
     expect(COMMIT_MESSAGE_AGENT_SPECS.pi?.defaultModelId).toBe('default')
   })
 
-  it('uses --prompt (not Claude --print) for Kimi non-interactive generation', () => {
-    // Why: kimi-code 0.31+ rejects --print; non-interactive mode is --prompt/-p (#11669).
+  it('passes only flags Kimi Code accepts for non-interactive generation', () => {
+    // Why: Kimi Code rejects --print/--quiet/--thinking/--no-thinking as unknown options (#11669, #14771).
     const spec = COMMIT_MESSAGE_AGENT_SPECS.kimi
-    expect(spec).toBeDefined()
-    expect(spec!.promptDelivery).toBe('argv')
-    const args = spec!.buildArgs({
-      prompt: 'Name a branch for adding login',
-      model: 'kimi-code/kimi-for-coding',
-      thinkingLevel: 'on'
-    })
-    expect(args).toContain('--prompt')
-    expect(args).not.toContain('--print')
-    // Why: with argv delivery the prompt is the value of --prompt.
-    const promptIndex = args.indexOf('--prompt')
-    expect(promptIndex).toBeGreaterThanOrEqual(0)
-    expect(args[promptIndex + 1]).toBe('Name a branch for adding login')
-    expect(args).toContain('--quiet')
-    expect(args).toContain('--thinking')
-    expect(args).toEqual(expect.arrayContaining(['--model', 'kimi-code/kimi-for-coding']))
+    expect(spec?.promptDelivery).toBe('argv')
+    expect(
+      spec?.buildArgs({
+        prompt: 'Name a branch for adding login',
+        model: 'kimi-code/kimi-for-coding',
+        thinkingLevel: 'on'
+      })
+    ).toEqual([
+      '--prompt',
+      'Name a branch for adding login',
+      '--model',
+      'kimi-code/kimi-for-coding'
+    ])
   })
 
   it('uses Muse exec for non-interactive Source Control AI generation', () => {
@@ -101,17 +77,6 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
       'default',
       'kimi-code/kimi-for-coding'
     ])
-  })
-
-  it('maps Kimi thinking off and omission to distinct argv', () => {
-    const spec = COMMIT_MESSAGE_AGENT_SPECS.kimi!
-    const offArgs = spec.buildArgs({ prompt: 'PROMPT', model: 'default', thinkingLevel: 'off' })
-    const defaultArgs = spec.buildArgs({ prompt: 'PROMPT', model: 'default' })
-
-    expect(offArgs).toContain('--no-thinking')
-    expect(offArgs).not.toContain('--thinking')
-    expect(defaultArgs).not.toContain('--thinking')
-    expect(defaultArgs).not.toContain('--no-thinking')
   })
 
   it('omits Kimi --model for the config default and an empty model', () => {
@@ -226,7 +191,7 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
     expect(listCommitMessageAgentIds()).not.toContain(CUSTOM_AGENT_ID)
   })
 
-  it('orders Codex models by version descending to match the official picker', () => {
+  it('orders seeded Codex models by version descending', () => {
     const ids = COMMIT_MESSAGE_AGENT_SPECS.codex?.models.map((m) => m.id)
     expect(ids).toEqual([
       'gpt-5.6-terra',
@@ -267,7 +232,9 @@ describe('buildArgs (Claude)', () => {
       'haiku',
       '--permission-mode',
       'plan',
-      ...claudeBackgroundArgs()
+      '--strict-mcp-config',
+      '--settings',
+      '{"disableAllHooks":true}'
     ])
   })
 
@@ -287,7 +254,9 @@ describe('buildArgs (Claude)', () => {
       'plan',
       '--effort',
       'high',
-      ...claudeBackgroundArgs()
+      '--strict-mcp-config',
+      '--settings',
+      '{"disableAllHooks":true}'
     ])
   })
 
@@ -348,7 +317,15 @@ describe('buildArgs (Jcode)', () => {
     const args = spec.buildArgs({ prompt: 'name this branch', model: 'claude-haiku-4-5' })
     const runIndex = args.indexOf('run')
     expect(runIndex).toBeGreaterThan(0)
-    expect(args.slice(0, runIndex).every((arg) => arg.startsWith('--') || arg !== 'run')).toBe(true)
+    expect(args.slice(0, runIndex)).toEqual([
+      '--no-update',
+      '--quiet',
+      '--no-selfdev',
+      '--tool-profile',
+      'none',
+      '--model',
+      'claude-haiku-4-5'
+    ])
     expect(args.slice(runIndex)).toEqual(['run', '--json', 'name this branch'])
   })
 
@@ -437,7 +414,9 @@ describe('model discovery parsers', () => {
       '--output-format',
       'stream-json',
       '--verbose',
-      ...claudeBackgroundArgs()
+      '--strict-mcp-config',
+      '--settings',
+      '{"disableAllHooks":true}'
     ])
     const payload = JSON.parse(discovery?.stdinPayload ?? '') as {
       type?: string

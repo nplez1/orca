@@ -1,6 +1,6 @@
 import React from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { JiraEditableField, JiraIssue } from '../../../../shared/jira-types'
+import type { JiraEditableField, JiraIssue } from '../../../../shared/jira/jira-types'
 import {
   JiraStoryPointsEditorForm,
   jiraStoryPointsFieldLabel,

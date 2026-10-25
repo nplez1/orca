@@ -1,5 +1,4 @@
-// Test fixture: the desktop's daemon launcher, run outside Electron's main process so a test can
-// choose which runtime it runs on (and so which runtime a daemon it starts runs on).
+// Run the desktop launcher outside Electron so tests can choose its runtime and the daemon's.
 import { build, type Plugin } from 'esbuild'
 import { mkdirSync, readlinkSync, realpathSync, symlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -23,7 +22,7 @@ const QUIT_GRACE_MS = 10_000
 const openWindows = new Set<ReturnType<typeof spawnProcess>>()
 const NATIVE_EXTERNALS = ['electron', 'node-pty', '@parcel/watcher', '*.node']
 
-// The FUSE-mounted AppImage runtime cannot exist in a test; everything after its check is real.
+// Simulate AppImage detection; the remaining launch path is real.
 const simulatedAppImageRuntime: Plugin = {
   name: 'simulated-appimage-runtime',
   setup(pluginBuild) {
@@ -44,11 +43,7 @@ const simulatedAppImageRuntime: Plugin = {
   }
 }
 
-/**
- * Bundles the driver to `outfile`; run it as `<userData> <appPath> <appVersion>` with piped stdin.
- * It prints one JSON line, stays connected like an open window, and exits when stdin closes
- * without stopping the daemon, as a quitting window leaves it.
- */
+/** Prints one JSON result; closing piped stdin disconnects the launcher without stopping the daemon. */
 export async function buildDaemonLauncherDriver(
   outfile: string,
   options: { simulateAppImageRuntime?: boolean } = {}
@@ -58,9 +53,9 @@ export async function buildDaemonLauncherDriver(
       contents: `
         import { mkdirSync } from 'node:fs'
         import { join } from 'node:path'
-        import { createOutOfProcessLauncher } from './src/main/daemon/daemon-out-of-process-launcher'
-        import { getDaemonSocketPath, getDaemonTokenPath } from './src/main/daemon/daemon-spawner'
-        import { setAppEnvironment } from './src/shared/app-environment'
+        import { createOutOfProcessLauncher } from './daemon-out-of-process-launcher'
+        import { getDaemonSocketPath, getDaemonTokenPath } from './daemon-spawner'
+        import { setAppEnvironment } from '../../shared/app-environment'
         const [userData, appPath, version] = process.argv.slice(2)
         setAppEnvironment({
           getPath: () => userData, getAppPath: () => appPath, getVersion: () => version,
@@ -123,7 +118,7 @@ export function daemonTestEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv 
   return { ...env, ...extra }
 }
 
-/** Runs the launcher as a window would, and keeps it connected until `quit`, as a window stays. */
+/** Keep the launcher connected like an open window until quit. */
 export async function openLauncherWindow(
   program: string,
   args: string[],

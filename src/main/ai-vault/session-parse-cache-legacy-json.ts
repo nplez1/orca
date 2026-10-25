@@ -1,6 +1,4 @@
-// Temporary: imports the single JSON file that builds before the per-row
-// database wrote, so the first launch after updating re-reads nothing. Remove
-// once no supported upgrade path starts from a build that wrote that file.
+// Retain JSON import until supported upgrades no longer include the old writer.
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import {
@@ -9,7 +7,7 @@ import {
 } from './session-parse-cache-database'
 import type { PersistedSessionParseCacheEntry } from './session-parse-cache-store'
 
-// The limit the old writer kept the file within.
+// Match the old writer's maximum file size.
 const LEGACY_MAX_BYTES = 64 * 1024 * 1024
 // Only schema 6 is admitted, because this file's directory is Orca NP's own — every build that ever
 // wrote it was a fork build, so upstream's JSON schemas never appear here. 4 and 5 are rejected on
@@ -19,13 +17,7 @@ const LEGACY_MAX_BYTES = 64 * 1024 * 1024
 // the transcript changes.
 const LEGACY_JSON_SCHEMA_VERSIONS: readonly number[] = [6]
 
-/**
- * Runs when the database opens, before any lookup or write can reach it, so a
- * delete can't be undone and an early title lookup can't make the import look
- * done. Synchronous: it happens once per profile, in the scanner child. Rows
- * already in the database win; the file (and any temp file a crashed save
- * left) is deleted whether or not it parsed.
- */
+/** Import before live I/O so newer or deleted rows cannot be overwritten; existing database rows win. */
 export function importLegacySessionParseCacheJson(
   filePath: string,
   database: SessionParseCacheDatabase,
@@ -36,7 +28,7 @@ export function importLegacySessionParseCacheJson(
       database.write(readLegacyEntries(readFileSync(filePath, 'utf8')), seenAt, true)
     }
   } catch {
-    // Missing, corrupt or foreign: the worst case is a cold scan.
+    // Unreadable legacy caches fall back to a cold scan.
   }
   removeLegacyFiles(filePath)
 }

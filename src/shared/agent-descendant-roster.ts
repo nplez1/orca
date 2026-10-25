@@ -6,6 +6,7 @@ import {
   type AgentSubagentSnapshot
 } from './agent-status-types'
 import { normalizeOptionalField } from './agent-status-field-normalization'
+import { readCodexSubagentIdentity } from './codex-subagent-identity'
 import {
   agentChildWorkLiveness,
   type AgentChildWorkLiveness
@@ -43,6 +44,8 @@ type TrackedAgentDescendant = {
    *  a roster entry can only ever hold a pane 'working', so a claim nothing can retract
    *  is strictly worse than settling late. */
   lastEventAt: number
+  /** The Codex rollout this child's description was last read from, so a repeat hook skips the read. */
+  identityTranscriptPath?: string
 }
 
 /** How long a descendant may go unmentioned before the pane stops believing in it.
@@ -166,6 +169,26 @@ export function pruneStaleAgentDescendants(roster: AgentDescendantRoster, now: n
 
 export function finishAgentDescendant(roster: AgentDescendantRoster, id: string): void {
   roster.delete(id.trim())
+}
+
+/** Name a tracked Codex child from its own rollout's immutable spawn metadata. */
+export function enrichCodexSubagentIdentity(
+  roster: AgentDescendantRoster,
+  id: string,
+  transcriptPath: string | undefined
+): void {
+  const child = roster.get(id.trim())
+  if (!child || !transcriptPath || child.identityTranscriptPath === transcriptPath) {
+    return
+  }
+  const identity = readCodexSubagentIdentity(transcriptPath, id.trim())
+  if (!identity) {
+    return
+  }
+  child.identityTranscriptPath = transcriptPath
+  child.description =
+    normalizeOptionalField(identity.description, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH) ??
+    child.description
 }
 
 /**

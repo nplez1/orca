@@ -4,27 +4,15 @@ import { checkIgnoredPaths } from './check-ignored-paths'
 import type { GitRuntimeOptions } from './git-runtime-options'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 
-/** Project-level list of gitignored paths to copy into each new worktree.
- *  Cross-tool convention (see issue #7549). */
+/** Cross-tool convention for copying selected gitignored paths into new worktrees (#7549). */
 export const WORKTREE_INCLUDE_FILE = '.worktreeinclude'
 
-// Why: a fresh worktree misses gitignored files (.env, .vscode/, config
-// secrets); a repo-root .worktreeinclude names the ones to carry over.
-
-// Why: this is the "safe for now" subset — literal files and directories only.
-// Glob (`*`/`?`) and negation (`!`) lines are skipped with a warning rather than
-// silently mishandled; they can be added later without changing this contract.
 const WORKTREE_INCLUDE_MAX_FILE_BYTES = 256 * 1024
-// Why: bound the work a single repo file can request; entries beyond this are ignored.
 const WORKTREE_INCLUDE_MAX_ENTRIES = 1000
-// Why: include files can name hundreds of independent paths; bound the local
-// stat fan-out while avoiding one serial filesystem round trip per entry.
+// Bound stat fan-out without serializing independent paths.
 const WORKTREE_INCLUDE_PATH_STAT_CONCURRENCY = 8
 
-/** Parse `.worktreeinclude` into deduped, repo-root-relative literal paths.
- *  Blank lines and `#` comments are skipped; `\` is normalized to `/`, a `./`
- *  prefix and trailing `/` are stripped. Each entry is anchored to the repo
- *  root (no implicit match-at-any-depth). */
+/** Entries are literal paths anchored to the repo root, without implicit depth matching. */
 export function parseWorktreeIncludeFile(content: string): string[] {
   const seen = new Set<string>()
   const entries: string[] = []
@@ -120,7 +108,6 @@ export async function resolveWorktreeIncludePaths(
         break
       }
       if (isUnsupportedPattern(entry)) {
-        // Glob and negation are not supported yet; skip loudly so the entry isn't silently mis-copied.
         console.warn(
           `[worktree-include] Skipping unsupported ${WORKTREE_INCLUDE_FILE} pattern "${entry}" (only literal files and directories are supported)`
         )
@@ -136,9 +123,6 @@ export async function resolveWorktreeIncludePaths(
       return []
     }
 
-    // Keep only entries present in the primary checkout — a listed but absent
-    // path (e.g. node_modules before install) has nothing to copy. The mapper
-    // retains candidate order for deterministic git-ignore input and output.
     const existence = await mapWithConcurrency(
       candidates,
       WORKTREE_INCLUDE_PATH_STAT_CONCURRENCY,
@@ -147,7 +131,6 @@ export async function resolveWorktreeIncludePaths(
           await lstat(join(repoPath, relativePath))
           return relativePath
         } catch {
-          // Absent in the primary checkout — nothing to copy.
           return null
         }
       }
@@ -159,8 +142,7 @@ export async function resolveWorktreeIncludePaths(
       return []
     }
 
-    // Why: enforce the gitignored-only contract (issue #7549) — never duplicate
-    // tracked files or surface unignored ones as spurious worktree diffs.
+    // Copying unignored paths would introduce spurious worktree diffs.
     const ignored = new Set(await checkIgnoredPaths(repoPath, existing, options))
     return existing.filter((relativePath) => ignored.has(relativePath)).sort()
   } catch (error) {
