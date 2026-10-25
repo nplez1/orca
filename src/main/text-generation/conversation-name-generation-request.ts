@@ -1,5 +1,5 @@
+import { buildConversationNamePrompt } from '../../shared/ai-prompts/conversation-name'
 import {
-  buildConversationNamePrompt,
   clampConversationNameFirstPrompt,
   sanitizeGeneratedConversationName,
   type ConversationNameContext

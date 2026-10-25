@@ -1,5 +1,5 @@
 import type { AiVaultSession } from '../../shared/ai-vault-types'
-import { CONVERSATION_NAME_PROMPT_OPENING } from '../../shared/conversation-name-generation'
+import { CONVERSATION_NAME_PROMPT_OPENING } from '../../shared/ai-prompts/conversation-name'
 
 // A naming request is one prompt and its one-line reply; a longer transcript is someone's chat.
 const MAX_NAME_REQUEST_MESSAGES = 6

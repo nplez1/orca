@@ -7,16 +7,22 @@ import type {
   SessionSummaryLedgerDelta
 } from '../../shared/session-summary-types'
 import {
+  SESSION_SUMMARY_EVENT_TEXT_MAX_CHARS,
+  type SessionSummaryChunkRange,
+  type SessionSummarySourceEvent
+} from '../../shared/session-summary-fold-contract'
+import { buildSessionSummaryChunkPrompt } from '../../shared/ai-prompts/session-summary-chunk'
+import {
   applySessionSummaryDelta,
   mergeSessionSummaryDeltas,
   normalizeSessionSummaryDelta
 } from './session-summary-ledger'
 
-export type SessionSummarySourceEvent = {
-  role: 'user' | 'assistant' | 'tool'
-  text: string
-  timestamp: string | null
-}
+export type {
+  SessionSummaryChunkRange,
+  SessionSummarySourceEvent
+} from '../../shared/session-summary-fold-contract'
+export { buildSessionSummaryChunkPrompt } from '../../shared/ai-prompts/session-summary-chunk'
 
 /** One structured-output completion; the brain is agent-CLI or direct-model. */
 export type SessionFoldBrain = {
@@ -30,9 +36,7 @@ export type SessionSummaryChunkCache = {
 
 const CHUNK_MAX_CHARS = 24_000
 const CHUNK_MAX_EVENTS = 40
-const EVENT_TEXT_MAX_CHARS = 1_500
-
-export type SessionSummaryChunkRange = { from: number; to: number }
+const EVENT_TEXT_MAX_CHARS = SESSION_SUMMARY_EVENT_TEXT_MAX_CHARS
 
 /** Split [0, events.length) into bounded chunks. Deterministic: same inputs → same ranges, so cache keys are stable across resumes. */
 export function buildSessionSummaryChunks(
@@ -97,42 +101,6 @@ export function extractSessionSummaryJson(text: string): unknown {
     }
   }
   return null
-}
-
-const CHUNK_EXTRACT_INSTRUCTIONS = `You are summarizing a slice of an agent coding session transcript.
-Produce a JSON object with exactly these keys:
-- "goal": string or null — the objective the agent is working toward, if discernible
-- "plan": string[] — steps the agent laid out (at most 5, earliest first)
-- "inProgress": string or null — what the agent is doing at the END of this slice
-- "done": string[] — completed milestones (at most 5)
-- "blockers": string[] — errors, failed approaches, things awaiting input (at most 5)
-- "decisions": string[] — notable choices made (at most 5)
-- "timeline": array of { "kind": one of "milestone"|"decision"|"error"|"needs-input"|"tool-burst"|"user-input", "text": one short sentence, "sourceIndex": number } — the notable events of this slice, chronological, at most 10. Use the message index shown in the transcript below for "sourceIndex".
-Rules: respond with ONLY the JSON object. Use plain lowercase text. If the slice is ambiguous or low-signal, say so in few entries rather than inventing detail.`
-
-function renderChunkTranscript(
-  events: readonly SessionSummarySourceEvent[],
-  range: SessionSummaryChunkRange,
-  absoluteFrom: number
-): string {
-  const lines: string[] = []
-  for (let index = range.from; index < range.to; index += 1) {
-    const event = events[index]
-    const text =
-      event.text.length > EVENT_TEXT_MAX_CHARS
-        ? `${event.text.slice(0, EVENT_TEXT_MAX_CHARS)}…`
-        : event.text
-    lines.push(`[#${absoluteFrom + index} ${event.role}] ${text}`)
-  }
-  return lines.join('\n')
-}
-
-export function buildSessionSummaryChunkPrompt(
-  events: readonly SessionSummarySourceEvent[],
-  range: SessionSummaryChunkRange,
-  absoluteFrom: number
-): string {
-  return `${CHUNK_EXTRACT_INSTRUCTIONS}\n\nTranscript slice:\n${renderChunkTranscript(events, range, absoluteFrom)}`
 }
 
 export type SessionSummaryFoldResult = {

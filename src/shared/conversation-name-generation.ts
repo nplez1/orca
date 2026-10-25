@@ -5,7 +5,7 @@ import { sliceAtCodeUnitLimit } from './surrogate-safe-text-slice'
 export type ConversationNameContext = { firstPrompt: string }
 
 const MAX_FIRST_PROMPT_LENGTH = 4000
-const MAX_GENERATED_NAME_LENGTH = 48
+export const MAX_GENERATED_NAME_LENGTH = 48
 
 export function clampConversationNameFirstPrompt(firstPrompt: string): string {
   return sliceAtCodeUnitLimit(firstPrompt.trim(), MAX_FIRST_PROMPT_LENGTH)
@@ -13,21 +13,6 @@ export function clampConversationNameFirstPrompt(firstPrompt: string): string {
 
 /** The naming request's first line; Session History reads it to hide these one-shot runs. */
 export const CONVERSATION_NAME_PROMPT_OPENING = "Name this chat from the user's first request."
-
-export function buildConversationNamePrompt(
-  context: ConversationNameContext,
-  customPrompt = ''
-): string {
-  const firstPrompt = clampConversationNameFirstPrompt(context.firstPrompt)
-  const basePrompt = `${CONVERSATION_NAME_PROMPT_OPENING}
-Write a short, specific title of at most ${MAX_GENERATED_NAME_LENGTH} characters.
-Output only the title, with no heading, quotes, or explanation.
-
-First request:
-${firstPrompt}`
-  const extra = customPrompt.trim()
-  return extra ? `${basePrompt}\n\nAdditional instructions:\n${extra}` : basePrompt
-}
 
 export function sanitizeGeneratedConversationName(raw: string): string | null {
   const cleaned = cleanGeneratedCommitMessage(raw)

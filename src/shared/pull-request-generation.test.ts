@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildPullRequestFieldsPrompt } from './ai-prompts/pull-request'
 import {
-  buildPullRequestFieldsPrompt,
   GENERATED_PULL_REQUEST_JSON_STRUCTURE_LIMITS,
   parseGeneratedPullRequestFields,
   type PullRequestDraftContext
