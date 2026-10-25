@@ -5,6 +5,11 @@ export type ScreenPromptObservation = {
   reason: RuntimeTerminalWaitBlockedReason
   /** When the tail gained this wording. Older than the turn means it is not this turn's wait. */
   since: number
+  /** The pane's own live marker says this dialog is open right now: pi's `π !` title, painted for as
+   *  long as a dialog holds the pane and never for scrollback. Set only by a reader that checked the
+   *  marker, and it outranks `since` - a card the pane itself still claims cannot be scrollback, and
+   *  a turn whose start the store could not pin would otherwise reject a live wait. */
+  current?: boolean
 }
 
 /** The blocked-text reasons that only match while a person is being asked something: an approval
@@ -19,13 +24,17 @@ export function isScreenInteractivePromptReason(reason: RuntimeTerminalWaitBlock
  * Copilot approves most requests itself, so `permission_prompt` is dropped as a wait signal and
  * `PermissionRequest` alone precedes both a prompt and a silent approval; the screen is the witness.
  *
- * Why Pi is NOT here, measured: a captured Pi select dialog (`pi --no-extensions -e <select ext>`,
- * 100x30, PTY recording) is painted with cursor addressing, so its footer never reaches the tail
- * text `detectTerminalWaitBlockedReason` reads - the visible grid has it, the tail does not. Reading
- * Pi's dialogs needs the emulated screen plus its own "gained" stamp, which is a separate change.
+ * Why Pi too: pi *does* report a dialog (`ui_prompt_start`), and that claim is only as durable as
+ * pi's silence. Any post that arrives while the card sits unanswered replaces the wait - a reload's
+ * `agent_start`, a child agent settling, a stamp that lost the extension's prompt depth - and no
+ * later event restores it until the card closes. Measured on this repo's own store: a question open
+ * from 08:44:04 to 09:02:10 held a `waiting` row for 3m31s and then read `working` for the remaining
+ * 14m35s. Like Copilot's, pi's card is the witness, but it is painted inside the alternate screen
+ * with cursor addressing, so it reaches the rendered grid and never the tail text that lane reads
+ * (Pi-Bolt 1.0.0 `ask_user_question`, 100x30 PTY). Hence its own grid read and its own gained stamp.
  */
 function screenReportsAgentDialogs(agentType: string | undefined): boolean {
-  return agentType === 'copilot'
+  return agentType === 'copilot' || agentType === 'pi'
 }
 
 /** Whether this row is a claim the screen can settle: the agent is working, and its hooks cannot
@@ -46,6 +55,6 @@ export function isScreenPromptForRow(
   return (
     screen !== null &&
     isScreenInteractivePromptReason(screen.reason) &&
-    screen.since >= (row.turnStartedAt ?? row.receivedAt)
+    (screen.current === true || screen.since >= (row.turnStartedAt ?? row.receivedAt))
   )
 }

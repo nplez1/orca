@@ -81,7 +81,12 @@ export type ScreenPromptCorroborationHost = {
   /** False where no pane screen is readable at all (the relay's parser, a headless peer). */
   readsScreen: () => boolean
   /** `undefined` when the pane's screen cannot be read at all, which is not "no dialog". */
-  readScreenPrompt: (paneKey: string) => ScreenPromptObservation | null | undefined
+  /** `agentType` picks the lane that can see the dialog: pi's card exists only on the rendered grid,
+   *  copilot's only in the tail text. */
+  readScreenPrompt: (
+    paneKey: string,
+    agentType: string | undefined
+  ) => ScreenPromptObservation | null | undefined
   currentRow: (paneKey: string) => EnrichedAgentHookEventPayload | undefined
   /** Publishes the repaint and returns the `receivedAt` the stored row ended up with. */
   publishScreenPromptRow: (row: AgentHookEventPayload) => number | undefined
@@ -191,7 +196,7 @@ export class ScreenPromptCorroboration {
       this.forget(paneKey)
       return
     }
-    const reading = this.host.readScreenPrompt(paneKey)
+    const reading = this.host.readScreenPrompt(paneKey, current.payload.agentType)
     // Why wait: a pane whose terminal is not bound yet (a restored one still reconnecting) cannot
     // answer, and releasing on that would report a live Working over a dialog nobody looked at.
     if (reading === undefined || isScreenPromptForRow(pane.working, reading)) {
@@ -211,7 +216,7 @@ export class ScreenPromptCorroboration {
       this.forget(paneKey)
       return
     }
-    const reading = this.host.readScreenPrompt(paneKey)
+    const reading = this.host.readScreenPrompt(paneKey, current.payload.agentType)
     const next = reading === undefined ? null : screenPromptRow(pane.working, current, reading)
     if (!next) {
       this.forget(paneKey)
