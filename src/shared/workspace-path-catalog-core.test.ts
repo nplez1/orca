@@ -170,10 +170,12 @@ describe('workspace path catalog core', () => {
     }
   })
 
+  // Why 5 min: the whole query battery runs against every scope descriptor at 100k paths.
   it('matches the full oracle battery and every scope descriptor at 100k paths', async () => {
     await assertGeneratedCatalogParity(100_000)
   }, 300_000)
 
+  // Why 10 min: the same battery at 300k paths, roughly three times the 100k run.
   it('matches the full battery and every scope descriptor at 300k paths', async () => {
     await assertGeneratedCatalogParity(300_000)
   }, 600_000)

@@ -211,8 +211,7 @@ for (const theme of ['dark', 'light'] as const) {
         await window.__store?.getState().updateSettings({ experimentalAgentDashboardPopout: true })
         window.__store?.getState().openAgentDashboardPage()
       })
-      await page.evaluate(() => window.__store?.getState().setAgentDashboardDrawerOpen(true))
-      await expect(page.locator('[data-agent-dashboard-sheet]')).toBeVisible()
+      await expect(page.locator('[data-agent-dashboard-page]')).toBeVisible()
       await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0)
       await expect(toaster).toHaveCSS('z-index', '47')
       await page.screenshot({

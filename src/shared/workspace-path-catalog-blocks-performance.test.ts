@@ -60,6 +60,7 @@ type Measurement = {
 }
 
 describe.skipIf(!RUN_BLOCKS_BENCHMARK)('workspace path catalog block performance matrix', () => {
+  // Why 15 min: opt-in benchmark that samples every profile and storage mode in one test.
   it('records packed and prefix-compressed footprints and warm samples for both profiles', async () => {
     const measurements: Measurement[] = []
     for (const profile of PROFILES) {

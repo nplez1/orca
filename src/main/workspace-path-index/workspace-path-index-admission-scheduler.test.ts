@@ -84,10 +84,11 @@ describe('WorkspacePathIndexQueryScheduler', () => {
 
   it('cancels only the superseded consumer and continues with the latest request', async () => {
     const cancelled: string[] = []
+    const slowRunning = deferred<void>()
     const scheduler = new WorkspacePathIndexQueryScheduler<string, string>(
       async (request, token) => {
         if (request === 'slow') {
-          await new Promise((resolve) => setTimeout(resolve, 5))
+          await slowRunning.promise
           return token.isCancelled() ? 'cancelled' : 'slow'
         }
         return request
@@ -98,6 +99,7 @@ describe('WorkspacePathIndexQueryScheduler', () => {
     await yieldToScheduler()
     const latest = scheduler.submit('one', 'latest')
     const other = scheduler.submit('two', 'other')
+    slowRunning.resolve()
     await expect(slow).resolves.toBeNull()
     await expect(latest).resolves.toBe('latest')
     await expect(other).resolves.toBe('other')

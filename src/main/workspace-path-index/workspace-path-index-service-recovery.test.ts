@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   WorkspacePathSearchFenceIdentity,
   WorkspacePathSearchOwnerIdentity
@@ -35,6 +35,10 @@ function identity(
 async function settleBuild(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('WorkspacePathIndexService recovery and admission', () => {
   it('drops worker-lost generations and rebuilds after bounded backoff', async () => {
@@ -82,6 +86,8 @@ describe('WorkspacePathIndexService recovery and admission', () => {
   })
 
   it('backs off after a worker build failure and retries the same requested scope', async () => {
+    // Only Date is faked: the retry backoff compares Date.now(), while settleBuild needs real timers.
+    vi.useFakeTimers({ toFake: ['Date'] })
     let buildCount = 0
     const service = new WorkspacePathIndexService({
       authorize: async (owner) => owner.authorizedCanonicalRoot,
@@ -111,7 +117,7 @@ describe('WorkspacePathIndexService recovery and admission', () => {
     await expect(service.ensure(args)).resolves.toMatchObject({ ready: false, reason: 'building' })
     await settleBuild()
     await expect(service.ensure(args)).resolves.toMatchObject({ ready: false, reason: 'failed' })
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    vi.advanceTimersByTime(20)
     await expect(service.ensure(args)).resolves.toMatchObject({ ready: false, reason: 'building' })
     await settleBuild()
     await expect(service.ensure(args)).resolves.toMatchObject({ ready: true })

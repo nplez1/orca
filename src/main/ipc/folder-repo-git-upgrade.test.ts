@@ -187,18 +187,22 @@ describe('folder repo git upgrade watch', () => {
    * chain finished — wait on the observable effect instead.
    */
   async function waitForUpgrade(store: ReturnType<typeof makeStore>): Promise<void> {
-    const deadline = Date.now() + 5_000
-    while (store.updateRepo.mock.calls.length === 0 && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
-    }
+    await vi.waitFor(
+      () => {
+        expect(store.updateRepo).toHaveBeenCalled()
+      },
+      { timeout: 5_000, interval: POLL_MS }
+    )
   }
 
   /** Why: the git probe is the observable the rejected-marker cache exists to bound. */
   async function waitForGitProbes(count: number): Promise<void> {
-    const deadline = Date.now() + 5_000
-    while (gitProbes.length < count && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS))
-    }
+    await vi.waitFor(
+      () => {
+        expect(gitProbes.length).toBeGreaterThanOrEqual(count)
+      },
+      { timeout: 5_000, interval: POLL_MS }
+    )
   }
 
   it('upgrades a local folder repo once an external git init creates .git', async () => {

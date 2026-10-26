@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
@@ -22,15 +22,28 @@ function testStore(): { store: SessionSummaryStore; path: string } {
   return { store: new SessionSummaryStore(path), path }
 }
 
+// Under fake timers vi.waitFor advances the clock by `interval` on every check, which is what
+// steps the host subscription's polling.
 async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
-  const start = Date.now()
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error('timed out waiting for condition')
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
+  await vi.waitFor(
+    () => {
+      if (!predicate()) {
+        throw new Error('timed out waiting for condition')
+      }
+    },
+    { timeout: timeoutMs, interval: 5 }
+  )
 }
+
+// The service's only async work is mocked promises, synchronous store writes and the host
+// subscription's poll timers, so fake time drives all of it.
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 type Harness = {
   service: SessionSummaryService
@@ -165,7 +178,7 @@ describe('SessionSummaryService', () => {
     )
     service.open({ paneKey: 'tab:leaf' })
     service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await vi.advanceTimersByTimeAsync(50)
     expect(updates.some((u) => u.status === 'failed')).toBe(false)
     // Nothing folded, so there is nothing to remember — see the next test.
     expect(store.get('tab:leaf')).toBeNull()
@@ -502,7 +515,7 @@ describe('SessionSummaryService host routing', () => {
 
     // Settled: polling stops instead of running for the life of the pane.
     const seen = h.hostFoldCalls.length
-    await new Promise((resolve) => setTimeout(resolve, 40))
+    await vi.advanceTimersByTimeAsync(40)
     expect(h.hostFoldCalls.length).toBe(seen)
   })
 
@@ -517,7 +530,7 @@ describe('SessionSummaryService host routing', () => {
     await waitFor(() => h.hostFoldCalls.some((c) => c.startsWith('peek:')))
     h.service.close({ paneKey: 'tab:leaf', seenTimelineCount: 0 })
     const seen = h.hostFoldCalls.length
-    await new Promise((resolve) => setTimeout(resolve, 40))
+    await vi.advanceTimersByTimeAsync(40)
 
     expect(h.hostFoldCalls.length).toBe(seen)
   })

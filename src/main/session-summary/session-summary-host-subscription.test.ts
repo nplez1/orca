@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
 import { SessionSummaryHostFoldSubscription } from './session-summary-host-subscription'
 
@@ -33,7 +33,19 @@ function harness(overrides: { peek?: () => Promise<SessionSummarySnapshot> } = {
   return { subscription, snapshots, errors, closed }
 }
 
-const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+// The subscription only schedules timers and awaits mocked promises, so fake time drives it
+// exactly; advanceTimersByTimeAsync flushes the promise chain between timers.
+const advance = async (ms: number): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(ms)
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('SessionSummaryHostFoldSubscription', () => {
   it('polls until the host reports the fold settled, then stops', async () => {
@@ -45,9 +57,9 @@ describe('SessionSummaryHostFoldSubscription', () => {
       environmentId: 'env-1',
       foldParams: null
     })
-    await wait(20)
+    await advance(20)
     const seen = h.snapshots.length
-    await wait(20)
+    await advance(20)
 
     expect(h.snapshots.at(-1)?.fold.running).toBe(false)
     expect(h.snapshots.length).toBe(seen)
@@ -70,7 +82,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
       environmentId: 'env-1',
       foldParams: null
     })
-    await wait(30)
+    await advance(30)
 
     expect(h.errors).toHaveLength(0)
     expect(h.snapshots.at(-1)?.fold.running).toBe(false)
@@ -87,7 +99,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
       environmentId: 'env-1',
       foldParams: null
     })
-    await wait(40)
+    await advance(40)
 
     expect(h.errors.map((error) => error.message)).toEqual(['host unreachable'])
   })
@@ -105,7 +117,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
       environmentId: 'env-1',
       foldParams: null
     })
-    await wait(10)
+    await advance(10)
     h.subscription.close({
       paneKey: 'tab-1:leaf-1',
       environmentId: 'env-1',
@@ -113,7 +125,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
       lastViewer: true
     })
     const seen = calls
-    await wait(20)
+    await advance(20)
 
     expect(calls).toBe(seen)
     expect(h.closed).toEqual(['tab-1:leaf-1'])
@@ -132,7 +144,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
       environmentId: 'env-1',
       foldParams: null
     })
-    await wait(10)
+    await advance(10)
     // A reopen replaces the chain while the old poll is in flight.
     h.subscription.open({
       paneKey: 'tab-1:leaf-1',
@@ -142,7 +154,7 @@ describe('SessionSummaryHostFoldSubscription', () => {
     for (const resolve of resolveLater.splice(0)) {
       resolve()
     }
-    await wait(10)
+    await advance(10)
 
     expect(h.errors).toHaveLength(0)
   })
@@ -192,11 +204,11 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
     expect(h.closed).toEqual([])
 
     resolveOpen(snapshot(false))
-    await wait(10)
+    await advance(10)
 
     expect(h.closed).toEqual([4])
     // The viewer is gone, so the answer must not restart polling.
-    await wait(10)
+    await advance(10)
     expect(h.snapshots).toHaveLength(0)
   })
 
@@ -227,7 +239,7 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
     for (const resolve of resolvers.splice(0)) {
       resolve(snapshot(false))
     }
-    await wait(10)
+    await advance(10)
 
     expect(h.closed.sort()).toEqual([1, 2])
   })
@@ -253,7 +265,7 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
     })
     subscription.open(args)
     subscription.open(args)
-    await wait(10)
+    await advance(10)
     subscription.close({
       paneKey: args.paneKey,
       environmentId: args.environmentId,
@@ -261,7 +273,7 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
       lastViewer: false
     })
     const afterFirstClose = polls
-    await wait(20)
+    await advance(20)
 
     expect(closed).toEqual([1])
     expect(polls).toBeGreaterThan(afterFirstClose)
@@ -285,14 +297,14 @@ describe('SessionSummaryHostFoldSubscription lease accounting', () => {
       lastViewer: true
     })
     h.subscription.open(args)
-    await wait(10)
+    await advance(10)
     h.subscription.close({
       paneKey: args.paneKey,
       environmentId: args.environmentId,
       seenTimelineCount: 2,
       lastViewer: true
     })
-    await wait(10)
+    await advance(10)
 
     expect(h.closed.sort()).toEqual([0, 2])
   })
@@ -330,9 +342,9 @@ describe('SessionSummaryHostFoldSubscription failed opens', () => {
 
     // Window A's open fails; window B's is accepted.
     subscription.open(args)
-    await wait(5)
+    await advance(5)
     subscription.open(args)
-    await wait(10)
+    await advance(10)
     // A closes: no lease of its own, and B's must survive.
     subscription.close({
       paneKey: args.paneKey,
@@ -340,7 +352,7 @@ describe('SessionSummaryHostFoldSubscription failed opens', () => {
       seenTimelineCount: 1,
       lastViewer: false
     })
-    await wait(10)
+    await advance(10)
 
     expect(closed).toEqual([])
     expect(polls).toBeGreaterThan(0)
@@ -352,7 +364,7 @@ describe('SessionSummaryHostFoldSubscription failed opens', () => {
       seenTimelineCount: 2,
       lastViewer: true
     })
-    await wait(5)
+    await advance(5)
     expect(closed).toEqual([2])
   })
 })
@@ -436,34 +448,34 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
 
     subscription.open(args)
     pending[0].resolve(snapshot(false))
-    await wait(4)
+    await advance(4)
     close(10)
-    await wait(4)
+    await advance(4)
     expect(closed).toEqual([10])
 
     // A close queued on an open that will fail, while another open stays in flight behind it.
     subscription.open(args)
     close(12)
     subscription.open(args)
-    await wait(4)
+    await advance(4)
     pending[1].reject(new Error('relay blip'))
-    await wait(4)
+    await advance(4)
     pending[2].resolve(snapshot(false))
-    await wait(4)
+    await advance(4)
 
     // A second lease, so the pane never goes idle between the two closes below.
     subscription.open(args)
     pending[3].resolve(snapshot(false))
-    await wait(4)
+    await advance(4)
 
     // Absorbed 12 beats this close's 7 …
     close(7)
-    await wait(4)
+    await advance(4)
     expect(closed).toEqual([10, 12])
 
     // … and is reported only once: the close of 7 spent it, so this one reports itself.
     close(3, true)
-    await wait(4)
+    await advance(4)
     expect(closed).toEqual([10, 12, 3])
   })
 
@@ -472,19 +484,19 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
   it('carries the place of a viewer who closes after their open failed', async () => {
     const h = scripted(['ok', 'fail', 'ok'])
     h.subscription.open(args)
-    await wait(4)
+    await advance(4)
     close(h.subscription, 1)
-    await wait(4)
+    await advance(4)
 
     h.subscription.open(args)
-    await wait(4) // fails: this viewer owes the host nothing
+    await advance(4) // fails: this viewer owes the host nothing
 
     h.subscription.open(args)
-    await wait(4)
+    await advance(4)
     close(h.subscription, 2) // the failed viewer's place, absorbed
-    await wait(4)
+    await advance(4)
     close(h.subscription, 1, true) // the lease holder's own count is the lower one
-    await wait(4)
+    await advance(4)
 
     expect(h.closed).toEqual([1, 2])
   })
@@ -494,20 +506,20 @@ describe('SessionSummaryHostFoldSubscription absorbed closes', () => {
   it('does not leave a phantom slot when a queued close fails', async () => {
     const h = scripted(['ok', 'fail', 'ok'])
     h.subscription.open(args)
-    await wait(4)
+    await advance(4)
     close(h.subscription, 1)
-    await wait(4)
+    await advance(4)
 
     // The queued count is deliberately larger than the close below, so a place that outlived
     // the idle pane would be reported as 20 instead of 9.
     h.subscription.open(args)
     close(h.subscription, 20)
-    await wait(10)
+    await advance(10)
 
     h.subscription.open(args)
-    await wait(4)
+    await advance(4)
     close(h.subscription, 9, true)
-    await wait(4)
+    await advance(4)
 
     // Exactly one close per accepted open, and none swallowed by a phantom slot.
     expect(h.closed).toEqual([1, 9])

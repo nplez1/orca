@@ -43,7 +43,9 @@ test('search excerpts keep matches visible after long leading context', async ({
   }, response)
   await orcaPage.evaluate(async () => {
     const state = window.__store?.getState()
-    await state?.updateSettingsOrThrow({ aiVaultSearch: { enabled: true, historyDays: null } })
+    await state?.updateSettingsOrThrow({
+      aiVaultSearch: { contentEnabled: true, historyDays: null }
+    })
     state?.setRightSidebarOpen(true)
     state?.setRightSidebarTab('vault')
     state?.setRightSidebarWidth(400)

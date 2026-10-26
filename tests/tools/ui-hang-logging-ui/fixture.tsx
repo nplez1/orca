@@ -13,7 +13,7 @@ import './fixture.css'
 const LOG_PATH = '/Users/you/Library/Application Support/Orca/logs/ui-hangs.ndjson'
 
 const settings = getDefaultSettings('/disposable-ui-hang-home')
-const updateSettings = (patch: Partial<GlobalSettings>): void => {
+const updateSettings = async (patch: Partial<GlobalSettings>): Promise<void> => {
   const current = useAppStore.getState().settings
   if (!current) {
     throw new Error('Settings fixture not initialized')

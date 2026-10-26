@@ -57,6 +57,7 @@ describe.skipIf(!hasRipgrep())('searchQuickOpenFilePaths against real ripgrep', 
     tempDir = null
   })
 
+  // Why 60 s: it writes 20,002 real files to disk before the search runs.
   it('finds a deep name-filter match beyond the unscoped listing cap', async () => {
     const root = tempDir!
     await mkdir(join(root, 'bulk'), { recursive: true })

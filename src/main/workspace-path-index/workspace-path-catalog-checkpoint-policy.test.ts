@@ -184,8 +184,11 @@ async function writeSpilledGeneration(
   return written.catalog
 }
 
+// Eviction orders checkpoints by relative mtime only, so ages count back from a fixed instant.
+const AGE_REFERENCE_MILLISECONDS = Date.UTC(2026, 0, 1)
+
 async function age(directory: string, millisecondsAgo: number): Promise<void> {
-  const aged = new Date(Date.now() - millisecondsAgo)
+  const aged = new Date(AGE_REFERENCE_MILLISECONDS - millisecondsAgo)
   for (const name of await readdir(directory)) {
     await utimes(join(directory, name), aged, aged)
   }

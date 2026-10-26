@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
@@ -25,14 +25,19 @@ function testStore(): SessionSummaryStore {
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
-  const start = Date.now()
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error('timed out waiting for condition')
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
+  await vi.waitFor(
+    () => {
+      if (!predicate()) {
+        throw new Error('timed out waiting for condition')
+      }
+    },
+    { timeout: timeoutMs, interval: 5 }
+  )
 }
+
+// A fixed clock: the freshness rule compares the fold's `now` with the row's and the brief's
+// stamps, so pinning it keeps every comparison exact.
+const NOW = 1_700_000_000_000
 
 function harness(options: {
   entry?: SessionSummaryStatusEntry | ((paneKey: string) => SessionSummaryStatusEntry | undefined)
@@ -60,7 +65,7 @@ function harness(options: {
           ? JSON.stringify({ since: 's', full: 'f' })
           : JSON.stringify({ inProgress: 'folding' })
     }),
-    now: () => Date.now()
+    now: () => NOW
   })
   const updates: SessionSummarySnapshot[] = []
   service.onUpdate((snapshot) => updates.push(snapshot))
@@ -81,7 +86,7 @@ function defaultEntry(
   return {
     agentType: 'pi',
     providerSession: { key: 'session_id', id: 'pi-1', transcriptPath: '/tmp/pi-1.jsonl' },
-    updatedAt: Date.now() + 1_000,
+    updatedAt: NOW + 1_000,
     ...overrides
   }
 }
@@ -165,12 +170,12 @@ describe('SessionSummaryService report staleness', () => {
         lastUserMessageIndex: 2,
         userMessageCount: 1,
         foldedThrough: 3,
-        foldedAt: Date.now() - 60_000
+        foldedAt: NOW - 60_000
       },
       chunkCache: {},
       messageCount: 3,
       seenThrough: 0,
-      updatedAt: Date.now() - 60_000
+      updatedAt: NOW - 60_000
     })
     const service = new SessionSummaryService({
       store,
@@ -185,7 +190,7 @@ describe('SessionSummaryService report staleness', () => {
           return JSON.stringify({ inProgress: 'folding' })
         }
       }),
-      now: () => Date.now()
+      now: () => NOW
     })
     const updates: SessionSummarySnapshot[] = []
     service.onUpdate((snapshot) => updates.push(snapshot))

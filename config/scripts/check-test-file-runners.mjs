@@ -89,6 +89,14 @@ const NON_UNIT_TEST_RUNNERS = [
     ]
   },
   {
+    // Why: fork-local `node --test` files, run by the fork's unit gate rather than a CI job.
+    name: 'fork-local node:test (local/gate-unit.mjs)',
+    manual: true,
+    include: ['local/**/*.test.mjs'],
+    sources: ['local/gate-unit.mjs'],
+    mirrors: ["const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']"]
+  },
+  {
     name: 'docs site',
     include: ['docs/site/tests/*.test.mjs'],
     sources: ['docs/site/package.json'],

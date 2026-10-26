@@ -62,6 +62,7 @@ function isWorkerMemorySample(value: unknown): value is WorkerMemoryReading {
 }
 
 describe.skipIf(!runDiscoveryMatrix)('workspace path index real discovery matrix', () => {
+  // Why 600 s: opt-in matrix that writes and then scans a real 100k-file tree.
   it('scans a real deterministic 100k tree directly into the index worker', async () => {
     const fixture = await createFilesystemPathTreeFixture(PATH_COUNT)
     fixtureCleanup = fixture.cleanup

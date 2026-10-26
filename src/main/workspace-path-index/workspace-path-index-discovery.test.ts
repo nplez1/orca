@@ -83,7 +83,8 @@ describe.skipIf(!canRunRipgrep)('worker-owned path catalog discovery', () => {
           batchCount += 1
           inFlightBatches += 1
           maximumInFlightBatches = Math.max(maximumInFlightBatches, inFlightBatches)
-          await new Promise((resolveBatch) => setTimeout(resolveBatch, 1))
+          // A macrotask yield lets an unbounded producer overlap a second batch if it would.
+          await new Promise((resolveBatch) => setTimeout(resolveBatch, 0))
           const accepted = await worker.appendCatalogPathBatch(buildId, pathSet, paths)
           inFlightBatches -= 1
           return accepted

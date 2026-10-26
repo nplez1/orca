@@ -33,6 +33,7 @@ describe('collectQuickOpenPaths with a real generated tree', () => {
     fixture = null
   })
 
+  // Why 120 s: the generated tree is real files on disk, and writing it dominates the run.
   it('enumerates every generated file under the temporary root', async () => {
     fixture = await createFilesystemPathTreeFixture()
 

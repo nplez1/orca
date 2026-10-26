@@ -55,6 +55,7 @@ type WarmQueryReport = {
 }
 
 describe.skipIf(!runMatrix)('workspace path index service performance matrix', () => {
+  // Why 30 min: opt-in matrix that measures every query, build and churn cell in one test.
   it('measures worker-backed query, admission, build, memory, and churn behavior', async () => {
     const temporaryDirectory = await createPathIndexBenchmarkTemporaryDirectory()
     const workerPath = await buildWorkspacePathIndexWorkerEntry(temporaryDirectory)

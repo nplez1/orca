@@ -1,7 +1,7 @@
 import { mkdtemp, open, readdir, rm, stat, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { compareFileNames } from '../../shared/file-name-sort'
 import {
   assertWorkspacePathSearchEquivalent,
@@ -247,27 +247,24 @@ describe('workspace path catalog spill files', () => {
         generation: { catalog }
       })
     }
-    for (
-      let attempt = 0;
-      attempt < 50 && (await readdir(temporaryDirectory)).length > 2;
-      attempt += 1
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-    expect(await readdir(temporaryDirectory)).toHaveLength(2)
+    const directory = temporaryDirectory
+    await vi.waitFor(
+      async () => {
+        expect(await readdir(directory)).toHaveLength(2)
+      },
+      { timeout: 500, interval: 10 }
+    )
     dropWorkspacePathIndexWorkerRoot({
       generations,
       latestGenerationIds,
       rootKey: 'spill-eviction-root'
     })
-    for (
-      let attempt = 0;
-      attempt < 50 && (await readdir(temporaryDirectory)).length > 0;
-      attempt += 1
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-    expect(await readdir(temporaryDirectory)).toEqual([])
+    await vi.waitFor(
+      async () => {
+        expect(await readdir(directory)).toEqual([])
+      },
+      { timeout: 500, interval: 10 }
+    )
   })
 
   it('enforces a bounded disk budget before publishing a spill', async () => {

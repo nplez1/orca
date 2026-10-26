@@ -40,6 +40,8 @@ const FOLD_VERSION = 'locale-lowercase-v1'
 const SCOPE_RULE_VERSION = 'quick-open-scope-v1'
 const OWNERSHIP_KEY = 'local::checkpoint-root'
 const SPILL_DIRECTORY_OFFSET = 8 + 4 + 32 * 1024
+// Older than any checkpoint this run writes, so eviction order never rests on timestamp resolution.
+const AGED_CHECKPOINT_MTIME = new Date(Date.UTC(2020, 0, 1))
 
 type SpilledCatalog = Extract<WorkspacePathCatalog, { storageKind: 'disk-spilled' }>
 
@@ -258,8 +260,7 @@ describe('workspace path catalog checkpoints', () => {
         ownershipKey: OWNERSHIP_KEY,
         generation: { catalog: written }
       })
-      const aged = new Date(Date.now() - 60_000)
-      await utimes(fixture.checkpointDirectory, aged, aged)
+      await utimes(fixture.checkpointDirectory, AGED_CHECKPOINT_MTIME, AGED_CHECKPOINT_MTIME)
     }
     expect(
       (await readdir(fixture.checkpointDirectory)).filter((name) => name.endsWith('.wpc'))
@@ -388,7 +389,7 @@ describe('workspace path catalog checkpoints', () => {
       foldVersion: FOLD_VERSION,
       foldLocale: resolveWorkspacePathFoldLocale(),
       scopeRuleVersion: SCOPE_RULE_VERSION,
-      writtenAtMilliseconds: Date.now()
+      writtenAtMilliseconds: Date.UTC(2026, 0, 1)
     })
     await expect(restoreFor(fixture)).resolves.toMatchObject({
       restored: false,

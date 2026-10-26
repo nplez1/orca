@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Worker } from 'node:worker_threads'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacePathSearchFenceIdentity } from '../../shared/workspace-path-search-contract'
 import { generateWorkspacePathCatalog } from '../../shared/__fixtures__/workspace-path-catalog'
 import { WorkspacePathCatalogBuilder } from '../../shared/workspace-path-catalog-builder'
@@ -133,14 +133,12 @@ describe('WorkspacePathIndexWorkerClient streamed builds', () => {
       decodedBlockCacheHits: 0
     })
     await client.drop('spill-worker-root')
-    for (
-      let attempt = 0;
-      attempt < 50 && (await readdir(spillDirectory)).length > 0;
-      attempt += 1
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-    expect(await readdir(spillDirectory)).toEqual([])
+    await vi.waitFor(
+      async () => {
+        expect(await readdir(spillDirectory)).toEqual([])
+      },
+      { timeout: 500, interval: 10 }
+    )
     client.dispose()
   })
 

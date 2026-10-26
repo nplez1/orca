@@ -88,6 +88,7 @@ const BEFORE_SYNCHRONOUS_PROJECTION: Record<ProjectionCase['fixtureId'], TimingD
 }
 
 describe.skipIf(!runProjectionMatrix)('workspace path index renderer projection matrix', () => {
+  // Why 120 s: opt-in matrix that repeats every projection case WARM_REPETITIONS times.
   it('measures projection and virtual-page commit in happy-dom with Phase 4 timing hooks', async () => {
     const cases = createProjectionCases()
     const reports: Record<string, unknown>[] = []

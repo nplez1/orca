@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import {
   activateAndRevealFolderWorkspace,
@@ -24,8 +24,16 @@ vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) =>
 )
 
 const initialAppStoreState = useAppStore.getState()
+// Why: tombstones only count within a TTL of the clock, so the fixtures' closedAt is pinned to it.
+const NOW = 1_800_000_000_000
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(NOW)
+})
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
   useAppStore.setState(initialAppStoreState, true)
@@ -351,7 +359,7 @@ function seedEmptiedFolderWorkspaceOnTwoHosts(): void {
 function recordFolderWorkspaceLastTerminalClosed(): void {
   useAppStore.setState({
     closedTerminalTabTombstonesByTabId: {
-      closed: { closedAt: Date.now(), worktreeId: FOLDER_KEY }
+      closed: { closedAt: NOW, worktreeId: FOLDER_KEY }
     }
   })
 }

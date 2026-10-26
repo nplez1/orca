@@ -234,7 +234,8 @@ describe('createWorktreeSymlinks', () => {
     const cloneWorktreePath = vi.fn(async (source: string, target: string) => {
       activeClones += 1
       maxActiveClones = Math.max(maxActiveClones, activeClones)
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 20))
+      // Why: hold each clone until a second one is in flight, so overlap is proven, not timed.
+      await vi.waitFor(() => expect(maxActiveClones).toBeGreaterThan(1))
       mkdirSync(target)
       writeFileSync(join(target, 'marker'), readFileSync(join(source, 'marker')))
       activeClones -= 1
@@ -260,7 +261,7 @@ describe('createWorktreeSymlinks', () => {
     const cloneWorktreePath = vi.fn(async (source: string, target: string) => {
       activeClones += 1
       maxActiveClones = Math.max(maxActiveClones, activeClones)
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 10))
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 0))
       mkdirSync(target)
       if (source === join(primary, 'dist')) {
         mkdirSync(join(target, 'nested'))

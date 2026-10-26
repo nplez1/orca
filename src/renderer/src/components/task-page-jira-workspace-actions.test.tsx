@@ -56,9 +56,19 @@ function renderList(workspaces = [first, second]) {
   )
 }
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   vi.clearAllMocks()
 })
+/** Press and hold past the 500ms hold window on fake time, then return to real timers. */
+async function pressPastHoldWindow(body: HTMLElement, init?: PointerEventInit): Promise<void> {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  fireEvent.pointerDown(body, init)
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(550)
+  })
+  vi.useRealTimers()
+}
 describe('Jira linked workspace split action', () => {
   it('opens the linked workspace on default click of the button body', async () => {
     renderList([first])
@@ -91,10 +101,7 @@ describe('Jira linked workspace split action', () => {
     renderList([first])
     const user = userEvent.setup()
     const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
-    fireEvent.pointerDown(body)
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 550))
-    })
+    await pressPastHoldWindow(body)
     expect(screen.getByRole('menuitem', { name: /API fix/ })).toBeInTheDocument()
     fireEvent.pointerUp(body)
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
@@ -108,10 +115,7 @@ describe('Jira linked workspace split action', () => {
   it('does not open the menu on a secondary-button press held past the hold window', async () => {
     renderList([first])
     const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
-    fireEvent.pointerDown(body, { button: 2 })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 550))
-    })
+    await pressPastHoldWindow(body, { button: 2 })
     fireEvent.pointerUp(body, { button: 2 })
     expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
@@ -120,10 +124,7 @@ describe('Jira linked workspace split action', () => {
   it('does not open the menu on a ctrl+click press held past the hold window (macOS right-click)', async () => {
     renderList([first])
     const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
-    fireEvent.pointerDown(body, { button: 0, ctrlKey: true })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 550))
-    })
+    await pressPastHoldWindow(body, { button: 0, ctrlKey: true })
     fireEvent.pointerUp(body, { button: 0, ctrlKey: true })
     expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()
@@ -132,10 +133,7 @@ describe('Jira linked workspace split action', () => {
   it('does not open the menu on a touch long-press of the body', async () => {
     renderList([first])
     const body = screen.getByRole('button', { name: 'Open workspace attached to APP-1' })
-    fireEvent.pointerDown(body, { button: 0, pointerType: 'touch' })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 550))
-    })
+    await pressPastHoldWindow(body, { button: 0, pointerType: 'touch' })
     fireEvent.pointerUp(body, { button: 0, pointerType: 'touch' })
     expect(screen.queryByRole('menuitem', { name: /API fix/ })).not.toBeInTheDocument()
     expect(onOpenOrStartWorkspace).not.toHaveBeenCalled()

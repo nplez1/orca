@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Worker } from 'node:worker_threads'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   WORKSPACE_PATH_CATALOG_SCOPE_RULE_VERSION,
   workspacePathCatalogFoldCacheKey
@@ -79,6 +79,7 @@ type Spread = {
 }
 
 describe.skipIf(!RUN_MATRIX)('workspace path index checkpoint matrix', () => {
+  // Why 6 h: opt-in matrix that builds the worker and measures every profile and size in one test.
   it(
     'measures checkpoint write, restore, provisional latency, and reconciliation',
     async () => {
@@ -296,20 +297,22 @@ async function measureCell(args: {
       }
       // Observe the rebuild through its own build observations: polling with search would issue a
       // multi-second spilled scan every tick and starve the very build being timed.
-      for (let attempt = 0; attempt < 28_800; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        if (reconciling.observations.allScopesReadyAt !== null) {
-          reconcileToReadyMilliseconds = performance.now() - startedAt
-          break
-        }
-        if (reconciling.observations.error) {
-          throw new Error(`Reconciliation failed: ${reconciling.observations.error}`)
-        }
+      await vi.waitFor(
+        () => {
+          if (
+            reconciling.observations.allScopesReadyAt === null &&
+            !reconciling.observations.error
+          ) {
+            throw new Error('Reconciliation never promoted the root to ready')
+          }
+        },
+        { timeout: 28_800 * 100, interval: 100 }
+      )
+      if (reconciling.observations.allScopesReadyAt === null) {
+        throw new Error(`Reconciliation failed: ${reconciling.observations.error}`)
       }
-      if (reconcileToReadyMilliseconds === null) {
-        throw new Error('Reconciliation never promoted the root to ready')
-      }
-      await sleep(150)
+      reconcileToReadyMilliseconds = performance.now() - startedAt
+      await waitForBuildSettled(reconciling.observations)
       const promoted = await reconciling.service.search(searchArgsFor(reconciling))
       if (!promoted.ready || promoted.response.state.freshness !== 'no-known-gap') {
         throw new Error('Reconciliation did not promote the root to a fresh ready state')
@@ -587,25 +590,27 @@ async function createReadyService(args: {
       activeWorkspace: true,
       correlationId: harness.correlationId
     })
-  let ensured = await ensureOnce()
-  for (let attempt = 0; !ensured.ready && attempt < 7_200; attempt += 1) {
-    await sleep(250)
-    ensured = await ensureOnce()
-  }
-  if (!ensured.ready) {
-    throw new Error(`Cold build never became ready for ${args.profile}:${args.size}`)
-  }
+  await vi.waitFor(
+    async () => {
+      if (!(await ensureOnce()).ready) {
+        throw new Error(`Cold build never became ready for ${args.profile}:${args.size}`)
+      }
+    },
+    { timeout: 7_200 * 250, interval: 250 }
+  )
   // A first-scope publication is already "ready"; the checkpoint unit is the complete snapshot.
-  for (let attempt = 0; harness.observations.outcome === null && attempt < 7_200; attempt += 1) {
-    if (harness.observations.error) {
-      throw new Error(`Cold build failed: ${harness.observations.error}`)
-    }
-    await sleep(100)
-  }
+  await vi.waitFor(
+    () => {
+      if (harness.observations.outcome === null && !harness.observations.error) {
+        throw new Error(`Cold build never published both scopes for ${args.profile}:${args.size}`)
+      }
+    },
+    { timeout: 7_200 * 100, interval: 100 }
+  )
   if (harness.observations.outcome === null) {
-    throw new Error(`Cold build never published both scopes for ${args.profile}:${args.size}`)
+    throw new Error(`Cold build failed: ${harness.observations.error}`)
   }
-  await sleep(100)
+  await waitForBuildSettled(harness.observations)
   // Re-read after completion: the final generation carries the second scope, unlike the
   // first-scope publication that made the entry "ready" moments earlier.
   const completed = await ensureOnce()
@@ -628,6 +633,18 @@ async function createReadyService(args: {
   }
 }
 
-function sleep(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+/**
+ * The service records a finished build in the microtasks after the build callback returns, so a
+ * timer tick that sees the callback's `finishedAt` past its last scope sees the settled entry.
+ */
+async function waitForBuildSettled(observations: BenchmarkBuildObservations): Promise<void> {
+  await vi.waitFor(
+    () => {
+      const readyAt = observations.allScopesReadyAt
+      if (readyAt === null || observations.finishedAt < readyAt) {
+        throw new Error('The build callback has not returned since its last scope was published')
+      }
+    },
+    { timeout: 60_000, interval: 10 }
+  )
 }

@@ -262,10 +262,13 @@ test.describe('Tabs', () => {
         .toBeGreaterThanOrEqual(2)
     }
 
-    const firstTabId = await getActiveTabId(orcaPage)
+    const firstTabId = (await getActiveTabId(orcaPage))!
     const orderedTabs = await getWorktreeTabs(orcaPage, worktreeId)
     const secondTabId = orderedTabs.find((tab) => tab.id !== firstTabId)?.id
     expect(secondTabId).toBeTruthy()
+    if (!secondTabId) {
+      return
+    }
 
     await orcaPage.evaluate((tabId) => {
       window.__store?.getState().setActiveTab(tabId)
@@ -326,7 +329,7 @@ test.describe('Tabs', () => {
         ? groups.find((group) => group.id === activeGroupId)
         : groups[0]
 
-      if (activeGroup?.tabOrder?.length >= 2) {
+      if (activeGroup && activeGroup.tabOrder.length >= 2) {
         const nextOrder = [
           activeGroup.tabOrder[1],
           activeGroup.tabOrder[0],

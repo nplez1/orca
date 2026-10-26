@@ -43,6 +43,7 @@ type StorageBenchmarkResult = {
 }
 
 describe('workspace path catalog storage benchmark', () => {
+  // Why 120 s: it builds and samples both storage layouts back to back in one test.
   it('compares retained string headers with packed folded code units', async () => {
     const results = [
       await benchmarkStorage('folded-strings'),

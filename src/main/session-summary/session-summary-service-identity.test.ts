@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SessionSummarySnapshot } from '../../shared/session-summary-types'
@@ -23,13 +23,14 @@ function testStore(): SessionSummaryStore {
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
-  const start = Date.now()
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error('timed out waiting for condition')
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
+  await vi.waitFor(
+    () => {
+      if (!predicate()) {
+        throw new Error('timed out waiting for condition')
+      }
+    },
+    { timeout: timeoutMs, interval: 5 }
+  )
 }
 
 // The viewer holds the pane, so it is the process guaranteed to know which session is on

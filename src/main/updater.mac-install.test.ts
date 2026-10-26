@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ServeSupervisorInstallPark from './updater/serve-supervisor-install-park'
-import { createUpdaterMainWindow } from './updater-test-main-window'
+import { createUpdaterMainWindow, updaterMainWindow } from './updater-test-main-window'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
-import { updaterMainWindow } from './updater-test-main-window'
 
 const {
   appMock,
