@@ -133,7 +133,9 @@ export function JiraSchemaFieldControl({
       />
     )
   }
-  if (kind === 'select' && field.allowedValues?.length) {
+  // Why `user`: a create screen can enumerate a user field's choices, and without a picker those
+  // supplied choices are the only valid values.
+  if ((kind === 'select' || kind === 'user') && field.allowedValues?.length) {
     return (
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger>

@@ -509,7 +509,7 @@ describe('Linear workspace file cross-process visibility', () => {
       'ws-alpha'
     )
     // Equal timestamps isolate credential revisions from filesystem clock resolution.
-    utimesSync(join(tempHome, '.orca', 'linear-workspaces.json'), 1, 1)
+    utimesSync(join(tempHome, HOME_DIRECTORY_NAME, 'linear-workspaces.json'), 1, 1)
     const linear = await loadClientModule()
     const signal = new AbortController().signal
     const captured = linear.getClients('ws-alpha', signal)[0]

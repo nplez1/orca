@@ -180,7 +180,7 @@ describe('LinearAgentSkillInstallCta', () => {
     mocks.agentRuntime = { runtime: 'wsl', wslDistro: 'Debian', label: 'WSL Debian' }
     const rendered = await renderCta()
     expect(rendered.textContent).toContain(
-      `npx skills@1.7.2 add https://github.com/stablyai/orca/tree/${'0'.repeat(40)} --skill orca-linear --global`
+      `npx skills@1.7.2 add https://github.com/nplez1/orca/tree/${'0'.repeat(40)} --skill orca-linear --global`
     )
     expect(rendered.textContent).not.toContain('Install skill')
     expect(mocks.plan).not.toHaveBeenCalled()

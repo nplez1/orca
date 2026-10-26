@@ -18,7 +18,7 @@ import {
 const DEV_CLI_BIN_FIRST = /^[^:;]*[\\/]cli[\\/]bin[:;]/
 const DEV_CLI_BIN_DIR = /^[^:;]*[\\/]cli[\\/]bin$/
 // Absolute launchers survive login-shell PATH reordering.
-const DEV_CLI_LAUNCHER = /^[^:;]*[\\/]cli[\\/]bin[\\/]orca-dev$/
+const DEV_CLI_LAUNCHER = /^[^:;]*[\\/]cli[\\/]bin[\\/]orca-np-dev$/
 
 async function codexChildEnv(
   env: Record<string, string>,

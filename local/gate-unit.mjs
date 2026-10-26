@@ -75,6 +75,11 @@ const ROOT = resolve(import.meta.dirname, '..')
 /** Why this switch: the unit and PR workflows set it, and it is what makes `config/vitest.config.ts`
  *  apply upstream's `UNIT_EXCLUDE` instead of `defaultExclude`. */
 const UNIT_LANE_ENV = { ORCA_BALANCE_UNIT_SHARDS: '1' }
+/** Why: `config/vitest.config.ts` records dependencies only when `CI` is unset, so upstream's lane runs
+ *  without it. With it on, an upstream fire-and-forget `import()` still pending when a file ends is
+ *  reported as `EnvironmentTeardownError: Cannot load …` against the next file (LOCAL-PATCHES.md,
+ *  2026-10-25 sync). Narrower than setting `CI`, which other suites read for their own behaviour. */
+const UNIT_LANE_ARGS = ['--experimental.recordDependencies=false']
 /** `local/` is outside `UNIT_INCLUDE` by upstream's definition, so nothing else would run these. */
 const FORK_TEST_INCLUDE = ['local/**/*.test.mjs']
 const FORK_TEST_TIMEOUT_MS = 5 * 60 * 1000
@@ -291,6 +296,7 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
         '--reporter=default',
         '--reporter=json',
         `--outputFile.json=${reportPath}`,
+        ...UNIT_LANE_ARGS,
         ...vitestArgs
       ],
       logFd,
@@ -342,6 +348,7 @@ function rerunIsolation(file, reportPath, timeoutMs) {
         'config/vitest.config.ts',
         '--reporter=json',
         `--outputFile.json=${reportPath}`,
+        ...UNIT_LANE_ARGS,
         file
       ],
       logFd,

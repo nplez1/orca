@@ -27,7 +27,7 @@ const diskPreconditionMock = vi.hoisted(() => ({ writeLocalTextFileWithDiskPreco
 vi.mock('./local-disk-write-precondition', () => diskPreconditionMock)
 vi.mock('electron', async () => (await import('./filesystem-test-harness')).electronMock)
 vi.mock(
-  './filesystem-search-file-paths',
+  '../filesystem-search-file-paths',
   async () => (await import('./filesystem-test-harness')).filePathSearchModuleMock
 )
 vi.mock('fs/promises', async () => (await import('./filesystem-test-harness')).fsPromisesMock)

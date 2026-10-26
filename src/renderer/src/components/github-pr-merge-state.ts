@@ -1,6 +1,7 @@
 import type { CheckStatus, ProviderCheckSummary } from '../../../shared/github/pull-request-types'
 import type { GitHubPRAutoMergeAvailabilityInput } from '../../../shared/github/pull-request-auto-merge-availability'
 import {
+  autoMergeActionWhenDirectMergeAvailable,
   resolveGitHubPRAutoMergeAction,
   type GitHubPRAutoMergeAction
 } from '@/components/github-pr-auto-merge-action'
@@ -64,7 +65,7 @@ function passedChecksMergePresentation(
       'Checks passed. Merge eligibility will be checked again before merging.'
     ),
     directMergeAvailable: true,
-    autoMergeAction
+    autoMergeAction: autoMergeActionWhenDirectMergeAvailable(autoMergeAction)
   }
 }
 
@@ -257,7 +258,7 @@ function presentGitHubPRMergeStateCore(item: GitHubPRMergeStateInput): GitHubPRM
           ? 'GitHub says this PR can merge and checks passed'
           : 'GitHub says this PR can merge'),
       directMergeAvailable: true,
-      autoMergeAction
+      autoMergeAction: autoMergeActionWhenDirectMergeAvailable(autoMergeAction)
     }
   }
   // Why: GitHub may still report intermediate mergeability while checks are

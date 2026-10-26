@@ -50,7 +50,7 @@ share text prints, from `MAIN_RELEASE_REPO`. Every desktop link that names this 
 
 - `src/main/github/client/fetch/orca-star.ts` — the `gh api user/starred/...` check and the `PUT`;
 - the star surfaces — `StarNagCard.tsx`, `star-nag/StarNagToastHost.tsx`,
-  `settings/GeneralSupportSection.tsx`, `Landing.tsx`;
+  `settings/GeneralSupportSection.tsx`, `GitHubStarButton.tsx` (the Landing page's star button);
 - the report and share surfaces — `sidebar/SidebarFeedbackDialog.tsx` (GitHub issues),
   `terminal-pane/TerminalErrorToast.tsx` (file an issue), `github-project/ProjectViewStates.tsx`
   (feature request), `sidebar/SidebarSettingsHelpMenu.tsx` (Help → GitHub), and
@@ -1070,6 +1070,54 @@ Remedy applied: that file is seated in the node-runtime project
 (`config/scripts/vitest-node-runtime-files.mjs`, `LOCAL(nplez1)` entry). If the symptom appears
 elsewhere, check it the same way — a deliberate timeout failure is the probe — and seat that file rather
 than re-running the suite. Do not read `Errors 1` in a bun-pool run as "the failure was elsewhere".
+
+### `local(test)`: the 2026-10-25 sync's red set — 115 cases repaired, 9 recorded
+
+The first full gate after merging upstream `0571e45107` (556 commits) read `155 failed (31 allowlisted,
+124 unexpected); 7 unhandled error headline(s)` at `ef2897da2b`. `observedRun` in
+`local/unit-known-red.json` lists every repaired case with its cause. In short: 83 were `mobile/`'s own
+workspace never installed; the rest were merge breaks — fork-extracted modules that stopped receiving
+an upstream change (`run-process-sync.ts`, `emitWorktreeLifecycle`), a fork suite missing upstream's new
+git-worker fixture, a mock path orphaned by the `ipc/filesystem/` move, upstream literals overwriting
+the fork identity (`orca-np-dev`, `.orca-np`, `nplez1/orca`), a resolver that reordered the auto-merge
+gate and dropped two call sites, a Jira user field with supplied choices rendered as text, and generated
+skill sources built from upstream's skills. One was a pre-merge fork defect (#185's star-link surface).
+
+Nine are recorded, all `owner: upstream` on code byte-identical to `0571e45107`:
+
+- **seven `sqlite-binding`** — `persisted-profile-state.unit` (2), `editor-view-layout-apply`,
+  `restored-editor-move-restart`, `sweep-terminal-placement` (2), `session-search-indexer`. The merge
+  raised `config/.bun-version` 1.4.3 → 1.4.4. Bun's `node:sqlite` on macOS loads Apple's system SQLite,
+  which cannot open a WAL database read-only once `close()` has removed `-wal`/`-shm`; 1.4.3 left
+  `-shm` behind, which hid it. Probe: writer in WAL mode, `close()`, `new DatabaseSync(p, { readOnly: true })`
+  — Node 26.11.1 opens it, bun 1.4.3 opens it, bun 1.4.4 throws `unable to open database file`. The same
+  HEAD passes all five files under bun 1.4.3. Product code runs on Electron's Node, not this path.
+- **`verify-cli-bin`, `macos-path-semantics`** — new upstream case; the child's `process.cwd()` reports
+  `/private/var/…` against the unresolved `os.tmpdir()` the case compares.
+- **`reclaim-worktree-generated-files`, `host-toolchain`** — new upstream file. The script recovers from
+  `EACCES`/`EPERM` only; bun on macOS (1.4.3 and 1.4.4 probed) fails `fs.rm` on a `0o555` directory with
+  `ENOTEMPTY`, where Node reports `EACCES`. The in-process case therefore cannot recover; the CLI cases,
+  which spawn Node, pass. Not verified on Linux bun.
+
+**The unhandled errors were not the tolerated teardown race.** All seven headlines were
+`EnvironmentTeardownError: Cannot load '<module>' … after the environment was torn down`, from eleven
+renderer store suites (35 occurrences, the same per-file counts in two full runs, none when a file runs
+alone). Cause: upstream fire-and-forget `import()`s still pending when a file ends
+(`store/terminals/terminal-tab-appearance.ts`, `slices/worktrees/teardown/removed-workspace-unsaved-files.ts`),
+surfaced by upstream's new `experimental: { recordDependencies: !process.env.CI }` in
+`config/vitest.config.ts`. Upstream's lane sets `CI`, so it never records dependencies and never sees
+them. Four of those suites in one worker: 20 errors as configured, 0 with `CI=1`, 0 with only
+`--experimental.recordDependencies=false`, 28/28 passing each time. `local/gate-unit.mjs` now passes that
+flag (its suite run and its isolation re-runs) so the gate runs upstream's lane setting; the races are
+upstream's to fix and are left in the code.
+
+Verdict on the uncommitted tree; the one unexpected failure compares the committed allowlist with the
+working copy, so it reads red until this change is committed. The verdict for the committed revision
+still has to be recorded here:
+
+```
+Unit gate @accb095dd6 (dirty): FAIL — 138067 passed; 41 failed (40 allowlisted, 1 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 2593 s
+```
 
 ## Syncing with upstream
 

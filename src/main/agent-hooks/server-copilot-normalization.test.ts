@@ -585,8 +585,8 @@ describe('Copilot hook normalization', () => {
       'copilot',
       buildBody({
         hook_event_name: 'Notification',
-        notification_type: 'permission_prompt',
-        message: 'Allow Bash to run?',
+        notification_type: 'elicitation_dialog',
+        message: 'Which build target?',
         tool_name: 'bash',
         tool_input: { command: 'pnpm build' }
       }),

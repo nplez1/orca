@@ -59,7 +59,7 @@ describe('managed hook script refresh stays off the main thread', () => {
   })
 
   it('uses no synchronous HOME filesystem calls for missing or stale scripts', async () => {
-    const hooksDir = join(state.home, '.orca', 'agent-hooks')
+    const hooksDir = join(state.home, '.orca-np', 'agent-hooks')
     const claudeScript = join(
       hooksDir,
       process.platform === 'win32' ? 'claude-hook.cmd' : 'claude-hook.sh'
@@ -82,7 +82,7 @@ describe('managed hook script refresh stays off the main thread', () => {
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
     try {
-      const hooksDir = join(state.home, '.orca', 'agent-hooks')
+      const hooksDir = join(state.home, '.orca-np', 'agent-hooks')
       await mkdir(hooksDir, { recursive: true })
       await writeFile(join(hooksDir, 'claude-hook.cmd'), 'stale', 'utf-8')
       state.syncCalls = []

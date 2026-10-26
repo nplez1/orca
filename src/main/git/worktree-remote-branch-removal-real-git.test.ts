@@ -8,10 +8,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { installRealWorkerThreadChildProcesses } from '../worker-thread-child-process/worker-thread-child-process-real.test-fixtures'
 import { removeWorktree } from './worktree'
 import { removeTree } from '../../shared/windows-transient-lock-removal'
 
 const execFileAsync = promisify(execFile)
+
+installRealWorkerThreadChildProcesses()
 
 let scratchDir = ''
 let originPath = ''

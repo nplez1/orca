@@ -19,30 +19,595 @@
     "the electron, node-pty, live-shell and cross-version-wire ones — are upstream-quarantined and",
     "deliberately absent here."
   ],
-  "recordedAt": "2026-10-23",
+  "recordedAt": "2026-10-25",
   "observedRun": {
-    "kind": "scoped",
-    "revision": "b094309766",
-    "subject": "the fifteen files the previous manifest named, plus the two the 2026-10-21 sync left unlisted",
-    "failingRecords": 38,
-    "allowlisted": 31,
-    "upstreamQuarantined": 5,
-    "fixed": 2,
+    "kind": "full",
+    "revision": "ef2897da2b",
+    "subject": "the first full gate after the 2026-10-25 merge of upstream 0571e45107 (556 commits)",
+    "failingRecords": 155,
+    "allowlisted": 40,
+    "upstreamQuarantined": 0,
+    "fixed": 115,
     "repairedCases": [
       {
         "file": "src/main/runtime/orca-runtime.test.ts",
-        "test": "the screen prompt a pane is holding answers null for a pane it cannot bind to a terminal",
-        "why": "asserted null where terminal-pane-screen-prompt.ts documents undefined, in the same fork commit that added both, so it never passed"
+        "test": "OrcaRuntimeService retires a deleted SSH folder workspace agent status rows",
+        "why": "the fork's extracted orca-runtime-owned-controllers.ts stopped passing emitWorktreeLifecycle; wired (accb095dd6)"
       },
       {
-        "file": "src/main/cli/cli-command-privileged-transaction.test.ts",
-        "test": "macOS privileged CLI command transaction repairs an unreadable link to an older Orca launcher through the transaction",
-        "why": "linked /Applications/Old Orca.app/.../bin/orca while the fork ships orca-np, so the installer read its own launcher as a foreign command; the two sibling cases in the same file already use orca-np"
+        "file": "config/scripts/computer-use-bundle-identity.test.mjs",
+        "test": "computer-use bundle identity leaves no pre-rename bundle id in any helper source",
+        "why": "the merge added upstream's duplicate TrustedOrcaApplication.swift carrying com.stablyai.orca; the duplicate and its test were removed (accb095dd6)"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle resolves react-native to react-native-web and leaves no require.context",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle cuts the routes into chunks the entry does not load",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle names the chunk each route lands in",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle bundles every route module",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle names an output the same way the manifest's own asset hash does",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle ships no haptic that reaches for the DOM",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle ships react-native-web's hairline at one device pixel, whichever of its builds resolves",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle embeds no absolute path from this checkout",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle loads the entry as a module, so its route imports resolve",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle declares an icon, so no browser asks the shell for one",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle declares no viewport-fit, because the shell owns the safe area",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle carries the root reset, so the mounted tree has a height to be 1 of",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the app bundle writes the manifest shape the packaging contract reads",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the Phase C budget is not already exceeded by the current bundle",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the Phase C budget keeps the derived ceiling under the map the phone actually holds",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the verifier accepts a bundle it has just built",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the verifier rejects a buildId the manifest's own asset list does not derive",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/build-mobile-web-app-bundle.test.mjs",
+        "test": "the verifier rejects a self-consistent bundle a fresh build does not reproduce",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "src/main/agent-trust-presets.test.ts",
+        "test": "markKimiWorkspaceTrusted uses the record name Kimi Code 2.3.1 wrote",
+        "why": "the resolver made markKimiWorkspaceTrusted async (the fork's canonicalize is async) but kept upstream's un-awaited calls"
+      },
+      {
+        "file": "src/main/agent-trust-presets.test.ts",
+        "test": "markKimiWorkspaceTrusted keys a symlinked workspace by the physical cwd Kimi sees",
+        "why": "the resolver made markKimiWorkspaceTrusted async (the fork's canonicalize is async) but kept upstream's un-awaited calls"
+      },
+      {
+        "file": "src/shared/orca-repository.test.ts",
+        "test": "project repository links comes from the shared identity in ../renderer/src/components/Landing.tsx",
+        "why": "pre-merge fork defect (#185 moved the star link from Landing.tsx into GitHubStarButton.tsx without updating PROJECT_LINK_SURFACES); surface list updated"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-terminal-init.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-push-subsystem-closure.test.mjs",
+        "test": "the push subsystem against the page is in no module the shipped bundle contains",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared can copy preview source under the opening grants of /h/[hostId]/files/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared can copy preview source under the opening grants of /h/[hostId]/files/preview/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares navigate on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares storage on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares externalLink on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares native.clipboard.write on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares native.clipboard.read on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared declares native.media.pick + native.media.read + native.media.release on every registered route whose own call sites reach it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without navigate",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without storage",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without externalLink",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without native.clipboard.write",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without native.clipboard.read",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reds the session route when it is registered without native.media.pick + native.media.read + native.media.release",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared reaches every one of the eight through the session route, and names where",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs",
+        "test": "what each page route reaches, against what it declared finds the clipboard reader and the media picker on the session route alone",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-tasks-external-links.test.mjs",
+        "test": "the tasks page closure opens every external URL through the platform seam",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-tasks-external-links.test.mjs",
+        "test": "the tasks page closure contains the seam, so the rule above is not vacuous",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-tasks-external-links.test.mjs",
+        "test": "the clipboard the tasks page reaches does not carry expo-clipboard's web module at all",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-tasks-external-links.test.mjs",
+        "test": "the clipboard the tasks page reaches carries the seam that replaced it, so the absence above is not vacuous",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-external-links.test.mjs",
+        "test": "the session screen closure opens every external URL through the platform seam",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-external-links.test.mjs",
+        "test": "the session screen closure contains the seam, so the rule above is not vacuous",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-external-links.test.mjs",
+        "test": "the clipboard the session screen reaches does not carry expo-clipboard's web module at all",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-external-links.test.mjs",
+        "test": "the clipboard the session screen reaches carries the seam that replaced it, so the absence above is not vacuous",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-source-control-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-media-picker.test.mjs",
+        "test": "the session page closure reaches no picker but the seam",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-media-picker.test.mjs",
+        "test": "the session page closure carries the seam, so the rule above is not vacuous",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-media-picker.test.mjs",
+        "test": "the session page closure carries none of the three native media modules at all",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-webview-consumers.test.mjs",
+        "test": "the session route web component closure resolves all four web components, and the terminal without its native sibling",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-drawer-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs",
+        "test": "the files page closures opens every external URL through the seam: app/h/[hostId]/files/preview/[worktreeId].tsx",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs",
+        "test": "the files page closures contains the seam, so the rule is not vacuous: app/h/[hostId]/files/preview/[worktreeId].tsx",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs",
+        "test": "the files page closures reaches the seam from the Markdown preview, which is what earns the preview its grant",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs",
+        "test": "the clipboard the files pages reach never uses the page clipboard: app/h/[hostId]/files/preview/[worktreeId].tsx",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs",
+        "test": "the clipboard the files pages reach reaches the device writer through the Markdown source Copy control",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-tasks-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-screencast-lane-grant.test.mjs",
+        "test": "the routes that mount the browser pane declares the screencast lane on exactly the routes whose closure asks for it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-screencast-lane-grant.test.mjs",
+        "test": "the routes that mount the browser pane reaches the seam through its web sibling, and the caller is the pane",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-safe-area-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-handoff-grants-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-closure-families.test.mjs",
+        "test": "the tasks page closure reaches exactly the golden families the pin tables commit",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-closure-families.test.mjs",
+        "test": "the files page closures reach exactly the golden families the pin tables commit, as a union",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-closure-families.test.mjs",
+        "test": "the files page closures each reach a strict part of it, which is what makes the union the oracle",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-page-closure-families.test.mjs",
+        "test": "the browser pane closure adds exactly those families to the session route, which is the route that mounts it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-external-navigation-grant.test.mjs",
+        "test": "the routes that render an HTML artifact declares external navigation on exactly the routes whose closure asks for it",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-external-navigation-grant.test.mjs",
+        "test": "the routes that render an HTML artifact reaches the seam through its web sibling, and the caller is the preview",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-agent-history-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-dictation-capture.test.mjs",
+        "test": "the routes that reach dictation capture holds every registered page route to the grants its own closure needs",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-dictation-capture.test.mjs",
+        "test": "the routes that reach dictation capture finds the seam in exactly one closure, which is the session route",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-dictation-capture.test.mjs",
+        "test": "the routes that reach dictation capture reds the same rule when the session route is registered without them",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-dictation-capture.test.mjs",
+        "test": "the routes that reach dictation capture carries the seam and not the native audio chain it stands in for",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/mobile-web-app-session-terminal-closure.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "src/main/linear/client.test.ts",
+        "test": "Linear workspace file cross-process visibility preserves external credential revisions and captured request deadlines",
+        "why": "the resolver took upstream's literal .orca over the fork's HOME_DIRECTORY_NAME on one line"
+      },
+      {
+        "file": "src/main/codex/codex-structured-child-environment.test.ts",
+        "test": "the Codex child environment keeps shell exports while pinned launch values win",
+        "why": "the merge took upstream's orca-dev launcher regex over the fork's orca-np-dev"
+      },
+      {
+        "file": "src/main/codex/codex-structured-child-environment.test.ts",
+        "test": "the Codex child environment names every session by its id, and adds the handle only for a registered worker",
+        "why": "the merge took upstream's orca-dev launcher regex over the fork's orca-np-dev"
+      },
+      {
+        "file": "src/main/codex/codex-structured-child-environment.test.ts",
+        "test": "the spawned Codex child starts the persistent shebang CLI with its sibling Node over a competing PATH runtime",
+        "why": "the merge took upstream's orca-dev launcher regex over the fork's orca-np-dev"
+      },
+      {
+        "file": "src/main/codex/codex-structured-child-environment.test.ts",
+        "test": "the spawned Codex child runs with its own session id and this app's CLI, over an id inherited by Orca itself",
+        "why": "the merge took upstream's orca-dev launcher regex over the fork's orca-np-dev"
+      },
+      {
+        "file": "src/main/runtime/runtime-folder-workspace-delete-lifecycle.test.ts",
+        "test": "deleting a folder workspace announces the removal to worktree lifecycle listeners under its folder key",
+        "why": "same missing emitWorktreeLifecycle dependency; wired (accb095dd6)"
+      },
+      {
+        "file": "src/main/agent-hooks/managed-hook-timeout.test.ts",
+        "test": "managed agent hook timeouts writes a config-level timeout on every managed JSON hook entry",
+        "why": "two hunks reverted the fork's .orca-np home to upstream's .orca"
+      },
+      {
+        "file": "src/main/agent-hooks/managed-hook-timeout.test.ts",
+        "test": "managed agent hook timeouts writes a config-level timeout on local Droid hooks",
+        "why": "two hunks reverted the fork's .orca-np home to upstream's .orca"
+      },
+      {
+        "file": "src/main/agent-hooks/managed-hook-timeout.test.ts",
+        "test": "managed agent hook timeouts comma-decimal curl locale clears inherited LC_ALL and sets LC_NUMERIC only for curl",
+        "why": "two hunks reverted the fork's .orca-np home to upstream's .orca"
+      },
+      {
+        "file": "src/main/agent-hooks/managed-hook-script-refresh-main-thread.test.ts",
+        "test": "managed hook script refresh stays off the main thread uses no synchronous HOME filesystem calls for missing or stale scripts",
+        "why": "upstream's new readFile assertions read .orca/agent-hooks while the fork writes .orca-np"
+      },
+      {
+        "file": "src/main/agent-hooks/managed-hook-script-refresh-main-thread.test.ts",
+        "test": "managed hook script refresh stays off the main thread keeps the Windows Claude entry and payload refresh off the main thread",
+        "why": "upstream's new readFile assertions read .orca/agent-hooks while the fork writes .orca-np"
+      },
+      {
+        "file": "src/main/agent-hooks/server-copilot-normalization.test.ts",
+        "test": "Copilot hook normalization later progress clears a prior blocked state for the same pane",
+        "why": "upstream's case opens with permission_prompt, which the fork deliberately does not treat as blocking (26c0c22881); now opens with elicitation_dialog"
+      },
+      {
+        "file": "src/main/git/worktree-remote-branch-removal-real-git.test.ts",
+        "test": "removeWorktree with deleteRemoteBranch deletes the branch on the remote and says so",
+        "why": "upstream moved git exec onto a worker thread and gave its real-git suites installRealWorkerThreadChildProcesses(); this fork-only suite never got it"
+      },
+      {
+        "file": "src/main/git/worktree-remote-branch-removal-real-git.test.ts",
+        "test": "removeWorktree with deleteRemoteBranch leaves the remote branch alone when the option is off",
+        "why": "upstream moved git exec onto a worker thread and gave its real-git suites installRealWorkerThreadChildProcesses(); this fork-only suite never got it"
+      },
+      {
+        "file": "src/main/git/worktree-remote-branch-removal-real-git.test.ts",
+        "test": "removeWorktree with deleteRemoteBranch keeps the remote branch when local unpushed commits make Git preserve the branch",
+        "why": "upstream moved git exec onto a worker thread and gave its real-git suites installRealWorkerThreadChildProcesses(); this fork-only suite never got it"
+      },
+      {
+        "file": "src/main/git/worktree-remote-branch-removal-real-git.test.ts",
+        "test": "removeWorktree with deleteRemoteBranch keeps the remote branch when the local branch delete is pinned off",
+        "why": "upstream moved git exec onto a worker thread and gave its real-git suites installRealWorkerThreadChildProcesses(); this fork-only suite never got it"
+      },
+      {
+        "file": "src/main/git/worktree-remote-branch-removal-real-git.test.ts",
+        "test": "removeWorktree with deleteRemoteBranch reports no upstream for a branch that has none",
+        "why": "upstream moved git exec onto a worker thread and gave its real-git suites installRealWorkerThreadChildProcesses(); this fork-only suite never got it"
+      },
+      {
+        "file": "src/renderer/src/components/github-pr-merge-state.test.ts",
+        "test": "presentGitHubPRMergeState blocks conflicts on merge-queue branches",
+        "why": "the resolver left canShowGitHubPRAutoMergeControl after the merge-queue branch, so a conflicting queue PR offered 'Merge when ready'; the gate is first again, and the dropped autoMergeActionWhenDirectMergeAvailable call sites are restored"
+      },
+      {
+        "file": "src/packages/process-host/src/run-process-bytes.test.ts",
+        "test": "process byte capture preserves invalid UTF-8 and NUL bytes in async and sync capture",
+        "why": "the fork's extracted run-process-sync.ts missed upstream's captureStderrAsBytes handling; ported"
+      },
+      {
+        "file": "src/packages/process-host/src/run-process-bytes.test.ts",
+        "test": "process byte capture captures stderr bytes independently of ordinary text stdout",
+        "why": "the fork's extracted run-process-sync.ts missed upstream's captureStderrAsBytes handling; ported"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam resolves the seam to the web sibling: /h/[hostId]/tasks",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam resolves the seam to the web sibling: /h/[hostId]/files/preview/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam resolves the seam to the web sibling: /h/[hostId]/session/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam imports the seam from at least one module, so the grant is not idle: /h/[hostId]/tasks",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam imports the seam from at least one module, so the grant is not idle: /h/[hostId]/files/preview/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam imports the seam from at least one module, so the grant is not idle: /h/[hostId]/session/[worktreeId]",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs",
+        "test": "every page route closure and the haptics seam declares haptics on exactly the routes whose closure reaches the seam",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "config/scripts/mobile-web-app/preview/mobile-web-app-media-preview-render.test.mjs",
+        "test": "(suite)",
+        "why": "mobile/ is its own pnpm workspace and its node_modules was not installed after the merge (Could not resolve \"markdown-it-cjk-friendly\"); repaired by `cd mobile && pnpm install`, no tree change — the lockfile was already right"
+      },
+      {
+        "file": "src/main/skills/bundled-skill-install/bundled-skill-sources.test.ts",
+        "test": "embedded bundled skill sources carry exactly the repo’s skills/*/SKILL.md, LF-normalised",
+        "why": "upstream's generated bundled-skill-sources.ts and released-digests.json arrived built from upstream's skills; regenerated with pnpm generate:skill-bundle-manifest"
+      },
+      {
+        "file": "src/main/ipc/filesystem/filesystem.test.ts",
+        "test": "registerFilesystemHandlers uses only complete live scans when the path-index kill switch is set",
+        "why": "the fork's search-file-paths mock moved with the file into ipc/filesystem/ but kept './', so it mocked nothing; now '../filesystem-search-file-paths'"
+      },
+      {
+        "file": "src/main/ipc/filesystem/filesystem.test.ts",
+        "test": "registerFilesystemHandlers routes a cold index through a complete live search fallback",
+        "why": "the fork's search-file-paths mock moved with the file into ipc/filesystem/ but kept './', so it mocked nothing; now '../filesystem-search-file-paths'"
+      },
+      {
+        "file": "src/main/ipc/filesystem/filesystem.test.ts",
+        "test": "registerFilesystemHandlers fs:searchFilePaths clamps a caller limit to the shared listing ceiling",
+        "why": "the fork's search-file-paths mock moved with the file into ipc/filesystem/ but kept './', so it mocked nothing; now '../filesystem-search-file-paths'"
+      },
+      {
+        "file": "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx",
+        "test": "LinearAgentSkillInstallCta keeps the resolved WSL project on the old command flow",
+        "why": "upstream's case pins the stablyai/orca skills URL; the fork's command uses nplez1/orca"
+      },
+      {
+        "file": "src/renderer/src/components/right-sidebar/HostedReviewActions.draft.test.tsx",
+        "test": "HostedReviewActions GitHub merge selection renders Conflicts for DIRTY / pending",
+        "why": "same auto-merge gate order as github-pr-merge-state"
+      },
+      {
+        "file": "src/renderer/src/components/task-page/jira/IssueUserField.test.tsx",
+        "test": "preserves supplied scalar metadata choices (constructed contract fixture, not observed Jira data)",
+        "why": "the resolver kept the fork's JiraSchemaFieldControl, which renders a user field with supplied allowedValues as a text input; it now renders the Select upstream's dialog did"
       }
     ],
     "unexpected": 0,
     "unhandledErrorHeadlines": 0,
-    "note": "Reconciliation run for the tightening above, not a gate verdict: it runs the allowlisted files and the two formerly-unlisted ones, so it cannot see a red in any other file. Every record closes: allowlisted + upstreamQuarantined + fixed = failingRecords. The full-suite verdict for the revision that ships is recorded in LOCAL-PATCHES.md, because this file changing is what invalidates that verdict's cache key."
+    "note": "Reconciliation of the ef2897da2b run: 31 failures were already recorded, 9 are the environment-bound reds this change records, and every other failure was repaired in the tree (or, for mobile/, by installing its workspace). Its 7 unhandled-error headlines are explained in LOCAL-PATCHES.md (2026-10-25 sync) and do not recur once the gate runs with upstream's lane setting for recordDependencies. The verdict for the revision that ships is recorded in LOCAL-PATCHES.md."
   },
   "unhandledErrors": [
     {
@@ -305,6 +870,78 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what the contract assumes ('rejects explicit undefined bindings').",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/verify-cli-bin.test.mjs",
+      "test": "verifyPackageCliBin accepts a non-empty Node entrypoint and can run help through Node",
+      "class": "macos-path-semantics",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream case; the child's process.cwd() reports /private/var/folders/... while the case compares the unresolved os.tmpdir() /var/folders/... it created. Test and verify-cli-bin.mjs are byte-identical to upstream 0571e45107; Linux tmp is not a symlink.",
+      "flaky": false
+    },
+    {
+      "file": "config/scripts/reclaim-worktree-generated-files.test.mjs",
+      "test": "reclaims read-only generated directories without chmodding hardlinked package files",
+      "class": "host-toolchain",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream file, byte-identical to 0571e45107. The script recovers only from EACCES/EPERM; under bun on macOS (1.4.3 and 1.4.4 both probed) fs.rm on a 0o555 directory fails with ENOTEMPTY instead, where Node reports EACCES, so the in-process case cannot recover and its afterEach then also fails ENOTEMPTY. The CLI cases, which spawn Node, pass.",
+      "flaky": false
+    },
+    {
+      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
+      "test": "reads committed SQLite and changes stopped fixtures without rewriting retained JSON",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
+      "test": "refuses a fixture write while a runtime is admitted and releases the refused owner",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/editor-view-layout-apply.test.ts",
+      "test": "main's Store apply keeps an editor tab's in-memory view a view-only re-send sticks, a close drops it, and no view reaches disk",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/restored-editor-move-restart.test.ts",
+      "test": "an editor tab Orca moved survives restart main loads the moved tab and its file record in the new workspace only",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
+      "test": "a terminal created by the CLI, across a restart, layout-owner build is left alone while its run owns it, and after a restart is shown like any other",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
+      "test": "a terminal created by the CLI, across a restart, layout-owner build one whose pane was saved stays in that pane after a restart, with no second tab",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
+      "flaky": false
+    },
+    {
+      "file": "src/main/ai-vault-search/session-search-indexer.test.ts",
+      "test": "stops everything on close, including work already queued",
+      "class": "sqlite-binding",
+      "owner": "upstream",
+      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
       "flaky": false
     }
   ]

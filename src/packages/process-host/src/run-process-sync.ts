@@ -46,7 +46,8 @@ function runResolvedProcessSync(spec: ProcessSpec, resolved: ResolvedSpawn): Pro
     signal: result.signal,
     stdout: spec.captureStdoutAsBytes ? '' : (result.stdout?.toString('utf8') ?? ''),
     ...(spec.captureStdoutAsBytes ? { stdoutBytes: result.stdout ?? Buffer.alloc(0) } : {}),
-    stderr: result.stderr?.toString('utf8') ?? '',
+    stderr: spec.captureStderrAsBytes ? '' : (result.stderr?.toString('utf8') ?? ''),
+    ...(spec.captureStderrAsBytes ? { stderrBytes: result.stderr ?? Buffer.alloc(0) } : {}),
     // Why always false: spawnSync reports an overrun as an ENOBUFS error, and
     // the guard above rethrows it, so no truncated result reaches this point.
     outputTruncated: false,

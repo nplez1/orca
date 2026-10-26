@@ -144,26 +144,29 @@ describe('markKimiWorkspaceTrusted', () => {
   const kimiHome = () => join(testState.fakeHomeDir, '.kimi-code')
   const records = () => readdirSync(join(kimiHome(), 'workspace-trust'))
 
-  it.skipIf(process.platform === 'win32')('uses the record name Kimi Code 2.3.1 wrote', () => {
-    // Name captured from a real Kimi Code 2.3.1 "Trust and continue" on macOS.
-    markKimiWorkspaceTrusted('/private/tmp/kimi-inst/ws/Sample Project', kimiHome())
-    expect(records()).toEqual(['wd_sample-project_017c73b76124'])
-  })
+  it.skipIf(process.platform === 'win32')(
+    'uses the record name Kimi Code 2.3.1 wrote',
+    async () => {
+      // Name captured from a real Kimi Code 2.3.1 "Trust and continue" on macOS.
+      await markKimiWorkspaceTrusted('/private/tmp/kimi-inst/ws/Sample Project', kimiHome())
+      expect(records()).toEqual(['wd_sample-project_017c73b76124'])
+    }
+  )
 
-  it.skipIf(process.platform !== 'win32')('lowercases Windows paths like Kimi', () => {
-    markKimiWorkspaceTrusted('C:\\projects\\Sample Project', kimiHome())
-    markKimiWorkspaceTrusted('c:\\PROJECTS\\sample project', kimiHome())
+  it.skipIf(process.platform !== 'win32')('lowercases Windows paths like Kimi', async () => {
+    await markKimiWorkspaceTrusted('C:\\projects\\Sample Project', kimiHome())
+    await markKimiWorkspaceTrusted('c:\\PROJECTS\\sample project', kimiHome())
     expect(records()).toEqual(['wd_sample-project_f415ab4f33c6'])
   })
 
   it.skipIf(process.platform === 'win32')(
     'keys a symlinked workspace by the physical cwd Kimi sees',
-    () => {
+    async () => {
       const real = mkdtempSync(join(tmpdir(), 'orca-kimi-ws-'))
       const link = join(testState.fakeHomeDir, 'linked-ws')
       symlinkSync(real, link)
       try {
-        markKimiWorkspaceTrusted(link, kimiHome())
+        await markKimiWorkspaceTrusted(link, kimiHome())
         const [name] = records()
         const record = JSON.parse(readFileSync(join(kimiHome(), 'workspace-trust', name), 'utf-8'))
         expect(record).toEqual({ root: realpathSync.native(real), trustedAt: expect.any(Number) })

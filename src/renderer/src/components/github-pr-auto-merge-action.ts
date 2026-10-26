@@ -19,7 +19,9 @@ export type GitHubPRAutoMergeAction = {
 export function resolveGitHubPRAutoMergeAction(
   item: GitHubPRAutoMergeAvailabilityInput
 ): GitHubPRAutoMergeAction | null {
-  if (item.state !== 'open') {
+  // Why: GitHub rejects enabling auto-merge on a conflicting PR, so offering it there only yields an
+  // error toast; repos that disable auto-merge are suppressed by the shared availability rule.
+  if (!canShowGitHubPRAutoMergeControl(item)) {
     return null
   }
   if (item.autoMergeEnabled === true) {
@@ -41,11 +43,6 @@ export function resolveGitHubPRAutoMergeAction(
         'Add this pull request to the GitHub merge queue'
       )
     }
-  }
-  // Why: GitHub rejects enabling auto-merge on a conflicting PR, so offering it there only yields an
-  // error toast; repos that disable auto-merge are suppressed by the shared availability rule.
-  if (!canShowGitHubPRAutoMergeControl(item)) {
-    return null
   }
   return {
     kind: 'enable',

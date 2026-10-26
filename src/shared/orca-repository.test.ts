@@ -34,7 +34,7 @@ describe('ORCA repository identity', () => {
 /** Every link that names this project's repository, and therefore every place the bug lived. */
 const PROJECT_LINK_SURFACES = [
   '../main/github/client/fetch/orca-star.ts',
-  '../renderer/src/components/Landing.tsx',
+  '../renderer/src/components/GitHubStarButton.tsx',
   '../renderer/src/components/StarNagCard.tsx',
   '../renderer/src/components/github-project/ProjectViewStates.tsx',
   '../renderer/src/components/settings/GeneralSupportSection.tsx',
