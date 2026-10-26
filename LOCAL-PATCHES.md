@@ -1112,11 +1112,16 @@ flag (its suite run and its isolation re-runs) so the gate runs upstream's lane 
 upstream's to fix and are left in the code.
 
 Verdict on the uncommitted tree; the one unexpected failure compares the committed allowlist with the
-working copy, so it reads red until this change is committed. The verdict for the committed revision
-still has to be recorded here:
+working copy, so it reads red until this change is committed:
 
 ```
 Unit gate @accb095dd6 (dirty): FAIL — 138067 passed; 41 failed (40 allowlisted, 1 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 2593 s
+```
+
+The committed revision, `7811f60dd6`:
+
+```
+Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s
 ```
 
 ## Syncing with upstream
@@ -1184,6 +1189,84 @@ pnpm run sync:localization-runtime-catalog
 **Policy:** the three most recent entries stay inline; older ones move verbatim to
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
+
+- **2026-10-25 — merge of upstream `0571e45107` (556 commits) into the release line, from
+  `095cf32705`** (merge base `57b5082404`, rollback tag `archive/pre-sync-095cf32705`, merge commit
+  `281cccf5a4`, then `995f2dbc27`, `ef2897da2b`, `accb095dd6`, `7811f60dd6`, `1b848feba6`).
+  **249 conflicted paths, 367 hunks** — `both-rewrote 167, union 47, modify/delete 23,
+  duplicate-tail 8, rename-replay 2, duplicate-members 1, add/add 1` — four to five times the
+  previous two syncs (52 and 63 paths). Upstream's delta is 11,612 files (−290,038/+189,207); most of
+  the deletions are the `docs/audits/**` JSON upstream removed. Substantively it is a **mass
+  comment-terseness pass** plus regroupings — `src/main/ipc/filesystem-watcher-*` into
+  `src/main/ipc/filesystem/watchers/`, `shared/jira-*` into `shared/jira/`, several
+  `src/main/runtime/` groups — and ~50 test inventories retired. The terseness pass is why
+  `both-rewrote` dominates: upstream rewrote the comments around nearly every fork hunk. Decisions
+  are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-25 sync";
+  the ones a reviewer will want first:
+
+  - **Resolved in three tiers, and most of it by proof rather than judgement.** All 367 blocks were
+    machine-verified against their recorded base/ours/theirs before any was touched. **215 hunks
+    mechanically:** 133 where upstream never touched the region (ours), 50 where ours differed only
+    by identity tokens (theirs, and `identity-sweep` re-applies the identity), 32 import-only.
+    **85 by direct decision** — `ORCA_SKILLS_REPOSITORY_URL` stays `nplez1/orca`, the identity-aware
+    `OrcaBundleIdentity.isTrustedPeer`, `listCached`, the both-owner skill-lock acceptance, the
+    schema version below. **67 by an Opus review pass** over the both-rewrote cluster. Reuse this
+    shape at the next large sync: the proof tier is what made 249 paths tractable.
+  - **`SESSION_SEARCH_SCHEMA_VERSION` is 10.** The fork had gone 6 → 9 and upstream 6 → 8, so the
+    merged schema takes a version above every one either line has shipped (runbook trap 8), not the
+    higher of the two.
+  - **The pi compaction guard reads the fork's async lane; `isHeldByChildren()` is unchanged**
+    (`ef2897da2b`). Upstream's new test expects a finished reply's compaction not to be announced
+    while children run, and upstream fills `lifecycleState.active` from the roster lane — but this
+    fork routes the async channels to its own lane (`agent-status-async-subagent-source.ts`) and
+    keeps them out of that set. The compaction guard alone now also consults
+    `piAsyncSubagentHasLiveRuns()`. `isHeldByChildren()` also gates `postAgentEndOnce`, and the fork
+    posts `agent_end` while async children run so the host holds the pane from `subagent_runs`;
+    feeding the async lane into `onEvent` instead broke 27 fork tests that pin that separation.
+  - **Computer-use identity converges on the fork's `OrcaBundleIdentity`** (`accb095dd6`). Upstream
+    added `TrustedOrcaApplication.swift` for the same job; the fork's helper is identity-aware
+    (`com.nplez1.orca`) and `main.swift` already calls it, so upstream's unreferenced duplicate is
+    deleted with its test. Its `com.stablyai.orca` literals are also what the fork's "leaves no
+    pre-rename bundle id in any helper source" test forbids.
+  - **Derived files were regenerated, not merged.** `en.json` by a three-way JSON merge (0 true
+    conflicts; 736 fork strings kept, 245 upstream keys added, 96 dropped), then
+    `en-runtime-required.json`, `bundled-skill-guides.ts`, `focus-setting-read-baseline.txt`
+    (`--prune`, 718 → 690 reads) and `pnpm-lock.yaml`.
+  - **Ten defects the merge introduced with no conflict marker**, all fixed:
+    `emitWorktreeLifecycle` never reached the fork's extracted project-group controller
+    (`orca-runtime-owned-controllers.ts`), so `deleteFolderWorkspace` threw; `run-process-sync.ts`
+    missed `captureStderrAsBytes`; a fork-only real-git test never got upstream's worker-thread
+    child-process fixture; a filesystem test's mock path did not follow its file into
+    `ipc/filesystem/`; four suites got upstream's `orca-dev`/`.orca` back over
+    `orca-np-dev`/`.orca-np`; `markKimiWorkspaceTrusted` became async under callers that did not
+    await it; the conflict check slipped behind the merge-queue branch, so a conflicting PR on a
+    merge-queue branch was offered "Merge when ready"; `autoMergeActionWhenDirectMergeAvailable`
+    lost both call sites; a Jira user field with a fixed choice list rendered as a text box; and the
+    skill bundle manifest arrived built from upstream's skills. `995f2dbc27` separately restored nine
+    files where a repair script had rewritten `./src/main/...` inside esbuild `stdin.contents`
+    templates — cwd-relative strings, not imports.
+  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` is now fork-only — upstream
+    deleted the module and the renderer owns those types — and is kept for its both-owner
+    lock-source rule; note that after the merge only its own test imports it. Six fork-only exports
+    upstream's refactors superseded are acknowledged, with their live replacements, across five paths
+    in `local/sync/expected-deletions.json`. The onboarding test lost its `nplez1` URL assertion.
+    `worktrees:listAll` went with the IPC surface upstream dropped; `listCached` stays, live in
+    `startup-worktree-cache.ts`.
+  - **Environment, not code: `origin/main` had never existed in this clone.** `gate-lint.mjs`'s
+    flaky ratchet scopes to `merge-base HEAD origin/main`, so the base fell back to a far older
+    commit and every fork-only test looked changed (28 spurious reds). `git push origin
+    upstream/main:main` created the branch, and `remote.origin.fetch` gained
+    `+refs/heads/main:refs/remotes/origin/main` and
+    `+refs/heads/upstream/*:refs/remotes/origin/upstream/*`.
+
+  Verified on `7811f60dd6`: `Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40
+  allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s`;
+  `lint gate @7811f60dd6+dirty: PASS — 39 green, 0 failing: 0 known red, 0 new; 39 steps; 103.7 s`
+  (the dirty part became `1b848feba6`); `pnpm tc` clean on node, cli and web. Nine allowlist entries
+  were added — see § "`local(test)`: the 2026-10-25 sync's red set" — and the unit lane now runs
+  upstream's `--experimental.recordDependencies=false`. The tagged revision is past the gated one:
+  `1b848feba6` changes only tests, e2e specs and two lint inputs (no product source), and the
+  docs-only sync record follows it, so the unit verdict does not cover `1b848feba6`'s test edits.
 
 - **2026-10-22 — merge of upstream `57b5082404` (268 commits) into the release line, from
   `c67d40f97b`** (merge base `bbc8303b47`, rollback tag `archive/pre-sync-c67d40f97b`, merge commit
@@ -1315,45 +1398,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
   (row order inside a section, `lastChild`), with no row added or lost. **This merge ships the first
   fork release with the Linux leg**; nothing in the Linux packaging contract needed a change for it.
 
-- **2026-10-19 — merge of upstream `83c768d1b4` (170 commits) into the release line, from
-  `cc42fb3b93`** (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). Upstream's
-  delta is mostly a module reorganisation rather than a feature wave: the SSH tree split into
-  `ssh/connection/`, `ssh/targets/` and `ssh/config/`, `filesystem-watcher.ts` split into
-  `filesystem-watcher-handlers.ts` + `filesystem-watcher-shutdown.ts`, `locale-text-collators` and
-  `markdown-document-paths` moved to `shared/`, `hasRuntimeRpcErrorCode` moved to
-  `shared/runtime-rpc-error-code.ts`, `@types/node` came back down to `^24.19.2`, and the AI Vault
-  caches gained a scope-aware depth rule.
-
-  The merge produced **52 conflicted paths** — `both-rewrote 34, union 10, rename-replay 3,
-  duplicate-tail 2, modify/delete 2, duplicate-members 1` — exactly the set the dry run named. Every
-  decision is in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-19
-  sync"; the ones a reviewer will want first:
-
-  - **The unbounded AI Vault bypass belongs to the two main-process scan caches, not the answer
-    cache.** `localCacheHit` (`cached-session-list.ts`) and both gates in `ai-vault-host-leg-cache.ts`
-    read `cached.depth === 'unlimited' || aiVaultCachedDepthServes(...)`, so a scoped bounded request
-    is answered from an unbounded scan (the fork's rule, pinned by its three
-    `serves a scoped bounded … list from the unbounded one already loaded` cases). The renderer's
-    result cache is strict — upstream's rule, pinned by its `rescans a scoped view at a lowered depth`
-    case — and its dead unbounded fallback is deleted rather than left to invite a "fix". A shared
-    helper for both was written and removed during the merge: it cannot satisfy both suites, and the
-    ledger records why not.
-  - **`codex-subagent-roster` stays deleted** (the fork renamed it to `agent-descendant-roster`) and
-    upstream's child-cap removal is ported into the renamed module and its test.
-  - **The AI Vault view-options hook keeps upstream's shared store and both fork extras.**
-    `usePersistedAiVaultViewOptions(localAgents?, disabledTuiAgents?)`: upstream's argument stays
-    first because the `/resume` dialog passes it positionally, and
-    `setAllAgentsEnabled(enabled, scope = AI_VAULT_AGENTS)` keeps the fork's scope-aware bulk toggle
-    so a one-argument call still means "every agent".
-  - **Two max-lines extractions, one of which retires recorded debt.**
-    `runtime-host-mode-capabilities.ts` took the three host-mode capability pushes out of
-    `orca-runtime-get-status.ts`, and `ai-vault-forced-rescan-throttle.ts` took the rescan throttle
-    out of the refresh hook — the overflow this file recorded as deliberate debt above is now gone.
-  - **`web-file-mutation-session.ts` adopted upstream's `assertMutationSupported({ pinConnection })`**
-    contract, including the connection-epoch pin, because the fork's own web preload module is the
-    provider for upstream's `web-file-mutation-methods.ts`.
-
-Entries from 2026-10-19 back to 2026-09-16 — 23 of them — are in
+Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md).
 
 ### `local(ci)`: release workflow

@@ -1,6 +1,16 @@
 # Branch tracker
 
-Last updated **2026-10-22** — `nplez1/main` merged upstream main @ `57b5082404` (268 commits) from
+Last updated **2026-10-25** — `nplez1/main` merged upstream main @ `0571e45107` (556 commits) from
+`095cf32705` (merge `281cccf5a4`, merge base `57b5082404`, rollback tag
+`archive/pre-sync-095cf32705`). 249 conflicted paths / 367 hunks, four to five times the previous
+two syncs: `both-rewrote 167, union 47, modify/delete 23, duplicate-tail 8, rename-replay 2,
+duplicate-members 1, add/add 1`. Upstream's delta is a mass comment-terseness pass plus regroupings
+(`ipc/filesystem/watchers/`, `shared/jira/`, `src/main/runtime/`), which is why nearly every fork
+hunk read as both-rewrote. **Every local branch now sits on a pre-sync base** — see § Base drift.
+Decisions are in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) §
+"2026-10-25 sync", and the sync log in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) names each resolution.
+
+Before that, on **2026-10-22** — `nplez1/main` merged upstream main @ `57b5082404` (268 commits) from
 `c67d40f97b` (merge `05b4768249`, merge base `bbc8303b47`, rollback tag
 `archive/pre-sync-c67d40f97b`). 52 conflicted paths, and no add/add this time: `union 22,
 both-rewrote 20, modify/delete 5, duplicate-members 2, rename-replay 2, duplicate-tail 1`. Upstream's
@@ -128,6 +138,24 @@ that `terminal-session-reconnect` adds. Splitting it further would mean duplicat
 dependency, so the three want to land in that order.
 
 ## Base drift — recorded, not fixed
+
+**2026-10-25:** after the `0571e45107` merge, **no local branch contains it** — every one needs a
+catch-up merge of `nplez1/main` before `local/open-pr.mjs` will accept it. Measured with
+`node local/branch-status.mjs --local-only` plus `git merge-base <branch> nplez1/main` (PR state was
+not read; run without `--local-only` for it):
+
+- `nplez1/AI-Prompts` on `ad57148cf6`, `nplez1/Session-Summary` on `204984546d` — one and six
+  commits behind the pre-sync tip, so this sync is essentially the whole catch-up (563 and 568
+  behind `nplez1/main`);
+- `nplez1/docs/fork-differences` on `3dbea1c247` (2026-10-19, 1466 behind);
+- `nplez1/pi-osc52-clipboard-over-paired-client` on `f9363b970c` (2026-10-17, 2116 behind);
+- `nplez1/fix-tag-mirror-token` and `nplez1/hunt-vitest-nonexit` on `bb043b9724` (2026-10-15, 2523
+  behind; `hunt-vitest-nonexit` has no own delta);
+- `nplez1/automations-project-scope` (`#109`) and `nplez1/automations-create-by-desc` (`#110`) on
+  `cf26a17b7a` (2026-10-13, 2529 behind) — by the local refs; the 2026-10-15 entry below recorded
+  `bb043b9724`, so the fork's copies may be newer than this clone's.
+
+Every other tracked branch is `not local` in this clone, so its base was not measured.
 
 **2026-10-16:** the same two fork PRs (`#109`, `#110`) are still open and now sit two syncs behind:
 they were cut before the 2026-10-15 sync, and `nplez1/main` has since moved to `ae9db02137` plus

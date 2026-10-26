@@ -3,6 +3,44 @@
 Entries moved verbatim out of [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) § Sync log, which keeps the
 three most recent inline so that section stays readable. Same text and same order; newest first.
 
+- **2026-10-19 — merge of upstream `83c768d1b4` (170 commits) into the release line, from
+  `cc42fb3b93`** (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). Upstream's
+  delta is mostly a module reorganisation rather than a feature wave: the SSH tree split into
+  `ssh/connection/`, `ssh/targets/` and `ssh/config/`, `filesystem-watcher.ts` split into
+  `filesystem-watcher-handlers.ts` + `filesystem-watcher-shutdown.ts`, `locale-text-collators` and
+  `markdown-document-paths` moved to `shared/`, `hasRuntimeRpcErrorCode` moved to
+  `shared/runtime-rpc-error-code.ts`, `@types/node` came back down to `^24.19.2`, and the AI Vault
+  caches gained a scope-aware depth rule.
+
+  The merge produced **52 conflicted paths** — `both-rewrote 34, union 10, rename-replay 3,
+  duplicate-tail 2, modify/delete 2, duplicate-members 1` — exactly the set the dry run named. Every
+  decision is in [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-19
+  sync"; the ones a reviewer will want first:
+
+  - **The unbounded AI Vault bypass belongs to the two main-process scan caches, not the answer
+    cache.** `localCacheHit` (`cached-session-list.ts`) and both gates in `ai-vault-host-leg-cache.ts`
+    read `cached.depth === 'unlimited' || aiVaultCachedDepthServes(...)`, so a scoped bounded request
+    is answered from an unbounded scan (the fork's rule, pinned by its three
+    `serves a scoped bounded … list from the unbounded one already loaded` cases). The renderer's
+    result cache is strict — upstream's rule, pinned by its `rescans a scoped view at a lowered depth`
+    case — and its dead unbounded fallback is deleted rather than left to invite a "fix". A shared
+    helper for both was written and removed during the merge: it cannot satisfy both suites, and the
+    ledger records why not.
+  - **`codex-subagent-roster` stays deleted** (the fork renamed it to `agent-descendant-roster`) and
+    upstream's child-cap removal is ported into the renamed module and its test.
+  - **The AI Vault view-options hook keeps upstream's shared store and both fork extras.**
+    `usePersistedAiVaultViewOptions(localAgents?, disabledTuiAgents?)`: upstream's argument stays
+    first because the `/resume` dialog passes it positionally, and
+    `setAllAgentsEnabled(enabled, scope = AI_VAULT_AGENTS)` keeps the fork's scope-aware bulk toggle
+    so a one-argument call still means "every agent".
+  - **Two max-lines extractions, one of which retires recorded debt.**
+    `runtime-host-mode-capabilities.ts` took the three host-mode capability pushes out of
+    `orca-runtime-get-status.ts`, and `ai-vault-forced-rescan-throttle.ts` took the rescan throttle
+    out of the refresh hook — the overflow this file recorded as deliberate debt above is now gone.
+  - **`web-file-mutation-session.ts` adopted upstream's `assertMutationSupported({ pinConnection })`**
+    contract, including the connection-epoch pin, because the fork's own web preload module is the
+    provider for upstream's `web-file-mutation-methods.ts`.
+
 - **2026-10-19 — full-suite evidence, and where this machine's run stops short.** The suite was run
   in three passes because the local tail is environment-bound. (1) `pnpm test` (both projects) ran to
   completion once: 69 failing cases in 23 files, every one classified — the list below. (2) After the

@@ -814,7 +814,7 @@ out of `src/cli/index-project-setup.test.ts`.
 
 **Paths:** `src/main/jira/*`, `src/main/ipc/jira.ts`, `src/renderer/src/runtime/runtime-jira{,-client,-detail-client,-board-client,-text-fields}.ts`,
 `src/renderer/src/components/{JiraIssueWorkspace,jira-issue-assignee-control,jira-issue-workspace-*}.tsx`,
-`src/renderer/src/components/task-page/jira/*`, `src/shared/{jira-types,jira-transition-fields,jira-runtime-capabilities}.ts`
+`src/renderer/src/components/task-page/jira/*`, `src/shared/jira/{jira-types,jira-transition-fields}.ts`, `src/shared/jira-runtime-capabilities.ts`
 
 **Decision (2026-10-15, fork owner):** upstream spent the same window building the same Jira features
 the fork built — assignee search and "Assign to me" (`#28612`), a board and current-sprint filter
@@ -1632,3 +1632,130 @@ over the top of the fork's entries — the counts belong to the merged tree, not
   fails to compile.
 - `worktrees-local-create-base-prefetch.test.ts` mocked `../providers/ssh-filesystem-dispatch`, which
   upstream deleted, so the mock target vanished with it.
+
+## 2026-10-25 sync (upstream `0571e45107`, 556 commits)
+
+Merge base `57b5082404`, pre-sync tip `095cf32705`, rollback tag `archive/pre-sync-095cf32705`, merge
+commit `281cccf5a4`. **249 conflicted paths, 367 hunks** — `both-rewrote 167, union 47,
+modify/delete 23, duplicate-tail 8, rename-replay 2, duplicate-members 1, add/add 1` — four to five
+times the previous two syncs. Upstream's delta is a **mass comment-terseness pass** (which is why
+`both-rewrote` dominates) plus regroupings: `ipc/filesystem/watchers/`, `shared/jira/`, several
+`src/main/runtime/` groups, and ~50 retired test inventories. The max-lines splits are in § "Max-lines
+budget pressure", 2026-10-25 addendum.
+
+### Filesystem watchers: upstream's `filesystem/watchers/` grouping wins, and the fork's files moved in
+
+**Paths:** `src/main/ipc/filesystem/watchers/**`, `src/main/ipc/filesystem-watcher-*`
+
+**Decision.** Upstream moved its flat `src/main/ipc/filesystem-watcher-*` modules into
+`src/main/ipc/filesystem/watchers/`. The fork's seven watcher files moved **with** them —
+`filesystem-watcher-event-coalescing.ts`, `-local-teardown.ts`, `-path-index-coverage.ts`,
+`-path-index-reconciliation.ts` (+ test), `-wsl-snapshot.ts` and `-local-lifecycle.test.ts` — and
+none is left flat.
+
+**Why this is not the ephemeral-VM rule** (2026-10-22: fork-only modules stay flat). Those were
+standalone; these are halves the fork extracted out of upstream's watcher modules, and each is
+imported only by an upstream sibling (`-local-events`, `-local-subscription`, `-wsl`) and imports
+siblings itself. Left flat, every one becomes a cross-directory pair with the module it was cut from.
+`1b848feba6` pruned the flaky-ratchet rows the move stranded at the old flat paths.
+
+**Do not:** move the seven back to `src/main/ipc/`. `git ls-files 'src/main/ipc/filesystem-watcher-*'`
+printing nothing is the shape the next sync expects.
+
+### Jira shared types: `shared/jira/jira-types` is upstream's path; the fork's types rode inside it
+
+**Paths:** `src/shared/jira/**`, `src/shared/jira-*.ts`
+
+**Decision.** Upstream moved `src/shared/jira-*` into `src/shared/jira/`, `jira-types.ts` included.
+The fork's additions to that file moved with it rather than into a fork file: eleven fork-only
+exported types (`JiraBoard`, `JiraBoardColumn`, `JiraBoardIssuePage`, `JiraBoardIssuePageRequest`,
+`JiraBoardOverview`, `JiraBoardSelection`, `JiraCommentBodyFormat`, `JiraEditableField`,
+`JiraFieldErrors`, `JiraSprint`, `JiraSprintAssignment`) and five fork-only `JiraCreateField` members
+(`hasDefaultValue`, `currentValue`, `hasCurrentValue`, `currentDisplayValue`, `currentUsers`). The
+fork-only modules no upstream file imports stay flat, per the ephemeral-VM rule:
+`jira-board-view-preferences`, `jira-field-draft`, `jira-field-rendering`, `jira-link-site-selection`,
+`jira-runtime-capabilities`.
+
+**Do not:** split the fork's types out into a second `jira-types` file to shrink the diff — every Jira
+importer would then need two imports, and the next sync re-conflicts the same block anyway.
+
+### Session search schema: version 10, above both lines
+
+**Paths:** `src/main/ai-vault-search/session-search-schema.ts`
+
+**Decision.** `SESSION_SEARCH_SCHEMA_VERSION` went 6 → 9 on the fork and 6 → 8 upstream; the merged
+file is **10**. Runbook trap 8: when both sides bump a persisted-format version in one sync, take a
+version strictly above every version either line has shipped. At 9, a fork install's database would
+read as current without upstream's version-8 change; 10 is a number neither line has written, so
+both rebuild.
+
+**Do not:** resolve to `max(ours, theirs)`. The two lines have meant the same number before.
+
+### pi: the async lane is the fork's, the roster lane is upstream's, and the compaction hold reads both
+
+**Paths:** `src/main/pi/agent-status-compaction-source.ts`, `src/main/pi/agent-status-async-subagent-session-source.ts`, `src/main/pi/agent-status-handler-source.ts`
+
+**Decision** (`ef2897da2b`). Upstream fills `lifecycleState.active` from the roster lane; the fork
+routes the async channels to its own lane (§ "pi subagent bindings") and keeps them out of that set.
+Upstream's new test expects a finished reply's compaction not to be announced while children run,
+so the compaction guard in `agent-status-compaction-source.ts` now reads
+`isHeldByChildren() || piAsyncSubagentHasLiveRuns()` — the second reading the same live set
+`subagent_async_state` posts. **`isHeldByChildren()` itself is unchanged.**
+
+**Why:** `isHeldByChildren()` also gates `postAgentEndOnce`, and the fork posts `agent_end` while
+async children run, letting the host hold the pane from `subagent_runs`. Feeding the async lane into
+`onEvent` (so `lifecycleState.active` would see it) broke 27 fork tests that pin that separation.
+
+**Do not:** fold `piAsyncSubagentHasLiveRuns()` into `isHeldByChildren()`, or route the async channels
+back into the roster lane to satisfy an upstream hold — add the async check at the one guard instead.
+
+### Computer-use identity: the fork's `OrcaBundleIdentity`, upstream's duplicate deleted
+
+**Paths:** `native/computer-use-macos/Sources/**`, `native/computer-use-macos/Tests/**`
+
+**Decision** (`accb095dd6`). Upstream added `TrustedOrcaApplication.swift` (+ test) for the job
+`OrcaBundleIdentity.isTrustedPeer` already does here. The fork's helper is identity-aware
+(`com.nplez1.orca` and its dev id) and `main.swift` already calls it, so upstream's file was
+unreferenced and is deleted with its test. Its `com.stablyai.orca` literals are also what the fork's
+"leaves no pre-rename bundle id in any helper source" test forbids.
+
+**Do not:** take `TrustedOrcaApplication.swift` back when upstream next edits it. Port the change into
+`OrcaBundleIdentity` if it adds a rule.
+
+### Worktree IPC: `worktrees:listAll` is gone, `listCached` stays
+
+**Paths:** `src/main/ipc/worktrees.ts`, `src/preload/api/worktree{s-bridge,-api}.ts`
+
+**Decision.** Upstream dropped the `worktrees:listAll` IPC surface, and the fork's copy went with it.
+`worktrees:listCached` is fork-only and stays: `src/renderer/src/startup/startup-worktree-cache.ts`
+calls it on startup (and the web preload mirrors it).
+
+**Do not:** delete `listCached` as part of the same surface. It looks like a sibling of `listAll`; it
+is not.
+
+### Skill freshness: `src/shared/skill-freshness.ts` is fork-only now
+
+**Paths:** `src/shared/skill-freshness.ts`, `src/shared/skill-freshness.test.ts`
+
+**Decision.** Upstream deleted the module (the renderer owns those types now); the fork keeps it for
+the both-owner lock-source rule (`isOrcaSkillLockSource` accepts `stablyai/orca` and `nplez1/orca`).
+**Open:** after the merge nothing but its own test imports it — the renderer's freshness status now
+derives from upstream's bundled-skill plan — so the rule is not on a live path. The next change here
+either wires it into upstream's ownership check or deletes it; do not leave it to drift.
+
+### The unit gate runs upstream's lane setting: `recordDependencies=false`
+
+**Paths:** `local/gate-unit.mjs`, `config/vitest.config.ts`
+
+**Decision.** `local/gate-unit.mjs` passes `--experimental.recordDependencies=false` (`UNIT_LANE_ARGS`)
+to its suite run and its isolation re-runs. Upstream's `config/vitest.config.ts` sets
+`experimental: { recordDependencies: !process.env.CI }`, and upstream's lane sets `CI`, so CI never
+records dependencies. Left on, this machine reports 35 `EnvironmentTeardownError` races per full run
+from upstream's fire-and-forget `import()`s that CI never sees. Reproduced on four suites in one
+worker: as configured 20 errors, `CI=1` 0, `recordDependencies=false` 0, 28/28 passing each time.
+
+**Trade-off, accepted:** the gate no longer surfaces those races. They are upstream's to fix and stay
+in the code.
+
+**Do not:** set `CI` for the gate instead — other suites read `CI` for their own behaviour, so the flag
+is the narrower switch.
