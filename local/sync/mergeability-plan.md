@@ -37,6 +37,8 @@ dropped item.
 | Linux nightly reds (§ 6.2)         | fixture import rewrite fixed, EPIPE observed, cooldown expectation per-platform, verdict names the file | The **merge resolution** rewrote two fixtures' imports to paths that exist in neither parent — invisible to import checks because the shorter path resolves from the changed file                                                                                              |
 | Gate preflight (§ 4.3)             | **dropped**                                                                                             | Both proposed checks would have failed a healthy tree: mobile deps hoist to the root install, and the bun pin resolves from a devDependency, not PATH                                                                                                                          |
 
+| Dead modules (§ 4.9) | 4 fork-only modules + 1 test deleted (290 lines, and 0 importers proven by a `from '…'` scan) | `check:test-file-runners` enumerates `git ls-files`, so an unstaged deletion reads as a missing file — stage the delete before believing that failure |
+
 ### Still open, in this plan's own terms
 
 - **§ 5.4 dashboard delivery — settled and executed 2026-10-26.** The product owner rejected
@@ -329,13 +331,19 @@ fork-owned overlay file that it merges with upstream's: upstream's baseline stay
 the fork records only the files whose count differs. Removes 2 paths/sync and also removes the risk
 of silently loosening upstream's ratchet.
 
-### 4.9 Delete the dead modules
+### 4.9 Delete the dead modules — **done 2026-10-27**
 
 Verified 0 importers: `src/renderer/src/components/task-page-jira-board-page-state.ts` (36),
 `src/shared/quick-open-path-inventory-limits.ts` (26),
 `src/shared/workspace-path-search-request-budget.ts` (23) — all three named as dead by the ledger on
-2026-10-15 and never removed. Plus `src/shared/skill-freshness.ts` (205): the ledger
-(`:1740-1744`) says wire it in or delete it, and nothing on a live path imports it.
+2026-10-15 and never removed. Plus `src/shared/skill-freshness.ts` (205): the ledger (`:1861`) says
+wire it in or delete it, and nothing on a live path imports it.
+
+All four are gone, with `skill-freshness.test.ts`. "No importer" needed two refinements: the _names_
+`SkillBundleFileIdentity` and `SkillUpdateRun` do appear elsewhere, but those files declare their own
+copies, so only a `from '.../skill-freshness'` scan settles it — and it found the module's own test as
+the sole importer. `check:test-file-runners` then failed with `ENOENT` until the deletions were
+staged, because it enumerates `git ls-files`.
 
 ---
 

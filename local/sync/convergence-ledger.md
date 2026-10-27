@@ -1142,7 +1142,8 @@ tree, and report each fork-only file nothing references. Run on 2026-10-15 it fo
 module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
 `quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already
 unreferenced at the fork tip), so the check needs an allowlist for known-dead paths and for worker
-entries loaded by path (`workspace-path-index-benchmark-worker-entry.ts`).
+entries loaded by path (`workspace-path-index-benchmark-worker-entry.ts`). **2026-10-27:** all four
+are deleted (§ 4.9 of the plan), so that allowlist now needs only the worker entry.
 
 **Do not:** rebuild the old inheritance chain; add new file-command units as composed fields here.
 
@@ -1862,11 +1863,13 @@ is not.
 
 **Paths:** `src/shared/skill-freshness.ts`, `src/shared/skill-freshness.test.ts`
 
-**Decision.** Upstream deleted the module (the renderer owns those types now); the fork keeps it for
+**Decision.** Upstream deleted the module (the renderer owns those types now); the fork kept it for
 the both-owner lock-source rule (`isOrcaSkillLockSource` accepts `stablyai/orca` and `nplez1/orca`).
-**Open:** after the merge nothing but its own test imports it — the renderer's freshness status now
-derives from upstream's bundled-skill plan — so the rule is not on a live path. The next change here
-either wires it into upstream's ownership check or deletes it; do not leave it to drift.
+**Resolution: delete** — resolved 2026-10-27. After the merge nothing but its own test imported it: the
+renderer's freshness status derives from upstream's bundled-skill plan, so the rule was not on a live
+path and the file recorded a policy the app no longer applied. `isOrcaSkillLockSource` and
+`ORCA_SKILL_LOCK_SOURCES` are gone with it. If a both-owner rule is ever needed again it belongs in
+upstream's ownership check, not in a resurrected dead module.
 
 ### The unit gate runs upstream's lane setting: `recordDependencies=false`
 

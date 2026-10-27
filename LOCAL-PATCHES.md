@@ -464,7 +464,7 @@ WSL lane keeps the bare registered name its shell wrappers resolve against `ORCA
 an inherited value is still dropped first.
 
 Anchors: `src/shared/agent-feature-install-commands.ts` (`ORCA_SKILLS_REPOSITORY_URL`),
-`src/shared/skill-freshness.ts` (`ORCA_SKILL_LOCK_SOURCES`), `skill-stubs/_shared/cli-resolution.md`,
+`skill-stubs/_shared/cli-resolution.md`,
 `skill-guides/orca-cli.md`, `skill-guides/orca-per-workspace-env.md`,
 `skill-guides/computer-use.md`, `docs/site/content/docs/cli/skills.mdx`, and
 `src/main/ipc/pty/host-env/assembly.ts` (`buildPtyHostEnv`, at the
@@ -1451,9 +1451,10 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     skill bundle manifest arrived built from upstream's skills. `995f2dbc27` separately restored nine
     files where a repair script had rewritten `./src/main/...` inside esbuild `stdin.contents`
     templates — cwd-relative strings, not imports.
-  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` is now fork-only — upstream
-    deleted the module and the renderer owns those types — and is kept for its both-owner
-    lock-source rule; note that after the merge only its own test imports it. Six fork-only exports
+  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` was fork-only — upstream
+    deleted the module and the renderer owns those types — and it is **now deleted too** (2026-10-27):
+    its both-owner lock-source rule had stopped being on a live path, nothing but its own test imported
+    it, so keeping it recorded a rule the app no longer applied. Six fork-only exports
     upstream's refactors superseded are acknowledged, with their live replacements, across five paths
     in `local/sync/expected-deletions.json`. The onboarding test lost its `nplez1` URL assertion.
     `worktrees:listAll` went with the IPC surface upstream dropped; `listCached` stays, live in
