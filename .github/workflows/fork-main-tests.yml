@@ -49,3 +49,8 @@ jobs:
       node_versions: '["24"]'
       runner: ubuntu-24.04-arm
       shards: ${{ needs.plan.outputs.shards }}
+      # Why: the relay job in `unit-tests.yml` hard-codes `blacksmith-4vcpu-ubuntu-2404`, and this
+      # fork has no runner for that label — the 2026-10-26 run sat queued for 17 h on it, which
+      # never completed the run, and `cancel-in-progress: false` then blocked every later night. The
+      # fork ships no cloud relay, so the job has nothing to test here.
+      run_relay_integration: false
