@@ -79,17 +79,22 @@ dropped item.
 - **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and four fixes are upstream-worthy
   (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions, and a bare
   `vitest` over the whole suite missing `ORCA_BACKGROUND_LAUNCH=1`).
-- **Nightly proof** — PR #186 merged on 2026-10-27, so `main` carries the unblock; a dispatch against the
-  branch measured the red set as three files, all commits missing from `main` rather than platform
-  differences, so the nightly should go green once this branch lands. Confirming that is one scheduled
-  run, or one dispatch (~50 billed minutes, a spend decision).
+- **Nightly proof** — PR #186 merged on 2026-10-27, so `main` carries the unblock, and the schedule
+  **fired on its own** for the first time since 10-24: run `40485647652` at 04:53Z on `main`
+  @ `7c53c12a17`, `plan` + all five shards + `relay integration` skipped as intended. It is red on four
+  files: three are the branch gap this branch closes (the cooldown expectation and both `daemon/*.electron`
+  fixtures), and the fourth — `daemon-pty-adapter-history-recovery.test.ts`, a `disconnectOnly` race —
+  is upstream-owned with zero fork hunks and passes 3/3 here, so it is a Linux flake needing its own red
+  set rather than an allowlist entry. `check-nightly-linux-parity.mjs`: all 17 Mac-allowlisted entries
+  passed on Linux. So the remaining proof is one run after this branch lands, and the only thing still
+  unowned is that Linux flake.
 
 ### Baselines that moved
 
 | Metric                                             | § 1 said      | Now                                                                                 |
 | -------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
 | Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                                           |
-| Nightly runs per week                              | 0             | 1 (the deadline is fixed; the next scheduled run is the proof)                      |
+| Nightly runs per week                              | 0             | 1, firing on its own since 10-27 (red: 3 branch-gap files + 1 upstream Linux flake) |
 | Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class                               |
 | Deletions asserted rather than re-decided          | 0             | 26                                                                                  |
 | Conflicted paths with a settled, executable answer | 0             | 15 (14 `delete`, 1 `take-theirs`; the rest are `manual`, which is the honest count) |
@@ -267,7 +272,7 @@ jobs) so repo-level workflow enablement cannot silence it. Then add a heartbeat 
 `local/check-actions-enablement.mjs`-adjacent tooling that reports "no run in 48 h" instead of
 leaving it to be noticed.
 
-### 4.2 The flake waiver is blanket on the release line
+### 4.2 The flake waiver is blanket on the release line — **done 2026-10-27**
 
 `gate-unit.mjs:169-178` diffs `merge-base(nplez1/main, HEAD) .. HEAD`. A sync is merged **onto**
 `nplez1/main`, so on the release line the merge-base _is_ HEAD, the diff is empty, and
@@ -278,6 +283,17 @@ judged against an empty diff immediately after a 556-commit merge.
 Fix: when the merge-base equals HEAD, fall back to a base that has content — the merge's first
 parent, or the last gated revision — and if neither resolves, return `unknown`, which already means
 "never waive". One condition, one test.
+
+**Done, in two pieces (`d86075ef79`, `f4c6615cf2`).** `branchDiff()` now judges a single-parent HEAD by
+its own parent, so a squashed land is read against the merge's first parent; and it returns `null` when
+no merge base resolved at all, so an unresolvable base stays `unknown` rather than falling back to
+`HEAD~1` alone. Two tests pin both directions. Running the gate once at four workers then showed the
+second half of the same problem: with upstream's rule, **`package.json` coupled every test** — and in
+this branch it changes only the electron-builder overlay and one removed lint step, so two gate runs in
+a row refused a genuine load flake for a reason that could not have caused it. The coupling is now
+content-aware on that one input: dependencies, peers, `engines`, `packageManager`, `resolutions`,
+`overrides`, `pnpm`, `type`, and any `test*`/`vitest*` script still couple everything; a build or lint
+script does not, and an unreadable manifest fails closed.
 
 ### 4.3 Gate preflight — **dropped, on evidence**
 

@@ -1344,6 +1344,27 @@ skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at 
 `fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
 cross-cutting break sitting on the release line until one of those two runs.
 
+**The first scheduled run after the unblock, read (2026-10-27, run id `40485647652`, `main` @
+`7c53c12a17`).** The schedule fires again — that is the part `#186` fixed, and this run proves it on a
+real slot rather than by dispatch. It is red: `plan` succeeded, all five shards ran, `relay integration`
+skipped as intended, and **four files failed across four shards** (shard 3 green).
+
+- Three are the branch gap this branch closes, exactly as the dispatch predicted: the cooldown
+  expectation, and both `daemon/*.electron` fixtures whose esbuild specifiers `be847f718f` rewrote.
+- The fourth is new and belongs to the lane, not the fork: `daemon-pty-adapter-history-recovery.test.ts
+  › serializes concurrent keepHistory and disconnectOnly checkpoints`, failing with
+  `DaemonConnectionLostError: Disconnected` out of `disconnectOnly()` at its own line 292. **All five
+  files in that chain are upstream-owned with zero fork hunks**, so it is upstream's own race under
+  Linux runner timing, not a regression here — and it passes 3/3 on this Mac, so it is not a Mac
+  allowlist entry either. It is the first case that needs a *Linux* flake set, which § 6.2's parity
+  checker does not carry; until one exists, read it as an ownerless red and do not "fix" it inside the
+  fork.
+
+`node local/check-nightly-linux-parity.mjs` on that run's artifacts: **PASS — all 17 Mac-allowlisted
+entries passed on Linux** (22/23 pruned entries passed; one absent because it is a macOS-only bundle
+test). So the Mac red set transfers clean, and the four failures are branch gap plus one upstream flake —
+no environment class of Linux's own, the same conclusion the dispatch reached.
+
 ### `local(sync)`: a file upstream owns is restored, not deleted
 
 The fork deleted 39 files upstream still owns and still edits, so every one was a modify/delete conflict
