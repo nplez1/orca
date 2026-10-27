@@ -45,7 +45,13 @@ function git(root, args) {
 }
 
 function resolveMergeBase(root, requested) {
-  for (const candidate of [requested, process.env.ORCA_CODE_QUALITY_BASE, 'origin/main', 'main']) {
+  for (const candidate of [
+    requested,
+    process.env.ORCA_CODE_QUALITY_BASE,
+    'origin/HEAD',
+    'origin/main',
+    'main'
+  ]) {
     if (!candidate) {
       continue
     }
