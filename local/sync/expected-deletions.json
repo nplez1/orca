@@ -38,155 +38,155 @@
       "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The 16-line resolver that chose between the drawer and the pop-out; there is nothing to choose between once the dashboard is a view. Deleted by the #44 refactor's merge resolution rather than by a commit of its own."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.test.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers agent-dashboard-open-mode.ts."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/main/ipc/dashboard-popout.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Part of the pop-out BrowserWindow delivery #44 replaced with a first-class dashboard view. Restoring it means reverting the deletion half of that refactor, including its IPC, preload API, renderer entry and 9 test suites; keeping it means a modify/delete conflict every sync. evidence: mergeability-plan.md 4.1 / dashboard section, LOCAL-PATCHES.md local(sync)"
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/main/ipc/dashboard-popout.test.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers dashboard-popout.ts, so it follows that decision."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/main/window/dashboard-popout-window.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The pop-out BrowserWindow itself, 270 lines. Follows the dashboard-delivery decision."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/main/window/dashboard-popout-window.test.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers dashboard-popout-window.ts."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/main/window/clipboard-dashboard-popout-access.test.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers clipboard access for the pop-out window, which no longer exists."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/preload/api/dashboard-api.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Preload surface for the pop-out window's snapshot bridge."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/preload/api/dashboard-bridge.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Preload surface for the pop-out window's snapshot bridge."
+      "status": "restore",
+      "reason": "Inert main-process and preload plumbing, restored to upstream/main byte-identical. Nothing registers or opens it, and its own suite passes (33 cases), so keeping upstream's file removes the modify/delete conflict at no cost. clipboard-dashboard-popout-access.test.ts needed upstream's isDashboardPopoutRenderer admission in clipboard-ipc-handlers.ts, which came back with it."
     },
     {
       "path": "src/renderer/popout.html",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Renderer entry for the pop-out window; electron.vite.config.ts also dropped it, so restoring this means restoring that too."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/popout.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Renderer entry for the pop-out window."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The pop-out window's root component; 14 lines that render AgentKanbanBoard."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.test.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers DashboardPopoutRoot.tsx."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The pop-out window's data pump, 176 lines. This is the one file in the set worth reading before deciding: it holds logic, not only chrome."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.test.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers useDashboardSnapshot.ts."
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
     },
     {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The in-window drawer delivery, 212 lines, replaced by the dashboard view."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.test.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers AgentDashboardDrawer.tsx."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/dashboard/DashboardPopoutBridge.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Bridges the main window's dashboard state to the pop-out window."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.ts",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "The hook behind the pop-out bridge."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.test.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers useDashboardPopoutBridge.ts."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Hosted the drawer as a sidebar companion sheet; the sidebar entry now selects on activeView instead."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     },
     {
       "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.test.tsx",
       "commit": "ab57bb7bbb",
       "class": "dashboard-delivery",
-      "status": "pending-decision",
-      "reason": "Covers AgentDashboardSidebarHost.tsx."
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     }
   ]
 }

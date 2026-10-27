@@ -550,10 +550,25 @@ re-export stays, because the fork lifted those constants out of `protocol-versio
 
 **Paths:** `src/renderer/src/components/dashboard/**`, `src/renderer/src/components/dashboard-popout/**`, `src/main/ipc/dashboard*.ts`, `src/preload/api/dashboard*.ts`, `src/main/window/dashboard-popout-window*`
 
-**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx`). The popout
-window plumbing (`src/main/window/dashboard-popout-window.ts`, its test, the popout IPC and preload)
-was **deleted** by the fork, so upstream's later fixes to those files are taken as deletions rather
-than merged back in.
+**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx`), and that view is
+the only delivery the fork exposes. The **popout window's main-process and preload plumbing is now
+restored** to `upstream/main` byte-identical (`src/main/ipc/dashboard-popout.ts`,
+`src/main/window/dashboard-popout-window.ts`, `src/preload/api/dashboard-{api,bridge}.ts` and three
+tests): nothing registers or opens it, it typechecks, and its own 33 cases pass, so holding upstream's
+version costs nothing and removes four modify/delete conflicts. `dashboard: DashboardApi` is back in
+`PreloadApi` because upstream's bridge satisfies it; nothing in the renderer reads it.
+
+**What stays deleted (2026-10-26),** asserted in `local/sync/expected-deletions.json`: the drawer, the
+sidebar host, the popout window shell (`popout.html`, `popout.tsx`, `DashboardPopoutRoot`,
+`useDashboardSnapshot`) and the open-mode/bridge hooks. They cannot be restored inertly the way the
+main-process half can — upstream's drawer needs `AppState.agentDashboardDrawerOpen`, which the fork
+removed, and upstream's `DashboardPopoutRoot` needs the `onAckAgent`/`onRevealAgent` props upstream
+added to `AgentKanbanBoard`. **The fork's live page view is built on that same board**, so restoring
+these means either two live implementations of one surface or a product change to the shipped view.
+That is a product decision, not a merge one, so the deletion is asserted instead of re-litigated.
+
+The reversed part of this entry: the popout plumbing used to be deleted, and upstream's later fixes to
+it were taken as deletions. They are now ordinary upstream code again.
 
 **Ack intent (2026-10-07 sync):** the fork keeps the 1-arg ack — `onAckAgent: (paneKey: string) =>
 void` on `AgentKanbanBoard`, calling `onAckAgent(card.paneKey)` — and does not adopt upstream's
@@ -562,7 +577,8 @@ fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept
 parameter would be cosmetic. The merge's test file had both assertions (`'explicit'`, `'view'`) from
 upstream's side; both are reverted to the 1-arg form.
 
-**Do not:** restore the popout window to carry an upstream fix.
+**Do not:** open the popout window to carry an upstream fix — nothing mounts it. The restored files
+exist to merge cleanly, not to ship.
 
 ---
 

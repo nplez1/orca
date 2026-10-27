@@ -75,7 +75,7 @@ export const OXLINT_SCANS = [
   }
 ]
 
-const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
+const SUPPRESSED_CHANGED_LINES_DIAGNOSTICS = new Map([
   [
     'react-doctor(no-adjust-state-on-prop-change)',
     new Set([
@@ -109,6 +109,18 @@ const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
     // arms a timer, so widening it further is the only alternative, not a narrower option.
     'react-doctor(effect-needs-cleanup)',
     new Set(['mobile/src/session/use-mobile-session-startup.ts'])
+  ],
+  [
+    // Same reason as the restored use-jira-issue-workspace-data.ts above: these three suites are
+    // byte-identical to upstream/main (LOCAL-PATCHES.md `local(sync)`), and upstream's own tests cast
+    // with `as`. They read as entirely added lines here, so every existing cast is a new finding until
+    // the branch merges — rewriting them is divergence the next sync has to re-resolve.
+    'typescript(consistent-type-assertions)',
+    new Set([
+      'src/main/ipc/dashboard-popout.test.ts',
+      'src/main/window/dashboard-popout-window.test.ts',
+      'src/main/window/clipboard-dashboard-popout-access.test.ts'
+    ])
   ]
 ])
 
@@ -552,7 +564,7 @@ export function findCastingDirectivesMissingSafety(root, rangesByFile) {
 }
 
 function isSuppressedDiagnostic(diagnostic, root) {
-  const files = SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS.get(diagnostic.code)
+  const files = SUPPRESSED_CHANGED_LINES_DIAGNOSTICS.get(diagnostic.code)
   return files?.has(normalizedDiagnosticPath(root, diagnostic.filename)) ?? false
 }
 

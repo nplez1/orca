@@ -39,9 +39,13 @@ dropped item.
 
 ### Still open, in this plan's own terms
 
-- **§ 5.4 dashboard delivery** — 20 of the 24 deletions are `pending-decision` in
-  `expected-deletions.json`. Restore upstream's subsystem plus a third mode, or keep the deletion and
-  let the resolver apply it. The triage note names those paths so they cannot be resolved by accident.
+- **§ 5.4 dashboard delivery — settled 2026-10-26, at the point the code allowed.** The restore split
+  where inertness stopped. **7 files restored** (main-process + preload popout plumbing, plus three
+  suites that pass — 33 cases), **15 asserted as `expected-deletion`** (drawer, sidebar host, popout
+  window shell, open-mode/bridge hooks). The renderer half cannot be restored without either two live
+  dashboards or a behaviour change to the shipped page view, because upstream's `DashboardPopoutRoot`
+  needs props upstream added to `AgentKanbanBoard`, and that board is what the fork's live view renders.
+  No `pending-decision` entries remain; the resolver can act on all 26.
 - **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone. **6 of 37 measured
   splits are undone** (`f77d72467c`): each was upstream's code with nothing of the fork's in it. The
   other 31 stay, with the measurement recorded — the block carries fork code, was rewritten rather than

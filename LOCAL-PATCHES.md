@@ -1258,7 +1258,27 @@ Still deleted, deliberately:
   without resurrecting that model, and a dead file is not a reason to bring a removed capability back.
   `local/sync/mergeability-plan.md` § 5 already carries this as a product decision.
 
-The 21 dashboard/pop-out files are a separate decision and are not covered by this entry.
+The 22 dashboard/pop-out files are now split by whether they can be inert, and the split is recorded in
+`local/sync/expected-deletions.json` rather than left implied:
+
+- **7 restored**: `src/main/ipc/dashboard-popout.ts`, `src/main/window/dashboard-popout-window.ts`,
+  `src/preload/api/dashboard-api.ts` and `-bridge.ts`, plus three suites — all byte-identical to
+  `upstream/main`. Nothing registers the IPC or opens the window, so they are dead, but they typecheck
+  and **their 33 cases pass**, which is why restoring them costs nothing: the cost of holding upstream's
+  file is zero, and the cost of deleting it is a modify/delete conflict every sync. Restoring
+  `dashboard-bridge.ts` required `dashboard: DashboardApi` back in `PreloadApi` (upstream's line), and
+  `clipboard-dashboard-popout-access.test.ts` required upstream's `isDashboardPopoutRenderer` admission
+  in `assertTrustedClipboardTextSender` — text authority only, never images, files or remote operations.
+- **15 stay deleted**: the drawer, the sidebar host, the popout window shell (`popout.html`,
+  `popout.tsx`, `DashboardPopoutRoot`, `useDashboardSnapshot`) and the open-mode/bridge hooks. These
+  cannot be restored inertly. Upstream's drawer needs `AppState.agentDashboardDrawerOpen`, which #44
+  removed, and its `DashboardPopoutRoot` needs the `onAckAgent`/`onRevealAgent` props upstream added to
+  `AgentKanbanBoard` — the very component the fork's **live** page view renders. Restoring them means
+  either two live implementations of one surface or a behaviour change to the shipped dashboard, which
+  is a product decision, not a merge one.
+
+`electron.vite.config.ts` keeps upstream's `popout` entry deleted along with `popout.html`: an entry
+that resolves nothing does not build, and the fork's comment there says why.
 
 ### `local(test)`: two `orca-runtime` defects were test bugs, not environment reds
 
