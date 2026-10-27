@@ -20,6 +20,10 @@
  * red that matches nothing still fails, and it fails by name — so the one alarm left is a failure
  * nobody has classified yet.
  *
+ * What it cannot see: a describe-level hook failure that Vitest attributes to a suite rather than to
+ * the file's `message`. `numFailedTestSuites` counts failing describes as well as failing files (2 for
+ * one failing file, measured), so it cannot be used to catch that without failing every night.
+ *
  * Usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH]
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -93,13 +97,21 @@ function failingTestNames(report) {
 // Why: a file whose import or `beforeAll` threw reports every test skipped, so no `failing:` line
 // names it and the shard reads as red with no culprit.
 function failedFilesWithoutFailingTest(report) {
-  return (report.testResults ?? [])
-    .filter(
-      (file) =>
-        file.status === 'failed' &&
-        !(file.assertionResults ?? []).some((assertion) => assertion.status === 'failed')
+  const failures = []
+  for (const file of report.testResults ?? []) {
+    if (file.status !== 'failed') {
+      continue
+    }
+    // Why a message counts even when a row failed too: an afterAll or teardown error is not the
+    // failure the entry accounts for, so absorbing the row must not absorb this red beside it.
+    const hasFailingTest = (file.assertionResults ?? []).some(
+      (assertion) => assertion.status === 'failed'
     )
-    .map((file) => file.name)
+    if (file.message || !hasFailingTest) {
+      failures.push({ file: file.name, detail: file.message || '' })
+    }
+  }
+  return failures
 }
 
 /**
@@ -154,18 +166,32 @@ export function decideUnitShardVerdict({ reportText, logText, outcome, knownRed 
       problems.push(`and ${unexpected.length - FAILING_TEST_LIMIT} more unexpected failure(s)`)
     }
     const fileLevelFailures = failedFilesWithoutFailingTest(report)
-    for (const file of fileLevelFailures) {
+    for (const { file, detail } of fileLevelFailures) {
       const entry = matchingEntry(knownRed, file, null)
       if (entry) {
         absorbed.push(`${file} [${entry.class}]`)
         absorbedEntries.add(entry)
       } else {
-        problems.push(`failing file (no test ran to failure): ${file}`)
+        const why = detail ? ` — ${detail.split('\n')[0].slice(0, 160)}` : ''
+        problems.push(`failing file (no test accounts for it): ${file}${why}`)
       }
     }
     for (const entry of knownRed) {
-      const present = (report.testResults ?? []).some((file) => entryFileMatches(entry, file.name))
-      if (present && !absorbedEntries.has(entry)) {
+      // Why a passed row is required: a file that crashed before this test ran, or a test that was
+      // renamed or skipped, is not evidence the entry can go. Only "it ran and passed" is.
+      const passed = (report.testResults ?? []).some(
+        (file) =>
+          entryFileMatches(entry, file.name) &&
+          (file.assertionResults ?? []).some(
+            (assertion) =>
+              assertion.status === 'passed' &&
+              entryMatchesFailure(entry, {
+                file: file.name,
+                test: assertion.fullName || assertion.title
+              })
+          )
+      )
+      if (passed && !absorbedEntries.has(entry)) {
         prunable.push(`${entry.file}${entry.test ? ` › ${entry.test}` : ''}`)
       }
     }
@@ -213,7 +239,13 @@ function parseArgs(argv) {
   let knownRedPath = null
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--known-red') {
-      knownRedPath = argv[index + 1] ?? null
+      // Why a missing value is a usage error rather than "no flag": the caller asked for a manifest
+      // and silently got none, which is the difference between judging against the red set and not.
+      if (argv[index + 1] === undefined) {
+        console.error('usage: --known-red needs a path')
+        process.exit(2)
+      }
+      knownRedPath = argv[index + 1]
       index += 1
     } else {
       positional.push(argv[index])

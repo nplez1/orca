@@ -329,7 +329,7 @@ test('a file-level failure is never absorbed by a name-matching entry', () => {
   ])
   const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
   assert.equal(result.ok, false)
-  assert.equal(result.unexpected[0].test, '(file-level failure)')
+  assert.equal(result.unexpected[0].test, null)
   // The entry matched no failure, so it is reported as prunable rather than as a false pass.
   assert.equal(result.stale.length, 1)
 })
@@ -407,7 +407,7 @@ test('a suite error alongside the listed failure is not absorbed by the entry', 
   assert.equal(result.ok, false)
   assert.equal(result.allowlisted.length, 1)
   assert.equal(result.unexpected.length, 1)
-  assert.equal(result.unexpected[0].test, '(file-level failure)')
+  assert.equal(result.unexpected[0].test, null)
 })
 
 test('a short title whose full name carries a describe prefix is still found', () => {

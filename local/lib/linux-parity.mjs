@@ -370,7 +370,9 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
       if (file.message || failedAssertions.length === 0) {
         failures.push({
           file: path,
-          test: '(file-level failure)',
+          // Why null rather than a sentinel string: `entryMatchesFailure` reads null as "file-level",
+          // and a sentinel is only safe until an entry's title happens to end with it.
+          test: null,
           detail: file.message || '(no message, and no failing test row)'
         })
       }
@@ -454,11 +456,13 @@ export function formatLinuxFailures(result, { allowlistPath, reportCount }) {
     `failing rows on Linux: ${result.failureCount}`
   ]
   for (const row of result.allowlisted) {
-    lines.push(`  known      ${row.test} — ${row.file.split('/src/').pop()} [${row.class}]`)
+    lines.push(
+      `  known      ${row.test ?? '(file-level failure)'} — ${row.file.split('/src/').pop()} [${row.class}]`
+    )
   }
   for (const row of result.unexpected) {
     lines.push(
-      `  UNEXPECTED ${row.test} — ${row.file.split('/src/').pop()}${row.detail ? ` — ${row.detail}` : ''}`
+      `  UNEXPECTED ${row.test ?? '(file-level failure)'} — ${row.file.split('/src/').pop()}${row.detail ? ` — ${row.detail}` : ''}`
     )
   }
   for (const { entry, status } of result.stale) {

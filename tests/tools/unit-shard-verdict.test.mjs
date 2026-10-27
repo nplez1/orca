@@ -33,15 +33,16 @@ function report({
     numFailedTests: failedTests,
     success: failedTests === 0 && failedSuites === 0,
     testResults: [
-      ...failing.map(([name, fullName]) => ({
+      ...failing.map(([name, fullName, message]) => ({
         name,
         status: 'failed',
+        ...(message ? { message } : {}),
         assertionResults: [{ status: 'failed', title: fullName, fullName }]
       })),
-      ...passing.map((name) => ({
+      ...passing.map(([name, fullName = 'passes']) => ({
         name,
         status: 'passed',
-        assertionResults: [{ status: 'passed', title: 'passes', fullName: 'passes' }]
+        assertionResults: [{ status: 'passed', title: fullName, fullName }]
       })),
       ...fileLevelFailures.map((name) => ({ name, status: 'failed', assertionResults: [] }))
     ]
@@ -171,25 +172,35 @@ it('fails on an outcome it cannot judge', () => {
   )
 })
 
-function run(reportText, logText, outcome, knownRed) {
+function run(reportText, logText, outcome, knownRed = []) {
   const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
   dirs.push(dir)
   const reportPath = join(dir, 'report.json')
   const logPath = join(dir, 'shard.log')
+  // Why always written, even when empty: otherwise a run on Linux falls back to the repo's real
+  // manifest and the test means something different on CI than it does here.
+  const knownRedPath = join(dir, 'known-red.json')
   writeFileSync(reportPath, reportText)
   writeFileSync(logPath, logText)
-  const args = [SCRIPT, reportPath, logPath, outcome]
-  if (knownRed !== undefined) {
-    const knownRedPath = join(dir, 'known-red.json')
-    writeFileSync(knownRedPath, JSON.stringify({ entries: knownRed }))
-    args.push('--known-red', knownRedPath)
-  }
+  writeFileSync(knownRedPath, JSON.stringify({ entries: knownRed }))
+  const args = [SCRIPT, reportPath, logPath, outcome, '--known-red', knownRedPath]
   try {
     return {
       status: 0,
       stdout: execFileSync(process.execPath, args, {
         encoding: 'utf8'
       })
+    }
+  } catch (error) {
+    return { status: error.status, stdout: `${error.stdout}${error.stderr}` }
+  }
+}
+
+function runRaw(args) {
+  try {
+    return {
+      status: 0,
+      stdout: execFileSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' })
     }
   } catch (error) {
     return { status: error.status, stdout: `${error.stdout}${error.stderr}` }
@@ -255,12 +266,27 @@ it('still exits non-zero for an unlisted failure beside a listed one', () => {
 })
 
 it('notes a listed entry whose file passed here, so a stale entry can be pruned', () => {
-  const result = run(report({ passing: ['src/a.test.ts'] }), log(), 'success', [
-    { file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }
-  ])
+  const result = run(
+    report({ passing: [['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both']] }),
+    log(),
+    'success',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
 
   expect(result.status).toBe(0)
   expect(result.stdout).toContain('did not fail here, so its known-red entry may be prunable')
+})
+
+it('does not call an entry prunable when its file ran but the test never did', () => {
+  const result = run(
+    report({ passing: [['src/a.test.ts', 'some other test']] }),
+    log(),
+    'success',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).not.toContain('prunable')
 })
 
 it('does not let a named entry absorb a file-level failure in the same file', () => {
@@ -271,7 +297,7 @@ it('does not let a named entry absorb a file-level failure in the same file', ()
 
   expect(result.status).toBe(1)
   expect(result.stdout).toContain(
-    '::error::unit shard: failing file (no test ran to failure): src/a.test.ts'
+    '::error::unit shard: failing file (no test accounts for it): src/a.test.ts'
   )
 })
 
@@ -282,6 +308,72 @@ it('lets a whole-file entry absorb a file-level failure', () => {
 
   expect(result.status).toBe(0)
   expect(result.stdout).toContain('tolerated a known Linux red')
+})
+
+it('still fails when a known red and a file-level error land in the same file', () => {
+  // The BLOCKER from review: the file-level check only looked at files where no row failed, so an
+  // afterAll error beside an absorbed red read as green. One file entry carries both, as Vitest
+  // reports it: a failed row and a `message`.
+  const result = run(
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/a.test.ts', 'serializes both', 'Error: afterAll hook timed out']]
+    }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('::error::unit shard: failing file (no test accounts for it)')
+  expect(result.stdout).not.toContain('every test passed apart from')
+})
+
+it('absorbs a red whose full name carries the describe prefix, as Vitest reports it', () => {
+  const result = run(
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/a.test.ts', 'DaemonPtyAdapter recovery serializes both']]
+    }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).toContain('[upstream-race]')
+})
+
+it('lets a whole-file entry absorb failing rows too, not only a file-level error', () => {
+  const result = run(
+    report({ failedTests: 1, failedSuites: 1, failing: [['src/a.test.ts', 'anything at all']] }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: null, class: 'env-bound' }]
+  )
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).toContain('tolerated a known Linux red')
+})
+
+it('treats --known-red without a path as a usage error, not as no manifest', () => {
+  const result = runRaw(['report.json', 'shard.log', 'failure', '--known-red'])
+
+  expect(result.status).toBe(2)
+  expect(result.stdout).toContain('--known-red needs a path')
+})
+
+it('fails when the named manifest is missing or malformed', () => {
+  expect(
+    runRaw(['report.json', 'shard.log', 'failure', '--known-red', '/nonexistent/x.json']).status
+  ).toBe(1)
+  const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
+  dirs.push(dir)
+  const malformed = join(dir, 'bad.json')
+  writeFileSync(malformed, '{"entries": "not an array"}')
+  expect(runRaw(['report.json', 'shard.log', 'failure', '--known-red', malformed]).status).toBe(1)
 })
 
 it('does not read a shared filename in a sibling directory as the listed file', () => {
