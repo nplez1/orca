@@ -234,6 +234,31 @@ before handing off to the release:
 node local/check-actions-enablement.mjs --fix
 ```
 
+### What the resolution itself invented
+
+Every check above asks whether the tree is coherent. None asks whether the **resolver** wrote something
+neither parent said. `git show --remerge-diff <merge>` prints exactly those hunks, and the one class
+worth grepping for is a rewritten module specifier:
+
+```bash
+# Only the hunks the resolution wrote, and only the relative imports among them.
+git show --remerge-diff <merge> | rg '^\+.*from +[^ ]*\./'
+```
+
+Expect many hits and most of them correct — this is a review list, not a verdict. A resolution that
+re-roots an import from `src/main/x/y.ts` is doing its job; the ones that matter are the specifiers that
+disagree with where the *importing* code resolves from.
+
+A path a resolution invents can be invisible to import-resolution checks, because it may resolve fine
+_relative to the changed file_ while the code importing it resolves from somewhere else entirely. The
+2026-10-25 merge (`281cccf5a4`) did this in two esbuild fixtures: it turned
+`'./src/main/daemon/daemon-spawner'` into `'./daemon-spawner'`. Both resolve from a normal `import`
+statement, so nothing complained — but inside an inline script bundled with
+`resolveDir: process.cwd()`, only the root-relative form exists. The electron suites then died in
+`beforeAll` with `Could not resolve`, reported a failed file with every test skipped, and the shard
+verdict named no culprit. `rg -n 'resolveDir: (process\.cwd|ROOT)' src config` lists the sites where
+this matters.
+
 For a **rebase**, also run the patch review:
 
 ```bash
