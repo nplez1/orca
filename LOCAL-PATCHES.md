@@ -155,6 +155,36 @@ Anchor: `config/electron-builder.config.cjs`, `ORCA_MAC_TEAM_ID`.
 `config/scripts/rebuild-and-relaunch-installed-macos-arm64.sh`: build locally and install over the
 running app. Convenience only — not for upstream.
 
+### `local(usage)`: Claude's spend cap is upstream's, Codex's stays ours
+
+Anchor: `src/main/rate-limits/claude-oauth-usage-request.ts`,
+`src/main/rate-limits/claude-usage-credits.ts`,
+`src/renderer/src/components/status-bar/InlineProviderUsage.tsx`,
+`src/main/rate-limits/codex-backend-usage-client.ts`.
+
+A Claude seat with no 5h/7d window reports a monthly spend cap. The fork implemented that half of
+upstream's `dd1248998f` itself, with its own parser and a separate `allowance` readout line; upstream later
+shipped the same feature as `cffb527b82` (#33655), so the fork's half is retired and upstream's is taken
+**byte-for-byte** in all three of its files (verified by `git hash-object` against the commit). Three
+things upstream does that the fork did not: the legacy `extra_usage` percentage is computed from the
+amounts first (the fork read a 0–1 fraction `0.0958` as 0.0958%, not 9.58%); `monthly` requires a real
+cap (a currency, a percentage and a limit above 0) rather than a bare percentage; and the window comes
+from the same `ExtraUsageBalance` the "Usage credits" section already renders, so the bar and that section
+cannot disagree. The duplicate `allowance` line went with it — the Credits section already shows the same
+bar and amounts. Net +163/−443 across 5 files, 231 of those deletions in a fork-only test file.
+
+**What remains fork-only, deliberately:** the Codex half. `spend_control.individual_limit` maps to
+`monthly` plus a `count`-unit `ProviderAllowance` in `codex-backend-usage-client.ts`; upstream has no
+equivalent, and its tests are unchanged. And **#134**, the Claude OAuth token refresh in
+`claude-accounts/claude-oauth-token-refresh.ts` — upstream deliberately never refreshes (`1bd308bd84`),
+and refreshing is this fork's product decision. That is the one permanent divergence in this area, and
+it is isolated in its own module rather than mixed into the spend-cap path.
+
+Two shared docs named Claude as an `allowance` producer, which stopped being true here:
+`src/shared/rate-limit-types.ts`, `src/shared/provider-allowance.ts` (Copilot and Codex are the
+remaining producers) and `docs/site/content/docs/agents/usage-tracking.mdx`. They now say so, including
+that Claude's percentage is one of the two computed ones.
+
 ### `local(agents)`: one binding per pi subagent channel
 
 Upstream's `#21882` tracks pi's async children _inside_ the generated extension source — its own
@@ -984,6 +1014,43 @@ a split, never a cap or a baseline entry. The forced-rescan throttle — `claimA
 its retry delay and its test reset — moved to `ai-vault-forced-rescan-throttle.ts`, with
 `markForcedRescanSpent()` and `forcedRescanRetryDelayMs()` as the new edges the hook and the tab-bar
 switch call. `tab-session-history-switch.ts` and three test files import from the new module.
+
+### `local(renderer)`: the fork's styling and transient state are not upstream's files
+
+Both of the fork's renderer stylesheets are **byte-identical to upstream's** — `assets/main.css` and
+`assets/rich-markdown-editor.css`. Take upstream's side on any conflict in either; the fork has no lines
+there. The 157 fork lines that used to live in them moved to two colocated files, verbatim except one
+comment that pointed "further down this file":
+
+- `components/pr-comment-inline/pr-comment-thread.css` — the `.orca-pr-comment-*` block, imported by
+  `PRCommentThreadCard.tsx`, the way upstream imports `AgentKanbanBoard.tsx`'s own stylesheet.
+- `components/comment-composer.css` — the composer rules that were in `rich-markdown-editor.css`,
+  imported by `comment-composer.tsx`. Not folded into the PR block: `CommentComposer` is rendered by the
+  Jira issue workspace too, and it is the only caller that passes `compact` or `disabled`.
+
+Why the load order cannot change the result: no moved selector ties on specificity with a remaining rule
+that touches the same element and property. The only overlap is
+`.orca-diff-comment-inline > .orca-diff-comment-card` (0,2,0), which outranks `.orca-pr-comment-thread`
+(0,1,0) either way; `.monaco-editor .glyph-margin-widgets .cgmr` (0,3,0) likewise; the composer's
+`.rich-markdown-editor.comment-composer-editor` (0,2,0) and its `p/ul/ol/blockquote` (0,2,1) outrank every
+base `.rich-markdown-editor` rule, and the rules that would tie are scoped to
+`.linear-issue-markdown-editor`/`.rich-markdown-editor-shell`, which the composer is never inside. The
+block was unlayered in `main.css` and stays unlayered, so it still beats Tailwind's layered utilities.
+
+Transient fork UI state lives in `store/slices/fork-ui.ts` — `settingsProjectAddHostRequest`,
+`prCommentInlineDisplayById`, their actions and the `ProjectHostAddRequest` type — registered beside
+`worktree-setup-runner` in `store/index.ts` and `store/types.ts`, one line each. `ui.ts`,
+`ui-slice-contract.ts`, `ui-slice-contract-contextual.ts` and `ui-slice-surface-actions.ts` now carry no
+fork lines for it; the only one left in `ui-slice-settings-actions.ts` is the request clear inside
+`closeSettingsPage`. **`store-test-helpers.ts` composes the slice too** — a hand-built `AppState` there
+fails `tc:web` without it, which is the check that catches a future slice registered in one place only.
+The persisted `hiddenWorkspaceStatusIds` and `mergeSameBranchWorkspaces` stay in upstream's UI slice
+because they ride its hydration.
+
+`task-page/jira/Content.tsx` is upstream's nested-ternary shape plus one hook
+(`task-page/jira/use-jira-board-mode.ts`) and one early return that mounts the configured board, so its
+fork delta is 63 changed lines where it was 384. A conflict there resolves by taking upstream and
+re-adding those hunks.
 
 ### `local(jira)`: a required transition field the issue already fills is not the user's to fill
 

@@ -717,7 +717,19 @@ and must not be opened without an explicit ask**:
    supports.
 8. An identity/brand seam: home directory, app-data name, display name.
 
-### 6.4 Adopt upstream's Claude spend cap
+### 6.4 Adopt upstream's Claude spend cap — **done 2026-10-27**
+
+Taken **byte-for-byte** in all three of upstream's files (`git hash-object` against `cffb527b82`, not a
+read-through), so a conflict there resolves by taking upstream. The fork's own Claude half of
+`dd1248998f` is retired: +163/−443 across 5 files, 231 of the deletions a fork-only test file. Three
+things upstream does that the fork did not, and two of them were the fork being *wrong*: the legacy
+`extra_usage` percentage is computed from the amounts first, so a 0–1 fraction `0.0958` reads as 9.58%
+rather than 0.0958%; `monthly` needs a real cap (currency, percentage, limit above 0) rather than a bare
+percentage; and the window comes from the same `ExtraUsageBalance` the Credits section renders, so the two
+cannot disagree. The Codex `spend_control` half stays fork-only and its 23 cases pass unchanged; #134's
+OAuth refresh was already isolated in `claude-accounts/claude-oauth-token-refresh.ts` and was not touched.
+The 2,800-commits-behind branch `fix/claude-codex-enterprise-accounts`, now archived, turned out to be
+the *history* of the code this deletes rather than a source for it.
 
 `cffb527b82` (pending) covers the Claude half of `dd1248998f`; take it and keep only the Codex
 `spend_control` half (~350 lines removed). Keep #134 (Claude OAuth refresh) as the one permanent
@@ -733,7 +745,23 @@ alone. Separately, the host-leg sync delta belongs in `ai-vault-host-leg-sync.ts
 lists, wrapping `args.scan` at the `ai-vault.ts` call site, so upstream's cache keeps its original
 signature — that is the 8-hunk file. This item is also the strongest upstream candidate (§6.3).
 
-### 6.6 Renderer tidying
+### 6.6 Renderer tidying — **done 2026-10-27**
+
+Both stylesheets are now **byte-identical to the merge base** (`main.css`,
+`rich-markdown-editor.css`), so a conflict there resolves by taking upstream outright. 157 fork lines
+moved out: the `.orca-pr-comment-*` block to `pr-comment-inline/pr-comment-thread.css` (imported by
+`PRCommentThreadCard.tsx`, following `AgentKanbanBoard.tsx:22`), and the 31 composer lines to
+`components/comment-composer.css` rather than into the PR block, because `CommentComposer` is also
+rendered by the Jira issue workspace and is the only caller passing `compact`/`disabled`. Every moved
+line is verbatim except one comment that said "further down this file", which is no longer true. The
+cascade argument is static but checkable: no moved selector ties on specificity with any remaining rule
+that touches the same element and property, and the block stays unlayered so it still beats Tailwind's
+layered utilities. Five transient-state fields moved into `store/slices/fork-ui.ts` (`ui.ts` and three
+`ui-slice-*.ts` now carry no fork lines), and `Content.tsx` was rebuilt on upstream's nested-ternary shape
+so its fork delta fell from 384 changed lines to 63. `tc:web` caught the one thing the agent could not:
+the hand-built `AppState` in `store-test-helpers.ts` did not compose the new slice.
+
+Original requirement, kept for the record:
 
 - `main.css`'s entire fork delta is one 145-line `.orca-pr-comment-*` block (+31 lines in
   `rich-markdown-editor.css`), and it introduces no tokens, so the styleguide is untouched. Move it
