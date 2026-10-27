@@ -6,6 +6,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   stat,
   symlink,
@@ -304,7 +305,8 @@ printf 'arg=%s\\n' "$@"
   itRunsUnixShell.each(unixLauncherFixtures)(
     'sanitizes node env and forwards argv verbatim through the $name launcher',
     async (launcherFixture) => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-unix-cli-env-'))
+      // The darwin launcher resolves its own path with `cd -P`; macOS tmpdir sits behind /private.
+      const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-unix-cli-env-')))
       try {
         const appDir = join(root, ...launcherFixture.appDir)
         const launcherPath = join(appDir, ...launcherFixture.launcher)

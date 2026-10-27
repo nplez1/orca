@@ -1273,16 +1273,19 @@ were defects **in the tests**, and both are fixed, so the three entries are remo
 `1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
 mentions `selector_not_found`, so this was persistent rather than a one-off.
 
-The remaining `macos-path-semantics` entries were not touched: `cli/packaged-cli-assets.test.ts` and the
-two `config/scripts` entries have no `match` at all, so a _different_ failure in them would be absorbed
-silently.
+**Every other `macos-path-semantics` entry was the same defect, and they are all fixed.** Nine cases
+across five files, each creating a temp dir with `mkdtemp(tmpdir())` and comparing it against a path the
+subject had resolved — the darwin launcher's `cd -P`, orcad's deploy root, a spawned child's reported
+cwd. Each now resolves its temp dir first:
+`orcad-forked-child-paths.test.ts` (4), `cli/packaged-cli-assets.test.ts` (1),
+`config/scripts/verify-cli-bin.test.mjs` (1), `config/scripts/macos-terminal-host-bundle.test.mjs` (1).
+The `orca-runtime` pair above is the other two.
 
-**The four `orcad-forked-child-paths` cases were the same defect, and are fixed too.** They set
-`process.argv[1]` to an unresolved `mkdtempSync(tmpdir())` path while the resolver reports the resolved
-deploy root, so all four compared `/var/...` against `/private/var/...`. Each now resolves its temp dir
-first, and all five cases in the file pass. Upstream has **not** fixed this one — the file is otherwise
-byte-identical to `upstream/main` — so it is a fork-local test fix that will conflict once, benignly,
-when upstream makes the same change. Four more entries leave the allowlist with it.
+Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
+test fix that will conflict once, benignly, when upstream makes the same change — the same trade
+upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 31
+today, and the remaining 31 are `host-toolchain` (22) and `sqlite-binding` (9) — a different machine's
+different bun and SQLite, which is not something this fork can fix in a test.
 
 ## Syncing with upstream
 

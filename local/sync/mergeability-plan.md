@@ -13,23 +13,23 @@ Companions: [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md) (the proc
 
 ## 1. The baseline, in numbers
 
-| Fact                              | Value                                                          | Where it comes from                                    |
-| --------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
-| Sync cadence                      | **11 syncs in 20 days**, each 50–628 upstream commits          | `git log --merges --first-parent`                      |
-| Upstream velocity                 | **150–255 commits/day**                                        | `git log upstream/main --since=60.days`                |
-| Pending sync (now)                | 174 upstream commits                                           | `upstream/main` = `5fea2893f6`                         |
-| Predicted conflicts               | **233 paths / 336 hunks**                                      | `conflicts.mjs --merge-tree HEAD upstream/main --json` |
-| …of which comment-sweep only      | **162 paths** caused solely by `7d6603aa17`                    | per-path `git log 0571e45107..upstream/main`           |
-| …of which real upstream work      | **70 paths**                                                   | same                                                   |
-| …on upstream-owned files          | **230 of 233**                                                 | `git ls-tree upstream/main`                            |
-| Comment-only hunks                | 65 of 336 (19%)                                                | hunk classifier over `conflicts.json`                  |
-| Conflict classes                  | 151 both-rewrote, 50 union, 30 modify/delete, 2 duplicate-tail | `conflicts.json`                                       |
-| Fork footprint                    | 1,585 file paths upstream does not have                        | `comm -23` of both trees                               |
-| Fork-only import breakage pending | 19 files / 8 renamed modules                                   | rename map × fork-only importers                       |
-| Follow-up commits per sync        | **median ~7** (4–12)                                           | sync log + first-parent commits                        |
-| Known-red allowlist               | **38 entries / 17 files**, all `owner: upstream` (was 40/18)   | `local/unit-known-red.json`                            |
-| Nightly backstop                  | **ran once, ever** (2026-10-08)                                | `gh run list --workflow fork-main-tests.yml`           |
-| Unit gate runtime                 | 1,227 s (10-22) → **2,575 s** (10-25), cap 3,600 s             | gate log                                               |
+| Fact                              | Value                                                                    | Where it comes from                                    |
+| --------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Sync cadence                      | **11 syncs in 20 days**, each 50–628 upstream commits                    | `git log --merges --first-parent`                      |
+| Upstream velocity                 | **150–255 commits/day**                                                  | `git log upstream/main --since=60.days`                |
+| Pending sync (now)                | 174 upstream commits                                                     | `upstream/main` = `5fea2893f6`                         |
+| Predicted conflicts               | **233 paths / 336 hunks**                                                | `conflicts.mjs --merge-tree HEAD upstream/main --json` |
+| …of which comment-sweep only      | **162 paths** caused solely by `7d6603aa17`                              | per-path `git log 0571e45107..upstream/main`           |
+| …of which real upstream work      | **70 paths**                                                             | same                                                   |
+| …on upstream-owned files          | **230 of 233**                                                           | `git ls-tree upstream/main`                            |
+| Comment-only hunks                | 65 of 336 (19%)                                                          | hunk classifier over `conflicts.json`                  |
+| Conflict classes                  | 151 both-rewrote, 50 union, 30 modify/delete, 2 duplicate-tail           | `conflicts.json`                                       |
+| Fork footprint                    | 1,585 file paths upstream does not have                                  | `comm -23` of both trees                               |
+| Fork-only import breakage pending | 19 files / 8 renamed modules                                             | rename map × fork-only importers                       |
+| Follow-up commits per sync        | **median ~7** (4–12)                                                     | sync log + first-parent commits                        |
+| Known-red allowlist               | **31 entries / 13 files** (was 40/18); `macos-path-semantics` eliminated | `local/unit-known-red.json`                            |
+| Nightly backstop                  | **ran once, ever** (2026-10-08)                                          | `gh run list --workflow fork-main-tests.yml`           |
+| Unit gate runtime                 | 1,227 s (10-22) → **2,575 s** (10-25), cap 3,600 s                       | gate log                                               |
 
 **The number that matters is the last four rows, not the 233.** A repo-wide upstream sweep inflates
 the current set; the structural cost is the recurrent 70, the ~7 follow-up commits, and a backstop

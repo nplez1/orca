@@ -677,14 +677,6 @@
       "flaky": false
     },
     {
-      "file": "config/scripts/macos-terminal-host-bundle.test.mjs",
-      "test": "terminal host assembly flags a require that only resolves outside the helper",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the case reads one yaml decoy as a require that resolves outside the helper bundle; the resolver walks the same /private/var indirection this machine adds.",
-      "flaky": false
-    },
-    {
       "file": "config/scripts/main-entry-facade.test.ts",
       "test": "keeps main code and asset paths working after a CLI build replaces its public entry",
       "class": "host-toolchain",
@@ -813,14 +805,6 @@
       "flaky": false
     },
     {
-      "file": "src/main/cli/packaged-cli-assets.test.ts",
-      "test": "packaged CLI assets sanitizes node env and forwards argv verbatim through the macOS launcher",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the darwin launcher resolves /var to /private/var with `cd -P` while the case builds its argv from the unresolved os.tmpdir().",
-      "flaky": false
-    },
-    {
       "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
       "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
       "class": "sqlite-binding",
@@ -835,14 +819,6 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite's own binding behaviour differs from what the contract assumes ('rejects explicit undefined bindings').",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/verify-cli-bin.test.mjs",
-      "test": "verifyPackageCliBin accepts a non-empty Node entrypoint and can run help through Node",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream case; the child's process.cwd() reports /private/var/folders/... while the case compares the unresolved os.tmpdir() /var/folders/... it created. Test and verify-cli-bin.mjs are byte-identical to upstream 0571e45107; Linux tmp is not a symlink.",
       "flaky": false
     },
     {
