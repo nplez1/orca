@@ -7,16 +7,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/lib/agent-catalog'
-import {
-  ClaudeIcon,
-  CopilotIcon,
-  DeepSeekIcon,
-  FireworksIcon,
-  GeminiIcon,
-  MiniMaxIcon,
-  OpenAIIcon,
-  OpenCodeGoIcon
-} from './icons'
+import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import { CopilotIcon, DeepSeekIcon, FireworksIcon } from './fork-usage-providers'
 import { translate } from '@/i18n/i18n'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'

@@ -21,10 +21,12 @@ import {
   getProviderUsageErrorMessage,
   getProviderUsageStatusLabel
 } from './tooltip'
-import { describeCredits, formatCreditsAmount, hasCreditsData } from './provider-credits-format'
+import { describeCredits, formatCreditsAmount } from './provider-credits-format'
 import type { ProviderCredits } from '../../../../shared/provider-credits'
 import { getOwnerNotSetUpLabelParts } from './owner-not-set-up-copy'
 import { isClaudeUsageWaitingForClaude } from './usage-error-copy'
+import { hasUsageData } from './status-bar-provider-visibility'
+import { FORK_USAGE_PROVIDERS, isForkUsageProvider } from './fork-usage-providers'
 import { getTightestUsageSection, getUsageHeadlineSection } from './UsageRosterPanel'
 import { formatBareUsagePercentage, formatUsagePercentageLabel } from './usage-percentage-label'
 import { translate } from '@/i18n/i18n'
@@ -176,6 +178,9 @@ export function UsageOverflowChip({
 }
 
 function getProviderLetter(provider: ProviderRateLimits['provider']): string {
+  if (isForkUsageProvider(provider)) {
+    return FORK_USAGE_PROVIDERS[provider].badgeLetter
+  }
   switch (provider) {
     case 'claude':
       return 'C'
@@ -197,28 +202,7 @@ function getProviderLetter(provider: ProviderRateLimits['provider']): string {
       return 'Z'
     case 'codex':
       return 'X'
-    case 'deepseek':
-      return 'D'
-    case 'fireworks':
-      return 'F'
-    case 'copilot':
-      return 'P'
   }
-}
-
-// Why: ProviderLetterBadge's dot needs the same "has data" answer as the segment,
-// and credits are data even when every window is null.
-function hasUsageData(p: ProviderRateLimits): boolean {
-  return Boolean(
-    p.session ||
-    p.weekly ||
-    p.fableWeekly ||
-    p.monthly ||
-    p.buckets?.length ||
-    // Why: an allowance-only plan has no window, so its readout rides this term.
-    p.allowance ||
-    hasCreditsData(p)
-  )
 }
 
 function CreditsSummary({

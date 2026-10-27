@@ -4,16 +4,8 @@ import {
   formatResetDuration
 } from '../../../../shared/rate-limit-reset-format'
 import { AgentIcon } from '@/lib/agent-catalog'
-import {
-  ClaudeIcon,
-  CopilotIcon,
-  DeepSeekIcon,
-  FireworksIcon,
-  GeminiIcon,
-  MiniMaxIcon,
-  OpenAIIcon,
-  OpenCodeGoIcon
-} from './icons'
+import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import { FORK_USAGE_PROVIDERS, isForkUsageProvider } from './fork-usage-providers'
 import { creditsItemRows, describeCredits } from './provider-credits-format'
 import { describeAllowance } from './provider-allowance-format'
 import { translate } from '@/i18n/i18n'
@@ -122,14 +114,9 @@ export function ProviderIcon({ provider }: { provider: string }): React.JSX.Elem
   if (provider === 'cursor') {
     return <AgentIcon agent="cursor" size={13} />
   }
-  if (provider === 'deepseek') {
-    return <DeepSeekIcon size={13} />
-  }
-  if (provider === 'fireworks') {
-    return <FireworksIcon size={13} />
-  }
-  if (provider === 'copilot') {
-    return <CopilotIcon size={13} />
+  const forkProvider = isForkUsageProvider(provider) ? FORK_USAGE_PROVIDERS[provider] : null
+  if (forkProvider) {
+    return <forkProvider.Icon size={13} />
   }
   return <ClaudeIcon size={13} />
 }

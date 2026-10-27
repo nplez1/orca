@@ -36,6 +36,7 @@ const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 const BATCH = 2000
 const DEFAULT_LIMIT = 200
 
+/** @param {string[]} argv */
 function parseArgs(argv) {
   const options = {
     range: null,
@@ -67,7 +68,9 @@ function parseArgs(argv) {
     } else if (options.range === null) {
       options.range = flag
     } else {
-      throw new Error(`one range or revision expected, got two: ${options.range} and ${flag}`)
+      throw new Error(
+        `one range or revision expected, got two: ${String(options.range)} and ${String(flag)}`
+      )
     }
   }
   return options

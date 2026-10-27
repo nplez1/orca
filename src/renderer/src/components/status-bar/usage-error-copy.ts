@@ -1,6 +1,7 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { translate } from '@/i18n/i18n'
 import { describeOwnerNotSetUp, getOwnerNotSetUpLabel } from './owner-not-set-up-copy'
+import { FORK_USAGE_PROVIDERS, isForkUsageProvider } from './fork-usage-providers'
 
 export function getProviderDisplayName(provider: ProviderRateLimits['provider']): string {
   if (provider === 'claude') {
@@ -24,15 +25,8 @@ export function getProviderDisplayName(provider: ProviderRateLimits['provider'])
   if (provider === 'minimax') {
     return 'MiniMax'
   }
-  if (provider === 'deepseek') {
-    return 'DeepSeek'
-  }
-  if (provider === 'fireworks') {
-    return 'Fireworks.ai'
-  }
-  if (provider === 'copilot') {
-    // Why: registered as a never-translate brand in the locale policy.
-    return 'GitHub Copilot'
+  if (isForkUsageProvider(provider)) {
+    return FORK_USAGE_PROVIDERS[provider].label
   }
   if (provider === 'grok') {
     return 'Grok'
