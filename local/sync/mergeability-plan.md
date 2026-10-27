@@ -41,6 +41,12 @@ dropped item.
 
 | Retire stale tooling (§ 6.9) | `curate.mjs` deleted; "patch series" wording corrected in three docs; `commit-msg` scoped to lineage | The hook's branch-name rule caused the failure it guarded: policy work went to fork PR branches _unlabelled_ five times rather than be refused |
 
+| Ratchet overlays (§ 4.8) | both count baselines restored to the merge base; 59 + 26 overlay rows, every one annotated | Restore to the **merge base**, not `upstream/main`: aligning to the tip needs a 0-row for every file upstream added since, and those rows fail when the sync brings the file in |
+| i18n overlay (§ 5.1) | `locales/en.json` + the runtime catalog byte-identical to the merge base; 736 keys in `i18n/fork/en.json` | Same merge-base reasoning. The overlay must live outside `locales/`, which `readdir`s every `.json` as a locale |
+| Identity builder overlay (§ 5.8) | `electron-builder.np.config.cjs`; base config +45/−21 → +6/−2; identity check moved into `local/gate-lint.mjs` | `ORCA_MAC_TEAM_ID` cannot travel in the overlay — `afterPack` reads the module constant. Six entry points now name the overlay, and a test fails if one points back |
+| Three upstream seams (§ 5.6) | `worktree.ts` delta → 0; `orcad-entry.ts` +7/−18 → +3/0; `agent-hook-listener.ts` +62/−67 → +45/−7 | The hook listener's decorator was attempted and abandoned: the pre-admit must run between upstream's compact steps and its inherited-owner check, which a wrapper cannot reach without copying them |
+| Nightly unblock (PR #186) | relay job off; `cancel-in-progress: true` keyed on the ref; `local/check-nightly-liveness.mjs` + 14 cases | Its first version reported "red (cancelled)" about a run a human cancelled **and** hid the last green: hence two clocks, and an in-flight run may never answer for a verdict |
+
 ### Still open, in this plan's own terms
 
 - **§ 5.4 dashboard delivery — settled and executed 2026-10-26.** The product owner rejected
@@ -59,9 +65,14 @@ dropped item.
   other 31 stay, with the measurement recorded — the block carries fork code, was rewritten rather than
   moved, or upstream has since changed it. Four more are byte-identical to the merge base and differ
   only by comments upstream has since rewritten, so restoring them would reintroduce stale text.
-- **§ 5.1 i18n overlay, § 5.3 usage providers, § 5.5–§ 5.8** — untouched.
+- **§ 5.1 i18n overlay, § 5.5 TUI overlay, § 5.8 identity overlay — done 2026-10-27.** § 5.6 is done
+  except the hook-listener decorator, which was attempted and does not fit without copying upstream's
+  steps. § 5.3 (usage providers as data) and § 5.7 (pi fence) are untouched.
 - **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and three fixes are upstream-worthy
   (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions).
+- **Nightly proof** — PR #186 carries the unblock. It cannot prove itself until it merges and the
+  schedule next runs, or until someone dispatches it against the branch (~50 billed minutes, which is
+  a spend decision, not a technical one).
 
 ### Baselines that moved
 
