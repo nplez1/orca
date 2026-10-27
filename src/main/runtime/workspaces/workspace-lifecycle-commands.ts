@@ -173,7 +173,9 @@ export function queueWorkspaceDelete<T>(
   hostId: string | undefined,
   requested: Partial<Record<RemovalFlag, boolean>> & { deleteRemoteBranch?: boolean },
   /** Called with the normalized flags, plus the caller's host when it named one. */
-  run: (removal: Record<RemovalFlag, boolean> & { hostId?: string }) => Promise<T>
+  run: (
+    removal: Record<RemovalFlag, boolean> & { deleteRemoteBranch: boolean; hostId?: string }
+  ) => Promise<T>
 ): Promise<T> {
   const removal: Record<RemovalFlag, boolean> = {
     force: requested.force === true,
@@ -181,20 +183,16 @@ export function queueWorkspaceDelete<T>(
     allowUnverifiedPtyStop: requested.allowUnverifiedPtyStop === true,
     allowFailedArchiveHook: requested.allowFailedArchiveHook === true
   }
+  const deleteRemoteBranch = requested.deleteRemoteBranch === true
   const options: LifecycleDeleteOptions = {
-    // Why the remote-branch choice is keyed but not a flag: deleting the branch and keeping it are
-    // different operations, so a retry must not join the other's reply — while the choice reaches
-    // the removal through `run`, not through the flags a retry is normalized from.
-    key: getRuntimeWorktreeRemovalOptionsKey({
-      ...removal,
-      deleteRemoteBranch: requested.deleteRemoteBranch === true
-    }),
+    // Why keyed: deleting and keeping the branch differ; a retry must not join the other's reply.
+    key: getRuntimeWorktreeRemovalOptionsKey({ ...removal, deleteRemoteBranch }),
     force: removal.allowUnverifiedPtyStop,
     label: getExplicitWorktreeIdSelector(selector) ?? selector
   }
   const command: LifecycleCommand<T> = {
     kind: 'delete',
-    run: () => run({ ...removal, ...(hostId ? { hostId } : {}) }),
+    run: () => run({ ...removal, deleteRemoteBranch, ...(hostId ? { hostId } : {}) }),
     lostContact: deleteLostContact,
     observe: observeTerminals(runtime, selector),
     delete: options

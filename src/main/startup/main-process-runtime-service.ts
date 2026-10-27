@@ -11,6 +11,7 @@ import { getLocalPtyProvider } from '../ipc/pty/provider/registry'
 import { clearProviderPtyState } from '../ipc/pty/provider/state-cleanup'
 import { agentHookServer } from '../agent-hooks/server'
 import { toAgentStatusIpcPayload } from '../agent-hooks/server/server-status-identity'
+import { wireScreenPromptReader } from '../agent-hooks/server/server-screen-prompt-wiring'
 import { browserManager } from '../browser/browser-manager'
 import { browserSessionRegistry } from '../browser/browser-session-registry'
 import { loadAgentSessionClaimSigner } from '../runtime/agent-session/ownership/agent-session-claim-identity'
@@ -160,12 +161,8 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   agentHookServer.subscribeEnrichedStatus((enriched) =>
     recordObservedAgentStatusPaneIdentity(observedPaneIdentities, enriched, runtime)
   )
+  wireScreenPromptReader(agentHookServer, runtime)
   agentHookServer.setCliWriterExecutionMatcher(observedPaneIdentities, runtime)
-  // Switch point: the screen is the only witness of a dialog some agents' hooks cannot report, and
-  // only this host can read a pane's terminal.
-  agentHookServer.setScreenPromptReader((paneKey, agentType) =>
-    runtime.readPaneScreenPrompt(paneKey, agentType)
-  )
   // Switch point: main keeps the resume record of each pane it holds from the status it accepts.
   if (ORCA_LAYOUT_OWNER_IS_MAIN) {
     agentHookServer.subscribeEnrichedStatus((enriched) =>

@@ -2,13 +2,13 @@ import type { TelemetrySettings } from './telemetry-settings-types'
 import type { BrowserProfileScope } from './browser-profile-scope'
 import type { GlobalSettingsBase } from './global-settings-base'
 import type { ExecutionHostId } from './execution-host'
-import type { OrcaWorkspaceLayout, OrcaWorkspaceLayoutSettings } from './orca-workspace-layout'
+import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
 import type { GitLabProjectSettings } from './gitlab-types'
+import type { TaskProvider } from './task-providers'
 import type { NpSettings } from './np-settings-types'
-import type { TaskViewSettings } from './task-view-settings-types'
 import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
@@ -40,7 +40,8 @@ import type {
   LeftSidebarAppearanceMode,
   OpenInApplication,
   SourceControlGroupOrder,
-  SourceControlViewMode
+  SourceControlViewMode,
+  TaskViewPresetId
 } from './ui-chrome-types'
 import type { WorktreeVisibilityDefaults } from './repo-types'
 
@@ -387,6 +388,20 @@ export type GlobalSettings = GlobalSettingsBase & {
   skipDeleteArtifactConfirm: boolean
   /** Why: a Codex rate-limit reset spends a scarce credit on the live account; keep this skip separate from local confirmations. */
   skipCodexRateLimitResetConfirm: boolean
+  /** Default preset in the new-workspace GitHub task view. */
+  defaultTaskViewPreset: TaskViewPresetId
+  /** Persisted last-used task source so Tasks reopens to the same provider instead of defaulting to GitHub. */
+  defaultTaskSource: TaskProvider
+  /** Persisted visible task providers; hides unused providers from Tasks chrome and sidebar shortcuts. */
+  visibleTaskProviders: TaskProvider[]
+  /** Why: one-shot guard to make Jira visible for existing profiles once, without re-adding after a later opt-out. */
+  visibleTaskProvidersDefaultedForJira: boolean
+  /** Persisted repo selection (cross-repo tasks view). null = sticky-all (includes future-added repos);
+   *  string[] = frozen curated subset (ineligible ids dropped on load; empty after drop is treated as null). */
+  defaultRepoSelection: string[] | null
+  /** Persisted Linear team selection (tasks view). Same nullable-array pattern as
+   *  defaultRepoSelection: null = sticky-all, string[] = frozen subset of team IDs. */
+  defaultLinearTeamSelection: string[] | null
   /** Session cookie for OpenCode Go rate-limit fetching. Stored encrypted. */
   opencodeSessionCookie: string
   /** Optional OpenCode Go workspace ID override; when set, skips the workspaces lookup and fetches usage directly. */
@@ -526,9 +541,7 @@ export type GlobalSettings = GlobalSettingsBase & {
   voice?: VoiceSettings
   /** Transcript full-text search consent + retention. Absent means off; nothing indexes until the user opts in. */
   aiVaultSearch?: AiVaultSearchSettings
-} & TaskViewSettings &
-  OrcaWorkspaceLayoutSettings &
-  NpSettings
+} & NpSettings
 
 // Re-exported so existing importers keep one entry point; the shape lives in its
 // own file because this one is at the max-lines ceiling.

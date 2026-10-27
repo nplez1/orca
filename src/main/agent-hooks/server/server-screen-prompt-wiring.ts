@@ -3,6 +3,22 @@ import { AgentHookServerStatusApplication } from './server-status-application'
 import type { EnrichedAgentHookEventPayload } from './server-types'
 import { ScreenPromptCorroboration } from './server-screen-prompt-corroboration'
 
+type ScreenPromptReader = (
+  paneKey: string,
+  agentType: string | undefined
+) => ScreenPromptObservation | null | undefined
+
+/** Switch point for both pane-owning hosts (main and orcad): the screen is the only witness of a
+ *  dialog some agents' hooks cannot report, and only the host can read a pane's terminal. */
+export function wireScreenPromptReader(
+  server: Pick<AgentHookServerScreenPromptWiring, 'setScreenPromptReader'>,
+  runtime: { readPaneScreenPrompt: ScreenPromptReader }
+): void {
+  server.setScreenPromptReader((paneKey, agentType) =>
+    runtime.readPaneScreenPrompt(paneKey, agentType)
+  )
+}
+
 /**
  * Lets the pane's screen settle a row whose agent cannot report its own dialogs: Copilot's
  * `permission_prompt` also fires for requests its CLI approves itself, so no hook proves a dialog,
@@ -12,12 +28,7 @@ import { ScreenPromptCorroboration } from './server-screen-prompt-corroboration'
 export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerStatusApplication {
   /** Bound by the host that owns panes (main, or the runtime behind `orca serve`); absent in the
    *  relay's parser, which has no screen to read. */
-  private screenPromptReader:
-    | ((
-        paneKey: string,
-        agentType: string | undefined
-      ) => ScreenPromptObservation | null | undefined)
-    | null = null
+  private screenPromptReader: ScreenPromptReader | null = null
 
   private readonly screenPromptCorroboration = new ScreenPromptCorroboration({
     readsScreen: () => this.screenPromptReader !== null,
@@ -31,14 +42,7 @@ export abstract class AgentHookServerScreenPromptWiring extends AgentHookServerS
   })
 
   /** Binds the pane-side screen reader; null leaves every screen claim unread. */
-  setScreenPromptReader(
-    reader:
-      | ((
-          paneKey: string,
-          agentType: string | undefined
-        ) => ScreenPromptObservation | null | undefined)
-      | null
-  ): void {
+  setScreenPromptReader(reader: ScreenPromptReader | null): void {
     this.screenPromptReader = reader
     // Why here: a headless host starts the store before it has a runtime to read panes with, so the
     // rows hydrated in between would otherwise never be adopted.
