@@ -34,6 +34,7 @@ import {
   lostContent,
   pinnedUpstreamBase,
   resolvePreSyncTip,
+  unreferencedForkModules,
   updaterFeed
 } from './lib/post-sync-checks.mjs'
 import { Report, STATUS, gitText, repoRoot } from './lib/run.mjs'
@@ -148,6 +149,12 @@ function main() {
       'deleted fork-only modules, with the exported surface each one carried',
       'for each name listed as unreferenced, find the caller the deletion dropped and re-home it; "upstream supersedes this" is not a review',
       () => deletedForkModules(tip, source)
+    ],
+    [
+      'unreferenced-fork-modules',
+      'fork-only modules under src/ that nothing imports',
+      'a fork module whose last caller upstream removed simply stops being read: delete it, or wire it in. Report-only, because deleting product code is a judgement',
+      () => unreferencedForkModules()
     ],
     [
       'repo-lint',

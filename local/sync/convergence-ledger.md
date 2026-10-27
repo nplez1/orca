@@ -1135,15 +1135,14 @@ methods use, with its imports re-pointed at `files/search/file-search`, `files/f
 `files/file-target`.
 
 **Why this was easy to miss:** no conflict marker pointed at it. The orphan only shows up as a
-fork-only module that no longer has an importer. **Follow-up:** add the sweep to
-`local/sync/post-sync.mjs` — take every path in the pre-sync fork-only inventory under `src/`
-(no tests/fixtures), resolve every `from './x'`, `import './x'` and `from '@/x'` specifier in the
-tree, and report each fork-only file nothing references. Run on 2026-10-15 it found exactly this
-module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
-`quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already
-unreferenced at the fork tip), so the check needs an allowlist for known-dead paths and for worker
-entries loaded by path (`workspace-path-index-benchmark-worker-entry.ts`). **2026-10-27:** all four
-are deleted (§ 4.9 of the plan), so that allowlist now needs only the worker entry.
+fork-only module that no longer has an importer. **Follow-up — done 2026-10-27.** `post-sync.mjs` now runs `unreferenced-fork-modules`, built on
+`lib/orphan-sweep.mjs`: every fork-only path under `src/` (no tests, no fixtures) checked against the
+specifiers every tracked source file carries, including the `@/` and `@renderer/` aliases. Run on
+2026-10-27 it found this module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
+`quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already unreferenced
+at the fork tip) — all four are now deleted (§ 4.9 of the plan). Two limits it states rather than hides:
+a cycle of two files that only import each other reads as live, and entries loaded by path
+(`…benchmark-worker-entry.ts`) need the allowlist argument.
 
 **Do not:** rebuild the old inheritance chain; add new file-command units as composed fields here.
 
