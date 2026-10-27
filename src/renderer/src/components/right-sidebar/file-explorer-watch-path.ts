@@ -44,7 +44,6 @@ export function canonicalizeFileExplorerWatchPath(
 
 export function createCachedDirPathIndex(
   cache: Record<string, { children: unknown }>,
-  /** A key enumeration already taken of `cache`, so scans can be shared instead of repeated. */
   keys: readonly string[] = Object.keys(cache)
 ): ReadonlyMap<string, string> {
   const index = new Map<string, string>()

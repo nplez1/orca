@@ -17,7 +17,6 @@ type JiraAdfDocument = {
 const LINE_FEED_CODE_UNIT = 10
 const CARRIAGE_RETURN_CODE_UNIT = 13
 
-/** Fallback ADF for a textarea value when the host cannot convert it itself. */
 export function buildJiraCreateTextAdf(text: string): JiraAdfDocument {
   const content: JiraAdfParagraphNode[] = []
   let lineStart = 0

@@ -103,7 +103,6 @@ describeOnWindows('ConPTY job ownership', () => {
     return { proc, grandchildPid }
   }
 
-  // Why 30 s: a real ConPTY cmd.exe has to start and announce its input reader.
   it('announces an input reader the daemon recognizes', async () => {
     // A ConPTY upgrade that changes its startup must fail here, not respawn every pane.
     const nodePty = await import('node-pty')
@@ -119,7 +118,6 @@ describeOnWindows('ConPTY job ownership', () => {
     startup.claim()
   }, 30_000)
 
-  // Why 30 s: it waits for a real ConPTY process tree to exit after the discard.
   it('tears down a pane discarded before its first output', async () => {
     // node-pty's own kill() would wait for output that a discarded pane never sends.
     const nodePty = await import('node-pty')

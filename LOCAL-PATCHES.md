@@ -24,6 +24,16 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   conflict (19 of the 30 pending ones). A genuine supersession lives in
   `local/sync/expected-deletions.json` with its evidence, and nowhere else.
 
+## Rationale moved out of upstream files
+
+These decisions were comments in files upstream owns. They live here because a comment there is
+conflict adjacency, and because each is a trap a well-meaning future edit can fall into.
+
+- **The managed-hook install lock uses `.orca`, not `HOME_DIRECTORY_NAME`**
+  (`src/main/agent-hooks/managed-hook-install-lock.ts`). It guards the shared `~/.claude` hooks, which
+  an official Orca install manages too, so both must contend on one lock path. Pointing it at this
+  fork's own home directory would give the two installs separate locks over one shared file.
+
 ## Patches
 
 ### `local(updater)`: point the update feed at this fork
