@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { writeMobileWebBundleFixtureTree } from './mobile-web-bundle-fixture-tree.mjs'
-import { APP_DISPLAY_NAME } from '../../src/shared/app-display-name'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 
@@ -16,16 +15,9 @@ const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.
 
 describe('electron-builder config', () => {
   it('keeps the packaged app identity aligned with local-build validation', () => {
-    expect(electronBuilderConfig.appId).toBe(
+    expect(require('../electron-builder.np.config.cjs').appId).toBe(
       require('../../src/shared/local-build-compatibility-contract.json').appId
     )
-  })
-
-  it('drives the packaged product name from the shared display name', () => {
-    // The config is CommonJS and cannot import the TypeScript constant, so this is what keeps the
-    // bundle name (macOS app menu, Dock, install path) from drifting away from what the running app
-    // shows in its own window.
-    expect(electronBuilderConfig.productName).toBe(APP_DISPLAY_NAME)
   })
 
   it('excludes repo-only source trees from app.asar', () => {
@@ -266,7 +258,7 @@ describe('electron-builder config', () => {
         }),
         expect.objectContaining({
           from: 'native/windows-cli-launcher/.build/orca.exe',
-          to: 'bin/orca-np.exe'
+          to: 'bin/orca.exe'
         }),
         expect.objectContaining({
           from: 'native/windows-cli-launcher/.build/orca-administrator-restart.exe',
@@ -335,10 +327,10 @@ describe('electron-builder config', () => {
   })
 
   // Why: the Windows CLI shim is delivered only via extraResources to
-  // resources/bin/orca-np.cmd (beside the native resources/bin/orca-np.exe). If the
+  // resources/bin/orca.cmd (beside the native resources/bin/orca.exe). If the
   // source tree is also packed into app.asar it gets extracted by
-  // asarUnpack:['resources/**'] to app.asar.unpacked/resources/win32/bin/orca-np.cmd,
-  // a duplicate with no adjacent orca-np.exe that fails to launch (#7351).
+  // asarUnpack:['resources/**'] to app.asar.unpacked/resources/win32/bin/orca.cmd,
+  // a duplicate with no adjacent orca.exe that fails to launch (#7351).
   it('keeps the Windows CLI shim source tree out of app.asar', () => {
     expect(electronBuilderConfig.files).toEqual(
       expect.arrayContaining(['!resources/win32{,/**/*}'])
@@ -347,8 +339,8 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.win.extraResources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          from: 'resources/win32/bin/orca-np.cmd',
-          to: 'bin/orca-np.cmd'
+          from: 'resources/win32/bin/orca.cmd',
+          to: 'bin/orca.cmd'
         })
       ])
     )

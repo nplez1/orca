@@ -213,7 +213,7 @@ jobs:
           if [ "${{ steps.signing.outputs.signed }}" != "true" ]; then
             unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
           fi
-          pnpm exec electron-builder --config config/electron-builder.config.cjs --mac \
+          pnpm exec electron-builder --config config/electron-builder.np.config.cjs --mac \
             --publish always \
             --config.publish.owner=${{ env.PUBLISH_OWNER }} \
             --config.publish.repo=orca
@@ -305,13 +305,13 @@ jobs:
           patterns: '^(orca-windows-setup\\.exe(\\.blockmap)?|latest\\.yml)$'
 
       # Why no signing env: this fork ships Windows unsigned (see LOCAL-PATCHES.md), and the
-      # config drops publisherName so electron-updater does not reject its own next build.
+      # NP config drops publisherName so electron-updater does not reject its own next build.
       # SmartScreen warns once per installer; that is the accepted cost.
       - name: Package and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pnpm exec electron-builder --config config/electron-builder.config.cjs --win `
+          pnpm exec electron-builder --config config/electron-builder.np.config.cjs --win `
             --publish always `
             --config.publish.owner=${{ env.PUBLISH_OWNER }} `
             --config.publish.repo=orca
@@ -436,7 +436,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node config/scripts/ensure-native-runtime.mjs --runtime=electron
-          pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm \
+          pnpm exec electron-builder --config config/electron-builder.np.config.cjs --linux AppImage deb rpm \
             --x64 --publish always \
             --config.publish.owner=${{ env.PUBLISH_OWNER }} \
             --config.publish.repo=orca
