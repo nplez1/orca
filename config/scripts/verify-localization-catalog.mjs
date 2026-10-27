@@ -6,6 +6,7 @@ import process from 'node:process'
 // TypeScript 7 is a native CLI; AST consumers still need the legacy JavaScript API.
 import ts from 'typescript-api'
 
+import { readEnglishCatalog, writeMissingEnglishEntries } from './fork-english-catalog.mjs'
 import { canonicalGenericRenderings } from './locale-generic-ui-terms.mjs'
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
 
@@ -488,8 +489,7 @@ export async function main(
   sharedReferences
 ) {
   const localesDir = path.join(root, LOCALES_RELATIVE_DIR)
-  const catalogPath = path.join(localesDir, 'en.json')
-  const catalog = JSON.parse(await fs.readFile(catalogPath, 'utf8'))
+  const catalog = await readEnglishCatalog(root)
   const pluginCatalogs = options.pluginCatalogs ?? []
   if (pluginCatalogs.length > 0) {
     if (options.fix) {
@@ -514,8 +514,11 @@ export async function main(
   if (missing.length > 0) {
     const missingFallbacks = referencesMissingFallbacks(missing)
     if (options.fix && missingFallbacks.length === 0) {
+      const entries = [...collectMissingCatalogEntries(missing)].filter(
+        ([key]) => getCatalogEntry(catalog, key) === undefined
+      )
       const added = applyMissingEnglishEntries(catalog, missing)
-      await fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
+      await writeMissingEnglishEntries(root, entries)
       catalogKeys = new Set(flattenCatalogKeys(catalog))
       console.log(`Added ${added} missing localization key(s) to en.json.`)
     } else {

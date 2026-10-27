@@ -34,14 +34,11 @@ afterEach(() => {
 })
 
 describe('electron-builder dev-channel identity', () => {
-  // LOCAL(nplez1): this fork drops publisherName on EVERY channel and disables the updater's
-  // Authenticode check (see LOCAL-PATCHES.md § local(build)), because it ships unsigned — an unsigned
-  // build that advertised a publisher would reject every installer it downloaded, including its own.
-  it('drops the SignPath publisherName on stable Windows builds too', () => {
+  it('keeps the SignPath publisherName on stable Windows builds', () => {
     const config = loadConfigWithEnv({})
 
-    expect(config.win.signtoolOptions.publisherName).toBeUndefined()
-    expect(config.win.verifyUpdateCodeSignature).toBe(false)
+    expect(config.win.signtoolOptions.publisherName).toBe('SignPath Foundation')
+    expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
     expect(config.publish.repo).toBe('orca')
     expect(config.publish.releaseType).toBe('draft')
   })
