@@ -1341,7 +1341,10 @@ git checkout nplez1/main
 git merge upstream/main
 ```
 
-**The release line merges; only a feature branch or the patch series rebases** (runbook Step 1).
+**The release line merges; only a feature branch rebases** (runbook Step 1). The "patch series" the
+older wording named does not exist as a separable thing — no patch ref, ~50 commits of product line
+importing the identity modules, 35 shared files — so nothing rebases it, and `curate.mjs`, which
+planned it, is retired.
 The merge commits are load-bearing: this line carries rollback tags (`archive/pre-sync-<tip>`) and one
 hand-resolved merge whose resolutions exist nowhere else, and a rebase drops both. Because each patch
 is a one-line constant edit, a conflict here means upstream moved that exact line — re-apply by hand
@@ -1376,7 +1379,7 @@ comm -23 "$modified" "$upstream_changed"   # expect empty
 Why `mktemp`: several agents and worktrees share one `/tmp`, and two of them have already written
 the same fixed filename at the same time.
 
-After a **rebase** — a feature branch or the patch series, never the release line — confirm the
+After a **rebase** — a feature branch, never the release line — confirm the
 series came through unchanged: `range-diff` prints `=` per patch that is byte-identical:
 
 ```bash
@@ -1825,17 +1828,22 @@ eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-swit
 after any sync that adds workflows, re-run the listing above rather than assuming the sweep still
 covers the tree.
 
-### `local(hooks)`: refuse fork-only commits on a PR branch
+### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
-`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
-`nplez1/main`. Fork PR branches are cut from `nplez1/main` and upstream-bound ones from `origin/main`;
-either way a fork-only file committed to a PR branch is wrong — for an upstream-bound branch it would
-be reviewed upstream, and for a fork branch it would let the patch series diverge from the branch that
-owns it — which is precisely what happened twice before this guard existed. It is
-`commit-msg` rather than `pre-commit` because the message is what identifies the commit as fork-only,
-and `pre-commit` cannot see it.
+`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
+`nplez1/main` in its history. Upstream-bound branches are cut from `origin/main`, so a fork-only file
+committed to one is reviewed upstream. It is `commit-msg` rather than `pre-commit` because the message
+is what identifies the commit as fork-only, and `pre-commit` cannot see it.
 
-If a commit is wrongly refused, the fix is to switch branches, not to bypass the hook.
+**Scoped to lineage on 2026-10-27, not to a branch name.** The original rule allowed `local(` on
+`nplez1/main` and nowhere else, which included fork PR branches — and the result was worse than the
+mistake it guarded: policy work committed there _without_ the `local(` label at least five times
+(#146, #130, #142, #177, #52), producing unlabelled fork-only changes riding fork PRs. A fork PR
+branch descends from `nplez1/main`; that lineage is what the rule now follows, so `local(` is allowed
+on the fork's own line and still refused on anything cut from `origin/main`. `local/open-pr.mjs
+--upstream` remains the second stop, refusing the subject and every fork-owned path.
+
+If a commit is wrongly refused, the fix is to branch from `nplez1/main`, not to bypass the hook.
 
 ### `local(vm)`: an ephemeral machine per worktree
 

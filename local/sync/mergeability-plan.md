@@ -39,6 +39,8 @@ dropped item.
 
 | Dead modules (§ 4.9) | 4 fork-only modules + 1 test deleted (290 lines, and 0 importers proven by a `from '…'` scan) | `check:test-file-runners` enumerates `git ls-files`, so an unstaged deletion reads as a missing file — stage the delete before believing that failure |
 
+| Retire stale tooling (§ 6.9) | `curate.mjs` deleted; "patch series" wording corrected in three docs; `commit-msg` scoped to lineage | The hook's branch-name rule caused the failure it guarded: policy work went to fork PR branches _unlabelled_ five times rather than be refused |
+
 ### Still open, in this plan's own terms
 
 - **§ 5.4 dashboard delivery — settled and executed 2026-10-26.** The product owner rejected
@@ -662,20 +664,21 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
 - `recordDependencies=false` in the gate means a full run never warms Vitest's dependency records,
   so `check:changed` keeps missing its 95% coverage threshold and runs everything.
 
-### 6.9 Retire what the docs describe but the repo does not have
+### 6.9 Retire what the docs describe but the repo does not have — **done 2026-10-27**
 
-- **`curate.mjs`** plans a curated patch series for the _rebase_ era and counts from
-  `git log merge-base..HEAD` without `--first-parent`, so it counts 332 commits including merges and
-  its per-group byte-identical promise does not hold on non-linear history. Retire it; do not finish
-  it.
-- **"Keep rebase for the patch series"** (runbook, `LOCAL-PATCHES.md:1138`) describes a series that
-  is not separable: no patch ref exists, the product line imports the identity modules (50 commits),
-  and 35 files are shared. Rewrite the wording to match reality.
-- **`.husky/commit-msg`** is redundant for upstream PRs (`open-pr.mjs` already refuses `local(`
-  commits and fork-owned paths upstream) and counter-productive for fork PRs — it pushed policy work
-  through unlabelled PRs at least five times (#146, #130, #142, #177, #52). Either scope it to
-  branches that do not descend from `nplez1/main`, or drop it and let policy changes ride fork PRs
-  with a `local(` title.
+- **`curate.mjs` — retired, deleted.** It planned a curated patch series for the _rebase_ era and
+  counted from `git log merge-base..HEAD` without `--first-parent`, so it counted 332 commits
+  including merges and its per-group byte-identical promise does not hold on non-linear history. It
+  was never applied; finishing it would have bought a plan for a branch nobody can build.
+- **"Keep rebase for the patch series" — corrected.** No patch ref exists, the product line imports
+  the identity modules (~50 commits), and 35 files are shared, so a separable series cannot be cut.
+  The runbook, `LOCAL-PATCHES.md` and `local/sync/README.md` now say the release line merges, feature
+  branches rebase, and there is no patch series.
+- **`.husky/commit-msg` — scoped to lineage.** It refused `local(` everywhere but `nplez1/main`,
+  including fork PR branches, and the observed result was policy work committed there _without_ the
+  label at least five times (#146, #130, #142, #177, #52) — an unlabelled fork-only change riding a
+  fork PR is worse than the mistake the hook guarded. It now allows `local(` on any branch carrying
+  `nplez1/main` in its history and still refuses anything cut from `origin/main`.
 
 ---
 
