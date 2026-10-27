@@ -57,11 +57,7 @@ export function judge(entries, failures, passes) {
   const known = []
   const unexpected = []
   for (const failure of failures) {
-    const entry = entries.find(
-      (candidate) =>
-        candidate.file === failure.file &&
-        (candidate.test === null || candidate.test === failure.test)
-    )
+    const entry = entries.find((candidate) => entryMatchesFailure(candidate, failure))
     if (entry) {
       known.push({ failure, entry })
     } else {
@@ -120,9 +116,25 @@ export function allowlistEntries(manifest) {
       class: String(entry.class ?? 'unclassified'),
       owner: String(entry.owner ?? 'unattributed'),
       flaky: entry.flaky === true,
+      // Why it throws: an invalid regex must not become an entry that silently never matches.
+      match: entry.match === undefined ? null : new RegExp(String(entry.match)),
       key: test === null ? `${file} › *` : `${file} › ${test}`
     }
   })
+}
+
+/**
+ * Why a `match` regex: an allowlisted test can start failing for a different reason, and matching on
+ * the name alone then keeps calling that new failure known. `lint-gate` already works this way.
+ */
+function entryMatchesFailure(entry, failure) {
+  if (entry.file !== failure.file) {
+    return false
+  }
+  if (entry.test !== null && entry.test !== failure.test) {
+    return false
+  }
+  return entry.match === null || entry.match.test(String(failure.detail ?? ''))
 }
 
 /**

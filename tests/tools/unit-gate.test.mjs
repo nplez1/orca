@@ -30,7 +30,8 @@ function reportFor(assertions) {
           fullName: entry.test,
           title: entry.test,
           status: entry.status,
-          failureMessages: entry.status === 'failed' ? ['AssertionError: boom\n  at x'] : []
+          failureMessages:
+            entry.status === 'failed' ? [entry.message ?? 'AssertionError: boom\n  at x'] : []
         }))
       }
     ]
@@ -70,6 +71,41 @@ describe('an entry covers exactly what it names', () => {
     const judged = judge(entries, cases.failures, cases.passes)
     expect(judged.known).toHaveLength(2)
     expect(judged.unexpected).toEqual([])
+  })
+
+  it('re-arms an entry whose failure now reads differently, when the entry names its reason', () => {
+    // Why: matching on the name alone kept calling a new failure known for as long as the test name
+    // stayed the same, which is how a proven-environmental entry could start hiding a real one.
+    const entries = allowlistEntries({
+      entries: [
+        {
+          file: 'src/main/thing.test.ts',
+          test: 'known case',
+          class: 'c',
+          owner: 'o',
+          match: 'mapfile: command not found'
+        }
+      ]
+    })
+    const same = collectCases(
+      reportFor([
+        {
+          test: 'known case',
+          status: 'failed',
+          message: 'Error: bash: mapfile: command not found\n  at x'
+        }
+      ])
+    )
+    expect(judge(entries, same.failures, same.passes).known).toHaveLength(1)
+
+    const drifted = collectCases(
+      reportFor([
+        { test: 'known case', status: 'failed', message: 'AssertionError: expected 1 to be 2' }
+      ])
+    )
+    expect(
+      judge(entries, drifted.failures, drifted.passes).unexpected.map((failure) => failure.test)
+    ).toEqual(['known case'])
   })
 
   it('reports an entry that passed as stale and a dead one as unseen', () => {
