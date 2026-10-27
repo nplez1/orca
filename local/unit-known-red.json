@@ -17,7 +17,12 @@
     "An entry for a file the gate does not run is a problem, not a pass. The gate runs upstream's own",
     "unit lane (`config/scripts/ci-unit-files.mjs` `UNIT_EXCLUDE`), so the 80 files that list drops —",
     "the electron, node-pty, live-shell and cross-version-wire ones — are upstream-quarantined and",
-    "deliberately absent here."
+    "deliberately absent here.",
+    "",
+    "An entry may carry a `match` regex, tested against the first line of the failure message. It is",
+    "what stops an allowlisted test from covering a NEW failure under the same name: without it the",
+    "entry matches on file and title alone, so a passed-in reason stays \"known\" for as long as the",
+    "title does. A `match` is only added where the failure text was observed to carry that signature."
   ],
   "recordedAt": "2026-10-25",
   "observedRun": {
@@ -630,7 +635,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
+      "flaky": false,
+      "match": "mapfile: command not found"
     },
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
@@ -638,7 +644,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
+      "flaky": false,
+      "match": "mapfile: command not found"
     },
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
@@ -646,7 +653,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
+      "flaky": false,
+      "match": "mapfile: command not found"
     },
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
@@ -654,7 +662,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
+      "flaky": false,
+      "match": "mapfile: command not found"
     },
     {
       "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
@@ -662,7 +671,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
+      "flaky": false,
+      "match": "mapfile: command not found"
     },
     {
       "file": "config/scripts/dependency-security-release.test.mjs",
@@ -694,7 +704,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -702,7 +713,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -710,7 +722,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -718,7 +731,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -726,7 +740,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -734,7 +749,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -742,7 +758,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
@@ -750,7 +767,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
+      "flaky": false,
+      "match": "unbound variable"
     },
     {
       "file": "config/scripts/process-host-dev-rebuild.test.ts",
@@ -814,7 +832,8 @@
       "class": "macos-path-semantics",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
+      "flaky": false,
+      "match": "/private/var"
     },
     {
       "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
@@ -822,7 +841,8 @@
       "class": "macos-path-semantics",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
+      "flaky": false,
+      "match": "/private/var"
     },
     {
       "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
@@ -830,7 +850,8 @@
       "class": "macos-path-semantics",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
+      "flaky": false,
+      "match": "/private/var"
     },
     {
       "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
@@ -838,7 +859,8 @@
       "class": "macos-path-semantics",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
+      "flaky": false,
+      "match": "/private/var"
     },
     {
       "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
@@ -846,7 +868,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite refuses the extra column that shadows its rowid alias (`cannot add rowid alias: rowid`) where the contract expects it accepted.",
-      "flaky": false
+      "flaky": false,
+      "match": "cannot add rowid alias"
     },
     {
       "file": "src/main/runtime/orca-runtime.test.ts",
@@ -862,7 +885,8 @@
       "class": "macos-path-semantics",
       "owner": "upstream",
       "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
-      "flaky": false
+      "flaky": false,
+      "match": "/private/var"
     },
     {
       "file": "src/main/sqlite/sync-database-portability.test.ts",
@@ -886,7 +910,8 @@
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream file, byte-identical to 0571e45107. The script recovers only from EACCES/EPERM; under bun on macOS (1.4.3 and 1.4.4 both probed) fs.rm on a 0o555 directory fails with ENOTEMPTY instead, where Node reports EACCES, so the in-process case cannot recover and its afterEach then also fails ENOTEMPTY. The CLI cases, which spawn Node, pass.",
-      "flaky": false
+      "flaky": false,
+      "match": "Some generated directories could not be removed"
     },
     {
       "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
@@ -894,7 +919,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
@@ -902,7 +928,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/editor-view-layout-apply.test.ts",
@@ -910,7 +937,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/restored-editor-move-restart.test.ts",
@@ -918,7 +946,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
@@ -926,7 +955,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
@@ -934,7 +964,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/ai-vault-search/session-search-indexer.test.ts",
@@ -942,7 +973,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "unable to open database file"
     }
   ]
 }
