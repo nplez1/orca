@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { TUI_AGENT_CONFIG } from './tui-agent-config'
+import {
+  getTuiAgentDetectCommands,
+  getTuiAgentLaunchCommand,
+  TUI_AGENT_CONFIG
+} from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'
 
 describe('TUI_AGENT_CONFIG', () => {
@@ -30,5 +34,34 @@ describe('TUI_AGENT_CONFIG', () => {
     for (const [agent, expected] of Object.entries(overrides)) {
       expect(TUI_AGENT_CONFIG[agent as TuiAgent]).toMatchObject(expected)
     }
+  })
+
+  it('applies the Orca NP overlay to Agent Teams without dropping upstream fields', () => {
+    const teams = TUI_AGENT_CONFIG['claude-agent-teams']
+    expect(getTuiAgentDetectCommands(teams)).toEqual([
+      'orca-np',
+      'orca-np-dev',
+      'orca-dev',
+      'orca-ide'
+    ])
+    expect(teams).toMatchObject({
+      detectRequiredCommands: ['claude'],
+      detectUnsupportedRuntimes: ['win32', 'wsl'],
+      expectedProcess: 'claude'
+    })
+  })
+
+  it('launches the local CLI locally and the relay shim on every remote platform', () => {
+    const teams = TUI_AGENT_CONFIG['claude-agent-teams']
+    expect(getTuiAgentLaunchCommand(teams, 'darwin')).toBe('orca-np claude-teams')
+    expect(getTuiAgentLaunchCommand(teams, 'linux')).toBe('orca-np claude-teams')
+    expect(getTuiAgentLaunchCommand(teams, 'win32')).toBe('orca-np.cmd claude-teams')
+    const remote = { isRemote: true }
+    expect(getTuiAgentLaunchCommand(teams, 'darwin', remote)).toBe('orca claude-teams')
+    expect(getTuiAgentLaunchCommand(teams, 'linux', remote)).toBe('orca claude-teams')
+    expect(getTuiAgentLaunchCommand(teams, 'win32', remote)).toBe('orca.cmd claude-teams')
+    expect(getTuiAgentLaunchCommand(TUI_AGENT_CONFIG.kiro, 'darwin', remote)).toBe(
+      'kiro-cli chat --tui'
+    )
   })
 })
