@@ -110,7 +110,7 @@ export type ProviderRateLimits = {
   weekly: RateLimitWindow | null
   /** Claude Fable 7-day weekly window, null if not available. */
   fableWeekly?: RateLimitWindow | null
-  /** 30-day monthly window (OpenCode Go, Grok unified billing, Cursor plan pools), null if not available. */
+  /** 30-day monthly window (OpenCode Go, Grok unified billing, Cursor plan pools, Claude enterprise spend caps), null if not available. */
   monthly?: RateLimitWindow | null
   /** Overage / pay-as-you-go balance the plan spends into once its windows cap. */
   extraUsage?: ExtraUsageBalance | null

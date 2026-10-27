@@ -14,6 +14,10 @@ export type ProjectHostAddRequest = {
 /**
  * The fork's transient renderer state, kept out of upstream's UI slice. Nothing here is
  * persisted or hydrated: no window.api.ui.set, and absent from the debounced UI writer.
+ *
+ * One fork line stays in upstream's `ui-slice-settings-actions.ts`: `closeSettingsPage` clears
+ * `settingsProjectAddHostRequest`, because that is where the page it belongs to is closed. Moving the
+ * clear here would need a subscription to upstream's view state for one field.
  */
 export type ForkUiSlice = {
   /** One-shot "add this project to that host" request from the sidebar's Add to… menu, carried

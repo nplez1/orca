@@ -23,6 +23,7 @@ import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { TaskPageJiraBoard } from './Board'
 import { useJiraBoardMode } from './use-jira-board-mode'
+
 export function TaskPageJiraContent({
   model
 }: {

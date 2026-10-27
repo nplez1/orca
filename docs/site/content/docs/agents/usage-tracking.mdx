@@ -56,7 +56,7 @@ Some plans report a spending ceiling rather than 5-hour and 7-day quota windows.
 
   Orca reads this through the **GitHub CLI** you are already signed in to, which supplies both the credential and the enterprise slug. The scopes matter: `read:enterprise` is what exposes an enterprise's slug and `manage_billing:enterprise` is what reads its billing data, so a `gh` sign-in without them cannot serve this provider — Settings → Accounts shows the exact `gh auth refresh` command when that is the case. For accounts the CLI cannot serve, that section also accepts a token and enterprise slug directly, which is the override and takes precedence.
 
-The percentage is normally the figure the provider itself reports, so it matches what their console shows. Two exceptions: GitHub Copilot reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those; and a Claude seat whose extra-usage payload reports utilization as a 0–1 fraction has its percentage derived from the amounts, because that fraction is not a percentage.
+The percentage is normally the figure the provider itself reports, so it matches what their console shows. Two exceptions: GitHub Copilot reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those; and Claude derives it from the amounts whenever its payload carries no percentage, which includes a `spend` object with no `percent` and a legacy `extra_usage` figure reported as a 0–1 fraction rather than a percentage.
 
 ## Estimated cost (Stats)
 
