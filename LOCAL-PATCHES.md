@@ -1209,13 +1209,26 @@ that label, so the job queued: the 2026-10-26 scheduled run sat on it for 17 hou
 and `concurrency: cancel-in-progress: false` then blocked every later night behind it. The caller now
 passes `run_relay_integration: false`. The fork ships no cloud relay, so the job has nothing to test.
 
-Before that the nightly had run **once**, on 2026-10-08. Its 2026-10-26 attempt is the first real
-evidence from it: 137,546 passed, 1 unit test red (`rate-limits/service-inactive-claude-cooldown.test.ts`,
-12/12 green on macOS), 3 electron suites that skip on macOS and fail to bundle on Linux
-(`daemon-appimage-copy-host`, `daemon-electron-to-node-adoption`), and 2 unhandled errors — `EPIPE`
-from a child-process write, and `selector_not_found` from `orca-runtime.test.ts`. That last one is
-**not** Linux-specific: it reproduces on macOS and the allowlist covers it as an `unhandledErrors`
-headline, which is why the Mac gate could never say so.
+Before that the nightly had run **once**, on 2026-10-08. Two runs are the evidence since. The 2026-10-26
+scheduled run (id `40308443374`) sat 17.5 h on the relay job, was cancelled, and its cancel rewrote the
+run-level conclusion — 1,905 skipped, four of five shards red, and no verdict a reader could see. The
+cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus the repair
+below): five shards, **three green**, and three red files in total —
+`rate-limits/service-inactive-claude-cooldown.test.ts`, `daemon/daemon-appimage-copy-host.electron.test.ts`
+and `daemon/daemon-electron-to-node-adoption.electron.test.ts` — plus one unhandled error,
+`selector_not_found`.
+
+**All three are the branch gap, not the platform.** Each maps onto a commit that exists here and not on
+`nplez1/main`: the cooldown expectation (`ba8e632509`), the fixture's esbuild specifiers
+(`be847f718f`), and the unhandled rejection (`fbb41b497d`). The third is a **test defect** — the test
+attached `.rejects` after awaiting a different promise, so the refusal settled unobserved while the
+assertion still passed — not a Linux-only reproduction as this entry previously claimed. So this
+measurement shows Linux carrying **no environment-bound red set of its own**: the Mac allowlist's two
+classes (`host-toolchain`, `sqlite-binding`) do not appear there at all, and two of the three red files
+are electron suites that skip on macOS and cannot bundle on Linux until the fixture path is right.
+
+The lesson is the one this entry exists for: a red nightly had to be read against `git log`, not against
+the allowlist, because the allowlist describes this Mac and the runner describes `main`.
 
 `node local/check-nightly-liveness.mjs` is what keeps that from going unnoticed again. It exits 0 on a
 fresh green run, 1 when the newest run is stale (older than two schedule slots) or **wedged** (queued
