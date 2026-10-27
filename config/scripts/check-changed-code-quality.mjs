@@ -81,6 +81,9 @@ const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
     new Set([
       'src/renderer/src/components/task-page/github/use-task-page-github-issue-draft.ts',
       'src/renderer/src/components/use-task-page-jira-creation-state.ts',
+      // Restored byte-identical to upstream/main under the no-delete policy, so this finding is
+      // upstream's code and fixing it here would be divergence the next sync has to re-resolve.
+      'src/renderer/src/components/use-jira-issue-workspace-data.ts',
       // The Issue pane's GitHub body is fetched over local or SSH runtime IPC,
       // so its loading/error/result state tracks the request, not a derivable prop.
       'src/renderer/src/components/right-sidebar/GithubLinkedIssuePane.tsx'
