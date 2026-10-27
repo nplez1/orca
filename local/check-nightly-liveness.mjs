@@ -51,6 +51,16 @@ async function fetchRuns(limit = 10) {
 
 const ageHours = (iso, now) => (now - Date.parse(iso)) / HOUR
 
+/**
+ * Conclusions that carry no verdict about the code. A cancelled run says a human or a timeout stopped
+ * it, and reading that as "red" is how a deliberately cancelled run raised a false alarm on
+ * 2026-10-27 while also hiding the last run that actually passed.
+ */
+const VERDICTLESS = new Set(['cancelled', 'skipped', 'neutral', null, undefined])
+
+const byRecency = (runs) =>
+  [...runs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+
 /** Judge liveness from already-fetched runs, so the decision is testable without a network. */
 export function judgeLiveness(runs, now = Date.now()) {
   if (!Array.isArray(runs) || runs.length === 0) {
@@ -61,10 +71,18 @@ export function judgeLiveness(runs, now = Date.now()) {
     }
   }
 
-  const newest = [...runs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]
+  // Two clocks: the schedule's (any run at all proves the cron fires) and the backstop's (only a
+  // completed run proves the suite still passes). Cancelling a run advances one and not the other.
+  const ordered = byRecency(runs)
+  const newest = ordered[0]
+  const verdictRun = ordered.find((r) => r.status === 'completed' && !VERDICTLESS.has(r.conclusion))
   const age = ageHours(newest.createdAt, now)
+  const verdictAge = verdictRun ? ageHours(verdictRun.createdAt, now) : null
   const inFlight = newest.status === 'queued' || newest.status === 'in_progress'
   const lastDay = runs.filter((r) => ageHours(r.createdAt, now) <= 24).length
+  const verdictless = ordered.filter(
+    (r) => r.status === 'completed' && VERDICTLESS.has(r.conclusion)
+  )
 
   const facts = {
     runId: newest.databaseId,
@@ -73,8 +91,18 @@ export function judgeLiveness(runs, now = Date.now()) {
     ageHours: Math.round(age * 10) / 10,
     headSha: newest.headSha?.slice(0, 10) ?? null,
     event: newest.event,
-    runsInLastDay: lastDay
+    runsInLastDay: lastDay,
+    verdictRunId: verdictRun?.databaseId ?? null,
+    verdictAgeHours: verdictAge === null ? null : Math.round(verdictAge * 10) / 10,
+    verdictlessRuns: verdictless.length
   }
+
+  const noVerdictNote =
+    verdictless.length > 0
+      ? ` (${verdictless.length} run(s) carried no verdict: ${verdictless
+          .map((r) => r.conclusion ?? r.status)
+          .join(', ')})`
+      : ''
 
   if (inFlight && age > WEDGED_AFTER_H) {
     return {
@@ -92,7 +120,7 @@ export function judgeLiveness(runs, now = Date.now()) {
       ...facts,
       ok: true,
       code: 0,
-      summary: `run ${newest.databaseId} is ${newest.status} (${facts.ageHours}h)`
+      summary: `run ${newest.databaseId} is ${newest.status} (${facts.ageHours}h)${verdictRun ? `; last verdict was ${verdictRun.conclusion} ${facts.verdictAgeHours}h ago` : ''}${noVerdictNote}`
     }
   }
   if (age > STALE_AFTER_H) {
@@ -103,15 +131,36 @@ export function judgeLiveness(runs, now = Date.now()) {
       summary:
         `newest run is ${facts.ageHours}h old (${newest.conclusion ?? newest.status}), past the ` +
         `${STALE_AFTER_H}h threshold for a ${CRON_UTC_HOUR}:${String(CRON_UTC_MINUTE).padStart(2, '0')} ` +
-        'UTC daily schedule — the cron is not firing, or the workflow is disabled.'
+        `UTC daily schedule — the cron is not firing, or the workflow is disabled.${noVerdictNote}`
     }
   }
-  const verdict = newest.conclusion === 'success' ? 'green' : `red (${newest.conclusion})`
+  if (!verdictRun) {
+    return {
+      ...facts,
+      ok: false,
+      code: 1,
+      summary:
+        `no completed run has produced a verdict in the last ${STALE_AFTER_H}h — the schedule is ` +
+        `firing (newest ${facts.ageHours}h ago) but nothing has actually run the suite${noVerdictNote}`
+    }
+  }
+  if (verdictAge > STALE_AFTER_H) {
+    return {
+      ...facts,
+      ok: false,
+      code: 1,
+      summary:
+        `the newest verdict is ${facts.verdictAgeHours}h old (${verdictRun.conclusion}) even though ` +
+        `a run exists ${facts.ageHours}h ago${noVerdictNote} — read that as the backstop being ` +
+        'down, not as green'
+    }
+  }
+  const verdict = verdictRun.conclusion === 'success' ? 'green' : `red (${verdictRun.conclusion})`
   return {
     ...facts,
-    ok: newest.conclusion === 'success',
-    code: newest.conclusion === 'success' ? 0 : 1,
-    summary: `nightly ${verdict} at ${facts.ageHours}h old, ${lastDay} run(s) in the last 24h`
+    ok: verdictRun.conclusion === 'success',
+    code: verdictRun.conclusion === 'success' ? 0 : 1,
+    summary: `nightly ${verdict} at ${facts.verdictAgeHours}h old, ${lastDay} run(s) in the last 24h${verdictRun.databaseId === newest.databaseId ? '' : `; newest run ${newest.databaseId} was ${newest.conclusion ?? newest.status}`}${noVerdictNote}`
   }
 }
 

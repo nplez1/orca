@@ -52,4 +52,48 @@ describe('nightly liveness', () => {
       code: 1
     })
   })
+
+  it('reads a cancelled run as no verdict, not as red', () => {
+    const verdict = judgeLiveness([run({ conclusion: 'cancelled' })], NOW)
+    expect(verdict).toMatchObject({ ok: false, code: 1, verdictRunId: null })
+    expect(verdict.summary).not.toMatch(/red/)
+    expect(verdict.summary).toMatch(/no completed run has produced a verdict/)
+  })
+
+  it('does not let a cancelled run hide the green run it followed', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 22, conclusion: 'cancelled', createdAt: hoursAgo(19) }),
+        run({ databaseId: 21, createdAt: hoursAgo(20) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: true, code: 0, verdictRunId: 21, verdictAgeHours: 20 })
+    expect(verdict.summary).toMatch(/nightly green/)
+    expect(verdict.summary).toMatch(/carried no verdict: cancelled/)
+  })
+
+  it('fails when every run for days carries no verdict', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 32, conclusion: 'cancelled', createdAt: hoursAgo(1) }),
+        run({ databaseId: 31, conclusion: 'cancelled', createdAt: hoursAgo(25) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1, verdictRunId: null })
+    expect(verdict.summary).toMatch(/no completed run has produced a verdict/)
+  })
+
+  it('fails when the schedule fires but the last verdict is stale', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 42, conclusion: 'cancelled', createdAt: hoursAgo(2) }),
+        run({ databaseId: 41, createdAt: hoursAgo(50) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1, verdictAgeHours: 50 })
+    expect(verdict.summary).toMatch(/newest verdict is 50h old/)
+  })
 })
