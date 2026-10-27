@@ -20,32 +20,36 @@ dropped item.
 
 ### Shipped on `nplez1/Fork-Opt`
 
-| Item                               | What changed                                                                                            | Learning worth keeping                                                                                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max-lines` (§ 5.2)                | `"off"` in all four `.oxlintrc.json` overrides                                                          | Four lines, no additions; proven with a 320-line probe that errors under upstream's config                                                                                        |
-| Nightly backstop (§ 4.1)           | `run_relay_integration: false` in `fork-main-tests.yml`                                                 | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                    |
-| Nightly liveness (§ 4.1)           | `local/check-nightly-liveness.mjs`                                                                      | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass                                                                                                    |
-| Flake waiver (§ 4.2)               | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives              | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                  |
-| Known-red detail (§ 4.5)           | per-entry `match` regex; 22 of 31 pinned                                                                | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                       |
-| `check:changed` base (§ 4.4)       | `origin/HEAD` first                                                                                     | `origin/main` on this fork is **upstream's mirror**, so the gate diffed 2,846 files                                                                                               |
-| Comment policy (§ 4.6)             | policy in `LOCAL-PATCHES.md` + 6 pure annotations removed                                               | Of 18 files whose whole diff was comments, 12 were the fork **rewording upstream's** comments to match fork reality. Reverting them makes the comments false                      |
-| Ledger `Resolution:` (§ 4.7)       | verb per section, printed by the resolver; Identity `Paths` 227 → 33 matches                            | A whole-file verb is not a hunk-level decision: Identity is `manual`, and auto-applying `keep-ours` there would revert upstream wholesale                                         |
-| Deletion manifest (§ 4.7)          | `expected-deletions.json`: 24 paths, three statuses                                                     | `modify/delete` is the one class where restoring the file is the tempting wrong answer                                                                                            |
-| Resolver actions (§ 5.9)           | `conflicts.mjs --propose` / `--apply`                                                                   | 3 of 231 conflicted paths carry a settled resolution today; the rest are honestly `manual`                                                                                        |
-| No-delete policy (§ 4.9, § 5.7)    | 13 files restored byte-identical; 4 kept deleted with reasons                                           | Two were not mechanical: the Swift pair trusts upstream's bundle id, and the resolver needs a model #169 removed                                                                  |
-| Test defects, not env reds (§ 4.5) | 9 failures fixed across 5 files; `macos-path-semantics` class **empty**                                 | All the same defect: `mkdtemp(tmpdir())` compared against a path the subject had resolved                                                                                         |
-| Linux nightly reds (§ 6.2)         | fixture import rewrite fixed, EPIPE observed, cooldown expectation per-platform, verdict names the file | The **merge resolution** rewrote two fixtures' imports to paths that exist in neither parent — invisible to import checks because the shorter path resolves from the changed file |
-| Gate preflight (§ 4.3)             | **dropped**                                                                                             | Both proposed checks would have failed a healthy tree: mobile deps hoist to the root install, and the bun pin resolves from a devDependency, not PATH                             |
+| Item                               | What changed                                                                                            | Learning worth keeping                                                                                                                                                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `max-lines` (§ 5.2)                | `"off"` in all four `.oxlintrc.json` overrides                                                          | Four lines, no additions; proven with a 320-line probe that errors under upstream's config                                                                                                                                                                                     |
+| Nightly backstop (§ 4.1)           | `run_relay_integration: false` in `fork-main-tests.yml`                                                 | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                                                                                                                 |
+| Nightly liveness (§ 4.1)           | `local/check-nightly-liveness.mjs`                                                                      | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass. A **cancelled run is not a verdict** — the first version read the author's own cancel as a red night _and_ hid the last green, so it now keeps a schedule clock and a verdict clock separately |
+| Flake waiver (§ 4.2)               | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives              | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                                                                                                               |
+| Known-red detail (§ 4.5)           | per-entry `match` regex; 22 of 31 pinned                                                                | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                                                                                                                    |
+| `check:changed` base (§ 4.4)       | `origin/HEAD` first                                                                                     | `origin/main` on this fork is **upstream's mirror**, so the gate diffed 2,846 files                                                                                                                                                                                            |
+| Comment policy (§ 4.6)             | policy in `LOCAL-PATCHES.md` + 6 pure annotations removed                                               | Of 18 files whose whole diff was comments, 12 were the fork **rewording upstream's** comments to match fork reality. Reverting them makes the comments false                                                                                                                   |
+| Ledger `Resolution:` (§ 4.7)       | verb per section, printed by the resolver; Identity `Paths` 227 → 33 matches                            | A whole-file verb is not a hunk-level decision: Identity is `manual`, and auto-applying `keep-ours` there would revert upstream wholesale                                                                                                                                      |
+| Deletion manifest (§ 4.7)          | `expected-deletions.json`: 24 paths, three statuses                                                     | `modify/delete` is the one class where restoring the file is the tempting wrong answer                                                                                                                                                                                         |
+| Resolver actions (§ 5.9)           | `conflicts.mjs --propose` / `--apply`                                                                   | 3 of 231 conflicted paths carry a settled resolution today; the rest are honestly `manual`                                                                                                                                                                                     |
+| No-delete policy (§ 4.9, § 5.7)    | 13 files restored byte-identical; 4 kept deleted with reasons                                           | Two were not mechanical: the Swift pair trusts upstream's bundle id, and the resolver needs a model #169 removed                                                                                                                                                               |
+| Test defects, not env reds (§ 4.5) | 9 failures fixed across 5 files; `macos-path-semantics` class **empty**                                 | All the same defect: `mkdtemp(tmpdir())` compared against a path the subject had resolved                                                                                                                                                                                      |
+| Linux nightly reds (§ 6.2)         | fixture import rewrite fixed, EPIPE observed, cooldown expectation per-platform, verdict names the file | The **merge resolution** rewrote two fixtures' imports to paths that exist in neither parent — invisible to import checks because the shorter path resolves from the changed file                                                                                              |
+| Gate preflight (§ 4.3)             | **dropped**                                                                                             | Both proposed checks would have failed a healthy tree: mobile deps hoist to the root install, and the bun pin resolves from a devDependency, not PATH                                                                                                                          |
 
 ### Still open, in this plan's own terms
 
-- **§ 5.4 dashboard delivery — settled 2026-10-26, at the point the code allowed.** The restore split
-  where inertness stopped. **7 files restored** (main-process + preload popout plumbing, plus three
-  suites that pass — 33 cases), **15 asserted as `expected-deletion`** (drawer, sidebar host, popout
-  window shell, open-mode/bridge hooks). The renderer half cannot be restored without either two live
-  dashboards or a behaviour change to the shipped page view, because upstream's `DashboardPopoutRoot`
-  needs props upstream added to `AgentKanbanBoard`, and that board is what the fork's live view renders.
-  No `pending-decision` entries remain; the resolver can act on all 26.
+- **§ 5.4 dashboard delivery — settled and executed 2026-10-26.** The product owner rejected
+  upstream's delivery outright (the content-area view is the dashboard), so this is a permanent
+  product decision rather than an open merge question. **4 files held inert** (the main-process popout
+  pair, byte-identical to upstream, nothing registering or opening them, 33 cases passing), **18
+  asserted as `expected-deletion`**. Restoring all 22 was measured first: **11 of 57 cases fail and
+  `tc:web` reports 29 errors**. The preload pair was dropped from the restore after the first attempt
+  put `dashboard: DashboardApi` on `PreloadApi` for an API nothing registers, and
+  `clipboard-dashboard-popout-access.test.ts` went with it because keeping it wired dead code into
+  `assertTrustedClipboardTextSender`. Recorded as three ledger entries — `delete`, `take-theirs`,
+  `manual` — because one verb cannot be honest for a renderer deletion, an inert upstream file and a
+  14-hunk behaviour diff.
 - **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone. **6 of 37 measured
   splits are undone** (`f77d72467c`): each was upstream's code with nothing of the fork's in it. The
   other 31 stay, with the measurement recorded — the block carries fork code, was rewritten rather than
@@ -57,13 +61,14 @@ dropped item.
 
 ### Baselines that moved
 
-| Metric                                             | § 1 said      | Now                                                            |
-| -------------------------------------------------- | ------------- | -------------------------------------------------------------- |
-| Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                      |
-| Nightly runs per week                              | 0             | 1 (the deadline is fixed; the next scheduled run is the proof) |
-| Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class          |
-| Deletions asserted rather than re-decided          | 0             | 24                                                             |
-| Conflicted paths with a settled, executable answer | 0             | 3 (the rest are `manual`, which is the honest count)           |
+| Metric                                             | § 1 said      | Now                                                                                 |
+| -------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
+| Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                                           |
+| Nightly runs per week                              | 0             | 1 (the deadline is fixed; the next scheduled run is the proof)                      |
+| Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class                               |
+| Deletions asserted rather than re-decided          | 0             | 26                                                                                  |
+| Conflicted paths with a settled, executable answer | 0             | 15 (14 `delete`, 1 `take-theirs`; the rest are `manual`, which is the honest count) |
+| Last passing nightly                               | 2026-10-08    | **still 2026-10-08** — 450 h, because the fix is unpushed                           |
 
 ---
 
