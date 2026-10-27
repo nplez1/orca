@@ -1273,10 +1273,16 @@ were defects **in the tests**, and both are fixed, so the three entries are remo
 `1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
 mentions `selector_not_found`, so this was persistent rather than a one-off.
 
-The other `macos-path-semantics` entries are a different question and were not touched: four in
-`orcad-forked-child-paths.test.ts` carry the same `/private/var` signature and deserve the same
-treatment, while `cli/packaged-cli-assets.test.ts` and the two `config/scripts` entries have no `match`
-at all, so a _different_ failure in them would be absorbed silently.
+The remaining `macos-path-semantics` entries were not touched: `cli/packaged-cli-assets.test.ts` and the
+two `config/scripts` entries have no `match` at all, so a _different_ failure in them would be absorbed
+silently.
+
+**The four `orcad-forked-child-paths` cases were the same defect, and are fixed too.** They set
+`process.argv[1]` to an unresolved `mkdtempSync(tmpdir())` path while the resolver reports the resolved
+deploy root, so all four compared `/var/...` against `/private/var/...`. Each now resolves its temp dir
+first, and all five cases in the file pass. Upstream has **not** fixed this one — the file is otherwise
+byte-identical to `upstream/main` — so it is a fork-local test fix that will conflict once, benignly,
+when upstream makes the same change. Four more entries leave the allowlist with it.
 
 ## Syncing with upstream
 

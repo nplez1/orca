@@ -821,42 +821,6 @@
       "flaky": false
     },
     {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths forks the session scanner child shipped beside orcad.js",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false,
-      "match": "/private/var"
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths forks the watcher child shipped beside orcad.js",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false,
-      "match": "/private/var"
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths ignores a decoy child under the working directory",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false,
-      "match": "/private/var"
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths reports the install root and the Node binary, not the data directory",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false,
-      "match": "/private/var"
-    },
-    {
       "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
       "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
       "class": "sqlite-binding",

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -25,7 +25,8 @@ describe('orcad forked-child paths', () => {
   let originalArgv: string[]
 
   beforeEach(() => {
-    deployRoot = mkdtempSync(join(tmpdir(), 'orcad-deploy-'))
+    // The resolver reports the resolved deploy root; macOS tmpdir sits behind /private.
+    deployRoot = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-deploy-')))
     // The layout build-orcad.mjs emits: the bundle and its children side by side.
     writeFileSync(join(deployRoot, 'orcad.js'), '')
     writeFileSync(join(deployRoot, 'parcel-watcher-process-entry.js'), '')
@@ -61,7 +62,7 @@ describe('orcad forked-child paths', () => {
     // A cwd-derived app root finds the real child only when the operator happens to
     // launch from the install directory, which a supervisor never does — and here it
     // would find someone else's build instead.
-    const elsewhere = mkdtempSync(join(tmpdir(), 'orcad-cwd-'))
+    const elsewhere = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-cwd-')))
     mkdirSync(join(elsewhere, 'out', 'main'), { recursive: true })
     writeFileSync(join(elsewhere, 'out', 'main', 'parcel-watcher-process-entry.js'), '')
     writeFileSync(join(elsewhere, 'parcel-watcher-process-entry.js'), '')
