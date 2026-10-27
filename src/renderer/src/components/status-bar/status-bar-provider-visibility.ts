@@ -173,7 +173,7 @@ export function createPendingProviderSnapshot(providerId: UsageProviderId): Prov
       ? { buckets: [] }
       : {}),
     // Why: the fork's windowless readouts need their own pending nulls (credits vs allowance).
-    ...(isForkUsageProvider(providerId) ? FORK_USAGE_PROVIDERS[providerId].pendingShape : {}),
+    ...(isForkUsageProvider(providerId) ? FORK_USAGE_PROVIDERS[providerId].pendingReadout : {}),
     updatedAt: 0,
     error: null,
     status: 'fetching'

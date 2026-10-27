@@ -111,7 +111,7 @@ type ForkUsageProviderEntry = {
   badgeLetter: string
   Icon: (props: { size?: number }) => React.JSX.Element
   settingsFlag: keyof ForkUsageProviderSettings
-  pendingShape: Partial<ProviderRateLimits>
+  pendingReadout: Partial<ProviderRateLimits>
   hasData: (provider: ProviderRateLimits) => boolean
 }
 
@@ -122,7 +122,7 @@ export const FORK_USAGE_PROVIDERS: Record<ForkUsageProviderId, ForkUsageProvider
     Icon: DeepSeekIcon,
     settingsFlag: 'deepseekApiKeyConfigured',
     // Why: DeepSeek has no windows; its readout is the credits field.
-    pendingShape: { credits: null },
+    pendingReadout: { credits: null },
     hasData: hasCreditsData
   },
   fireworks: {
@@ -131,17 +131,18 @@ export const FORK_USAGE_PROVIDERS: Record<ForkUsageProviderId, ForkUsageProvider
     Icon: FireworksIcon,
     settingsFlag: 'fireworksApiKeyConfigured',
     // Why: Fireworks has no windows; its readout is the credits field.
-    pendingShape: { credits: null },
+    pendingReadout: { credits: null },
     hasData: hasCreditsData
   },
   copilot: {
-    // Why: registered as a never-translate brand in the locale policy.
+    // Why: a brand label, like upstream's own provider names in usage-error-copy.ts; the
+    // localization checker's allowlist carries the reviewed exclusion.
     label: 'GitHub Copilot',
     badgeLetter: 'P',
     Icon: CopilotIcon,
     settingsFlag: 'copilotTokenConfigured',
     // Why: Copilot reports a monthly allowance rather than a quota window.
-    pendingShape: { monthly: null, allowance: null },
+    pendingReadout: { monthly: null, allowance: null },
     hasData: (provider) => provider.allowance != null
   }
 }
