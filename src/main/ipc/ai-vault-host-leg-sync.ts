@@ -25,9 +25,10 @@ export type AiVaultHostLegSyncBasis = {
 type HeldList = { depth: AiVaultSessionDepth; result: AiVaultListResult }
 
 /**
- * Rows held lists may total, ~1.5 KB each from the scanner, so main keeps tens of megabytes
- * rather than one 15 MB history per scope and host. A count cap alone would not bound that: every
- * paged reply carries a fingerprint, including an unlimited listing.
+ * Rows one map of held lists may total, ~1.5 KB each from the scanner. This module's map and the
+ * host-leg cache's are capped separately, so main keeps tens of megabytes per map rather than one
+ * 15 MB history per scope and host. A count cap alone would not bound that: every paged reply
+ * carries a fingerprint, including an unlimited listing.
  *
  * The trade-off is deliberate: a host whose own listing approaches this bound can be evicted by
  * another host's store and then pays a full read on its next refresh, which is cheaper than

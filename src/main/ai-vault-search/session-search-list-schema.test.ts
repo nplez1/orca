@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { removeTree } from '../../shared/windows-transient-lock-removal'
 import SyncDatabase from '../sqlite/sync-database'
@@ -13,6 +13,7 @@ import { SESSION_SEARCH_SCHEMA_VERSION, openSessionSearchDatabase } from './sess
 let roots: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(roots.map((root) => removeTree(root)))
   roots = []
 })
@@ -55,6 +56,7 @@ function rewriteAsMergedTen(path: string): void {
   const db = new SyncDatabase(path)
   try {
     db.exec(`
+      DROP TRIGGER session_metadata_fts_insert;
       DROP TRIGGER session_metadata_fts_refresh;
       DROP TRIGGER session_list_reclaim;
       DROP TABLE session_list_facts;
@@ -128,6 +130,7 @@ it('gives a fresh index the list tier beside upstream’s tables, under its own 
       expect.arrayContaining([
         'table:session_list_facts',
         'table:session_metadata_fts',
+        'trigger:session_metadata_fts_insert',
         'trigger:session_metadata_fts_refresh',
         'trigger:session_list_reclaim'
       ])
@@ -246,6 +249,74 @@ it('reclaims a session’s list rows when upstream’s retention purge deletes i
     expect(count(db, 'sessions')).toBe(1)
     expect(count(db, 'session_metadata_fts')).toBe(1)
     expect(count(db, 'session_list_facts')).toBe(1)
+  } finally {
+    db.close()
+  }
+})
+
+it('discards, rather than migrates, a merged-10 index missing any of the eight columns', async () => {
+  const path = await tempDatabasePath()
+  openSessionSearchDatabase(path).close()
+  rewriteAsMergedTen(path)
+  const legacy = new SyncDatabase(path)
+  legacy.exec('ALTER TABLE sessions DROP COLUMN queued_message_count')
+  legacy.close()
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  const rebuilt = openSessionSearchDatabase(path)
+  try {
+    expect(count(rebuilt, 'files')).toBe(0)
+    expect(warn).not.toHaveBeenCalled()
+  } finally {
+    rebuilt.close()
+  }
+})
+
+it.each([
+  ['from another build', "UPDATE meta SET value = '0' WHERE key = 'session_list_schema_version'"],
+  ['missing beside indexed sessions', "DELETE FROM meta WHERE key = 'session_list_schema_version'"]
+])(
+  'rebuilds rather than stamps a list tier %s when the pre-open check never judged it',
+  async (_label, damage) => {
+    const path = await tempDatabasePath()
+    const stale = openSessionSearchDatabase(path)
+    stale
+      .prepare(
+        "INSERT INTO sessions(agent, session_id, file_path, title, resume_command) VALUES ('claude', 's', 's', 't', '')"
+      )
+      .run()
+    stale.exec(damage)
+    stale.close()
+
+    // The check's first statement throws, as a lock timeout would; the opener then keeps the file.
+    vi.spyOn(SyncDatabase.prototype, 'pragma').mockImplementationOnce(() => {
+      throw new Error('database is locked')
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const reopened = openSessionSearchDatabase(path)
+    expect(warn).toHaveBeenCalledWith(
+      '[ai-vault-search] list schema check skipped:',
+      'database is locked'
+    )
+    try {
+      expect(count(reopened, 'sessions')).toBe(0)
+      expect(meta(reopened, 'session_list_schema_version')).toBe(
+        String(SESSION_LIST_SCHEMA_VERSION)
+      )
+    } finally {
+      reopened.close()
+    }
+  }
+)
+
+it('makes a session findable by metadata when its row is inserted already named', async () => {
+  const db = openSessionSearchDatabase(await tempDatabasePath())
+  try {
+    db.prepare(
+      `INSERT INTO sessions(agent, session_id, file_path, title, cwd, resume_command)
+       VALUES ('claude', 's', 's', 'harbor pilot', '/repo/app', '')`
+    ).run()
+    expect(count(db, 'session_metadata_fts WHERE session_metadata_fts MATCH ?', 'harbor')).toBe(1)
   } finally {
     db.close()
   }

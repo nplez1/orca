@@ -75,11 +75,16 @@ export type IndexedSessionList = {
   truncated: boolean
 }
 
-const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch, model,
-  created_at, updated_at, modified_at, message_count, COALESCE(total_tokens, 0) AS total_tokens,
-  COALESCE(queued_message_count, 0) AS queued_message_count,
-  COALESCE(subagent_transcript_count, 0) AS subagent_transcript_count,
-  subagent_parent_session_id, subagent_agent_type, subagent_parent_agent, resume_command`
+// The facts columns are qualified so a same-named column upstream adds to `sessions` is not ambiguous.
+const COLUMNS = `id, agent, session_id, file_path, codex_home, title, cwd, branch,
+  session_list_facts.model AS model, created_at, updated_at,
+  session_list_facts.modified_at AS modified_at, message_count,
+  COALESCE(session_list_facts.total_tokens, 0) AS total_tokens,
+  COALESCE(session_list_facts.queued_message_count, 0) AS queued_message_count,
+  COALESCE(session_list_facts.subagent_transcript_count, 0) AS subagent_transcript_count,
+  session_list_facts.subagent_parent_session_id AS subagent_parent_session_id,
+  session_list_facts.subagent_agent_type AS subagent_agent_type,
+  session_list_facts.subagent_parent_agent AS subagent_parent_agent, resume_command`
 
 /**
  * The columns the panel's own filter searches, minus preview text.
@@ -96,7 +101,7 @@ const QUERY_COLUMNS = [
   'session_id',
   'agent',
   'branch',
-  'model',
+  'session_list_facts.model',
   'cwd',
   'file_path'
 ] as const

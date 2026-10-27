@@ -37,11 +37,14 @@ const FACT_COLUMNS = [
   'subagent_parent_agent'
 ] as const
 
+const METADATA_FTS_REFRESH = `DELETE FROM session_metadata_fts WHERE rowid = NEW.id;
+  INSERT INTO session_metadata_fts(rowid, title, cwd, branch, agent)
+    VALUES (NEW.id, NEW.title, NEW.cwd, NEW.branch, NEW.agent);`
+
 /**
  * Triggers keep both tables in step with `sessions` whichever upstream path
  * writes or deletes it, so upstream's writer, retention purge and replacement
- * delete need no fork hunks. There is deliberately no INSERT trigger: a row is
- * created blank and named by its first UPDATE, which is when it becomes findable.
+ * delete need no fork hunks — including one that inserts a named row in one statement.
  */
 const SESSION_LIST_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS session_list_facts(
@@ -64,11 +67,12 @@ CREATE TABLE IF NOT EXISTS session_list_facts(
 CREATE VIRTUAL TABLE IF NOT EXISTS session_metadata_fts USING fts5(
   title, cwd, branch, agent, ${TOKENIZER}, detail=full
 );
+CREATE TRIGGER IF NOT EXISTS session_metadata_fts_insert AFTER INSERT ON sessions BEGIN
+  ${METADATA_FTS_REFRESH}
+END;
 CREATE TRIGGER IF NOT EXISTS session_metadata_fts_refresh
 AFTER UPDATE OF title, cwd, branch, agent ON sessions BEGIN
-  DELETE FROM session_metadata_fts WHERE rowid = NEW.id;
-  INSERT INTO session_metadata_fts(rowid, title, cwd, branch, agent)
-    VALUES (NEW.id, NEW.title, NEW.cwd, NEW.branch, NEW.agent);
+  ${METADATA_FTS_REFRESH}
 END;
 -- sessions.id is AUTOINCREMENT and never reused, so a row left behind here could never be reclaimed.
 CREATE TRIGGER IF NOT EXISTS session_list_reclaim AFTER DELETE ON sessions BEGIN
@@ -81,10 +85,28 @@ END;
 export const SESSION_LIST_FROM = `sessions LEFT JOIN session_list_facts
   ON session_list_facts.session_row_id = sessions.id`
 
+// Coded as corruption because that is what makes the versioned opener rebuild the file.
+class SessionListTierMismatchError extends Error {
+  readonly code = 'SQLITE_CORRUPT'
+  constructor(listVersion: string | undefined) {
+    super(`session list tier ${listVersion ?? 'missing'} does not match the indexed sessions`)
+    this.name = 'SessionListTierMismatchError'
+  }
+}
+
 /** Run inside the versioned opener's schema step, so a fresh index gets the tier too. */
 export function ensureSessionListSchema(db: SyncDatabase): void {
+  const listVersion = readMeta(db, SESSION_LIST_SCHEMA_KEY)
+  if (listVersion === String(SESSION_LIST_SCHEMA_VERSION)) {
+    db.exec(SESSION_LIST_SCHEMA_SQL)
+    return
+  }
+  // Backstop for a failed pre-open check: an unchanged file's session is never re-read to fill its facts.
+  if (listVersion !== undefined || hasSessionRows(db)) {
+    throw new SessionListTierMismatchError(listVersion)
+  }
   db.exec(SESSION_LIST_SCHEMA_SQL)
-  db.prepare('INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)').run(
+  db.prepare('INSERT INTO meta(key, value) VALUES (?, ?)').run(
     SESSION_LIST_SCHEMA_KEY,
     String(SESSION_LIST_SCHEMA_VERSION)
   )
@@ -166,10 +188,11 @@ function migrateOrJudge(db: SyncDatabase): 'keep' | 'discard' {
 }
 
 function isMergedLegacyLayout(db: SyncDatabase): boolean {
+  const columns = sessionColumns(db)
   return (
     readMeta(db, 'schema_version') === MERGED_LEGACY_SCHEMA_VERSION &&
     hasTable(db, 'sessions_fts') &&
-    sessionColumns(db).has('subagent_parent_agent')
+    FACT_COLUMNS.every((column) => columns.has(column))
   )
 }
 
@@ -203,6 +226,10 @@ function hasTable(db: SyncDatabase, name: string): boolean {
       .prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = ?")
       .get(name) !== undefined
   )
+}
+
+function hasSessionRows(db: SyncDatabase): boolean {
+  return db.prepare('SELECT 1 AS present FROM sessions LIMIT 1').get() !== undefined
 }
 
 function readMeta(db: SyncDatabase, key: string): string | undefined {

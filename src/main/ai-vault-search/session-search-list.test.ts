@@ -455,3 +455,32 @@ describe('the mapped row', () => {
     expect(list(db).sessions[0]?.modifiedAt).toBe('2026-09-02T00:00:00.000Z')
   })
 })
+
+describe('beside upstream’s columns', () => {
+  it('reads and filters the facts even when `sessions` grows a column of the same name', async () => {
+    const db = await openIndex()
+    for (const column of [
+      'model TEXT',
+      'modified_at TEXT',
+      'total_tokens INTEGER',
+      'queued_message_count INTEGER',
+      'subagent_transcript_count INTEGER',
+      'subagent_parent_session_id TEXT',
+      'subagent_agent_type TEXT',
+      'subagent_parent_agent TEXT'
+    ]) {
+      db.exec(`ALTER TABLE sessions ADD COLUMN ${column}`)
+    }
+    seed(db, {
+      id: 1,
+      model: 'claude-fable-5',
+      totalTokens: 900,
+      subagent: { parentSessionId: 'root', agentType: 'Explore', status: null, parentAgent: 'pi' }
+    })
+
+    const listed = list(db, { query: 'fable' }).sessions
+    expect(listed).toHaveLength(1)
+    expect(listed[0]).toMatchObject({ model: 'claude-fable-5', totalTokens: 900 })
+    expect(listed[0]?.subagent).toMatchObject({ parentSessionId: 'root', parentAgent: 'pi' })
+  })
+})

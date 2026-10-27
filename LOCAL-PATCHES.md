@@ -1063,11 +1063,24 @@ metadata FTS live in `session_list_facts` / `session_metadata_fts`, versioned by
 verbatim on every sync and bump the fork's key instead. That is the whole point: the two constants used
 to collide (fork 6→9, upstream 6→8, merged 10) and the same shape had already hit the parse cache.
 
-Triggers on `sessions` maintain both fork tables, so upstream's writer, retention purge and replacement
+Triggers on `sessions` maintain both fork tables — `AFTER UPDATE` and `AFTER INSERT` refreshing the
+metadata row, `AFTER DELETE` reclaiming both — so upstream's writer, retention purge and replacement
 delete carry no fork hunks, and `session-search-retrieval.ts` / `session-search-retention-delete.ts` are
-byte-identical to upstream. The only fork lines left are two hook calls in `openSessionSearchDatabase`
-(`session-search-schema.ts`), one `writeSessionListFacts` call in `session-search-file-records.ts`, and
-the list read's `LEFT JOIN` in `session-search-list.ts`.
+byte-identical to upstream. **The INSERT trigger is load-bearing, not redundant:** without it metadata
+search depends on upstream's `createSessionRow` staying "insert blank, then UPDATE", and the day it
+inserts a full row in one statement every session would silently drop out of metadata search. The only
+fork lines left are two hook calls in `openSessionSearchDatabase` (`session-search-schema.ts`), one
+`writeSessionListFacts` call in `session-search-file-records.ts`, and the list read's `LEFT JOIN` in
+`session-search-list.ts` — with every fact column written as `session_list_facts.<name> AS <name>`, so
+upstream adding a `model` column to `sessions` cannot make the list query ambiguous.
+
+**A wrong or missing key on a file that already holds sessions rebuilds, it does not stamp.** When the
+pre-open check cannot judge the file (a lock timeout, a transient error), `ensureSessionListSchema` throws
+`SessionListTierMismatchError` carrying `code = 'SQLITE_CORRUPT'` instead of writing the current fork
+version over whatever is on disk — upstream's `openVersionedCacheDatabase` already treats that code as
+"delete and rebuild once", so this needs no new lines in upstream's opener. **If upstream changes that
+rebuild rule, the schema test fails rather than the index quietly degrading**, which is the coupling to
+watch. The stamp itself is a plain `INSERT` and only fires when the key is absent and `sessions` is empty.
 
 **The merged-10 migration.** `migrateMergedLegacyLayout` runs before upstream's opener — it has to,
 because upstream deletes a file whose version it does not recognise — and fires only for a version `'10'`
@@ -1444,12 +1457,12 @@ skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at 
 `fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
 cross-cutting break sitting on the release line until one of those two runs.
 
-**The Linux red set, and why the Mac one does not substitute for it.** The Mac allowlist names *this
-machine's* environment; the nightly runs `ubuntu-24.04-arm`, which has its own. `local/nightly-linux-known-red.json`
+**The Linux red set, and why the Mac one does not substitute for it.** The Mac allowlist names _this
+machine's_ environment; the nightly runs `ubuntu-24.04-arm`, which has its own. `local/nightly-linux-known-red.json`
 is that set — an entry needs a `file`, a `test` name, a `class`, and **`evidence`; an entry without
 evidence is a hard problem, not a warning**, because that is the difference between a verdict and a mute
 button. `node local/check-nightly-linux-parity.mjs <artifacts> --failures` judges every failing assertion
-in the shards against it: no entry → the run fails; a listed test that *passed* is reported as prunable
+in the shards against it: no entry → the run fails; a listed test that _passed_ is reported as prunable
 (reported, never enforced, so an upstream fix does not turn the night red in the other direction); and a
 file-level failure (a `beforeAll` or import error with no assertion rows) can never be absorbed by a
 name-matching entry.

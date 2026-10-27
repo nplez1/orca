@@ -10,10 +10,13 @@
 One database holds two tiers, and only one of them needs consent.
 
 - **Metadata** — one `sessions` row per transcript (agent, session id, path, cwd,
-  branch, model, times, counts, title, resume command) plus `sessions_fts` over
-  titles, working directories, branches and agent names. Always indexed: it is what
-  Agent Session History lists, and every one of those values is already shown in the
-  panel.
+  branch, times, message count, title, resume command), a `session_list_facts` row
+  beside it with what the list renders beyond those (model, token and queued counts,
+  sub-agent lineage, modified time), and `session_metadata_fts` over titles, working
+  directories, branches and agent names. Triggers on `sessions` keep the last two in
+  step. Always indexed: it is what Agent Session History lists, and every one of
+  those values is already shown in the panel. `meta.session_list_schema_version`
+  versions the two list tables apart from `schema_version`.
 - **Content** — message bodies in `messages` and `messages_fts`. Opt-in: this is
   the tier that reads every transcript on the machine end to end.
 
@@ -23,7 +26,7 @@ recorded it keeps it rather than having the question silently re-opened. Retenti
 applies to both tiers.
 
 With content off the host stores no message rows at all, so a text query is
-answered from `sessions_fts` — title, path, branch and agent matches, ranked by
+answered from `session_metadata_fts` — title, path, branch and agent matches, ranked by
 bm25 with `updated_at`/`id` as a total tiebreak. Those hits carry `evidence: null`:
 there is no transcript text to quote and none is fabricated. `status.contentEnabled`
 reports the tier; `status.enabled` means only that an index exists and runs, which
