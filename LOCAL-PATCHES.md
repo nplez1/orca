@@ -585,6 +585,18 @@ Verdict, on the revision that ships:
 Unit gate @b8d9bf7987 (clean): PASS — 136644 passed; 38 failed (38 allowlisted, 0 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 1227 s
 ```
 
+**2026-10-26: the machine was fixed, so fourteen entries are gone.** These were never upstream's
+failure — `/bin/bash` on macOS is Apple's 3.2, which has no `mapfile` and rejects an empty array under
+`set -u`, while the ubuntu runners ship bash 5. Homebrew's `bash` 5.3.20 is now installed; because
+`/opt/homebrew/bin` precedes `/bin` on this machine's `PATH`, `bash` resolves to 5.3.20 for every
+spawned child with no repository change. Cleared: the five `ci-managed-ssh-execution` cases and the
+`dependency-security-release` case (both `mapfile: command not found`) and the eight
+`pr-auxiliary-preflight-admission` cases (`MOBILE_CI_ARGS[@]: unbound variable`). Those three files run
+**233 passed** against the pruned allowlist, which is now **17 entries over 10 files**. This is the reason to keep chasing an allowlisted failure
+even when it looks environmental: it was, and naming the _cause_ rather than the _symptom_ is what made
+it a one-command fix. Nothing in the tree changed — the fork still needs bash 4+ to run these, which
+`config/.bun-version` and the CI image already assume.
+
 **The gate also had to learn one heading.** Vitest reports the run's unhandled errors in two shapes,
 and `collectUnhandledErrors` matched only `Unhandled Rejection` / `Uncaught Exception`. A pool crash
 arrives under `Unhandled Error`, so the declared count read 7 against 6 headlines and the gate failed
@@ -1283,9 +1295,10 @@ The `orca-runtime` pair above is the other two.
 
 Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
 test fix that will conflict once, benignly, when upstream makes the same change — the same trade
-upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 31
-today, and the remaining 31 are `host-toolchain` (22) and `sqlite-binding` (9) — a different machine's
-different bun and SQLite, which is not something this fork can fix in a test.
+upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 17
+today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a different machine's different bun
+and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
+bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
 
 ## Syncing with upstream
 

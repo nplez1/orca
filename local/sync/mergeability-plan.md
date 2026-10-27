@@ -55,7 +55,7 @@ dropped item.
 
 | Metric                                             | § 1 said      | Now                                                            |
 | -------------------------------------------------- | ------------- | -------------------------------------------------------------- |
-| Known-red entries                                  | 40 / 18 files | **31 / 13**, `macos-path-semantics` empty                      |
+| Known-red entries                                  | 40 / 18 files | **17 / 10**, `macos-path-semantics` empty                      |
 | Nightly runs per week                              | 0             | 1 (the deadline is fixed; the next scheduled run is the proof) |
 | Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class          |
 | Deletions asserted rather than re-decided          | 0             | 24                                                             |
@@ -79,7 +79,7 @@ dropped item.
 | Fork footprint                    | 1,585 file paths upstream does not have                                  | `comm -23` of both trees                               |
 | Fork-only import breakage pending | 19 files / 8 renamed modules                                             | rename map × fork-only importers                       |
 | Follow-up commits per sync        | **median ~7** (4–12)                                                     | sync log + first-parent commits                        |
-| Known-red allowlist               | **31 entries / 13 files** (was 40/18); `macos-path-semantics` eliminated | `local/unit-known-red.json`                            |
+| Known-red allowlist               | **17 entries / 10 files** (was 40/18); `macos-path-semantics` eliminated | `local/unit-known-red.json`                            |
 | Nightly backstop                  | **ran once, ever** (2026-10-08)                                          | `gh run list --workflow fork-main-tests.yml`           |
 | Unit gate runtime                 | 1,227 s (10-22) → **2,575 s** (10-25), cap 3,600 s                       | gate log                                               |
 

@@ -344,7 +344,14 @@ describe('the known-red manifest', () => {
   it('closes the arithmetic of the run it was reconciled with', () => {
     const run = manifest.observedRun
     expect(run.allowlisted + run.upstreamQuarantined + run.fixed).toBe(run.failingRecords)
-    expect(run.allowlisted).toBe(manifest.entries.length)
+    // Entries pruned since that run are why the count moves without a new run: a case that stopped
+    // failing is removed with the revision that fixed it, and the run it was reconciled with is not
+    // re-derived by editing a number.
+    expect(run.allowlisted).toBe(manifest.entries.length + (manifest.prunedSince ?? []).length)
     expect(run.fixed).toBe(run.repairedCases.length)
+    for (const entry of manifest.prunedSince ?? []) {
+      expect(entry.reason ?? '', `${entry.file} was pruned without a reason`).toBeTruthy()
+      expect(entry.commit ?? '', `${entry.file} was pruned without a revision`).toBeTruthy()
+    }
   })
 })
