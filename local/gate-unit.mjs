@@ -44,7 +44,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
-import { flakeWaiver } from './gate-flake-coupling.mjs'
+import { flakeWaiver, packageJsonChangedForTests } from './gate-flake-coupling.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -172,15 +172,22 @@ function readJsonFile(path, what) {
  * `HEAD^1..HEAD`, so that is the diff that has to judge it.
  */
 export function branchDiff(runGit = git) {
+  let baseResolved = false
   for (const base of ['nplez1/main', 'origin/nplez1/main']) {
     const mergeBase = runGit(['merge-base', base, 'HEAD'])
     if (!mergeBase) {
       continue
     }
+    baseResolved = true
     const files = changedSince(runGit, mergeBase)
     if (files.size > 0) {
       return { base, files }
     }
+  }
+  // Why up front: with no merge base at all, a multi-commit branch judged by HEAD~1 alone would waive a
+  // flake in a file an earlier commit of that branch touched. Unresolved stays unknown, as before.
+  if (!baseResolved) {
+    return null
   }
   // Why the first parent and not HEAD^2: everything a merge adds to the release line is
   // `HEAD^1..HEAD`, so nothing that merge could have broken falls outside the diff.
@@ -600,13 +607,16 @@ function evaluate(options, { reportPath, logPath, dir }) {
     unexpectedByFile.set(failure.file, list)
   }
   const reruns = rerunIsolation([...unexpectedByFile.keys()], dir, options.timeoutMs)
+  // Why computed once: a diff that touched package.json only through build or lint scripts cannot change
+  // what any test executes, so treating it as a harness change blocked every load flake in this branch.
+  const packageJsonShared = diff === null ? true : packageJsonChangedForTests(git, diff.base)
   for (const [file, failures] of unexpectedByFile) {
     const rerun = reruns.get(file) ?? NO_RERUN
     const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
     // Why not `diff.files.has(file)`: a branch that changes `src/x.ts`, the module beside a test, an
     // imported module, or the harness every test runs under breaks `x.test.ts` without the test file
     // itself being in the diff.
-    const waiver = flakeWaiver(file, diff?.files ?? null)
+    const waiver = flakeWaiver(file, diff?.files ?? null, undefined, { packageJsonShared })
     for (const failure of failures) {
       if (reproduced.has(failure.test)) {
         blocking.push(failure)

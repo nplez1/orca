@@ -557,7 +557,8 @@ function main() {
         ledger: { path: LEDGER_URL.pathname, found: ledger.found },
         deletions: { path: DELETIONS_URL.pathname, entries: manifest.entries.length }
       }
-      payload.notes = [...result.notes, ledger.note, manifest.note].filter(Boolean)
+      // Why not manifest.note again: it is already in result.notes with the `deletion manifest:` prefix.
+      payload.notes = [...result.notes, ledger.note].filter(Boolean)
       console.log(JSON.stringify(payload, null, 2))
       return 0
     }

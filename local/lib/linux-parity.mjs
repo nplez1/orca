@@ -140,7 +140,7 @@ export function judgeParityEntry(entry, index) {
       test: null,
       class: entry.class,
       status: ABSENT,
-      detail: `${entry.file} appears in a shard report but reports no suite status, so it did not run`
+      detail: `${entry.file} appears in a shard report but reports no passing test, so nothing on Linux ran`
     }
   }
 

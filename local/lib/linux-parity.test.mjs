@@ -162,7 +162,7 @@ test('across node-version shards: any failure wins over a pass elsewhere', () =>
   assert.equal(rows.status, 'failed')
 })
 
-test('a file-level entry (* ) follows the file status, not any single case', () => {
+test('a file-level entry (*) passes on a passed file and fails on a suite-level failure', () => {
   const passed = indexFor([
     report([
       fileResult('src/main/thing.test.ts', {

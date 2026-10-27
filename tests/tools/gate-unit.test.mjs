@@ -3,6 +3,7 @@ import {
   SHARED_TEST_INPUTS,
   branchCoupledPaths,
   flakeWaiver,
+  packageJsonAffectsTests,
   importSpecifiers,
   sharedHarnessPaths
 } from '../../local/gate-flake-coupling.mjs'
@@ -318,6 +319,32 @@ describe('what a flaky pass is allowed to waive', () => {
         matched: shared
       })
     }
+  })
+
+  it('reads a build-only package.json change as no harness coupling', () => {
+    // Why: the fork owns a permanent overlay in package.json, so a diff touching only build or lint
+    // scripts was refusing every load flake — the test executes none of those scripts.
+    const before = { scripts: { build: 'a', lint: 'b', test: 'vitest' }, dependencies: { x: '1' } }
+    expect(
+      packageJsonAffectsTests(before, {
+        ...before,
+        scripts: { ...before.scripts, build: 'z', lint: 'y' }
+      })
+    ).toBe(false)
+    expect(
+      flakeWaiver('src/main/foo.test.ts', new Set(['package.json']), noSource, {
+        packageJsonShared: false
+      })
+    ).toEqual({ inDiff: false, matched: null })
+  })
+
+  it('reads a dependency or test-script change as harness coupling', () => {
+    const before = { scripts: { test: 'vitest' }, dependencies: { x: '1' } }
+    expect(packageJsonAffectsTests(before, { ...before, dependencies: { x: '2' } })).toBe(true)
+    expect(
+      packageJsonAffectsTests(before, { ...before, scripts: { test: 'vitest --changed' } })
+    ).toBe(true)
+    expect(packageJsonAffectsTests(before, { ...before, packageManager: 'pnpm@10' })).toBe(true)
   })
 
   it('follows what the config and the runner import, so the pool and sequencer are covered', () => {

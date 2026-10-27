@@ -138,9 +138,15 @@ export function branchCoupledPaths(testFile, readSource = readRepoFile) {
 }
 
 /** A trailing slash in the harness set means "any file under this directory". */
-function sharedMatch(diffFiles) {
+function sharedMatch(diffFiles, { packageJsonShared = true } = {}) {
   const shared = sharedHarnessPaths()
   for (const path of shared) {
+    // Why package.json is conditional: it couples every test through its dependency graph, which is a
+    // real coupling — but a diff that only touched `scripts.build:*` or the lint chain cannot change
+    // what any test executes. Blanket-coupling it refused every flake on such a diff.
+    if (path === 'package.json' && !packageJsonShared) {
+      continue
+    }
     if (!path.endsWith('/') && diffFiles.has(path)) {
       return path
     }
@@ -156,14 +162,71 @@ function sharedMatch(diffFiles) {
 }
 
 /**
- * A flaky pass is waived only when nothing the test is coupled to is in the branch diff. A diff that
- * could not be resolved is never waived.
+ * The `package.json` fields whose change can alter what a test resolves or how it runs. A script that
+ * builds, lints or packages cannot: those run outside the suite.
  */
-export function flakeWaiver(testFile, diffFiles, readSource = readRepoFile) {
+export const TEST_RELEVANT_PACKAGE_KEYS = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+  'packageManager',
+  'engines',
+  'resolutions',
+  'pnpm',
+  'overrides',
+  'type'
+]
+
+/** True when the two manifests differ in a way a unit test could observe. */
+export function packageJsonAffectsTests(before, after) {
+  for (const key of TEST_RELEVANT_PACKAGE_KEYS) {
+    if (JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null)) {
+      return true
+    }
+  }
+  const beforeScripts = before.scripts ?? {}
+  const afterScripts = after.scripts ?? {}
+  for (const [name, command] of Object.entries(afterScripts)) {
+    if (/^(test|vitest)/.test(name) && beforeScripts[name] !== command) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Whether the branch's own `package.json` change can affect a test, read from git. Fails closed on any
+ * unreadable manifest: an unknown answer must not excuse a flake.
+ */
+export function packageJsonChangedForTests(runGit, base) {
+  if (!base) {
+    return true
+  }
+  try {
+    const before = JSON.parse(runGit(['show', `${base}:package.json`]) ?? 'null')
+    const after = JSON.parse(runGit(['show', 'HEAD:package.json']) ?? 'null')
+    return before === null || after === null ? true : packageJsonAffectsTests(before, after)
+  } catch {
+    return true
+  }
+}
+
+/**
+ * A flaky pass is waived only when nothing the test is coupled to is in the branch diff. A diff that
+ * could not be resolved is never waived. `packageJsonShared` lets the caller narrow the one shared input
+ * whose relevance it can actually check.
+ */
+export function flakeWaiver(
+  testFile,
+  diffFiles,
+  readSource = readRepoFile,
+  { packageJsonShared = true } = {}
+) {
   if (!diffFiles) {
     return { inDiff: true, matched: null }
   }
-  const shared = sharedMatch(diffFiles)
+  const shared = sharedMatch(diffFiles, { packageJsonShared })
   if (shared) {
     return { inDiff: true, matched: shared }
   }
