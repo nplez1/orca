@@ -6,13 +6,14 @@ real breakage are one command instead of a list you read off a runbook at the en
 
 The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md).
 
-| Tool                    | Use it when                                             | Mutates anything?                                                                        |
-| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pre-sync.mjs`          | before starting a sync                                  | refs and git config only with `--prepare`; the catalog gate rewrites the derived catalog |
-| `conflicts.mjs`         | stopped in a conflict, or to predict one                | no                                                                                       |
-| `post-sync.mjs`         | the tree is resolved and you are about to push          | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
-| `identity-sweep.mjs`    | any time the tree is not conflicted                     | only with `--fix`                                                                        |
-| `convergence-ledger.md` | every time a convergence question comes up              | edit it when you settle one                                                              |
+| Tool                    | Use it when                                    | Mutates anything?                                                                        |
+| ----------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pre-sync.mjs`          | before starting a sync                         | refs and git config only with `--prepare`; the catalog gate rewrites the derived catalog |
+| `conflicts.mjs`         | stopped in a conflict, or to predict one       | no                                                                                       |
+| `post-sync.mjs`         | the tree is resolved and you are about to push | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
+| `identity-sweep.mjs`    | any time the tree is not conflicted            | only with `--fix`                                                                        |
+| `fork-symbols.mjs`      | after the merge, beside post-sync              | no                                                                                       |
+| `convergence-ledger.md` | every time a convergence question comes up     | edit it when you settle one                                                              |
 
 **Neither sync script is read-only.** `pre-sync.mjs` and `post-sync.mjs` both run
 `pnpm run sync:localization-runtime-catalog`, which rewrites the derived catalog with `--fix`; that
@@ -58,6 +59,15 @@ counts, a classification (`union`, `duplicate-tail`, `both-rewrote`, `add/add`, 
 <other>` does the same for a conflict that does not exist yet. **Every classification is a hint**:
 delimiter balance cannot prove a union is correct.
 
+`--propose` also attaches a per-hunk proof read from each side's syntax tree (via `typescript-api`,
+the 6.x JS API; the `typescript` dependency is the native TS 7 compiler and has none):
+upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (theirs with the fork's
+literals re-applied), import-only (three-way union). `--apply-proven <decision.json>` re-proves each
+file from disk and writes only files where every hunk is proven and nothing changed since the proposal;
+it stages nothing and prints, never runs, the `git rm` a settled deletion needs. `--rename-forecast
+<old-base> <new-base>` runs before the merge and lists fork-added references (imports, `vi.mock`, path
+strings) that upstream's renames and deletions will leave pointing at nothing.
+
 The two mistakes it is designed to prevent, both made for real:
 
 - duplicating a shared tail when the tail already closed _both_ sides (that one shipped a doubled
@@ -71,6 +81,11 @@ update-feed references, the lost-content diff, the exported surface of every del
 module (each name searched for a surviving reference — a deleted module is invisible to a
 modified-files diff), and `pnpm tc`. "Skipped" and "unavailable" are reported as themselves, never
 as a pass.
+
+**`fork-symbols.mjs`** — the modified-file companion to post-sync's deleted-module row: names the
+fork added to a file since the old base (top-level declarations, and members of top-level classes,
+interfaces, type literals, enums and object-literal constants) that the merged file no longer declares.
+A `symbols` entry in `expected-deletions.json` with status `expected-deletion` acknowledges one.
 
 **`identity-sweep.mjs`** — upstream reintroduces `~/.orca`, `orca.exe` and `orca-dev` every sync.
 This reports them against a documented allowlist (the `orca://` scheme, the relay's fixed shim, the

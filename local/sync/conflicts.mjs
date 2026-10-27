@@ -9,11 +9,12 @@
 // the binding record, and it is read, never written.
 //
 //   node local/sync/conflicts.mjs [--summary | --json | --verify]
+//   node local/sync/conflicts.mjs --propose --json > decision.json && --apply-proven decision.json
 //   node local/sync/conflicts.mjs --merge-tree <base> <other>
 //   node local/sync/conflicts.mjs --help
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import {
@@ -28,7 +29,11 @@ import {
   pendingDeletionPaths,
   staleDeletions
 } from './lib/expected-deletions.mjs'
+import { planApplyProven, renderApplyPlan } from './lib/conflict-apply-proven.mjs'
+import { proveFile } from './lib/conflict-prove.mjs'
 import { proposeAll } from './lib/conflict-propose.mjs'
+import { renameForecast } from './lib/fork-surface-git.mjs'
+import { renderForecast } from './lib/rename-forecast.mjs'
 import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
 
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
@@ -39,6 +44,8 @@ const UNMERGED = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 const MARKER_PATTERN = '^(<<<<<<<|\\|\\|\\|\\|\\|\\|\\|) |^>>>>>>> '
 const MESSAGE = /^(Auto-merging|CONFLICT|Warning:|fatal:|error:|Failed to merge)/
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+// Merged text per path, kept out of the classified file so --json does not carry every file twice.
+const MERGED = new Map()
 
 const HELP = `conflict triage for an upstream sync stop — advisory only
 
@@ -49,6 +56,9 @@ usage
   node local/sync/conflicts.mjs --verify                    exit 1 if conflict markers remain
   node local/sync/conflicts.mjs --propose                   what the fork has already decided, per path
   node local/sync/conflicts.mjs --apply                     resolve those, stage them, commit nothing
+  node local/sync/conflicts.mjs --apply-proven <decision>   write files whose every hunk is proven
+  node local/sync/conflicts.mjs --rename-forecast <old-base> <new-base> [--tip <ref>] [--json]
+                                                            fork references upstream's moves break
   node local/sync/conflicts.mjs --merge-tree <base> <other> what that merge would conflict on
   node local/sync/conflicts.mjs --help
 
@@ -59,6 +69,17 @@ the worktree.
 settled entry in \`expected-deletions.json\`. A verb is a whole-file decision, so a hunk-level one (the
 Identity entry) is recorded as \`manual\` and proposes nothing. --apply runs the git steps and stages
 them; it never commits, and it refuses to act on a \`--merge-tree\` run because there is no index.
+
+--propose also attaches a per-hunk proof, read from each side's syntax tree (comments and whitespace
+dropped): upstream-unchanged (take ours), fork-unchanged (take theirs), identity-only (take theirs with
+the fork's identity literals re-applied; re-run identity-sweep.mjs), import-only (three-way union with
+no duplicate module or binding). --apply-proven reads \`--propose --json\` output, re-proves each file
+from the bytes on disk, and writes only files where EVERY hunk is proven and nothing changed since.
+It stages nothing, and prints the \`git rm\` a ledger/manifest deletion needs instead of running it.
+
+--rename-forecast runs before the merge: upstream's renames and deletions in <old-base>..<new-base>,
+matched against the lines the fork added since <old-base> (default tip HEAD) — import specifiers,
+vi.mock paths and string paths — each re-resolved from where its importer will live afterwards.
 
 classes, each a hint and never a resolution; a class describes the shape and names the question it
 leaves open — the report never says which side to keep
@@ -106,6 +127,11 @@ function worktreeText(path) {
   } catch {
     return null
   }
+}
+
+function remember(path, merged) {
+  MERGED.set(path, merged)
+  return merged
 }
 
 const unmergedPaths = () =>
@@ -172,7 +198,7 @@ function readLive() {
       base: blobAt(':1', path),
       ours: blobAt(':2', path),
       theirs: blobAt(':3', path),
-      merged: worktreeText(path)
+      merged: remember(path, worktreeText(path))
     })
   )
   return { mode: 'live', state: readState(gitText(['rev-parse', '--git-dir'])), files, notes: [] }
@@ -226,7 +252,7 @@ function readMergeTree(base, other) {
       base: baseContent,
       ours,
       theirs,
-      merged: blobAt(tree, path)
+      merged: remember(path, blobAt(tree, path))
     })
   })
   if (files.some((file) => file.status !== null)) {
@@ -359,7 +385,20 @@ function applyProposals(proposals) {
   return { applied, failures }
 }
 
-// ------------------------------------------------------------------ rendering
+function runApplyProven(decisionPath) {
+  const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), worktreeText)
+  const written = []
+  for (const write of plan.writes) {
+    try {
+      writeFileSync(write.path, write.text)
+      written.push(write.path)
+    } catch (error) {
+      plan.refused.push({ path: write.path, reason: `write failed: ${error.message}` })
+    }
+  }
+  console.log(renderApplyPlan(plan, written))
+  return plan.refused.length === 0 ? 0 : 1
+}
 
 // ------------------------------------------------------------------ verify
 
@@ -435,6 +474,8 @@ function parseArgs(argv) {
     verify: false,
     propose: false,
     apply: false,
+    applyProven: null,
+    forecast: null,
     base: null,
     other: null
   }
@@ -476,10 +517,34 @@ function parseArgs(argv) {
       options.apply = true
       continue
     }
+    if (flag === '--rename-forecast') {
+      options.forecast = { oldBase: argv[index + 1], newBase: argv[index + 2], tip: 'HEAD' }
+      index += 2
+      if (!options.forecast.oldBase || !options.forecast.newBase) {
+        throw new Error('--rename-forecast needs <old-base> <new-base>')
+      }
+      continue
+    }
+    if (flag === '--tip' && options.forecast) {
+      options.forecast.tip = argv[index + 1] ?? 'HEAD'
+      index += 1
+      continue
+    }
+    if (flag === '--apply-proven') {
+      options.applyProven = argv[index + 1] ?? null
+      index += 1
+      if (options.applyProven === null) {
+        throw new Error('--apply-proven needs the decision file `--propose --json` wrote')
+      }
+      continue
+    }
     throw new Error(`unknown argument: ${flag}`)
   }
   if (options.verify && (options.source !== 'live' || options.output !== 'text')) {
     throw new Error('--verify runs alone: it reads the worktree, not a classification input')
+  }
+  if (options.applyProven && argv.length !== 2) {
+    throw new Error('--apply-proven runs alone: the decision file already names the source')
   }
   if (options.apply && options.source !== 'live') {
     throw new Error('--apply needs the worktree: a --merge-tree run has no index to resolve')
@@ -503,6 +568,16 @@ function main() {
   try {
     if (options.verify) {
       return runVerify()
+    }
+    if (options.applyProven) {
+      return runApplyProven(options.applyProven)
+    }
+    if (options.forecast) {
+      const report = renameForecast(options.forecast)
+      console.log(
+        options.output === 'json' ? JSON.stringify(report, null, 2) : renderForecast(report)
+      )
+      return 0
     }
     const result =
       options.source === 'merge-tree' ? readMergeTree(options.base, options.other) : readLive()
@@ -534,6 +609,20 @@ function main() {
           file.proposal = proposal
         }
       }
+      for (const file of result.files) {
+        const { resolvedText: _text, ...proof } = proveFile({
+          path: file.path,
+          status: file.status,
+          merged: MERGED.get(file.path) ?? null
+        })
+        file.proof = proof
+      }
+      const proven = result.files.filter((file) => file.proof.fullyProven).length
+      const hunks = result.files.reduce((sum, file) => sum + file.proof.hunkCount, 0)
+      const provenHunks = result.files.reduce((sum, file) => sum + file.proof.provenHunks, 0)
+      result.notes.push(
+        `proof: ${provenHunks} of ${hunks} hunk(s) proven; ${proven} of ${result.files.length} path(s) fully proven (--apply-proven writes only those)`
+      )
       const settled = result.files.filter((file) => file.proposal)
       result.notes.push(
         `${settled.length} of ${result.files.length} conflicted path(s) carry a settled resolution; the rest are manual`
