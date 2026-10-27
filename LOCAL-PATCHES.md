@@ -12,6 +12,17 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   and the PR would silently disagree about that file.
 - Every patch is listed below with its reason and its exact anchors, because upstream edits to those
   lines are the only thing that breaks them.
+- **No fork comment in a file upstream owns.** The reason goes here, in
+  `local/sync/convergence-ledger.md`, in the commit message, or in a fork-owned module. Upstream's own
+  comment audit (`7d6603aa17`, 16,196 files) accounts for 162 of the 233 pending conflicts, and 73% of
+  this sync's hunks have an upstream side that changed only comments. A rationale paragraph above
+  upstream's code is conflict adjacency and nothing else. The rule covers the fork's own added blocks
+  too: a fork hook should name an exported function in a fork file, not explain itself in prose above
+  upstream's code.
+- **No deleting a file upstream still owns.** Restore it and neutralise at a seam instead — a deletion
+  is re-applied on every sync, and each upstream edit to the deleted file arrives as a modify/delete
+  conflict (19 of the 30 pending ones). A genuine supersession lives in
+  `local/sync/expected-deletions.json` with its evidence, and nowhere else.
 
 ## Patches
 
@@ -1123,6 +1134,66 @@ The committed revision, `7811f60dd6`:
 ```
 Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s
 ```
+
+### `local(lint)`: upstream's `max-lines` budget is off
+
+`.oxlintrc.json` sets `max-lines` to `"off"` in the four overrides that carried 300/400/600/800.
+Upstream's budget is a code-management construct for its own tree, and on this fork it did the opposite
+of what it is for: it is what made fork additions **evict upstream code** into fork files to stay under
+the number. Every such move is a permanent conflict at that spot plus a silent-drift risk — upstream's
+later edit lands in a block the fork owns a stale copy of — and `local(renderer)`
+`ai-vault-session-refresh.ts` above records one of them, made "a split, never a cap or a baseline
+entry".
+
+Four changed lines, none added. Proven off with a 320-line probe: it passes under this config and
+errors under upstream's (`Maximum allowed is 300`).
+
+What this does **not** do is undo the evictions already made. `config/max-lines-baseline.txt` and
+`check:max-lines-ratchet` stay — the ratchet reads only `mobile/.oxlintrc.json` and inline
+`oxlint-disable max-lines` directives, so it is inert now rather than wrong, and removing it would be
+another edit to a hot file for no gain. Restoring the evicted blocks is separate work, tracked in
+`local/sync/mergeability-plan.md` § 5.2; this line is what makes it possible.
+
+Config upstream still owns and this fork now edits: `.oxlintrc.json` (cold — 0 upstream commits in the
+174 pending at 2026-10-26, so it costs one conflict if upstream ever touches it).
+
+### `local(test)`: the gate judges a merge by the merge's own diff
+
+Three fixes with one cause: a signal that was **absent** was read as a signal that was satisfied.
+
+- `local/gate-unit.mjs` `branchDiff()` treated an empty diff as a resolved one. A sync merges upstream
+  _onto_ `nplez1/main`, so `merge-base(nplez1/main, HEAD)` is HEAD itself, the diff is empty, and
+  `flakeWaiver` reads "nothing coupled was touched" — waiving every flaky pass on a line a 556-commit
+  merge had just built. That is the release line, which is where the gate runs. An empty diff now falls
+  back to the merge's first parent (`HEAD^1..HEAD`, what that merge contributed) and to `unknown` when
+  there is nothing to compare against, and `unknown` never waives. The `7811f60dd6` PASS above — "1
+  flaky re-run passed" — was judged the old way, immediately after a 556-commit merge.
+- `local/unit-known-red.json` entries carry an optional `match` regex, tested against the first line
+  of the failure. Without it an entry matched on file and title alone, so an allowlisted test that
+  started failing for a **new** reason stayed "known" for as long as its title did. 27 of 40 are
+  pinned, each to a signature the failure text actually carried in the `8da9849c43` run; the other 13
+  keep matching on title alone because their text is a generic deep-equality diff, and guessing a
+  signature there would turn a known red into an unexpected one.
+- `config/scripts/check-changed.mjs` resolved its base as `origin/main`, which on this fork is
+  **upstream's mirror** — so the pre-handoff gate diffed the fork's whole 2,846-file delta instead of
+  the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
+  `check-changed-code-quality.mjs`.
+
+### `local(ci)`: the nightly's relay job could never start
+
+`.github/workflows/fork-main-tests.yml` calls upstream's reusable `unit-tests.yml`, whose
+`relay_integration` job hard-codes `runs-on: blacksmith-4vcpu-ubuntu-2404`. This fork has no runner for
+that label, so the job queued: the 2026-10-26 scheduled run sat on it for 17 hours, never completed,
+and `concurrency: cancel-in-progress: false` then blocked every later night behind it. The caller now
+passes `run_relay_integration: false`. The fork ships no cloud relay, so the job has nothing to test.
+
+Before that the nightly had run **once**, on 2026-10-08. Its 2026-10-26 attempt is the first real
+evidence from it: 137,546 passed, 1 unit test red (`rate-limits/service-inactive-claude-cooldown.test.ts`,
+12/12 green on macOS), 3 electron suites that skip on macOS and fail to bundle on Linux
+(`daemon-appimage-copy-host`, `daemon-electron-to-node-adoption`), and 2 unhandled errors — `EPIPE`
+from a child-process write, and `selector_not_found` from `orca-runtime.test.ts`. That last one is
+**not** Linux-specific: it reproduces on macOS and the allowlist covers it as an `unhandledErrors`
+headline, which is why the Mac gate could never say so.
 
 ## Syncing with upstream
 

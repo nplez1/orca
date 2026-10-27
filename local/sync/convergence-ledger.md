@@ -12,6 +12,13 @@ Rules for using it:
 - `Do not` lines are the expensive mistakes this fork has already made once.
 - When a decision is superseded by upstream, record the new one and delete the old, rather than
   accumulating contradictory entries.
+- A **`Paths:` glob must name what the entry decides.** A glob wide enough to catch the whole tree makes
+  "this path has a decision" true everywhere and worthless — the Identity section was `src/**`, which
+  matched 227 of the 233 pending conflicts. Narrow it, or say `**Reach:** catch-all` so nothing reads it
+  as coverage.
+- A **`Resolution:` line says what to do** with a matched conflict, not what the design is: `keep-ours`,
+  `take-theirs`, `delete` (propose `git rm`), `rerere`, or `manual`. Prose cannot be executed, so a
+  modify/delete conflict is currently re-decided by a human on every sync.
 
 ---
 
@@ -390,7 +397,13 @@ startup command.
 
 ## Identity: this fork ships as Orca NP
 
-**Paths:** `config/**`, `native/**`, `resources/**`, `mobile/**`, `src/**`, `package.json`
+**Paths:** `package.json`, `config/electron-builder.config.cjs`, `config/nsis/**`, `config/scripts/{build-notification-status-macos,check-upstream-identity-literals,computer-use-bundle-identity,dev-electron-bundle-identity,smoke-packaged-cli,verify-agent-hook-stdin-lifecycle}.mjs`, `native/**`, `resources/**`, `mobile/**`, `src/cli/**`, `src/main/cli/**`, `src/main/{floating-workspace-launch-directory,home-directory-migration,macos-press-and-hold-default,macos-tcc-prompt-watch}.ts`, `src/main/{agent-hooks,ai-vault,jenkins,pi,runtime,skills}/**`, `src/main/{ipc/floating-workspace-directory,ipc/notification-system-settings-link,ipc/pty/host-env/assembly,startup/dev-instance-identity}.ts`, `src/renderer/src/components/settings/**`, `src/renderer/src/i18n/locales/en.json`, `src/shared/{agent-launch-remote,app-directory-names,app-display-name,local-build-compatibility-contract,orca-cli-command-name,orca-repository,orcad-artifacts,release-channel,tui-agent-config-table}.ts`, `src/shared/local-build-compatibility-contract.json`, `src/shared/rpc-contract/orchestration-params.ts`
+
+**Reach:** wide by nature — identity is a rename, not a module, so it lands wherever a name, path or
+bundle id is written (49 non-test files at 2026-10-26, 44 of them upstream-owned). It was `src/**`
+until then, which matched 227 of the 233 pending conflicts and made "this path has a ledger decision"
+worthless; it is now the files that actually carry an identity literal. Still do not read a match here
+as "this conflict has a decision" — check whether a narrower section also matched.
 
 **Decision:** `Orca NP`, bundle `com.nplez1.orca`, CLI `orca-np` (`orca-np-dev` in dev), packaged
 userData `appData/orca-np`, home directory `~/.orca-np`, NSIS ProgIDs `OrcaNP.Markdown` /
