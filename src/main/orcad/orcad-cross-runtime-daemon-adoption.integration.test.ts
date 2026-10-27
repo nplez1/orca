@@ -319,9 +319,9 @@ worker.on('error', (error) => { console.error(error); process.exitCode = 1 })
       stdin: {
         // orcad's own daemon client, playing a paired client's terminal.
         contents: `
-        import { DaemonPtyAdapter } from '../daemon/daemon-pty-adapter'
-        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from '../daemon/daemon-spawner'
-        import { setAppEnvironment } from '../../shared/app-environment'
+        import { DaemonPtyAdapter } from './src/main/daemon/daemon-pty-adapter'
+        import { getDaemonPidPath, getDaemonSocketPath, getDaemonTokenPath } from './src/main/daemon/daemon-spawner'
+        import { setAppEnvironment } from './src/shared/app-environment'
         const [op, runtimeDir, sessionId, marker, cwd] = process.argv.slice(2)
         setAppEnvironment({
           getPath: () => cwd, getAppPath: () => cwd, getVersion: () => 'test', isPackaged: () => true,

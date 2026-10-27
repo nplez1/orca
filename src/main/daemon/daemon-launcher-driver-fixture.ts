@@ -53,9 +53,9 @@ export async function buildDaemonLauncherDriver(
       contents: `
         import { mkdirSync } from 'node:fs'
         import { join } from 'node:path'
-        import { createOutOfProcessLauncher } from './daemon-out-of-process-launcher'
-        import { getDaemonSocketPath, getDaemonTokenPath } from './daemon-spawner'
-        import { setAppEnvironment } from '../../shared/app-environment'
+        import { createOutOfProcessLauncher } from './src/main/daemon/daemon-out-of-process-launcher'
+        import { getDaemonSocketPath, getDaemonTokenPath } from './src/main/daemon/daemon-spawner'
+        import { setAppEnvironment } from './src/shared/app-environment'
         const [userData, appPath, version] = process.argv.slice(2)
         setAppEnvironment({
           getPath: () => userData, getAppPath: () => appPath, getVersion: () => version,
