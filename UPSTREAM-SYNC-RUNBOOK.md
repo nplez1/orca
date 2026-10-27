@@ -114,6 +114,14 @@ node local/sync/conflicts.mjs --summary     # what is conflicted, by class
 node local/sync/conflicts.mjs               # per-file, per-hunk: stages, balance, class, ledger entries
 ```
 
+A `modify/delete` conflict also prints what `local/sync/expected-deletions.json` says about the path,
+because that is the one class where restoring the file is the tempting wrong answer. The manifest
+answers it with `expected-deletion` (the deletion is this fork's answer; re-apply it), `restore` (the
+file comes back; do not delete it again) or `pending-decision` (nobody has chosen — and a triage note
+lists those paths by name so they cannot be resolved by accident). A path the manifest calls deleted but
+HEAD still has is reported as stale on read, which is how a restored file would otherwise get silently
+re-deleted.
+
 Then work the file. The three index stages are the ground truth, not the markers, and they exist in
 both shapes:
 
@@ -247,7 +255,7 @@ git show --remerge-diff <merge> | rg '^\+.*from +[^ ]*\./'
 
 Expect many hits and most of them correct — this is a review list, not a verdict. A resolution that
 re-roots an import from `src/main/x/y.ts` is doing its job; the ones that matter are the specifiers that
-disagree with where the *importing* code resolves from.
+disagree with where the _importing_ code resolves from.
 
 A path a resolution invents can be invisible to import-resolution checks, because it may resolve fine
 _relative to the changed file_ while the code importing it resolves from somewhere else entirely. The

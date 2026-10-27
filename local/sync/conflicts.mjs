@@ -23,9 +23,16 @@ import {
   ledgerResolution,
   parseLedger
 } from './lib/conflict-classify.mjs'
+import {
+  deletionFor,
+  parseExpectedDeletions,
+  pendingDeletionPaths,
+  staleDeletions
+} from './lib/expected-deletions.mjs'
 
 const WIDTH = 100
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
+const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
 const UNMERGED = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 // Labelled markers only: a bare `=======` line is a diff separator in .patch files and a rule in
 // licence text, both of which this repo tracks.
@@ -301,6 +308,36 @@ function attachLedger(files, ledger) {
   }
 }
 
+function attachExpectedDeletions(files, manifest) {
+  for (const file of files) {
+    file.expectedDeletion = deletionFor(manifest.entries, file.path)
+  }
+}
+
+/**
+ * The manifest answers "who deleted this, and was that the answer?" for a modify/delete conflict.
+ * Checked against HEAD on read, because a manifest that still calls a restored file deleted would talk a
+ * resolver into deleting it again.
+ */
+function loadExpectedDeletions() {
+  let text
+  try {
+    text = readFileSync(DELETIONS_URL, 'utf8')
+  } catch {
+    return { entries: [], note: `no deletion manifest at ${DELETIONS_URL.pathname}` }
+  }
+  const { entries, note } = parseExpectedDeletions(text)
+  const atHead = new Set(
+    (gitText(['ls-tree', '-r', '--name-only', 'HEAD']) ?? '').split('\n').filter(Boolean)
+  )
+  const stale = staleDeletions(entries, atHead)
+  const problems = [note]
+  if (stale.length > 0) {
+    problems.push(`manifest calls deleted but HEAD still has: ${stale.join('; ')}`)
+  }
+  return { entries, note: problems.filter(Boolean).join(' | ') || null }
+}
+
 // ------------------------------------------------------------------ rendering
 
 function truncate(text, width) {
@@ -386,6 +423,13 @@ function fileRows(file) {
   for (const note of file.notes) {
     rows.push(`  note: ${truncate(note, WIDTH - 8)}`)
   }
+  if (file.expectedDeletion) {
+    const { status, class: klass, reason } = file.expectedDeletion
+    rows.push(`  deletion — ${status} (${klass})`)
+    if (reason) {
+      rows.push(`    why      ${truncate(reason, WIDTH - 13)}`)
+    }
+  }
   for (const entry of file.ledger) {
     rows.push(`  ledger — ${entry.title}`)
     if (entry.resolution) {
@@ -466,8 +510,9 @@ function renderSummary(result, ledger) {
   const width = Math.min(58, Math.max(...result.files.map((file) => file.path.length)) + 1)
   for (const file of result.files) {
     const titles = file.ledger.map((entry) => entry.title).join('; ')
+    const deletion = file.expectedDeletion ? `  [deletion: ${file.expectedDeletion.status}]` : ''
     const row = `${truncate(file.path, width).padEnd(width)} ${(file.status ?? 'n/a').padEnd(4)} ${file.class.padEnd(18)} ${file.hunkCount} hunk(s)`
-    rows.push(truncate(`${row}${titles ? `  [ledger: ${titles}]` : ''}`, WIDTH))
+    rows.push(truncate(`${row}${deletion}${titles ? `  [ledger: ${titles}]` : ''}`, WIDTH))
   }
   return rows.join('\n')
 }
@@ -599,15 +644,27 @@ function main() {
       options.source === 'merge-tree' ? readMergeTree(options.base, options.other) : readLive()
     const ledger = loadLedger()
     attachLedger(result.files, ledger)
+    const manifest = loadExpectedDeletions()
+    attachExpectedDeletions(result.files, manifest)
+    const pending = pendingDeletionPaths(
+      manifest.entries,
+      result.files.map((file) => file.path)
+    )
+    if (pending.length > 0) {
+      result.notes.push(
+        `${pending.length} conflicted path(s) are pending-decision in expected-deletions.json: ${pending.join('; ')}`
+      )
+    }
     if (options.output === 'json') {
       const { byClass } = classCounts(result.files)
       const payload = {
         advisory: true,
         ...result,
         counts: { paths: result.files.length, byClass },
-        ledger: { path: LEDGER_URL.pathname, found: ledger.found }
+        ledger: { path: LEDGER_URL.pathname, found: ledger.found },
+        deletions: { path: DELETIONS_URL.pathname, entries: manifest.entries.length }
       }
-      payload.notes = [...result.notes, ledger.note].filter(Boolean)
+      payload.notes = [...result.notes, ledger.note, manifest.note].filter(Boolean)
       console.log(JSON.stringify(payload, null, 2))
       return 0
     }
