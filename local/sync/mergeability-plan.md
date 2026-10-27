@@ -1,13 +1,62 @@
 # Mergeability plan — making the upstream sync cheap
 
 Baseline measured **2026-10-26** at `8da9849c43`, seven analysis passes over the conflict set, the
-patch series, the product line, the test gates and the sync tooling. This is a plan, not a change:
-nothing here has been implemented, and no suites were run to produce it.
+patch series, the product line, the test gates and the sync tooling. § 1–§ 2 are that measurement and
+have not been rewritten. **§ 0 is current: read it first.**
 
 Companions: [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md) (the process),
 [convergence-ledger.md](./convergence-ledger.md) (which side wins per subsystem),
+[expected-deletions.json](./expected-deletions.json) (the deletions and their statuses),
 [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) (the patch series), [BRANCHES.md](../../BRANCHES.md)
 (branch state), [README.md](./README.md) (the sync scripts).
+
+---
+
+## 0. What has landed since this was written
+
+Nothing below this section is implemented by it — § 1 onward is the analysis and the plan. This is
+the record of what came of it, so a later session does not re-derive a decision or re-litigate a
+dropped item.
+
+### Shipped on `nplez1/Fork-Opt`
+
+| Item                               | What changed                                                                                            | Learning worth keeping                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max-lines` (§ 5.2)                | `"off"` in all four `.oxlintrc.json` overrides                                                          | Four lines, no additions; proven with a 320-line probe that errors under upstream's config                                                                                        |
+| Nightly backstop (§ 4.1)           | `run_relay_integration: false` in `fork-main-tests.yml`                                                 | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                    |
+| Nightly liveness (§ 4.1)           | `local/check-nightly-liveness.mjs`                                                                      | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass                                                                                                    |
+| Flake waiver (§ 4.2)               | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives              | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                  |
+| Known-red detail (§ 4.5)           | per-entry `match` regex; 22 of 31 pinned                                                                | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                       |
+| `check:changed` base (§ 4.4)       | `origin/HEAD` first                                                                                     | `origin/main` on this fork is **upstream's mirror**, so the gate diffed 2,846 files                                                                                               |
+| Comment policy (§ 4.6)             | policy in `LOCAL-PATCHES.md` + 6 pure annotations removed                                               | Of 18 files whose whole diff was comments, 12 were the fork **rewording upstream's** comments to match fork reality. Reverting them makes the comments false                      |
+| Ledger `Resolution:` (§ 4.7)       | verb per section, printed by the resolver; Identity `Paths` 227 → 33 matches                            | A whole-file verb is not a hunk-level decision: Identity is `manual`, and auto-applying `keep-ours` there would revert upstream wholesale                                         |
+| Deletion manifest (§ 4.7)          | `expected-deletions.json`: 24 paths, three statuses                                                     | `modify/delete` is the one class where restoring the file is the tempting wrong answer                                                                                            |
+| Resolver actions (§ 5.9)           | `conflicts.mjs --propose` / `--apply`                                                                   | 3 of 231 conflicted paths carry a settled resolution today; the rest are honestly `manual`                                                                                        |
+| No-delete policy (§ 4.9, § 5.7)    | 13 files restored byte-identical; 4 kept deleted with reasons                                           | Two were not mechanical: the Swift pair trusts upstream's bundle id, and the resolver needs a model #169 removed                                                                  |
+| Test defects, not env reds (§ 4.5) | 9 failures fixed across 5 files; `macos-path-semantics` class **empty**                                 | All the same defect: `mkdtemp(tmpdir())` compared against a path the subject had resolved                                                                                         |
+| Linux nightly reds (§ 6.2)         | fixture import rewrite fixed, EPIPE observed, cooldown expectation per-platform, verdict names the file | The **merge resolution** rewrote two fixtures' imports to paths that exist in neither parent — invisible to import checks because the shorter path resolves from the changed file |
+| Gate preflight (§ 4.3)             | **dropped**                                                                                             | Both proposed checks would have failed a healthy tree: mobile deps hoist to the root install, and the bun pin resolves from a devDependency, not PATH                             |
+
+### Still open, in this plan's own terms
+
+- **§ 5.4 dashboard delivery** — 20 of the 24 deletions are `pending-decision` in
+  `expected-deletions.json`. Restore upstream's subsystem plus a third mode, or keep the deletion and
+  let the resolver apply it. The triage note names those paths so they cannot be resolved by accident.
+- **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone; that work is in
+  progress and is the largest remaining item.
+- **§ 5.1 i18n overlay, § 5.3 usage providers, § 5.5–§ 5.8** — untouched.
+- **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and three fixes are upstream-worthy
+  (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions).
+
+### Baselines that moved
+
+| Metric                                             | § 1 said      | Now                                                            |
+| -------------------------------------------------- | ------------- | -------------------------------------------------------------- |
+| Known-red entries                                  | 40 / 18 files | **31 / 13**, `macos-path-semantics` empty                      |
+| Nightly runs per week                              | 0             | 1 (the deadline is fixed; the next scheduled run is the proof) |
+| Silent-breakage files found after the merge        | 19 pending    | 2 found and fixed, plus a runbook check for the class          |
+| Deletions asserted rather than re-decided          | 0             | 24                                                             |
+| Conflicted paths with a settled, executable answer | 0             | 3 (the rest are `manual`, which is the honest count)           |
 
 ---
 
@@ -624,17 +673,17 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
 
 Record these per sync in the sync log (the tooling can emit them):
 
-| Metric                                                                         | Baseline (2026-10-26)    | Target                    |
-| ------------------------------------------------------------------------------ | ------------------------ | ------------------------- |
-| Conflicted paths, excluding repo-wide upstream sweeps                          | **70**                   | ≤ 25                      |
-| Conflicted paths you must _think_ about (both-rewrote with real upstream work) | ~40                      | ≤ 10                      |
-| Follow-up commits per sync                                                     | **~7**                   | ≤ 2                       |
-| Silent-breakage files found after the merge                                    | 19 (pending), 30 (10-13) | 0 (forecast before)       |
-| Wall clock, pre-sync tip → green                                               | 1–10 h                   | ≤ 2 h                     |
-| Known-red entries                                                              | 40                       | ≤ 10, each with a `match` |
-| Nightly runs per week                                                          | 0                        | 7                         |
-| `en.json` conflicts                                                            | 12/12 syncs              | 0                         |
-| Branches containing the release tip                                            | 0 of 13                  | all live branches         |
+| Metric                                                                         | Baseline (2026-10-26)              | Target                    |
+| ------------------------------------------------------------------------------ | ---------------------------------- | ------------------------- |
+| Conflicted paths, excluding repo-wide upstream sweeps                          | **70**                             | ≤ 25                      |
+| Conflicted paths you must _think_ about (both-rewrote with real upstream work) | ~40                                | ≤ 10                      |
+| Follow-up commits per sync                                                     | **~7**                             | ≤ 2                       |
+| Silent-breakage files found after the merge                                    | 19 (pending), 30 (10-13)           | 0 (forecast before)       |
+| Wall clock, pre-sync tip → green                                               | 1–10 h                             | ≤ 2 h                     |
+| Known-red entries                                                              | 40 (31 after the 2026-10-26 fixes) | ≤ 10, each with a `match` |
+| Nightly runs per week                                                          | 0                                  | 7                         |
+| `en.json` conflicts                                                            | 12/12 syncs                        | 0                         |
+| Branches containing the release tip                                            | 0 of 13                            | all live branches         |
 
 Measure with the conflict dry run **plus** the per-path upstream-commit classification that
 `7d6603aa17` revealed — a raw path count is not the metric, because one upstream sweep can triple it.
