@@ -1608,31 +1608,48 @@ live, and the section below is why its being live was not the same as its runnin
 
 #### `local(ci)`: the nightly could queue forever and say nothing
 
-`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then queued on a
-job whose runner label this fork does not provision — `unit-tests.yml`'s relay job asks for
-`blacksmith-4vcpu-ubuntu-2404` — so the job never started and the run never completed. The only signal
-was eighteen days of absence, and `cancel-in-progress: false` would have stacked every later night
-behind the wedged run had one been scheduled.
+`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
+failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
+`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and the four other shards **failed** (shard
+4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
+`cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
+was absence.
+
+So `nplez1/main` was **red on four of five shards** on 2026-10-26 (run `40308443374`), and that is still
+true: nothing in this change fixes those tests, it only stops the failures from being invisible. Per
+`AGENTS.md`, a red nightly needs an owner — the first session after a red run either fixes it or files
+it before starting anything else. The shards were red on Linux runners, so this is also the first
+measurement of the Linux red set the local macOS allowlist (`local/unit-known-red.json`) does not cover.
 
 Three changes:
 
 - **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
-  so the job had nothing to test here even if a runner existed. It does drop `browser_contract` and the
-  two `relay-region` unit files from the nightly, because they ran only inside that job.
-- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Superseding is safe
-  because a run takes minutes and the next schedule is a day away, so a future wedge costs one night
-  instead of every night. The ref in the group name keeps a `workflow_dispatch` on some feature branch
-  from cancelling the release line's nightly.
+  so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
+  files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
+  this caller never enabled it (its default is `false`).
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** A run that never finishes
+  otherwise holds the slot until a human cancels it, and the schedule behind it does not run — which is
+  what happened on 10-27. Superseding is safe because a shard takes minutes and the next schedule is a
+  day away. The ref in the group name keeps a `workflow_dispatch` on some feature branch from
+  cancelling the release line's nightly.
 
 `node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
-run, 1 when the newest run is stale (past two schedule slots) or **wedged** (not `completed` for more
-than four hours — the exact failure above), and 2 when it cannot tell. Exit 2 is deliberately not a
-pass: a missing `gh` must never read as a green nightly.
+run, 1 when the newest scheduled run is stale (past two schedule slots), **wedged** (not `completed` for
+more than four hours from its own `startedAt` — the exact failure above), or **red**, and 2 when it
+cannot tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly.
 
 It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
-hide the last verdict: one clock asks whether the schedule fires at all, the other asks when a
-completed run last produced a verdict. An in-flight run is a note on that verdict, never a substitute
-for it — otherwise a re-run dispatched after a red night would report green for hours.
+hide the last verdict: one clock asks whether the schedule fires at all (a `workflow_dispatch` does not
+prove the cron fires, so it does not count), the other asks when a completed run last produced a
+verdict. An in-flight run is a note on that verdict, never a substitute for it — otherwise a re-run
+dispatched after a red night would report green for hours.
+
+**A cancelled run's shards still get a vote.** This check's own first version read the run-level
+conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
+Had the night before been green it would have reported **PASS** on a night that went red, which is the
+same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
+(bounded to the three newest) and takes a red verdict from them: a cancel can hide four red shards, but
+only from a checker that does not look.
 
 **The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
 on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as

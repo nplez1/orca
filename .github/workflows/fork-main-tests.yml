@@ -22,9 +22,12 @@ permissions:
 concurrency:
   # Why the ref is in the group: `workflow_dispatch` can target any branch, and a dispatch on a feature
   # branch must not cancel the release line's nightly — nor share its slot.
-  # Why `cancel-in-progress: true`: a run that never finishes must not block the next night. With
-  # `false`, one wedged run suppressed every schedule behind it until a human cancelled it. Superseding
-  # is safe here: a run takes minutes, a job is capped at 60, and the next schedule is a day away.
+  # Why `cancel-in-progress: true`: a run that never finishes must not hold the slot for the next
+  # night. Under `false` it holds until a human cancels it — which is what happened on 2026-10-26: the
+  # 10-27 schedule never ran because the wedged run was still holding the slot, so one stuck job cost
+  # a night of coverage even though the schedule itself fired. Superseding is safe here: a test shard
+  # takes minutes, and the next schedule is a day away. `plan` is the one job with no
+  # `timeout-minutes` of its own (default 360), so it is the worst case for holding the slot.
   group: fork-main-unit-tests-${{ github.ref }}
   cancel-in-progress: true
 
@@ -55,7 +58,8 @@ jobs:
       runner: ubuntu-24.04-arm
       shards: ${{ needs.plan.outputs.shards }}
       # Why: the relay job in `unit-tests.yml` hard-codes `blacksmith-4vcpu-ubuntu-2404`, and this
-      # fork has no runner for that label — the 2026-10-26 run sat queued for 17 h on it and never
-      # completed. The fork ships no cloud relay, so the job has nothing to test here. What it does
-      # drop: `browser_contract` and the two `relay-region` unit files ran only inside that job.
+      # fork has no runner for that label — it queued for ~17.5 h in the 2026-10-26 run and was
+      # cancelled. The fork ships no cloud relay, so the job has nothing to test here. What it drops:
+      # the two `relay-region` unit files, which shard discovery excludes and only that job ran.
+      # `browser_contract` is not dropped — this caller never enabled it (its default is `false`).
       run_relay_integration: false
