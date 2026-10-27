@@ -351,6 +351,13 @@ async function main() {
   } else {
     const line = verdict.ok ? 'nightly liveness: PASS' : 'nightly liveness: ATTENTION'
     console.error(`${line} — ${verdict.summary}`)
+    // Red shards carry the nightly's Vitest reports; they also answer whether the Mac-allowlisted
+    // known-red entries actually pass on Linux, which is the check the triage rule points at.
+    if (verdict.failedJobs.length > 0) {
+      console.error(
+        'a red shard also leaves its report to triage with: node local/check-nightly-linux-parity.mjs <downloaded unit-shard artifacts dir>'
+      )
+    }
   }
   process.exit(verdict.code)
 }
