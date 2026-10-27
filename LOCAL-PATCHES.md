@@ -1634,9 +1634,10 @@ Three changes:
   nightly.
 
 **What none of that fixes, and the checker exists for:** the cancelled run did not block 10-27 — it was
-cancelled at 04:02Z, ~50 min before that day's 04:53 cron — and **no scheduled run fired on 10-25 or
-10-27 either**, with the slot free both times. So the missing nights are the scheduler's own
-unreliability, not the wedge, and `cancel-in-progress` does nothing about them. Only the check does.
+cancelled at 04:02Z, ~50 min before that day's 04:53 cron — and **no scheduled run fired on 10-25, the
+first night after the 10-24 re-enable, nor on 10-27**, with the slot free both times. `cancel-in-progress`
+does nothing about a schedule that does not fire; only the check does. (The wider gap back to 10-08 is
+the workflow being disabled in the fleet sweep, which is a different cause and a known one.)
 
 `node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
 run, 1 when the newest scheduled run is stale (past two schedule slots), **wedged** (not `completed` for
@@ -1653,8 +1654,8 @@ dispatched after a red night would report green for hours.
 conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
 Had the night before been green it would have reported **PASS** on a night that went red, which is the
 same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
-(bounded to the three newest) and takes a red verdict from them: a cancel can hide four red shards, but
-only from a checker that does not look.
+(up to five, and only runs newer than the newest run with a verdict of its own) and takes a red verdict
+from them: a cancel can hide four red shards, but only from a checker that does not look.
 
 **The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
 on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as

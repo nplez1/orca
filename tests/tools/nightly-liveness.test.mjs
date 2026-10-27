@@ -339,6 +339,16 @@ describe('nightly liveness', () => {
       ])
     ).toEqual([4])
   })
+
+  it('reads a verdict-less run created at the same moment as the verdict it must not override', () => {
+    // Both sides of the boundary use >=, so a tie is inspected rather than skipped.
+    expect(
+      runsNeedingJobs([
+        run({ databaseId: 7, createdAt: hoursAgo(24) }),
+        run({ databaseId: 8, conclusion: 'cancelled', createdAt: hoursAgo(24) })
+      ])
+    ).toEqual([8])
+  })
 })
 
 describe('nightly liveness CLI', () => {
