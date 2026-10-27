@@ -29,6 +29,7 @@ import {
   pendingDeletionPaths,
   staleDeletions
 } from './lib/expected-deletions.mjs'
+import { proposeAll } from './lib/conflict-propose.mjs'
 
 const WIDTH = 100
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
@@ -47,10 +48,18 @@ usage
   node local/sync/conflicts.mjs --summary                   counts by class, one line per file
   node local/sync/conflicts.mjs --json                      machine-readable, for other tools
   node local/sync/conflicts.mjs --verify                    exit 1 if conflict markers remain
+  node local/sync/conflicts.mjs --propose                   what the fork has already decided, per path
+  node local/sync/conflicts.mjs --apply                     resolve those, stage them, commit nothing
   node local/sync/conflicts.mjs --merge-tree <base> <other> what that merge would conflict on
   node local/sync/conflicts.mjs --help
 
---summary and --json compose with --merge-tree; --verify runs alone.
+--summary and --json compose with --merge-tree and --propose; --verify runs alone and --apply needs
+the worktree.
+
+--propose prints only what the fork has settled twice over: a \`Resolution:\` verb in the ledger, or a
+settled entry in \`expected-deletions.json\`. A verb is a whole-file decision, so a hunk-level one (the
+Identity entry) is recorded as \`manual\` and proposes nothing. --apply runs the git steps and stages
+them; it never commits, and it refuses to act on a \`--merge-tree\` run because there is no index.
 
 classes, each a hint and never a resolution; a class describes the shape and names the question it
 leaves open — the report never says which side to keep
@@ -338,6 +347,28 @@ function loadExpectedDeletions() {
   return { entries, note: problems.filter(Boolean).join(' | ') || null }
 }
 
+/** Runs each proposal's git steps. Never commits: resolving the index is the point, not finishing. */
+function applyProposals(proposals) {
+  const failures = []
+  let applied = 0
+  for (const proposal of proposals) {
+    let ok = true
+    for (const args of proposal.git) {
+      const result = git(args)
+      if (result.status !== 0) {
+        const first = (result.stderr ?? '').trim().split('\n')[0]
+        failures.push(`${proposal.path}: git ${args.join(' ')} — ${first}`)
+        ok = false
+        break
+      }
+    }
+    if (ok) {
+      applied += 1
+    }
+  }
+  return { applied, failures }
+}
+
 // ------------------------------------------------------------------ rendering
 
 function truncate(text, width) {
@@ -428,6 +459,14 @@ function fileRows(file) {
     rows.push(`  deletion — ${status} (${klass})`)
     if (reason) {
       rows.push(`    why      ${truncate(reason, WIDTH - 13)}`)
+    }
+  }
+  if (file.proposal) {
+    rows.push(
+      `  propose  ${file.proposal.action} — ${truncate(file.proposal.provenance, WIDTH - 22)}`
+    )
+    if (file.proposal.reason) {
+      rows.push(`    why      ${truncate(file.proposal.reason, WIDTH - 13)}`)
     }
   }
   for (const entry of file.ledger) {
@@ -585,7 +624,15 @@ function runVerify() {
 // The source (live state or a --merge-tree dry run) and the output format are orthogonal, so the
 // sibling pre-sync tool's `--merge-tree <base> <other> --summary` works. --verify runs alone.
 function parseArgs(argv) {
-  const options = { source: 'live', output: 'text', verify: false, base: null, other: null }
+  const options = {
+    source: 'live',
+    output: 'text',
+    verify: false,
+    propose: false,
+    apply: false,
+    base: null,
+    other: null
+  }
   const setOutput = (name) => {
     if (options.output !== 'text' && options.output !== name) {
       throw new Error('pick one of --summary, --json')
@@ -615,10 +662,22 @@ function parseArgs(argv) {
       options.verify = true
       continue
     }
+    if (flag === '--propose') {
+      options.propose = true
+      continue
+    }
+    if (flag === '--apply') {
+      options.propose = true
+      options.apply = true
+      continue
+    }
     throw new Error(`unknown argument: ${flag}`)
   }
   if (options.verify && (options.source !== 'live' || options.output !== 'text')) {
     throw new Error('--verify runs alone: it reads the worktree, not a classification input')
+  }
+  if (options.apply && options.source !== 'live') {
+    throw new Error('--apply needs the worktree: a --merge-tree run has no index to resolve')
   }
   return options
 }
@@ -654,6 +713,30 @@ function main() {
       result.notes.push(
         `${pending.length} conflicted path(s) are pending-decision in expected-deletions.json: ${pending.join('; ')}`
       )
+    }
+    if (options.propose) {
+      for (const file of result.files) {
+        file.proposal = null
+      }
+      for (const proposal of proposeAll(result.files)) {
+        const file = result.files.find((candidate) => candidate.path === proposal.path)
+        if (file) {
+          file.proposal = proposal
+        }
+      }
+      const settled = result.files.filter((file) => file.proposal)
+      result.notes.push(
+        `${settled.length} of ${result.files.length} conflicted path(s) carry a settled resolution; the rest are manual`
+      )
+      if (options.apply) {
+        const outcome = applyProposals(settled.map((file) => file.proposal))
+        result.notes.push(
+          `applied ${outcome.applied} resolution(s), ${outcome.failures.length} failed — the index is staged, nothing is committed`
+        )
+        for (const failure of outcome.failures) {
+          console.error(`conflicts: apply failed — ${failure}`)
+        }
+      }
     }
     if (options.output === 'json') {
       const { byClass } = classCounts(result.files)

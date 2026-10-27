@@ -539,7 +539,9 @@ export function ledgerResolution(section) {
   if (!line) {
     return null
   }
-  const [verb, ...rest] = line.split(/\s+/)
+  // A verb written as prose ends its sentence — `manual.` is still the verb `manual`.
+  const [rawVerb, ...rest] = line.split(/\s+/)
+  const verb = rawVerb.replace(/[.,;:]+$/, '')
   return {
     action: LEDGER_RESOLUTIONS.includes(verb) ? verb : 'unknown',
     verb,

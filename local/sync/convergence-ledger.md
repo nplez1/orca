@@ -402,10 +402,11 @@ startup command.
 
 **Paths:** `package.json`, `config/electron-builder.config.cjs`, `config/nsis/**`, `config/scripts/{build-notification-status-macos,check-upstream-identity-literals,computer-use-bundle-identity,dev-electron-bundle-identity,smoke-packaged-cli,verify-agent-hook-stdin-lifecycle}.mjs`, `native/**`, `resources/**`, `mobile/**`, `src/cli/**`, `src/main/cli/**`, `src/main/{floating-workspace-launch-directory,home-directory-migration,macos-press-and-hold-default,macos-tcc-prompt-watch}.ts`, `src/main/{agent-hooks,ai-vault,jenkins,pi,runtime,skills}/**`, `src/main/{ipc/floating-workspace-directory,ipc/notification-system-settings-link,ipc/pty/host-env/assembly,startup/dev-instance-identity}.ts`, `src/renderer/src/components/settings/**`, `src/renderer/src/i18n/locales/en.json`, `src/shared/{agent-launch-remote,app-directory-names,app-display-name,local-build-compatibility-contract,orca-cli-command-name,orca-repository,orcad-artifacts,release-channel,tui-agent-config-table}.ts`, `src/shared/local-build-compatibility-contract.json`, `src/shared/rpc-contract/orchestration-params.ts`
 
-**Resolution:** keep-ours on the identity literal itself; take upstream's surrounding change. The fork's
-names, paths and bundle ids are the product, so they win wherever they appear — but nothing else in
-these files is the fork's to hold, and an edit that keeps a whole file because one literal is in it is
-how this entry got a 227-path match.
+**Resolution:** manual. The identity literal is `keep-ours`, but everything around it is upstream's, so
+this is a hunk-level decision and a whole-file verb would revert upstream's work wholesale. The fork's
+names, paths and bundle ids are the product, so they win wherever they appear — and nothing else in these
+files is the fork's to hold. An edit that keeps a whole file because one literal is in it is how this
+entry got a 227-path match.
 
 **Reach:** wide by nature — identity is a rename, not a module, so it lands wherever a name, path or
 bundle id is written (49 non-test files at 2026-10-26, 44 of them upstream-owned). It was `src/**`

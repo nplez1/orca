@@ -380,3 +380,19 @@ test('a ledger Resolution line is the actionable half of a decision', () => {
   })
   assert.ok(LEDGER_RESOLUTIONS.includes('delete'))
 })
+
+test('a verb written as prose still names the verb', () => {
+  const [section] = parseLedger(
+    [
+      '## Prose',
+      '',
+      '**Paths:** `src/x/**`',
+      '**Resolution:** manual. The literal wins, the rest is upstream.'
+    ].join('\n')
+  )
+  assert.deepEqual(ledgerResolution(section), {
+    action: 'manual',
+    verb: 'manual',
+    note: 'The literal wins, the rest is upstream.'
+  })
+})
