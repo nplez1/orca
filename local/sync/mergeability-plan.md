@@ -414,6 +414,14 @@ Do this per file, each its own commit, each verified by the restored upstream su
 upstreaming rather than undoing: `DiffCommentCard` → `useCommentCardResize` (extracted for reuse by
 `PRCommentThreadCard.tsx`).
 
+**Addendum 2026-10-27 — the budget is no longer a reason to evict.** The cap is enforced again, and the
+rule for an over-budget file is ownership, not size: a fork-owned file is split, and an upstream-owned
+file gets a two-line `oxlint-disable max-lines -- Why:` plus a baseline row rather than being
+restructured. So "move the fork's lines out" above is a _seam_ decision (fewer conflicts, one hunk fewer
+in an upstream file), never a budget decision — a fork addition that fits nowhere goes in a directive and
+a baseline row, and the cap stops being a reason to touch upstream's code at all. The full rule, with the
+probe recipe for listing offenders without editing the config, is `LOCAL-PATCHES.md` § `local(lint)`.
+
 ### 5.3 Fork usage providers as data, not if-arms
 
 The fork threads DeepSeek/Fireworks/Copilot through upstream's if-chains across seven status-bar
@@ -642,10 +650,23 @@ the tool reports harness coupling loudly instead of quietly expanding itself to 
 
 ### 6.2 Make the nightly's Linux pass count
 
-Shard reports are already uploaded (14-day retention). A small script can assert that each
-Mac-allowlisted test passed on Linux — turning 33 "environment-bound" claims into checks, and
-seeding the Linux allowlist the nightly needs before it can be read as a verdict rather than "which
-shard". A first agent opening a session after a red nightly triages it (already the AGENTS.md rule).
+**Done 2026-10-27, and it settles the assumption.** `local/check-nightly-linux-parity.mjs` takes a
+nightly run's downloaded `unit-shard` artifacts and reports each allowlisted entry as passed, failed or
+absent on Linux, exiting non-zero on anything but passed. `absent` is never a pass: a file never
+collected, a suite-level failure, or a test reported `skipped` all read as absent, and no reports at all
+exits 2 (cannot tell). The pure core is `local/lib/linux-parity.mjs`, reusing `allowlistEntries` from
+`unit-gate-judgement.mjs` so the gate and this checker share one vocabulary; `prunedSince` is reported
+but not enforced, because those entries were pruned for passing locally, so their Linux outcome informs
+the next prune rather than gating it.
+
+**The measurement:** against the 2026-10-26 scheduled run's five shard reports, **all 17 allowlisted
+entries passed on Linux** (22 of 23 `prunedSince` passed; the one absent entry is a macOS-only bundle
+test that is skipped there). So the Mac allowlist is Mac-specific exactly as claimed, and Linux carries
+**no environment-bound red set of its own** — which the 2026-10-27 dispatch confirms from the other
+direction: its three red files were commits missing from `main`, not platform differences.
+
+That makes the nightly readable as a verdict rather than "which shard". Its liveness check now points at
+this script whenever the verdict names a failed job, so the tool is found by the person who needs it.
 
 ### 6.3 Upstream-facing PRs — needs a decision
 
@@ -727,10 +748,29 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
   does cap processes. Capacity planning that treats this project as uncapped is pessimistic by one
   project's worth of concurrency; it needs one empirical confirmation on an idle machine before the
   machine-level `AGENTS.md` claim (which lives outside this repo) is corrected.
-- 2,575 s against a 3,600 s cap, with a timeout not cached (`gate-verdict-cache.mjs:83`). Investigate
-  the doubling (bun 1.4.4 bump, an uncapped run alongside unqueued work, or the mobile install).
-- Batch the isolation re-runs: each unexpected file currently gets a serial cold start with a full
-  60-minute allowance (`gate-unit.mjs:563-570`).
+- **The 2,575 s run is a worker cap, not more work — resolved 2026-10-27.** Reconstructed from the
+  gate's own JSON reports: fast runs (10-23) showed up to **9 files concurrent** and a 1,354–1,416 s
+  suite; every run from 10-24 onward is capped at **2 concurrent**, while doing _less_ work — 32,068
+  modules against 44,384, summed per-file time 2,209 s against 4,457 s, and faster per-file medians
+  (8.4 ms against 13.4 ms). So not CPU contention (per-file times fell), not the mobile install (module
+  count fell), not the bun 1.4.4 pin (slow runs began 10-24, before that pin reached this line). The cap
+  of exactly 2 was `VITEST_MAX_WORKERS`, exported machine-wide from `~/.zshrc:13` and `~/.zprofile:8`
+  (mtime 2026-10-23 17:02, between the last fast run at 15:40 and the first slow one). Both now export
+  **4**, the shim's default matches, and the machine `AGENTS.md` claim that this gate is "uncapped" is
+  corrected there — it is capped, and that error is what made a 1,400 s gate look like a 2,575 s one.
+  `gate-unit.mjs` now prints `gate-unit: VITEST_MAX_WORKERS=<n>` before spawning, so the next slow run
+  says why in one line instead of needing this reconstruction. Note for a session started before the
+  change: the parent shell still holds the old value, so pass `VITEST_MAX_WORKERS=4` to the gate once.
+- **Batch the isolation re-runs — done 2026-10-27.** Each unexpected file used to get a serial cold
+  start with a full 60-minute allowance; all of them now run in one invocation, with `rerunReportsFor`
+  mapping the shared report to each file by exact path, so attribution is unchanged and a file missing
+  from the report still reads `NO_RERUN` (every failure reproduced — fails closed). 3 new tests.
+- **`recordDependencies` vs `check:changed` — closed, not a defect.** `recordDependencies=false` is
+  deliberate and documented (teardown-error misattribution, `LOCAL-PATCHES.md` 2026-10-25). Records are
+  cold here — 291 of 13,903 files (2.1%) against `check:changed`'s 95% threshold — and cold, that gate
+  stays selective rather than running everything, so the plan's premise was wrong. The cost is real (the
+  gate never warms records) and re-enabling recording would reintroduce the documented false reds: a
+  slower, less certain verdict for a warmer cache. Reported, not changed.
 - **The vitest-direct "trap" is not a trap, on measurement.** `test:node` and
   `test:skill-sharing:release` both call bare `vitest run`, which is what it looks like, and both
   scripts are **upstream's** — byte-identical at `upstream/main:package.json:42-43`. `test:node` exists
