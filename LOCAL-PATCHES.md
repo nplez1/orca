@@ -1201,40 +1201,80 @@ Three fixes with one cause: a signal that was **absent** was read as a signal th
   the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
   `check-changed-code-quality.mjs`.
 
-### `local(ci)`: the nightly's relay job could never start
+### `local(ci)`: the nightly could queue forever and say nothing
 
-`.github/workflows/fork-main-tests.yml` calls upstream's reusable `unit-tests.yml`, whose
-`relay_integration` job hard-codes `runs-on: blacksmith-4vcpu-ubuntu-2404`. This fork has no runner for
-that label, so the job queued: the 2026-10-26 scheduled run sat on it for 17 hours, never completed,
-and `concurrency: cancel-in-progress: false` then blocked every later night behind it. The caller now
-passes `run_relay_integration: false`. The fork ships no cloud relay, so the job has nothing to test.
+`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
+failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
+`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and four of its five test shards **failed**
+(shard 4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
+`cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
+was absence.
 
-Before that the nightly had run **once**, on 2026-10-08. Two runs are the evidence since. The 2026-10-26
-scheduled run (id `40308443374`) sat 17.5 h on the relay job, was cancelled, and its cancel rewrote the
-run-level conclusion — 1,905 skipped, four of five shards red, and no verdict a reader could see. The
-cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus the repair
-below): five shards, **three green**, and three red files in total —
+Three changes:
+
+- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
+  so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
+  files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
+  this caller never enabled it (its default is `false`).
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Under `false` a run
+  that never finishes holds the slot until a human cancels it; the 10-26 run held it for 17.5 h.
+  Superseding is safe because a shard takes minutes and the next schedule is a day away. The ref in
+  the group name keeps a `workflow_dispatch` on some feature branch from cancelling the release line's
+  nightly.
+- **`node local/check-nightly-liveness.mjs`**, because the first two only make a failure faster. See
+  below.
+
+**What the first real runs measured.** The 2026-10-26 scheduled run (id `40308443374`) is unusable as a
+red set: its cancel rewrote the run-level conclusion, so a reader saw four red shards and no verdict.
+The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus this
+repair): five shards, **three green**, and three red files in total —
 `rate-limits/service-inactive-claude-cooldown.test.ts`, `daemon/daemon-appimage-copy-host.electron.test.ts`
 and `daemon/daemon-electron-to-node-adoption.electron.test.ts` — plus one unhandled error,
 `selector_not_found`.
 
-**All three are the branch gap, not the platform.** Each maps onto a commit that exists here and not on
+**All three were the branch gap, not the platform.** Each maps onto a commit that exists here and not on
 `nplez1/main`: the cooldown expectation (`ba8e632509`), the fixture's esbuild specifiers
 (`be847f718f`), and the unhandled rejection (`fbb41b497d`). The third is a **test defect** — the test
 attached `.rejects` after awaiting a different promise, so the refusal settled unobserved while the
-assertion still passed — not a Linux-only reproduction as this entry previously claimed. So this
-measurement shows Linux carrying **no environment-bound red set of its own**: the Mac allowlist's two
-classes (`host-toolchain`, `sqlite-binding`) do not appear there at all, and two of the three red files
-are electron suites that skip on macOS and cannot bundle on Linux until the fixture path is right.
+assertion still passed. So this measurement shows Linux carrying **no environment-bound red set of its
+own**: the Mac allowlist's two classes (`host-toolchain`, `sqlite-binding`) do not appear there at all,
+and two of the three red files are electron suites that skip on macOS and cannot bundle on Linux until
+the fixture path is right.
 
-The lesson is the one this entry exists for: a red nightly had to be read against `git log`, not against
-the allowlist, because the allowlist describes this Mac and the runner describes `main`.
+The lesson is that a red nightly has to be read against `git log`, not against the allowlist: the
+allowlist describes this Mac and the runner describes `main`.
 
-`node local/check-nightly-liveness.mjs` is what keeps that from going unnoticed again. It exits 0 on a
-fresh green run, 1 when the newest run is stale (older than two schedule slots) or **wedged** (queued
-or in progress for more than four hours — the exact failure this entry records), and 2 when it cannot
-tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly. Make it the
-first thing a session does after a sync, next to `local/branch-status.mjs`.
+**What none of that fixes:** the cancelled run did not block 10-27 — it was cancelled at 04:02Z, ~50 min
+before that day's 04:53 cron — and **no scheduled run fired on 10-25, the first night after the 10-24
+re-enable, nor on 10-27**, with the slot free both times. `cancel-in-progress` does nothing about a
+schedule that does not fire; only the check does. (The wider gap back to 10-08 is the workflow being
+disabled in the fleet sweep, which is a different cause and a known one.)
+
+The check exits 0 on a fresh green run, 1 when the newest scheduled run is stale (past two schedule
+slots), **wedged** (not `completed` for more than four hours from its own `startedAt`), or **red**, and
+2 when it cannot tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green
+nightly. Make it the first thing a session does after a sync, next to `local/branch-status.mjs`.
+
+It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
+hide the last verdict: one clock asks whether the schedule fires at all (a `workflow_dispatch` does not
+prove the cron fires, so it does not count), the other asks when a completed run last produced a
+verdict. An in-flight run is a note on that verdict, never a substitute for it — otherwise a re-run
+dispatched after a red night would report green for hours.
+
+**A cancelled run's shards still get a vote.** The check's own first version read the run-level
+conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
+Had the night before been green it would have reported **PASS** on a night that went red, which is the
+same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
+(up to five, and only runs newer than the newest run with a verdict of its own) and takes a red verdict
+from them: a cancel can hide four red shards, but only from a checker that does not look.
+
+**The cost of that, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate on a
+fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as mergeable, so
+the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`, `gate-lint`, plus the
+review) are the only thing standing between a change and `nplez1/main` — nothing in CI backstops a
+skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all; it runs nightly on
+`fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
+cross-cutting break sitting on the release line until one of those two runs.
 
 ### `local(sync)`: a file upstream owns is restored, not deleted
 
@@ -1809,7 +1849,10 @@ it back on — which is what a fork wants, and why this is documented here inste
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
-- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. This is the backstop the
+- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. Its last passing run is
+  2026-10-08, from before it was disabled in the fleet sweep and re-enabled on 10-24; the first
+  scheduled run after that (10-26) wedged, which is why the absence below starts at 10-08 rather than
+  at 10-24. This is the backstop the
   PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
   `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
   as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
@@ -1823,15 +1866,8 @@ it back on — which is what a fork wants, and why this is documented here inste
 so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
 
 Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
-`e2e.yml`, `mobile.yml`, `fork-main-gates.yml` and `fork-main-tests.yml`.
-
-**The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
-on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as
-mergeable, so the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`,
-`gate-lint`, plus the review) are the only thing standing between a change and `nplez1/main` — nothing
-in CI backstops a skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all;
-it runs nightly on `fork-main-tests.yml` and again at the release gate, and the failure window that
-choice accepts is a cross-cutting break sitting on the release line until one of those two runs.
+`e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
+live, and the section below is why its being live was not the same as its running.
 
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,

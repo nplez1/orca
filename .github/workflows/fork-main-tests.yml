@@ -20,8 +20,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: fork-main-unit-tests
-  cancel-in-progress: false
+  # Why the ref is in the group: `workflow_dispatch` can target any branch, and a dispatch on a feature
+  # branch must not cancel the release line's nightly — nor share its slot.
+  # Why `cancel-in-progress: true`: a run that never finishes must not hold the slot for the next
+  # night. Under `false` it holds until a human cancels it — on 2026-10-26 the run held it for 17.5 h.
+  # Superseding is safe here: a test shard takes minutes, and the next schedule is a day away. `plan`
+  # is the one job with no `timeout-minutes` of its own (default 360), so it is the worst case for
+  # holding the slot.
+  group: fork-main-unit-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   plan:
@@ -50,7 +57,8 @@ jobs:
       runner: ubuntu-24.04-arm
       shards: ${{ needs.plan.outputs.shards }}
       # Why: the relay job in `unit-tests.yml` hard-codes `blacksmith-4vcpu-ubuntu-2404`, and this
-      # fork has no runner for that label — the 2026-10-26 run sat queued for 17 h on it, which
-      # never completed the run, and `cancel-in-progress: false` then blocked every later night. The
-      # fork ships no cloud relay, so the job has nothing to test here.
+      # fork has no runner for that label — it queued for ~17.5 h in the 2026-10-26 run and was
+      # cancelled. The fork ships no cloud relay, so the job has nothing to test here. What it drops:
+      # the two `relay-region` unit files, which shard discovery excludes and only that job ran.
+      # `browser_contract` is not dropped — this caller never enabled it (its default is `false`).
       run_relay_integration: false

@@ -426,6 +426,17 @@ repeated conflict shape in the repo" (`:256`).
   with the icons moved in. Each upstream function keeps one guard line. Fork snapshot/settings fields
   join the upstream type with one `&`. Delete the duplicate `hasUsageData` in
   `StatusBarProviderSegment.tsx`.
+
+  **Done 2026-10-27, with a measurement that partly contradicts the premise.** `icons.tsx` is now
+  byte-identical to the merge base (the 85-line append moved into the new mapping file), the duplicate
+  `hasUsageData` is gone, both type joins are in place, and the five `if`-arms are one mapping consult
+  each. But **hunk counts barely moved** (visibility 10→10, segment 6→7, tooltip 7→7, error-copy 5→6,
+  menu 2→2): a guard at each call site still diffs at each call site, and two of the increases are the
+  imports the guards need. What improved is hunk _size_ — every one is now 1–2 lines instead of 3–9,
+  and the single largest fork block in the renderer (the icon append) disappeared. The honest summary:
+  this makes each future conflict a one-line resolution instead of a block rewrite, but the conflict
+  count on these files is unchanged. `pnpm tc:web` clean; 89 tests across five files pass.
+
 - **Main:** use upstream's **existing sibling-provider lane** —
   `service-sibling-provider-result.ts` exports `SettledProviderResult` and
   `settleSiblingProviderResult`, and upstream already runs grok/cursor/zcode/antigravity outside the
