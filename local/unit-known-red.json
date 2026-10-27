@@ -616,12 +616,6 @@
   },
   "unhandledErrors": [
     {
-      "headline": "Error: selector_not_found",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Raised by src/main/runtime/orca-runtime.test.ts: `does not coalesce concurrent same-id removals on different hosts` hands the in-flight removal promise to the second caller without awaiting it, and that promise rejects with selector_not_found. Pre-existing at 1a64dbe2f6; the coalescing map is upstream code. Declared for the headline, not for a test: the 2026-10-22 full run raised none."
-    },
-    {
       "headline": "Error: [vitest-pool]: Worker node-runtime emitted error.",
       "class": "pool-crash",
       "owner": "unattributed",
@@ -870,23 +864,6 @@
       "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite refuses the extra column that shadows its rowid alias (`cannot add rowid alias: rowid`) where the contract expects it accepted.",
       "flaky": false,
       "match": "cannot add rowid alias"
-    },
-    {
-      "file": "src/main/runtime/orca-runtime.test.ts",
-      "test": "OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/runtime/orca-runtime.test.ts",
-      "test": "OrcaRuntimeService sets up an existing folder on a fresh runtime after importing the repo project",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
-      "flaky": false,
-      "match": "/private/var"
     },
     {
       "file": "src/main/sqlite/sync-database-portability.test.ts",

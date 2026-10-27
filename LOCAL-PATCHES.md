@@ -1248,6 +1248,36 @@ Still deleted, deliberately:
 
 The 21 dashboard/pop-out files are a separate decision and are not covered by this entry.
 
+### `local(test)`: two `orca-runtime` defects were test bugs, not environment reds
+
+`local/unit-known-red.json` carried three `orca-runtime` items as `macos-path-semantics`. Both causes
+were defects **in the tests**, and both are fixed, so the three entries are removed in the same commit.
+
+- **`/private/var` vs `/var`** (two cases). Upstream #30657 (`f6e9e649f4`) made the runtime store git's
+  resolved toplevel on purpose, and pinned that in
+  `runtime-repository-registration-controller.test.ts:154`, which already calls `realpath` on its temp
+  dir. #30657 missed two cases in `repository-project-operations.spec.ts`, which kept comparing against
+  an unresolved `mkdtemp(tmpdir())`. **Upstream fixed it in #33540 (`6b255983ae`)**; this takes that hunk
+  byte-for-byte, comment included, so the next sync merges it with no hunk to resolve.
+- **`Error: selector_not_found`** as an unhandled-error headline. The refusal itself is correct: a
+  removal scoped to `ssh:host-b` cannot find the worktree on that host. The test created its promise,
+  awaited a _different_ promise, and only then attached `.rejects`; the rejection settles before the
+  local removal's real I/O completes, so Node raised an unhandled rejection and Vitest reported it while
+  the assertion attached afterwards still passed. Attaching the handler before the await fixes the
+  reporting and changes nothing the test checks. The allowlist's `evidence` line blamed the coalescing
+  map, which the stack trace contradicts — the rejection comes from target resolution at
+  `workspaces/workspace-removal.ts:87`, before that map is reached. The same defect exists on
+  `upstream/main` today.
+
+`pnpm test src/main/runtime/orca-runtime.test.ts` — before: 2 failed and 1 unhandled error; after:
+`1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
+mentions `selector_not_found`, so this was persistent rather than a one-off.
+
+The other `macos-path-semantics` entries are a different question and were not touched: four in
+`orcad-forked-child-paths.test.ts` carry the same `/private/var` signature and deserve the same
+treatment, while `cli/packaged-cli-assets.test.ts` and the two `config/scripts` entries have no `match`
+at all, so a _different_ failure in them would be absorbed silently.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream

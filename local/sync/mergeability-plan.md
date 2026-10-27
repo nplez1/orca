@@ -27,7 +27,7 @@ Companions: [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUNBOOK.md) (the proc
 | Fork footprint                    | 1,585 file paths upstream does not have                        | `comm -23` of both trees                               |
 | Fork-only import breakage pending | 19 files / 8 renamed modules                                   | rename map × fork-only importers                       |
 | Follow-up commits per sync        | **median ~7** (4–12)                                           | sync log + first-parent commits                        |
-| Known-red allowlist               | **40 entries / 18 files**, all `owner: upstream`               | `local/unit-known-red.json`                            |
+| Known-red allowlist               | **38 entries / 17 files**, all `owner: upstream` (was 40/18)   | `local/unit-known-red.json`                            |
 | Nightly backstop                  | **ran once, ever** (2026-10-08)                                | `gh run list --workflow fork-main-tests.yml`           |
 | Unit gate runtime                 | 1,227 s (10-22) → **2,575 s** (10-25), cap 3,600 s             | gate log                                               |
 

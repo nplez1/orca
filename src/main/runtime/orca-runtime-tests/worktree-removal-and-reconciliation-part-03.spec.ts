@@ -144,9 +144,12 @@ describe('OrcaRuntimeService', () => {
       hostId: 'ssh:host-b'
     })
 
+    // Why attach now: the refusal settles before the local removal starts, and an unobserved
+    // rejection across that I/O is reported as unhandled.
+    const remoteRefused = expect(remote).rejects.toThrow('selector_not_found')
     await localStarted.promise
     // Joining the local removal would have resolved; the unserved host's catalog refuses instead.
-    await expect(remote).rejects.toThrow('selector_not_found')
+    await remoteRefused
 
     finishRemovals.resolve()
     await expect(local).resolves.toEqual({})
