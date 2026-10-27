@@ -30,6 +30,7 @@ import { getManagedStatusLineCommand, getManagedStatusLineScript } from './statu
 import { refuseProfileAtDefaultHome } from './claude-profile-hook-target'
 import {
   applyManagedHooks,
+  applyManagedStatusLine,
   CLAUDE_HOOK_SETTINGS,
   getManagedScriptFileName,
   getConfigPath,
@@ -38,18 +39,15 @@ import {
   getPosixManagedScriptFileName,
   getRemoteConfigPath,
   getRemoteManagedEventCommand,
+  getStatusLineInstallMarkerPath,
   getStatusLineScriptFileName,
   getStatusLineScriptPath,
+  getStatusLineSlotState,
   findManagedEventHookForms,
   removeManagedHooks,
+  removeManagedStatusLine,
   type ClaudeCompatibleHookSettings
 } from './hook-settings'
-import {
-  applyManagedStatusLine,
-  getStatusLineInstallMarkerPath,
-  getStatusLineSlotState,
-  removeManagedStatusLine
-} from './claude-status-line-slot'
 import { claudeAcceptsExecFormHooks } from './claude-hook-event-versions'
 import {
   getClaudeManagedHookPlan,

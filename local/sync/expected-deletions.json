@@ -1,36 +1,192 @@
 {
-  "why": [
-    "Deletions a reviewer has judged superseded, keyed by the deleted path.",
-    "`node local/sync/post-sync.mjs` inventories the exported surface of every deleted fork-only module",
-    "and fails when an export has no surviving reference. That is the right default: a module disappearing",
-    "is exactly when a caller can leave with it. This file is how a reviewed supersession is recorded so",
-    "the check can pass without weakening it.",
-    "Each entry must name the live replacement and the evidence for calling it a superset — the check",
-    "prints this, so the next sync inherits the reasoning instead of re-deriving it.",
-    "An entry whose path is no longer deleted is reported as stale, so this file cannot rot unnoticed.",
-    "Entries are therefore per sync: a previous sync's acknowledgements are pruned once their deletion is",
-    "no longer part of the tip..HEAD range."
-  ],
-  "acknowledged": {
-    "src/main/runtime/session-lifecycle/projection/window-wake-sleep-record.ts": {
-      "supersededBy": "src/main/runtime/session-lifecycle/projection/sleep-record-pane-claim.ts",
-      "evidence": "Upstream's 2026-10-25 rewrite of the sleep-record pane claim moved the module and dropped the fork's claimWindowWakeRecordForPane/isWindowWakeSleepRecord helpers; the sibling export markResumedRecordLive carried over and still has 3 references, so the module's live surface moved rather than vanished."
+  "note": "Files this fork deletes that upstream still owns. Every one is a modify/delete conflict on the next sync, so each is asserted here rather than rediscovered: the resolver prints the entry and can apply it. LOCAL-PATCHES.md and local/sync/convergence-ledger.md stay the evidence; this file is the machine-readable claim. Generated from `git diff <base>..HEAD --diff-filter=D`, NOT from the log: a merge resolution can delete a file without a commit of its own, which is how agent-dashboard-open-mode.ts was missed the first time. A path listed as deleted must be absent at HEAD and present at upstream/main, and conflicts.mjs reports a stale entry on read. Statuses were settled on 2026-10-26: the fork ships the Agent Dashboard as a content-area view and rejects upstream’s drawer/pop-out delivery, so the renderer half is a recorded product deletion and only the mutually inert main-process pair is held.",
+  "statuses": {
+    "expected-deletion": "settled: the deletion is the fork's answer and a sync re-applies it",
+    "pending-decision": "not settled: the deletion exists but nobody has chosen between restoring and keeping it",
+    "restore": "settled the other way: the file comes back and a sync must not re-delete it"
+  },
+  "deletions": [
+    {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift",
+      "commit": "accb095dd6",
+      "class": "identity",
+      "status": "expected-deletion",
+      "reason": "Upstream hardcodes com.stablyai.orca as the app it trusts; this fork's helper trusts com.nplez1.orca.computer-use from its own OrcaBundleIdentity.swift, so taking it back would make the helper trust the wrong app. evidence: convergence-ledger.md Identity Do-not, config/scripts/computer-use-bundle-identity.test.mjs"
     },
-    "src/renderer/src/components/task-page-linear-cache-selectors.ts": {
-      "supersededBy": "src/renderer/src/components/task-page/linear/task-page-linear-cache-selectors.ts",
-      "evidence": "Upstream grouped the task-page Linear modules under task-page/linear/. The old path's findTaskPageLinearDrawerIssue has no caller in the merged tree; the drawer issue is resolved through the grouped selectors module instead."
+    {
+      "path": "native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TrustedOrcaApplicationTests.swift",
+      "commit": "accb095dd6",
+      "class": "identity",
+      "status": "expected-deletion",
+      "reason": "Tests only the Swift file above, so it goes with it. evidence: convergence-ledger.md Identity Do-not"
     },
-    "src/renderer/src/components/use-task-page-linear-collection-effects.ts": {
-      "supersededBy": "src/renderer/src/components/task-page/linear/use-task-page-linear-collection-effects.ts",
-      "evidence": "Same task-page/linear/ grouping. The TaskPageLinearCollectionEffectsPreludeModel type was folded into the grouped module's own state shape and has no importer anywhere in the merged tree."
+    {
+      "path": "src/renderer/src/components/right-sidebar/pr-comment-snapshotted-thread-resolver.ts",
+      "commit": "9fb0aafb5e",
+      "class": "superseded",
+      "status": "expected-deletion",
+      "reason": "Needs PendingPRCommentAiAckGithubResolveTarget, PendingPRCommentAiAckGitlabTarget and the githubResolveTarget/gitlabTarget fields that #169 deliberately removed from the pending ack; it cannot compile without resurrecting that model, and a dead file is not a reason to bring a removed capability back. evidence: mergeability-plan.md 5, LOCAL-PATCHES.md local(sync)"
     },
-    "src/renderer/src/lib/linear-agent-skill-update-command.ts": {
-      "supersededBy": "src/renderer/src/lib/agent-feature-install-commands.ts (buildAgentFeatureSkillInstallCommand)",
-      "evidence": "The fork built its Linear skill command in a local helper; upstream replaced that with the shared builder, which every surviving caller now uses (AgentSkillSetupPanel, WslLinearAgentSkillInstallCta, FeatureWallBrowserAction, AgentCapabilitiesSetupAction). Upstream's is a superset: it still pins to the build's commit, and ORCA_SKILLS_REPOSITORY_URL keeps the fork's nplez1/orca pin."
+    {
+      "path": "src/renderer/src/components/right-sidebar/pr-comment-snapshotted-thread-resolver.test.ts",
+      "commit": "9fb0aafb5e",
+      "class": "superseded",
+      "status": "expected-deletion",
+      "reason": "Covers the resolver above. evidence: mergeability-plan.md 5"
     },
-    "src/shared/remote-runtime-shared-control-connection-actions.ts": {
-      "supersededBy": "src/shared/remote-runtime/control/remote-runtime-shared-control-connection-actions.ts",
-      "evidence": "Upstream grouped the remote-runtime modules under remote-runtime/control/. closeSharedControlSubscription lost its caller in that rewrite; the grouped module owns the subscription lifecycle now."
+    {
+      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.test.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/main/ipc/dashboard-popout.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "restore",
+      "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
+    },
+    {
+      "path": "src/main/ipc/dashboard-popout.test.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "restore",
+      "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
+    },
+    {
+      "path": "src/main/window/dashboard-popout-window.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "restore",
+      "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
+    },
+    {
+      "path": "src/main/window/dashboard-popout-window.test.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "restore",
+      "reason": "Held, not used: the dashboard delivery is the fork’s content-area view, so upstream’s pop-out is rejected — but this main-process pair costs nothing to hold. It imports nothing of the fork’s, nothing imports it, and its two suites pass, so keeping upstream’s bytes removes the modify/delete conflict at no cost. The preload half of the same subsystem was NOT kept: it exists only to publish window.api.dashboard, which has no caller."
+    },
+    {
+      "path": "src/main/window/clipboard-dashboard-popout-access.test.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "Deleted: it asserts the fork admits upstream’s pop-out renderer in assertTrustedClipboardTextSender. The fork deliberately does not — dead code has no business adding an admission to a clipboard trust check."
+    },
+    {
+      "path": "src/preload/api/dashboard-api.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "Deleted: the fork’s board removed the relay these bridges served, so window.api.dashboard has no caller. Keeping them needs a `dashboard` member on PreloadApi for a runtime API nothing registers, and dashboard-bridge.ts type-checks itself against that member — the lie would be load-bearing."
+    },
+    {
+      "path": "src/preload/api/dashboard-bridge.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "Deleted: the fork’s board removed the relay these bridges served, so window.api.dashboard has no caller. Keeping them needs a `dashboard` member on PreloadApi for a runtime API nothing registers, and dashboard-bridge.ts type-checks itself against that member — the lie would be load-bearing."
+    },
+    {
+      "path": "src/renderer/popout.html",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/popout.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/DashboardPopoutRoot.test.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/useDashboardSnapshot.test.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The popout window is never opened, and popout.tsx mounts DashboardPopoutRoot, which requires the onAckAgent/onRevealAgent props upstream added to AgentKanbanBoard. The fork's live page view is built on that same board, so restoring this means either two live dashboard implementations or changing the shipped view."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/AgentDashboardDrawer.test.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/DashboardPopoutBridge.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/useDashboardPopoutBridge.test.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/AgentDashboardSidebarHost.test.tsx",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "expected-deletion",
+      "reason": "The fork delivers the dashboard as a full-page view (#44), which is the only delivery it exposes. Upstream's drawer and sidebar host need AppState.agentDashboardDrawerOpen, which the fork removed, and upstream's newer AgentKanbanBoard props. Restoring them re-adds a second live implementation of the same surface."
     }
-  }
+  ]
 }

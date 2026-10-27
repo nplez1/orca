@@ -76,6 +76,18 @@ function failingTestNames(report) {
   return names
 }
 
+// Why: a file whose import or `beforeAll` threw reports every test skipped, so no `failing:` line
+// names it and the shard reads as red with no culprit.
+function failedFilesWithoutFailingTest(report) {
+  return (report.testResults ?? [])
+    .filter(
+      (file) =>
+        file.status === 'failed' &&
+        !(file.assertionResults ?? []).some((assertion) => assertion.status === 'failed')
+    )
+    .map((file) => file.name)
+}
+
 /**
  * The verdict's inputs are the JSON report (what the tests did), the captured run log (which
  * unhandled errors were raised) and the test step's own outcome (so a failure the report cannot
@@ -103,6 +115,9 @@ export function decideUnitShardVerdict({ reportText, logText, outcome }) {
     }
     if (failedSuites > 0) {
       problems.push(`${failedSuites} test file(s) failed`)
+      for (const name of failedFilesWithoutFailingTest(report).slice(0, FAILING_TEST_LIMIT)) {
+        problems.push(`failing file (no test ran to failure): ${name}`)
+      }
     }
     if (failedTests > 0) {
       problems.push(`${failedTests} test(s) failed`)

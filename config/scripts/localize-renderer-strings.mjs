@@ -8,6 +8,7 @@ import process from 'node:process'
 import ts from 'typescript-api'
 
 import { collectLocalizationCandidates } from './audit-localization-coverage.mjs'
+import { readForkEnglishCatalog, writeForkEnglishCatalog } from './fork-english-catalog.mjs'
 
 const TRANSLATE_IMPORT = "import { translate } from '@/i18n/i18n'\n"
 
@@ -226,8 +227,7 @@ async function collectCandidateFiles(root) {
 }
 
 export async function main(root = process.cwd()) {
-  const catalogPath = path.join(root, 'src', 'renderer', 'src', 'i18n', 'locales', 'en.json')
-  const catalog = JSON.parse(await fs.readFile(catalogPath, 'utf8'))
+  const catalog = await readForkEnglishCatalog(root)
   const files = await collectCandidateFiles(root)
   let count = 0
 
@@ -235,7 +235,7 @@ export async function main(root = process.cwd()) {
     count += await localizeFile(root, filePath, catalog)
   }
 
-  await fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`)
+  await writeForkEnglishCatalog(root, catalog)
   console.log(`Localized ${count} renderer string candidates.`)
   return 0
 }

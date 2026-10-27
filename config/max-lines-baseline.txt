@@ -1,8 +1,21 @@
 # Files/globs currently allowed to exceed the oxlint `max-lines` budget.
 # This is a RATCHET: the list may only SHRINK. Do NOT add entries to get CI green —
-# split the oversized file instead.
+# split the oversized file instead. The one exception, decided 2026-10-27: a file UPSTREAM owns is
+# exempted rather than split, because splitting it costs a permanent hunk on every sync. Fork-owned
+# files are never exempted. Rule and probe recipe: LOCAL-PATCHES.md § local(lint).
 # Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
 inline src/main/ipc/worktree-remote.ts
 inline src/main/ssh/ssh-channel-multiplexer.ts
 inline src/main/ssh/connection/ssh-connection.ts
 inline src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts
+# Fork exemptions, reviewer-approved 2026-10-27 (plan §7 addendum): each is an upstream-owned file
+# held at its budget ceiling by the fork's own lines. Splitting an upstream file would cost a
+# permanent hunk on every sync, which is the divergence this baseline exists to avoid.
+inline src/main/claude/hook-settings.ts
+inline src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts
+inline src/main/orcad/orcad-entry.ts
+inline src/renderer/src/components/editor/CheckRunDetailsPanel.tsx
+inline src/renderer/src/components/settings/accounts-search.ts
+inline src/renderer/src/web/preload-api/web-filesystem-api.ts
+inline src/shared/agent-hook-listener.ts
+inline src/shared/tui-agent-config.ts

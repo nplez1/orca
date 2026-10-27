@@ -103,5 +103,26 @@
     "text": "fixtures · files named *.fixture.tsx under src/renderer/src",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/status-bar/fork-usage-providers.tsx",
+    "kind": "object-property:label",
+    "text": "DeepSeek",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/status-bar/fork-usage-providers.tsx",
+    "kind": "object-property:label",
+    "text": "Fireworks.ai",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/status-bar/fork-usage-providers.tsx",
+    "kind": "object-property:label",
+    "text": "GitHub Copilot",
+    "dynamic": false,
+    "count": 1
   }
 ]

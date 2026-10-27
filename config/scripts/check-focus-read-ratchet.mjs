@@ -4,8 +4,8 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import {
   diffCounts,
-  parseCountBaseline,
   pruneCountBaseline,
+  readCountBaseline,
   readTrackedSources,
   totalCount
 } from './ratchet-baseline.mjs'
@@ -18,6 +18,7 @@ import {
 
 const SCAN_ROOT = 'src/renderer/src'
 const BASELINE_PATH = 'config/focus-setting-read-baseline.txt'
+const OVERLAY_PATH = 'config/focus-setting-read-baseline.fork.txt'
 const FORBIDDEN_HELPERS = [
   'getActiveRuntimeTarget',
   'legacyRouteFromSettings',
@@ -415,7 +416,7 @@ export function main(root = process.cwd()) {
   }
   const { grown, shrunk } = diffCounts(
     current,
-    parseCountBaseline(fs.readFileSync(baselineFile, 'utf8'))
+    readCountBaseline(root, BASELINE_PATH, OVERLAY_PATH)
   )
   for (const { file, now, allowed } of grown) {
     console.error(
@@ -436,8 +437,9 @@ export function main(root = process.cwd()) {
 
 export function prune(root = process.cwd()) {
   const { counts: current } = collectCurrentCounts(root)
-  const kept = pruneCountBaseline(root, BASELINE_PATH, BASELINE_HEADER, current)
-  console.log(`Pruned ${BASELINE_PATH} to ${kept} read(s).`)
+  const kept = pruneCountBaseline(root, BASELINE_PATH, BASELINE_HEADER, current, OVERLAY_PATH)
+  const written = fs.existsSync(path.join(root, OVERLAY_PATH)) ? OVERLAY_PATH : BASELINE_PATH
+  console.log(`Pruned ${written} to ${kept} read(s).`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -10,11 +10,11 @@ import {
   type AgentLeadStatusResolution
 } from '../../agent-lead-status-fold'
 import {
-  agentDescendantRosterToSnapshots,
+  codexRosterToSnapshots,
   enrichCodexSubagentIdentity,
-  finishAgentDescendant,
-  upsertAgentDescendant
-} from '../../agent-descendant-roster'
+  finishCodexSubagent,
+  upsertCodexSubagent
+} from '../../codex-subagent-roster'
 import {
   codexTranscriptTurnEnd,
   reconcileCodexSubagentTranscript
@@ -31,7 +31,7 @@ import { readString } from '../tool-input-preview'
 import {
   codexMainAgentStatusForPayload,
   codexLeadOutcomeForEvent,
-  getOrCreateAgentDescendantRoster,
+  getOrCreateCodexSubagentRoster,
   getOrCreateCodexSubagentTranscriptState,
   hasCodexTranscriptSubagents,
   resolveCodexPaneStatus,
@@ -68,7 +68,7 @@ export function buildCodexStatusPayload(
     lastAssistantMessage: snapshot.lastAssistantMessage,
     lastAssistantMessageIsToolOutput: snapshot.lastAssistantMessageIsToolOutput,
     interrupted: mainAgentTurnInterrupted(lead),
-    subagents: agentDescendantRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey)),
+    subagents: codexRosterToSnapshots(state.codexSubagentRosterByPaneKey.get(paneKey)),
     mainAgent: codexMainAgentStatusForPayload(lead)
   })
 }
@@ -97,9 +97,9 @@ export function normalizeCodexSubagentLifecycleEvent(
   if (!agentId) {
     return null
   }
-  const roster = getOrCreateAgentDescendantRoster(state, paneKey)
+  const roster = getOrCreateCodexSubagentRoster(state, paneKey)
   if (eventName === 'SubagentStart') {
-    upsertAgentDescendant(
+    upsertCodexSubagent(
       roster,
       agentId,
       {
@@ -125,7 +125,7 @@ export function normalizeCodexSubagentLifecycleEvent(
       )
     }
   } else {
-    finishAgentDescendant(roster, agentId)
+    finishCodexSubagent(roster, agentId)
     state.codexSubagentTranscriptByPaneKey.get(paneKey)?.subagents.delete(agentId)
   }
   return buildCodexChildDrivenStatusPayload(state, eventName, paneKey, hookPayload)
@@ -207,7 +207,7 @@ export function normalizeCodexEvent(
     if (transcriptState.parent.filePath === transcriptPath) {
       reconcileCodexSubagentTranscript(
         transcriptState,
-        getOrCreateAgentDescendantRoster(state, paneKey),
+        getOrCreateCodexSubagentRoster(state, paneKey),
         transcriptPath
       )
     } else {
@@ -217,7 +217,7 @@ export function normalizeCodexEvent(
   if (transcriptPath && !agentId) {
     reconcileCodexSubagentTranscript(
       getOrCreateCodexSubagentTranscriptState(state, paneKey),
-      getOrCreateAgentDescendantRoster(state, paneKey),
+      getOrCreateCodexSubagentRoster(state, paneKey),
       transcriptPath
     )
   }
@@ -236,8 +236,8 @@ export function normalizeCodexEvent(
       transcriptPath,
       stateName
     )
-    upsertAgentDescendant(
-      getOrCreateAgentDescendantRoster(state, paneKey),
+    upsertCodexSubagent(
+      getOrCreateCodexSubagentRoster(state, paneKey),
       agentId,
       {
         agentType: readString(hookPayload, 'agent_type'),
@@ -247,7 +247,7 @@ export function normalizeCodexEvent(
       Date.now()
     )
     enrichCodexSubagentIdentity(
-      getOrCreateAgentDescendantRoster(state, paneKey),
+      getOrCreateCodexSubagentRoster(state, paneKey),
       agentId,
       transcriptPath
     )
@@ -257,7 +257,7 @@ export function normalizeCodexEvent(
   if (eventName === 'Stop' && !hasCodexTranscriptSubagents(state, paneKey)) {
     // Why: Codex CLI 0.144 can omit child Stop hooks; later child activity safely recreates any agent still running.
     // Cleared, not deleted, so a reconcile cannot re-seed retired children from the previous row.
-    getOrCreateAgentDescendantRoster(state, paneKey).clear()
+    getOrCreateCodexSubagentRoster(state, paneKey).clear()
   }
   // Why: resolved after the transcript reconcile above, so this turn's reviewer is read from the
   // rollout during the very PermissionRequest being classified, not from a prior event.

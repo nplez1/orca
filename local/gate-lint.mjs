@@ -4,8 +4,8 @@
  *
  * `pnpm lint` is one `&&` chain, so it stops at the first failing step and says nothing about the
  * rest. That is how four ratchet reds (#161) hid each other, and why a red this fork did not cause
- * has had to be hand-verified as pre-existing in an unrelated PR. This gate runs every step on its
- * own and turns the set of failures into a verdict: a failure listed in
+ * has had to be hand-verified as pre-existing in an unrelated PR. This gate runs every step — the
+ * chain's and `FORK_LINT_STEPS` — on its own and turns the set of failures into a verdict: a failure listed in
  * `local/lint-known-red.json` is reported but does not fail the gate, a failure outside it does.
  *
  * Same shape as `local/gate-unit.mjs` for the unit suite (AGENTS.md § Release gate), and the same
@@ -107,6 +107,33 @@ export function resolveLintSteps(scripts) {
     }
     return { id: command, command, argv: ['pnpm', 'exec', ...command.split(/\s+/)] }
   })
+}
+
+/**
+ * Fork-only lint steps, run beside the chain. Why not in `package.json`'s `lint`: that is one line
+ * upstream edits ~100 times a month, so a step prepended to it conflicts on every sync. This file is
+ * fork-owned, so a sync cannot drop a step from here.
+ */
+export const FORK_LINT_STEPS = [
+  {
+    id: 'check-upstream-identity-literals',
+    command: 'node config/scripts/check-upstream-identity-literals.mjs',
+    argv: ['node', 'config/scripts/check-upstream-identity-literals.mjs']
+  }
+]
+
+/**
+ * The chain plus the fork steps. A fork step whose script is gone throws rather than being skipped,
+ * and one a sync has put back into the chain runs once.
+ */
+export function resolveGateSteps(scripts, forkSteps = FORK_LINT_STEPS, root = ROOT) {
+  const chain = resolveLintSteps(scripts)
+  for (const step of forkSteps) {
+    if (!existsSync(join(root, step.argv[1]))) {
+      throw new Error(`fork lint step "${step.id}" runs ${step.argv[1]}, which does not exist`)
+    }
+  }
+  return [...chain, ...forkSteps.filter((step) => !chain.some((own) => own.id === step.id))]
 }
 
 /**
@@ -258,7 +285,7 @@ function runStep(step, timeoutMs) {
 function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv)
   const manifest = readManifest(options.allowlist)
-  const steps = resolveLintSteps(
+  const steps = resolveGateSteps(
     JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts
   )
   const entries = Array.isArray(manifest.entries) ? manifest.entries : []

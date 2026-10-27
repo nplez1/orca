@@ -17,10 +17,17 @@ import {
   refExists,
   repoRoot,
   run,
+  splitNul,
   tailText,
   toolExists,
   toolPath
 } from './run.mjs'
+
+import { isSweepCandidate, orphanForkFiles } from './orphan-sweep.mjs'
+
+// What can carry an import specifier. Kept broad on purpose: a config script or a test importing a
+// fork module keeps it alive, so scanning only `src/` would report live files as orphans.
+const SOURCE_FILE = /\.[cm]?[jt]sx?$/
 
 export const FORK_SLUG = 'nplez1/orca'
 export const UPSTREAM_REF = 'upstream/main'
@@ -134,6 +141,43 @@ export function updaterFeed() {
         ? `feed override still points at the fork (${globbed.length} ${FEED_GLOB.prefix}*.ts helper(s) scanned)`
         : `${missing.length} feed override file(s) lost the fork reference`,
     details: [...scanFailures.map((line) => `  ! ${line}`), ...details]
+  }
+}
+
+/**
+ * Fork-only modules under `src/` that nothing imports. The sync cannot see these: no conflict marker
+ * points at a file upstream does not have, so a fork module whose last caller was removed upstream
+ * simply stops being read. Reported rather than failed — deleting is a judgement about product code,
+ * and the allowlist below is for entries loaded by path, which no import scan can prove alive.
+ */
+export function unreferencedForkModules({ allowlist = [] } = {}) {
+  const tracked = splitNul(gitText(['ls-files', '-z']))
+  const upstream = new Set(splitNul(gitText(['ls-tree', '-r', '--name-only', '-z', UPSTREAM_REF])))
+  if (upstream.size === 0) {
+    return {
+      status: STATUS.unavailable,
+      summary: `${UPSTREAM_REF} is not fetched, so fork-only files cannot be told from upstream's`,
+      details: ['run: git fetch upstream']
+    }
+  }
+  const candidates = tracked.filter((file) => !upstream.has(file) && isSweepCandidate(file))
+  const readable = tracked.filter((file) => SOURCE_FILE.test(file))
+  const sources = new Map()
+  for (const file of readable) {
+    try {
+      sources.set(file, readFileSync(path.join(repoRoot(), file), 'utf8'))
+    } catch {
+      // An unreadable file proves nothing either way; leaving it out can only add a false orphan.
+    }
+  }
+  const orphans = orphanForkFiles({ sources, forkOnly: candidates, allowlist })
+  return {
+    status: orphans.length === 0 ? STATUS.passed : STATUS.info,
+    summary:
+      orphans.length === 0
+        ? `${candidates.length} fork-only module(s) under src/, all referenced`
+        : `${orphans.length} fork-only module(s) nothing imports`,
+    details: orphans.map((file) => `  ? ${file}`)
   }
 }
 

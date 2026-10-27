@@ -1,6 +1,6 @@
 import { ExternalLink, Loader2, Lock, LockOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DeepSeekIcon } from '../status-bar/icons'
+import { DeepSeekIcon } from '../status-bar/fork-usage-providers'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'

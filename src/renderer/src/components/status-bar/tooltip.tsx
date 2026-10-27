@@ -1,19 +1,11 @@
-import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
+import type { ProviderRateLimits, RateLimitWindow } from '../../../../shared/rate-limit-types'
 import {
   formatResetCountdown,
   formatResetDuration
 } from '../../../../shared/rate-limit-reset-format'
 import { AgentIcon } from '@/lib/agent-catalog'
-import {
-  ClaudeIcon,
-  CopilotIcon,
-  DeepSeekIcon,
-  FireworksIcon,
-  GeminiIcon,
-  MiniMaxIcon,
-  OpenAIIcon,
-  OpenCodeGoIcon
-} from './icons'
+import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import { FORK_USAGE_PROVIDERS, isForkUsageProvider } from './fork-usage-providers'
 import { creditsItemRows, describeCredits } from './provider-credits-format'
 import { describeAllowance } from './provider-allowance-format'
 import { translate } from '@/i18n/i18n'
@@ -22,13 +14,14 @@ import {
   getProviderUsageErrorMessage,
   getProviderUsageStatusLabel
 } from './usage-error-copy'
-import type { UsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
-import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
-import { ProviderExtraUsageSection } from './provider-extra-usage-section'
 import {
-  ProviderRateLimitWindowSection,
-  getWindowSections
-} from './provider-rate-limit-window-sections'
+  clampUsedPercent,
+  getDisplayedUsagePercentage,
+  type UsagePercentageDisplay
+} from '../../../../shared/usage-percentage-display'
+import { formatUsagePercentageLabel } from './usage-percentage-label'
+import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
+import { barColor, ProviderExtraUsageSection } from './provider-extra-usage-section'
 
 export {
   barColor,
@@ -38,16 +31,13 @@ export {
 } from './provider-extra-usage-section'
 
 // Re-exported from its shared home so status-bar callers keep a single import.
-export { clampUsedPercent } from '../../../../shared/usage-percentage-display'
+export { clampUsedPercent }
 
 export {
   getProviderDisplayName,
   getProviderUsageErrorMessage,
   getProviderUsageStatusLabel
 } from './usage-error-copy'
-
-// Re-exported here so status-bar callers keep a single import path for tooltip pieces.
-export { getWindowSections } from './provider-rate-limit-window-sections'
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -124,14 +114,9 @@ export function ProviderIcon({ provider }: { provider: string }): React.JSX.Elem
   if (provider === 'cursor') {
     return <AgentIcon agent="cursor" size={13} />
   }
-  if (provider === 'deepseek') {
-    return <DeepSeekIcon size={13} />
-  }
-  if (provider === 'fireworks') {
-    return <FireworksIcon size={13} />
-  }
-  if (provider === 'copilot') {
-    return <CopilotIcon size={13} />
+  const forkProvider = isForkUsageProvider(provider) ? FORK_USAGE_PROVIDERS[provider] : null
+  if (forkProvider) {
+    return <forkProvider.Icon size={13} />
   }
   return <ClaudeIcon size={13} />
 }
@@ -167,6 +152,115 @@ function ErrorMessage({
     <div className="space-y-0.5">
       <div className={`text-[11px] font-medium ${labelClass}`}>{resolvedLabel}</div>
       <div className={detailClass}>{message}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Window section derivation
+// ---------------------------------------------------------------------------
+
+export function getWindowSections(
+  p: ProviderRateLimits
+): { label: string; window: RateLimitWindow | null }[] {
+  if (p.buckets?.length) {
+    const bucketSections = p.buckets.map((b) => ({ label: b.name, window: b as RateLimitWindow }))
+    return [
+      ...bucketSections,
+      // Why: Cursor reports the plan total in `monthly` and its pools as buckets,
+      // so dropping it here would hide the number closest to the user's cap.
+      ...(p.monthly
+        ? [
+            {
+              label:
+                p.provider === 'cursor'
+                  ? translate('auto.components.status.bar.tooltip.cursor.plan', 'Plan')
+                  : translate('auto.components.status.bar.tooltip.7f7f208060', 'Monthly'),
+              window: p.monthly
+            }
+          ]
+        : []),
+      {
+        label: translate('auto.components.status.bar.tooltip.252c096536', 'Weekly'),
+        window: p.weekly
+      }
+    ]
+  }
+  const sections: { label: string; window: RateLimitWindow | null }[] = [
+    {
+      label: translate('auto.components.status.bar.tooltip.94038ad2fa', 'Session'),
+      window: p.session
+    },
+    {
+      label: translate('auto.components.status.bar.tooltip.252c096536', 'Weekly'),
+      window: p.weekly
+    }
+  ]
+  if (p.fableWeekly !== undefined && p.fableWeekly !== null) {
+    sections.push({
+      label: translate('auto.components.status.bar.tooltip.a79c64f87e', 'Fable'),
+      window: p.fableWeekly
+    })
+  }
+  if (p.monthly !== undefined && p.monthly !== null) {
+    sections.push({
+      label:
+        p.provider === 'zcode'
+          ? translate('auto.components.status.bar.tooltip.zcode.mcp', 'MCP')
+          : translate('auto.components.status.bar.tooltip.7f7f208060', 'Monthly'),
+      window: p.monthly
+    })
+  }
+  return sections
+}
+
+// ---------------------------------------------------------------------------
+// Tooltip — progress bar section for a single window
+// ---------------------------------------------------------------------------
+
+// Why: the base tooltip component uses `bg-foreground text-background` which
+// inverts the color scheme (light bg in dark mode). These rich tooltips use
+// `text-background` for primary text and `text-background/50` for secondary
+// to stay readable inside the inverted tooltip container.
+
+function ProviderRateLimitWindowSection({
+  window,
+  label,
+  textClass,
+  mutedClass,
+  emptyBarClass,
+  usagePercentageDisplay,
+  now
+}: {
+  window: RateLimitWindow | null
+  label: string
+  textClass: string
+  mutedClass: string
+  emptyBarClass: string
+  usagePercentageDisplay: UsagePercentageDisplay
+  now: number
+}): React.JSX.Element | null {
+  if (!window) {
+    return null
+  }
+  const usedPct = clampUsedPercent(window.usedPercent)
+  const displayedPct = getDisplayedUsagePercentage(usedPct, usagePercentageDisplay)
+  const resetLabel = window.resetsAt ? formatResetCountdown(window.resetsAt - now) : null
+
+  return (
+    <div className="space-y-1">
+      <div className={`font-medium ${textClass}`}>{label}</div>
+      <div className={`h-[6px] w-full overflow-hidden rounded-full ${emptyBarClass}`}>
+        {/* Why: fill follows the selected percentage; color still signals consumption urgency. */}
+        <div
+          className={`h-full rounded-full ${barColor(usedPct)} transition-all duration-300`}
+          style={{ width: `${displayedPct}%` }}
+        />
+      </div>
+      <div className={`flex justify-between ${mutedClass}`}>
+        <span>{formatUsagePercentageLabel(usedPct, usagePercentageDisplay)}</span>
+        {resetLabel && <span>{resetLabel}</span>}
+      </div>
     </div>
   )
 }

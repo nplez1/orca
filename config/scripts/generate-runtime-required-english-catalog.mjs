@@ -1,8 +1,12 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
+import {
+  readEnglishCatalog,
+  readRuntimeRequiredCatalogs,
+  writeForkRuntimeRequiredCatalog
+} from './fork-english-catalog.mjs'
 import { collectLocalizationReferences } from './verify-localization-catalog.mjs'
 
 export const EN_CATALOG_RELATIVE_PATH = path.join(
@@ -129,23 +133,30 @@ function reportKeys(label, keys) {
 
 export async function main(root = process.cwd(), argv = process.argv.slice(2), sharedReferences) {
   const fix = argv.includes('--fix')
-  const catalogEntries = flattenCatalogEntries(
-    JSON.parse(await fs.readFile(path.join(root, EN_CATALOG_RELATIVE_PATH), 'utf8'))
-  )
+  const catalogEntries = flattenCatalogEntries(await readEnglishCatalog(root))
   const references = sharedReferences ?? (await collectLocalizationReferences(root))
   const requiredKeys = collectRuntimeRequiredKeys(catalogEntries, references)
-  const outputPath = path.join(root, RUNTIME_REQUIRED_RELATIVE_PATH)
+  const runtimeCatalogs = await readRuntimeRequiredCatalogs(root)
 
   if (fix) {
-    const catalog = buildRuntimeRequiredCatalog(catalogEntries, requiredKeys)
-    await fs.writeFile(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
+    const upstreamShipped = flattenCatalogEntries(runtimeCatalogs.upstream)
+    // Why: upstream's subset stays upstream's bytes; the fork ships what it omits or contradicts.
+    const forkKeys = new Set(
+      [...requiredKeys, ...upstreamShipped.keys()].filter(
+        (key) => catalogEntries.has(key) && upstreamShipped.get(key) !== catalogEntries.get(key)
+      )
+    )
+    await writeForkRuntimeRequiredCatalog(
+      root,
+      buildRuntimeRequiredCatalog(catalogEntries, forkKeys)
+    )
     console.log(
-      `Wrote ${requiredKeys.size} of ${catalogEntries.size} English entries to en-runtime-required.json.`
+      `Wrote ${forkKeys.size} fork entries to fork/en-runtime-required.json; ${requiredKeys.size} of ${catalogEntries.size} English entries must ship.`
     )
     return 0
   }
 
-  const shipped = flattenCatalogEntries(JSON.parse(await fs.readFile(outputPath, 'utf8')))
+  const shipped = flattenCatalogEntries(runtimeCatalogs.merged)
   const { missing, contradicting, superfluous } = collectRuntimeRequiredCatalogProblems(
     catalogEntries,
     requiredKeys,

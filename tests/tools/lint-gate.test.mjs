@@ -1,10 +1,16 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   classifyRun,
   extractFailureLines,
+  FORK_LINT_STEPS,
   matchesEntry,
+  resolveGateSteps,
   resolveLintSteps
 } from '../../local/gate-lint.mjs'
+
+const REPO_ROOT = join(import.meta.dirname, '..', '..')
 
 const SCRIPTS = {
   lint: 'oxlint && node config/scripts/check-thing.mjs && pnpm run check:other-ratchet',
@@ -30,6 +36,37 @@ describe('the lint chain is read from package.json, not restated', () => {
 
   it('refuses a chain that names a script package.json does not have', () => {
     expect(() => resolveLintSteps({ lint: 'pnpm run missing' })).toThrow(/missing/)
+  })
+})
+
+describe('fork-only steps run from the gate, not from package.json', () => {
+  const forkStep = {
+    id: 'check-thing',
+    command: 'node config/scripts/check-thing.mjs',
+    argv: ['node', 'config/scripts/check-thing.mjs']
+  }
+
+  // Why against the real tree: this is the only place the identity check runs locally now, so a
+  // gate that stopped resolving it would otherwise go quiet rather than red.
+  it('runs the fork identity check on this repository', () => {
+    const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+    expect(resolveGateSteps(scripts).map((step) => step.id)).toContain(
+      'check-upstream-identity-literals'
+    )
+    expect(FORK_LINT_STEPS.map((step) => step.id)).toContain('check-upstream-identity-literals')
+  })
+
+  it('runs a fork step once when a sync puts it back into the chain', () => {
+    const steps = resolveGateSteps({
+      lint: 'oxlint && node config/scripts/check-upstream-identity-literals.mjs'
+    })
+    expect(steps.map((step) => step.id)).toEqual(['oxlint', 'check-upstream-identity-literals'])
+  })
+
+  it('refuses a fork step whose script is gone instead of skipping it', () => {
+    expect(() =>
+      resolveGateSteps({ lint: 'oxlint' }, [forkStep], join(REPO_ROOT, 'no-such-root'))
+    ).toThrow(/check-thing/)
   })
 })
 

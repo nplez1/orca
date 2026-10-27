@@ -17,7 +17,12 @@
     "An entry for a file the gate does not run is a problem, not a pass. The gate runs upstream's own",
     "unit lane (`config/scripts/ci-unit-files.mjs` `UNIT_EXCLUDE`), so the 80 files that list drops —",
     "the electron, node-pty, live-shell and cross-version-wire ones — are upstream-quarantined and",
-    "deliberately absent here."
+    "deliberately absent here.",
+    "",
+    "An entry may carry a `match` regex, tested against the first line of the failure message. It is",
+    "what stops an allowlisted test from covering a NEW failure under the same name: without it the",
+    "entry matches on file and title alone, so a passed-in reason stays \"known\" for as long as the",
+    "title does. A `match` is only added where the failure text was observed to carry that signature."
   ],
   "recordedAt": "2026-10-25",
   "observedRun": {
@@ -611,12 +616,6 @@
   },
   "unhandledErrors": [
     {
-      "headline": "Error: selector_not_found",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Raised by src/main/runtime/orca-runtime.test.ts: `does not coalesce concurrent same-id removals on different hosts` hands the in-flight removal promise to the second caller without awaiting it, and that promise rejects with selector_not_found. Pre-existing at 1a64dbe2f6; the coalescing map is upstream code. Declared for the headline, not for a test: the 2026-10-22 full run raised none."
-    },
-    {
       "headline": "Error: [vitest-pool]: Worker node-runtime emitted error.",
       "class": "pool-crash",
       "owner": "unattributed",
@@ -625,131 +624,11 @@
   ],
   "entries": [
     {
-      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "managed SSH workflow command keeps compatibility with legacy checkout refs",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "managed SSH workflow command keeps compatibility with missing checkout refs",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "managed SSH workflow command keeps full daily and explicit suite execution for ",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "managed SSH workflow command keeps full daily and explicit suite execution for [\"tests/e2e/ssh-orcad-\",\"tests/e2e/ssh-orcad-open-in-owner.spec.ts\"]",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
-      "test": "managed SSH workflow command passes only the selected SSH files to Playwright, with literal file matching",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the workflow step these cases execute calls `mapfile`, which macOS /bin/bash 3.2 does not have (`bash: mapfile: command not found`); the ubuntu runners ship bash 5.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/dependency-security-release.test.mjs",
-      "test": "extracts release data while excluding executable package and Cargo configuration",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the audit action the case extracts runs a bash step with `mapfile`, absent from macOS bash 3.2 — same class as ci-managed-ssh-execution.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/macos-terminal-host-bundle.test.mjs",
-      "test": "terminal host assembly flags a require that only resolves outside the helper",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the case reads one yaml decoy as a require that resolves outside the helper bundle; the resolver walks the same /private/var indirection this machine adds.",
-      "flaky": false
-    },
-    {
       "file": "config/scripts/main-entry-facade.test.ts",
       "test": "keeps main code and asset paths working after a CLI build replaces its public entry",
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md: the CLI build harness these cases drive times out or reports a mismatched result document on this machine.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual addition",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual deletion",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual rename",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual type change",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Mobile CI complete Git change evidence retains full root units for an actual addition",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Mobile CI complete Git change evidence retains full root units for an actual deletion",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Mobile CI complete Git change evidence retains full root units for an actual rename",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
-      "flaky": false
-    },
-    {
-      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
-      "test": "Mobile CI complete Git change evidence retains full root units for an actual type change",
-      "class": "host-toolchain",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the admission script counts an empty array under `set -u`, which macOS bash 3.2 rejects (`MOBILE_CI_ARGS[@]: unbound variable`) and bash 5 does not.",
       "flaky": false
     },
     {
@@ -801,68 +680,13 @@
       "flaky": false
     },
     {
-      "file": "src/main/cli/packaged-cli-assets.test.ts",
-      "test": "packaged CLI assets sanitizes node env and forwards argv verbatim through the macOS launcher",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: the darwin launcher resolves /var to /private/var with `cd -P` while the case builds its argv from the unresolved os.tmpdir().",
-      "flaky": false
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths forks the session scanner child shipped beside orcad.js",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths forks the watcher child shipped beside orcad.js",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths ignores a decoy child under the working directory",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
-      "test": "orcad forked-child paths reports the install root and the Node binary, not the data directory",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md: upstream file, the same /private/var signature on all four cases.",
-      "flaky": false
-    },
-    {
       "file": "src/main/persistence/profile-state/profile-state-streaming-validation.test.ts",
       "test": "complete streaming profile validation accepts extra columns that shadow every SQLite rowid alias",
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md np.37: the bundled SQLite refuses the extra column that shadows its rowid alias (`cannot add rowid alias: rowid`) where the contract expects it accepted.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/runtime/orca-runtime.test.ts",
-      "test": "OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
-      "flaky": false
-    },
-    {
-      "file": "src/main/runtime/orca-runtime.test.ts",
-      "test": "OrcaRuntimeService sets up an existing folder on a fresh runtime after importing the repo project",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "Both cases compare against the os.tmpdir() they created; the runtime stores the resolved /private/var path, so the imported-folder rows and the project identity never compare equal.",
-      "flaky": false
+      "flaky": false,
+      "match": "cannot add rowid alias"
     },
     {
       "file": "src/main/sqlite/sync-database-portability.test.ts",
@@ -873,20 +697,13 @@
       "flaky": false
     },
     {
-      "file": "config/scripts/verify-cli-bin.test.mjs",
-      "test": "verifyPackageCliBin accepts a non-empty Node entrypoint and can run help through Node",
-      "class": "macos-path-semantics",
-      "owner": "upstream",
-      "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream case; the child's process.cwd() reports /private/var/folders/... while the case compares the unresolved os.tmpdir() /var/folders/... it created. Test and verify-cli-bin.mjs are byte-identical to upstream 0571e45107; Linux tmp is not a symlink.",
-      "flaky": false
-    },
-    {
       "file": "config/scripts/reclaim-worktree-generated-files.test.mjs",
       "test": "reclaims read-only generated directories without chmodding hardlinked package files",
       "class": "host-toolchain",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: new upstream file, byte-identical to 0571e45107. The script recovers only from EACCES/EPERM; under bun on macOS (1.4.3 and 1.4.4 both probed) fs.rm on a 0o555 directory fails with ENOTEMPTY instead, where Node reports EACCES, so the in-process case cannot recover and its afterEach then also fails ENOTEMPTY. The CLI cases, which spawn Node, pass.",
-      "flaky": false
+      "flaky": false,
+      "match": "Some generated directories could not be removed"
     },
     {
       "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
@@ -894,7 +711,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "tests/e2e/helpers/persisted-profile-state.unit.test.ts",
@@ -902,7 +720,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/editor-view-layout-apply.test.ts",
@@ -910,7 +729,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/restored-editor-move-restart.test.ts",
@@ -918,7 +738,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
@@ -926,7 +747,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/runtime/workspaces/persisted-surfaces/sweep-terminal-placement.test.ts",
@@ -934,7 +756,8 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "Unable to read profile state database"
     },
     {
       "file": "src/main/ai-vault-search/session-search-indexer.test.ts",
@@ -942,7 +765,171 @@
       "class": "sqlite-binding",
       "owner": "upstream",
       "evidence": "LOCAL-PATCHES.md 2026-10-25 sync: the merge raised config/.bun-version 1.4.3 -> 1.4.4, and bun's node:sqlite on macOS loads Apple's system SQLite, which cannot open a WAL database read-only once close() has removed -wal/-shm ('unable to open database file' / ProfileStateDatabaseOpenError). Same HEAD passes under bun 1.4.3 and under Node; a 10-line node:sqlite probe reproduces it under bun 1.4.4 only. The test and every module it reaches are unchanged from the pre-merge fork, which passed in the 2026-10-22 gate.",
-      "flaky": false
+      "flaky": false,
+      "match": "unable to open database file"
+    }
+  ],
+  "prunedSince": [
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps compatibility with legacy checkout refs",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the workflow step these cases execute calls mapfile, which Apple's /bin/bash 3.2 lacks; homebrew bash 5.3.20 now resolves first on PATH"
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps compatibility with missing checkout refs",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the workflow step these cases execute calls mapfile, which Apple's /bin/bash 3.2 lacks; homebrew bash 5.3.20 now resolves first on PATH"
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps full daily and explicit suite execution for ",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the workflow step these cases execute calls mapfile, which Apple's /bin/bash 3.2 lacks; homebrew bash 5.3.20 now resolves first on PATH"
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command keeps full daily and explicit suite execution for [\"tests/e2e/ssh-orcad-\",\"tests/e2e/ssh-orcad-open-in-owner.spec.ts\"]",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the workflow step these cases execute calls mapfile, which Apple's /bin/bash 3.2 lacks; homebrew bash 5.3.20 now resolves first on PATH"
+    },
+    {
+      "file": "config/scripts/ci-managed-ssh-execution.test.mjs",
+      "test": "managed SSH workflow command passes only the selected SSH files to Playwright, with literal file matching",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the workflow step these cases execute calls mapfile, which Apple's /bin/bash 3.2 lacks; homebrew bash 5.3.20 now resolves first on PATH"
+    },
+    {
+      "file": "config/scripts/dependency-security-release.test.mjs",
+      "test": "extracts release data while excluding executable package and Cargo configuration",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the audit action's bash step calls mapfile; same bash install"
+    },
+    {
+      "file": "config/scripts/macos-terminal-host-bundle.test.mjs",
+      "test": "terminal host assembly flags a require that only resolves outside the helper",
+      "class": "macos-path-semantics",
+      "commit": "05fd6bd8e0",
+      "reason": "the case compared an unresolved mkdtemp(tmpdir()) against a path the subject had resolved to /private/var; it now resolves first"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual addition",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual deletion",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual rename",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Daemon mock complete Git change evidence keeps platform packages for an actual type change",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual addition",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual deletion",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual rename",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "test": "Mobile CI complete Git change evidence retains full root units for an actual type change",
+      "class": "bash-3.2",
+      "commit": "28b86984e4",
+      "reason": "the admission script indexes an empty array under set -u, which bash 3.2 rejects and bash 5 accepts; same bash install"
+    },
+    {
+      "file": "src/main/cli/packaged-cli-assets.test.ts",
+      "test": "packaged CLI assets sanitizes node env and forwards argv verbatim through the macOS launcher",
+      "class": "macos-path-semantics",
+      "commit": "05fd6bd8e0",
+      "reason": "same unresolved-tmpdir defect against the darwin launcher's cd -P"
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths forks the session scanner child shipped beside orcad.js",
+      "class": "macos-path-semantics",
+      "commit": "8be888db9f",
+      "reason": "same unresolved-tmpdir defect against the resolved deploy root; upstream has not fixed this one, so it is a fork-local fix"
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths forks the watcher child shipped beside orcad.js",
+      "class": "macos-path-semantics",
+      "commit": "8be888db9f",
+      "reason": "same unresolved-tmpdir defect against the resolved deploy root; upstream has not fixed this one, so it is a fork-local fix"
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths ignores a decoy child under the working directory",
+      "class": "macos-path-semantics",
+      "commit": "8be888db9f",
+      "reason": "same unresolved-tmpdir defect against the resolved deploy root; upstream has not fixed this one, so it is a fork-local fix"
+    },
+    {
+      "file": "src/main/orcad/orcad-forked-child-paths.test.ts",
+      "test": "orcad forked-child paths reports the install root and the Node binary, not the data directory",
+      "class": "macos-path-semantics",
+      "commit": "8be888db9f",
+      "reason": "same unresolved-tmpdir defect against the resolved deploy root; upstream has not fixed this one, so it is a fork-local fix"
+    },
+    {
+      "file": "src/main/runtime/orca-runtime.test.ts",
+      "test": "OrcaRuntimeService keeps existing-folder imports split by runtime host on the same normalized path",
+      "class": "macos-path-semantics",
+      "commit": "fbb41b497d",
+      "reason": "/private/var vs /var (upstream fixed it in #33540, taken byte-for-byte) and selector_not_found, whose rejection settled unobserved because the test awaited a different promise"
+    },
+    {
+      "file": "src/main/runtime/orca-runtime.test.ts",
+      "test": "OrcaRuntimeService sets up an existing folder on a fresh runtime after importing the repo project",
+      "class": "macos-path-semantics",
+      "commit": "fbb41b497d",
+      "reason": "/private/var vs /var (upstream fixed it in #33540, taken byte-for-byte) and selector_not_found, whose rejection settled unobserved because the test awaited a different promise"
+    },
+    {
+      "file": "config/scripts/verify-cli-bin.test.mjs",
+      "test": "verifyPackageCliBin accepts a non-empty Node entrypoint and can run help through Node",
+      "class": "macos-path-semantics",
+      "commit": "05fd6bd8e0",
+      "reason": "same unresolved-tmpdir defect in a spawned child's reported cwd"
     }
   ]
 }

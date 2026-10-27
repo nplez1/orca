@@ -12,12 +12,22 @@ Rules for using it:
 - `Do not` lines are the expensive mistakes this fork has already made once.
 - When a decision is superseded by upstream, record the new one and delete the old, rather than
   accumulating contradictory entries.
+- A **`Paths:` glob must name what the entry decides.** A glob wide enough to catch the whole tree makes
+  "this path has a decision" true everywhere and worthless — the Identity section was `src/**`, which
+  matched 227 of the 233 pending conflicts. Narrow it, or say `**Reach:** catch-all` so nothing reads it
+  as coverage.
+- A **`Resolution:` line says what to do** with a matched conflict, not what the design is: `keep-ours`,
+  `take-theirs`, `delete` (propose `git rm`), `rerere`, or `manual`. Prose cannot be executed, so a
+  modify/delete conflict is currently re-decided by a human on every sync.
 
 ---
 
 ## SSH relay removal: upstream's orcad model wins
 
 **Paths:** `src/relay/**`, `src/wsl-guest/**`, `src/shared/ssh-ai-vault-relay.ts`, `src/main/providers/ssh-filesystem-*.ts`, `src/main/runtime/runtime-file-commands-search-remote-quick-*`, `src/main/runtime/runtime-file-commands-workspace-path-search.ts`, `src/main/ipc/filesystem/filesystem-remote-path-search.ts`, `src/main/providers/ssh-filesystem-provider-crud.ts`, `src/main/ai-vault/remote-session-scanner-*.ts`
+
+**Resolution:** take-theirs — upstream retired the relay, so their deletion of these files wins and the
+fork's SSH path-search stack goes with it
 
 **Decision:** Upstream's deletion of the SSH relay stands. The 2026-10-11 sync takes the whole
 `src/relay/` removal (`2b4b60a87e` the server, `ff27338299` the client path) instead of reverting
@@ -188,6 +198,14 @@ promise is published by `initializeStatusHookOwner()` in
 sources (`jcode`, `qoder-cn`, `qwen-code`) get `null` descendant adapters until something emits
 descendant facts for them.
 
+**Addendum 2026-10-27 — the codex half of that decision is retired.** Upstream's
+`codex-subagent-roster.ts` is the codex roster again (`CodexSubagentRoster`,
+`getOrCreateCodexSubagentRoster`), restored byte-identical to the sync base with six files back to
+zero fork hunks. `agent-descendant-roster.ts` keeps only the pi/claude descendant extras, so this entry
+now governs those lanes and not the codex one. Reason: the rename cost a modify/delete plus importer
+rewrites on every sync for no behaviour, and upstream's cap-removal port survives in upstream's own
+file.
+
 **Why:** the rename is fork-wide and recurrent — upstream keeps adding files that import the old
 name; `main/codex/codex-subagent-roster.ts` is a _different_ module and keeps its name.
 
@@ -332,13 +350,15 @@ one silently dropped reports success with the wrong rows or no progress.
 
 **Paths:** `src/renderer/src/components/settings/accounts-search*.ts`, `src/renderer/src/components/settings/AccountsPane*.tsx`, `src/main/ipc/register-core-handlers/**`
 
-**Decision:** the newer-provider search catalogs live in `accounts-search-extra-providers.ts` and
-are re-exported from `accounts-search.ts` to stay under the 300-line cap (Grok, Cursor, Antigravity,
-ZcodePlan). Credential sections are split per provider; a pane that mounts `OpenCodeGoCredentials`
-or a GLMT plan section needs those `window.api` doubles in its test.
+**Decision:** the search catalogs live in `accounts-search.ts` — upstream's four (Grok, Cursor,
+Antigravity, ZcodePlan) in upstream's order, then the fork's three (DeepSeek, Fireworks, Copilot) as
+pure additions after them. Credential sections are split per provider; a pane that mounts
+`OpenCodeGoCredentials` or a GLMT plan section needs those `window.api` doubles in its test.
 
-**Why:** `accounts-search.ts` was over the cap once already; moving catalogs out is the accepted way
-to stay inside it, and no `max-lines` suppression is allowed.
+**Why:** this was `accounts-search-extra-providers.ts` from 2026-10-15 until 2026-10-26, and the reason
+then was the 300-line cap. The cap is now off (`max-lines` is `"off"` in every `.oxlintrc.json`), so a
+split is no longer a reason to move upstream's code — and leaving upstream's entries where upstream has
+them turns this file's next sync into an addition rather than a rival copy.
 
 **Do not:** add a `max-lines` disable, or inline a credential section back into `AccountsPane.tsx`.
 
@@ -390,7 +410,19 @@ startup command.
 
 ## Identity: this fork ships as Orca NP
 
-**Paths:** `config/**`, `native/**`, `resources/**`, `mobile/**`, `src/**`, `package.json`
+**Paths:** `package.json`, `config/electron-builder.config.cjs`, `config/nsis/**`, `config/scripts/{build-notification-status-macos,check-upstream-identity-literals,computer-use-bundle-identity,dev-electron-bundle-identity,smoke-packaged-cli,verify-agent-hook-stdin-lifecycle}.mjs`, `native/**`, `resources/**`, `mobile/**`, `src/cli/**`, `src/main/cli/**`, `src/main/{floating-workspace-launch-directory,home-directory-migration,macos-press-and-hold-default,macos-tcc-prompt-watch}.ts`, `src/main/{agent-hooks,ai-vault,jenkins,pi,runtime,skills}/**`, `src/main/{ipc/floating-workspace-directory,ipc/notification-system-settings-link,ipc/pty/host-env/assembly,startup/dev-instance-identity}.ts`, `src/renderer/src/components/settings/**`, `src/renderer/src/i18n/locales/en.json`, `src/shared/{agent-launch-remote,app-directory-names,app-display-name,local-build-compatibility-contract,orca-cli-command-name,orca-repository,orcad-artifacts,release-channel,tui-agent-config-table}.ts`, `src/shared/local-build-compatibility-contract.json`, `src/shared/rpc-contract/orchestration-params.ts`
+
+**Resolution:** manual. The identity literal is `keep-ours`, but everything around it is upstream's, so
+this is a hunk-level decision and a whole-file verb would revert upstream's work wholesale. The fork's
+names, paths and bundle ids are the product, so they win wherever they appear — and nothing else in these
+files is the fork's to hold. An edit that keeps a whole file because one literal is in it is how this
+entry got a 227-path match.
+
+**Reach:** wide by nature — identity is a rename, not a module, so it lands wherever a name, path or
+bundle id is written (49 non-test files at 2026-10-26, 44 of them upstream-owned). It was `src/**`
+until then, which matched 227 of the 233 pending conflicts and made "this path has a ledger decision"
+worthless; it is now the files that actually carry an identity literal. Still do not read a match here
+as "this conflict has a decision" — check whether a narrower section also matched.
 
 **Decision:** `Orca NP`, bundle `com.nplez1.orca`, CLI `orca-np` (`orca-np-dev` in dev), packaged
 userData `appData/orca-np`, home directory `~/.orca-np`, NSIS ProgIDs `OrcaNP.Markdown` /
@@ -522,23 +554,103 @@ re-export stays, because the fork lifted those constants out of `protocol-versio
 
 ---
 
-## Dashboard and the popout window
+## Dashboard delivery: a content-area view, not a drawer or a pop-out
 
-**Paths:** `src/renderer/src/components/dashboard/**`, `src/renderer/src/components/dashboard-popout/**`, `src/main/ipc/dashboard*.ts`, `src/preload/api/dashboard*.ts`, `src/main/window/dashboard-popout-window*`
+**Paths:** `src/renderer/src/components/dashboard/AgentDashboard{Page,Drawer}*`,
+`src/renderer/src/components/dashboard/agent-dashboard-open-mode*`,
+`src/renderer/src/components/dashboard-popout/DashboardPopoutRoot*`,
+`src/renderer/src/components/dashboard-popout/useDashboardSnapshot*`,
+`src/renderer/src/components/dashboard/DashboardPopoutBridge*`,
+`src/renderer/src/components/dashboard/useDashboardPopoutBridge*`,
+`src/renderer/src/components/sidebar/AgentDashboard{SidebarHost,Drawer}*`, `src/renderer/src/popout.*`,
+`src/preload/api/dashboard-api.ts`, `src/preload/api/dashboard-bridge.ts`
 
-**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx`). The popout
-window plumbing (`src/main/window/dashboard-popout-window.ts`, its test, the popout IPC and preload)
-was **deleted** by the fork, so upstream's later fixes to those files are taken as deletions rather
-than merged back in.
+**Resolution:** delete
 
-**Ack intent (2026-10-07 sync):** the fork keeps the 1-arg ack — `onAckAgent: (paneKey: string) =>
-void` on `AgentKanbanBoard`, calling `onAckAgent(card.paneKey)` — and does not adopt upstream's
-`AgentSubjectReadIntent` parameter. Upstream added it with the popout relay the fork deleted; the
-fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept, so adopting the
-parameter would be cosmetic. The merge's test file had both assertions (`'explicit'`, `'view'`) from
-upstream's side; both are reverted to the 1-arg form.
+**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx` rendered by
+`AppWorkspaceShell.tsx:80` while `activeView === 'dashboard'`), and that view is the only delivery the
+fork ships. This is a **product decision the owner made explicitly on 2026-10-26**: upstream's drawer
+and pop-out window are not a better version of the fork's page, they are a different feature the fork
+does not want. Both surfaces are therefore dead ends here, not candidates for restore.
 
-**Do not:** restore the popout window to carry an upstream fix.
+The renderer half of upstream's delivery — the drawer, the sidebar host, `popout.html`/`popout.tsx`,
+`DashboardPopoutRoot`, `useDashboardSnapshot`, the open-mode and bridge hooks — cannot be restored
+inertly, and that is a structural fact rather than a preference: upstream's drawer needs
+`AppState.agentDashboardDrawerOpen`, which #44 removed, and its `DashboardPopoutRoot` renders the same
+`AgentKanbanBoard` the fork's live page renders, so restoring it puts a second live board over one
+snapshot. The preload pair (`dashboard-api.ts`, `dashboard-bridge.ts`) only exists to publish
+`window.api.dashboard`, which the fork's board stopped calling when it dropped the pop-out relay;
+`dashboard-bridge.ts` type-checks itself against `PreloadApi['dashboard']`, so keeping it forces a
+`dashboard` member onto `PreloadApi` for a runtime API that nothing registers.
+
+**Do not:** measure this by restore-and-run. Restoring all 22 files was tried: 11 of 57 cases fail and
+`tc:web` reports 29 errors, because upstream's renderer half has moved past the fork's. The number is
+not a reason to change the decision — it is the cost of a delivery the fork rejected.
+
+---
+
+## Dashboard popout plumbing: upstream's bytes, held inert
+
+**Paths:** `src/main/ipc/dashboard-popout.ts`, `src/main/ipc/dashboard-popout.test.ts`,
+`src/main/window/dashboard-popout-window.ts`, `src/main/window/dashboard-popout-window.test.ts`
+
+**Resolution:** take-theirs
+
+**Decision:** these four are byte-identical to `upstream/main` and stay that way. They are dead —
+nothing registers the IPC and nothing opens the window, because `electron.vite.config.ts` has no
+`popout` entry and there is no `popout.html` to load. Holding them costs nothing (they typecheck and
+their 33 cases pass) and removes four modify/delete conflicts, so a sync should take upstream's version
+without reading it. The fork contributes nothing to these files and must not start.
+
+**Do not:** wire them up to "carry" an upstream fix. They exist to merge cleanly, not to ship. The
+preload halves that would have completed the wiring are deleted by the entry above, so a restore of
+that wiring cannot compile.
+
+---
+
+## Agent board: click jumps to the workspace, ack takes no intent
+
+**Paths:** `src/renderer/src/components/dashboard-popout/AgentKanbanBoard.tsx` (+ its test)
+
+**Resolution:** manual
+
+**Decision:** the fork's board differs from upstream's in behaviour, not only in routing, and every
+difference is deliberate:
+
+- **A card click follows `snapshot.cardClickAction`** — `'workspace'` (the default) dispatches
+  `dashboardCardRevealArgs(card)` to the workspace, `'preview'` opens the in-board terminal dialog.
+  Upstream always opens the dialog. The setting lives in `np-settings-types.ts` and is the fork's own.
+- **Ack is 1-arg** (`onAckAgent: (paneKey: string) => void`, calling `onAckAgent(card.paneKey)`).
+  Upstream's `AgentSubjectReadIntent` parameter arrived with the pop-out relay the fork deleted; the
+  fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept.
+- **No pop-out relays.** Upstream defaults `onAckAgent`/`onRevealAgent` to `window.api.dashboard.*`
+  relays; the fork passes both from the page and deleted the relays.
+
+This file is a 14-hunk conflict on every sync and `manual` is the honest resolution: a whole-file
+`keep-ours` would revert upstream's unrelated board work, and `take-theirs` would revert the click
+behaviour the owner chose. The comments that name the pop-out _are_ kept, because restoring upstream's
+text would describe a renderer the fork no longer builds.
+
+**Do not:** "modernise" the board to upstream's prop shape as a merge-cleanliness exercise. The relays
+would have to come back for the defaults to mean anything, and that reverses the entry above.
+
+---
+
+## Pending PR-comment acknowledgements: no snapshot thread resolver
+
+**Paths:** `src/renderer/src/components/right-sidebar/pr-comment-snapshotted-thread-resolver*`
+
+**Resolution:** delete
+
+**Decision:** #169 made the pending ack reply-only and removed
+`PendingPRCommentAiAckGithubResolveTarget`, `PendingPRCommentAiAckGitlabTarget` and the
+`githubResolveTarget`/`gitlabTarget` fields this resolver works against. It cannot compile without
+resurrecting that model, and a dead file is not a reason to bring a removed capability back.
+`local/sync/mergeability-plan.md` § 5 carries the same decision, and
+`local/sync/expected-deletions.json` asserts it.
+
+**Do not:** restore it to "keep the file present". Presence is only free when the file still compiles
+against the tree it sits in; this one does not.
 
 ---
 
@@ -808,6 +920,27 @@ emitters out of `src/main/ipc/settings.ts`; `worktree-set-parent-selector.ts` to
 `index-project-setup-test-fixtures.ts` took the project fixtures and a `legacyProjectSetup` builder
 out of `src/cli/index-project-setup.test.ts`.
 
+**2026-10-26 reversal: the cap is off, and six of those splits are undone.** `max-lines` is now `"off"`
+in all four `.oxlintrc.json` overrides, because the cap was making the fork evict _upstream_ code into
+fork-owned files — a permanent conflict at the carve point plus a copy that silently drifts. Six blocks
+went back into the upstream file they came from, verbatim from the merge base, and the sibling files are
+gone:
+
+| Back into                                                     | From                                      |
+| ------------------------------------------------------------- | ----------------------------------------- |
+| `src/renderer/src/components/status-bar/tooltip.tsx`          | `provider-rate-limit-window-sections.tsx` |
+| `src/renderer/src/components/editor/CheckRunDetailsPanel.tsx` | `check-run-details-status.ts`             |
+| `src/renderer/src/web/preload-api/web-filesystem-api.ts`      | `web-file-mutation-session.ts`            |
+| `src/main/claude/hook-settings.ts` + `hook-service.ts`        | `claude-status-line-slot.ts`              |
+| `src/renderer/src/components/settings/accounts-search.ts`     | `accounts-search-extra-providers.ts`      |
+| `src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts`  | `filesystem-watcher-wsl-snapshot.ts`      |
+
+Each was upstream's code with no fork content beyond an `export` keyword, so the split bought nothing
+once the cap went. Thirty-one other splits were examined and left alone because the block carries fork
+code, was restructured rather than moved, or upstream has since changed it — the measured table is in
+the 2026-10-26 analysis. **A split whose block is fork-authored is not affected by this:** that file is
+the fork's own and stays.
+
 ---
 
 ## The Jira product line: upstream's shape, the fork's extra capabilities
@@ -1010,14 +1143,14 @@ methods use, with its imports re-pointed at `files/search/file-search`, `files/f
 `files/file-target`.
 
 **Why this was easy to miss:** no conflict marker pointed at it. The orphan only shows up as a
-fork-only module that no longer has an importer. **Follow-up:** add the sweep to
-`local/sync/post-sync.mjs` — take every path in the pre-sync fork-only inventory under `src/`
-(no tests/fixtures), resolve every `from './x'`, `import './x'` and `from '@/x'` specifier in the
-tree, and report each fork-only file nothing references. Run on 2026-10-15 it found exactly this
-module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
-`quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already
-unreferenced at the fork tip), so the check needs an allowlist for known-dead paths and for worker
-entries loaded by path (`workspace-path-index-benchmark-worker-entry.ts`).
+fork-only module that no longer has an importer. **Follow-up — done 2026-10-27.** `post-sync.mjs` now runs `unreferenced-fork-modules`, built on
+`lib/orphan-sweep.mjs`: every fork-only path under `src/` (no tests, no fixtures) checked against the
+specifiers every tracked source file carries, including the `@/` and `@renderer/` aliases. Run on
+2026-10-27 it found this module plus four pre-existing dead files (`task-page-jira-board-page-state.ts`,
+`quick-open-path-inventory-limits.ts`, `workspace-path-search-request-budget.ts`, already unreferenced
+at the fork tip) — all four are now deleted (§ 4.9 of the plan). Two limits it states rather than hides:
+a cycle of two files that only import each other reads as live, and entries loaded by path
+(`…benchmark-worker-entry.ts`) need the allowlist argument.
 
 **Do not:** rebuild the old inheritance chain; add new file-command units as composed fields here.
 
@@ -1289,6 +1422,12 @@ deletion stands and upstream's removal is ported into the renamed module and its
 `posts every running child` expectation. The constant is deleted from `agent-status-types.ts` and must
 not come back — nothing references it any more (the fork's Pi async-subagent test takes upstream's
 uncapped assertion).
+
+**Addendum 2026-10-27 — reversed: the deletion does not stand.** Upstream's
+`codex-subagent-roster.ts` is restored at its own path and name, byte-identical to the sync base, and
+the cap removal (upstream's own, which it made in that file) came with it. `agent-descendant-roster.ts`
+keeps only the pi/claude extras. The rename was the divergence; `AGENT_STATUS_MAX_SUBAGENTS` still must
+not come back, and that part of this entry holds.
 
 ### The SSH tree, the watcher and the RPC error helper moved; fork-owned files followed
 
@@ -1737,11 +1876,13 @@ is not.
 
 **Paths:** `src/shared/skill-freshness.ts`, `src/shared/skill-freshness.test.ts`
 
-**Decision.** Upstream deleted the module (the renderer owns those types now); the fork keeps it for
+**Decision.** Upstream deleted the module (the renderer owns those types now); the fork kept it for
 the both-owner lock-source rule (`isOrcaSkillLockSource` accepts `stablyai/orca` and `nplez1/orca`).
-**Open:** after the merge nothing but its own test imports it — the renderer's freshness status now
-derives from upstream's bundled-skill plan — so the rule is not on a live path. The next change here
-either wires it into upstream's ownership check or deletes it; do not leave it to drift.
+**Resolution: delete** — resolved 2026-10-27. After the merge nothing but its own test imported it: the
+renderer's freshness status derives from upstream's bundled-skill plan, so the rule was not on a live
+path and the file recorded a policy the app no longer applied. `isOrcaSkillLockSource` and
+`ORCA_SKILL_LOCK_SOURCES` are gone with it. If a both-owner rule is ever needed again it belongs in
+upstream's ownership check, not in a resurrected dead module.
 
 ### The unit gate runs upstream's lane setting: `recordDependencies=false`
 

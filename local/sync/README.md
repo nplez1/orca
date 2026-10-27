@@ -12,7 +12,6 @@ The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUN
 | `conflicts.mjs`         | stopped in a conflict, or to predict one                | no                                                                                       |
 | `post-sync.mjs`         | the tree is resolved and you are about to push          | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
 | `identity-sweep.mjs`    | any time the tree is not conflicted                     | only with `--fix`                                                                        |
-| `curate.mjs`            | you want a plan for collapsing `docs(fork)` bookkeeping | `--write-manifest` writes `local/sync/patch-series.json`; never builds a branch          |
 | `convergence-ledger.md` | every time a convergence question comes up              | edit it when you settle one                                                              |
 
 **Neither sync script is read-only.** `pre-sync.mjs` and `post-sync.mjs` both run
@@ -27,7 +26,7 @@ ref or writes git config.
 git fetch origin && git fetch upstream
 node local/sync/pre-sync.mjs --prepare
 
-# 1. sync the release line (merges) or a feature branch / patch series (rebase)
+# 1. sync the release line (merge) or a feature branch (rebase; there is no patch series)
 git merge upstream/main
 
 # 2. work the conflicts
@@ -78,15 +77,12 @@ This reports them against a documented allowlist (the `orca://` scheme, the rela
 legacy daemon exe name) and fixes only the mechanical literal cases. Persisted-path changes are
 report-only until the `~/.orca` migration is designed.
 
-**`curate.mjs`** — plans a curated, linear patch series: a contiguous partition of the existing line,
-where each patch's tree is a real historical tree, so a series built from the plan ends byte-identical
-and nothing can change behaviourally. `--plan` prints the partition and `--write-manifest` records it;
-applying it is a manual, reviewed operation, because building the branch would overwrite an existing
-`nplez1/curated` and every commit it made would go through the commit hooks. Folding is limited to
-`docs(fork)` bookkeeping; `fix(sync)` is reported as its own bucket and never folded — `0ca31372cc`
-restored authorization behaviour across 14 files. It was **not** applied on 2026-10-05, because the
-gain measured ~15 fewer patches out of ~148 in exchange for a second public rewrite of the release
-line. Prefer it only when the bookkeeping has accumulated again.
+**`curate.mjs`** — **retired 2026-10-27.** It planned a curated, linear patch series for the _rebase_
+era: a contiguous partition of the release line where each patch's tree is a real historical tree. It
+counted from `git log merge-base..HEAD` without `--first-parent`, so it counted 332 commits including
+merges, and its per-group byte-identical promise does not hold on non-linear history. It was never
+applied. The series it planned does not exist as a separable thing, so finishing the tool would have
+bought a plan for a branch nobody can build.
 
 **`convergence-ledger.md`** — the reason a decision does not have to be made twice. `rerere` reuses
 textual conflict shapes; it cannot remember that upstream's key-store factory beat ours, or that the

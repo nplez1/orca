@@ -4,7 +4,8 @@ import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
-const EN_CATALOG_PATH = path.join('src', 'renderer', 'src', 'i18n', 'locales', 'en.json')
+import { readEnglishCatalog } from './fork-english-catalog.mjs'
+
 const PLACEHOLDER_RE = /\{\{[^}]+\}\}/g
 
 function flattenCatalog(value, prefix = '', entries = new Map()) {
@@ -110,7 +111,7 @@ export async function main(root = process.cwd()) {
   try {
     const [extractedCatalog, englishCatalog] = await Promise.all([
       extractToTemporaryCatalog(root, tempDir),
-      fs.readFile(path.join(root, EN_CATALOG_PATH), 'utf8').then(JSON.parse)
+      readEnglishCatalog(root)
     ])
     const result = compareExtraction(extractedCatalog, englishCatalog)
 

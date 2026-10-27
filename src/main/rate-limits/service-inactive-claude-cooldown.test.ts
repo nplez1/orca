@@ -403,10 +403,16 @@ it.each([401, 503])(
       status: 'error',
       updatedAt: originalAt,
       session: { usedPercent: 21 },
-      // Why not stale-token: a 401 here starts a refresh, and this fixture's Keychain item cannot
-      // be re-read by the exchange, so the host reports a login it will retry rather than a dead one.
+      // Why not stale-token: a 401 here starts a refresh, and what that refresh reports depends on
+      // which credential store this platform reads. On darwin the Keychain cannot be re-read, so the
+      // host reports a login it will retry; elsewhere the credentials file has no refresh token.
       usageMetadata: {
-        failureKind: status === 401 ? 'refreshable-credentials-without-token' : 'server'
+        failureKind:
+          status === 401
+            ? process.platform === 'darwin'
+              ? 'refreshable-credentials-without-token'
+              : 'stale-token'
+            : 'server'
       }
     })
     expect(cached('A')?.usageMetadata?.retryAtMs).toBeUndefined()

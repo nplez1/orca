@@ -6,7 +6,9 @@ instruction is **"sync upstream"**; everything below is what that means.
 Companions: [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch series that must survive,
 [BRANCHES.md](./BRANCHES.md) for what each branch is, [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md)
 for publishing, [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) for the
-decisions already made, and [local/sync/README.md](./local/sync/README.md) for the tools.
+decisions already made, [local/sync/README.md](./local/sync/README.md) for the tools, and
+[local/sync/mergeability-plan.md](./local/sync/mergeability-plan.md) for the measured cost of a sync
+and the plan that reduces it.
 
 ## Two shapes, one decision
 
@@ -23,8 +25,14 @@ _per collision_, so `service-full-cycle-preparation.ts` — seven fork commits, 
 upstream also changed — stopped the 2026-10-05 rebase three separate times, re-deciding the same
 thing each time.
 
-**Decision (2026-10-05): merge upstream into the release line; keep rebase for the patch series and
-for feature branches.** The deciding cost is repeated resolution, not a measured speedup:
+**Decision (2026-10-05): merge upstream into the release line; keep rebase for feature branches.**
+That decision was taken with a patch series in mind. **Correction, 2026-10-27: the patch series does
+not exist as a separable thing**, so nothing rebases it. No patch ref has ever been created; the
+product line imports the identity modules across ~50 commits and shares 35 files with it, so a
+series cut on those boundaries would not apply to any tree. `local/sync/curate.mjs` planned that
+series for the rebase era and is retired. Rebase survives only where it is still honest: short-lived
+feature branches, and an upstream-bound branch, which is cut from `origin/main`. The deciding cost is
+repeated resolution, not a measured speedup:
 
 - A rebase stops once per commit _per collision_, so the same file stops it several times and each
   stop re-decides a question already settled.
@@ -38,15 +46,16 @@ for feature branches.** The deciding cost is repeated resolution, not a measured
 What a merge gives up, and what replaces it:
 
 - `git range-diff` over the whole line: replaced by `git show --remerge-diff` (per-merge resolution
-  review), the endpoint-delta review below, and the tests. **Keep `range-diff` for the patch series
-  and for feature branches**, which are still rebased.
+  review), the endpoint-delta review below, and the tests. **Keep `range-diff` for feature branches**,
+  which are still rebased.
 - The pre-sync-tip lost-content diff still works, and still matters (see Step 3).
 - Force-push: no longer needed for the release line, so `backup/` refs stop being load-bearing
   there.
 
 Still true either way, so do not "fix" these:
 
-- `.husky/commit-msg` refuses `local(` commits anywhere but `nplez1/main`. Do not bypass it.
+- `.husky/commit-msg` refuses `local(` commits on any branch that does not carry `nplez1/main` in its
+  history — i.e. anywhere upstream-bound. Do not bypass it.
 - `.github/workflows/fork-release.yml` stamps `<package.json version>-np.${GITHUB_RUN_NUMBER}` —
   history shape is irrelevant to versioning.
 - `local/open-pr.mjs` requires a PR head to descend from its base, and the base must be an ancestor
@@ -64,7 +73,6 @@ node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
 node local/sync/post-sync.mjs [--json] [--skip-typecheck]
 node local/sync/identity-sweep.mjs [--json|--fix]
-node local/sync/curate.mjs --plan | --write-manifest                # plan a curated patch series; never builds a branch
 ```
 
 `local/sync/convergence-ledger.md` is not a script: it is the durable record of _which side wins_
@@ -95,7 +103,7 @@ git checkout nplez1/main
 git merge upstream/main          # one conflict set, resolved once per file
 ```
 
-**Patch series and feature branches (rebase):** a fork PR branch is cut from `nplez1/main`, which is
+**Feature branches (rebase):** a fork PR branch is cut from `nplez1/main`, which is
 the base `local/open-pr.mjs` requires; only an **upstream-bound** branch is cut from `origin/main`.
 Either way, rebase `--onto` the new base. Replay order is by commit date, so a commit that arrived
 through a merge can land after the commits that refined it. That is expected; see the traps in
@@ -111,6 +119,14 @@ GIT_EDITOR=true git rebase upstream/main
 node local/sync/conflicts.mjs --summary     # what is conflicted, by class
 node local/sync/conflicts.mjs               # per-file, per-hunk: stages, balance, class, ledger entries
 ```
+
+A `modify/delete` conflict also prints what `local/sync/expected-deletions.json` says about the path,
+because that is the one class where restoring the file is the tempting wrong answer. The manifest
+answers it with `expected-deletion` (the deletion is this fork's answer; re-apply it), `restore` (the
+file comes back; do not delete it again) or `pending-decision` (nobody has chosen — and a triage note
+lists those paths by name so they cannot be resolved by accident). A path the manifest calls deleted but
+HEAD still has is reported as stale on read, which is how a restored file would otherwise get silently
+re-deleted.
 
 Then work the file. The three index stages are the ground truth, not the markers, and they exist in
 both shapes:
@@ -186,7 +202,7 @@ answer into the ledger** in the same commit. Decisions already taken are in
    `contentEnabled` (a no-op toggle); two settings surfaces controlling one consent. Step 3's
    typecheck and tests are what find these — and with a merge there is exactly one tree to run them
    on.
-6. **The commit-msg hook refuses `local(` commits anywhere but `nplez1/main`.** Sync on the branch
+6. **The commit-msg hook refuses `local(` commits on an upstream-bound branch.** Sync on the branch
    itself; do not bypass the hook.
 7. **Reword a commit whose body no longer describes its content** (ours described the engine we
    dropped). **Rebases only:** fold the doc fix in with `git rebase -i <sha>^`, mark it `edit`, amend,
@@ -231,6 +247,31 @@ before handing off to the release:
 ```bash
 node local/check-actions-enablement.mjs --fix
 ```
+
+### What the resolution itself invented
+
+Every check above asks whether the tree is coherent. None asks whether the **resolver** wrote something
+neither parent said. `git show --remerge-diff <merge>` prints exactly those hunks, and the one class
+worth grepping for is a rewritten module specifier:
+
+```bash
+# Only the hunks the resolution wrote, and only the relative imports among them.
+git show --remerge-diff <merge> | rg '^\+.*from +[^ ]*\./'
+```
+
+Expect many hits and most of them correct — this is a review list, not a verdict. A resolution that
+re-roots an import from `src/main/x/y.ts` is doing its job; the ones that matter are the specifiers that
+disagree with where the _importing_ code resolves from.
+
+A path a resolution invents can be invisible to import-resolution checks, because it may resolve fine
+_relative to the changed file_ while the code importing it resolves from somewhere else entirely. The
+2026-10-25 merge (`281cccf5a4`) did this in two esbuild fixtures: it turned
+`'./src/main/daemon/daemon-spawner'` into `'./daemon-spawner'`. Both resolve from a normal `import`
+statement, so nothing complained — but inside an inline script bundled with
+`resolveDir: process.cwd()`, only the root-relative form exists. The electron suites then died in
+`beforeAll` with `Could not resolve`, reported a failed file with every test skipped, and the shard
+verdict named no culprit. `rg -n 'resolveDir: (process\.cwd|ROOT)' src config` lists the sites where
+this matters.
 
 For a **rebase**, also run the patch review:
 

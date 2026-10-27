@@ -1,24 +1,30 @@
 #!/usr/bin/env sh
-# LOCAL(nplez1): fork-only changes must never land on a PR branch.
+# LOCAL(nplez1): a fork-only change must never reach an upstream-bound branch.
 #
-# Fork PR branches are cut from nplez1/main and upstream-bound ones from origin/main, so a
-# fork-only file committed to either would be reviewed as part of that PR's diff — and the whole
-# point of LOCAL-PATCHES.md is that these patches are reviewed nowhere. This guard is here because
-# the mistake was made twice in one session: a `local(...)` commit authored on the wrong branch.
+# Upstream-bound branches are cut from origin/main, so a fork-only file committed to one is reviewed
+# as part of that PR's diff — and the point of LOCAL-PATCHES.md is that these patches are reviewed
+# nowhere. `local/open-pr.mjs --upstream` already refuses a `local(` subject and every fork-owned
+# path, so this is the earlier, cheaper stop.
 #
-# Every `local(...)` commit belongs on nplez1/main and nowhere else.
+# It deliberately does NOT refuse `local(` on a fork PR branch. It used to, and the result was worse
+# than the mistake it guarded: policy work committed there without the `local(` label at least five
+# times (#146, #130, #142, #177, #52), which is an *unlabelled* fork-only change riding a fork PR.
+# A fork PR branch descends from nplez1/main, and that lineage is the line the rule should follow.
 
 branch="$(git branch --show-current)"
 subject="$(head -1 "$1")"
 
 case "$subject" in
   local\(*)
-    if [ "$branch" != "nplez1/main" ]; then
+    # nplez1/main itself, or anything carrying it in its history, is the fork's own line.
+    if git merge-base --is-ancestor nplez1/main HEAD 2>/dev/null; then
+      :
+    else
       echo "" >&2
       echo "commit-msg: refusing a fork-only commit on '$branch'." >&2
-      echo "  '$subject' belongs on nplez1/main." >&2
-      echo "  Fork-only changes on a PR branch would be reviewed upstream." >&2
-      echo "  Switch with: git checkout nplez1/main" >&2
+      echo "  '$subject' belongs on a branch that descends from nplez1/main." >&2
+      echo "  This branch does not, so it is upstream-bound: a fork-only change here would be" >&2
+      echo "  reviewed as part of that PR's diff." >&2
       echo "" >&2
       exit 1
     fi

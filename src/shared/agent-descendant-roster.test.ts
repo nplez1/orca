@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { AGENT_MODEL_MAX_LENGTH, AGENT_TYPE_MAX_LENGTH } from './agent-status-types'
 import {
-  codexRosterChildWorkLiveness,
   agentDescendantRosterToSnapshots,
   findAgentDescendantByProviderSession,
   finishAgentDescendant,
   replaceAgentDescendants,
-  setAgentDescendantModel,
   upsertAgentDescendant,
   type AgentDescendantRoster
 } from './agent-descendant-roster'
 
-describe('Codex subagent roster', () => {
+describe('Agent descendant roster', () => {
   it('normalizes retained identity fields before storing them', () => {
     const roster: AgentDescendantRoster = new Map()
 
@@ -44,70 +42,6 @@ describe('Codex subagent roster', () => {
     upsertAgentDescendant(roster, '   ', { state: 'waiting' }, 10)
 
     expect(roster.size).toBe(0)
-  })
-
-  describe('codexRosterChildWorkLiveness', () => {
-    it('reads every child as agent work, a waiting one above the rest, and nothing as a watch loop', () => {
-      const roster: AgentDescendantRoster = new Map()
-      expect(codexRosterChildWorkLiveness(undefined)).toBeNull()
-      expect(codexRosterChildWorkLiveness(roster)).toBeNull()
-      upsertAgentDescendant(roster, 'a', { state: 'working' }, 1)
-      expect(codexRosterChildWorkLiveness(roster)).toBe('working')
-      upsertAgentDescendant(roster, 'b', { state: 'waiting' }, 2)
-      expect(codexRosterChildWorkLiveness(roster)).toBe('waiting')
-      finishAgentDescendant(roster, 'b')
-      expect(codexRosterChildWorkLiveness(roster)).toBe('working')
-    })
-  })
-
-  describe('setAgentDescendantModel', () => {
-    it('records the model without disturbing the child lifecycle or label', () => {
-      const roster: AgentDescendantRoster = new Map()
-      upsertAgentDescendant(roster, 'child-1', { description: '/root/audit', state: 'waiting' }, 10)
-
-      setAgentDescendantModel(roster, 'child-1', ' gpt-5.6-terra ')
-
-      expect(agentDescendantRosterToSnapshots(roster)).toEqual([
-        {
-          id: 'child-1',
-          agentType: undefined,
-          description: '/root/audit',
-          model: 'gpt-5.6-terra',
-          state: 'waiting',
-          startedAt: 10
-        }
-      ])
-    })
-
-    it('never creates a row for a child that is no longer tracked', () => {
-      const roster: AgentDescendantRoster = new Map()
-      upsertAgentDescendant(roster, 'child-1', { state: 'working' }, 10)
-      finishAgentDescendant(roster, 'child-1')
-
-      // A model read racing a completed child must not resurrect its row.
-      setAgentDescendantModel(roster, 'child-1', 'gpt-5.6-terra')
-
-      expect(roster.size).toBe(0)
-    })
-
-    it('keeps a known model when the new value is empty', () => {
-      const roster: AgentDescendantRoster = new Map()
-      upsertAgentDescendant(roster, 'child-1', { model: 'gpt-5.6-sol', state: 'working' }, 10)
-
-      setAgentDescendantModel(roster, 'child-1', '   ')
-      setAgentDescendantModel(roster, 'child-1', undefined)
-
-      expect(roster.get('child-1')?.model).toBe('gpt-5.6-sol')
-    })
-
-    it('bounds an oversized model to the shared cap', () => {
-      const roster: AgentDescendantRoster = new Map()
-      upsertAgentDescendant(roster, 'child-1', { state: 'working' }, 10)
-
-      setAgentDescendantModel(roster, 'child-1', 'x'.repeat(AGENT_MODEL_MAX_LENGTH + 50))
-
-      expect(roster.get('child-1')?.model).toHaveLength(AGENT_MODEL_MAX_LENGTH)
-    })
   })
 })
 

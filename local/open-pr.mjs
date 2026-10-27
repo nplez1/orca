@@ -40,8 +40,8 @@ import {
   formatVerdict,
   gateInputsFingerprint,
   readCachedVerdict,
-  toolchainVersions,
-  unitGateCacheDir
+  resolvedGateCacheDir,
+  toolchainVersions
 } from './gate-verdict-cache.mjs'
 
 const FORK = 'nplez1/orca'
@@ -247,7 +247,8 @@ export function gateInputsAtHead(head, gitRaw = runRaw) {
 export function unitGateVerdict(
   head,
   {
-    gitDir = tryGit(['rev-parse', '--absolute-git-dir']),
+    commonDir,
+    gitDir,
     // Why from the commit and not the working tree: an uncommitted allowlist would fingerprint a red
     // set that is not part of the revision being shipped.
     allowlistText = allowlistAtHead(head),
@@ -261,10 +262,17 @@ export function unitGateVerdict(
     }
   }
   const fingerprint = allowlistFingerprint(allowlistText)
-  if (!gitDir) {
+  // Why the inference is skipped when either was supplied: a caller that names a git dir is answering
+  // the question, and inventing a common dir over it would read a cache that caller did not choose.
+  if (commonDir === undefined && gitDir === undefined) {
+    commonDir = tryGit(['rev-parse', '--path-format=absolute', '--git-common-dir'])
+    gitDir = tryGit(['rev-parse', '--absolute-git-dir'])
+  }
+  if (!commonDir && !gitDir) {
     return { ok: false, reason: 'cannot resolve the git dir, so no cached verdict can be found' }
   }
-  const verdict = readCachedVerdict(unitGateCacheDir(gitDir), head, fingerprint)
+  const cacheDir = resolvedGateCacheDir({ commonDir, gitDir, root: process.cwd() })
+  const verdict = readCachedVerdict(cacheDir, head, fingerprint)
   if (!verdict || verdict.revision !== head) {
     return {
       ok: false,

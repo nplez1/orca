@@ -18,13 +18,21 @@ import { join } from 'node:path'
 import process from 'node:process'
 import {
   classifyFile,
-  UNMERGED_STATUS,
   ledgerMatches,
+  ledgerResolution,
   parseLedger
 } from './lib/conflict-classify.mjs'
+import {
+  deletionFor,
+  parseExpectedDeletions,
+  pendingDeletionPaths,
+  staleDeletions
+} from './lib/expected-deletions.mjs'
+import { proposeAll } from './lib/conflict-propose.mjs'
+import { classCounts, renderSummary, renderText } from './lib/conflict-report.mjs'
 
-const WIDTH = 100
 const LEDGER_URL = new URL('./convergence-ledger.md', import.meta.url)
+const DELETIONS_URL = new URL('./expected-deletions.json', import.meta.url)
 const UNMERGED = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 // Labelled markers only: a bare `=======` line is a diff separator in .patch files and a rule in
 // licence text, both of which this repo tracks.
@@ -39,10 +47,18 @@ usage
   node local/sync/conflicts.mjs --summary                   counts by class, one line per file
   node local/sync/conflicts.mjs --json                      machine-readable, for other tools
   node local/sync/conflicts.mjs --verify                    exit 1 if conflict markers remain
+  node local/sync/conflicts.mjs --propose                   what the fork has already decided, per path
+  node local/sync/conflicts.mjs --apply                     resolve those, stage them, commit nothing
   node local/sync/conflicts.mjs --merge-tree <base> <other> what that merge would conflict on
   node local/sync/conflicts.mjs --help
 
---summary and --json compose with --merge-tree; --verify runs alone.
+--summary and --json compose with --merge-tree and --propose; --verify runs alone and --apply needs
+the worktree.
+
+--propose prints only what the fork has settled twice over: a \`Resolution:\` verb in the ledger, or a
+settled entry in \`expected-deletions.json\`. A verb is a whole-file decision, so a hunk-level one (the
+Identity entry) is recorded as \`manual\` and proposes nothing. --apply runs the git steps and stages
+them; it never commits, and it refuses to act on a \`--merge-tree\` run because there is no index.
 
 classes, each a hint and never a resolution; a class describes the shape and names the question it
 leaves open — the report never says which side to keep
@@ -143,17 +159,6 @@ function readState(gitDir) {
     }
   }
   return { kind: 'none' }
-}
-
-function stateLine(state) {
-  if (state.kind === 'rebase') {
-    const progress = state.total > 0 ? `, step ${state.step}/${state.total}` : ''
-    return `rebase in progress: ${state.branch || 'unknown branch'} onto ${state.onto}${progress}`
-  }
-  if (state.kind === 'none') {
-    return 'no rebase, merge, cherry-pick or revert in progress'
-  }
-  return `${state.kind} in progress: ${state.head}${state.subject ? ` ${state.subject}` : ''}`
 }
 
 // ------------------------------------------------------------------ adapters
@@ -263,13 +268,22 @@ function loadLedger() {
     const orphans = sections
       .filter((section) => section.paths.length === 0)
       .map((section) => section.title)
+    // Why: an unrecognised Resolution verb is a ledger defect, not "no instruction".
+    const badResolutions = sections
+      .map((section) => ({ section, resolution: ledgerResolution(section) }))
+      .filter(({ resolution }) => resolution?.action === 'unknown')
+      .map(({ section, resolution }) => `${section.title} (${resolution.verb})`)
+    const problems = []
+    if (orphans.length > 0) {
+      problems.push(`ledger section(s) with no Paths, check by hand: ${orphans.join('; ')}`)
+    }
+    if (badResolutions.length > 0) {
+      problems.push(`ledger Resolution verb(s) not in the fixed set: ${badResolutions.join('; ')}`)
+    }
     return {
       found: true,
       sections,
-      note:
-        orphans.length === 0
-          ? null
-          : `ledger section(s) with no Paths, check by hand: ${orphans.join('; ')}`
+      note: problems.length === 0 ? null : problems.join(' | ')
     }
   } catch (error) {
     return {
@@ -285,174 +299,67 @@ function attachLedger(files, ledger) {
     file.ledger = ledgerMatches(ledger.sections, file.path).map((section) => ({
       title: section.title,
       decision: section.decision,
-      doNot: section.doNot
+      doNot: section.doNot,
+      resolution: ledgerResolution(section)
     }))
   }
 }
 
-// ------------------------------------------------------------------ rendering
-
-function truncate(text, width) {
-  const characters = [...(text ?? '')]
-  return characters.length <= width
-    ? characters.join('')
-    : `${characters.slice(0, Math.max(1, width - 1)).join('')}…`
-}
-
-function classCounts(files) {
-  const byClass = {}
+function attachExpectedDeletions(files, manifest) {
   for (const file of files) {
-    byClass[file.class] = (byClass[file.class] ?? 0) + 1
-  }
-  return {
-    byClass,
-    line: `${files.length} conflicted path(s): ${Object.entries(byClass)
-      .sort((left, right) => right[1] - left[1])
-      .map(([name, count]) => `${name} ${count}`)
-      .join(', ')}`
+    file.expectedDeletion = deletionFor(manifest.entries, file.path)
   }
 }
 
-function sideBySide(ours, theirs, limit = 8) {
-  const column = Math.floor((WIDTH - 5) / 2)
-  const rows = [`${'ours'.padEnd(column)} | theirs`]
-  for (let index = 0; index < Math.min(Math.max(ours.length, theirs.length), limit); index += 1) {
-    rows.push(
-      `${truncate(ours[index] ?? '', column).padEnd(column)} | ${truncate(theirs[index] ?? '', column)}`
-    )
+/**
+ * The manifest answers "who deleted this, and was that the answer?" for a modify/delete conflict.
+ * Checked against HEAD on read, because a manifest that still calls a restored file deleted would talk a
+ * resolver into deleting it again — the stale paths are named in the note, and the note now reaches the
+ * text report as well as `--json`, so a human sees them without asking for JSON. The note does not stop
+ * `--apply`: a stale entry is a manifest to fix, not a resolution to trust.
+ */
+function loadExpectedDeletions() {
+  let text
+  try {
+    text = readFileSync(DELETIONS_URL, 'utf8')
+  } catch {
+    return { entries: [], note: `no deletion manifest at ${DELETIONS_URL.pathname}` }
   }
-  const hidden = Math.max(ours.length, theirs.length) - limit
-  if (hidden > 0) {
-    rows.push(`… (+${hidden} more line(s) each)`)
-  }
-  return rows
-}
-
-function hunkRows(hunk) {
-  const span = hunk.endLine ? `L${hunk.startLine}-${hunk.endLine}` : `L${hunk.startLine}`
-  const sides = `ours +${hunk.delta.ours.added}/-${hunk.delta.ours.removed} (bal ${hunk.balance.ours})  theirs +${hunk.delta.theirs.added}/-${hunk.delta.theirs.removed} (bal ${hunk.balance.theirs})`
-  const rows = [
-    `  hunk ${hunk.index}  ${span}  ${sides}${hunk.basePresent ? '' : '  (no base)'}  → ${hunk.class}`,
-    `    ${truncate(hunk.reason, WIDTH - 4)}`
-  ]
-  if (hunk.class !== 'union' && hunk.firstDiff !== null) {
-    rows.push(`    first diff at file line ${hunk.firstDiff.line}:`)
-    rows.push(`      ours   : ${truncate(hunk.firstDiff.ours ?? '(side is shorter)', WIDTH - 14)}`)
-    rows.push(
-      `      theirs : ${truncate(hunk.firstDiff.theirs ?? '(side is shorter)', WIDTH - 14)}`
-    )
-  }
-  if (hunk.class === 'both-rewrote' || hunk.class === 'rename-replay') {
-    rows.push('    candidate bodies:')
-    for (const row of sideBySide(hunk.ours, hunk.theirs)) {
-      rows.push(`      ${row}`)
-    }
-  }
-  for (const side of hunk.duplicateFor) {
-    rows.push(
-      `    tail closing ${side}: ${truncate(hunk.tail.slice(0, hunk.tailCloses[side]).join(' ⏎ '), WIDTH - 25)}`
-    )
-  }
-  return rows
-}
-
-function fileRows(file) {
-  const status =
-    file.status === null ? 'n/a' : `${file.status} ${UNMERGED_STATUS[file.status] ?? 'unmerged'}`
-  const mix = [...new Set(file.hunkClasses)].map(
-    (name) => `${name}×${file.hunkClasses.filter((one) => one === name).length}`
+  const { entries, note } = parseExpectedDeletions(text)
+  const atHead = new Set(
+    (gitText(['ls-tree', '-r', '--name-only', 'HEAD']) ?? '').split('\n').filter(Boolean)
   )
-  const sides = ['base', 'ours', 'theirs']
-    .map((side) => `${side} ${file.sides[side] ? 'yes' : 'MISSING'}`)
-    .join('  ')
-  const rows = [
-    truncate(
-      `${file.path}  [${status}]  ${file.class}${mix.length > 0 ? `  (hunks: ${mix.join(', ')})` : ''}`,
-      WIDTH
-    ),
-    `  sides: ${sides}`
-  ]
-  for (const note of file.notes) {
-    rows.push(`  note: ${truncate(note, WIDTH - 8)}`)
+  const stale = staleDeletions(entries, atHead)
+  const problems = [note]
+  if (stale.length > 0) {
+    problems.push(`manifest calls deleted but HEAD still has: ${stale.join('; ')}`)
   }
-  for (const entry of file.ledger) {
-    rows.push(`  ledger — ${entry.title}`)
-    for (const [label, field] of [
-      ['decision', 'decision'],
-      ['do not  ', 'doNot']
-    ]) {
-      entry[field].forEach((paragraph, index) =>
-        rows.push(`    ${index === 0 ? label : '        '} ${truncate(paragraph, WIDTH - 13)}`)
-      )
-    }
-  }
-  for (const hunk of file.hunks) {
-    rows.push(...hunkRows(hunk))
-  }
-  return rows
+  return { entries, note: problems.filter(Boolean).join(' | ') || null }
 }
 
-function headRows(result, ledger) {
-  const rows = ['conflict triage — ADVISORY ONLY; a class is a hint, not a resolution']
-  if (result.mode === 'live') {
-    rows.push(stateLine(result.state))
-  } else if (result.state.clean) {
-    rows.push(`merge-tree ${result.state.base} + ${result.state.other}: clean merge, no conflicts`)
-  } else {
-    rows.push(
-      `merge-tree ${result.state.base} + ${result.state.other}: ${result.files.length} conflicted path(s), tree ${result.state.tree.slice(0, 10)}`
-    )
-  }
-  for (const note of [...result.notes, ledger.note]) {
-    if (note) {
-      rows.push(`note: ${note}`)
+/** Runs each proposal's git steps. Never commits: resolving the index is the point, not finishing. */
+function applyProposals(proposals) {
+  const failures = []
+  let applied = 0
+  for (const proposal of proposals) {
+    let ok = true
+    for (const args of proposal.git) {
+      const result = git(args)
+      if (result.status !== 0) {
+        const first = (result.stderr ?? '').trim().split('\n')[0]
+        failures.push(`${proposal.path}: git ${args.join(' ')} — ${first}`)
+        ok = false
+        break
+      }
+    }
+    if (ok) {
+      applied += 1
     }
   }
-  return rows
+  return { applied, failures }
 }
 
-function renderText(result, ledger) {
-  const rows = headRows(result, ledger)
-  if (result.files.length === 0) {
-    rows.push(
-      '',
-      result.mode === 'live'
-        ? 'no conflicted paths — nothing to classify.'
-        : 'no conflicts in that merge.'
-    )
-    if (result.mode === 'live' && result.state.kind !== 'none') {
-      rows.push(
-        `the ${result.state.kind} is still in progress; continue it when the tree is what you want.`
-      )
-    }
-    return rows.join('\n')
-  }
-  rows.push(classCounts(result.files).line)
-  for (const file of result.files) {
-    rows.push('', ...fileRows(file))
-  }
-  rows.push(
-    '',
-    'every class above is advisory — confirm against the ledger decision before resolving.'
-  )
-  return rows.join('\n')
-}
-
-function renderSummary(result, ledger) {
-  const rows = headRows(result, ledger)
-  if (result.files.length === 0) {
-    rows.push('no conflicted paths')
-    return rows.join('\n')
-  }
-  rows.push(classCounts(result.files).line)
-  const width = Math.min(58, Math.max(...result.files.map((file) => file.path.length)) + 1)
-  for (const file of result.files) {
-    const titles = file.ledger.map((entry) => entry.title).join('; ')
-    const row = `${truncate(file.path, width).padEnd(width)} ${(file.status ?? 'n/a').padEnd(4)} ${file.class.padEnd(18)} ${file.hunkCount} hunk(s)`
-    rows.push(truncate(`${row}${titles ? `  [ledger: ${titles}]` : ''}`, WIDTH))
-  }
-  return rows.join('\n')
-}
+// ------------------------------------------------------------------ rendering
 
 // ------------------------------------------------------------------ verify
 
@@ -522,7 +429,15 @@ function runVerify() {
 // The source (live state or a --merge-tree dry run) and the output format are orthogonal, so the
 // sibling pre-sync tool's `--merge-tree <base> <other> --summary` works. --verify runs alone.
 function parseArgs(argv) {
-  const options = { source: 'live', output: 'text', verify: false, base: null, other: null }
+  const options = {
+    source: 'live',
+    output: 'text',
+    verify: false,
+    propose: false,
+    apply: false,
+    base: null,
+    other: null
+  }
   const setOutput = (name) => {
     if (options.output !== 'text' && options.output !== name) {
       throw new Error('pick one of --summary, --json')
@@ -552,10 +467,22 @@ function parseArgs(argv) {
       options.verify = true
       continue
     }
+    if (flag === '--propose') {
+      options.propose = true
+      continue
+    }
+    if (flag === '--apply') {
+      options.propose = true
+      options.apply = true
+      continue
+    }
     throw new Error(`unknown argument: ${flag}`)
   }
   if (options.verify && (options.source !== 'live' || options.output !== 'text')) {
     throw new Error('--verify runs alone: it reads the worktree, not a classification input')
+  }
+  if (options.apply && options.source !== 'live') {
+    throw new Error('--apply needs the worktree: a --merge-tree run has no index to resolve')
   }
   return options
 }
@@ -581,14 +508,56 @@ function main() {
       options.source === 'merge-tree' ? readMergeTree(options.base, options.other) : readLive()
     const ledger = loadLedger()
     attachLedger(result.files, ledger)
+    const manifest = loadExpectedDeletions()
+    attachExpectedDeletions(result.files, manifest)
+    // Why in result.notes and not only in the JSON payload: headRows renders result.notes, so a stale
+    // manifest went unreported in the text and --summary reports — the two a human actually reads.
+    if (manifest.note) {
+      result.notes.push(`deletion manifest: ${manifest.note}`)
+    }
+    const pending = pendingDeletionPaths(
+      manifest.entries,
+      result.files.map((file) => file.path)
+    )
+    if (pending.length > 0) {
+      result.notes.push(
+        `${pending.length} conflicted path(s) are pending-decision in expected-deletions.json: ${pending.join('; ')}`
+      )
+    }
+    if (options.propose) {
+      for (const file of result.files) {
+        file.proposal = null
+      }
+      for (const proposal of proposeAll(result.files)) {
+        const file = result.files.find((candidate) => candidate.path === proposal.path)
+        if (file) {
+          file.proposal = proposal
+        }
+      }
+      const settled = result.files.filter((file) => file.proposal)
+      result.notes.push(
+        `${settled.length} of ${result.files.length} conflicted path(s) carry a settled resolution; the rest are manual`
+      )
+      if (options.apply) {
+        const outcome = applyProposals(settled.map((file) => file.proposal))
+        result.notes.push(
+          `applied ${outcome.applied} resolution(s), ${outcome.failures.length} failed — the index is staged, nothing is committed`
+        )
+        for (const failure of outcome.failures) {
+          console.error(`conflicts: apply failed — ${failure}`)
+        }
+      }
+    }
     if (options.output === 'json') {
       const { byClass } = classCounts(result.files)
       const payload = {
         advisory: true,
         ...result,
         counts: { paths: result.files.length, byClass },
-        ledger: { path: LEDGER_URL.pathname, found: ledger.found }
+        ledger: { path: LEDGER_URL.pathname, found: ledger.found },
+        deletions: { path: DELETIONS_URL.pathname, entries: manifest.entries.length }
       }
+      // Why not manifest.note again: it is already in result.notes with the `deletion manifest:` prefix.
       payload.notes = [...result.notes, ledger.note].filter(Boolean)
       console.log(JSON.stringify(payload, null, 2))
       return 0

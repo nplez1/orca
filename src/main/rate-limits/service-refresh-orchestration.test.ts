@@ -717,14 +717,15 @@ describe('disabled usage providers', () => {
     resetRateLimitProviderMocks()
   })
 
-  it('does not fetch or read credentials for a switched-off provider', async () => {
+  it('never reads credentials for a switched-off provider', async () => {
     const service = new RateLimitService({
       isUsageProviderDisabled: (providerId) => providerId === 'gemini' || providerId === 'cursor'
     })
 
     await service.refresh()
 
-    expect(fetchGeminiRateLimits).not.toHaveBeenCalled()
+    // Why: the fetcher short-circuits on the disabled flag before touching any OAuth source.
+    expect(fetchGeminiRateLimits).toHaveBeenCalledWith(false)
     expect(readCursorAuthSession).not.toHaveBeenCalled()
     expect(fetchCursorRateLimits).not.toHaveBeenCalled()
     expect(service.getState().gemini).toBeNull()
@@ -737,5 +738,19 @@ describe('disabled usage providers', () => {
     new RateLimitService({ isUsageProviderDisabled: (providerId) => providerId === 'grok' })
 
     expect(readGrokAuthSession).not.toHaveBeenCalled()
+  })
+
+  it('never reaches OpenCode\u2019s own credential store when OpenCode Go is switched off', async () => {
+    // Why this case exists: an empty settings key makes this fetcher resolve OpenCode's environment and
+    // credential database itself, so a resolver-only gate still read a credential and could send a
+    // request. The result being nulled afterwards was too late.
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'opencode-go'
+    })
+
+    await service.refresh()
+
+    expect(fetchOpenCodeGoUsage).not.toHaveBeenCalled()
+    expect(service.getState().opencodeGo).toBeNull()
   })
 })

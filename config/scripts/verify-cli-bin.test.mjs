@@ -2,6 +2,7 @@ import {
   chmodSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -24,7 +25,8 @@ function makeProjectWithCli(
   content,
   { mode = 0o755, rootPackageType, writeOutPackageJson = true } = {}
 ) {
-  const projectDir = mkdtempSync(path.join(tmpdir(), 'orca-cli-bin-'))
+  // The spawned child reports the resolved cwd; macOS tmpdir sits behind /private.
+  const projectDir = realpathSync(mkdtempSync(path.join(tmpdir(), 'orca-cli-bin-')))
   roots.push(projectDir)
   const cliPath = path.join(projectDir, 'out', 'cli', 'index.js')
   const outPackageJsonPath = path.join(projectDir, 'out', 'package.json')

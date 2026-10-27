@@ -184,13 +184,13 @@ describe('orca cli worktree awareness', () => {
       const startChild = Object.assign(new EventEmitter(), {
         stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
         stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
-        stdin: { write: vi.fn(), end: vi.fn() },
+        stdin: Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() }),
         kill: vi.fn()
       })
       const cleanupChild = Object.assign(new EventEmitter(), {
         stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
         stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
-        stdin: { write: vi.fn(), end: vi.fn() },
+        stdin: Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() }),
         kill: vi.fn()
       })
       spawnMock
@@ -284,7 +284,7 @@ describe('orca cli worktree awareness', () => {
       const startChild = Object.assign(new EventEmitter(), {
         stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
         stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
-        stdin: { write: vi.fn(), end: vi.fn() },
+        stdin: Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() }),
         kill: vi.fn()
       })
       spawnMock.mockImplementationOnce(() => {

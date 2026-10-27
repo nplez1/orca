@@ -44,7 +44,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { UNIT_EXCLUDE, UNIT_INCLUDE } from '../config/scripts/ci-unit-files.mjs'
 import { TOLERATED_UNHANDLED_ERROR, collectUnhandledErrors } from './check-unit-shard-verdict.mjs'
-import { flakeWaiver } from './gate-flake-coupling.mjs'
+import { flakeWaiver, packageJsonChangedForTests } from './gate-flake-coupling.mjs'
 import {
   GATE_INPUT_PATHS,
   allowlistFingerprint,
@@ -53,7 +53,7 @@ import {
   formatVerdict,
   gateInputsFingerprint,
   toolchainVersions,
-  unitGateCacheDir,
+  resolvedGateCacheDir,
   verdictRecordProblem
 } from './gate-verdict-cache.mjs'
 import {
@@ -66,7 +66,7 @@ import {
   judgeUnhandled,
   prunableEntries,
   quarantinedEntryProblems,
-  reportForFile,
+  rerunReportsFor,
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
@@ -165,17 +165,49 @@ function readJsonFile(path, what) {
 /**
  * The file is inside the branch's own diff when it appears between the merge-base and HEAD. Without
  * a resolvable base the answer is `unknown`, and a flaky pass is never waived on `unknown`.
+ *
+ * Why an empty diff is not a resolved one: a sync merges upstream *onto* the release line, so
+ * `merge-base(nplez1/main, HEAD)` is HEAD itself and the diff comes back empty — which waived every
+ * flaky pass on a line a 556-commit merge had just built. What that merge contributed is
+ * `HEAD^1..HEAD`, so that is the diff that has to judge it.
  */
-function branchDiff() {
+export function branchDiff(runGit = git) {
+  let baseResolved = false
   for (const base of ['nplez1/main', 'origin/nplez1/main']) {
-    const mergeBase = git(['merge-base', base, 'HEAD'])
+    const mergeBase = runGit(['merge-base', base, 'HEAD'])
     if (!mergeBase) {
       continue
     }
-    const diff = git(['diff', '--name-only', '--no-renames', mergeBase, 'HEAD'])
-    return { base, files: new Set((diff ?? '').split('\n').filter(Boolean)) }
+    baseResolved = true
+    const files = changedSince(runGit, mergeBase)
+    if (files.size > 0) {
+      return { base, files }
+    }
+  }
+  // Why up front: with no merge base at all, a multi-commit branch judged by HEAD~1 alone would waive a
+  // flake in a file an earlier commit of that branch touched. Unresolved stays unknown, as before.
+  if (!baseResolved) {
+    return null
+  }
+  // Why the first parent and not HEAD^2: everything a merge adds to the release line is
+  // `HEAD^1..HEAD`, so nothing that merge could have broken falls outside the diff.
+  // Why a single-parent HEAD is included: every PR into `nplez1/main` squashes, so a landed change is
+  // a one-parent commit whose diff against `nplez1/main` is empty — it IS that line. Excluding it left
+  // the answer `null`, and `null` means "in the diff", so a load flake on the release line could never
+  // be excused and the gate would fail on code that commit did not touch.
+  const parents = (runGit(['rev-list', '--parents', '-n', '1', 'HEAD']) ?? '').split(' ')
+  if (parents.length >= 2 && parents[1]) {
+    const files = changedSince(runGit, parents[1])
+    if (files.size > 0) {
+      return { base: parents[1], files }
+    }
   }
   return null
+}
+
+function changedSince(runGit, base) {
+  const diff = runGit(['diff', '--name-only', '--no-renames', base, 'HEAD'])
+  return new Set((diff ?? '').split('\n').filter(Boolean))
 }
 
 function runStep(label, program, args, logFd, timeoutMs, env) {
@@ -285,6 +317,12 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
         return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
       }
     }
+    // Why the cap line: the doubling this gate once showed (2,575 s against a 1,400 s baseline) was
+    // a worker cap inherited from the shell, and a run log that named it would have said so in one
+    // line instead of a per-file concurrency reconstruction.
+    if (process.env.VITEST_MAX_WORKERS !== undefined) {
+      process.stderr.write(`gate-unit: VITEST_MAX_WORKERS=${process.env.VITEST_MAX_WORKERS}\n`)
+    }
     const suite = runStep(
       'full unit suite',
       'node',
@@ -329,17 +367,24 @@ function closeSyncSafe(fd) {
 }
 
 /**
- * One isolated re-run of a file, reported as the tests that passed and failed inside it.
+ * One isolated re-run of every unexpected file in a single Vitest invocation, reported per file as
+ * the tests that passed and failed inside it. Batched so N failing files pay one cold start instead
+ * of N serial ones; each file still runs in its own worker, and the report is filtered by exact
+ * path, so the per-file attribution of a serial re-run is unchanged.
  *
- * Why per test rather than per file: the file's own allowlisted reds still fail when it runs alone,
- * so "the file exited non-zero" cannot tell a load flake from a real break once entries are named.
- * A missing report is not evidence of anything, so it reads as "every failure reproduced".
+ * Why per test rather than per file: the file's own allowlisted reds still fail when it re-runs with
+ * its siblings, so "the file exited non-zero" cannot tell a load flake from a real break once entries
+ * are named. A missing report is not evidence of anything, so it reads as "every failure reproduced".
  */
-function rerunIsolation(file, reportPath, timeoutMs) {
-  const logFd = openSync(join(reportPath, '..', 'isolation.log'), 'a')
+function rerunIsolation(files, dir, timeoutMs) {
+  if (files.length === 0) {
+    return new Map()
+  }
+  const reportPath = join(dir, 'isolation-report.json')
+  const logFd = openSync(join(dir, 'isolation.log'), 'a')
   try {
     const step = runStep(
-      `isolation re-run ${file}`,
+      `isolation re-run ${files.length} file(s)`,
       'node',
       [
         RUN_VITEST,
@@ -349,20 +394,20 @@ function rerunIsolation(file, reportPath, timeoutMs) {
         '--reporter=json',
         `--outputFile.json=${reportPath}`,
         ...UNIT_LANE_ARGS,
-        file
+        ...files
       ],
       logFd,
       timeoutMs,
       UNIT_LANE_ENV
     )
     if (step.timedOut || !existsSync(reportPath)) {
-      return NO_RERUN
+      return new Map(files.map((file) => [file, NO_RERUN]))
     }
     try {
-      return reportForFile(JSON.parse(readFileSync(reportPath, 'utf8')), file)
+      return rerunReportsFor(JSON.parse(readFileSync(reportPath, 'utf8')), files)
     } catch {
       // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
-      return NO_RERUN
+      return new Map(files.map((file) => [file, NO_RERUN]))
     }
   } finally {
     closeSyncSafe(logFd)
@@ -548,9 +593,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
     problems.push(exitProblem)
   }
 
-  // A failure outside the allowlist gets one isolated re-run. A failure that does not come back is
-  // a load-order flake — a different claim from "this change broke it" — so it is waived unless the
-  // file is in the diff. Judged per test: the file's allowlisted reds still fail when it runs alone.
+  // A failure outside the allowlist gets an isolated re-run, all such files in one batched
+  // invocation. A failure that does not come back is a load-order flake — a different claim from
+  // "this change broke it" — so it is waived unless the file is in the diff. Judged per test: the
+  // file's allowlisted reds still fail when it re-runs with its siblings.
   const diff = branchDiff()
   const flaky = []
   const blocking = []
@@ -560,19 +606,17 @@ function evaluate(options, { reportPath, logPath, dir }) {
     list.push(failure)
     unexpectedByFile.set(failure.file, list)
   }
-  let isolationIndex = 0
+  const reruns = rerunIsolation([...unexpectedByFile.keys()], dir, options.timeoutMs)
+  // Why computed once: a diff that touched package.json only through build or lint scripts cannot change
+  // what any test executes, so treating it as a harness change blocked every load flake in this branch.
+  const packageJsonShared = diff === null ? true : packageJsonChangedForTests(git, diff.base)
   for (const [file, failures] of unexpectedByFile) {
-    isolationIndex += 1
-    const rerun = rerunIsolation(
-      file,
-      join(dir, `isolation-${isolationIndex}.json`),
-      options.timeoutMs
-    )
+    const rerun = reruns.get(file) ?? NO_RERUN
     const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
     // Why not `diff.files.has(file)`: a branch that changes `src/x.ts`, the module beside a test, an
     // imported module, or the harness every test runs under breaks `x.test.ts` without the test file
     // itself being in the diff.
-    const waiver = flakeWaiver(file, diff?.files ?? null)
+    const waiver = flakeWaiver(file, diff?.files ?? null, undefined, { packageJsonShared })
     for (const failure of failures) {
       if (reproduced.has(failure.test)) {
         blocking.push(failure)
@@ -628,9 +672,14 @@ function main() {
   const allowlistHash = allowlistFingerprint(readFileSync(options.allowlist))
   const gateInputs = currentGateInputs()
   const revision = git(['rev-parse', 'HEAD'])
-  // Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
-  // is not a directory and the gate could not record the verdict it just computed.
-  const cacheDir = unitGateCacheDir(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'))
+  // Why the common dir and not the worktree's git dir: a linked worktree's `.git` is a file, and
+  // `--absolute-git-dir` answers with `.git/worktrees/<name>`, so each worktree kept its own copy of a
+  // cache keyed by revision. Gating the same SHA twice cost a full suite run.
+  const cacheDir = resolvedGateCacheDir({
+    commonDir: git(['rev-parse', '--path-format=absolute', '--git-common-dir']),
+    gitDir: git(['rev-parse', '--absolute-git-dir']),
+    root: ROOT
+  })
   const cachePath = revision ? cachedVerdictPath(cacheDir, revision, allowlistHash) : null
   // Why the reuse guard is here and not inside the check: `--no-cache` is the documented way out of a
   // damaged cache file, so it must not parse one to refuse it, and `--allow-dirty` asks about the tree

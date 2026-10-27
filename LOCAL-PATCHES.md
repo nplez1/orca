@@ -12,6 +12,27 @@ They are never proposed upstream, and they must never reach an upstream-bound PR
   and the PR would silently disagree about that file.
 - Every patch is listed below with its reason and its exact anchors, because upstream edits to those
   lines are the only thing that breaks them.
+- **No fork comment in a file upstream owns.** The reason goes here, in
+  `local/sync/convergence-ledger.md`, in the commit message, or in a fork-owned module. Upstream's own
+  comment audit (`7d6603aa17`, 16,196 files) accounts for 162 of the 233 pending conflicts, and 73% of
+  this sync's hunks have an upstream side that changed only comments. A rationale paragraph above
+  upstream's code is conflict adjacency and nothing else. The rule covers the fork's own added blocks
+  too: a fork hook should name an exported function in a fork file, not explain itself in prose above
+  upstream's code.
+- **No deleting a file upstream still owns.** Restore it and neutralise at a seam instead — a deletion
+  is re-applied on every sync, and each upstream edit to the deleted file arrives as a modify/delete
+  conflict (19 of the 30 pending ones). A genuine supersession lives in
+  `local/sync/expected-deletions.json` with its evidence, and nowhere else.
+
+## Rationale moved out of upstream files
+
+These decisions were comments in files upstream owns. They live here because a comment there is
+conflict adjacency, and because each is a trap a well-meaning future edit can fall into.
+
+- **The managed-hook install lock uses `.orca`, not `HOME_DIRECTORY_NAME`**
+  (`src/main/agent-hooks/managed-hook-install-lock.ts`). It guards the shared `~/.claude` hooks, which
+  an official Orca install manages too, so both must contend on one lock path. Pointing it at this
+  fork's own home directory would give the two installs separate locks over one shared file.
 
 ## Patches
 
@@ -201,6 +222,23 @@ local evidence of a producer is upstream's own test. Closing it means one guarde
 `kind !== 'pi'` plus the matching expectation.
 
 ### `local(agents)`: the descendant lane is pi's, plus one grok child question
+
+**Addendum 2026-10-27 — the roster moved back to upstream's name and path, and the ownership fence
+became upstream's.** Two restorations, both gated on evidence rather than assumed:
+
+- `src/shared/codex-subagent-roster.ts` is **upstream's file again**, byte-identical to the sync base,
+  with upstream's own name (`CodexSubagentRoster`) — six files back to zero fork hunks
+  (`codex-subagent-transcript.ts` and its test, `providers/codex-events.ts`,
+  `providers/codex-transcript-poll.ts`, `codex-status-transcript-line.test.ts`).
+  `agent-descendant-roster.ts` survives as the **sibling** holding only this lane's pi/claude extras,
+  so a sync no longer reports upstream's roster as a modify/delete plus importer rewrites.
+- `src/main/pi/agent-status-session-owner-source.ts` (204 lines, the fork's #68 fence) is **deleted**,
+  and upstream's `omp-session-status-owner-source.ts` is live at `f37c1f6b95`'s bytes. The gate that
+  justified it: the fork's #68 suite ran unmodified against upstream's 54-line rule — **22/22 pass**,
+  including all twelve Pi-lane cases (in-process child, reopened child, re-key on a `session_start`
+  naming the leaving file, nested child, unpersisted session, the three handoffs, forked-session pane,
+  refused transcript, persisted child off an unpersisted pane, switched unpersisted pane, no session
+  manager). No case proved upstream's rule insufficient, so the 150-line difference bought nothing.
 
 After the 2026-09-25 sync, upstream's `providers/grok-events.ts` is the single owner of grok's child
 lifecycle: it refuses to settle the parent from a child event and reads a background subagent as
@@ -443,7 +481,7 @@ WSL lane keeps the bare registered name its shell wrappers resolve against `ORCA
 an inherited value is still dropped first.
 
 Anchors: `src/shared/agent-feature-install-commands.ts` (`ORCA_SKILLS_REPOSITORY_URL`),
-`src/shared/skill-freshness.ts` (`ORCA_SKILL_LOCK_SOURCES`), `skill-stubs/_shared/cli-resolution.md`,
+`skill-stubs/_shared/cli-resolution.md`,
 `skill-guides/orca-cli.md`, `skill-guides/orca-per-workspace-env.md`,
 `skill-guides/computer-use.md`, `docs/site/content/docs/cli/skills.mdx`, and
 `src/main/ipc/pty/host-env/assembly.ts` (`buildPtyHostEnv`, at the
@@ -563,6 +601,18 @@ Verdict, on the revision that ships:
 ```
 Unit gate @b8d9bf7987 (clean): PASS — 136644 passed; 38 failed (38 allowlisted, 0 unexpected); 0 flaky re-run passed; 0 unhandled error headline(s); 1227 s
 ```
+
+**2026-10-26: the machine was fixed, so fourteen entries are gone.** These were never upstream's
+failure — `/bin/bash` on macOS is Apple's 3.2, which has no `mapfile` and rejects an empty array under
+`set -u`, while the ubuntu runners ship bash 5. Homebrew's `bash` 5.3.20 is now installed; because
+`/opt/homebrew/bin` precedes `/bin` on this machine's `PATH`, `bash` resolves to 5.3.20 for every
+spawned child with no repository change. Cleared: the five `ci-managed-ssh-execution` cases and the
+`dependency-security-release` case (both `mapfile: command not found`) and the eight
+`pr-auxiliary-preflight-admission` cases (`MOBILE_CI_ARGS[@]: unbound variable`). Those three files run
+**233 passed** against the pruned allowlist, which is now **17 entries over 10 files**. This is the reason to keep chasing an allowlisted failure
+even when it looks environmental: it was, and naming the _cause_ rather than the _symptom_ is what made
+it a one-command fix. Nothing in the tree changed — the fork still needs bash 4+ to run these, which
+`config/.bun-version` and the CI image already assume.
 
 **The gate also had to learn one heading.** Vitest reports the run's unhandled errors in two shapes,
 and `collectUnhandledErrors` matched only `Unhandled Rejection` / `Uncaught Exception`. A pool crash
@@ -1124,6 +1174,298 @@ The committed revision, `7811f60dd6`:
 Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s
 ```
 
+### `local(lint)`: upstream's `max-lines` budget is enforced again, with 8 exemptions
+
+**Reversed 2026-10-27, with the measurement that reversed it.** This section used to record the cap as
+`"off"` in the four overrides that carried 300/400/600/800. That worked and cost more than it saved:
+with the rule off, two of upstream's own coverage tests in
+`config/scripts/check-max-lines-ratchet.test.mjs` fail (they assert the installed oxlint still flags an
+over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the rule —
+becomes inert. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
+avoid an exemption list.
+
+The exemption list turned out to be short. With upstream's rule restored, **nine files** exceeded
+budget: eight upstream-owned, over by 1, 3, 3, 9, 20, 23, 31 and 34 lines, and the fork's own
+`local/sync/conflicts.mjs` at 682. The fork's file was split (`local/sync/lib/conflict-report.mjs`,
+leaving 568); the eight upstream files each carry one `eslint-disable max-lines -- Why:` line naming
+what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an _upstream_ file to
+fit the budget would be the eviction this section exists to stop — a permanent hunk on every sync.
+
+So: upstream's rule, upstream's ratchet, upstream's baseline, 12 grandfathered entries of which four are
+upstream's own. `.oxlintrc.json` is byte-identical to `0571e45107` again, both upstream tests pass, and
+the ratchet reports `OK — 12 grandfathered entr(y/ies)`. What this does **not** do is undo the evictions
+already made; restoring the evicted blocks is § 5.2, and this is what makes it possible.
+
+`.oxlintrc.json` is therefore no longer a file this fork edits — which removes it from the hot-file list
+this section used to keep for it.
+
+#### The rule for next time: whose file is it?
+
+The budget is enforced. Whether an over-budget file gets an exemption is decided by **ownership, not by
+size**, because the two possible fixes cost wildly different amounts at the next sync:
+
+| The file is…                              | Over budget →                        | Why                                                                                                                                                                          |
+| ----------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ours** (absent from the sync base)      | **split it.** No exemption, ever     | A split costs one commit. There is no upstream copy to conflict with, so the cap is a free quality guard                                                                     |
+| **upstream's** (present at the sync base) | **one directive + one baseline row** | Splitting upstream's file is a permanent hunk at that spot on _every_ sync, and it silently drops upstream's later edits there. A two-line directive conflicts once, if ever |
+
+The cap exists to stop files growing without bound. It does **not** exist to push the fork into
+restructuring upstream's code, which is what makes a 3-line overage cost more than the rule saves. So a
+fork line that pushes an upstream file past its budget is not a failure to fix — it is a row.
+
+When the fork's own block inside an upstream file becomes self-contained (a whole component, a catalog
+section), moving it to a fork-owned sibling is still the better outcome, because it removes a fork hunk
+from an upstream file instead of exempting it. That is seam work, tracked in § 5.6/§ 5.5 of
+`mergeability-plan.md`, not a budget decision.
+
+**Never** raise the numbers in `.oxlintrc.json` instead. It weakens the guard for every file to spare a
+few, and it desyncs the `defaultLimitForPath` constants that `check-max-lines-ratchet.test.mjs` pins —
+so the next reader gets a red gate from a config edit that looked harmless.
+
+**Never** turn the rule off. That is what the paragraph above records being tried and reversed: it costs
+two of upstream's own tests and makes the ratchet script blind to the very bypasses it exists to freeze.
+
+To list the offenders without touching the real config, run upstream's rule from a probe copy:
+
+```bash
+git show 0571e45107:.oxlintrc.json > .oxlintrc.maxprobe.json
+npx oxlint --config .oxlintrc.maxprobe.json --format json . | node -e '
+  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+    for (const x of JSON.parse(s).diagnostics.filter(d=>String(d.code).includes("max-lines")))
+      console.log((x.message||"").padEnd(28), String(x.filename).split("/").slice(-2).join("/"))
+  })'
+rm .oxlintrc.maxprobe.json
+```
+
+Then `node config/scripts/check-max-lines-ratchet.mjs` (expect `OK — N grandfathered entries`) and
+`pnpm test config/scripts/check-max-lines-ratchet.test.mjs` for upstream's own coverage. A row whose file
+the fork later slims back under budget is reported stale by `--prune`, so the list shrinks on its own; it
+should never need to grow without a reviewer saying yes.
+
+The eight fork exemptions are listed in `config/max-lines-baseline.txt`, and each file carries its own
+`-- Why:` naming what the fork added there — deliberately, so the reason travels with the code and cannot
+drift away from the file the way a list in this document would.
+
+### `local(test)`: the gate judges a merge by the merge's own diff
+
+Three fixes with one cause: a signal that was **absent** was read as a signal that was satisfied.
+
+- `local/gate-unit.mjs` `branchDiff()` treated an empty diff as a resolved one. A sync merges upstream
+  _onto_ `nplez1/main`, so `merge-base(nplez1/main, HEAD)` is HEAD itself, the diff is empty, and
+  `flakeWaiver` reads "nothing coupled was touched" — waiving every flaky pass on a line a 556-commit
+  merge had just built. That is the release line, which is where the gate runs. An empty diff now falls
+  back to the merge's first parent (`HEAD^1..HEAD`, what that merge contributed) and to `unknown` when
+  there is nothing to compare against, and `unknown` never waives. The `7811f60dd6` PASS above — "1
+  flaky re-run passed" — was judged the old way, immediately after a 556-commit merge.
+- `local/unit-known-red.json` entries carry an optional `match` regex, tested against the first line
+  of the failure. Without it an entry matched on file and title alone, so an allowlisted test that
+  started failing for a **new** reason stayed "known" for as long as its title did. 9 of the current 17
+  are pinned, each to a signature the failure text actually carried in the `8da9849c43` run; the rest
+  keep matching on title alone because their text is a generic deep-equality diff, and guessing a
+  signature there would turn a known red into an unexpected one. (Counts move as entries are pruned; the
+  file is the number, not this line.)
+- `config/scripts/check-changed.mjs` resolved its base as `origin/main`, which on this fork is
+  **upstream's mirror** — so the pre-handoff gate diffed the fork's whole 2,846-file delta instead of
+  the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
+  `check-changed-code-quality.mjs`.
+
+### `local(ci)`: the nightly could queue forever and say nothing
+
+`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
+failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
+`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and four of its five test shards **failed**
+(shard 4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
+`cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
+was absence.
+
+Three changes:
+
+- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
+  so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
+  files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
+  this caller never enabled it (its default is `false`).
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Under `false` a run
+  that never finishes holds the slot until a human cancels it; the 10-26 run held it for 17.5 h.
+  Superseding is safe because a shard takes minutes and the next schedule is a day away. The ref in
+  the group name keeps a `workflow_dispatch` on some feature branch from cancelling the release line's
+  nightly.
+- **`node local/check-nightly-liveness.mjs`**, because the first two only make a failure faster. See
+  below.
+
+**What the first real runs measured.** The 2026-10-26 scheduled run (id `40308443374`) is unusable as a
+red set: its cancel rewrote the run-level conclusion, so a reader saw four red shards and no verdict.
+The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus this
+repair): five shards, **three green**, and three red files in total —
+`rate-limits/service-inactive-claude-cooldown.test.ts`, `daemon/daemon-appimage-copy-host.electron.test.ts`
+and `daemon/daemon-electron-to-node-adoption.electron.test.ts` — plus one unhandled error,
+`selector_not_found`.
+
+**All three were the branch gap, not the platform.** Each maps onto a commit that exists here and not on
+`nplez1/main`: the cooldown expectation (`ba8e632509`), the fixture's esbuild specifiers
+(`be847f718f`), and the unhandled rejection (`fbb41b497d`). The third is a **test defect** — the test
+attached `.rejects` after awaiting a different promise, so the refusal settled unobserved while the
+assertion still passed. So this measurement shows Linux carrying **no environment-bound red set of its
+own**: the Mac allowlist's two classes (`host-toolchain`, `sqlite-binding`) do not appear there at all,
+and two of the three red files are electron suites that skip on macOS and cannot bundle on Linux until
+the fixture path is right.
+
+The lesson is that a red nightly has to be read against `git log`, not against the allowlist: the
+allowlist describes this Mac and the runner describes `main`.
+
+**What none of that fixes:** the cancelled run did not block 10-27 — it was cancelled at 04:02Z, ~50 min
+before that day's 04:53 cron — and **no scheduled run fired on 10-25, the first night after the 10-24
+re-enable, nor on 10-27**, with the slot free both times. `cancel-in-progress` does nothing about a
+schedule that does not fire; only the check does. (The wider gap back to 10-08 is the workflow being
+disabled in the fleet sweep, which is a different cause and a known one.)
+
+The check exits 0 on a fresh green run, 1 when the newest scheduled run is stale (past two schedule
+slots), **wedged** (not `completed` for more than four hours from its own `startedAt`), or **red**, and
+2 when it cannot tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green
+nightly. Make it the first thing a session does after a sync, next to `local/branch-status.mjs`.
+
+It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
+hide the last verdict: one clock asks whether the schedule fires at all (a `workflow_dispatch` does not
+prove the cron fires, so it does not count), the other asks when a completed run last produced a
+verdict. An in-flight run is a note on that verdict, never a substitute for it — otherwise a re-run
+dispatched after a red night would report green for hours.
+
+**A cancelled run's shards still get a vote.** The check's own first version read the run-level
+conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
+Had the night before been green it would have reported **PASS** on a night that went red, which is the
+same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
+(up to five, and only runs newer than the newest run with a verdict of its own) and takes a red verdict
+from them: a cancel can hide four red shards, but only from a checker that does not look.
+
+**The cost of that, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate on a
+fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as mergeable, so
+the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`, `gate-lint`, plus the
+review) are the only thing standing between a change and `nplez1/main` — nothing in CI backstops a
+skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all; it runs nightly on
+`fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
+cross-cutting break sitting on the release line until one of those two runs.
+
+**The first scheduled run after the unblock, read (2026-10-27, run id `40485647652`, `main` @
+`7c53c12a17`).** The schedule fires again — that is the part `#186` fixed, and this run proves it on a
+real slot rather than by dispatch. It is red: `plan` succeeded, all five shards ran, `relay integration`
+skipped as intended, and **four files failed across four shards** (shard 3 green).
+
+- Three are the branch gap this branch closes, exactly as the dispatch predicted: the cooldown
+  expectation, and both `daemon/*.electron` fixtures whose esbuild specifiers `be847f718f` rewrote.
+- The fourth is new and belongs to the lane, not the fork: `daemon-pty-adapter-history-recovery.test.ts
+  › serializes concurrent keepHistory and disconnectOnly checkpoints`, failing with
+  `DaemonConnectionLostError: Disconnected` out of `disconnectOnly()` at its own line 292. **All five
+  files in that chain are upstream-owned with zero fork hunks**, so it is upstream's own race under
+  Linux runner timing, not a regression here — and it passes 3/3 on this Mac, so it is not a Mac
+  allowlist entry either. It is the first case that needs a *Linux* flake set, which § 6.2's parity
+  checker does not carry; until one exists, read it as an ownerless red and do not "fix" it inside the
+  fork.
+
+`node local/check-nightly-linux-parity.mjs` on that run's artifacts: **PASS — all 17 Mac-allowlisted
+entries passed on Linux** (22/23 pruned entries passed; one absent because it is a macOS-only bundle
+test). So the Mac red set transfers clean, and the four failures are branch gap plus one upstream flake —
+no environment class of Linux's own, the same conclusion the dispatch reached.
+
+### `local(sync)`: a file upstream owns is restored, not deleted
+
+The fork deleted 39 files upstream still owns and still edits, so every one was a modify/delete conflict
+on the next sync **and** a place where upstream's later fixes were silently dropped instead of
+surfacing. Of the 17 outside the dashboard/pop-out subsystem, **13 are restored**; the four that stay
+deleted are recorded below with their reason rather than left implied.
+
+Restored, present, and dead — nothing in the fork imports any of these:
+
+- the five Jira files (`JiraIssueRowCopyMenu`, `JiraLinkedWorkspaceAction`, `use-jira-issue-{comment-submission,remote-details,workspace-data}`)
+  — the fork's split-button row and side-data modules replaced them. Every import resolves and every
+  `translate()` key is in `en.json`, so they compile even though nothing calls them.
+- `quick-open-capped-local-listing.ts` — `nextCappedLocalListing` has had no caller since `b3a4f9ddac` (#34).
+- three `docs/assets` images — upstream's README references them at lines 7 and 267; this fork's does not.
+
+Still deleted, deliberately:
+
+- `native/computer-use-macos/.../TrustedOrcaApplication.swift` (+ its test), which
+  `convergence-ledger.md` already records as a **Do not take back**. Upstream's file hardcodes
+  `com.stablyai.orca`; this fork's helper trusts `com.nplez1.orca.computer-use` from its own
+  `OrcaBundleIdentity.swift` (fork-created), so restoring it verbatim would make the helper trust
+  _upstream's_ app — a real defect, and exactly what
+  `config/scripts/computer-use-bundle-identity.test.mjs:39-43` exists to catch.
+- `right-sidebar/pr-comment-snapshotted-thread-resolver.ts` (+ test). #169 made the pending ack
+  reply-only and removed `PendingPRCommentAiAckGithubResolveTarget`, `PendingPRCommentAiAckGitlabTarget`
+  and the `githubResolveTarget`/`gitlabTarget` fields this resolver works against; it cannot compile
+  without resurrecting that model, and a dead file is not a reason to bring a removed capability back.
+  `local/sync/mergeability-plan.md` § 5 already carries this as a product decision.
+
+The 22 dashboard/pop-out files are split by whether they can be inert, and the split is recorded in
+`local/sync/expected-deletions.json` rather than left implied. **The decision is the owner's and it is
+settled (2026-10-26): the fork ships the Agent Dashboard as a content-area view and rejects upstream's
+drawer and pop-out window**, which are a different feature rather than a better version of the same
+one. That makes the renderer half a permanent product deletion, not an unresolved merge question.
+
+- **4 held, dead**: `src/main/ipc/dashboard-popout.ts` (+ its test) and
+  `src/main/window/dashboard-popout-window.ts` (+ its test), byte-identical to `upstream/main`.
+  Nothing registers the IPC and nothing opens the window — `electron.vite.config.ts` has no `popout`
+  entry and there is no `popout.html` to load — so they are dead, but they typecheck and **their 33
+  cases pass**. Holding upstream's bytes costs nothing and removes four modify/delete conflicts; the
+  ledger marks them `take-theirs` so a sync does not read them.
+- **18 stay deleted**, including the preload pair this bullet used to call restored.
+  `dashboard-api.ts` and `dashboard-bridge.ts` exist only to publish `window.api.dashboard`, which the
+  fork's board stopped calling when it dropped the pop-out relay; `dashboard-bridge.ts` type-checks
+  itself against `PreloadApi['dashboard']`, so keeping it forces a `dashboard` member onto `PreloadApi`
+  for a runtime API nothing registers. `clipboard-dashboard-popout-access.test.ts` goes with them: it
+  asserts that `assertTrustedClipboardTextSender` admits upstream's pop-out renderer, and dead code has
+  no business adding an admission to a clipboard trust check. The rest are the drawer, the sidebar
+  host, `popout.html`/`popout.tsx`, `DashboardPopoutRoot`, `useDashboardSnapshot` and the open-mode
+  and bridge hooks — none of which can be restored inertly. Upstream's drawer needs
+  `AppState.agentDashboardDrawerOpen`, which #44 removed, and its `DashboardPopoutRoot` renders the same
+  `AgentKanbanBoard` the fork's **live** page renders, so restoring it puts a second live board over one
+  snapshot.
+
+Restoring all 22 was measured before deciding, not assumed: **11 of 57 cases fail and `tc:web` reports
+29 errors**, because upstream's renderer half has moved past the fork's. That number is the price of a
+rejected delivery, not an argument for changing the decision.
+
+`electron.vite.config.ts` keeps upstream's `popout` entry deleted along with `popout.html`: an entry
+that resolves nothing does not build, and the fork's comment there says why.
+
+### `local(test)`: two `orca-runtime` defects were test bugs, not environment reds
+
+`local/unit-known-red.json` carried three `orca-runtime` items as `macos-path-semantics`. Both causes
+were defects **in the tests**, and both are fixed, so the three entries are removed in the same commit.
+
+- **`/private/var` vs `/var`** (two cases). Upstream #30657 (`f6e9e649f4`) made the runtime store git's
+  resolved toplevel on purpose, and pinned that in
+  `runtime-repository-registration-controller.test.ts:154`, which already calls `realpath` on its temp
+  dir. #30657 missed two cases in `repository-project-operations.spec.ts`, which kept comparing against
+  an unresolved `mkdtemp(tmpdir())`. **Upstream fixed it in #33540 (`6b255983ae`)**; this takes that hunk
+  byte-for-byte, comment included, so the next sync merges it with no hunk to resolve.
+- **`Error: selector_not_found`** as an unhandled-error headline. The refusal itself is correct: a
+  removal scoped to `ssh:host-b` cannot find the worktree on that host. The test created its promise,
+  awaited a _different_ promise, and only then attached `.rejects`; the rejection settles before the
+  local removal's real I/O completes, so Node raised an unhandled rejection and Vitest reported it while
+  the assertion attached afterwards still passed. Attaching the handler before the await fixes the
+  reporting and changes nothing the test checks. The allowlist's `evidence` line blamed the coalescing
+  map, which the stack trace contradicts — the rejection comes from target resolution at
+  `workspaces/workspace-removal.ts:87`, before that map is reached. The same defect exists on
+  `upstream/main` today.
+
+`pnpm test src/main/runtime/orca-runtime.test.ts` — before: 2 failed and 1 unhandled error; after:
+`1520 passed | 3 skipped`, green on three consecutive runs. Every cached verdict under `orca-gate/`
+mentions `selector_not_found`, so this was persistent rather than a one-off.
+
+**Every other `macos-path-semantics` entry was the same defect, and they are all fixed.** Nine cases
+across five files, each creating a temp dir with `mkdtemp(tmpdir())` and comparing it against a path the
+subject had resolved — the darwin launcher's `cd -P`, orcad's deploy root, a spawned child's reported
+cwd. Each now resolves its temp dir first:
+`orcad-forked-child-paths.test.ts` (4), `cli/packaged-cli-assets.test.ts` (1),
+`config/scripts/verify-cli-bin.test.mjs` (1), `config/scripts/macos-terminal-host-bundle.test.mjs` (1).
+The `orca-runtime` pair above is the other two.
+
+Every one of those four files is otherwise byte-identical to `upstream/main`, so each is a fork-local
+test fix that will conflict once, benignly, when upstream makes the same change — the same trade
+upstream itself made in #33540. **The class is now empty**: 40 entries at the 2026-10-26 baseline, 17
+today, and all 17 are `host-toolchain` (8) and `sqlite-binding` (9) — a different machine's different bun
+and SQLite, which is not something this fork can fix in a test. The `host-toolchain` entries that were
+bash 3.2 rather than bun or SQLite are gone with the bash install recorded above.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
@@ -1135,7 +1477,10 @@ git checkout nplez1/main
 git merge upstream/main
 ```
 
-**The release line merges; only a feature branch or the patch series rebases** (runbook Step 1).
+**The release line merges; only a feature branch rebases** (runbook Step 1). The "patch series" the
+older wording named does not exist as a separable thing — no patch ref, ~50 commits of product line
+importing the identity modules, 35 shared files — so nothing rebases it, and `curate.mjs`, which
+planned it, is retired.
 The merge commits are load-bearing: this line carries rollback tags (`archive/pre-sync-<tip>`) and one
 hand-resolved merge whose resolutions exist nowhere else, and a rebase drops both. Because each patch
 is a one-line constant edit, a conflict here means upstream moved that exact line — re-apply by hand
@@ -1170,7 +1515,7 @@ comm -23 "$modified" "$upstream_changed"   # expect empty
 Why `mktemp`: several agents and worktrees share one `/tmp`, and two of them have already written
 the same fixed filename at the same time.
 
-After a **rebase** — a feature branch or the patch series, never the release line — confirm the
+After a **rebase** — a feature branch, never the release line — confirm the
 series came through unchanged: `range-diff` prints `=` per patch that is byte-identical:
 
 ```bash
@@ -1245,9 +1590,10 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     skill bundle manifest arrived built from upstream's skills. `995f2dbc27` separately restored nine
     files where a repair script had rewritten `./src/main/...` inside esbuild `stdin.contents`
     templates — cwd-relative strings, not imports.
-  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` is now fork-only — upstream
-    deleted the module and the renderer owns those types — and is kept for its both-owner
-    lock-source rule; note that after the merge only its own test imports it. Six fork-only exports
+  - **Lost or diverged, stated plainly.** `src/shared/skill-freshness.ts` was fork-only — upstream
+    deleted the module and the renderer owns those types — and it is **now deleted too** (2026-10-27):
+    its both-owner lock-source rule had stopped being on a live path, nothing but its own test imported
+    it, so keeping it recorded a rule the app no longer applied. Six fork-only exports
     upstream's refactors superseded are acknowledged, with their live replacements, across five paths
     in `local/sync/expected-deletions.json`. The onboarding test lost its `nplez1` URL assertion.
     `worktrees:listAll` went with the IPC surface upstream dropped; `listCached` stays, live in
@@ -1606,65 +1952,6 @@ Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`,
 `e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
 live, and the section below is why its being live was not the same as its running.
 
-#### `local(ci)`: the nightly could queue forever and say nothing
-
-`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
-failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
-`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and four of its five test shards **failed**
-(shard 4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
-`cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
-was absence.
-
-So `nplez1/main` was **red on four of five shards** on 2026-10-26 (run `40308443374`), and that is still
-true: nothing in this change fixes those tests, it only stops the failures from being invisible. Per
-`AGENTS.md`, a red nightly needs an owner — the first session after a red run either fixes it or files
-it before starting anything else. The shards were red on Linux runners, so this is also the first
-measurement of the Linux red set the local macOS allowlist (`local/unit-known-red.json`) does not cover.
-
-Three changes:
-
-- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
-  so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
-  files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
-  this caller never enabled it (its default is `false`).
-- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Under `false` a run
-  that never finishes holds the slot until a human cancels it; the 10-26 run held it for 17.5 h.
-  Superseding is safe because a shard takes minutes and the next schedule is a day away. The ref in
-  the group name keeps a `workflow_dispatch` on some feature branch from cancelling the release line's
-  nightly.
-
-**What none of that fixes, and the checker exists for:** the cancelled run did not block 10-27 — it was
-cancelled at 04:02Z, ~50 min before that day's 04:53 cron — and **no scheduled run fired on 10-25, the
-first night after the 10-24 re-enable, nor on 10-27**, with the slot free both times. `cancel-in-progress`
-does nothing about a schedule that does not fire; only the check does. (The wider gap back to 10-08 is
-the workflow being disabled in the fleet sweep, which is a different cause and a known one.)
-
-`node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
-run, 1 when the newest scheduled run is stale (past two schedule slots), **wedged** (not `completed` for
-more than four hours from its own `startedAt` — the exact failure above), or **red**, and 2 when it
-cannot tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly.
-
-It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
-hide the last verdict: one clock asks whether the schedule fires at all (a `workflow_dispatch` does not
-prove the cron fires, so it does not count), the other asks when a completed run last produced a
-verdict. An in-flight run is a note on that verdict, never a substitute for it — otherwise a re-run
-dispatched after a red night would report green for hours.
-
-**A cancelled run's shards still get a vote.** This check's own first version read the run-level
-conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
-Had the night before been green it would have reported **PASS** on a night that went red, which is the
-same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
-(up to five, and only runs newer than the newest run with a verdict of its own) and takes a red verdict
-from them: a cancel can hide four red shards, but only from a checker that does not look.
-
-**The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
-on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as
-mergeable, so the pre-PR gates in `AGENTS.md` (targeted tests for the changed area, `pnpm tc`,
-`gate-lint`, plus the review) are the only thing standing between a change and `nplez1/main` — nothing
-in CI backstops a skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at all;
-it runs nightly on `fork-main-tests.yml` and again at the release gate, and the failure window that
-choice accepts is a cross-cutting break sitting on the release line until one of those two runs.
-
 **A sweep is never complete, and the first one wasn't.** Nine workflows survived it on 2026-10-19 —
 eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-switch-e2e`,
 `windows-typecheck-parity`, the three `preflight-*`, and the two `zcode-*-contract`) plus
@@ -1673,17 +1960,22 @@ eight still triggering on `pull_request` (`wsl-orcad-e2e`, `win-orcad-serve-swit
 after any sync that adds workflows, re-run the listing above rather than assuming the sweep still
 covers the tree.
 
-### `local(hooks)`: refuse fork-only commits on a PR branch
+### `local(hooks)`: refuse fork-only commits on an upstream-bound branch
 
-`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the current branch is
-`nplez1/main`. Fork PR branches are cut from `nplez1/main` and upstream-bound ones from `origin/main`;
-either way a fork-only file committed to a PR branch is wrong — for an upstream-bound branch it would
-be reviewed upstream, and for a fork branch it would let the patch series diverge from the branch that
-owns it — which is precisely what happened twice before this guard existed. It is
-`commit-msg` rather than `pre-commit` because the message is what identifies the commit as fork-only,
-and `pre-commit` cannot see it.
+`.husky/commit-msg` refuses any commit whose subject starts with `local(` unless the branch carries
+`nplez1/main` in its history. Upstream-bound branches are cut from `origin/main`, so a fork-only file
+committed to one is reviewed upstream. It is `commit-msg` rather than `pre-commit` because the message
+is what identifies the commit as fork-only, and `pre-commit` cannot see it.
 
-If a commit is wrongly refused, the fix is to switch branches, not to bypass the hook.
+**Scoped to lineage on 2026-10-27, not to a branch name.** The original rule allowed `local(` on
+`nplez1/main` and nowhere else, which included fork PR branches — and the result was worse than the
+mistake it guarded: policy work committed there _without_ the `local(` label at least five times
+(#146, #130, #142, #177, #52), producing unlabelled fork-only changes riding fork PRs. A fork PR
+branch descends from `nplez1/main`; that lineage is what the rule now follows, so `local(` is allowed
+on the fork's own line and still refused on anything cut from `origin/main`. `local/open-pr.mjs
+--upstream` remains the second stop, refusing the subject and every fork-owned path.
+
+If a commit is wrongly refused, the fix is to branch from `nplez1/main`, not to bypass the hook.
 
 ### `local(vm)`: an ephemeral machine per worktree
 

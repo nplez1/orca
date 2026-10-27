@@ -3,6 +3,7 @@ import {
   SHARED_TEST_INPUTS,
   branchCoupledPaths,
   flakeWaiver,
+  packageJsonAffectsTests,
   importSpecifiers,
   sharedHarnessPaths
 } from '../../local/gate-flake-coupling.mjs'
@@ -10,11 +11,16 @@ import {
   cachedVerdictProblem,
   formatVerdict,
   gateInputsFingerprint,
+  resolvedGateCacheDir,
   unitGateCacheDir,
   verdictRecordProblem
 } from '../../local/gate-verdict-cache.mjs'
+import { branchDiff } from '../../local/gate-unit.mjs'
 import {
+  NO_RERUN,
   declaredUnhandledMismatch,
+  rerunReportsFor,
+  reproducedFailures,
   unexplainedSuiteExit
 } from '../../local/unit-gate-judgement.mjs'
 
@@ -60,6 +66,60 @@ describe('a run the report cannot explain fails closed', () => {
     expect(declaredUnhandledMismatch(2, 1)).toMatch(/declared 2 .*1 could be read/)
     // The base compared with `>`, so a log that yielded more headlines than Vitest declared passed.
     expect(declaredUnhandledMismatch(1, 2)).toMatch(/declared 1 .*2 could be read/)
+  })
+})
+
+describe('one batched isolation re-run, read per file', () => {
+  const fileEntry = (name, assertions, status = 'passed') => ({
+    name,
+    status,
+    assertionResults: assertions
+  })
+  const passing = (fullName) => ({ fullName, status: 'passed' })
+  const failing = (fullName, message = 'boom') => ({
+    fullName,
+    status: 'failed',
+    failureMessages: [message]
+  })
+  const report = {
+    testResults: [
+      fileEntry(
+        'src/main/a.test.ts',
+        [passing('one'), failing('two'), failing('three', 'load flake')],
+        'failed'
+      ),
+      fileEntry('src/main/b.test.tsx', [passing('four')]),
+      // A positional filter is a substring match, so a batched run can collect a sibling the
+      // serial run would not have; it must not bleed into any requested file's reading.
+      fileEntry('src/main/b.test.ts', [failing('five')], 'failed')
+    ]
+  }
+
+  it('keeps the per-file attribution a serial re-run had', () => {
+    const reruns = rerunReportsFor(report, ['src/main/a.test.ts', 'src/main/b.test.tsx'])
+    const a = reruns.get('src/main/a.test.ts')
+    expect(a.complete).toBe(true)
+    expect([...a.failures]).toEqual(['two', 'three'])
+    expect([...a.passes]).toEqual(['one'])
+    expect(a.filePassed).toBe(false)
+    const b = reruns.get('src/main/b.test.tsx')
+    expect([...b.failures]).toEqual([])
+    expect([...b.passes]).toEqual(['four'])
+    expect(b.filePassed).toBe(true)
+  })
+
+  it('reads a file the batched report never mentions as no report at all', () => {
+    const reruns = rerunReportsFor(report, ['src/main/absent.test.ts'])
+    const rerun = reruns.get('src/main/absent.test.ts')
+    expect(rerun).toBe(NO_RERUN)
+    // …which is "every failure reproduced", whatever the caller failed with.
+    const failures = [{ file: 'src/main/absent.test.ts', test: 'x', detail: 'boom' }]
+    expect(reproducedFailures(failures, rerun)).toEqual(failures)
+  })
+
+  it('reports nothing when there was nothing to re-run', () => {
+    expect(rerunReportsFor(report, []).size).toBe(0)
+    expect(rerunReportsFor(null, ['src/main/a.test.ts']).get('src/main/a.test.ts')).toBe(NO_RERUN)
   })
 })
 
@@ -120,6 +180,33 @@ describe('which verdicts may be reused, and which may be recorded', () => {
     // Why this and not a write probe: `<root>/.git` is a file in a linked worktree, so the gate has
     // to resolve the git dir itself — which it does with `--absolute-git-dir`.
     expect(unitGateCacheDir('/repo/.git/worktrees/wt')).toBe('/repo/.git/worktrees/wt/orca-gate')
+  })
+
+  it('keys the verdict cache to the repository, so two worktrees gate a revision once', () => {
+    // Why: `--absolute-git-dir` answers with `.git/worktrees/<name>`, so the same SHA gated here and
+    // in the main tree ran the full suite twice — 25 minutes of it for the release gate.
+    const inWorktree = resolvedGateCacheDir({
+      commonDir: '/repo/.git',
+      gitDir: '/repo/.git/worktrees/wt',
+      root: '/repo'
+    })
+    const inMainTree = resolvedGateCacheDir({
+      commonDir: '/repo/.git',
+      gitDir: '/repo/.git',
+      root: '/repo'
+    })
+    expect(inWorktree).toBe('/repo/.git/orca-gate')
+    expect(inMainTree).toBe(inWorktree)
+  })
+
+  it('falls back to the worktree git dir when no common dir is reported', () => {
+    expect(resolvedGateCacheDir({ gitDir: '/repo/.git/worktrees/wt', root: '/repo' })).toBe(
+      '/repo/.git/worktrees/wt/orca-gate'
+    )
+  })
+
+  it('resolves a relative common dir against the root, not the cwd', () => {
+    expect(resolvedGateCacheDir({ commonDir: '.git', root: '/repo' })).toBe('/repo/.git/orca-gate')
   })
 
   it('fingerprints the gate inputs, and only them', () => {
@@ -234,6 +321,32 @@ describe('what a flaky pass is allowed to waive', () => {
     }
   })
 
+  it('reads a build-only package.json change as no harness coupling', () => {
+    // Why: the fork owns a permanent overlay in package.json, so a diff touching only build or lint
+    // scripts was refusing every load flake — the test executes none of those scripts.
+    const before = { scripts: { build: 'a', lint: 'b', test: 'vitest' }, dependencies: { x: '1' } }
+    expect(
+      packageJsonAffectsTests(before, {
+        ...before,
+        scripts: { ...before.scripts, build: 'z', lint: 'y' }
+      })
+    ).toBe(false)
+    expect(
+      flakeWaiver('src/main/foo.test.ts', new Set(['package.json']), noSource, {
+        packageJsonShared: false
+      })
+    ).toEqual({ inDiff: false, matched: null })
+  })
+
+  it('reads a dependency or test-script change as harness coupling', () => {
+    const before = { scripts: { test: 'vitest' }, dependencies: { x: '1' } }
+    expect(packageJsonAffectsTests(before, { ...before, dependencies: { x: '2' } })).toBe(true)
+    expect(
+      packageJsonAffectsTests(before, { ...before, scripts: { test: 'vitest --changed' } })
+    ).toBe(true)
+    expect(packageJsonAffectsTests(before, { ...before, packageManager: 'pnpm@10' })).toBe(true)
+  })
+
   it('follows what the config and the runner import, so the pool and sequencer are covered', () => {
     // A hand list missed exactly these the first time: re-seating tests into the node-runtime pool is
     // a harness change no test file mentions.
@@ -276,5 +389,67 @@ describe('what a flaky pass is allowed to waive', () => {
       inDiff: true,
       matched: null
     })
+  })
+})
+
+describe('the diff that judges a flaky pass', () => {
+  function fakeGit(answers) {
+    return (args) => answers[args.join(' ')] ?? null
+  }
+
+  it('uses the merge-base against the release line when that diff has content', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'base',
+      'diff --name-only --no-renames base HEAD': 'src/a.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'nplez1/main', files: new Set(['src/a.ts']) })
+  })
+
+  it('does not read an empty release-line diff as resolved, and judges the merge instead', () => {
+    // The sync shape: the merge lands *on* nplez1/main, so merge-base is HEAD, the diff is empty,
+    // and the merge's own contribution is the only diff that can judge it.
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first second',
+      'diff --name-only --no-renames first HEAD': 'src/b.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'first', files: new Set(['src/b.ts']) })
+  })
+
+  it('answers unknown when there is nothing but HEAD itself to compare against', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head'
+    })
+    expect(branchDiff(run)).toBeNull()
+  })
+
+  it('judges a squashed land on the release line by its own single parent', () => {
+    // Every PR into nplez1/main squashes, so a landed change is a one-parent commit that IS the line:
+    // its diff against nplez1/main is empty. Reading that as `unknown` means "in the diff", which
+    // refuses every flake on code the commit never touched.
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first',
+      'diff --name-only --no-renames first HEAD': 'src/c.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'first', files: new Set(['src/c.ts']) })
+  })
+
+  it('still answers unknown when a single-parent HEAD changed nothing itself', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first',
+      'diff --name-only --no-renames first HEAD': ''
+    })
+    expect(branchDiff(run)).toBeNull()
   })
 })

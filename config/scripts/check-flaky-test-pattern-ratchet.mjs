@@ -10,6 +10,7 @@ import { listTrackedFiles, runCountRatchet } from './ratchet-baseline.mjs'
 // counts one rule in one file, so fixing one pattern cannot pay for adding another.
 
 const BASELINE_PATH = 'config/flaky-test-pattern-baseline.txt'
+const OVERLAY_PATH = 'config/flaky-test-pattern-baseline.fork.txt'
 const RULE_FILTER = '^test-'
 const HEADER = [
   '# Flaky-test pattern findings per rule and file (config/ast-grep/rules/flaky-tests).',
@@ -82,6 +83,7 @@ export function main(root = process.cwd(), arg = undefined) {
     {
       name: 'flaky-test-pattern',
       baselinePath: BASELINE_PATH,
+      overlayPath: OVERLAY_PATH,
       header: HEADER,
       collect: collectFlakyTestPatternCounts,
       scope: (dir) => changedFileScope(listChangedFiles(dir)),

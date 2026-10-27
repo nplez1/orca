@@ -112,6 +112,17 @@ describe('workspace lifecycle commands', () => {
     expect(ran).toBe(true)
   })
 
+  it('hands the remote-branch choice to the removal', async () => {
+    const forwarded = await queueWorkspaceDelete(
+      runtime(null),
+      'feature',
+      undefined,
+      { ...removal, deleteRemoteBranch: true },
+      async (normalized) => normalized.deleteRemoteBranch
+    )
+    expect(forwarded).toBe(true)
+  })
+
   it('refuses a delete that differs from the pending one only in the remote-branch choice', async () => {
     const queue = new WorkspaceLifecycleQueue()
     let release!: () => void

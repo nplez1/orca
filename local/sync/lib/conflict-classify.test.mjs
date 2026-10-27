@@ -4,10 +4,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  LEDGER_RESOLUTIONS,
   classifyFile,
   delimiterBalance,
   globMatches,
   ledgerMatches,
+  ledgerResolution,
   lineDelta,
   parseConflictHunks,
   parseLedger
@@ -341,4 +343,56 @@ test('ledger parse is tolerant and path matching handles ** and {a,b}', () => {
     ['Rate limits']
   )
   assert.deepEqual(ledgerMatches(sections, 'src/renderer/other.ts'), [])
+})
+
+test('a ledger Resolution line is the actionable half of a decision', () => {
+  const sections = parseLedger(
+    [
+      '## Relay removal',
+      '',
+      '**Paths:** `src/relay/**`',
+      '**Resolution:** take-theirs upstream retired the relay, so their deletion wins',
+      '',
+      '**Decision:** upstream wins here',
+      '',
+      '## Prose only',
+      '',
+      '**Paths:** `src/other/**`',
+      '',
+      '**Decision:** no verb recorded',
+      '',
+      '## Malformed verb',
+      '',
+      '**Paths:** `src/broken/**`',
+      '**Resolution:** ask-someone-later'
+    ].join('\n')
+  )
+  assert.deepEqual(ledgerResolution(sections[0]), {
+    action: 'take-theirs',
+    verb: 'take-theirs',
+    note: 'upstream retired the relay, so their deletion wins'
+  })
+  assert.equal(ledgerResolution(sections[1]), null)
+  assert.deepEqual(ledgerResolution(sections[2]), {
+    action: 'unknown',
+    verb: 'ask-someone-later',
+    note: ''
+  })
+  assert.ok(LEDGER_RESOLUTIONS.includes('delete'))
+})
+
+test('a verb written as prose still names the verb', () => {
+  const [section] = parseLedger(
+    [
+      '## Prose',
+      '',
+      '**Paths:** `src/x/**`',
+      '**Resolution:** manual. The literal wins, the rest is upstream.'
+    ].join('\n')
+  )
+  assert.deepEqual(ledgerResolution(section), {
+    action: 'manual',
+    verb: 'manual',
+    note: 'The literal wins, the rest is upstream.'
+  })
 })

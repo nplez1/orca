@@ -1,9 +1,20 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
+  FORK_EN_CATALOG_RELATIVE_PATH,
+  FORK_RUNTIME_REQUIRED_RELATIVE_PATH,
+  UPSTREAM_EN_CATALOG_RELATIVE_PATH,
+  UPSTREAM_RUNTIME_REQUIRED_RELATIVE_PATH
+} from './fork-english-catalog.mjs'
+import {
   buildRuntimeRequiredCatalog,
   collectRuntimeRequiredCatalogProblems,
-  collectRuntimeRequiredKeys
+  collectRuntimeRequiredKeys,
+  main
 } from './generate-runtime-required-english-catalog.mjs'
 
 const entries = new Map([
@@ -93,5 +104,41 @@ describe('runtime-required English catalog rule', () => {
         unreferenced: 'Legacy copy'
       }
     })
+  })
+
+  it('writes only what upstream omits or contradicts to the fork subset', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'orca-runtime-required-fork-'))
+    try {
+      const write = (relative, value) => {
+        mkdirSync(path.dirname(path.join(root, relative)), { recursive: true })
+        writeFileSync(path.join(root, relative), JSON.stringify(value))
+      }
+      write('src/main/ready.ts', '')
+      write(UPSTREAM_EN_CATALOG_RELATIVE_PATH, {
+        upstream: { plural_one: 'Old', same_one: 'Same' }
+      })
+      write(UPSTREAM_RUNTIME_REQUIRED_RELATIVE_PATH, {
+        upstream: { plural_one: 'Old', same_one: 'Same' }
+      })
+      write(FORK_EN_CATALOG_RELATIVE_PATH, {
+        upstream: { plural_one: 'New' },
+        fork: { plural_one: 'Fork' }
+      })
+
+      expect(await main(root, [])).toBe(1)
+      expect(await main(root, ['--fix'])).toBe(0)
+      expect(await main(root, [])).toBe(0)
+
+      const read = (relative) => JSON.parse(readFileSync(path.join(root, relative), 'utf8'))
+      expect(read(FORK_RUNTIME_REQUIRED_RELATIVE_PATH)).toEqual({
+        fork: { plural_one: 'Fork' },
+        upstream: { plural_one: 'New' }
+      })
+      expect(read(UPSTREAM_RUNTIME_REQUIRED_RELATIVE_PATH)).toEqual({
+        upstream: { plural_one: 'Old', same_one: 'Same' }
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

@@ -7,11 +7,11 @@ import {
 } from '../../agent-lead-status-fold'
 import {
   codexRosterChildWorkLiveness,
-  agentDescendantRosterToSnapshots,
-  finishAgentDescendant,
-  seedAgentDescendantRoster,
-  type AgentDescendantRoster
-} from '../../agent-descendant-roster'
+  codexRosterToSnapshots,
+  finishCodexSubagent,
+  seedCodexSubagentRoster,
+  type CodexSubagentRoster
+} from '../../codex-subagent-roster'
 import {
   createCodexSubagentTranscriptState,
   hasTrackedCodexTranscriptSubagents,
@@ -19,10 +19,10 @@ import {
 } from '../../codex-subagent-transcript'
 import type { CodexLeadTurnState, HookListenerState } from '../listener-state'
 
-export function getOrCreateAgentDescendantRoster(
+export function getOrCreateCodexSubagentRoster(
   state: HookListenerState,
   paneKey: string
-): AgentDescendantRoster {
+): CodexSubagentRoster {
   let roster = state.codexSubagentRosterByPaneKey.get(paneKey)
   if (!roster) {
     roster = new Map()
@@ -123,7 +123,7 @@ export function seedCodexStateFromSnapshot(
 ): void {
   const snapshots = payload.subagents ?? []
   if (snapshots.length > 0 && !state.codexSubagentRosterByPaneKey.has(paneKey)) {
-    seedAgentDescendantRoster(getOrCreateAgentDescendantRoster(state, paneKey), snapshots)
+    seedCodexSubagentRoster(getOrCreateCodexSubagentRoster(state, paneKey), snapshots)
   }
   if (!state.codexLeadStateByPaneKey.has(paneKey)) {
     const mainAgent = payload.mainAgent
@@ -222,13 +222,13 @@ export function reconcileRemoteCodexState(
   if (agentId && !payload.subagents && !state.codexSubagentRosterByPaneKey.has(paneKey)) {
     return payload
   }
-  const roster = getOrCreateAgentDescendantRoster(state, paneKey)
+  const roster = getOrCreateCodexSubagentRoster(state, paneKey)
   if (payload.subagents) {
-    seedAgentDescendantRoster(roster, payload.subagents)
+    seedCodexSubagentRoster(roster, payload.subagents)
   }
   if (agentId) {
     if (eventName === 'SubagentStop') {
-      finishAgentDescendant(roster, agentId)
+      finishCodexSubagent(roster, agentId)
     }
   } else {
     const leadState = codexLeadStateForHookEvent(eventName, payload.state)
@@ -275,7 +275,7 @@ export function reconcileRemoteCodexState(
     interrupted:
       resolution.stateName === 'done' && mainAgentTurnInterrupted(lead) ? true : undefined,
     model: lead.model ?? payload.model,
-    subagents: agentDescendantRosterToSnapshots(roster),
+    subagents: codexRosterToSnapshots(roster),
     // Why: main's cache outlives a relay restart, so it is the main agent fact for a relayed row too.
     mainAgent: codexMainAgentStatusForPayload(lead)
   }

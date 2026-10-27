@@ -1,7 +1,14 @@
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { USAGE_PROVIDER_IDS } from '../../../../shared/usage-provider-enablement'
-import { hasCreditsData } from './provider-credits-format'
+import {
+  forkUsageHasData,
+  FORK_USAGE_PROVIDER_IDS,
+  FORK_USAGE_PROVIDERS,
+  isForkUsageProvider,
+  type ForkUsageProviderSettings,
+  type ForkUsageProviderSnapshots
+} from './fork-usage-providers'
 
 export type UsageProviderSettings = Pick<
   GlobalSettings,
@@ -10,8 +17,6 @@ export type UsageProviderSettings = Pick<
   | 'opencodeSessionCookie'
   | 'geminiCliOAuthEnabled'
 > & {
-  /** Widened to string so any provider id (including Kimi/Antigravity) can be checked. */
-  disabledUsageProviders?: readonly string[]
   // Why: Antigravity has no separate persisted usage credential in Orca. The
   // checked status-bar item is the durable user signal; StatusBar only sets
   // this after PATH detection says the agent is available. No Gemini OAuth
@@ -28,13 +33,7 @@ export type UsageProviderSettings = Pick<
   opencodeGoApiKeyConfigured: boolean
   grokAuthConfigured: boolean
   cursorAuthConfigured: boolean
-  // Why: DeepSeek/Fireworks credentials are API keys stored outside GlobalSettings;
-  // main derives these booleans each poll and the renderer never sees the key.
-  deepseekApiKeyConfigured: boolean
-  fireworksApiKeyConfigured: boolean
-  // Why: the Copilot token and enterprise slug also live outside GlobalSettings.
-  copilotTokenConfigured: boolean
-}
+} & ForkUsageProviderSettings
 
 type UsageProviderSnapshots = {
   claude: ProviderRateLimits | null | undefined
@@ -47,16 +46,10 @@ type UsageProviderSnapshots = {
   grok: ProviderRateLimits | null | undefined
   cursor: ProviderRateLimits | null | undefined
   zcode?: ProviderRateLimits | null
-  deepseek: ProviderRateLimits | null | undefined
-  fireworks: ProviderRateLimits | null | undefined
-  copilot: ProviderRateLimits | null | undefined
-}
+} & ForkUsageProviderSnapshots
 
 type UsageProviderId = ProviderRateLimits['provider']
 
-// Why: credits count as usage data — DeepSeek/Fireworks publish no window at all,
-// so without this term every window-shaped caller reads them as "no data" and
-// hides a configured, funded account behind the invisible-bar state.
 export function hasUsageData(provider: ProviderRateLimits): boolean {
   return Boolean(
     provider.session ||
@@ -65,9 +58,10 @@ export function hasUsageData(provider: ProviderRateLimits): boolean {
     provider.monthly ||
     (provider.buckets && provider.buckets.length > 0) ||
     // Why: an allowance-only plan (no percentage window) must still count as data, or
-    // a configured enterprise account reads as "No usage data" again.
+    // a configured enterprise account reads as "No usage data" again; the fork's
+    // windowless credits providers join through their mapping.
     provider.allowance ||
-    hasCreditsData(provider)
+    forkUsageHasData(provider)
   )
 }
 
@@ -161,14 +155,8 @@ export function hasUsageProviderSettingsForProvider(
   if (providerId === 'zcode') {
     return settings.zcodePlanApiKeyConfigured === true
   }
-  if (providerId === 'deepseek') {
-    return settings.deepseekApiKeyConfigured === true
-  }
-  if (providerId === 'fireworks') {
-    return settings.fireworksApiKeyConfigured === true
-  }
-  if (providerId === 'copilot') {
-    return settings.copilotTokenConfigured === true
+  if (isForkUsageProvider(providerId)) {
+    return settings[FORK_USAGE_PROVIDERS[providerId].settingsFlag] === true
   }
   return false
 }
@@ -184,10 +172,8 @@ export function createPendingProviderSnapshot(providerId: UsageProviderId): Prov
     ...(providerId === 'gemini' || providerId === 'cursor' || providerId === 'antigravity'
       ? { buckets: [] }
       : {}),
-    // Why: DeepSeek/Fireworks have no windows; their readout is the credits field.
-    ...(providerId === 'deepseek' || providerId === 'fireworks' ? { credits: null } : {}),
-    // Why: Copilot reports a monthly allowance rather than a quota window.
-    ...(providerId === 'copilot' ? { monthly: null, allowance: null } : {}),
+    // Why: the fork's windowless readouts need their own pending nulls (credits vs allowance).
+    ...(isForkUsageProvider(providerId) ? FORK_USAGE_PROVIDERS[providerId].pendingReadout : {}),
     updatedAt: 0,
     error: null,
     status: 'fetching'
@@ -246,9 +232,7 @@ export function isUsageEmptyState(
     pendingForBar('grok', providers.grok) ||
     pendingForBar('cursor', providers.cursor) ||
     (providers.zcode !== undefined && pendingForBar('zcode', providers.zcode)) ||
-    pendingForBar('deepseek', providers.deepseek) ||
-    pendingForBar('fireworks', providers.fireworks) ||
-    pendingForBar('copilot', providers.copilot)
+    FORK_USAGE_PROVIDER_IDS.some((providerId) => pendingForBar(providerId, providers[providerId]))
   ) {
     return false
   }
@@ -264,8 +248,6 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.grok) &&
     !isProviderConfigured(providers.cursor) &&
     !isProviderConfigured(providers.zcode) &&
-    !isProviderConfigured(providers.deepseek) &&
-    !isProviderConfigured(providers.fireworks) &&
-    !isProviderConfigured(providers.copilot)
+    FORK_USAGE_PROVIDER_IDS.every((providerId) => !isProviderConfigured(providers[providerId]))
   )
 }

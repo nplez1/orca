@@ -113,7 +113,7 @@ const devChannelRepo = isHourlyChannel
     : isAdhocChannel
       ? 'orca-adhoc'
       : null
-const appId = 'com.nplez1.orca'
+const appId = 'com.stablyai.orca'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
@@ -247,8 +247,8 @@ const ORCA_MAC_TEAM_ID = process.env.APPLE_TEAM_ID ?? '6CX3WHS9HZ'
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca NP',
-  protocols: [{ name: 'Orca NP', schemes: ['orca'] }],
+  productName: 'Orca',
+  protocols: [{ name: 'Orca', schemes: ['orca'] }],
   toolsets: { appimage: '1.0.3' },
   ...(devChannelBuildVersion
     ? { extraMetadata: { version: devChannelBuildVersion } }
@@ -336,10 +336,10 @@ module.exports = {
     // extraResources entry below; keeping them in app.asar would ship every
     // native variant (and duplicate the selected one).
     '!node_modules/sherpa-onnx*{,/**/*}',
-    // Why: the Windows CLI shim ships via extraResources to resources/bin/orca-np.cmd
-    // (beside the native resources/bin/orca-np.exe). Packing the source tree into
+    // Why: the Windows CLI shim ships via extraResources to resources/bin/orca.cmd
+    // (beside the native resources/bin/orca.exe). Packing the source tree into
     // app.asar too lets asarUnpack:['resources/**'] extract a second copy at
-    // app.asar.unpacked/resources/win32/bin/orca-np.cmd with no adjacent orca-np.exe,
+    // app.asar.unpacked/resources/win32/bin/orca.cmd with no adjacent orca.exe,
     // which fails to launch the CLI (#7351).
     '!resources/win32{,/**/*}'
   ],
@@ -560,7 +560,7 @@ module.exports = {
     }
   },
   win: {
-    executableName: 'Orca NP',
+    executableName: 'Orca',
     // Why: Windows installers are signed after electron-builder packaging by
     // SignPath, so the packager cannot infer the updater publisherName.
     //
@@ -579,24 +579,21 @@ module.exports = {
     // are unset, so local and dev builds are unaffected. publisherName stays on
     // its existing channel split above.
     signtoolOptions: {
-      sign: signWindowsUninstallerViaSignPath
-      // LOCAL(nplez1): deliberately no publisherName. This fork ships unsigned, and
-      // electron-updater Authenticode-verifies every installer against the name in the
-      // installed app-update.yml, rejecting its own channel's next build when it mismatches.
+      sign: signWindowsUninstallerViaSignPath,
+      ...(isWinDevChannel ? {} : { publisherName: 'SignPath Foundation' })
     },
-    // LOCAL(nplez1): accept our own unsigned installers.
-    verifyUpdateCodeSignature: false,
+    ...(isWinDevChannel ? { verifyUpdateCodeSignature: false } : {}),
     extraResources: [
       ...commonExtraResources,
       ...windowsRuntimeResources,
       winSpeechNativeResource,
       {
-        from: 'resources/win32/bin/orca-np.cmd',
-        to: 'bin/orca-np.cmd'
+        from: 'resources/win32/bin/orca.cmd',
+        to: 'bin/orca.cmd'
       },
       {
         from: 'native/windows-cli-launcher/.build/orca.exe',
-        to: 'bin/orca-np.exe'
+        to: 'bin/orca.exe'
       },
       {
         from: 'native/windows-cli-launcher/.build/orca-administrator-restart.exe',
@@ -731,12 +728,6 @@ module.exports = {
     mimeTypes: ['text/markdown', 'text/csv', 'text/tab-separated-values'],
     // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
     // The Linux installer should not claim those system package/file names.
-    // Why (fork): the packages and the PATH command carry this fork's name (`orca-np`), so an
-    // official Orca .deb/.rpm and Orca NP's can be installed side by side — dpkg/rpm ownership is
-    // what decides that, not this binary name. The in-bundle binary and launcher keep upstream's
-    // file name because `LINUX_CLI_COMMAND_NAME` (src/main/cli/bundled-cli-launcher-path.ts) and
-    // the AppImage cache layout locate `resources/bin/orca-ide`; the *installed* command is already
-    // `orca-np` (CLI_COMMAND_NAME). See LOCAL-PATCHES.md § local(identity).
     executableName: 'orca-ide',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
@@ -744,11 +735,7 @@ module.exports = {
     desktop: {
       entry: {
         // Why: Electron reports WM_CLASS=orca for the visible Linux window;
-        // GNOME docks need an exact match to group it with the .desktop entry.
-        // Why (fork) this is unchanged: the class comes from the app name Electron reports, not
-        // from the package or executable name, so the fork's package rename does not move it.
-        // Unverified on a real desktop for this fork's packaged name — see the note in
-        // LOCAL-PATCHES.md § local(identity); check `xprop WM_CLASS` on the first shipped build.
+        // GNOME docks need an exact match to group it with orca-ide.desktop.
         StartupWMClass: 'orca'
       }
     },
@@ -780,17 +767,11 @@ module.exports = {
     category: 'Utility'
   },
   appImage: {
-    // Why (fork) this keeps upstream's file name: `verifyStaticAppImagePackage`
-    // (config/scripts/static-appimage-package-contract.cjs) identifies the AppImage's target
-    // architecture from this exact name, and the PR lane runs the file as `dist/orca-linux.AppImage`.
-    // The name is not something dpkg/rpm own, so it costs nothing; only the packages are renamed.
     artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
   },
   deb: {
-    // Why (fork): package name is what dpkg uses for ownership. `orca-ide` belongs to an official
-    // Orca install, so reusing it would make this build replace that app rather than sit beside it.
-    packageName: 'orca-np',
-    artifactName: 'orca-np_${version}_${arch}.${ext}',
+    packageName: 'orca-ide',
+    artifactName: 'orca-ide_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
@@ -804,7 +785,7 @@ module.exports = {
       'xclip',
       'xvfb'
     ],
-    // Why: symlink the bundled CLI onto PATH at install time so `orca-np serve`
+    // Why: symlink the bundled CLI onto PATH at install time so `orca-ide serve`
     // works on a headless host. The in-app CLI registration (CliInstaller) is
     // GUI-triggered and can never run on a server, so without this the CLI is
     // unreachable from the shell on exactly the hosts that need it.
@@ -814,9 +795,8 @@ module.exports = {
     fpm: appImageNodeRuntimeFpmArgs
   },
   rpm: {
-    // Why (fork): see deb.packageName.
-    packageName: 'orca-np',
-    artifactName: 'orca-np-${version}.${arch}.${ext}',
+    packageName: 'orca-ide',
+    artifactName: 'orca-ide-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [
