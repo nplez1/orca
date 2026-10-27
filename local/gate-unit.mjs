@@ -66,7 +66,7 @@ import {
   judgeUnhandled,
   prunableEntries,
   quarantinedEntryProblems,
-  reportForFile,
+  rerunReportsFor,
   reproducedFailures,
   unexplainedSuiteExit
 } from './unit-gate-judgement.mjs'
@@ -306,6 +306,12 @@ function runSuite({ reportPath, logPath, timeoutMs, vitestArgs, forkTests }) {
         return { outcome: `${preparation.label} failed`, elapsedMs, forkTestsPassed }
       }
     }
+    // Why the cap line: the doubling this gate once showed (2,575 s against a 1,400 s baseline) was
+    // a worker cap inherited from the shell, and a run log that named it would have said so in one
+    // line instead of a per-file concurrency reconstruction.
+    if (process.env.VITEST_MAX_WORKERS !== undefined) {
+      process.stderr.write(`gate-unit: VITEST_MAX_WORKERS=${process.env.VITEST_MAX_WORKERS}\n`)
+    }
     const suite = runStep(
       'full unit suite',
       'node',
@@ -350,17 +356,24 @@ function closeSyncSafe(fd) {
 }
 
 /**
- * One isolated re-run of a file, reported as the tests that passed and failed inside it.
+ * One isolated re-run of every unexpected file in a single Vitest invocation, reported per file as
+ * the tests that passed and failed inside it. Batched so N failing files pay one cold start instead
+ * of N serial ones; each file still runs in its own worker, and the report is filtered by exact
+ * path, so the per-file attribution of a serial re-run is unchanged.
  *
  * Why per test rather than per file: the file's own allowlisted reds still fail when it runs alone,
  * so "the file exited non-zero" cannot tell a load flake from a real break once entries are named.
  * A missing report is not evidence of anything, so it reads as "every failure reproduced".
  */
-function rerunIsolation(file, reportPath, timeoutMs) {
-  const logFd = openSync(join(reportPath, '..', 'isolation.log'), 'a')
+function rerunIsolation(files, dir, timeoutMs) {
+  if (files.length === 0) {
+    return new Map()
+  }
+  const reportPath = join(dir, 'isolation-report.json')
+  const logFd = openSync(join(dir, 'isolation.log'), 'a')
   try {
     const step = runStep(
-      `isolation re-run ${file}`,
+      `isolation re-run ${files.length} file(s)`,
       'node',
       [
         RUN_VITEST,
@@ -370,20 +383,20 @@ function rerunIsolation(file, reportPath, timeoutMs) {
         '--reporter=json',
         `--outputFile.json=${reportPath}`,
         ...UNIT_LANE_ARGS,
-        file
+        ...files
       ],
       logFd,
       timeoutMs,
       UNIT_LANE_ENV
     )
     if (step.timedOut || !existsSync(reportPath)) {
-      return NO_RERUN
+      return new Map(files.map((file) => [file, NO_RERUN]))
     }
     try {
-      return reportForFile(JSON.parse(readFileSync(reportPath, 'utf8')), file)
+      return rerunReportsFor(JSON.parse(readFileSync(reportPath, 'utf8')), files)
     } catch {
       // Why not readJsonFile: that exits the process, losing the summary this verdict is for.
-      return NO_RERUN
+      return new Map(files.map((file) => [file, NO_RERUN]))
     }
   } finally {
     closeSyncSafe(logFd)
@@ -569,9 +582,10 @@ function evaluate(options, { reportPath, logPath, dir }) {
     problems.push(exitProblem)
   }
 
-  // A failure outside the allowlist gets one isolated re-run. A failure that does not come back is
-  // a load-order flake — a different claim from "this change broke it" — so it is waived unless the
-  // file is in the diff. Judged per test: the file's allowlisted reds still fail when it runs alone.
+  // A failure outside the allowlist gets an isolated re-run, all such files in one batched
+  // invocation. A failure that does not come back is a load-order flake — a different claim from
+  // "this change broke it" — so it is waived unless the file is in the diff. Judged per test: the
+  // file's allowlisted reds still fail when it runs alone.
   const diff = branchDiff()
   const flaky = []
   const blocking = []
@@ -581,14 +595,9 @@ function evaluate(options, { reportPath, logPath, dir }) {
     list.push(failure)
     unexpectedByFile.set(failure.file, list)
   }
-  let isolationIndex = 0
+  const reruns = rerunIsolation([...unexpectedByFile.keys()], dir, options.timeoutMs)
   for (const [file, failures] of unexpectedByFile) {
-    isolationIndex += 1
-    const rerun = rerunIsolation(
-      file,
-      join(dir, `isolation-${isolationIndex}.json`),
-      options.timeoutMs
-    )
+    const rerun = reruns.get(file) ?? NO_RERUN
     const reproduced = new Set(reproducedFailures(failures, rerun).map((failure) => failure.test))
     // Why not `diff.files.has(file)`: a branch that changes `src/x.ts`, the module beside a test, an
     // imported module, or the harness every test runs under breaks `x.test.ts` without the test file

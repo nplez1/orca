@@ -167,6 +167,18 @@ export function reportForFile(report, file) {
 }
 
 /**
+ * Each re-run file's own reading of one shared batched report. A file the report never mentions gets
+ * `NO_RERUN` — a missing report is not evidence of anything — and every named file keeps the exact-
+ * path filtering a serial re-run had, so batching costs no attribution.
+ */
+export function rerunReportsFor(report, files) {
+  const mentioned = new Set((report?.testResults ?? []).map((file) => repoPath(file.name)))
+  return new Map(
+    files.map((file) => [file, mentioned.has(file) ? reportForFile(report, file) : NO_RERUN])
+  )
+}
+
+/**
  * Which of a file's unexpected failures survived its isolated re-run, and so are real.
  *
  * Why "did it pass" rather than "did it fail again": a test the re-run never reported is not

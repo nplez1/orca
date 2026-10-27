@@ -16,7 +16,10 @@ import {
 } from '../../local/gate-verdict-cache.mjs'
 import { branchDiff } from '../../local/gate-unit.mjs'
 import {
+  NO_RERUN,
   declaredUnhandledMismatch,
+  rerunReportsFor,
+  reproducedFailures,
   unexplainedSuiteExit
 } from '../../local/unit-gate-judgement.mjs'
 
@@ -62,6 +65,60 @@ describe('a run the report cannot explain fails closed', () => {
     expect(declaredUnhandledMismatch(2, 1)).toMatch(/declared 2 .*1 could be read/)
     // The base compared with `>`, so a log that yielded more headlines than Vitest declared passed.
     expect(declaredUnhandledMismatch(1, 2)).toMatch(/declared 1 .*2 could be read/)
+  })
+})
+
+describe('one batched isolation re-run, read per file', () => {
+  const fileEntry = (name, assertions, status = 'passed') => ({
+    name,
+    status,
+    assertionResults: assertions
+  })
+  const passing = (fullName) => ({ fullName, status: 'passed' })
+  const failing = (fullName, message = 'boom') => ({
+    fullName,
+    status: 'failed',
+    failureMessages: [message]
+  })
+  const report = {
+    testResults: [
+      fileEntry(
+        'src/main/a.test.ts',
+        [passing('one'), failing('two'), failing('three', 'load flake')],
+        'failed'
+      ),
+      fileEntry('src/main/b.test.tsx', [passing('four')]),
+      // A positional filter is a substring match, so a batched run can collect a sibling the
+      // serial run would not have; it must not bleed into any requested file's reading.
+      fileEntry('src/main/b.test.ts', [failing('five')], 'failed')
+    ]
+  }
+
+  it('keeps the per-file attribution a serial re-run had', () => {
+    const reruns = rerunReportsFor(report, ['src/main/a.test.ts', 'src/main/b.test.tsx'])
+    const a = reruns.get('src/main/a.test.ts')
+    expect(a.complete).toBe(true)
+    expect([...a.failures]).toEqual(['two', 'three'])
+    expect([...a.passes]).toEqual(['one'])
+    expect(a.filePassed).toBe(false)
+    const b = reruns.get('src/main/b.test.tsx')
+    expect([...b.failures]).toEqual([])
+    expect([...b.passes]).toEqual(['four'])
+    expect(b.filePassed).toBe(true)
+  })
+
+  it('reads a file the batched report never mentions as no report at all', () => {
+    const reruns = rerunReportsFor(report, ['src/main/absent.test.ts'])
+    const rerun = reruns.get('src/main/absent.test.ts')
+    expect(rerun).toBe(NO_RERUN)
+    // …which is "every failure reproduced", whatever the caller failed with.
+    const failures = [{ file: 'src/main/absent.test.ts', test: 'x', detail: 'boom' }]
+    expect(reproducedFailures(failures, rerun)).toEqual(failures)
+  })
+
+  it('reports nothing when there was nothing to re-run', () => {
+    expect(rerunReportsFor(report, []).size).toBe(0)
+    expect(rerunReportsFor(null, ['src/main/a.test.ts']).get('src/main/a.test.ts')).toBe(NO_RERUN)
   })
 })
 
