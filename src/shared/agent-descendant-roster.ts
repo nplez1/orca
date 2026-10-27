@@ -6,11 +6,6 @@ import {
   type AgentSubagentSnapshot
 } from './agent-status-types'
 import { normalizeOptionalField } from './agent-status-field-normalization'
-import { readCodexSubagentIdentity } from './codex-subagent-identity'
-import {
-  agentChildWorkLiveness,
-  type AgentChildWorkLiveness
-} from './agent-status-child-work-liveness'
 
 /** Live descendants (subagents, spawned threads, async child runs) of one pane's
  *  lead agent session, keyed by the provider-assigned child id.
@@ -44,8 +39,6 @@ type TrackedAgentDescendant = {
    *  a roster entry can only ever hold a pane 'working', so a claim nothing can retract
    *  is strictly worse than settling late. */
   lastEventAt: number
-  /** The Codex rollout this child's description was last read from, so a repeat hook skips the read. */
-  identityTranscriptPath?: string
 }
 
 /** How long a descendant may go unmentioned before the pane stops believing in it.
@@ -171,79 +164,6 @@ export function finishAgentDescendant(roster: AgentDescendantRoster, id: string)
   roster.delete(id.trim())
 }
 
-/** Name a tracked Codex child from its own rollout's immutable spawn metadata. */
-export function enrichCodexSubagentIdentity(
-  roster: AgentDescendantRoster,
-  id: string,
-  transcriptPath: string | undefined
-): void {
-  const child = roster.get(id.trim())
-  if (!child || !transcriptPath || child.identityTranscriptPath === transcriptPath) {
-    return
-  }
-  const identity = readCodexSubagentIdentity(transcriptPath, id.trim())
-  if (!identity) {
-    return
-  }
-  child.identityTranscriptPath = transcriptPath
-  child.description =
-    normalizeOptionalField(identity.description, AGENT_STATUS_TOOL_INPUT_MAX_LENGTH) ??
-    child.description
-}
-
-/**
- * Record the model a already-tracked child is running. Deliberately narrower
- * than `upsertAgentDescendant`: it never creates a roster entry and never touches
- * `state`, so late model discovery from a child rollout cannot resurrect a
- * finished child nor move any child's lifecycle.
- */
-export function setAgentDescendantModel(
-  roster: AgentDescendantRoster,
-  id: string,
-  model: string | undefined
-): void {
-  const normalizedModel = normalizeOptionalField(model, AGENT_MODEL_MAX_LENGTH)
-  if (!normalizedModel) {
-    return
-  }
-  const existing = roster.get(id.trim())
-  if (!existing) {
-    return
-  }
-  existing.model = normalizedModel
-}
-
-export function seedAgentDescendantRoster(
-  roster: AgentDescendantRoster,
-  snapshots: readonly AgentSubagentSnapshot[]
-): void {
-  for (const snapshot of snapshots) {
-    if (snapshot.state !== 'working' && snapshot.state !== 'waiting') {
-      continue
-    }
-    upsertAgentDescendant(
-      roster,
-      snapshot.id,
-      {
-        agentType: snapshot.agentType,
-        description: snapshot.description,
-        model: snapshot.model,
-        toolName: snapshot.toolName,
-        toolInput: snapshot.toolInput,
-        providerSession: snapshot.providerSession,
-        state: snapshot.state
-      },
-      snapshot.startedAt
-    )
-    // Why: a restored child's quiet clock starts at its own start time, so a seed whose
-    // finish was lost while Orca was down cannot outlive the reap window a live one gets.
-    const restored = roster.get(snapshot.id.trim())
-    if (restored) {
-      restored.lastEventAt = snapshot.startedAt
-    }
-  }
-}
-
 export function agentDescendantRosterToSnapshots(
   roster: AgentDescendantRoster | undefined
 ): AgentSubagentSnapshot[] | undefined {
@@ -283,19 +203,6 @@ export function findAgentDescendantByProviderSession(
     }
   }
   return null
-}
-
-/** The roster as child-work evidence for the shared fold. Every tracked child is a spawned
- *  agent thread, classified by the one kind test the other lanes use, so a waiting child
- *  reads `waiting` and a live one `working`; nothing here is a watch loop. */
-export function codexRosterChildWorkLiveness(
-  roster: AgentDescendantRoster | undefined
-): AgentChildWorkLiveness {
-  return agentChildWorkLiveness(
-    roster
-      ? Array.from(roster.values(), (tracked) => ({ kind: 'agent' as const, state: tracked.state }))
-      : undefined
-  )
 }
 
 /** The pane's state once its live descendants are taken into account: a lead

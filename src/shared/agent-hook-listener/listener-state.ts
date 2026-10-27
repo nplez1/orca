@@ -13,6 +13,7 @@ import type { AgentStatusLegacyIngressCaller } from '../agent-status-legacy-ingr
 import type { ClaudeLaunchedBackgroundTasks } from '../claude-owed-task-notifications'
 import type { ClaudeSubagentRoster } from '../claude-subagent-roster'
 import type { AgentDescendantRoster } from '../agent-descendant-roster'
+import type { CodexSubagentRoster } from '../codex-subagent-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
 import type { MuseSessionLogState } from '../muse-session-log'
 import type { AgentHookEventPayload, ToolSnapshot } from './listener-event'
@@ -61,7 +62,7 @@ export type HookListenerState = {
    *  even when no SessionStart arrives — the backstop for the exits that emit no terminating hook. */
   claudeSessionOwnerByPaneKey: Map<string, string>
   /** Live thread-spawn children per Codex pane. */
-  codexSubagentRosterByPaneKey: Map<string, AgentDescendantRoster>
+  codexSubagentRosterByPaneKey: Map<string, CodexSubagentRoster>
   /** Incremental parent/child rollout cursors for Codex collaboration v2. */
   codexSubagentTranscriptByPaneKey: Map<string, CodexSubagentTranscriptState>
   /** Root Codex state/model, kept separate from child hook traffic. */

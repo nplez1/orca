@@ -198,6 +198,14 @@ promise is published by `initializeStatusHookOwner()` in
 sources (`jcode`, `qoder-cn`, `qwen-code`) get `null` descendant adapters until something emits
 descendant facts for them.
 
+**Addendum 2026-10-27 — the codex half of that decision is retired.** Upstream's
+`codex-subagent-roster.ts` is the codex roster again (`CodexSubagentRoster`,
+`getOrCreateCodexSubagentRoster`), restored byte-identical to the sync base with six files back to
+zero fork hunks. `agent-descendant-roster.ts` keeps only the pi/claude descendant extras, so this entry
+now governs those lanes and not the codex one. Reason: the rename cost a modify/delete plus importer
+rewrites on every sync for no behaviour, and upstream's cap-removal port survives in upstream's own
+file.
+
 **Why:** the rename is fork-wide and recurrent — upstream keeps adding files that import the old
 name; `main/codex/codex-subagent-roster.ts` is a _different_ module and keeps its name.
 
@@ -1414,6 +1422,12 @@ deletion stands and upstream's removal is ported into the renamed module and its
 `posts every running child` expectation. The constant is deleted from `agent-status-types.ts` and must
 not come back — nothing references it any more (the fork's Pi async-subagent test takes upstream's
 uncapped assertion).
+
+**Addendum 2026-10-27 — reversed: the deletion does not stand.** Upstream's
+`codex-subagent-roster.ts` is restored at its own path and name, byte-identical to the sync base, and
+the cap removal (upstream's own, which it made in that file) came with it. `agent-descendant-roster.ts`
+keeps only the pi/claude extras. The rename was the divergence; `AGENT_STATUS_MAX_SUBAGENTS` still must
+not come back, and that part of this entry holds.
 
 ### The SSH tree, the watcher and the RPC error helper moved; fork-owned files followed
 

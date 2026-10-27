@@ -3,7 +3,7 @@ import { getPiPrefillHandlerSourceLines } from './prefill-extension-source'
 import { getAgentStatusInputRedactionSourceLines } from './agent-status-input-redaction-source'
 import { getAgentStatusAssistantTextSourceLines } from './agent-status-assistant-text-source'
 import type { PiAgentKind } from '../../shared/pi-agent-kind'
-import { getAgentStatusSessionOwnerHandlerSourceLines } from './agent-status-session-owner-source'
+import { getOmpSessionOwnerHandlerSourceLines } from './omp-session-status-owner-source'
 import {
   getPiAgentStatusAsyncSubagentSessionNoteLines,
   getPiAgentStatusAsyncSubagentSourceLines
@@ -139,7 +139,7 @@ export function getPiAgentStatusHandlerSourceLines(kind: PiAgentKind): string[] 
     `  process.env.${ownerEnv} = selfPid`,
     '  resetPostQueue()',
     ...getPiSubagentRosterSetupSourceLines(kind),
-    ...getAgentStatusSessionOwnerHandlerSourceLines(kind),
+    ...getOmpSessionOwnerHandlerSourceLines(kind),
     ...getAgentStatusSessionBoundaryHandlerSourceLines(kind),
     ...getOmpModelCommandSourceLines(),
     ...sessionStartHandler,

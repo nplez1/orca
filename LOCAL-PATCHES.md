@@ -223,6 +223,23 @@ local evidence of a producer is upstream's own test. Closing it means one guarde
 
 ### `local(agents)`: the descendant lane is pi's, plus one grok child question
 
+**Addendum 2026-10-27 — the roster moved back to upstream's name and path, and the ownership fence
+became upstream's.** Two restorations, both gated on evidence rather than assumed:
+
+- `src/shared/codex-subagent-roster.ts` is **upstream's file again**, byte-identical to the sync base,
+  with upstream's own name (`CodexSubagentRoster`) — six files back to zero fork hunks
+  (`codex-subagent-transcript.ts` and its test, `providers/codex-events.ts`,
+  `providers/codex-transcript-poll.ts`, `codex-status-transcript-line.test.ts`).
+  `agent-descendant-roster.ts` survives as the **sibling** holding only this lane's pi/claude extras,
+  so a sync no longer reports upstream's roster as a modify/delete plus importer rewrites.
+- `src/main/pi/agent-status-session-owner-source.ts` (204 lines, the fork's #68 fence) is **deleted**,
+  and upstream's `omp-session-status-owner-source.ts` is live at `f37c1f6b95`'s bytes. The gate that
+  justified it: the fork's #68 suite ran unmodified against upstream's 54-line rule — **22/22 pass**,
+  including all twelve Pi-lane cases (in-process child, reopened child, re-key on a `session_start`
+  naming the leaving file, nested child, unpersisted session, the three handoffs, forked-session pane,
+  refused transcript, persisted child off an unpersisted pane, switched unpersisted pane, no session
+  manager). No case proved upstream's rule insufficient, so the 150-line difference bought nothing.
+
 After the 2026-09-25 sync, upstream's `providers/grok-events.ts` is the single owner of grok's child
 lifecycle: it refuses to settle the parent from a child event and reads a background subagent as
 `working`. The fork's generic descendant lane therefore serves **pi**, whose live child set
@@ -1335,12 +1352,6 @@ deleted are recorded below with their reason rather than left implied.
 
 Restored, present, and dead — nothing in the fork imports any of these:
 
-- `src/shared/codex-subagent-roster.ts` (+ test) — superseded by `src/shared/agent-descendant-roster.ts`.
-  Two exported names exist in both, `codexRosterChildWorkLiveness` and `enrichCodexSubagentIdentity`;
-  they cannot clash because nothing imports both, but they can drift apart.
-- `src/main/pi/omp-session-status-owner-source.ts` (+ test) — superseded by
-  `agent-status-session-owner-source.ts`, which `agent-status-handler-source.ts:6` wires in. Its test is
-  **not** dead: it drives the fork's ownership fence through the shared harness and all 11 cases pass.
 - the five Jira files (`JiraIssueRowCopyMenu`, `JiraLinkedWorkspaceAction`, `use-jira-issue-{comment-submission,remote-details,workspace-data}`)
   — the fork's split-button row and side-data modules replaced them. Every import resolves and every
   `translate()` key is in `en.json`, so they compile even though nothing calls them.
