@@ -1211,6 +1211,43 @@ or in progress for more than four hours — the exact failure this entry records
 tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly. Make it the
 first thing a session does after a sync, next to `local/branch-status.mjs`.
 
+### `local(sync)`: a file upstream owns is restored, not deleted
+
+The fork deleted 39 files upstream still owns and still edits, so every one was a modify/delete conflict
+on the next sync **and** a place where upstream's later fixes were silently dropped instead of
+surfacing. Of the 17 outside the dashboard/pop-out subsystem, **13 are restored**; the four that stay
+deleted are recorded below with their reason rather than left implied.
+
+Restored, present, and dead — nothing in the fork imports any of these:
+
+- `src/shared/codex-subagent-roster.ts` (+ test) — superseded by `src/shared/agent-descendant-roster.ts`.
+  Two exported names exist in both, `codexRosterChildWorkLiveness` and `enrichCodexSubagentIdentity`;
+  they cannot clash because nothing imports both, but they can drift apart.
+- `src/main/pi/omp-session-status-owner-source.ts` (+ test) — superseded by
+  `agent-status-session-owner-source.ts`, which `agent-status-handler-source.ts:6` wires in. Its test is
+  **not** dead: it drives the fork's ownership fence through the shared harness and all 11 cases pass.
+- the five Jira files (`JiraIssueRowCopyMenu`, `JiraLinkedWorkspaceAction`, `use-jira-issue-{comment-submission,remote-details,workspace-data}`)
+  — the fork's split-button row and side-data modules replaced them. Every import resolves and every
+  `translate()` key is in `en.json`, so they compile even though nothing calls them.
+- `quick-open-capped-local-listing.ts` — `nextCappedLocalListing` has had no caller since `b3a4f9ddac` (#34).
+- three `docs/assets` images — upstream's README references them at lines 7 and 267; this fork's does not.
+
+Still deleted, deliberately:
+
+- `native/computer-use-macos/.../TrustedOrcaApplication.swift` (+ its test), which
+  `convergence-ledger.md` already records as a **Do not take back**. Upstream's file hardcodes
+  `com.stablyai.orca`; this fork's helper trusts `com.nplez1.orca.computer-use` from its own
+  `OrcaBundleIdentity.swift` (fork-created), so restoring it verbatim would make the helper trust
+  _upstream's_ app — a real defect, and exactly what
+  `config/scripts/computer-use-bundle-identity.test.mjs:39-43` exists to catch.
+- `right-sidebar/pr-comment-snapshotted-thread-resolver.ts` (+ test). #169 made the pending ack
+  reply-only and removed `PendingPRCommentAiAckGithubResolveTarget`, `PendingPRCommentAiAckGitlabTarget`
+  and the `githubResolveTarget`/`gitlabTarget` fields this resolver works against; it cannot compile
+  without resurrecting that model, and a dead file is not a reason to bring a removed capability back.
+  `local/sync/mergeability-plan.md` § 5 already carries this as a product decision.
+
+The 21 dashboard/pop-out files are a separate decision and are not covered by this entry.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
