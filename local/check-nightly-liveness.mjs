@@ -2,26 +2,45 @@
 /**
  * Report whether the nightly unit backstop is actually running.
  *
- * The backstop is `.github/workflows/fork-main-tests.yml`. It ran once on 2026-10-08 and then went
- * silent for eighteen days without anything saying so: the 2026-10-26 scheduled run queued on a job
- * whose runner label this fork does not provision, never completed, and `cancel-in-progress: false`
- * then blocked every later night behind it. A nightly nobody notices is worse than no nightly, which
- * is why this exists as a check rather than as a resolver item.
+ * The backstop is `.github/workflows/fork-main-tests.yml`. Its last passing run was 2026-10-08; the
+ * 2026-10-26 schedule then queued on a job whose runner label this fork does not provision, never
+ * completed, and `cancel-in-progress: false` would have blocked every later night behind it. A night
+ * gone silently wrong is worse than no nightly, which is why this exists as a check.
  *
  * Exit codes are the contract: 0 healthy, 1 stale or wedged, 2 cannot tell. "Cannot tell" is not a
  * pass — it is reported separately so a missing `gh` never reads as a green nightly.
  */
 import { execFile } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
 
 const WORKFLOW = 'fork-main-tests.yml'
 const REPO = 'nplez1/orca'
+// The schedule only ever runs on the default branch, and a dispatch on a feature branch must not be
+// able to answer for the nightly.
+const BRANCH = 'nplez1/main'
 const CRON_UTC_HOUR = 4
 const CRON_UTC_MINUTE = 53
 
 const HOUR = 60 * 60 * 1000
 const STALE_AFTER_H = 36
 const WEDGED_AFTER_H = 4
+
+// Every path emits the same keys, with null where there is nothing to report, so a consumer of --json
+// can rely on the shape rather than on which branch produced the verdict.
+const EMPTY_FACTS = {
+  runId: null,
+  status: null,
+  conclusion: null,
+  ageHours: null,
+  headSha: null,
+  event: null,
+  runsInLastDay: 0,
+  verdictRunId: null,
+  verdictAgeHours: null,
+  verdictlessRuns: 0
+}
 
 const run = promisify(execFile)
 
@@ -39,6 +58,8 @@ async function fetchRuns(limit = 10) {
       WORKFLOW,
       '--repo',
       REPO,
+      '--branch',
+      BRANCH,
       '--limit',
       String(limit),
       '--json',
@@ -65,6 +86,7 @@ const byRecency = (runs) =>
 export function judgeLiveness(runs, now = Date.now()) {
   if (!Array.isArray(runs) || runs.length === 0) {
     return {
+      ...EMPTY_FACTS,
       ok: false,
       code: 1,
       summary: `no run of ${WORKFLOW} has ever been recorded — the backstop is not wired up`
@@ -78,7 +100,7 @@ export function judgeLiveness(runs, now = Date.now()) {
   const verdictRun = ordered.find((r) => r.status === 'completed' && !VERDICTLESS.has(r.conclusion))
   const age = ageHours(newest.createdAt, now)
   const verdictAge = verdictRun ? ageHours(verdictRun.createdAt, now) : null
-  const inFlight = newest.status === 'queued' || newest.status === 'in_progress'
+  const inFlight = newest.status !== 'completed'
   const lastDay = runs.filter((r) => ageHours(r.createdAt, now) <= 24).length
   const verdictless = ordered.filter(
     (r) => r.status === 'completed' && VERDICTLESS.has(r.conclusion)
@@ -112,17 +134,16 @@ export function judgeLiveness(runs, now = Date.now()) {
       summary:
         `run ${newest.databaseId} has been ${newest.status} for ${facts.ageHours}h — that is a wedged ` +
         'run, not a slow one. Check which job is stuck (a runner label this fork does not provision ' +
-        'is the known cause) and cancel it, because cancel-in-progress: false blocks every later night.'
+        'is the known cause) and cancel it: a wedged run blocks the group it shares with every later ' +
+        'night.'
     }
   }
-  if (inFlight) {
-    return {
-      ...facts,
-      ok: true,
-      code: 0,
-      summary: `run ${newest.databaseId} is ${newest.status} (${facts.ageHours}h)${verdictRun ? `; last verdict was ${verdictRun.conclusion} ${facts.verdictAgeHours}h ago` : ''}${noVerdictNote}`
-    }
-  }
+  // Why an in-flight run does not answer for the backstop: it has produced no verdict yet, so
+  // returning early here would report PASS for up to WEDGED_AFTER_H after yesterday went red, and
+  // would hide a verdict that is already stale. The verdict decides; the in-flight run is a note.
+  const inFlightNote = inFlight
+    ? `; run ${newest.databaseId} is ${newest.status} (${facts.ageHours}h) and has no verdict yet`
+    : ''
   if (age > STALE_AFTER_H) {
     return {
       ...facts,
@@ -140,8 +161,8 @@ export function judgeLiveness(runs, now = Date.now()) {
       ok: false,
       code: 1,
       summary:
-        `no completed run has produced a verdict in the last ${STALE_AFTER_H}h — the schedule is ` +
-        `firing (newest ${facts.ageHours}h ago) but nothing has actually run the suite${noVerdictNote}`
+        'no completed run in the fetched history has produced a verdict — the schedule is ' +
+        `firing (newest ${facts.ageHours}h ago) but nothing has actually run the suite${inFlightNote}${noVerdictNote}`
     }
   }
   if (verdictAge > STALE_AFTER_H) {
@@ -151,8 +172,8 @@ export function judgeLiveness(runs, now = Date.now()) {
       code: 1,
       summary:
         `the newest verdict is ${facts.verdictAgeHours}h old (${verdictRun.conclusion}) even though ` +
-        `a run exists ${facts.ageHours}h ago${noVerdictNote} — read that as the backstop being ` +
-        'down, not as green'
+        `a run exists ${facts.ageHours}h ago${inFlightNote}${noVerdictNote} — read that as the ` +
+        'backstop being down, not as green'
     }
   }
   const verdict = verdictRun.conclusion === 'success' ? 'green' : `red (${verdictRun.conclusion})`
@@ -160,7 +181,7 @@ export function judgeLiveness(runs, now = Date.now()) {
     ...facts,
     ok: verdictRun.conclusion === 'success',
     code: verdictRun.conclusion === 'success' ? 0 : 1,
-    summary: `nightly ${verdict} at ${facts.verdictAgeHours}h old, ${lastDay} run(s) in the last 24h${verdictRun.databaseId === newest.databaseId ? '' : `; newest run ${newest.databaseId} was ${newest.conclusion ?? newest.status}`}${noVerdictNote}`
+    summary: `nightly ${verdict} at ${facts.verdictAgeHours}h old, ${lastDay} run(s) in the last 24h${verdictRun.databaseId === newest.databaseId ? '' : `; newest run ${newest.databaseId} was ${newest.conclusion ?? newest.status}`}${inFlightNote}${noVerdictNote}`
   }
 }
 
@@ -174,7 +195,7 @@ async function main() {
     if (json) {
       console.log(
         JSON.stringify(
-          { ok: false, code: 2, summary: `cannot read run history: ${message}` },
+          { ...EMPTY_FACTS, ok: false, code: 2, summary: `cannot read run history: ${message}` },
           null,
           2
         )
@@ -195,6 +216,6 @@ async function main() {
   process.exit(verdict.code)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   await main()
 }

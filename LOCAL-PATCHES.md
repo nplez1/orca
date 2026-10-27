@@ -1599,30 +1599,37 @@ it back on — which is what a fork wants, and why this is documented here inste
 `cloud-operate-relay-*` flags/watchers. `ci-cache-warmup-platform-jobs.yml` is `workflow_call`-only,
 so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
 
+Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
+`e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
+live, and the section below is why its being live was not the same as its running.
+
 #### `local(ci)`: the nightly could queue forever and say nothing
 
-`fork-main-tests.yml` ran once on 2026-10-24 and then stopped, silently. The 2026-10-26 schedule
-queued on a job whose runner label this fork does not provision — `unit-tests.yml`'s relay job asks
-for `blacksmith-4vcpu-ubuntu-2404` — so the job never started, the run never completed, and with
-`cancel-in-progress: false` every later night waited behind it. Eighteen days of no backstop, and the
-only symptom was an absence.
+`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then queued on a
+job whose runner label this fork does not provision — `unit-tests.yml`'s relay job asks for
+`blacksmith-4vcpu-ubuntu-2404` — so the job never started and the run never completed. The only signal
+was eighteen days of absence, and `cancel-in-progress: false` would have stacked every later night
+behind the wedged run had one been scheduled.
 
-Two changes, both in the fork's own workflow:
+Three changes:
 
-- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud
-  relay, so the job had nothing to test here even if a runner existed.
-- **`cancel-in-progress: true`.** Superseding is safe because a run takes minutes and the next
-  schedule is a day away, and it means a future wedge costs one night instead of every night.
+- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
+  so the job had nothing to test here even if a runner existed. It does drop `browser_contract` and the
+  two `relay-region` unit files from the nightly, because they ran only inside that job.
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Superseding is safe
+  because a run takes minutes and the next schedule is a day away, so a future wedge costs one night
+  instead of every night. The ref in the group name keeps a `workflow_dispatch` on some feature branch
+  from cancelling the release line's nightly.
 
 `node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
-run, 1 when the newest run is stale (past two schedule slots) or **wedged** (queued or in progress for
-more than four hours — the exact failure above), and 2 when it cannot tell. Exit 2 is deliberately not
-a pass: a missing `gh` must never read as a green nightly. It reads two clocks, because a run that was
-**cancelled on purpose** is not a red night and must not hide the last verdict: one clock asks whether
-the schedule fires at all, the other asks when a completed run last produced a verdict.
+run, 1 when the newest run is stale (past two schedule slots) or **wedged** (not `completed` for more
+than four hours — the exact failure above), and 2 when it cannot tell. Exit 2 is deliberately not a
+pass: a missing `gh` must never read as a green nightly.
 
-Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
-`e2e.yml`, `mobile.yml`, `fork-main-gates.yml` and `fork-main-tests.yml`.
+It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
+hide the last verdict: one clock asks whether the schedule fires at all, the other asks when a
+completed run last produced a verdict. An in-flight run is a note on that verdict, never a substitute
+for it — otherwise a re-run dispatched after a red night would report green for hours.
 
 **The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
 on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as

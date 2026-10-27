@@ -37,13 +37,60 @@ describe('nightly liveness', () => {
     expect(verdict.summary).toMatch(/wedged/)
   })
 
-  it('tolerates a run that is genuinely in flight', () => {
-    expect(
-      judgeLiveness([run({ status: 'in_progress', conclusion: null, createdAt: hoursAgo(1) })], NOW)
-    ).toMatchObject({
-      ok: true,
-      code: 0
-    })
+  it('does not let an in-flight run answer for the backstop on its own', () => {
+    // Why: it has produced no verdict, so reporting PASS hands out up to WEDGED_AFTER_H of green on
+    // the strength of a run that has not finished — after a red night, exactly when it matters.
+    const verdict = judgeLiveness(
+      [run({ status: 'in_progress', conclusion: null, createdAt: hoursAgo(1) })],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1 })
+    expect(verdict.summary).toMatch(/nothing has actually run the suite/)
+  })
+
+  it('passes on an in-flight run when a recent verdict is green', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 12, status: 'in_progress', conclusion: null, createdAt: hoursAgo(1) }),
+        run({ databaseId: 11, conclusion: 'success', createdAt: hoursAgo(25) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: true, code: 0, verdictRunId: 11 })
+    expect(verdict.summary).toMatch(/has no verdict yet/)
+  })
+
+  it('still reports a red run when a re-run is in flight over it', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 24, status: 'in_progress', conclusion: null, createdAt: hoursAgo(1) }),
+        run({ databaseId: 23, conclusion: 'failure', createdAt: hoursAgo(20) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1 })
+    expect(verdict.summary).toMatch(/red \(failure\)/)
+  })
+
+  it('treats pending as in flight, because pending is the concurrency-blocked state', () => {
+    const verdict = judgeLiveness(
+      [run({ status: 'pending', conclusion: null, createdAt: hoursAgo(9) })],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1 })
+    expect(verdict.summary).toMatch(/wedged/)
+  })
+
+  it('does not let a cancelled run cover an older red one', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 34, conclusion: 'cancelled', createdAt: hoursAgo(2) }),
+        run({ databaseId: 33, conclusion: 'failure', createdAt: hoursAgo(20) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1, verdictRunId: 33 })
+    expect(verdict.summary).toMatch(/red \(failure\)/)
   })
 
   it('fails on a red run even when it is fresh', () => {
@@ -57,7 +104,9 @@ describe('nightly liveness', () => {
     const verdict = judgeLiveness([run({ conclusion: 'cancelled' })], NOW)
     expect(verdict).toMatchObject({ ok: false, code: 1, verdictRunId: null })
     expect(verdict.summary).not.toMatch(/red/)
-    expect(verdict.summary).toMatch(/no completed run has produced a verdict/)
+    expect(verdict.summary).toMatch(
+      /no completed run in the fetched history has produced a verdict/
+    )
   })
 
   it('does not let a cancelled run hide the green run it followed', () => {
@@ -82,7 +131,9 @@ describe('nightly liveness', () => {
       NOW
     )
     expect(verdict).toMatchObject({ ok: false, code: 1, verdictRunId: null })
-    expect(verdict.summary).toMatch(/no completed run has produced a verdict/)
+    expect(verdict.summary).toMatch(
+      /no completed run in the fetched history has produced a verdict/
+    )
   })
 
   it('fails when the schedule fires but the last verdict is stale', () => {

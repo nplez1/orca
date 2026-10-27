@@ -20,11 +20,12 @@ permissions:
   contents: read
 
 concurrency:
-  # Why: a run that never finishes must not block the next night. `cancel-in-progress: false` meant one
-  # wedged run (see the relay job note below) suppressed every later schedule until a human cancelled
-  # it — the fork went eighteen days with no passing nightly and nothing said so. Superseding is safe
-  # here because a run takes minutes and the next schedule is a day away.
-  group: fork-main-unit-tests
+  # Why the ref is in the group: `workflow_dispatch` can target any branch, and a dispatch on a feature
+  # branch must not cancel the release line's nightly — nor share its slot.
+  # Why `cancel-in-progress: true`: a run that never finishes must not block the next night. With
+  # `false`, one wedged run suppressed every schedule behind it until a human cancelled it. Superseding
+  # is safe here: a run takes minutes, a job is capped at 60, and the next schedule is a day away.
+  group: fork-main-unit-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -54,7 +55,7 @@ jobs:
       runner: ubuntu-24.04-arm
       shards: ${{ needs.plan.outputs.shards }}
       # Why: the relay job in `unit-tests.yml` hard-codes `blacksmith-4vcpu-ubuntu-2404`, and this
-      # fork has no runner for that label — the 2026-10-26 run sat queued for 17 h on it, which
-      # never completed the run, and `cancel-in-progress: false` then blocked every later night. The
-      # fork ships no cloud relay, so the job has nothing to test here.
+      # fork has no runner for that label — the 2026-10-26 run sat queued for 17 h on it and never
+      # completed. The fork ships no cloud relay, so the job has nothing to test here. What it does
+      # drop: `browser_contract` and the two `relay-region` unit files ran only inside that job.
       run_relay_integration: false
