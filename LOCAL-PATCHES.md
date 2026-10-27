@@ -1599,6 +1599,28 @@ it back on — which is what a fork wants, and why this is documented here inste
 `cloud-operate-relay-*` flags/watchers. `ci-cache-warmup-platform-jobs.yml` is `workflow_call`-only,
 so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
 
+#### `local(ci)`: the nightly could queue forever and say nothing
+
+`fork-main-tests.yml` ran once on 2026-10-24 and then stopped, silently. The 2026-10-26 schedule
+queued on a job whose runner label this fork does not provision — `unit-tests.yml`'s relay job asks
+for `blacksmith-4vcpu-ubuntu-2404` — so the job never started, the run never completed, and with
+`cancel-in-progress: false` every later night waited behind it. Eighteen days of no backstop, and the
+only symptom was an absence.
+
+Two changes, both in the fork's own workflow:
+
+- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud
+  relay, so the job had nothing to test here even if a runner existed.
+- **`cancel-in-progress: true`.** Superseding is safe because a run takes minutes and the next
+  schedule is a day away, and it means a future wedge costs one night instead of every night.
+
+`node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
+run, 1 when the newest run is stale (past two schedule slots) or **wedged** (queued or in progress for
+more than four hours — the exact failure above), and 2 when it cannot tell. Exit 2 is deliberately not
+a pass: a missing `gh` must never read as a green nightly. It reads two clocks, because a run that was
+**cancelled on purpose** is not a red night and must not hide the last verdict: one clock asks whether
+the schedule fires at all, the other asks when a completed run last produced a verdict.
+
 Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
 `e2e.yml`, `mobile.yml`, `fork-main-gates.yml` and `fork-main-tests.yml`.
 
