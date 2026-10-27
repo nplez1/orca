@@ -95,7 +95,10 @@ it('stores the sub-agent lineage the list nests a row under', () => {
 
   expect(
     index.db
-      .prepare('SELECT session_id, subagent_parent_session_id, subagent_agent_type FROM sessions')
+      .prepare(
+        `SELECT session_id, subagent_parent_session_id, subagent_agent_type
+         FROM sessions JOIN session_list_facts ON session_row_id = sessions.id`
+      )
       .get()
   ).toEqual({
     session_id: 'child',
@@ -120,7 +123,9 @@ it('clears a stale lineage when a re-read says the session is a root', () => {
   })
 
   expect(
-    index.db.prepare('SELECT subagent_parent_session_id, subagent_agent_type FROM sessions').get()
+    index.db
+      .prepare('SELECT subagent_parent_session_id, subagent_agent_type FROM session_list_facts')
+      .get()
   ).toEqual({ subagent_parent_session_id: null, subagent_agent_type: null })
 })
 

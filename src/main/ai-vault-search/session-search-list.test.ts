@@ -54,11 +54,9 @@ type SeededSession = {
 function seed(db: SyncDatabase, row: SeededSession): void {
   const cwd = row.cwd ?? null
   db.prepare(
-    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,model,
-       created_at,updated_at,modified_at,message_count,total_tokens,queued_message_count,
-       subagent_transcript_count,subagent_parent_session_id,subagent_agent_type,
-       subagent_parent_agent,resume_command)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,
+       created_at,updated_at,message_count,resume_command)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).run(
     row.id,
     row.agent ?? 'claude',
@@ -69,18 +67,26 @@ function seed(db: SyncDatabase, row: SeededSession): void {
     cwd,
     cwdKey(cwd),
     row.branch ?? null,
-    row.model ?? null,
     row.createdAt ?? null,
     row.updatedAt === undefined ? '2026-09-01T00:00:00.000Z' : row.updatedAt,
-    row.modifiedAt ?? null,
     row.messageCount ?? 0,
+    row.resumeCommand ?? ''
+  )
+  db.prepare(
+    `INSERT INTO session_list_facts(session_row_id,model,modified_at,total_tokens,
+       queued_message_count,subagent_transcript_count,subagent_parent_session_id,
+       subagent_agent_type,subagent_parent_agent)
+     VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run(
+    row.id,
+    row.model ?? null,
+    row.modifiedAt ?? null,
     row.totalTokens ?? 0,
     row.queuedMessageCount ?? 0,
     row.subagentTranscriptCount ?? 0,
     row.subagent?.parentSessionId ?? null,
     row.subagent?.agentType ?? null,
-    row.subagent?.parentAgent ?? null,
-    row.resumeCommand ?? ''
+    row.subagent?.parentAgent ?? null
   )
 }
 

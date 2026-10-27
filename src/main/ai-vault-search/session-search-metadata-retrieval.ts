@@ -34,7 +34,7 @@ export type MetadataRetrieved = {
 }
 
 /**
- * The metadata tier's retrieval: `sessions_fts` (title, cwd, branch, agent)
+ * The metadata tier's retrieval: `session_metadata_fts` (title, cwd, branch, agent)
  * joined to `sessions`, and the answer when transcript content is not consented
  * to. `messages_fts` is empty in that state, so the content ladder would return
  * nothing for a query that a title or a path does answer.
@@ -108,9 +108,9 @@ export class SessionSearchMetadataRetrieval {
       sort === 'newest'
         ? 's.updated_at DESC, score DESC, s.id DESC'
         : 'score DESC, s.updated_at DESC, s.id DESC'
-    const sql = `SELECT sessions_fts.rowid AS session_row_id, -bm25(sessions_fts) AS score
-      FROM sessions_fts JOIN sessions s ON s.id = sessions_fts.rowid
-      WHERE sessions_fts MATCH ?${eligible} ORDER BY ${order} LIMIT ${candidateLimit}`
+    const sql = `SELECT session_metadata_fts.rowid AS session_row_id, -bm25(session_metadata_fts) AS score
+      FROM session_metadata_fts JOIN sessions s ON s.id = session_metadata_fts.rowid
+      WHERE session_metadata_fts MATCH ?${eligible} ORDER BY ${order} LIMIT ${candidateLimit}`
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the SELECT aliases exactly these two columns, and SQLite cannot type its own rows.
     return this.db.prepare(sql).all(expression, ...filter.values) as ScoredRow[]
   }

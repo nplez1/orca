@@ -69,10 +69,13 @@ function plannedDb(): PlannedListDatabase {
 
 function seedCorpus(db: SyncDatabase, count: number): void {
   const insertSession = db.prepare(
-    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,model,
-       created_at,updated_at,modified_at,message_count,total_tokens,queued_message_count,
-       subagent_transcript_count,resume_command)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO sessions(id,agent,session_id,file_path,codex_home,title,cwd,cwd_key,branch,
+       created_at,updated_at,message_count,resume_command)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  )
+  const insertFacts = db.prepare(
+    `INSERT INTO session_list_facts(session_row_id,model,modified_at,total_tokens)
+     VALUES (?,?,?,?)`
   )
   const insertFile = db.prepare(
     `INSERT INTO files(path,byte_offset,mtime_ms,session_row_id) VALUES (?,?,?,?)`
@@ -98,16 +101,12 @@ function seedCorpus(db: SyncDatabase, count: number): void {
         cwd,
         cwdKey(cwd),
         'main',
-        'claude-fable-5',
-        updatedAt,
         updatedAt,
         updatedAt,
         id % 20,
-        id * 100,
-        0,
-        0,
         ''
       )
+      insertFacts.run(id, 'claude-fable-5', updatedAt, id * 100)
       // Every session has a file row, so the retention subquery has something to
       // match and cannot quietly exclude the corpus this file measures.
       insertFile.run(`/synthetic/${id}.jsonl`, 0, at, id)

@@ -230,10 +230,6 @@ export class SessionSearchIndexWriter {
             const previous = session
             session = this.records.createSessionRow(candidate)
             if (previous !== null) {
-              // The replacement's metadata row goes with the session row, or a
-              // stale sessions_fts row would keep answering a query for a
-              // session no longer in `sessions`.
-              this.records.deleteSessionFts(previous)
               db.prepare('DELETE FROM sessions WHERE id = ?').run(previous)
               orphaned = true
             }
@@ -322,7 +318,6 @@ export class SessionSearchIndexWriter {
       return
     }
     deleteSearchMessages(this.db, sessionRowId)
-    this.records.deleteSessionFts(sessionRowId)
     this.db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionRowId)
   }
 }

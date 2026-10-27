@@ -1,17 +1,11 @@
 import { MAX_TIMER_DELAY_MS } from '../../shared/timer-delay'
-import type {
-  AiVaultListResult,
-  AiVaultListSyncDelta,
-  AiVaultScanIssue,
-  AiVaultSession
-} from '../../shared/ai-vault-types'
-import { applyAiVaultListDelta } from '../../shared/ai-vault-list-sync'
-import { AI_VAULT_LIST_SKIP_ISSUE_PATH } from '../../shared/ai-vault-types'
+import type { AiVaultListResult } from '../../shared/ai-vault-types'
 import {
   aiVaultCachedDepthServes,
   truncateAiVaultListResult,
   type AiVaultSessionDepth
 } from '../../shared/ai-vault-session-depth'
+import { pruneHeldListsByRows } from './ai-vault-host-leg-sync'
 
 export const AI_VAULT_CACHE_TTL_MS = 15_000
 
@@ -31,16 +25,6 @@ const lastFullHostLegs = new Map<
   { depth: AiVaultSessionDepth; result: AiVaultListResult }
 >()
 const LAST_FULL_HOST_LEGS_MAX = 8
-/**
- * Rows these held lists may total, ~1.5 KB each from the scanner, so main keeps tens of megabytes
- * rather than one 15 MB history per scope and host. A count cap alone would not bound that: every
- * paged reply now carries a fingerprint, including an unlimited listing.
- *
- * The trade-off is deliberate: a host whose own listing approaches this bound can be evicted by
- * another host's store and then pays a full read on its next refresh, which is cheaper than
- * holding every scope's history for the life of the process.
- */
-export const LAST_FULL_HOST_LEG_MAX_ROWS = 40_000
 let expiryTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleHostLegExpiry(): void {
@@ -62,15 +46,7 @@ function scheduleHostLegExpiry(): void {
   expiryTimer.unref?.()
 }
 
-/** What this host's held list was, so a refresh can ask for the difference from it. */
-export type AiVaultHostLegSyncBasis = {
-  fingerprint: string
-  sessions: readonly AiVaultSession[]
-}
-
-/** Serves one host's leg from the per-host TTL cache, and stores it only when
- * that host answered without a host issue — a failing host is retried on the
- * next open while its healthy neighbours stay cached. */
+/** Cache only healthy legs so failing hosts retry without rescanning their neighbors. */
 export async function scanHostLegWithCache(args: {
   cacheKey: string
   /** The key an unbounded leg is stored under: it answers every scope at every depth. */
@@ -79,16 +55,7 @@ export async function scanHostLegWithCache(args: {
   scopePaths?: readonly string[]
   force: boolean
   afterFingerprint?: string | null
-  /** The host this leg addresses; names it in an issue row this module has to author itself. */
-  hostLabel: string
-  /**
-   * Identity of the listing this leg holds, independent of which view asked for it: the all-hosts
-   * view must be able to sync from the list the single-host view already loaded, or a large
-   * history could never finish loading within its own drain budget.
-   */
-  syncBasisKey: string
-  /** Receives the basis to sync from, or undefined when this leg holds no full list yet. */
-  scan: (syncFrom: AiVaultHostLegSyncBasis | undefined) => Promise<AiVaultListResult>
+  scan: () => Promise<AiVaultListResult>
 }): Promise<AiVaultListResult> {
   const now = Date.now()
   const startGeneration = cacheGeneration
@@ -111,14 +78,8 @@ export async function scanHostLegWithCache(args: {
   ) {
     return truncateAiVaultListResult(cached.result, args.depth, args.scopePaths)
   }
-  // Why capture rather than look up afterwards: the basis is what the delta is applied to, and a
-  // concurrent scan must not swap it out between the request and the reply.
-  const basis = hostLegSyncBasis(args.syncBasisKey, args.depth)
-  const scanned = await scanWithSyncBasis(args, basis)
-  const delta = scanned.syncDelta
-  const result = delta && basis ? withAppliedDelta(basis, delta, scanned) : scanned
-  // A delete's invalidation landed while this leg was scanning; caching a
-  // pre-delete result would resurrect the deleted session for the TTL.
+  const result = await args.scan()
+  // A pre-delete scan must not repopulate the invalidated cache.
   if (startGeneration !== cacheGeneration) {
     return result
   }
@@ -144,86 +105,13 @@ export async function scanHostLegWithCache(args: {
   }
   cachedHostLegs.set(args.cacheKey, {
     depth: args.depth,
-    result: rememberFullHostLeg(args.syncBasisKey, args.depth, result),
+    result: rememberFullHostLeg(args.cacheKey, args.depth, result),
     expiresAt: Date.now() + AI_VAULT_CACHE_TTL_MS
   })
   scheduleHostLegExpiry()
   return result
 }
 
-/**
- * A delta is only meaningful against the list this leg sent, so a host that answers one without a
- * basis gets one retry without a token. Why not throw: under the 'all' scope a throw here would
- * reject the merged Promise.all and take every other host's list down with it.
- */
-async function scanWithSyncBasis(
-  args: Parameters<typeof scanHostLegWithCache>[0],
-  basis: AiVaultHostLegSyncBasis | undefined
-): Promise<AiVaultListResult> {
-  const first = await args.scan(basis)
-  if (!first.syncDelta || basis) {
-    return first
-  }
-  const retried = await args.scan(undefined)
-  if (!retried.syncDelta) {
-    return retried
-  }
-  // Both attempts named a list this leg never sent; say so instead of caching an empty body.
-  return {
-    sessions: [],
-    issues: [
-      ...retried.issues,
-      {
-        agent: 'codex',
-        kind: 'host',
-        path: args.hostLabel,
-        message: 'The session host answered with changes this computer does not hold.'
-      }
-    ],
-    scannedAt: retried.scannedAt
-  }
-}
-
-/** The full list this leg holds at exactly this depth; a shallower depth cannot reuse it. */
-function hostLegSyncBasis(
-  cacheKey: string,
-  depth: AiVaultSessionDepth
-): AiVaultHostLegSyncBasis | undefined {
-  const held = lastFullHostLegs.get(cacheKey)
-  const fingerprint = held?.result.fingerprint
-  if (held?.depth !== depth || !fingerprint) {
-    return undefined
-  }
-  // Why refuse a body that reported skips: a diff never re-sends the rows it did not change, so the
-  // notice could never be withdrawn once the row was fixed, and a full read derives it again from
-  // the rows in front of it — the only way it stays true. The cost is that a host serving a row this
-  // build cannot read is fully read on every refresh until the build can; that is bounded, visible,
-  // and cheaper than a warning that outlives its cause.
-  if (held.result.issues.some(isClientSkipIssue)) {
-    return undefined
-  }
-  return { fingerprint, sessions: held.result.sessions }
-}
-
-function withAppliedDelta(
-  basis: AiVaultHostLegSyncBasis,
-  delta: AiVaultListSyncDelta,
-  reply: AiVaultListResult
-): AiVaultListResult {
-  return {
-    sessions: applyAiVaultListDelta(basis.sessions, delta),
-    issues: reply.issues,
-    scannedAt: reply.scannedAt,
-    ...(reply.fingerprint ? { fingerprint: reply.fingerprint } : {})
-  }
-}
-
-/** The row this client writes when it had to skip result entries it cannot read. */
-function isClientSkipIssue(issue: AiVaultScanIssue): boolean {
-  return issue.path === AI_VAULT_LIST_SKIP_ISSUE_PATH
-}
-
-/** Returns the full list an `unchanged` reply stands for when one is known. */
 function rememberFullHostLeg(
   cacheKey: string,
   depth: AiVaultSessionDepth,
@@ -240,26 +128,8 @@ function rememberFullHostLeg(
   }
   lastFullHostLegs.delete(cacheKey)
   lastFullHostLegs.set(cacheKey, { depth, result })
-  pruneHeldLists()
+  pruneHeldListsByRows(lastFullHostLegs, LAST_FULL_HOST_LEGS_MAX)
   return result
-}
-
-/** Oldest first, and never the one just stored — it is the basis the next refresh diffs against. */
-function pruneHeldLists(): void {
-  let rows = 0
-  for (const entry of lastFullHostLegs.values()) {
-    rows += entry.result.sessions.length
-  }
-  for (const [cacheKey, entry] of lastFullHostLegs) {
-    if (lastFullHostLegs.size === 1) {
-      break
-    }
-    if (lastFullHostLegs.size <= LAST_FULL_HOST_LEGS_MAX && rows <= LAST_FULL_HOST_LEG_MAX_ROWS) {
-      break
-    }
-    lastFullHostLegs.delete(cacheKey)
-    rows -= entry.result.sessions.length
-  }
 }
 
 function pruneExpiredHostLegs(now: number): void {
@@ -274,10 +144,7 @@ function pruneExpiredHostLegs(now: number): void {
 export function invalidateAiVaultHostLegCache(): void {
   cacheGeneration++
   cachedHostLegs.clear()
-  // Why the held lists survive: they are the basis every refresh diffs against, and a diff is
-  // computed against a content-addressed fingerprint, so it describes whatever the host's list now
-  // is — a deleted row comes back in `removedIds` if the host had it at all. Clearing them would
-  // make the forced refresh that follows a delete re-download each remote host's whole history.
+  lastFullHostLegs.clear()
   if (expiryTimer !== null) {
     clearTimeout(expiryTimer)
   }
@@ -286,5 +153,4 @@ export function invalidateAiVaultHostLegCache(): void {
 
 export function resetAiVaultHostLegCacheForTests(): void {
   invalidateAiVaultHostLegCache()
-  lastFullHostLegs.clear()
 }

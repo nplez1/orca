@@ -46,12 +46,13 @@ import {
   resetAiVaultHostLegCacheForTests,
   scanHostLegWithCache
 } from './ai-vault-host-leg-cache'
+import { resetAiVaultHostLegSyncForTests } from './ai-vault-host-leg-sync'
 import {
   aiVaultAppliedScopePaths,
   requestedAiVaultSessionDepth
 } from '../../shared/ai-vault-session-depth'
 import { aiVaultHostListQuery } from '../../shared/ai-vault-session-filters'
-import { aiVaultLegScopeKey, legListArgs } from './ai-vault-leg-request'
+import { aiVaultLegSyncScan, legListArgs } from './ai-vault-leg-request'
 import type {
   AiVaultSessionTitlesArgs,
   AiVaultSessionTitlesResult
@@ -135,18 +136,16 @@ async function listAiVaultSessions(
         scopePaths,
         force: args?.force === true,
         afterFingerprint,
-        hostLabel: executionHostScope,
-        // The same string the all-hosts view uses for this host, so the two views share a basis.
-        syncBasisKey: aiVaultLegScopeKey(args, executionHostScope),
         // Why always overwrite: a token the caller supplied itself names a list this leg never
         // sent, and letting it through would hand back a delta there is no basis to apply.
-        scan: (syncFrom) =>
+        scan: aiVaultLegSyncScan(args, executionHostScope, depth, (syncFrom) =>
           scanAiVaultSessionsByHostScope(
             { ...args, syncFromFingerprint: syncFrom?.fingerprint },
             executionHostScope,
             scanSignal,
             key
           )
+        )
       })
     }
   })
@@ -174,9 +173,7 @@ async function scanAiVaultSessionsByHostScope(
           depth,
           scopePaths,
           force: args?.force === true,
-          hostLabel: hostInfo.executionHostId,
-          syncBasisKey: aiVaultLegScopeKey(args, hostInfo.executionHostId),
-          scan: (syncFrom) =>
+          scan: aiVaultLegSyncScan(args, hostInfo.executionHostId, depth, (syncFrom) =>
             scanRuntimeAiVaultSessions({
               hostInfo,
               scanner: handlerOptions.scanRuntimeAiVaultSessions,
@@ -187,6 +184,7 @@ async function scanAiVaultSessionsByHostScope(
                 drainTimeoutMs: allHostsRuntimeScanDrainMs(hostInfo)
               }
             })
+          )
         })
       )
     ])
@@ -316,6 +314,7 @@ export function registerAiVaultHandlers(options: AiVaultHandlerOptions = {}): vo
 
 function resetAiVaultCacheForTests(): void {
   resetAiVaultHostLegCacheForTests()
+  resetAiVaultHostLegSyncForTests()
   scanCoordinator = new AiVaultScanCoordinator()
   handlerOptions = {}
   // Keep tests isolated from the shared local-leg cache.

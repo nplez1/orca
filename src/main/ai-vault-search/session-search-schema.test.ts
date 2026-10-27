@@ -78,7 +78,7 @@ describe('openSessionSearchDatabase', () => {
           .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_fts'")
           .all() as { name: string }[]
       ).map((row) => row.name)
-    expect(tables().sort()).toEqual(['messages_fts', 'sessions_fts'])
+    expect(tables().sort()).toEqual(['messages_fts', 'session_metadata_fts'])
 
     // A version bump must remove obsolete tables that CREATE IF NOT EXISTS would retain.
     fresh.exec('CREATE VIRTUAL TABLE conversation_fts USING fts5(user_text, assistant_text)')

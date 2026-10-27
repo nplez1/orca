@@ -4,18 +4,12 @@ import {
   openVersionedCacheDatabase,
   removeVersionedCacheDatabase
 } from '../sqlite/versioned-cache-database'
+import { ensureSessionListSchema, prepareSessionListSchema } from './session-search-list-schema'
 
 // Cache transcript content verbatim; outbound snippet policy belongs at the transport boundary.
 
-// Bump to drop and rebuild: the index is a cache over the transcripts, never a source.
-// Schema 7 carries Copilot's typed-prompt titles instead of ones prefixed with the
-// injected `<current_datetime>` context, which unchanged files would otherwise keep.
-// Schema 8 adds sub-agent lineage, which the list needs for every row it renders:
-// a schema 7 index would answer every listing with `subagent: null`.
-// Schema 9 adds the parent's AGENT beside that lineage. A link can cross agents — a pi session
-// spawning a claude conversation — and a list filtered to one agent has to tell that apart from a
-// parent that is merely not loaded, or it counts a real session as hidden.
-export const SESSION_SEARCH_SCHEMA_VERSION = 10
+// Bump to discard and rebuild this transcript-derived cache.
+export const SESSION_SEARCH_SCHEMA_VERSION = 8
 
 // Keep paths and C++ intact; omit # so #123 also matches 123.
 const TOKENIZER = `tokenize="unicode61 tokenchars '_.-/+'"`
@@ -40,21 +34,7 @@ CREATE TABLE IF NOT EXISTS sessions(
   resume_command TEXT NOT NULL,
   -- Chained digest of the first N messages; forks of one conversation share it.
   content_hash TEXT,
-  content_hash_count INTEGER NOT NULL DEFAULT 0,
-  -- The rest of what Agent Session History renders a row from, listed so the panel
-  -- is one indexed read instead of a walk and a parse. The fields the panel only
-  -- needs on demand (preview turns, first prompt, subagent rows) stay out.
-  model TEXT,
-  total_tokens INTEGER NOT NULL DEFAULT 0,
-  queued_message_count INTEGER NOT NULL DEFAULT 0,
-  subagent_transcript_count INTEGER NOT NULL DEFAULT 0,
-  modified_at TEXT,
-  -- Sub-agent lineage. A list served from the index has to nest a child under
-  -- its parent exactly as a scanned row does, so these cannot stay on-demand.
-  subagent_parent_session_id TEXT,
-  subagent_agent_type TEXT,
-  -- The agent that owns the parent session, when the link crosses agents.
-  subagent_parent_agent TEXT
+  content_hash_count INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS sessions_agent ON sessions(agent);
 CREATE INDEX IF NOT EXISTS sessions_updated_at ON sessions(updated_at);
@@ -86,19 +66,15 @@ CREATE INDEX IF NOT EXISTS messages_session ON messages(session_row_id);
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
   user_text, assistant_text, tool_text, identifiers, ${TOKENIZER}, detail=full
 );
--- The metadata tier's own search surface: titles, paths, branches and agent names
--- for every session, indexed whether or not transcript content is consented to.
--- rowid is the sessions row id, so a hit joins back without a second lookup.
-CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
-  title, cwd, branch, agent, ${TOKENIZER}, detail=full
-);
 `
 
 export function openSessionSearchDatabase(path: string): SyncDatabase {
+  prepareSessionListSchema(path)
   return openVersionedCacheDatabase(path, {
     version: SESSION_SEARCH_SCHEMA_VERSION,
     sql: SCHEMA_SQL,
     afterSchema: (db) => {
+      ensureSessionListSchema(db)
       db.prepare('INSERT OR IGNORE INTO meta(key, value) VALUES (?, ?)').run(
         'index_incarnation',
         randomUUID()
