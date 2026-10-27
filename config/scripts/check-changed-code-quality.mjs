@@ -119,7 +119,10 @@ const SUPPRESSED_CHANGED_LINES_DIAGNOSTICS = new Map([
     new Set([
       'src/main/ipc/dashboard-popout.test.ts',
       'src/main/window/dashboard-popout-window.test.ts',
-      'src/main/window/clipboard-dashboard-popout-access.test.ts'
+      'src/main/window/clipboard-dashboard-popout-access.test.ts',
+      // Upstream's own cast, in a file this fork only wraps: the one-line overlay call makes the whole
+      // statement a changed hunk, so a finding present at the merge base is reported as new here.
+      'src/shared/tui-agent-config.ts'
     ])
   ]
 ])

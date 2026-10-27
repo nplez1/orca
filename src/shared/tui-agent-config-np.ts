@@ -3,7 +3,9 @@ import { getRelayCliCommandNameForPlatform } from './orca-cli-command-name'
 import type { TuiAgentConfigSource } from './tui-agent-config-types'
 
 // Why: Orca NP's own entries over upstream's table, so upstream table edits still merge in place.
-const FORK_TUI_AGENT_OVERRIDES: Partial<Record<TuiAgent, Partial<TuiAgentConfigSource>>> = {
+// `satisfies` rather than an annotation: it keeps the literal key type, so the merge below indexes
+// `Record<TuiAgent, …>` without a cast.
+const FORK_TUI_AGENT_OVERRIDES = {
   'claude-agent-teams': {
     detectCmd: 'orca-np',
     detectCmdAliases: ['orca-np-dev', 'orca-dev', 'orca-ide'],
@@ -16,16 +18,14 @@ const FORK_TUI_AGENT_OVERRIDES: Partial<Record<TuiAgent, Partial<TuiAgentConfigS
       win32: `${getRelayCliCommandNameForPlatform('win32')} claude-teams`
     }
   }
-}
+} satisfies Partial<Record<TuiAgent, Partial<TuiAgentConfigSource>>>
 
 export function withForkTuiAgentOverrides(
   source: Record<TuiAgent, TuiAgentConfigSource>
 ): Record<TuiAgent, TuiAgentConfigSource> {
   const merged = { ...source }
   for (const [agent, override] of Object.entries(FORK_TUI_AGENT_OVERRIDES)) {
-    // SAFETY: keys come from FORK_TUI_AGENT_OVERRIDES, which is typed by TuiAgent.
-    const id = agent as TuiAgent
-    merged[id] = { ...source[id], ...override }
+    merged[agent] = { ...source[agent], ...override }
   }
   return merged
 }
