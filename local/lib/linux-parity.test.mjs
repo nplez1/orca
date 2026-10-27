@@ -10,6 +10,7 @@ import test from 'node:test'
 import {
   formatParity,
   indexShardReports,
+  judgeLinuxFailures,
   judgeParity,
   judgeParityEntry,
   reportPathsFor
@@ -271,4 +272,85 @@ test('formatParity separates failed from absent in its verdict line', () => {
   assert.match(lines.at(-1), /1 failed and 1 absent of 2/)
   assert.ok(lines.some((line) => line.startsWith('  FAILED    ')))
   assert.ok(lines.some((line) => line.startsWith('  ABSENT    ')))
+})
+
+// The Linux red set. Same fixture shape and same `/home/runner/work` paths, because the question is
+// whether a nightly's *other* reds are accounted for, not whether this Mac's claim transfers.
+const RED_SET_ENTRY = {
+  file: 'src/main/daemon/daemon-race.test.ts',
+  test: 'serializes concurrent checkpoints',
+  class: 'upstream-daemon-disconnect-race',
+  evidence: 'failed on Linux twice and passed 3/3 on the Mac'
+}
+
+function linuxIndex(results) {
+  return indexShardReports([{ source: 'shard.json', report: report(results) }])
+}
+
+test('judgeLinuxFailures passes when the only red is a listed one', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'failed',
+      assertions: [
+        assertion('DaemonPtyAdapter history recovery serializes concurrent checkpoints', 'failed', [
+          'DaemonConnectionLostError: Disconnected'
+        ])
+      ]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, true)
+  assert.equal(result.allowlisted.length, 1)
+  assert.equal(result.stale.length, 0)
+  // Matched on a substring of the full name, because Vitest prefixes it with the describe block.
+  assert.equal(result.allowlisted[0].class, 'upstream-daemon-disconnect-race')
+})
+
+test('judgeLinuxFailures fails on a red no entry accounts for', () => {
+  const index = linuxIndex([
+    fileResult('src/main/other.test.ts', {
+      status: 'failed',
+      assertions: [assertion('something broke', 'failed', ['AssertionError: nope'])]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, false)
+  assert.equal(result.unexpected.length, 1)
+  assert.match(result.unexpected[0].detail, /nope/)
+})
+
+test('a file-level failure is never absorbed by a name-matching entry', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'failed',
+      message: 'Error: connect ECONNREFUSED'
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, false)
+  assert.equal(result.unexpected[0].test, '(file-level failure)')
+  // The entry matched no failure, so it is reported as prunable rather than as a false pass.
+  assert.equal(result.stale.length, 1)
+})
+
+test('a listed test that passed is prunable, reported but not enforced', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'passed',
+      assertions: [assertion('serializes concurrent checkpoints', 'passed')]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, true)
+  assert.equal(result.stale.length, 1)
+  assert.equal(result.total, 1)
+})
+
+test('an entry with no evidence is a problem, so the set cannot become a mute button', () => {
+  const result = judgeLinuxFailures(
+    manifestOf([{ file: 'src/main/daemon/daemon-race.test.ts', test: 'x' }]),
+    linuxIndex([])
+  )
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join(' '), /no evidence/)
 })

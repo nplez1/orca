@@ -267,3 +267,103 @@ export function formatParity(result, { allowlistPath, reportCount }) {
   )
   return lines
 }
+
+/** A red-set entry matches a failure when the file matches by `/`-bounded suffix and the name is in it. */
+function entryMatchesFailure(entry, failure) {
+  const sameFile = failure.file === entry.file || failure.file.endsWith(`/${entry.file}`)
+  return sameFile && failure.test.includes(entry.test)
+}
+
+/**
+ * The complement of `judgeParity`. Parity asks whether this Mac's red set holds on Linux; this asks
+ * whether anything else is red there, against `local/nightly-linux-known-red.json`. Without it a
+ * nightly is red forever on one upstream race, which teaches everyone to ignore red.
+ *
+ * Fails closed: an entry with no `evidence` is a problem, and a red that no entry matches is
+ * `unexpected` and fails the verdict. A listed test that passed is `stale` — reported, never enforced,
+ * because that is the signal to prune the entry rather than a reason to fail the night.
+ */
+export function judgeLinuxFailures(manifest, index) {
+  const problems = [...index.problems]
+  const entries = Array.isArray(manifest?.entries) ? manifest.entries : null
+  if (entries === null) {
+    problems.push('the Linux red set has no `entries` array')
+  }
+  for (const entry of entries ?? []) {
+    if (typeof entry.file !== 'string' || entry.file === '') {
+      problems.push('a Linux red-set entry has no `file`')
+    }
+    if (typeof entry.test !== 'string' || entry.test === '') {
+      problems.push(`${entry.file}: a Linux red-set entry has no test name`)
+    }
+    if (typeof entry.evidence !== 'string' || entry.evidence === '') {
+      problems.push(`${entry.file}: a Linux red-set entry claims a red with no evidence`)
+    }
+  }
+  const failures = []
+  for (const [path, file] of index.files) {
+    for (const assertion of file.assertions) {
+      if (assertion.status === 'failed') {
+        failures.push({ file: path, test: assertion.test, detail: assertion.detail })
+      }
+    }
+    // A file that failed without a failing assertion is a beforeAll/import failure: no row to match,
+    // so it can never be allowlisted by name and always reads as unexpected.
+    if (file.status === 'failed' && !file.assertions.some((a) => a.status === 'failed')) {
+      failures.push({ file: path, test: '(file-level failure)', detail: file.message })
+    }
+  }
+  const allowlisted = []
+  const unexpected = []
+  for (const failure of failures) {
+    const entry = (entries ?? []).find((candidate) => entryMatchesFailure(candidate, failure))
+    if (entry) {
+      allowlisted.push({ ...failure, class: entry.class ?? 'unclassified' })
+    } else {
+      unexpected.push(failure)
+    }
+  }
+  const stale = (entries ?? []).filter(
+    (entry) => !failures.some((failure) => entryMatchesFailure(entry, failure))
+  )
+  return {
+    allowlisted,
+    unexpected,
+    stale,
+    failureCount: failures.length,
+    total: (entries ?? []).length,
+    problems,
+    ok: unexpected.length === 0 && problems.length === 0
+  }
+}
+
+/** Human-readable lines for the Linux red-set verdict. */
+export function formatLinuxFailures(result, { allowlistPath, reportCount }) {
+  const lines = [
+    `nightly Linux red set: ${result.total} entr${result.total === 1 ? 'y' : 'ies'} from ${allowlistPath} against ${reportCount} shard report(s)`,
+    `failing assertions on Linux: ${result.failureCount}`
+  ]
+  for (const row of result.allowlisted) {
+    lines.push(`  known     ${row.test} — ${row.file.split('/src/').pop()} [${row.class}]`)
+  }
+  for (const row of result.unexpected) {
+    lines.push(
+      `  UNEXPECTED ${row.test} — ${row.file.split('/src/').pop()}${row.detail ? ` — ${row.detail}` : ''}`
+    )
+  }
+  for (const entry of result.stale) {
+    lines.push(
+      `  prunable  ${entry.test} — ${entry.file} did not fail on Linux, so this entry can go`
+    )
+  }
+  for (const problem of result.problems) {
+    lines.push(`  problem: ${problem}`)
+  }
+  lines.push(
+    result.ok
+      ? `red set: PASS — every Linux failure is a listed one (${result.allowlisted.length} known, 0 unexpected)`
+      : `red set: FAIL — ${result.unexpected.length} red(s) no entry accounts for; either it is a real ` +
+          `regression or it needs an entry with evidence`
+  )
+  return lines
+}

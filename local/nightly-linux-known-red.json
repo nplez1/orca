@@ -1,0 +1,15 @@
+{
+  "note": "Tests that fail on the Linux runner for reasons that do not exist on this Mac. The Mac allowlist (unit-known-red.json) does NOT transfer: it names this machine's environment, and the nightly runs ubuntu-24.04-arm. An entry here is a claim with evidence, not a mute button — check it with `node local/check-nightly-linux-parity.mjs --failures <downloaded-artifacts>`, which fails on any red that is not listed and reports a listed test that passed as prunable.",
+  "entries": [
+    {
+      "file": "src/main/daemon/daemon-pty-adapter-history-recovery.test.ts",
+      "test": "serializes concurrent keepHistory and disconnectOnly checkpoints",
+      "class": "upstream-daemon-disconnect-race",
+      "owner": "upstream",
+      "firstSeen": "2026-10-27",
+      "evidence": "Failed on Linux twice, in run 40485647652 (scheduled, main @7c53c12a17) and run 40517494613 (dispatch, main @ddc2a7827f), both with DaemonConnectionLostError: Disconnected out of disconnectOnly() at the test's own line 292. Passes 3/3 on this Mac, so it is not a Mac allowlist entry either. Every file in the stack is upstream-owned with zero fork hunks: daemon-pty-event-subscriptions.ts, daemon/client.ts, daemon-client-pending-requests.ts, daemon-pty-adapter.ts and the test itself. Not fixable inside the fork without divergence, which costs more at the next sync than the red costs now.",
+      "exit": "Remove when upstream serialises finishDisconnectOnly against in-flight requests, or when this test passes on Linux in two consecutive nightlies."
+    }
+  ],
+  "prunedSince": []
+}

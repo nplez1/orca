@@ -32,24 +32,45 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { formatParity, indexShardReports, judgeParity } from './lib/linux-parity.mjs'
+import {
+  formatLinuxFailures,
+  formatParity,
+  indexShardReports,
+  judgeLinuxFailures,
+  judgeParity
+} from './lib/linux-parity.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ALLOWLIST = join(ROOT, 'local', 'unit-known-red.json')
+/** Tests that fail on Linux for reasons absent from this Mac, with the evidence for each claim. */
+const DEFAULT_RED_SET = join(ROOT, 'local', 'nightly-linux-known-red.json')
 /** The name `unit-tests.yml` writes the shard's Vitest report under before uploading `ci-shards/`. */
 const REPORT_FILE_NAME = 'unit-report.json'
 const WALK_DEPTH = 8
 
 function usage() {
-  return 'usage: node local/check-nightly-linux-parity.mjs REPORT.json [REPORT.json … | DIR …] [--allowlist PATH] [--json]'
+  return (
+    'usage: node local/check-nightly-linux-parity.mjs REPORT.json [REPORT.json … | DIR …] ' +
+    '[--allowlist PATH] [--failures [--red-set PATH]] [--json]'
+  )
 }
 
 function parseArgs(argv) {
-  const options = { paths: [], allowlist: DEFAULT_ALLOWLIST, json: false }
+  const options = {
+    paths: [],
+    allowlist: DEFAULT_ALLOWLIST,
+    redSet: DEFAULT_RED_SET,
+    json: false,
+    failures: false
+  }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--allowlist') {
       options.allowlist = resolve(argv[(index += 1)] ?? '')
+    } else if (arg === '--red-set') {
+      options.redSet = resolve(argv[(index += 1)] ?? '')
+    } else if (arg === '--failures') {
+      options.failures = true
     } else if (arg === '--json') {
       options.json = true
     } else if (arg === '--help' || arg === '-h') {
@@ -117,11 +138,14 @@ function readReports(paths) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2))
+  const manifestPath = options.failures ? options.redSet : options.allowlist
   let manifest = null
   try {
-    manifest = JSON.parse(readFileSync(options.allowlist, 'utf8'))
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
   } catch (error) {
-    console.error(`cannot read the known-red allowlist at ${options.allowlist}: ${error.message}`)
+    console.error(
+      `cannot read ${options.failures ? 'the Linux red set' : 'the known-red allowlist'} at ${manifestPath}: ${error.message}`
+    )
     process.exit(2)
   }
 
@@ -134,17 +158,25 @@ function main() {
     process.exit(2)
   }
 
-  const result = judgeParity(manifest, indexShardReports(reports))
+  const result = options.failures
+    ? judgeLinuxFailures(manifest, indexShardReports(reports))
+    : judgeParity(manifest, indexShardReports(reports))
   result.problems.push(...unreadable.map((line) => `unreadable report: ${line}`))
   result.ok = result.ok && unreadable.length === 0
 
   if (options.json) {
-    console.log(JSON.stringify({ ...result, reportCount: reports.length }, null, 2))
+    console.log(
+      JSON.stringify(
+        { ...result, mode: options.failures ? 'failures' : 'parity', reportCount: reports.length },
+        null,
+        2
+      )
+    )
   } else {
-    for (const line of formatParity(result, {
-      allowlistPath: options.allowlist,
-      reportCount: reports.length
-    })) {
+    const lines = options.failures
+      ? formatLinuxFailures(result, { allowlistPath: manifestPath, reportCount: reports.length })
+      : formatParity(result, { allowlistPath: manifestPath, reportCount: reports.length })
+    for (const line of lines) {
       console.log(line)
     }
   }

@@ -1444,6 +1444,24 @@ skipped run. Since 2026-10-24 the full unit suite is therefore not a PR gate at 
 `fork-main-tests.yml` and again at the release gate, and the failure window that choice accepts is a
 cross-cutting break sitting on the release line until one of those two runs.
 
+**The Linux red set, and why the Mac one does not substitute for it.** The Mac allowlist names *this
+machine's* environment; the nightly runs `ubuntu-24.04-arm`, which has its own. `local/nightly-linux-known-red.json`
+is that set — an entry needs a `file`, a `test` name, a `class`, and **`evidence`; an entry without
+evidence is a hard problem, not a warning**, because that is the difference between a verdict and a mute
+button. `node local/check-nightly-linux-parity.mjs <artifacts> --failures` judges every failing assertion
+in the shards against it: no entry → the run fails; a listed test that *passed* is reported as prunable
+(reported, never enforced, so an upstream fix does not turn the night red in the other direction); and a
+file-level failure (a `beforeAll` or import error with no assertion rows) can never be absorbed by a
+name-matching entry.
+
+Its first entry is `daemon-pty-adapter-history-recovery.test.ts › serializes concurrent keepHistory and
+disconnectOnly checkpoints`, which failed on Linux in **both** runs — the 04:53Z schedule
+(`40485647652`) and this dispatch — with `DaemonConnectionLostError: Disconnected` out of
+`disconnectOnly()`, while passing 3/3 on this Mac. Every file in that stack is upstream-owned with zero
+fork hunks, so it is upstream's race under Linux runner timing, and the entry records its exit condition
+rather than hiding it. Verified in both directions: `--failures` exits 0 on this run's artifacts and
+exits **1** on the earlier one, naming the three branch-gap reds that the merge has since fixed.
+
 **The first scheduled run after the unblock, read (2026-10-27, run id `40485647652`, `main` @
 `7c53c12a17`).** The schedule fires again — that is the part `#186` fixed, and this run proves it on a
 real slot rather than by dispatch. It is red: `plan` succeeded, all five shards ran, `relay integration`
