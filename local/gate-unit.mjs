@@ -53,7 +53,7 @@ import {
   formatVerdict,
   gateInputsFingerprint,
   toolchainVersions,
-  unitGateCacheDir,
+  resolvedGateCacheDir,
   verdictRecordProblem
 } from './gate-verdict-cache.mjs'
 import {
@@ -649,9 +649,14 @@ function main() {
   const allowlistHash = allowlistFingerprint(readFileSync(options.allowlist))
   const gateInputs = currentGateInputs()
   const revision = git(['rev-parse', 'HEAD'])
-  // Why the gitdir and not `<root>/.git`: in a linked worktree `.git` is a file, so the literal path
-  // is not a directory and the gate could not record the verdict it just computed.
-  const cacheDir = unitGateCacheDir(git(['rev-parse', '--absolute-git-dir']) ?? join(ROOT, '.git'))
+  // Why the common dir and not the worktree's git dir: a linked worktree's `.git` is a file, and
+  // `--absolute-git-dir` answers with `.git/worktrees/<name>`, so each worktree kept its own copy of a
+  // cache keyed by revision. Gating the same SHA twice cost a full suite run.
+  const cacheDir = resolvedGateCacheDir({
+    commonDir: git(['rev-parse', '--path-format=absolute', '--git-common-dir']),
+    gitDir: git(['rev-parse', '--absolute-git-dir']),
+    root: ROOT
+  })
   const cachePath = revision ? cachedVerdictPath(cacheDir, revision, allowlistHash) : null
   // Why the reuse guard is here and not inside the check: `--no-cache` is the documented way out of a
   // damaged cache file, so it must not parse one to refuse it, and `--allow-dirty` asks about the tree

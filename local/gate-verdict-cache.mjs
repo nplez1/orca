@@ -1,11 +1,11 @@
-// The unit gate records one verdict per (revision, allowlist) under the worktree's git dir, and
-// two readers depend on it: `local/gate-unit.mjs`, which writes and reuses it, and
+// The unit gate records one verdict per (revision, allowlist) under the repository's shared git dir,
+// and two readers depend on it: `local/gate-unit.mjs`, which writes and reuses it, and
 // `local/open-pr.mjs`, which refuses to open a PR for a revision with no PASS on record. A verdict
 // only one script can find is advisory, which is what this file exists to stop.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, isAbsolute, resolve } from 'node:path'
 
 /**
  * What a verdict depends on besides the revision and the allowlist: the scripts that decide it, the
@@ -23,6 +23,18 @@ export const GATE_INPUT_PATHS = [
 
 export function unitGateCacheDir(gitDir) {
   return join(gitDir, 'orca-gate')
+}
+
+/**
+ * One cache per repository, not per worktree. `--absolute-git-dir` answers with the *worktree's* git
+ * dir (`.git/worktrees/<name>`), so the same revision gated in two worktrees ran the full suite
+ * twice — and the release gate is 25 minutes. `--git-common-dir` is the shared `.git`, which is the
+ * right key for a cache whose entries are already keyed by revision, allowlist and toolchain. A
+ * relative answer (plain `--git-common-dir` in a worktree) is resolved against the root, not the cwd.
+ */
+export function resolvedGateCacheDir({ commonDir, gitDir, root }) {
+  const base = commonDir || gitDir || join(root, '.git')
+  return unitGateCacheDir(isAbsolute(base) ? base : resolve(root, base))
 }
 
 export function allowlistFingerprint(text) {

@@ -10,6 +10,7 @@ import {
   cachedVerdictProblem,
   formatVerdict,
   gateInputsFingerprint,
+  resolvedGateCacheDir,
   unitGateCacheDir,
   verdictRecordProblem
 } from '../../local/gate-verdict-cache.mjs'
@@ -121,6 +122,33 @@ describe('which verdicts may be reused, and which may be recorded', () => {
     // Why this and not a write probe: `<root>/.git` is a file in a linked worktree, so the gate has
     // to resolve the git dir itself — which it does with `--absolute-git-dir`.
     expect(unitGateCacheDir('/repo/.git/worktrees/wt')).toBe('/repo/.git/worktrees/wt/orca-gate')
+  })
+
+  it('keys the verdict cache to the repository, so two worktrees gate a revision once', () => {
+    // Why: `--absolute-git-dir` answers with `.git/worktrees/<name>`, so the same SHA gated here and
+    // in the main tree ran the full suite twice — 25 minutes of it for the release gate.
+    const inWorktree = resolvedGateCacheDir({
+      commonDir: '/repo/.git',
+      gitDir: '/repo/.git/worktrees/wt',
+      root: '/repo'
+    })
+    const inMainTree = resolvedGateCacheDir({
+      commonDir: '/repo/.git',
+      gitDir: '/repo/.git',
+      root: '/repo'
+    })
+    expect(inWorktree).toBe('/repo/.git/orca-gate')
+    expect(inMainTree).toBe(inWorktree)
+  })
+
+  it('falls back to the worktree git dir when no common dir is reported', () => {
+    expect(resolvedGateCacheDir({ gitDir: '/repo/.git/worktrees/wt', root: '/repo' })).toBe(
+      '/repo/.git/worktrees/wt/orca-gate'
+    )
+  })
+
+  it('resolves a relative common dir against the root, not the cwd', () => {
+    expect(resolvedGateCacheDir({ commonDir: '.git', root: '/repo' })).toBe('/repo/.git/orca-gate')
   })
 
   it('fingerprints the gate inputs, and only them', () => {
