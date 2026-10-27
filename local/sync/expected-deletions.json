@@ -1,5 +1,5 @@
 {
-  "note": "Files this fork deletes that upstream still owns. Every one is a modify/delete conflict on the next sync, so each is asserted here rather than rediscovered: the resolver prints the entry and the resolver can apply it. LOCAL-PATCHES.md and local/sync/convergence-ledger.md stay the evidence; this file is the machine-readable claim. A path listed as expected-deletion must be absent at HEAD and present at upstream/main, and `node --test local/sync/lib/expected-deletions.test.mjs` plus the staleness check in conflicts.mjs hold it to that.",
+  "note": "Files this fork deletes that upstream still owns. Every one is a modify/delete conflict on the next sync, so each is asserted here rather than rediscovered: the resolver prints the entry and can apply it. LOCAL-PATCHES.md and local/sync/convergence-ledger.md stay the evidence; this file is the machine-readable claim. Generated from `git diff <base>..HEAD --diff-filter=D`, NOT from the log: a merge resolution can delete a file without a commit of its own, which is how agent-dashboard-open-mode.ts was missed the first time. A path listed as deleted must be absent at HEAD and present at upstream/main, and conflicts.mjs reports a stale entry on read.",
   "statuses": {
     "expected-deletion": "settled: the deletion is the fork's answer and a sync re-applies it",
     "pending-decision": "not settled: the deletion exists but nobody has chosen between restoring and keeping it",
@@ -33,6 +33,20 @@
       "class": "superseded",
       "status": "expected-deletion",
       "reason": "Covers the resolver above. evidence: mergeability-plan.md 5"
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "pending-decision",
+      "reason": "The 16-line resolver that chose between the drawer and the pop-out; there is nothing to choose between once the dashboard is a view. Deleted by the #44 refactor's merge resolution rather than by a commit of its own."
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/agent-dashboard-open-mode.test.ts",
+      "commit": "ab57bb7bbb",
+      "class": "dashboard-delivery",
+      "status": "pending-decision",
+      "reason": "Covers agent-dashboard-open-mode.ts."
     },
     {
       "path": "src/main/ipc/dashboard-popout.ts",
