@@ -46,7 +46,6 @@ import { readClipboardCopiedFilePaths } from './clipboard-copied-file-paths'
 import { buildClipboardImageThumbnail } from './clipboard-image-thumbnail'
 import { readClipboardNativeImage } from './clipboard-native-image'
 import { publishClipboardText } from './clipboard-text-publisher'
-import { isDashboardPopoutRenderer } from './dashboard-popout-window'
 import { restoreNativeChatPastes, sweepExpiredNativeChatPastes } from './native-chat-paste-files'
 import { savePastedTextAsFile, type SavePastedTextAsFileArgs } from './native-chat-pasted-text-file'
 import { agentSessionPastedImageName } from '../../shared/agent-session-attachments'
@@ -314,8 +313,8 @@ function assertTrustedClipboardSender(event: IpcMainInvokeEvent): void {
 }
 
 function assertTrustedClipboardTextSender(event: IpcMainInvokeEvent): void {
-  // Dashboard popouts need text clipboard authority only; never extend it to images, files or remote operations.
-  if (!isTrustedClipboardRenderer(event.sender) && !isDashboardPopoutRenderer(event.sender)) {
+  // Why: clip board text authority must not extend to image, file, or remote operations.
+  if (!isTrustedClipboardRenderer(event.sender)) {
     throw new Error('Unauthorized clipboard IPC sender')
   }
 }

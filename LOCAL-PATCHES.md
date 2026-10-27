@@ -1258,24 +1258,34 @@ Still deleted, deliberately:
   without resurrecting that model, and a dead file is not a reason to bring a removed capability back.
   `local/sync/mergeability-plan.md` § 5 already carries this as a product decision.
 
-The 22 dashboard/pop-out files are now split by whether they can be inert, and the split is recorded in
-`local/sync/expected-deletions.json` rather than left implied:
+The 22 dashboard/pop-out files are split by whether they can be inert, and the split is recorded in
+`local/sync/expected-deletions.json` rather than left implied. **The decision is the owner's and it is
+settled (2026-10-26): the fork ships the Agent Dashboard as a content-area view and rejects upstream's
+drawer and pop-out window**, which are a different feature rather than a better version of the same
+one. That makes the renderer half a permanent product deletion, not an unresolved merge question.
 
-- **7 restored**: `src/main/ipc/dashboard-popout.ts`, `src/main/window/dashboard-popout-window.ts`,
-  `src/preload/api/dashboard-api.ts` and `-bridge.ts`, plus three suites — all byte-identical to
-  `upstream/main`. Nothing registers the IPC or opens the window, so they are dead, but they typecheck
-  and **their 33 cases pass**, which is why restoring them costs nothing: the cost of holding upstream's
-  file is zero, and the cost of deleting it is a modify/delete conflict every sync. Restoring
-  `dashboard-bridge.ts` required `dashboard: DashboardApi` back in `PreloadApi` (upstream's line), and
-  `clipboard-dashboard-popout-access.test.ts` required upstream's `isDashboardPopoutRenderer` admission
-  in `assertTrustedClipboardTextSender` — text authority only, never images, files or remote operations.
-- **15 stay deleted**: the drawer, the sidebar host, the popout window shell (`popout.html`,
-  `popout.tsx`, `DashboardPopoutRoot`, `useDashboardSnapshot`) and the open-mode/bridge hooks. These
-  cannot be restored inertly. Upstream's drawer needs `AppState.agentDashboardDrawerOpen`, which #44
-  removed, and its `DashboardPopoutRoot` needs the `onAckAgent`/`onRevealAgent` props upstream added to
-  `AgentKanbanBoard` — the very component the fork's **live** page view renders. Restoring them means
-  either two live implementations of one surface or a behaviour change to the shipped dashboard, which
-  is a product decision, not a merge one.
+- **4 held, dead**: `src/main/ipc/dashboard-popout.ts` (+ its test) and
+  `src/main/window/dashboard-popout-window.ts` (+ its test), byte-identical to `upstream/main`.
+  Nothing registers the IPC and nothing opens the window — `electron.vite.config.ts` has no `popout`
+  entry and there is no `popout.html` to load — so they are dead, but they typecheck and **their 33
+  cases pass**. Holding upstream's bytes costs nothing and removes four modify/delete conflicts; the
+  ledger marks them `take-theirs` so a sync does not read them.
+- **18 stay deleted**, including the preload pair this bullet used to call restored.
+  `dashboard-api.ts` and `dashboard-bridge.ts` exist only to publish `window.api.dashboard`, which the
+  fork's board stopped calling when it dropped the pop-out relay; `dashboard-bridge.ts` type-checks
+  itself against `PreloadApi['dashboard']`, so keeping it forces a `dashboard` member onto `PreloadApi`
+  for a runtime API nothing registers. `clipboard-dashboard-popout-access.test.ts` goes with them: it
+  asserts that `assertTrustedClipboardTextSender` admits upstream's pop-out renderer, and dead code has
+  no business adding an admission to a clipboard trust check. The rest are the drawer, the sidebar
+  host, `popout.html`/`popout.tsx`, `DashboardPopoutRoot`, `useDashboardSnapshot` and the open-mode
+  and bridge hooks — none of which can be restored inertly. Upstream's drawer needs
+  `AppState.agentDashboardDrawerOpen`, which #44 removed, and its `DashboardPopoutRoot` renders the same
+  `AgentKanbanBoard` the fork's **live** page renders, so restoring it puts a second live board over one
+  snapshot.
+
+Restoring all 22 was measured before deciding, not assumed: **11 of 57 cases fail and `tc:web` reports
+29 errors**, because upstream's renderer half has moved past the fork's. That number is the price of a
+rejected delivery, not an argument for changing the decision.
 
 `electron.vite.config.ts` keeps upstream's `popout` entry deleted along with `popout.html`: an entry
 that resolves nothing does not build, and the fork's comment there says why.

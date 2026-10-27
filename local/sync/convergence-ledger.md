@@ -546,39 +546,103 @@ re-export stays, because the fork lifted those constants out of `protocol-versio
 
 ---
 
-## Dashboard and the popout window
+## Dashboard delivery: a content-area view, not a drawer or a pop-out
 
-**Paths:** `src/renderer/src/components/dashboard/**`, `src/renderer/src/components/dashboard-popout/**`, `src/main/ipc/dashboard*.ts`, `src/preload/api/dashboard*.ts`, `src/main/window/dashboard-popout-window*`
+**Paths:** `src/renderer/src/components/dashboard/AgentDashboard{Page,Drawer}*`,
+`src/renderer/src/components/dashboard/agent-dashboard-open-mode*`,
+`src/renderer/src/components/dashboard-popout/DashboardPopoutRoot*`,
+`src/renderer/src/components/dashboard-popout/useDashboardSnapshot*`,
+`src/renderer/src/components/dashboard/DashboardPopoutBridge*`,
+`src/renderer/src/components/dashboard/useDashboardPopoutBridge*`,
+`src/renderer/src/components/sidebar/AgentDashboard{SidebarHost,Drawer}*`, `src/renderer/src/popout.*`,
+`src/preload/api/dashboard-api.ts`, `src/preload/api/dashboard-bridge.ts`
 
-**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx`), and that view is
-the only delivery the fork exposes. The **popout window's main-process and preload plumbing is now
-restored** to `upstream/main` byte-identical (`src/main/ipc/dashboard-popout.ts`,
-`src/main/window/dashboard-popout-window.ts`, `src/preload/api/dashboard-{api,bridge}.ts` and three
-tests): nothing registers or opens it, it typechecks, and its own 33 cases pass, so holding upstream's
-version costs nothing and removes four modify/delete conflicts. `dashboard: DashboardApi` is back in
-`PreloadApi` because upstream's bridge satisfies it; nothing in the renderer reads it.
+**Resolution:** delete
 
-**What stays deleted (2026-10-26),** asserted in `local/sync/expected-deletions.json`: the drawer, the
-sidebar host, the popout window shell (`popout.html`, `popout.tsx`, `DashboardPopoutRoot`,
-`useDashboardSnapshot`) and the open-mode/bridge hooks. They cannot be restored inertly the way the
-main-process half can — upstream's drawer needs `AppState.agentDashboardDrawerOpen`, which the fork
-removed, and upstream's `DashboardPopoutRoot` needs the `onAckAgent`/`onRevealAgent` props upstream
-added to `AgentKanbanBoard`. **The fork's live page view is built on that same board**, so restoring
-these means either two live implementations of one surface or a product change to the shipped view.
-That is a product decision, not a merge one, so the deletion is asserted instead of re-litigated.
+**Decision:** the Agent Dashboard is a first-class view (`AgentDashboardPage.tsx` rendered by
+`AppWorkspaceShell.tsx:80` while `activeView === 'dashboard'`), and that view is the only delivery the
+fork ships. This is a **product decision the owner made explicitly on 2026-10-26**: upstream's drawer
+and pop-out window are not a better version of the fork's page, they are a different feature the fork
+does not want. Both surfaces are therefore dead ends here, not candidates for restore.
 
-The reversed part of this entry: the popout plumbing used to be deleted, and upstream's later fixes to
-it were taken as deletions. They are now ordinary upstream code again.
+The renderer half of upstream's delivery — the drawer, the sidebar host, `popout.html`/`popout.tsx`,
+`DashboardPopoutRoot`, `useDashboardSnapshot`, the open-mode and bridge hooks — cannot be restored
+inertly, and that is a structural fact rather than a preference: upstream's drawer needs
+`AppState.agentDashboardDrawerOpen`, which #44 removed, and its `DashboardPopoutRoot` renders the same
+`AgentKanbanBoard` the fork's live page renders, so restoring it puts a second live board over one
+snapshot. The preload pair (`dashboard-api.ts`, `dashboard-bridge.ts`) only exists to publish
+`window.api.dashboard`, which the fork's board stopped calling when it dropped the pop-out relay;
+`dashboard-bridge.ts` type-checks itself against `PreloadApi['dashboard']`, so keeping it forces a
+`dashboard` member onto `PreloadApi` for a runtime API that nothing registers.
 
-**Ack intent (2026-10-07 sync):** the fork keeps the 1-arg ack — `onAckAgent: (paneKey: string) =>
-void` on `AgentKanbanBoard`, calling `onAckAgent(card.paneKey)` — and does not adopt upstream's
-`AgentSubjectReadIntent` parameter. Upstream added it with the popout relay the fork deleted; the
-fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept, so adopting the
-parameter would be cosmetic. The merge's test file had both assertions (`'explicit'`, `'view'`) from
-upstream's side; both are reverted to the 1-arg form.
+**Do not:** measure this by restore-and-run. Restoring all 22 files was tried: 11 of 57 cases fail and
+`tc:web` reports 29 errors, because upstream's renderer half has moved past the fork's. The number is
+not a reason to change the decision — it is the cost of a delivery the fork rejected.
 
-**Do not:** open the popout window to carry an upstream fix — nothing mounts it. The restored files
-exist to merge cleanly, not to ship.
+---
+
+## Dashboard popout plumbing: upstream's bytes, held inert
+
+**Paths:** `src/main/ipc/dashboard-popout.ts`, `src/main/ipc/dashboard-popout.test.ts`,
+`src/main/window/dashboard-popout-window.ts`, `src/main/window/dashboard-popout-window.test.ts`
+
+**Resolution:** take-theirs
+
+**Decision:** these four are byte-identical to `upstream/main` and stay that way. They are dead —
+nothing registers the IPC and nothing opens the window, because `electron.vite.config.ts` has no
+`popout` entry and there is no `popout.html` to load. Holding them costs nothing (they typecheck and
+their 33 cases pass) and removes four modify/delete conflicts, so a sync should take upstream's version
+without reading it. The fork contributes nothing to these files and must not start.
+
+**Do not:** wire them up to "carry" an upstream fix. They exist to merge cleanly, not to ship. The
+preload halves that would have completed the wiring are deleted by the entry above, so a restore of
+that wiring cannot compile.
+
+---
+
+## Agent board: click jumps to the workspace, ack takes no intent
+
+**Paths:** `src/renderer/src/components/dashboard-popout/AgentKanbanBoard.tsx` (+ its test)
+
+**Resolution:** manual
+
+**Decision:** the fork's board differs from upstream's in behaviour, not only in routing, and every
+difference is deliberate:
+
+- **A card click follows `snapshot.cardClickAction`** — `'workspace'` (the default) dispatches
+  `dashboardCardRevealArgs(card)` to the workspace, `'preview'` opens the in-board terminal dialog.
+  Upstream always opens the dialog. The setting lives in `np-settings-types.ts` and is the fork's own.
+- **Ack is 1-arg** (`onAckAgent: (paneKey: string) => void`, calling `onAckAgent(card.paneKey)`).
+  Upstream's `AgentSubjectReadIntent` parameter arrived with the pop-out relay the fork deleted; the
+  fork's store call is `acknowledgeAgents([paneKey])`, which has no intent concept.
+- **No pop-out relays.** Upstream defaults `onAckAgent`/`onRevealAgent` to `window.api.dashboard.*`
+  relays; the fork passes both from the page and deleted the relays.
+
+This file is a 14-hunk conflict on every sync and `manual` is the honest resolution: a whole-file
+`keep-ours` would revert upstream's unrelated board work, and `take-theirs` would revert the click
+behaviour the owner chose. The comments that name the pop-out _are_ kept, because restoring upstream's
+text would describe a renderer the fork no longer builds.
+
+**Do not:** "modernise" the board to upstream's prop shape as a merge-cleanliness exercise. The relays
+would have to come back for the defaults to mean anything, and that reverses the entry above.
+
+---
+
+## Pending PR-comment acknowledgements: no snapshot thread resolver
+
+**Paths:** `src/renderer/src/components/right-sidebar/pr-comment-snapshotted-thread-resolver*`
+
+**Resolution:** delete
+
+**Decision:** #169 made the pending ack reply-only and removed
+`PendingPRCommentAiAckGithubResolveTarget`, `PendingPRCommentAiAckGitlabTarget` and the
+`githubResolveTarget`/`gitlabTarget` fields this resolver works against. It cannot compile without
+resurrecting that model, and a dead file is not a reason to bring a removed capability back.
+`local/sync/mergeability-plan.md` § 5 carries the same decision, and
+`local/sync/expected-deletions.json` asserts it.
+
+**Do not:** restore it to "keep the file present". Presence is only free when the file still compiles
+against the tree it sits in; this one does not.
 
 ---
 

@@ -415,21 +415,39 @@ repeated conflict shape in the repo" (`:256`).
 No renderer provider registry exists upstream (grep for `Record<UsageProviderId…` returns nothing),
 so this is a fork-owned table behind one-line guards until/unless P2.3 lands one.
 
-### 5.4 Dashboard: restore upstream, add a mode
+### 5.4 Dashboard: the view is the delivery (plan reversed 2026-10-26)
 
 The fork deleted upstream's popout window, drawer, popout bridge, `AgentDashboardSidebarHost.tsx` and
-`popout.tsx` (`ab57bb7bbb`, #44) and the ledger records "taken as deletions" (`:529-541`). Upstream
-keeps editing those files, so this is 14 modify/delete paths **every sync, forever**.
+`popout.tsx` (`ab57bb7bbb`, #44), and upstream keeps editing those files — 14 modify/delete paths on
+every sync. This section used to propose restoring them plus an `AgentDashboardMode` union member,
+reasoning that the same change could be proposed upstream.
 
-Restore them byte-identical, extend `AgentDashboardMode = 'in-window' | 'popout'`
-(`ui-chrome-types.ts:29`) with `'page'`, and make `'page'` the fork default. That turns 14 conflicts
-into one union member plus the page component, and the same change is a plausible upstream proposal
-(adds a mode, removes nothing).
+**That is reversed.** The product owner rejected upstream's delivery outright: the fork's content-area
+view is the dashboard, and the drawer and pop-out window are a different feature the fork does not
+want, not a better version of the same one. A union member would ship a mode whose other value the
+owner has said no to.
 
-Two carry-overs: upstream's `chatNames` change (`3aec926fe5`) also lands in `useLiveDashboardSnapshot.ts`
-— keep `chatNames: getStructuredChatTabNames()` in that file's resolution; and widen the ledger's
-`Paths` glob to cover `src/renderer/src/popout.tsx` and `sidebar/AgentDashboardSidebarHost.tsx`,
-which it currently misses.
+The reversal was measured rather than asserted: restoring all 22 files leaves **11 of 57 cases failing
+and `tc:web` reporting 29 errors**, because upstream's renderer half has moved past the fork's. That is
+the price of the rejected delivery.
+
+What landed instead:
+
+- **4 files held inert** — `src/main/ipc/dashboard-popout.ts` (+ test) and
+  `src/main/window/dashboard-popout-window.ts` (+ test), byte-identical to `upstream/main`, nothing
+  registering or opening them, 33 cases passing. They remove four modify/delete conflicts for free and
+  the ledger marks them `take-theirs`.
+- **18 deletions asserted** in `local/sync/expected-deletions.json`, with `Resolution: delete` ledger
+  entries, so the resolver proposes the deletion instead of a human re-deriving it. The preload pair
+  and `clipboard-dashboard-popout-access.test.ts` are among them: wiring dead code into `PreloadApi`
+  or into `assertTrustedClipboardTextSender` is a live behaviour change for a dead feature.
+
+`AgentKanbanBoard.tsx` stays a `manual` resolution — 14 code hunks of fork behaviour (click follows
+`cardClickAction`, 1-arg ack, no pop-out relays) that neither `keep-ours` nor `take-theirs` resolves
+honestly.
+
+One carry-over still applies on the next sync: upstream's `chatNames` change (`3aec926fe5`) lands in
+`useLiveDashboardSnapshot.ts`, so keep `chatNames: getStructuredChatTabNames()` in that resolution.
 
 ### 5.5 TUI config overlay
 
