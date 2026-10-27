@@ -1586,7 +1586,10 @@ it back on — which is what a fork wants, and why this is documented here inste
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
-- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. This is the backstop the
+- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. Its last passing run is
+  2026-10-08, from before it was disabled in the fleet sweep and re-enabled on 10-24; the first
+  scheduled run after that (10-26) wedged, which is why the absence below starts at 10-08 rather than
+  at 10-24. This is the backstop the
   PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
   `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
   as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
@@ -1600,7 +1603,59 @@ it back on — which is what a fork wants, and why this is documented here inste
 so it runs only when `ci-cache-warmup.yml` does — and that one is disabled.
 
 Everything else is `disabled_manually`. As of 2026-10-19 that includes `pr.yml`, `unit-tests.yml`,
-`e2e.yml`, `mobile.yml`, `fork-main-gates.yml` and `fork-main-tests.yml`.
+`e2e.yml`, `mobile.yml` and `fork-main-gates.yml`. `fork-main-tests.yml` is the exception above: it is
+live, and the section below is why its being live was not the same as its running.
+
+#### `local(ci)`: the nightly could queue forever and say nothing
+
+`fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
+failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
+`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and four of its five test shards **failed**
+(shard 4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
+`cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
+was absence.
+
+So `nplez1/main` was **red on four of five shards** on 2026-10-26 (run `40308443374`), and that is still
+true: nothing in this change fixes those tests, it only stops the failures from being invisible. Per
+`AGENTS.md`, a red nightly needs an owner — the first session after a red run either fixes it or files
+it before starting anything else. The shards were red on Linux runners, so this is also the first
+measurement of the Linux red set the local macOS allowlist (`local/unit-known-red.json`) does not cover.
+
+Three changes:
+
+- **`run_relay_integration: false`.** `unit-tests.yml` takes that input; the fork ships no cloud relay,
+  so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
+  files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
+  this caller never enabled it (its default is `false`).
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Under `false` a run
+  that never finishes holds the slot until a human cancels it; the 10-26 run held it for 17.5 h.
+  Superseding is safe because a shard takes minutes and the next schedule is a day away. The ref in
+  the group name keeps a `workflow_dispatch` on some feature branch from cancelling the release line's
+  nightly.
+
+**What none of that fixes, and the checker exists for:** the cancelled run did not block 10-27 — it was
+cancelled at 04:02Z, ~50 min before that day's 04:53 cron — and **no scheduled run fired on 10-25, the
+first night after the 10-24 re-enable, nor on 10-27**, with the slot free both times. `cancel-in-progress`
+does nothing about a schedule that does not fire; only the check does. (The wider gap back to 10-08 is
+the workflow being disabled in the fleet sweep, which is a different cause and a known one.)
+
+`node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
+run, 1 when the newest scheduled run is stale (past two schedule slots), **wedged** (not `completed` for
+more than four hours from its own `startedAt` — the exact failure above), or **red**, and 2 when it
+cannot tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly.
+
+It reads two clocks, because a run that was **cancelled on purpose** is not a red night and must not
+hide the last verdict: one clock asks whether the schedule fires at all (a `workflow_dispatch` does not
+prove the cron fires, so it does not count), the other asks when a completed run last produced a
+verdict. An in-flight run is a note on that verdict, never a substitute for it — otherwise a re-run
+dispatched after a red night would report green for hours.
+
+**A cancelled run's shards still get a vote.** This check's own first version read the run-level
+conclusion only, so run `40308443374` — `cancelled`, with four failed shards — read as "no verdict".
+Had the night before been green it would have reported **PASS** on a night that went red, which is the
+same failure it exists to catch, one level down. It now reads the jobs of completed verdict-less runs
+(up to five, and only runs newer than the newest run with a verdict of its own) and takes a red verdict
+from them: a cancel can hide four red shards, but only from a checker that does not look.
 
 **The cost of the sweep, stated plainly:** with `pr.yml` off there is **no required `verify` aggregate
 on a fork PR**. A PR can show a couple of unrelated lanes or nothing at all and still read as
