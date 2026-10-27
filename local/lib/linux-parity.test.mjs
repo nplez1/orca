@@ -163,13 +163,33 @@ test('across node-version shards: any failure wins over a pass elsewhere', () =>
 })
 
 test('a file-level entry (* ) follows the file status, not any single case', () => {
-  const passed = indexFor([report([fileResult('src/main/thing.test.ts')])])
+  const passed = indexFor([
+    report([
+      fileResult('src/main/thing.test.ts', {
+        assertions: [assertion('one case', 'passed')]
+      })
+    ])
+  ])
   const failed = indexFor([
     report([fileResult('src/main/thing.test.ts', { status: 'failed', message: 'collect error' })])
   ])
   const entry = { ...ENTRY, test: null, key: 'src/main/thing.test.ts › *' }
   assert.equal(judgeParityEntry(entry, passed).status, 'passed')
   assert.equal(judgeParityEntry(entry, failed).status, 'failed')
+})
+
+test('a file-level entry does not pass on a file whose every test was skipped', () => {
+  // Why: Vitest reports an all-skipped file as `passed`, so the file status alone is not evidence that
+  // anything ran on Linux.
+  const skipped = indexFor([
+    report([
+      fileResult('src/main/thing.test.ts', {
+        assertions: [assertion('one case', 'skipped'), assertion('another', 'pending')]
+      })
+    ])
+  ])
+  const entry = { ...ENTRY, test: null, key: 'src/main/thing.test.ts › *' }
+  assert.equal(judgeParityEntry(entry, skipped).status, 'absent')
 })
 
 test('suffix matching is /-bounded: ba/x.test.ts never satisfies a/x.test.ts', () => {

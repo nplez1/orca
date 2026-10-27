@@ -314,7 +314,9 @@ function attachExpectedDeletions(files, manifest) {
 /**
  * The manifest answers "who deleted this, and was that the answer?" for a modify/delete conflict.
  * Checked against HEAD on read, because a manifest that still calls a restored file deleted would talk a
- * resolver into deleting it again.
+ * resolver into deleting it again — the stale paths are named in the note, and the note now reaches the
+ * text report as well as `--json`, so a human sees them without asking for JSON. The note does not stop
+ * `--apply`: a stale entry is a manifest to fix, not a resolution to trust.
  */
 function loadExpectedDeletions() {
   let text
@@ -508,6 +510,11 @@ function main() {
     attachLedger(result.files, ledger)
     const manifest = loadExpectedDeletions()
     attachExpectedDeletions(result.files, manifest)
+    // Why in result.notes and not only in the JSON payload: headRows renders result.notes, so a stale
+    // manifest went unreported in the text and --summary reports — the two a human actually reads.
+    if (manifest.note) {
+      result.notes.push(`deletion manifest: ${manifest.note}`)
+    }
     const pending = pendingDeletionPaths(
       manifest.entries,
       result.files.map((file) => file.path)

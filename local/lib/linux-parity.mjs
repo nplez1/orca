@@ -106,7 +106,6 @@ export function judgeParityEntry(entry, index) {
   }
 
   if (entry.test === null) {
-    const statuses = paths.map((path) => index.files.get(path).status)
     const failedFile = paths.find((path) => index.files.get(path).status === FAILED)
     if (failedFile) {
       return {
@@ -118,7 +117,14 @@ export function judgeParityEntry(entry, index) {
         detail: `${failedFile}: ${index.files.get(failedFile).message || 'the file failed at suite level'}`
       }
     }
-    if (statuses.some((status) => status === PASSED)) {
+    // Why a passed assertion is required rather than the file status: Vitest reports a file whose
+    // every test was skipped as `passed`, so the status alone would let a whole-file entry pass parity
+    // on Linux having run nothing. No entry uses the whole-file form today; this keeps the invariant
+    // true when one does.
+    const passedAssertion = paths.some((path) =>
+      index.files.get(path).assertions.some((assertion) => assertion.status === PASSED)
+    )
+    if (passedAssertion) {
       return {
         key: entry.key,
         file: entry.file,

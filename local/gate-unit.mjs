@@ -184,8 +184,12 @@ export function branchDiff(runGit = git) {
   }
   // Why the first parent and not HEAD^2: everything a merge adds to the release line is
   // `HEAD^1..HEAD`, so nothing that merge could have broken falls outside the diff.
+  // Why a single-parent HEAD is included: every PR into `nplez1/main` squashes, so a landed change is
+  // a one-parent commit whose diff against `nplez1/main` is empty — it IS that line. Excluding it left
+  // the answer `null`, and `null` means "in the diff", so a load flake on the release line could never
+  // be excused and the gate would fail on code that commit did not touch.
   const parents = (runGit(['rev-list', '--parents', '-n', '1', 'HEAD']) ?? '').split(' ')
-  if (parents.length > 2) {
+  if (parents.length >= 2 && parents[1]) {
     const files = changedSince(runGit, parents[1])
     if (files.size > 0) {
       return { base: parents[1], files }
@@ -361,9 +365,9 @@ function closeSyncSafe(fd) {
  * of N serial ones; each file still runs in its own worker, and the report is filtered by exact
  * path, so the per-file attribution of a serial re-run is unchanged.
  *
- * Why per test rather than per file: the file's own allowlisted reds still fail when it runs alone,
- * so "the file exited non-zero" cannot tell a load flake from a real break once entries are named.
- * A missing report is not evidence of anything, so it reads as "every failure reproduced".
+ * Why per test rather than per file: the file's own allowlisted reds still fail when it re-runs with
+ * its siblings, so "the file exited non-zero" cannot tell a load flake from a real break once entries
+ * are named. A missing report is not evidence of anything, so it reads as "every failure reproduced".
  */
 function rerunIsolation(files, dir, timeoutMs) {
   if (files.length === 0) {
@@ -585,7 +589,7 @@ function evaluate(options, { reportPath, logPath, dir }) {
   // A failure outside the allowlist gets an isolated re-run, all such files in one batched
   // invocation. A failure that does not come back is a load-order flake — a different claim from
   // "this change broke it" — so it is waived unless the file is in the diff. Judged per test: the
-  // file's allowlisted reds still fail when it runs alone.
+  // file's allowlisted reds still fail when it re-runs with its siblings.
   const diff = branchDiff()
   const flaky = []
   const blocking = []

@@ -12,7 +12,6 @@ The process they belong to is [UPSTREAM-SYNC-RUNBOOK.md](../../UPSTREAM-SYNC-RUN
 | `conflicts.mjs`         | stopped in a conflict, or to predict one                | no                                                                                       |
 | `post-sync.mjs`         | the tree is resolved and you are about to push          | the catalog check rewrites the derived catalog (that rewriting _is_ the check)           |
 | `identity-sweep.mjs`    | any time the tree is not conflicted                     | only with `--fix`                                                                        |
-| `curate.mjs`            | you want a plan for collapsing `docs(fork)` bookkeeping | `--write-manifest` writes `local/sync/patch-series.json`; never builds a branch          |
 | `convergence-ledger.md` | every time a convergence question comes up              | edit it when you settle one                                                              |
 
 **Neither sync script is read-only.** `pre-sync.mjs` and `post-sync.mjs` both run

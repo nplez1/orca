@@ -400,4 +400,29 @@ describe('the diff that judges a flaky pass', () => {
     })
     expect(branchDiff(run)).toBeNull()
   })
+
+  it('judges a squashed land on the release line by its own single parent', () => {
+    // Every PR into nplez1/main squashes, so a landed change is a one-parent commit that IS the line:
+    // its diff against nplez1/main is empty. Reading that as `unknown` means "in the diff", which
+    // refuses every flake on code the commit never touched.
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first',
+      'diff --name-only --no-renames first HEAD': 'src/c.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'first', files: new Set(['src/c.ts']) })
+  })
+
+  it('still answers unknown when a single-parent HEAD changed nothing itself', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first',
+      'diff --name-only --no-renames first HEAD': ''
+    })
+    expect(branchDiff(run)).toBeNull()
+  })
 })

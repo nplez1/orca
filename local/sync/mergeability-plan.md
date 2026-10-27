@@ -26,7 +26,7 @@ dropped item.
 | Nightly backstop (§ 4.1)                  | `run_relay_integration: false` in `fork-main-tests.yml`                                                                                                                 | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                                                                                                                 |
 | Nightly liveness (§ 4.1)                  | `local/check-nightly-liveness.mjs`                                                                                                                                      | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass. A **cancelled run is not a verdict** — the first version read the author's own cancel as a red night _and_ hid the last green, so it now keeps a schedule clock and a verdict clock separately |
 | Flake waiver (§ 4.2)                      | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives                                                                              | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                                                                                                               |
-| Known-red detail (§ 4.5)                  | per-entry `match` regex; 22 of 31 pinned                                                                                                                                | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                                                                                                                    |
+| Known-red detail (§ 4.5)                  | per-entry `match` regex; 9 of 17 pinned (the count moves as entries are pruned)                                                                                                                                | An entry matched on file and title alone, so a test failing for a new reason stayed "known"                                                                                                                                                                                    |
 | `check:changed` base (§ 4.4)              | `origin/HEAD` first                                                                                                                                                     | `origin/main` on this fork is **upstream's mirror**, so the gate diffed 2,846 files                                                                                                                                                                                            |
 | Comment policy (§ 4.6)                    | policy in `LOCAL-PATCHES.md` + 6 pure annotations removed                                                                                                               | Of 18 files whose whole diff was comments, 12 were the fork **rewording upstream's** comments to match fork reality. Reverting them makes the comments false                                                                                                                   |
 | Ledger `Resolution:` (§ 4.7)              | verb per section, printed by the resolver; Identity `Paths` 227 → 33 matches                                                                                            | A whole-file verb is not a hunk-level decision: Identity is `manual`, and auto-applying `keep-ours` there would revert upstream wholesale                                                                                                                                      |
@@ -64,19 +64,25 @@ dropped item.
   `assertTrustedClipboardTextSender`. Recorded as three ledger entries — `delete`, `take-theirs`,
   `manual` — because one verb cannot be honest for a renderer deletion, an inert upstream file and a
   14-hunk behaviour diff.
-- **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone. **6 of 37 measured
+- **§ 5.2 restore the evicted blocks** — **the cap is enforced again as of 2026-10-27**, with eight
+  upstream files exempted instead of restructured (see `LOCAL-PATCHES.md` § `local(lint)`), so the splits
+  can still be undone and the budget is no longer a reason to avoid it. **6 of 37 measured
   splits are undone** (`f77d72467c`): each was upstream's code with nothing of the fork's in it. The
   other 31 stay, with the measurement recorded — the block carries fork code, was rewritten rather than
   moved, or upstream has since changed it. Four more are byte-identical to the merge base and differ
   only by comments upstream has since rewritten, so restoring them would reintroduce stale text.
-- **§ 5.1 i18n overlay, § 5.5 TUI overlay, § 5.8 identity overlay — done 2026-10-27.** § 5.6 is done
-  except the hook-listener decorator, which was attempted and does not fit without copying upstream's
-  steps. § 5.3 (usage providers as data) and § 5.7 (pi fence) are untouched.
-- **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and three fixes are upstream-worthy
-  (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions).
-- **Nightly proof** — PR #186 carries the unblock. It cannot prove itself until it merges and the
-  schedule next runs, or until someone dispatches it against the branch (~50 billed minutes, which is
-  a spend decision, not a technical one).
+- **§ 5.1 i18n overlay, § 5.5 TUI overlay, § 5.6 seams, § 5.8 identity overlay — done 2026-10-27.**
+  § 5.6 is done except the hook-listener decorator, which was attempted and does not fit without copying
+  upstream's steps. **§ 5.3 (usage providers as data) and § 5.7 (pi fence) are done** — the renderer
+  mapping replaced five `if`-arms, the main-process halves ride upstream's sibling lane, and the fork's
+  204-line session-owner module is gone after its own suite passed 22/22 against upstream's 54-line rule.
+- **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and four fixes are upstream-worthy
+  (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions, and a bare
+  `vitest` over the whole suite missing `ORCA_BACKGROUND_LAUNCH=1`).
+- **Nightly proof** — PR #186 merged on 2026-10-27, so `main` carries the unblock; a dispatch against the
+  branch measured the red set as three files, all commits missing from `main` rather than platform
+  differences, so the nightly should go green once this branch lands. Confirming that is one scheduled
+  run, or one dispatch (~50 billed minutes, a spend decision).
 
 ### Baselines that moved
 
@@ -419,7 +425,7 @@ upstreaming rather than undoing: `DiffCommentCard` → `useCommentCardResize` (e
 
 **Addendum 2026-10-27 — the budget is no longer a reason to evict.** The cap is enforced again, and the
 rule for an over-budget file is ownership, not size: a fork-owned file is split, and an upstream-owned
-file gets a two-line `oxlint-disable max-lines -- Why:` plus a baseline row rather than being
+file gets a two-line `eslint-disable max-lines -- Why:` plus a baseline row rather than being
 restructured. So "move the fork's lines out" above is a _seam_ decision (fewer conflicts, one hunk fewer
 in an upstream file), never a budget decision — a fork addition that fits nowhere goes in a directive and
 a baseline row, and the cap stops being a reason to touch upstream's code at all. The full rule, with the

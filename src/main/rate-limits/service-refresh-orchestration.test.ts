@@ -739,4 +739,18 @@ describe('disabled usage providers', () => {
 
     expect(readGrokAuthSession).not.toHaveBeenCalled()
   })
+
+  it('never reaches OpenCode\u2019s own credential store when OpenCode Go is switched off', async () => {
+    // Why this case exists: an empty settings key makes this fetcher resolve OpenCode's environment and
+    // credential database itself, so a resolver-only gate still read a credential and could send a
+    // request. The result being nulled afterwards was too late.
+    const service = new RateLimitService({
+      isUsageProviderDisabled: (providerId) => providerId === 'opencode-go'
+    })
+
+    await service.refresh()
+
+    expect(fetchOpenCodeGoUsage).not.toHaveBeenCalled()
+    expect(service.getState().opencodeGo).toBeNull()
+  })
 })

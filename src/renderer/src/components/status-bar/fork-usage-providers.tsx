@@ -110,7 +110,7 @@ type ForkUsageProviderEntry = {
   label: string
   badgeLetter: string
   Icon: (props: { size?: number }) => React.JSX.Element
-  settingsFlag: keyof ForkUsageProviderSettings
+  settingsFlag: Exclude<keyof ForkUsageProviderSettings, 'disabledUsageProviders'>
   pendingReadout: Partial<ProviderRateLimits>
   hasData: (provider: ProviderRateLimits) => boolean
 }

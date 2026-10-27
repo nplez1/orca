@@ -1,6 +1,8 @@
 # Files/globs currently allowed to exceed the oxlint `max-lines` budget.
 # This is a RATCHET: the list may only SHRINK. Do NOT add entries to get CI green —
-# split the oversized file instead.
+# split the oversized file instead. The one exception, decided 2026-10-27: a file UPSTREAM owns is
+# exempted rather than split, because splitting it costs a permanent hunk on every sync. Fork-owned
+# files are never exempted. Rule and probe recipe: LOCAL-PATCHES.md § local(lint).
 # Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
 inline src/main/ipc/worktree-remote.ts
 inline src/main/ssh/ssh-channel-multiplexer.ts

@@ -56,6 +56,11 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
     const openCodeGoConfig = this.resolveOpenCodeGoConfig()
+    // Why a call-site gate for this one provider: the other disabled providers are gated inside their
+    // resolvers, but this fetcher treats an empty settings key as "look elsewhere" and resolves OpenCode's
+    // own credential store and environment, then can make the request. UpdateState nulling the result
+    // afterwards is too late — the read already happened.
+    const openCodeGoDisabled = this.isUsageProviderDisabled('opencode-go')
     const cookie = openCodeGoConfig.sessionCookie
     const workspaceIdOverride = openCodeGoConfig.workspaceIdOverride
     const openCodeGoApiKey = openCodeGoConfig.apiKey
@@ -193,26 +198,28 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
               signal
             })),
         fetchGeminiRateLimits(geminiCliOAuthEnabled),
-        fetchOpenCodeGoUsage({
-          settingsApiKey: openCodeGoApiKey,
-          // Why here: the key can also come from the environment or OpenCode's
-          // own store, so presence is only known once the fetch resolves it.
-          onApiKeyResolved: (resolution) => {
-            // Why: a credential change mid-fetch bumps the generation; its stale presence must not win.
-            if (opencodeGeneration !== this.opencodeFetchGeneration) {
-              return
-            }
-            // An undecryptable or briefly unreadable saved key still counts, so the bar stays up.
-            this.openCodeGoApiKeyConfigured =
-              resolution.status === 'found' ||
-              openCodeGoApiKeyError !== null ||
-              openCodeGoApiKeyReadSkipped
-          },
-          cookie,
-          workspaceIdOverride: workspaceIdOverride || undefined,
-          networkProxySettings: this.networkProxySettingsResolver?.(),
-          signal
-        }),
+        openCodeGoDisabled
+          ? Promise.resolve(this.disabledUsageProviderSnapshot('opencode-go'))
+          : fetchOpenCodeGoUsage({
+              settingsApiKey: openCodeGoApiKey,
+              // Why here: the key can also come from the environment or OpenCode's
+              // own store, so presence is only known once the fetch resolves it.
+              onApiKeyResolved: (resolution) => {
+                // Why: a credential change mid-fetch bumps the generation; its stale presence must not win.
+                if (opencodeGeneration !== this.opencodeFetchGeneration) {
+                  return
+                }
+                // An undecryptable or briefly unreadable saved key still counts, so the bar stays up.
+                this.openCodeGoApiKeyConfigured =
+                  resolution.status === 'found' ||
+                  openCodeGoApiKeyError !== null ||
+                  openCodeGoApiKeyReadSkipped
+              },
+              cookie,
+              workspaceIdOverride: workspaceIdOverride || undefined,
+              networkProxySettings: this.networkProxySettingsResolver?.(),
+              signal
+            }),
         this.fetchKimiWithResolvedHome(),
         miniMaxConfigResult.error
           ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))

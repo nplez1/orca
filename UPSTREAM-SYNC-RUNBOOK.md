@@ -73,7 +73,6 @@ node local/sync/conflicts.mjs [--summary|--json|--verify]
 node local/sync/conflicts.mjs --merge-tree <base> <other>      # dry run, no working tree touched
 node local/sync/post-sync.mjs [--json] [--skip-typecheck]
 node local/sync/identity-sweep.mjs [--json|--fix]
-node local/sync/curate.mjs --plan | --write-manifest                # plan a curated patch series; never builds a branch
 ```
 
 `local/sync/convergence-ledger.md` is not a script: it is the durable record of _which side wins_

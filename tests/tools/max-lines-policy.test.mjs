@@ -32,6 +32,17 @@ function refExists(ref) {
   }
 }
 
+// The upstream mirror is `origin/main` here; `origin/HEAD` is the fallback for a clone that renamed it.
+// Tried in order rather than assuming one, because a silent skip is how a policy check stops checking.
+function resolveUpstreamRef() {
+  for (const ref of [UPSTREAM_REF, 'origin/HEAD']) {
+    if (refExists(ref)) {
+      return ref
+    }
+  }
+  return null
+}
+
 function existsAtRef(path, ref) {
   try {
     execFileSync('git', ['cat-file', '-e', `${ref}:${path}`], { stdio: 'ignore' })
@@ -42,7 +53,7 @@ function existsAtRef(path, ref) {
 }
 
 const entries = parseBaseline(readFileSync(BASELINE, 'utf8'))
-const upstreamRefPresent = refExists(UPSTREAM_REF)
+const upstreamRef = resolveUpstreamRef()
 
 describe('max-lines baseline', () => {
   it('parses every row into a known kind and a path', () => {
@@ -63,10 +74,10 @@ describe('max-lines baseline', () => {
     }
   })
 
-  it.skipIf(!upstreamRefPresent)(
-    `exempts only upstream-owned files (${UPSTREAM_REF} is the sync base)`,
+  it.skipIf(upstreamRef === null)(
+    'exempts only upstream-owned files (the sync base is the upstream mirror)',
     () => {
-      const forkOwned = entries.filter((entry) => !existsAtRef(entry.path, UPSTREAM_REF))
+      const forkOwned = entries.filter((entry) => !existsAtRef(entry.path, upstreamRef))
       expect(
         forkOwned.map((entry) => entry.path),
         'a fork-owned file over the max-lines budget must be split, not exempted: it has no upstream ' +

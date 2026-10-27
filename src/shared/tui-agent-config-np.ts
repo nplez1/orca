@@ -3,8 +3,9 @@ import { getRelayCliCommandNameForPlatform } from './orca-cli-command-name'
 import type { TuiAgentConfigSource } from './tui-agent-config-types'
 
 // Why: Orca NP's own entries over upstream's table, so upstream table edits still merge in place.
-// `satisfies` rather than an annotation: it keeps the literal key type, so the merge below indexes
-// `Record<TuiAgent, …>` without a cast.
+// `satisfies` rather than an annotation: the literal values must satisfy the config source type without
+// widening it. The key type does not survive `Object.entries` below — that widens to `string`, which only
+// compiles because this project's tsconfig leaves `noImplicitAny` off.
 const FORK_TUI_AGENT_OVERRIDES = {
   'claude-agent-teams': {
     detectCmd: 'orca-np',

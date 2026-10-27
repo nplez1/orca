@@ -1187,7 +1187,7 @@ avoid an exemption list.
 The exemption list turned out to be short. With upstream's rule restored, **nine files** exceeded
 budget: eight upstream-owned, over by 1, 3, 3, 9, 20, 23, 31 and 34 lines, and the fork's own
 `local/sync/conflicts.mjs` at 682. The fork's file was split (`local/sync/lib/conflict-report.mjs`,
-leaving 568); the eight upstream files each carry one `oxlint-disable max-lines -- Why:` line naming
+leaving 568); the eight upstream files each carry one `eslint-disable max-lines -- Why:` line naming
 what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an _upstream_ file to
 fit the budget would be the eviction this section exists to stop — a permanent hunk on every sync.
 
@@ -1259,10 +1259,11 @@ Three fixes with one cause: a signal that was **absent** was read as a signal th
   flaky re-run passed" — was judged the old way, immediately after a 556-commit merge.
 - `local/unit-known-red.json` entries carry an optional `match` regex, tested against the first line
   of the failure. Without it an entry matched on file and title alone, so an allowlisted test that
-  started failing for a **new** reason stayed "known" for as long as its title did. 27 of 40 are
-  pinned, each to a signature the failure text actually carried in the `8da9849c43` run; the other 13
+  started failing for a **new** reason stayed "known" for as long as its title did. 9 of the current 17
+  are pinned, each to a signature the failure text actually carried in the `8da9849c43` run; the rest
   keep matching on title alone because their text is a generic deep-equality diff, and guessing a
-  signature there would turn a known red into an unexpected one.
+  signature there would turn a known red into an unexpected one. (Counts move as entries are pruned; the
+  file is the number, not this line.)
 - `config/scripts/check-changed.mjs` resolved its base as `origin/main`, which on this fork is
   **upstream's mirror** — so the pre-handoff gate diffed the fork's whole 2,846-file delta instead of
   the branch's own. `origin/HEAD` now comes first, as it already does in the sibling
