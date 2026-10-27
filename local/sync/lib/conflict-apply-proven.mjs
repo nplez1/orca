@@ -7,10 +7,19 @@ import { proveFile, sha256 } from './conflict-prove.mjs'
 
 const quote = (file) => (/^[\w./@+-]+$/.test(file) ? file : `'${file.replace(/'/g, "'\\''")}'`)
 
-export function planApplyProven(decision, readText) {
+/**
+ * @param {{ readText: (path: string) => string | null, unmerged: Set<string>, isSymlink: (path: string) => boolean }} worktree
+ *   `unmerged` is `git diff --name-only --diff-filter=U`: a decision may only write a path git still calls conflicted.
+ */
+export function planApplyProven(decision, { readText, unmerged, isSymlink }) {
   if (decision?.mode !== 'live' || !Array.isArray(decision.files)) {
     throw new Error(
       'the decision file must be `conflicts.mjs --propose --json` output from a live conflict (not --merge-tree)'
+    )
+  }
+  if (!(unmerged instanceof Set)) {
+    throw new Error(
+      'the unmerged path set is required, so a decision cannot name an arbitrary path'
     )
   }
   const plan = { writes: [], removals: [], unproven: [], refused: [] }
@@ -19,7 +28,7 @@ export function planApplyProven(decision, readText) {
       plan.removals.push({
         path: file.path,
         provenance: file.proposal.provenance,
-        command: `git rm -f -- ${quote(file.path)}`
+        command: `git rm -- ${quote(file.path)}`
       })
       continue
     }
@@ -32,6 +41,14 @@ export function planApplyProven(decision, readText) {
         reasons: [...new Set((proof?.hunks ?? []).map((hunk) => hunk.reason).filter(Boolean))],
         ledger: file.proposal ? `${file.proposal.action} (${file.proposal.provenance})` : null
       })
+      continue
+    }
+    if (!unmerged.has(file.path)) {
+      plan.refused.push({ path: file.path, reason: 'git does not list it as unmerged' })
+      continue
+    }
+    if (isSymlink(file.path)) {
+      plan.refused.push({ path: file.path, reason: 'it is a symlink; writing would follow it' })
       continue
     }
     const current = readText(file.path)

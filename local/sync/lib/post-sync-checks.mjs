@@ -488,7 +488,8 @@ function readExpectedDeletions() {
   const { entries, note } = parseExpectedDeletions(text)
   const acknowledged = {}
   for (const entry of entries) {
-    if (entry.status !== 'restore') {
+    // `pending-decision` means nobody has judged it yet, so it acknowledges nothing.
+    if (entry.status === 'expected-deletion') {
       acknowledged[entry.path] = { reason: entry.reason }
     }
   }

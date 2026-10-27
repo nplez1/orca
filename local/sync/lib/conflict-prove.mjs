@@ -7,6 +7,7 @@
 //   identity-only       ours differs from base only by fork identity literals     -> theirs, with
 //                       the same literals re-applied token-for-token; re-run the identity sweep
 //   import-only         every side is import declarations only                    -> three-way union
+// A token or comment crossing a hunk edge on any side refuses the hunk: its meaning lives outside it.
 // Everything else is unproven, and a file is written only when every hunk in it is proven.
 import { createHash } from 'node:crypto'
 import { parseConflictHunks } from './conflict-classify.mjs'
@@ -63,13 +64,20 @@ export function reconstruct(merged, hunks, side) {
   return { text: out.join('\n'), ranges }
 }
 
+// `getStart` skips a JSX text's leading whitespace, which renders when it sits on one line.
+const tokenStart = (node, sf) =>
+  node.kind === ts.SyntaxKind.JsxText ? node.pos : node.getStart(sf)
+
 function normalizedLeaf(node, sf) {
-  const text = node.getText(sf)
+  const text = sf.text.slice(tokenStart(node, sf), node.getEnd())
   if (node.kind === ts.SyntaxKind.JsxText) {
-    // JSX drops whitespace runs that contain a newline, so re-indented text is the same text.
-    return text
-      .split('\n')
-      .map((line) => line.trim())
+    // JSX drops only whitespace runs that contain a newline; a space on a single line renders.
+    const lines = text.split(/\r\n|\r|\n/)
+    return lines
+      .map((line, row) => {
+        const head = row === 0 ? line : line.replace(/^[ \t]+/, '')
+        return row === lines.length - 1 ? head : head.replace(/[ \t]+$/, '')
+      })
       .filter(Boolean)
       .join(' ')
   }
@@ -96,7 +104,7 @@ export function regionNodes(sf, [start, end]) {
     if (isJsDoc(node) || node.kind === ts.SyntaxKind.EndOfFileToken) {
       return
     }
-    const nodeStart = node.getStart(sf)
+    const nodeStart = tokenStart(node, sf)
     const nodeEnd = node.getEnd()
     if (nodeEnd <= start || nodeStart >= end || nodeStart === nodeEnd) {
       return
@@ -118,6 +126,38 @@ export function regionNodes(sf, [start, end]) {
   return { entries, roots, straddles }
 }
 
+/** Every comment's [pos, end), read from the trivia before each token so JSX text never counts as one. */
+export function commentRanges(sf) {
+  const ranges = new Map()
+  const visit = (node) => {
+    if (isJsDoc(node)) {
+      return
+    }
+    const children = node.getChildren(sf)
+    if (children.length === 0 && node.kind !== ts.SyntaxKind.JsxText) {
+      for (const range of ts.getLeadingCommentRanges(sf.text, node.pos) ?? []) {
+        ranges.set(range.pos, range.end)
+      }
+    }
+    children.forEach(visit)
+  }
+  visit(sf)
+  return [...ranges]
+}
+
+/** `crosses` when a comment runs over one edge of [start, end), `enclosed` when one spans both. */
+function commentEdge(comments, [start, end]) {
+  let enclosed = false
+  for (const [from, to] of comments) {
+    if (from < start && to > end) {
+      enclosed = true
+    } else if ((from < start && to > start) || (from < end && to > end)) {
+      return 'crosses'
+    }
+  }
+  return enclosed ? 'enclosed' : 'clear'
+}
+
 const signature = (entries, sf) =>
   entries
     .map((entry) =>
@@ -130,6 +170,7 @@ function identityMap(base, ours) {
     return null
   }
   const map = new Map()
+  const kept = new Set()
   for (let index = 0; index < base.entries.length; index += 1) {
     const b = base.entries[index]
     const o = ours.entries[index]
@@ -142,6 +183,7 @@ function identityMap(base, ours) {
     const baseText = b.node.getText(base.sf)
     const oursText = o.node.getText(ours.sf)
     if (baseText === oursText) {
+      kept.add(baseText)
       continue
     }
     if (upstreamIdentity(oursText) !== baseText || (map.get(baseText) ?? oursText) !== oursText) {
@@ -149,23 +191,28 @@ function identityMap(base, ours) {
     }
     map.set(baseText, oursText)
   }
-  return map.size === 0 ? null : map
+  // A literal the fork rebranded in one place and kept in another has no token-level answer.
+  if (map.size === 0 || [...map.keys()].some((text) => kept.has(text))) {
+    return null
+  }
+  return map
 }
 
-/** Theirs' region with each base literal ours rebranded swapped for ours' text; null if one has no target. */
-function reapplyIdentity(theirs, map) {
+const leafCount = (side, text) =>
+  side.entries.filter((entry) => entry.leaf && entry.node.getText(side.sf) === text).length
+
+/** Theirs' region with each base literal ours rebranded swapped for ours' text; null unless theirs has exactly base's occurrences. */
+function reapplyIdentity(theirs, base, map) {
+  if ([...map.keys()].some((text) => leafCount(theirs, text) !== leafCount(base, text))) {
+    return null
+  }
   const [start, end] = theirs.range
-  const used = new Set()
   const edits = []
   for (const entry of theirs.entries) {
     const text = entry.leaf ? entry.node.getText(theirs.sf) : null
     if (text !== null && map.has(text)) {
-      used.add(text)
       edits.push([entry.node.getStart(theirs.sf), entry.node.getEnd(), map.get(text)])
     }
-  }
-  if (used.size !== map.size) {
-    return null
   }
   let out = theirs.sf.text.slice(start, end)
   for (const [from, to, text] of edits.sort((a, b) => b[0] - a[0])) {
@@ -190,6 +237,16 @@ function importFacts(node) {
   return { module: `${typeOnly ? 'type ' : ''}${node.moduleSpecifier.text}`, names }
 }
 
+/** The side's import declarations outside its hunk region; other hunks count on either side. */
+const importsOutside = (side) =>
+  side.sf.statements
+    .filter((statement) => ts.isImportDeclaration(statement))
+    .filter(
+      (statement) =>
+        statement.getEnd() <= side.range[0] || statement.getStart(side.sf) >= side.range[1]
+    )
+    .map(importFacts)
+
 /** Three-way union of import declarations, or null when it would duplicate a module or a binding. */
 function importUnion(sides) {
   const keyed = {}
@@ -198,16 +255,34 @@ function importUnion(sides) {
     if (!side.roots.every((root) => ts.isImportDeclaration(root))) {
       return null
     }
-    keyed[name] = side.roots.map((root) => {
+    keyed[name] = side.roots.map((root, at) => {
       const entries = []
       pushSubtree(root, side.sf, entries)
       const start = Math.max(root.getFullStart(), side.range[0])
-      const text = side.sf.text.slice(start, root.getEnd()).replace(/^(?:[ \t]*\r?\n)+/, '')
+      // The last import carries the rest of the region, so a trailing comment travels with it.
+      const end = at === side.roots.length - 1 ? side.range[1] : root.getEnd()
+      const text = side.sf.text
+        .slice(start, end)
+        .replace(/^(?:[ \t]*\r?\n)+/, '')
+        .trimEnd()
       return { key: signature(entries, side.sf), text, facts: importFacts(root) }
     })
   }
   if (keyed.ours.length + keyed.theirs.length === 0) {
     return null
+  }
+  const moduleKeys = (name) => new Map(keyed[name].map((item) => [item.facts.module, item.key]))
+  const [baseModules, oursModules, theirsModules] = ['base', 'ours', 'theirs'].map(moduleKeys)
+  for (const [module, key] of baseModules) {
+    for (const [gone, kept] of [
+      [oursModules, theirsModules],
+      [theirsModules, oursModules]
+    ]) {
+      // One side dropped the import and the other changed it: a modify/delete, not a union.
+      if (!gone.has(module) && kept.has(module) && kept.get(module) !== key) {
+        return null
+      }
+    }
   }
   const keys = (name) => new Set(keyed[name].map((item) => item.key))
   const [base, ours, theirs] = [keys('base'), keys('ours'), keys('theirs')]
@@ -215,9 +290,17 @@ function importUnion(sides) {
     ...keyed.ours.filter((item) => !base.has(item.key) || theirs.has(item.key)),
     ...keyed.theirs.filter((item) => !base.has(item.key) && !ours.has(item.key))
   ]
+  const elsewhere = ['ours', 'theirs'].flatMap((name) => importsOutside(sides[name]))
+  const outsideModules = new Set(elsewhere.map((facts) => facts.module))
+  const outsideNames = new Set(elsewhere.flatMap((facts) => facts.names))
   const modules = merged.map((item) => item.facts.module)
   const names = merged.flatMap((item) => item.facts.names)
-  if (new Set(modules).size !== modules.length || new Set(names).size !== names.length) {
+  if (
+    new Set(modules).size !== modules.length ||
+    new Set(names).size !== names.length ||
+    modules.some((module) => outsideModules.has(module)) ||
+    names.some((name) => outsideNames.has(name))
+  ) {
     return null
   }
   return merged.flatMap((item) => item.text.split('\n'))
@@ -237,12 +320,21 @@ export function proveHunk(hunk, trees, index) {
     return unproven('a side does not parse as a whole file')
   }
   const sides = {}
+  const edges = new Set()
   for (const name of ['base', 'ours', 'theirs']) {
-    const { sf, ranges } = trees[name]
+    const { sf, ranges, comments } = trees[name]
     sides[name] = { sf, range: ranges[index], ...regionNodes(sf, ranges[index]) }
     if (sides[name].straddles) {
       return unproven(`the hunk edge splits a token on the ${name} side`)
     }
+    const edge = commentEdge(comments, ranges[index])
+    if (edge === 'crosses') {
+      return unproven(`a comment crosses the hunk edge on the ${name} side`)
+    }
+    edges.add(edge)
+  }
+  if (edges.size > 1) {
+    return unproven('the hunk sits inside a comment on some sides only')
   }
   const sig = (name) => signature(sides[name].entries, sides[name].sf)
   if (sig('theirs') === sig('base')) {
@@ -262,7 +354,7 @@ export function proveHunk(hunk, trees, index) {
     }
   }
   const map = identityMap(sides.base, sides.ours)
-  const rebranded = map ? reapplyIdentity(sides.theirs, map) : null
+  const rebranded = map ? reapplyIdentity(sides.theirs, sides.base, map) : null
   if (rebranded) {
     return {
       tier: 'identity-only',
@@ -307,7 +399,8 @@ export function proveFile({ path, status = null, merged = null }) {
     trees = {}
     for (const side of ['base', 'ours', 'theirs']) {
       const rebuilt = reconstruct(merged, hunks, side)
-      trees[side] = { ...parseSource(path, rebuilt.text), ranges: rebuilt.ranges }
+      const parsed = parseSource(path, rebuilt.text)
+      trees[side] = { ...parsed, ranges: rebuilt.ranges, comments: commentRanges(parsed.sf) }
     }
   }
   const proofs = hunks.map((hunk, index) => ({

@@ -87,6 +87,11 @@ fork added to a file since the old base (top-level declarations, and members of 
 interfaces, type literals, enums and object-literal constants) that the merged file no longer declares.
 A `symbols` entry in `expected-deletions.json` with status `expected-deletion` acknowledges one.
 
+It exits **1 whenever any name is relocated or lost**, so a relocation needs an acknowledgement too; the
+summary reports both. The `merged` ref must contain the pre-sync tip and the new upstream base
+(`merge-base --is-ancestor` both ways), and it fails closed otherwise — during conflict resolution `HEAD`
+is still the tip, so the default would otherwise compare the tip with itself and report clear.
+
 **`identity-sweep.mjs`** — upstream reintroduces `~/.orca`, `orca.exe` and `orca-dev` every sync.
 This reports them against a documented allowlist (the `orca://` scheme, the relay's fixed shim, the
 legacy daemon exe name) and fixes only the mechanical literal cases. Persisted-path changes are

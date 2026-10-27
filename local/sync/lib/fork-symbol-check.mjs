@@ -6,6 +6,7 @@ import path from 'node:path'
 import { parseExpectedSymbols } from './expected-deletions.mjs'
 import { forkAdded, forkSurface, manifestEntry, survivalVerdict } from './fork-symbols.mjs'
 import { blobs, upstreamMoves } from './fork-surface-git.mjs'
+import { addedLines } from './rename-forecast.mjs'
 import { BACKUP_REF, isDeletedCodeModule, pinnedUpstreamBase } from './post-sync-checks.mjs'
 import { STATUS, git, gitText, repoRoot, splitNul, tailText } from './run.mjs'
 
@@ -18,16 +19,81 @@ function readManifestSymbols() {
   }
 }
 
-/** Bare names that still occur as a whole word anywhere in the merged tree outside local/sync. */
-function referencedNames(merged, names) {
+const wholeWord = (name) =>
+  new RegExp(`(?<![A-Za-z0-9_])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_])`)
+
+function gitOrThrow(args) {
+  const result = git(args)
+  if (!result.ok && result.code !== 1) {
+    throw new Error(`git ${args[0]} exited ${result.code}: ${tailText(result.stderr, 2).join(' ')}`)
+  }
+  return result
+}
+
+/**
+ * Bare names with a whole-word hit in the merged tree (outside local/sync) on more lines of a file
+ * than the fork itself added there: the fork's own tests, comments and stale callers are not a home.
+ */
+function referencedNames({ oldBase, tip, merged, renames, names }) {
   const found = new Set()
-  // One existence probe per name: a batched `-o` prints every occurrence of a common member name.
-  for (const name of new Set(names)) {
-    const result = git(['grep', '-q', '-w', '-F', '-e', name, merged, '--', '.', ':!local/sync'])
-    if (!result.ok && result.code !== 1) {
-      throw new Error(`git grep exited ${result.code}: ${tailText(result.stderr, 2).join(' ')}`)
+  const unique = [...new Set(names)]
+  if (unique.length === 0) {
+    return found
+  }
+  const hitsByName = new Map()
+  for (const name of unique) {
+    // Counts, not lines: a common member name can occur thousands of times.
+    const result = gitOrThrow([
+      'grep',
+      '-c',
+      '-z',
+      '-w',
+      '-F',
+      '-e',
+      name,
+      merged,
+      '--',
+      '.',
+      ':!local/sync'
+    ])
+    const hits = []
+    for (const row of result.ok ? result.stdout.split('\n') : []) {
+      const [where, count] = row.split('\0')
+      if (count !== undefined) {
+        hits.push([where.slice(merged.length + 1), Number(count)])
+      }
     }
-    if (result.ok) {
+    hitsByName.set(name, hits)
+  }
+  const forkRows = addedLines(
+    gitOrThrow(['diff', '-U0', '--no-color', '--no-renames', '--diff-filter=AM', oldBase, tip])
+      .stdout
+  )
+  const tipPathOf = new Map([...renames].map(([from, to]) => [to, from]))
+  const tipPath = (file) => tipPathOf.get(file) ?? file
+  const hitFiles = new Set([...hitsByName.values()].flat().map(([file]) => tipPath(file)))
+  const texts = blobs(
+    [...hitFiles].filter((file) => forkRows.has(file)).map((file) => `${tip}:${file}`)
+  )
+  const forkLines = new Map()
+  const forkText = (file) => {
+    if (!forkLines.has(file)) {
+      const rows = (texts.get(`${tip}:${tipPath(file)}`) ?? '').split('\n')
+      const added = [...(forkRows.get(tipPath(file)) ?? [])]
+      forkLines.set(
+        file,
+        added.map((row) => rows[row - 1] ?? '')
+      )
+    }
+    return forkLines.get(file)
+  }
+  for (const [name, hits] of hitsByName) {
+    const pattern = wholeWord(name)
+    if (
+      hits.some(
+        ([file, count]) => count > forkText(file).filter((line) => pattern.test(line)).length
+      )
+    ) {
       found.add(name)
     }
   }
@@ -36,6 +102,26 @@ function referencedNames(merged, names) {
 
 /** The scan proper, given the three commits; `newBase` is only used to follow upstream renames. */
 export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
+  // During conflict resolution HEAD is still the pre-sync tip, and comparing it with itself is clear.
+  for (const [label, commit] of [
+    ['pre-sync tip', tip],
+    ['new base', newBase]
+  ]) {
+    const ancestry = git(['merge-base', '--is-ancestor', commit, merged])
+    if (!ancestry.ok) {
+      return {
+        status: STATUS.failed,
+        summary:
+          ancestry.code === 1
+            ? `${merged} does not contain the ${label} ${commit.slice(0, 10)}, so it is not the merge result`
+            : `git merge-base --is-ancestor ${commit.slice(0, 10)} ${merged} failed`,
+        details: [
+          'commit the merge first, or pass --merged <the merge commit>; this is not a pass',
+          ...tailText(ancestry.stderr, 2)
+        ]
+      }
+    }
+  }
   const listed = git([
     'diff',
     '-z',
@@ -90,14 +176,17 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
       pending.push({ file, target, added, now, gone: mergedText === null })
     }
   }
-  const referenced = referencedNames(
+  const referenced = referencedNames({
+    oldBase,
+    tip,
     merged,
-    pending.flatMap((item) =>
+    renames,
+    names: pending.flatMap((item) =>
       item.added
         .filter((symbol) => !item.now.has(symbol.name))
         .map((symbol) => symbol.name.split('.').at(-1))
     )
-  )
+  })
   const results = pending.flatMap((item) =>
     survivalVerdict({
       path: item.file.path,
@@ -108,6 +197,7 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
     }).map((result) => ({ ...result, mergedPath: item.target, fileGone: item.gone }))
   )
   const lost = results.filter((result) => result.verdict === 'lost')
+  const relocated = results.filter((result) => result.verdict === 'relocated')
   const details = [
     `old base ${oldBase.slice(0, 10)}, pre-sync tip ${tip.slice(0, 10)}, merged ${merged}`,
     `scanned ${files.length} fork-added or fork-modified code module(s) for names the merged file no longer declares`
@@ -121,7 +211,7 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
       )
     } else if (result.verdict === 'relocated') {
       details.push(
-        `  ? ${label} — gone from this file, but the name still appears elsewhere: moved?`
+        `  ? ${label} — gone from this file; the name is on a line the fork did not add: moved? review it`
       )
     } else {
       details.push(`  ! ${label} — no reference left in the merged tree`)
@@ -130,7 +220,7 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
   details.push(
     'this compares declared names, not behaviour: a branch dropped inside a surviving function is invisible to it'
   )
-  const outcome = { details, results, manifestEntries: lost.map(manifestEntry) }
+  const outcome = { details, results, manifestEntries: [...lost, ...relocated].map(manifestEntry) }
   if (scanFailures.length > 0) {
     return {
       ...outcome,
@@ -139,13 +229,14 @@ export function scanForkSymbols({ oldBase, tip, newBase, merged = 'HEAD' }) {
       details: [...scanFailures.map((line) => `  ! ${line}`), ...details]
     }
   }
+  const unreviewed = lost.length + relocated.length
   return {
     ...outcome,
-    status: lost.length === 0 ? STATUS.passed : STATUS.failed,
+    status: unreviewed === 0 ? STATUS.passed : STATUS.failed,
     summary:
-      lost.length === 0
-        ? `clear scan: no unreviewed lost name among ${files.length} fork-touched module(s)`
-        : `${lost.length} fork-added name(s) the merged tree no longer declares or references`
+      unreviewed === 0
+        ? `clear scan: no unreviewed lost or relocated name among ${files.length} fork-touched module(s)`
+        : `${lost.length} fork-added name(s) the merged tree no longer declares or references; ${relocated.length} relocated name(s) to review`
   }
 }
 

@@ -17,10 +17,11 @@ usage
   node local/sync/fork-symbols.mjs --old-base <ref> --tip <ref> --new-base <ref> [--merged <ref>] [--json]
 
 A name is a top-level declaration, or a member of a top-level class, interface, type literal, enum or
-object-literal constant. Each lost name is \`lost\` (fails), \`relocated\` (the bare name still appears
-elsewhere in the merged tree; review it) or \`acknowledged\` by a \`symbols\` entry with status
+object-literal constant. Each lost name is \`lost\` (fails), \`relocated\` (fails: the bare name is still on
+a merged line the fork did not add; review it) or \`acknowledged\` by a \`symbols\` entry with status
 expected-deletion in local/sync/expected-deletions.json. --json prints \`manifestEntries\` ready to paste
-there once a reviewer has judged them; they are written as pending-decision, which silences nothing.`
+there once a reviewer has judged them; they are written as pending-decision, which silences nothing.
+--merged must contain both the tip and the new base: mid-conflict HEAD is still the tip, and fails.`
 
 function parseArgs(argv) {
   const options = { json: false, merged: 'HEAD' }

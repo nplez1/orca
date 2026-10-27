@@ -119,7 +119,7 @@ export function forkAdded(before, after) {
 
 /**
  * Per lost name: `acknowledged` (a settled manifest entry), `relocated` (its bare name still appears
- * somewhere in the merged tree, so it may have moved) or `lost` (nothing names it any more).
+ * on a merged line the fork did not add, so it may have moved; still unreviewed) or `lost`.
  * A manifest entry with status `restore` never acknowledges: it says the name must come back.
  */
 export function survivalVerdict({ path, added, merged, referenced, acknowledgements }) {

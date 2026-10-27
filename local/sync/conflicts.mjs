@@ -14,7 +14,7 @@
 //   node local/sync/conflicts.mjs --help
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import {
@@ -386,7 +386,17 @@ function applyProposals(proposals) {
 }
 
 function runApplyProven(decisionPath) {
-  const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), worktreeText)
+  const plan = planApplyProven(JSON.parse(readFileSync(decisionPath, 'utf8')), {
+    readText: worktreeText,
+    unmerged: new Set(unmergedPaths()),
+    isSymlink: (path) => {
+      try {
+        return lstatSync(path).isSymbolicLink()
+      } catch {
+        return false
+      }
+    }
+  })
   const written = []
   for (const write of plan.writes) {
     try {
