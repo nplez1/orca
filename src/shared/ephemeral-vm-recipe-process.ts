@@ -155,6 +155,10 @@ export async function runRecipeCommand(args: {
       args.signal?.addEventListener('abort', abort, { once: true })
     }
 
+    // A shell that exits without reading stdin makes this write fail EPIPE, and an unobserved error on
+    // that stream is an uncaught exception which takes down the host. The exit code reports the outcome.
+    child.stdin.on('error', () => {})
+
     if (args.stdin) {
       child.stdin.end(args.stdin)
     } else {
