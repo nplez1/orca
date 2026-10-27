@@ -50,13 +50,13 @@ DeepSeek and Fireworks.ai are configured with an API key in [Settings → Accoun
 
 Some plans report a spending ceiling rather than 5-hour and 7-day quota windows. When the active account reports no such window, Orca shows the ceiling's own percentage as a monthly bar, and the detail panel shows the amounts consumed against it.
 
-- **Claude** — the monthly spend cap, e.g. `$192.68 of $8,000.00`. Claude does not report when this cap resets, so that row shows a percentage without a countdown.
+- **Claude** — the monthly spend cap, as a percentage bar with no countdown, because Claude does not report when this cap resets. The dollars consumed against the cap come from the same extra-usage balance the Usage credits section renders, so the two cannot disagree.
 - **Codex** — the account's spend control, e.g. `10,048 of 52,000 credits`, with the reset date reported by the provider.
 - **GitHub Copilot** — the credits consumed this month against the enterprise's monthly AI-credit budget, e.g. `412,300 of 1,000,000 AI credits`. GitHub's budget API reports that ceiling in dollars, so Orca displays it in AI credits using the price from the usage report.
 
   Orca reads this through the **GitHub CLI** you are already signed in to, which supplies both the credential and the enterprise slug. The scopes matter: `read:enterprise` is what exposes an enterprise's slug and `manage_billing:enterprise` is what reads its billing data, so a `gh` sign-in without them cannot serve this provider — Settings → Accounts shows the exact `gh auth refresh` command when that is the case. For accounts the CLI cannot serve, that section also accepts a token and enterprise slug directly, which is the override and takes precedence.
 
-The percentage is always the figure the provider itself reports, so it matches what their console shows; Orca does not compute it from the amounts. GitHub Copilot is the exception — it reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those.
+The percentage is normally the figure the provider itself reports, so it matches what their console shows. Two exceptions: GitHub Copilot reports only the dollar ceiling and the credits consumed, so Orca derives the percentage from those; and a Claude seat whose extra-usage payload reports utilization as a 0–1 fraction has its percentage derived from the amounts, because that fraction is not a percentage.
 
 ## Estimated cost (Stats)
 

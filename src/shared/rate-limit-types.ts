@@ -121,7 +121,9 @@ export type ProviderRateLimits = {
   credits?: ProviderCredits | null
   /**
    * Consumed-against-ceiling readout for enterprise and usage-billed plans that report
-   * no percentage quota window: Claude's monthly spend cap, Codex's spend control.
+   * no percentage quota window: Codex's spend control, Copilot's credit budget. Claude's
+   * spend cap arrives as `monthly` instead, from the same payload the Credits section
+   * renders.
    */
   allowance?: ProviderAllowance | null
   /** Named per-model buckets (Gemini models, Cursor plan pools). */
