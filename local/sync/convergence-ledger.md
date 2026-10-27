@@ -342,13 +342,15 @@ one silently dropped reports success with the wrong rows or no progress.
 
 **Paths:** `src/renderer/src/components/settings/accounts-search*.ts`, `src/renderer/src/components/settings/AccountsPane*.tsx`, `src/main/ipc/register-core-handlers/**`
 
-**Decision:** the newer-provider search catalogs live in `accounts-search-extra-providers.ts` and
-are re-exported from `accounts-search.ts` to stay under the 300-line cap (Grok, Cursor, Antigravity,
-ZcodePlan). Credential sections are split per provider; a pane that mounts `OpenCodeGoCredentials`
-or a GLMT plan section needs those `window.api` doubles in its test.
+**Decision:** the search catalogs live in `accounts-search.ts` — upstream's four (Grok, Cursor,
+Antigravity, ZcodePlan) in upstream's order, then the fork's three (DeepSeek, Fireworks, Copilot) as
+pure additions after them. Credential sections are split per provider; a pane that mounts
+`OpenCodeGoCredentials` or a GLMT plan section needs those `window.api` doubles in its test.
 
-**Why:** `accounts-search.ts` was over the cap once already; moving catalogs out is the accepted way
-to stay inside it, and no `max-lines` suppression is allowed.
+**Why:** this was `accounts-search-extra-providers.ts` from 2026-10-15 until 2026-10-26, and the reason
+then was the 300-line cap. The cap is now off (`max-lines` is `"off"` in every `.oxlintrc.json`), so a
+split is no longer a reason to move upstream's code — and leaving upstream's entries where upstream has
+them turns this file's next sync into an addition rather than a rival copy.
 
 **Do not:** add a `max-lines` disable, or inline a credential section back into `AccountsPane.tsx`.
 
@@ -829,6 +831,27 @@ emitters out of `src/main/ipc/settings.ts`; `worktree-set-parent-selector.ts` to
 (upstream sits at exactly 300; the fork's Jira link is the overflow); and
 `index-project-setup-test-fixtures.ts` took the project fixtures and a `legacyProjectSetup` builder
 out of `src/cli/index-project-setup.test.ts`.
+
+**2026-10-26 reversal: the cap is off, and six of those splits are undone.** `max-lines` is now `"off"`
+in all four `.oxlintrc.json` overrides, because the cap was making the fork evict _upstream_ code into
+fork-owned files — a permanent conflict at the carve point plus a copy that silently drifts. Six blocks
+went back into the upstream file they came from, verbatim from the merge base, and the sibling files are
+gone:
+
+| Back into                                                     | From                                      |
+| ------------------------------------------------------------- | ----------------------------------------- |
+| `src/renderer/src/components/status-bar/tooltip.tsx`          | `provider-rate-limit-window-sections.tsx` |
+| `src/renderer/src/components/editor/CheckRunDetailsPanel.tsx` | `check-run-details-status.ts`             |
+| `src/renderer/src/web/preload-api/web-filesystem-api.ts`      | `web-file-mutation-session.ts`            |
+| `src/main/claude/hook-settings.ts` + `hook-service.ts`        | `claude-status-line-slot.ts`              |
+| `src/renderer/src/components/settings/accounts-search.ts`     | `accounts-search-extra-providers.ts`      |
+| `src/main/ipc/filesystem/watchers/filesystem-watcher-wsl.ts`  | `filesystem-watcher-wsl-snapshot.ts`      |
+
+Each was upstream's code with no fork content beyond an `export` keyword, so the split bought nothing
+once the cap went. Thirty-one other splits were examined and left alone because the block carries fork
+code, was restructured rather than moved, or upstream has since changed it — the measured table is in
+the 2026-10-26 analysis. **A split whose block is fork-authored is not affected by this:** that file is
+the fork's own and stays.
 
 ---
 

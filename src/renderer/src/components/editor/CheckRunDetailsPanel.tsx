@@ -20,12 +20,67 @@ import { CheckRunCopyButton } from './CheckRunCopyButton'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useCheckDetailsReadingPosition } from './use-check-details-reading-position'
 
-import {
-  formatCheckTimestamp,
-  getCheckStatusLabel,
-  isFailureState,
-  type CheckStatusLike
-} from './check-run-details-status'
+function formatCheckTimestamp(value: string | null | undefined): string | null {
+  if (!value) {
+    return null
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+}
+
+type CheckStatusLike = {
+  status: PRCheckDetail['status'] | (string & {}) | null | undefined
+  conclusion: PRCheckDetail['conclusion'] | (string & {}) | null | undefined
+}
+
+function getCheckStatusLabel(check: CheckStatusLike): string {
+  const conclusion = check.conclusion ?? 'pending'
+  switch (conclusion) {
+    case 'success':
+      return translate('auto.components.editor.CheckRunDetailsPanel.8f2d0f5a91', 'Passed')
+    case 'failure':
+      return translate('auto.components.editor.CheckRunDetailsPanel.4c8e1b2d73', 'Failed')
+    case 'cancelled':
+      return translate('auto.components.editor.CheckRunDetailsPanel.91a4c7e2b0', 'Cancelled')
+    case 'timed_out':
+      return translate('auto.components.editor.CheckRunDetailsPanel.2f6d8a1c45', 'Timed out')
+    case 'action_required':
+      return translate(
+        'auto.components.editor.CheckRunDetailsPanel.actionRequired',
+        'Action required'
+      )
+    case 'skipped':
+      return translate('auto.components.editor.CheckRunDetailsPanel.7b3e9d4f12', 'Skipped')
+    case 'neutral':
+      return translate('auto.components.editor.CheckRunDetailsPanel.5a1c8e3d67', 'Neutral')
+    case 'pending':
+      return translate('auto.components.editor.CheckRunDetailsPanel.3d9f2b8e14', 'Pending')
+    default:
+      return isFailureState(conclusion)
+        ? translate('auto.components.editor.CheckRunDetailsPanel.4c8e1b2d73', 'Failed')
+        : translate('auto.components.editor.CheckRunDetailsPanel.3d9f2b8e14', 'Pending')
+  }
+}
+
+function isFailureState(state: string | null | undefined): boolean {
+  return (
+    state === 'failure' ||
+    state === 'failed' ||
+    state === 'action_required' ||
+    state === 'cancelled' ||
+    state === 'stale' ||
+    state === 'startup_failure' ||
+    state === 'timed_out'
+  )
+}
 
 export function CheckRunDetailsPanel({
   check,
