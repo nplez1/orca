@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's check-run panel plus the fork's Jenkins
+   integration entry point. */
 import React from 'react'
 import { ExternalLink, RefreshCw, Settings } from 'lucide-react'
 import { toast } from 'sonner'

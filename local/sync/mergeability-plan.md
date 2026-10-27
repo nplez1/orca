@@ -22,7 +22,7 @@ dropped item.
 
 | Item                                      | What changed                                                                                                                  | Learning worth keeping                                                                                                                                                                                                                                                         |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `max-lines` (§ 5.2)                       | `"off"` in all four `.oxlintrc.json` overrides                                                                                | Four lines, no additions; proven with a 320-line probe that errors under upstream's config                                                                                                                                                                                     |
+| `max-lines` (§ 5.2) — **reversed 10-27**  | rule restored; 8 upstream files exempt with a directive + baseline row; `conflicts.mjs` split                                 | Turning the rule off cost 4 changed lines in upstream's config, **two of upstream's own tests red**, and an inert ratchet. Only 9 files were over: 1, 3, 3, 9, 20, 23, 31, 34 lines and our own 682-line CLI. Upstream's baseline exists for exactly this                      |
 | Nightly backstop (§ 4.1)                  | `run_relay_integration: false` in `fork-main-tests.yml`                                                                       | It was **wedged**, not disabled: a job on `blacksmith-4vcpu-ubuntu-2404` queued 17 h and `cancel-in-progress: false` blocked every later night                                                                                                                                 |
 | Nightly liveness (§ 4.1)                  | `local/check-nightly-liveness.mjs`                                                                                            | Exit 1 on stale **or** wedged; exit 2 (cannot tell) is deliberately not a pass. A **cancelled run is not a verdict** — the first version read the author's own cancel as a red night _and_ hid the last green, so it now keeps a schedule clock and a verdict clock separately |
 | Flake waiver (§ 4.2)                      | empty branch diff falls back to `HEAD^1..HEAD`, else `unknown`, and `unknown` never waives                                    | A sync merges _onto_ `nplez1/main`, so the old rule waived every flake across a 556-commit merge                                                                                                                                                                               |
@@ -783,7 +783,10 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
   deliberately unrenamed names (`orca://`, the relay's plain `orca` shim, per-repo `.orca/`). The
   builder overlay in §5.8 gets most of the benefit for a fraction of the risk.
 - **Raise or remove the `max-lines` cap.** It is upstream's own ratchet and a real quality guard.
-  The fix is to move the right side's lines (§5.2).
+  The fix is to move the right side's lines (§5.2). **Addendum 2026-10-27: this was tried and
+  reversed.** Removing the cap broke two of upstream's own coverage tests and made the ratchet inert,
+  to avoid exempting 9 files. The cap is back on with 8 one-line exemptions; see
+  `LOCAL-PATCHES.md` § `local(lint)`.
 - **Re-seat the PTY suites into the node-runtime project as the known-red fix.** Some entries need
   it (the bun/SQLite class); doing it to the whole class would mask real breakage. Route the 7
   SQLite files, prove the rest with TMPDIR/bash (§6.2).

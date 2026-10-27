@@ -1157,27 +1157,30 @@ The committed revision, `7811f60dd6`:
 Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted, 0 unexpected); 1 flaky re-run passed; 0 unhandled error headline(s); 2575 s
 ```
 
-### `local(lint)`: upstream's `max-lines` budget is off
+### `local(lint)`: upstream's `max-lines` budget is enforced again, with 8 exemptions
 
-`.oxlintrc.json` sets `max-lines` to `"off"` in the four overrides that carried 300/400/600/800.
-Upstream's budget is a code-management construct for its own tree, and on this fork it did the opposite
-of what it is for: it is what made fork additions **evict upstream code** into fork files to stay under
-the number. Every such move is a permanent conflict at that spot plus a silent-drift risk — upstream's
-later edit lands in a block the fork owns a stale copy of — and `local(renderer)`
-`ai-vault-session-refresh.ts` above records one of them, made "a split, never a cap or a baseline
-entry".
+**Reversed 2026-10-27, with the measurement that reversed it.** This section used to record the cap as
+`"off"` in the four overrides that carried 300/400/600/800. That worked and cost more than it saved:
+with the rule off, two of upstream's own coverage tests in
+`config/scripts/check-max-lines-ratchet.test.mjs` fail (they assert the installed oxlint still flags an
+over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the rule —
+becomes inert. So the fork was paying four changed lines in a file upstream owns *and* a red gate, to
+avoid an exemption list.
 
-Four changed lines, none added. Proven off with a 320-line probe: it passes under this config and
-errors under upstream's (`Maximum allowed is 300`).
+The exemption list turned out to be short. With upstream's rule restored, **nine files** exceeded
+budget: eight upstream-owned, over by 1, 3, 3, 9, 20, 23, 31 and 34 lines, and the fork's own
+`local/sync/conflicts.mjs` at 682. The fork's file was split (`local/sync/lib/conflict-report.mjs`,
+leaving 568); the eight upstream files each carry one `oxlint-disable max-lines -- Why:` line naming
+what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an *upstream* file to
+fit the budget would be the eviction this section exists to stop — a permanent hunk on every sync.
 
-What this does **not** do is undo the evictions already made. `config/max-lines-baseline.txt` and
-`check:max-lines-ratchet` stay — the ratchet reads only `mobile/.oxlintrc.json` and inline
-`oxlint-disable max-lines` directives, so it is inert now rather than wrong, and removing it would be
-another edit to a hot file for no gain. Restoring the evicted blocks is separate work, tracked in
-`local/sync/mergeability-plan.md` § 5.2; this line is what makes it possible.
+So: upstream's rule, upstream's ratchet, upstream's baseline, 12 grandfathered entries of which four are
+upstream's own. `.oxlintrc.json` is byte-identical to `0571e45107` again, both upstream tests pass, and
+the ratchet reports `OK — 12 grandfathered entr(y/ies)`. What this does **not** do is undo the evictions
+already made; restoring the evicted blocks is § 5.2, and this is what makes it possible.
 
-Config upstream still owns and this fork now edits: `.oxlintrc.json` (cold — 0 upstream commits in the
-174 pending at 2026-10-26, so it costs one conflict if upstream ever touches it).
+`.oxlintrc.json` is therefore no longer a file this fork edits — which removes it from the hot-file list
+this section used to keep for it.
 
 ### `local(test)`: the gate judges a merge by the merge's own diff
 

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's web filesystem bridge plus the fork's workspace
+   path-search controllers. */
 import { callAbortableRuntimeEnvironment } from '../../runtime/abortable-runtime-environment-call'
 import { unwrapRuntimeRpcResult } from '../../runtime/runtime-rpc-result'
 import type { PreloadApi } from '../../../../preload/api-types'

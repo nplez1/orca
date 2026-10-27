@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's entry point plus three lines wiring the fork's
+   screen-prompt reader. */
 /**
  * `orcad` — the Orca runtime served without Electron.
  *

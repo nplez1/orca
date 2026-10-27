@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's WSL watcher plus the fork's index consumers,
+   event sequencing and reconciliation promise. */
 /** Poll inside WSL so distro shutdown kills the watcher instead of Windows UNC polling repeatedly waking it. */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'

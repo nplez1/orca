@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's table plus the fork's overlay call. Splitting
+   an upstream-owned file would cost a permanent hunk on every sync; one directive does not. */
 import type { TuiAgent } from './tui-agent'
 import { getOrcaCliCommandNameForPlatform } from './orca-cli-command-name'
 import type { TuiAgentConfig, TuiAgentConfigSource } from './tui-agent-config-types'

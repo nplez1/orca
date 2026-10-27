@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's listener plus the fork's pre-admit and post-gate
+   guards. Moving them out is not possible without copying upstream's compact steps (plan §5.6). */
 import { readHookAgentProcess } from './agent-process-presence'
 import { resolveAgentStatusIdentity } from './agent-status-identity'
 import { sameAgentStatusTerminalOwner } from './agent-status-terminal-owner'

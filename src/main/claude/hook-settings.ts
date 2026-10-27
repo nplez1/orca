@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's installer plus the fork's home-directory name,
+   which must be resolved here rather than rewritten into upstream's literals. */
 import { homedir } from 'node:os'
 import { basename, extname, join, win32 } from 'node:path'
 import { HOME_DIRECTORY_NAME } from '../../shared/app-directory-names'

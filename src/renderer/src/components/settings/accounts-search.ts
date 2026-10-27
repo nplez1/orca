@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Why: upstream's search catalog plus the fork's three usage-provider
+   entries. Moving them out would break the localized-catalog co-location upstream relies on. */
 import type { SettingsSearchEntry } from './settings-search'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'

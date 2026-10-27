@@ -177,19 +177,19 @@
     {
       "files": ["**/*.ts", "**/*.mts", "**/*.cts"],
       "rules": {
-        "max-lines": "off"
+        "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["**/*.tsx"],
       "rules": {
-        "max-lines": "off"
+        "max-lines": ["error", { "max": 400, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["**/*.mjs"],
       "rules": {
-        "max-lines": "off"
+        "max-lines": ["error", { "max": 600, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -204,7 +204,7 @@
         "**/*.spec.cts"
       ],
       "rules": {
-        "max-lines": "off"
+        "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],
