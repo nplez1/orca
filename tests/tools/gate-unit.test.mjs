@@ -13,6 +13,7 @@ import {
   unitGateCacheDir,
   verdictRecordProblem
 } from '../../local/gate-verdict-cache.mjs'
+import { branchDiff } from '../../local/gate-unit.mjs'
 import {
   declaredUnhandledMismatch,
   unexplainedSuiteExit
@@ -276,5 +277,42 @@ describe('what a flaky pass is allowed to waive', () => {
       inDiff: true,
       matched: null
     })
+  })
+})
+
+describe('the diff that judges a flaky pass', () => {
+  function fakeGit(answers) {
+    return (args) => answers[args.join(' ')] ?? null
+  }
+
+  it('uses the merge-base against the release line when that diff has content', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'base',
+      'diff --name-only --no-renames base HEAD': 'src/a.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'nplez1/main', files: new Set(['src/a.ts']) })
+  })
+
+  it('does not read an empty release-line diff as resolved, and judges the merge instead', () => {
+    // The sync shape: the merge lands *on* nplez1/main, so merge-base is HEAD, the diff is empty,
+    // and the merge's own contribution is the only diff that can judge it.
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head first second',
+      'diff --name-only --no-renames first HEAD': 'src/b.ts'
+    })
+    expect(branchDiff(run)).toEqual({ base: 'first', files: new Set(['src/b.ts']) })
+  })
+
+  it('answers unknown when there is nothing but HEAD itself to compare against', () => {
+    const run = fakeGit({
+      'merge-base nplez1/main HEAD': 'head',
+      'merge-base origin/nplez1/main HEAD': 'head',
+      'diff --name-only --no-renames head HEAD': '',
+      'rev-list --parents -n 1 HEAD': 'head'
+    })
+    expect(branchDiff(run)).toBeNull()
   })
 })

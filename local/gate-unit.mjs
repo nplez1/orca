@@ -165,17 +165,38 @@ function readJsonFile(path, what) {
 /**
  * The file is inside the branch's own diff when it appears between the merge-base and HEAD. Without
  * a resolvable base the answer is `unknown`, and a flaky pass is never waived on `unknown`.
+ *
+ * Why an empty diff is not a resolved one: a sync merges upstream *onto* the release line, so
+ * `merge-base(nplez1/main, HEAD)` is HEAD itself and the diff comes back empty — which waived every
+ * flaky pass on a line a 556-commit merge had just built. What that merge contributed is
+ * `HEAD^1..HEAD`, so that is the diff that has to judge it.
  */
-function branchDiff() {
+export function branchDiff(runGit = git) {
   for (const base of ['nplez1/main', 'origin/nplez1/main']) {
-    const mergeBase = git(['merge-base', base, 'HEAD'])
+    const mergeBase = runGit(['merge-base', base, 'HEAD'])
     if (!mergeBase) {
       continue
     }
-    const diff = git(['diff', '--name-only', '--no-renames', mergeBase, 'HEAD'])
-    return { base, files: new Set((diff ?? '').split('\n').filter(Boolean)) }
+    const files = changedSince(runGit, mergeBase)
+    if (files.size > 0) {
+      return { base, files }
+    }
+  }
+  // Why the first parent and not HEAD^2: everything a merge adds to the release line is
+  // `HEAD^1..HEAD`, so nothing that merge could have broken falls outside the diff.
+  const parents = (runGit(['rev-list', '--parents', '-n', '1', 'HEAD']) ?? '').split(' ')
+  if (parents.length > 2) {
+    const files = changedSince(runGit, parents[1])
+    if (files.size > 0) {
+      return { base: parents[1], files }
+    }
   }
   return null
+}
+
+function changedSince(runGit, base) {
+  const diff = runGit(['diff', '--name-only', '--no-renames', base, 'HEAD'])
+  return new Set((diff ?? '').split('\n').filter(Boolean))
 }
 
 function runStep(label, program, args, logFd, timeoutMs, env) {
