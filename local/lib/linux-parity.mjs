@@ -287,11 +287,11 @@ function entryMatchesFailure(entry, failure) {
  * nightly is red forever on one upstream race, which teaches everyone to ignore red.
  *
  * Fails closed on everything it can see: an entry with no `evidence`, a red no entry matches, fewer
- * shard reports than `expectedReports`, and a report that declares more failing tests than could be
- * attributed. A file-level error in a file whose listed test also failed is its own red, never absorbed
- * by the entry. `notes` carries what it can see but must not enforce: Vitest counts a suite as failed
- * for worker-teardown errors that appear in no `testResults` entry, and failing the night on that
- * would make the verdict permanently red on noise.
+ * shard reports than `expectedReports`, a report that declares more failing tests than could be
+ * attributed, and a shard that reports failure with no failing test at all. A file-level error in a file
+ * whose listed test also failed is its own red, never absorbed by the entry. `notes` carries what the
+ * reports say but the check does not attribute — the shards' failed-suite count, which is not a count of
+ * files with a failing row and can include a suite that failed for a reason no assertion row records.
  *
  * @param {unknown} manifest
  * @param {{ files: Map<string, { status: string | null, message: string, assertions: { test: string, status: string, detail: string }[] }>, problems: string[] }} index
@@ -385,10 +385,13 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
     }
   }
   const notes = []
+  // Why no attribution: Vitest's suite count is not a count of files with a failing row, and it can
+  // include a suite that failed for a reason no assertion row records. Report the raw comparison and
+  // let a reader decide; the check that fails the night is the `success === false` one above.
   if (declaredSuites > failingFileCount) {
     notes.push(
-      `${declaredSuites - failingFileCount} suite-level failure(s) carry no failing test — usually ` +
-        'Vitest worker teardown; reported, not enforced'
+      `the shards report ${declaredSuites} failed suite(s) against ${failingFileCount} file(s) with a ` +
+        'failing row — the difference is not a number this check attributes'
     )
   }
 

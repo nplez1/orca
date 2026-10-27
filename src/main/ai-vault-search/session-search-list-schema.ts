@@ -106,7 +106,10 @@ export function ensureSessionListSchema(db: SyncDatabase): void {
     throw new SessionListTierMismatchError(listVersion)
   }
   db.exec(SESSION_LIST_SCHEMA_SQL)
-  db.prepare('INSERT INTO meta(key, value) VALUES (?, ?)').run(
+  // Why OR IGNORE: two processes opening a fresh index can both see the key absent, and `key` is a
+  // primary key -- a plain INSERT would throw a constraint error the opener does not treat as
+  // unusable, so that open would fail. Never overwrite is the intent; not throwing is the fix.
+  db.prepare('INSERT OR IGNORE INTO meta(key, value) VALUES (?, ?)').run(
     SESSION_LIST_SCHEMA_KEY,
     String(SESSION_LIST_SCHEMA_VERSION)
   )

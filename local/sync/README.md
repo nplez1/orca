@@ -89,7 +89,8 @@ A `symbols` entry in `expected-deletions.json` with status `expected-deletion` a
 
 It exits **1 whenever any name is relocated or lost**, so a relocation needs an acknowledgement too; the
 summary reports both. The `merged` ref must contain the pre-sync tip and the new upstream base
-(`merge-base --is-ancestor` both ways), and it fails closed otherwise — during conflict resolution `HEAD`
+(`merge-base --is-ancestor` against the merged ref, once per ref — not a bidirectional test between the
+two), and it fails closed otherwise — during conflict resolution `HEAD`
 is still the tip, so the default would otherwise compare the tip with itself and report clear.
 
 **`identity-sweep.mjs`** — upstream reintroduces `~/.orca`, `orca.exe` and `orca-dev` every sync.
