@@ -273,9 +273,21 @@ export function formatParity(result, { allowlistPath, reportCount }) {
  * the entry's name or its last segment — not a bare substring, or one entry absorbs every sibling whose
  * title happens to contain it.
  */
-function entryMatchesFailure(entry, failure) {
-  const sameFile = failure.file === entry.file || failure.file.endsWith(`/${entry.file}`)
-  if (!sameFile) {
+/** Why the path separator: a report carries `/home/runner/.../src/a.ts`, the manifest `src/a.ts`. */
+export function entryFileMatches(entry, reportPath) {
+  return reportPath === entry.file || reportPath.endsWith(`/${entry.file}`)
+}
+
+export function entryMatchesFailure(entry, failure) {
+  if (!entryFileMatches(entry, failure.file)) {
+    return false
+  }
+  // A whole-file entry absorbs anything in that file; a named entry never absorbs a file-level
+  // failure, which is a red that happened outside any test.
+  if (entry.test === null) {
+    return true
+  }
+  if (failure.test === null) {
     return false
   }
   return failure.test === entry.test || failure.test.endsWith(` ${entry.test}`)

@@ -18,18 +18,33 @@ afterEach(() => {
   }
 })
 
-function report({ totalTests = 100, failedTests = 0, failedSuites = 0, failing = [] } = {}) {
+function report({
+  totalTests = 100,
+  failedTests = 0,
+  failedSuites = 0,
+  failing = [],
+  passing = [],
+  fileLevelFailures = []
+} = {}) {
   return JSON.stringify({
-    numTotalTestSuites: failedSuites + 1,
-    numFailedTestSuites: failedSuites,
+    numTotalTestSuites: failedSuites + passing.length + fileLevelFailures.length + 1,
+    numFailedTestSuites: failedSuites + fileLevelFailures.length,
     numTotalTests: totalTests,
     numFailedTests: failedTests,
     success: failedTests === 0 && failedSuites === 0,
-    testResults: failing.map(([name, fullName]) => ({
-      name,
-      status: 'failed',
-      assertionResults: [{ status: 'failed', title: fullName, fullName }]
-    }))
+    testResults: [
+      ...failing.map(([name, fullName]) => ({
+        name,
+        status: 'failed',
+        assertionResults: [{ status: 'failed', title: fullName, fullName }]
+      })),
+      ...passing.map((name) => ({
+        name,
+        status: 'passed',
+        assertionResults: [{ status: 'passed', title: 'passes', fullName: 'passes' }]
+      })),
+      ...fileLevelFailures.map((name) => ({ name, status: 'failed', assertionResults: [] }))
+    ]
   })
 }
 
@@ -71,7 +86,13 @@ it('reads the teardown race out of the log and tolerates exactly it', () => {
     logText: log({ errors: [TOLERATED_UNHANDLED_ERROR] }),
     outcome: 'failure'
   })
-  expect(verdict).toEqual({ ok: true, tolerated: [TOLERATED_UNHANDLED_ERROR], problems: [] })
+  expect(verdict).toEqual({
+    ok: true,
+    tolerated: [TOLERATED_UNHANDLED_ERROR],
+    absorbed: [],
+    prunable: [],
+    problems: []
+  })
 })
 
 it('tolerates the race when two workers close at once', () => {
@@ -123,10 +144,9 @@ it('fails on a failed test even while the teardown race is present', () => {
   })
 
   expect(verdict.ok).toBe(false)
-  expect(verdict.problems).toContain('1 test(s) failed')
-  expect(verdict.problems).toContain(
+  expect(verdict.problems).toEqual([
     'failing: src/main/ipc/worktrees-detected-scan-cache.test.ts › stops re-scanning'
-  )
+  ])
 })
 
 it('fails when the shard failed with nothing to explain it', () => {
@@ -151,17 +171,23 @@ it('fails on an outcome it cannot judge', () => {
   )
 })
 
-function run(reportText, logText, outcome) {
+function run(reportText, logText, outcome, knownRed) {
   const dir = mkdtempSync(join(tmpdir(), 'unit-shard-verdict-'))
   dirs.push(dir)
   const reportPath = join(dir, 'report.json')
   const logPath = join(dir, 'shard.log')
   writeFileSync(reportPath, reportText)
   writeFileSync(logPath, logText)
+  const args = [SCRIPT, reportPath, logPath, outcome]
+  if (knownRed !== undefined) {
+    const knownRedPath = join(dir, 'known-red.json')
+    writeFileSync(knownRedPath, JSON.stringify({ entries: knownRed }))
+    args.push('--known-red', knownRedPath)
+  }
   try {
     return {
       status: 0,
-      stdout: execFileSync(process.execPath, [SCRIPT, reportPath, logPath, outcome], {
+      stdout: execFileSync(process.execPath, args, {
         encoding: 'utf8'
       })
     }
@@ -186,8 +212,92 @@ it('exits non-zero for a real failure and names it', () => {
   )
 
   expect(result.status).toBe(1)
-  expect(result.stdout).toContain('::error::unit shard: 1 test file(s) failed')
+  expect(result.stdout).toContain(
+    '::error::unit shard: the report declares 2 failing test(s) but lists 1; failing closed'
+  )
   expect(result.stdout).toContain('::error::unit shard: failing: src/a.test.ts › does the thing')
+})
+
+it('exits zero when the only failure is a listed known red, and names the entry', () => {
+  const result = run(
+    report({ failedTests: 1, failedSuites: 1, failing: [['src/a.test.ts', 'serializes both']] }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).toContain('tolerated a known Linux red, already triaged')
+  expect(result.stdout).toContain('[upstream-race]')
+  expect(result.stdout).toContain('every test passed apart from 1 known red(s)')
+  expect(result.stdout).not.toContain('::error::')
+  expect(result.stdout).not.toContain('prunable')
+})
+
+it('still exits non-zero for an unlisted failure beside a listed one', () => {
+  const result = run(
+    report({
+      failedTests: 2,
+      failedSuites: 2,
+      failing: [
+        ['src/a.test.ts', 'serializes both'],
+        ['src/b.test.ts', 'adds the total']
+      ]
+    }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('::error::unit shard: failing: src/b.test.ts › adds the total')
+  expect(result.stdout).not.toContain('::error::unit shard: failing: src/a.test.ts')
+})
+
+it('notes a listed entry whose file passed here, so a stale entry can be pruned', () => {
+  const result = run(report({ passing: ['src/a.test.ts'] }), log(), 'success', [
+    { file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }
+  ])
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).toContain('did not fail here, so its known-red entry may be prunable')
+})
+
+it('does not let a named entry absorb a file-level failure in the same file', () => {
+  // The tolerated test did not fail here, so something before or outside it did — a new red.
+  const result = run(report({ fileLevelFailures: ['src/a.test.ts'] }), log(), 'failure', [
+    { file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }
+  ])
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain(
+    '::error::unit shard: failing file (no test ran to failure): src/a.test.ts'
+  )
+})
+
+it('lets a whole-file entry absorb a file-level failure', () => {
+  const result = run(report({ fileLevelFailures: ['src/a.test.ts'] }), log(), 'failure', [
+    { file: 'src/a.test.ts', test: null, class: 'env-bound' }
+  ])
+
+  expect(result.status).toBe(0)
+  expect(result.stdout).toContain('tolerated a known Linux red')
+})
+
+it('does not read a shared filename in a sibling directory as the listed file', () => {
+  const result = run(
+    report({
+      failedTests: 1,
+      failedSuites: 1,
+      failing: [['src/other/a.test.ts', 'serializes both']]
+    }),
+    log(),
+    'failure',
+    [{ file: 'src/a.test.ts', test: 'serializes both', class: 'upstream-race' }]
+  )
+
+  expect(result.status).toBe(1)
+  expect(result.stdout).toContain('::error::unit shard: failing: src/other/a.test.ts')
 })
 
 it('fails when the report is missing, so a crashed run cannot pass as green', () => {

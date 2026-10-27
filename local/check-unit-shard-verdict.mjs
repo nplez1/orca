@@ -14,9 +14,16 @@
  * Upstream's own runs never call this: `.github/workflows/unit-tests.yml` guards it on
  * `github.repository` and leaves Vitest's exit code in charge there.
  *
- * Usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME
+ * Known reds are the second tolerance, and the reason the nightly stopped mailing an alarm for a
+ * failure the repo had already triaged: a failing test that matches an entry in
+ * `local/nightly-linux-known-red.json` is reported as tolerated rather than failing the job. Every
+ * red that matches nothing still fails, and it fails by name — so the one alarm left is a failure
+ * nobody has classified yet.
+ *
+ * Usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH]
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { entryFileMatches, entryMatchesFailure } from './lib/linux-parity.mjs'
 
 // Why not the shared stripAnsiEscapeSequences: that helper is TypeScript and CI runs this script
 // under plain node. The reporter only colours with SGR codes, so `ESC[…m` is the whole alphabet.
@@ -32,6 +39,13 @@ const UNHANDLED_HEADER = /^\W*Unhandled Errors\W*$/
 const ERROR_SEPARATOR =
   /^\W*Unhandled Rejection\W*$|^\W*Uncaught Exception\W*$|^\W*Unhandled Error\W*$/
 const FAILING_TEST_LIMIT = 5
+/** The manifest this runner's known reds live in; the Mac allowlist names a different environment. */
+export const DEFAULT_KNOWN_RED = 'local/nightly-linux-known-red.json'
+
+/** One matcher for both this shard verdict and the cross-shard checker, so the two always agree. */
+function matchingEntry(knownRed, file, test) {
+  return knownRed.find((entry) => entryMatchesFailure(entry, { file, test }))
+}
 
 /** Vitest prints its own count; a mismatch means the log shape moved, so the verdict fails closed. */
 export function collectUnhandledErrors(logText) {
@@ -69,7 +83,7 @@ function failingTestNames(report) {
   for (const file of report.testResults ?? []) {
     for (const assertion of file.assertionResults ?? []) {
       if (assertion.status === 'failed') {
-        names.push(`${file.name} › ${assertion.fullName || assertion.title}`)
+        names.push({ file: file.name, test: assertion.fullName || assertion.title })
       }
     }
   }
@@ -93,9 +107,12 @@ function failedFilesWithoutFailingTest(report) {
  * unhandled errors were raised) and the test step's own outcome (so a failure the report cannot
  * explain still fails).
  */
-export function decideUnitShardVerdict({ reportText, logText, outcome }) {
+export function decideUnitShardVerdict({ reportText, logText, outcome, knownRed = [] }) {
   const problems = []
   const tolerated = []
+  const absorbed = []
+  const absorbedEntries = new Set()
+  const prunable = []
   let report = null
 
   try {
@@ -108,21 +125,48 @@ export function decideUnitShardVerdict({ reportText, logText, outcome }) {
 
   if (report) {
     const totalTests = Number(report.numTotalTests) || 0
-    const failedTests = Number(report.numFailedTests) || 0
-    const failedSuites = Number(report.numFailedTestSuites) || 0
+    const declaredFailedTests = Number(report.numFailedTests) || 0
+    const failingTests = failingTestNames(report)
     if (totalTests === 0) {
       problems.push('the report holds no tests, so the shard cannot be judged green')
     }
-    if (failedSuites > 0) {
-      problems.push(`${failedSuites} test file(s) failed`)
-      for (const name of failedFilesWithoutFailingTest(report).slice(0, FAILING_TEST_LIMIT)) {
-        problems.push(`failing file (no test ran to failure): ${name}`)
+    // Why fail closed on a mismatch: a row the report counts but does not list is a red whose name
+    // nobody sees, and a listed row the report does not count means the shape moved under us.
+    if (declaredFailedTests !== failingTests.length) {
+      problems.push(
+        `the report declares ${declaredFailedTests} failing test(s) but lists ${failingTests.length}; failing closed`
+      )
+    }
+    const unexpected = []
+    for (const { file, test } of failingTests) {
+      const entry = matchingEntry(knownRed, file, test)
+      if (entry) {
+        absorbed.push(`${file} › ${test} [${entry.class}]`)
+        absorbedEntries.add(entry)
+      } else {
+        unexpected.push(`${file} › ${test}`)
       }
     }
-    if (failedTests > 0) {
-      problems.push(`${failedTests} test(s) failed`)
-      for (const name of failingTestNames(report).slice(0, FAILING_TEST_LIMIT)) {
-        problems.push(`failing: ${name}`)
+    for (const name of unexpected.slice(0, FAILING_TEST_LIMIT)) {
+      problems.push(`failing: ${name}`)
+    }
+    if (unexpected.length > FAILING_TEST_LIMIT) {
+      problems.push(`and ${unexpected.length - FAILING_TEST_LIMIT} more unexpected failure(s)`)
+    }
+    const fileLevelFailures = failedFilesWithoutFailingTest(report)
+    for (const file of fileLevelFailures) {
+      const entry = matchingEntry(knownRed, file, null)
+      if (entry) {
+        absorbed.push(`${file} [${entry.class}]`)
+        absorbedEntries.add(entry)
+      } else {
+        problems.push(`failing file (no test ran to failure): ${file}`)
+      }
+    }
+    for (const entry of knownRed) {
+      const present = (report.testResults ?? []).some((file) => entryFileMatches(entry, file.name))
+      if (present && !absorbedEntries.has(entry)) {
+        prunable.push(`${entry.file}${entry.test ? ` › ${entry.test}` : ''}`)
       }
     }
   }
@@ -143,11 +187,16 @@ export function decideUnitShardVerdict({ reportText, logText, outcome }) {
 
   if (outcome !== 'success' && outcome !== 'failure') {
     problems.push(`unknown test-step outcome "${outcome}"`)
-  } else if (outcome === 'failure' && problems.length === 0 && tolerated.length === 0) {
+  } else if (
+    outcome === 'failure' &&
+    problems.length === 0 &&
+    tolerated.length === 0 &&
+    absorbed.length === 0
+  ) {
     problems.push('the shard failed without the tolerated Vitest teardown race')
   }
 
-  return { ok: problems.length === 0, tolerated, problems }
+  return { ok: problems.length === 0, tolerated, absorbed, prunable, problems }
 }
 
 function readOrReport(path) {
@@ -159,10 +208,52 @@ function readOrReport(path) {
   }
 }
 
+function parseArgs(argv) {
+  const positional = []
+  let knownRedPath = null
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === '--known-red') {
+      knownRedPath = argv[index + 1] ?? null
+      index += 1
+    } else {
+      positional.push(argv[index])
+    }
+  }
+  return { positional, knownRedPath }
+}
+
+/**
+ * Why the path is optional and absent is not a failure: this script also runs on this Mac, where the
+ * Linux manifest describes a different machine. An unreadable manifest the caller named is a failure.
+ */
+function loadKnownRed(knownRedPath) {
+  const path = knownRedPath ?? (process.platform === 'linux' ? DEFAULT_KNOWN_RED : null)
+  if (path === null || !existsSync(path)) {
+    if (knownRedPath !== null) {
+      console.log(`::error::unit shard: cannot read the known-red manifest ${path}`)
+      process.exit(1)
+    }
+    return []
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    if (!Array.isArray(parsed.entries)) {
+      throw new Error('no entries array')
+    }
+    return parsed.entries
+  } catch (error) {
+    console.log(`::error::unit shard: cannot read the known-red manifest ${path}: ${error.message}`)
+    process.exit(1)
+  }
+}
+
 function main() {
-  const [reportPath, logPath, outcome] = process.argv.slice(2)
+  const { positional, knownRedPath } = parseArgs(process.argv.slice(2))
+  const [reportPath, logPath, outcome] = positional
   if (!reportPath || !logPath || outcome === undefined) {
-    console.error('usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME')
+    console.error(
+      'usage: node local/check-unit-shard-verdict.mjs REPORT.json SHARD.log OUTCOME [--known-red PATH]'
+    )
     process.exit(2)
   }
   const reportText = readOrReport(reportPath)
@@ -171,10 +262,19 @@ function main() {
     process.exit(1)
   }
 
-  const verdict = decideUnitShardVerdict({ reportText, logText, outcome })
+  const knownRed = loadKnownRed(knownRedPath)
+  const verdict = decideUnitShardVerdict({ reportText, logText, outcome, knownRed })
   for (const headline of verdict.tolerated) {
     console.log(
       `::warning::unit shard tolerated the Vitest worker teardown race (vitest-dev/vitest#11153): ${headline}`
+    )
+  }
+  for (const entry of verdict.absorbed) {
+    console.log(`::warning::unit shard tolerated a known Linux red, already triaged: ${entry}`)
+  }
+  for (const entry of verdict.prunable) {
+    console.log(
+      `::notice::unit shard: ${entry} did not fail here, so its known-red entry may be prunable`
     )
   }
   for (const problem of verdict.problems) {
@@ -183,7 +283,12 @@ function main() {
   if (!verdict.ok) {
     process.exit(1)
   }
-  console.log('::notice::unit shard verdict: every test passed, no unexplained error')
+  const absorbed = verdict.absorbed.length
+  console.log(
+    absorbed === 0
+      ? '::notice::unit shard verdict: every test passed, no unexplained error'
+      : `::notice::unit shard verdict: every test passed apart from ${absorbed} known red(s), no unexplained error`
+  )
 }
 
 if (process.argv[1] && process.argv[1].endsWith('check-unit-shard-verdict.mjs')) {
