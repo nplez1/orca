@@ -34,7 +34,7 @@ function count(db: SyncDatabase, sql: string, ...values: (string | number)[]): n
 }
 
 /** Everything a schema declares, by type and name, so two files can be compared as shapes. */
-function shape(db: SyncDatabase): { objects: string[]; sessionColumns: string[] } {
+function schemaInventory(db: SyncDatabase): { objects: string[]; sessionColumns: string[] } {
   const objects = db
     .prepare(
       "SELECT type || ':' || name AS object FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY 1"
@@ -123,7 +123,7 @@ it('gives a fresh index the list tier beside upstream’s tables, under its own 
   try {
     expect(meta(db, 'schema_version')).toBe(String(SESSION_SEARCH_SCHEMA_VERSION))
     expect(meta(db, 'session_list_schema_version')).toBe(String(SESSION_LIST_SCHEMA_VERSION))
-    const { objects, sessionColumns } = shape(db)
+    const { objects, sessionColumns } = schemaInventory(db)
     expect(objects).toEqual(
       expect.arrayContaining([
         'table:session_list_facts',
@@ -141,7 +141,7 @@ it('gives a fresh index the list tier beside upstream’s tables, under its own 
 
 it('migrates a merged-10 index in place: same shape as a fresh one, every row kept', async () => {
   const freshDb = openSessionSearchDatabase(await tempDatabasePath())
-  const fresh = shape(freshDb)
+  const fresh = schemaInventory(freshDb)
   freshDb.close()
 
   const path = await tempDatabasePath()
@@ -155,7 +155,7 @@ it('migrates a merged-10 index in place: same shape as a fresh one, every row ke
     expect(meta(db, 'schema_version')).toBe('8')
     expect(meta(db, 'schema_version')).toBe(String(SESSION_SEARCH_SCHEMA_VERSION))
     expect(meta(db, 'session_list_schema_version')).toBe(String(SESSION_LIST_SCHEMA_VERSION))
-    expect(shape(db)).toEqual(fresh)
+    expect(schemaInventory(db)).toEqual(fresh)
 
     expect(count(db, 'files')).toBe(2)
     expect(count(db, 'messages_fts WHERE messages_fts MATCH ?', 'lighthouse')).toBe(1)
