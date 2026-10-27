@@ -1205,6 +1205,12 @@ from a child-process write, and `selector_not_found` from `orca-runtime.test.ts`
 **not** Linux-specific: it reproduces on macOS and the allowlist covers it as an `unhandledErrors`
 headline, which is why the Mac gate could never say so.
 
+`node local/check-nightly-liveness.mjs` is what keeps that from going unnoticed again. It exits 0 on a
+fresh green run, 1 when the newest run is stale (older than two schedule slots) or **wedged** (queued
+or in progress for more than four hours — the exact failure this entry records), and 2 when it cannot
+tell. Exit 2 is deliberately not a pass: a missing `gh` must never read as a green nightly. Make it the
+first thing a session does after a sync, next to `local/branch-status.mjs`.
+
 ## Syncing with upstream
 
 **The full procedure is [UPSTREAM-SYNC-RUNBOOK.md](./UPSTREAM-SYNC-RUNBOOK.md)** — "sync upstream
