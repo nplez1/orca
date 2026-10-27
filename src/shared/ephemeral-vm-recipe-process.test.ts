@@ -50,6 +50,37 @@ describe('runRecipeCommand', () => {
     await expect(resultPromise).resolves.toMatchObject({ exitCode: 0 })
   })
 
+  it('absorbs a stdin write failure so a shell that exits early cannot crash the host', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: undefined,
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+      unref: vi.fn()
+    })
+    const resultPromise = runRecipeCommand({
+      command: 'destroy',
+      repoPath: makeRepo(),
+      mode: 'destroy',
+      resultSchemaVersion: 1,
+      context: { recipeId: 'cloud-sandbox', repoPath: makeRepo() },
+      stdin: '{"kind":"destroy"}',
+      spawnCommand: vi.fn(() => child) as never
+    })
+
+    // Why synthetic: emitting `error` on a stream with no listener throws, which is the same
+    // uncaught exception a real EPIPE produces during the end() write. Awaiting a real failing
+    // write would report it as an unhandled error rather than a clean assertion failure.
+    await Promise.resolve()
+    expect(() =>
+      child.stdin.emit('error', Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+    ).not.toThrow()
+
+    child.emit('close', 9, null)
+    await expect(resultPromise).resolves.toMatchObject({ exitCode: 9 })
+  })
+
   it('force-kills an aborted recipe if graceful termination never closes it', async () => {
     vi.useFakeTimers()
     const child = Object.assign(new EventEmitter(), {
