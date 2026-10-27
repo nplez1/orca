@@ -112,17 +112,17 @@ _syncs-affected × work-removed_, using the baseline above.
 
 ### P0 — Stop the bleeding (≈1 day, all low risk)
 
-| #    | Item                                                                      | Why                                                                     | Effort | Impact                                                      |
-| ---- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | ----------------------------------------------------------- |
-| P0.1 | Prove the nightly backstop runs (§4.1)                                    | The PR gate traded the full suite away for it; it has one run ever      | S      | restores the safety net the whole verification tier assumes |
-| P0.2 | Empty branch diff is `unknown`, never waived (§4.2)                       | Waives _every_ flake after every merge                                  | S      | stops hidden merge flakes reaching `nplez1/main`            |
-| P0.3 | Gate preflight: `mobile/node_modules`, probe run, nightly liveness (§4.3) | 83 of 155 failures in one 43-min run were an uninstalled workspace      | S      | one full gate run saved per sync                            |
-| P0.4 | `check:changed` base `origin/main` → `origin/HEAD` (§4.4)                 | Diffs 2,846 files on every handoff, unqueued                            | S      | minutes per handoff; less memory pressure                   |
-| P0.5 | Per-entry `match` on known-red failure detail (§4.5)                      | An allowlisted test can start failing for a new reason and stay "known" | S      | stops 40 tests masking regressions                          |
-| P0.6 | **Comment policy**: no fork comments in upstream files (§4.6)             | 162 of 233 paths, 35 hunks                                              | S      | removes the largest single class                            |
-| P0.7 | Ledger `Resolution:` field, narrower Identity glob, coverage line (§4.7)  | `src/**` in Identity makes "has a ledger entry" match 227/233           | S–M    | makes the resolver in P1.9 possible                         |
-| P0.8 | Ratchet baselines → fork overlay (§4.8)                                   | Two conflicts per sync, both pure bookkeeping                           | S      | −2 paths/sync                                               |
-| P0.9 | Delete the 4 dead modules (§4.9)                                          | Verified 0 importers                                                    | S      | −290 lines, no risk                                         |
+| #    | Item                                                                     | Why                                                                     | Effort | Impact                                                                 |
+| ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| P0.1 | Prove the nightly backstop runs (§4.1)                                   | The PR gate traded the full suite away for it; it has one run ever      | S      | restores the safety net the whole verification tier assumes            |
+| P0.2 | Empty branch diff is `unknown`, never waived (§4.2)                      | Waives _every_ flake after every merge                                  | S      | stops hidden merge flakes reaching `nplez1/main`                       |
+| P0.3 | Gate preflight: daily liveness only (§4.3)                               | Two of the three proposed checks turned out to be false                 | S      | see § 4.3 — dropped on evidence; the liveness check shipped separately |
+| P0.4 | `check:changed` base `origin/main` → `origin/HEAD` (§4.4)                | Diffs 2,846 files on every handoff, unqueued                            | S      | minutes per handoff; less memory pressure                              |
+| P0.5 | Per-entry `match` on known-red failure detail (§4.5)                     | An allowlisted test can start failing for a new reason and stay "known" | S      | stops 40 tests masking regressions                                     |
+| P0.6 | **Comment policy**: no fork comments in upstream files (§4.6)            | 162 of 233 paths, 35 hunks                                              | S      | removes the largest single class                                       |
+| P0.7 | Ledger `Resolution:` field, narrower Identity glob, coverage line (§4.7) | `src/**` in Identity makes "has a ledger entry" match 227/233           | S–M    | makes the resolver in P1.9 possible                                    |
+| P0.8 | Ratchet baselines → fork overlay (§4.8)                                  | Two conflicts per sync, both pure bookkeeping                           | S      | −2 paths/sync                                                          |
+| P0.9 | Delete the 4 dead modules (§4.9)                                         | Verified 0 importers                                                    | S      | −290 lines, no risk                                                    |
 
 ### P1 — Re-architect the seams (2–3 weeks; the real win)
 
@@ -193,17 +193,28 @@ Fix: when the merge-base equals HEAD, fall back to a base that has content — t
 parent, or the last gated revision — and if neither resolves, return `unknown`, which already means
 "never waive". One condition, one test.
 
-### 4.3 Gate preflight
+### 4.3 Gate preflight — **dropped, on evidence**
 
-Before spending 43 minutes:
+Proposed: check `mobile/node_modules`, the pinned Playwright browsers, a 5-second probe run, and
+`gh run list` freshness before spending 43 minutes. **Two of those were wrong, and I verified it rather
+than shipping them:**
 
-- `mobile/node_modules` present (83 of 155 failures in the 10-25 run were this);
-- the pinned Playwright browsers present;
-- a 5-second probe run of one tiny file through the configured runner, which catches config/flag/
-  reporter drift (`check-unit-shard-verdict.mjs:25-33` depends on Vitest's JSON shape and banners);
-- `gh run list --workflow fork-main-tests.yml -L1` freshness.
+- `mobile/node_modules` does not exist in this worktree and the suite is green (`ls -d mobile/node_modules`
+  → absent). pnpm hoists the mobile deps into the root install, so a check for that directory would
+  have failed a healthy tree and blocked every gate run. This worktree's last full run passed with it
+  absent, which is the proof that the proposed check is a false positive and not a real guard.
+- The `bun` on `PATH` is 1.4.3 while `config/.bun-version` pins 1.4.4, which looks like the
+  "silently did not run" hazard — but it is not: `config/scripts/run-vitest.mjs:17` prefers
+  `resolvePinnedBunExecutable`, which resolves the pin from a **devDependency** (here
+  `/Volumes/Storage/.pnpm-store/.../bun/1.4.4/...`). PATH is only the fallback, so a version check on
+  PATH would have guarded the path that is not used.
 
-Each is a `spawnSync` in `gate-unit.mjs`'s existing step style, and each fails closed.
+The remaining ideas are not worth a check: a broken runner config already exits in seconds, and the
+43-minute failure mode this was meant to prevent was the _queue_, not the environment.
+
+What did ship: `local/check-nightly-liveness.mjs`, as a standalone check rather than a gate step,
+because it answers "is the backstop alive" (a question about the repo) rather than "can this suite
+run" (a question about the tree). See `LOCAL-PATCHES.md` § `local(ci)`.
 
 ### 4.4 `check:changed` base
 
