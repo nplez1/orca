@@ -30,6 +30,24 @@ import {
 } from './service-types'
 import { readGrokAuthSession } from '../grok-auth'
 
+/** Hidden placeholder a disabled provider resolves to, so a cycle can settle its slot without a network call. */
+export function disabledUsageProviderSnapshot(
+  provider: ActiveRateLimitProvider
+): ProviderRateLimits {
+  return {
+    provider,
+    session: null,
+    weekly: null,
+    ...(provider === 'opencode-go' ? { monthly: null } : {}),
+    ...(provider === 'gemini' || provider === 'cursor' ? { buckets: [] } : {}),
+    ...(provider === 'deepseek' || provider === 'fireworks' ? { credits: null } : {}),
+    ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
+    updatedAt: Date.now(),
+    error: null,
+    status: 'unavailable'
+  }
+}
+
 export abstract class RateLimitServiceState {
   protected state: InternalRateLimitState = {
     claude: null,
@@ -213,30 +231,9 @@ export abstract class RateLimitServiceState {
     return overrides
   }
 
-  /** Hidden placeholder a disabled provider resolves to, so the cycle's result tuple stays typed without a network call. */
+  /** Hidden placeholder a disabled provider resolves to, so a cycle can settle its slot without a network call. */
   protected disabledUsageProviderSnapshot(provider: ActiveRateLimitProvider): ProviderRateLimits {
-    return {
-      provider,
-      session: null,
-      weekly: null,
-      ...(provider === 'opencode-go' ? { monthly: null } : {}),
-      ...(provider === 'gemini' || provider === 'cursor' ? { buckets: [] } : {}),
-      ...(provider === 'deepseek' || provider === 'fireworks' ? { credits: null } : {}),
-      ...(provider === 'copilot' ? { monthly: null, allowance: null } : {}),
-      updatedAt: Date.now(),
-      error: null,
-      status: 'unavailable'
-    }
-  }
-
-  /** Runs the real fetch, or resolves a hidden snapshot when the user switched the provider off. */
-  protected fetchUnlessDisabled(
-    providerId: DisableableUsageProviderId,
-    load: () => Promise<ProviderRateLimits>
-  ): Promise<ProviderRateLimits> {
-    return this.isUsageProviderDisabled(providerId)
-      ? Promise.resolve(this.disabledUsageProviderSnapshot(providerId))
-      : load()
+    return disabledUsageProviderSnapshot(provider)
   }
 
   onStateChange(listener: (state: RateLimitState) => void): () => void {
@@ -276,7 +273,9 @@ export abstract class RateLimitServiceState {
   }
 
   protected updateState(next: InternalRateLimitState): void {
-    this.state = next
+    // Why: a disabled provider's slot must read null on every push, not only the
+    // cycle that first observed the toggle, so mobile and the renderer agree.
+    this.state = { ...next, ...this.disabledUsageProviderStateOverrides() }
     this.pushToRenderer()
   }
 

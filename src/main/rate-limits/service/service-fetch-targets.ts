@@ -194,7 +194,18 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     return process.platform !== 'win32'
   }
 
+  // Why: a disabled provider must not read the credential store at all, so the
+  // empty config is returned before the injected resolver (and its disk read) runs.
   protected resolveOpenCodeGoConfig(): OpenCodeGoResolvedConfig {
+    if (this.isUsageProviderDisabled('opencode-go')) {
+      return {
+        sessionCookie: '',
+        workspaceIdOverride: '',
+        apiKey: '',
+        apiKeyError: null,
+        apiKeyReadSkipped: false
+      }
+    }
     const config = this.openCodeGoConfigResolver?.() ?? {
       sessionCookie: '',
       workspaceIdOverride: ''
@@ -222,10 +233,8 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  // Why: a disabled provider must not read the credential store at all, so the
-  // empty config is returned before the resolver (and its disk read) runs.
-  protected resolveMiniMaxConfig(options?: { disabled?: boolean }): MiniMaxResolvedConfig {
-    if (options?.disabled) {
+  protected resolveMiniMaxConfig(): MiniMaxResolvedConfig {
+    if (this.isUsageProviderDisabled('minimax')) {
       return {
         config: {
           sessionCookie: '',
@@ -275,8 +284,8 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveDeepSeekConfig(options?: { disabled?: boolean }): DeepSeekResolvedConfig {
-    if (options?.disabled) {
+  protected resolveDeepSeekConfig(): DeepSeekResolvedConfig {
+    if (this.isUsageProviderDisabled('deepseek')) {
       return { config: { apiKey: '' }, error: null }
     }
     try {
@@ -286,8 +295,8 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveFireworksConfig(options?: { disabled?: boolean }): FireworksResolvedConfig {
-    if (options?.disabled) {
+  protected resolveFireworksConfig(): FireworksResolvedConfig {
+    if (this.isUsageProviderDisabled('fireworks')) {
       return { config: { apiKey: '', accountIdOverride: null }, error: null }
     }
     try {
@@ -300,8 +309,8 @@ export abstract class RateLimitServiceFetchTargets extends RateLimitServiceResul
     }
   }
 
-  protected resolveCopilotConfig(options?: { disabled?: boolean }): CopilotResolvedConfig {
-    if (options?.disabled) {
+  protected resolveCopilotConfig(): CopilotResolvedConfig {
+    if (this.isUsageProviderDisabled('copilot')) {
       return { config: { token: '', enterpriseSlug: '' }, error: null }
     }
     try {

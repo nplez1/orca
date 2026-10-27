@@ -1,9 +1,5 @@
 import { fetchClaudeRateLimits } from '../claude-fetcher'
 import { fetchCodexRateLimits } from '../codex-fetcher'
-import { fetchDeepSeekRateLimits } from '../deepseek/deepseek-fetcher'
-import { fetchFireworksRateLimits } from '../fireworks/fireworks-fetcher'
-import { fetchCopilotRateLimits } from '../copilot/copilot-fetcher'
-import { readCopilotGhCredentialsForCycle } from '../copilot/copilot-gh-credentials'
 import { fetchGeminiRateLimits } from '../gemini-usage-fetcher'
 import { fetchGrokRateLimits } from '../grok-fetcher'
 import { readGrokAuthSession } from '../grok-auth'
@@ -16,8 +12,8 @@ import { ZCODE_PLAN_SITE_BASE_URLS } from '../../../shared/zcode-plan-sites'
 import { fetchMiniMaxRateLimits } from '../minimax/minimax-fetcher'
 import { createHash } from 'node:crypto'
 import { fetchOpenCodeGoUsage } from '../opencode-go-usage-source-selection'
+import { prepareForkProviderCycle } from '../fork/fork-provider-cycle'
 import { RateLimitServiceCycleFetchState } from './service-cycle-fetch-state'
-import { resolveCopilotCycleCredentials } from './service-copilot-cycle-credentials'
 import { trackSettledProviderResult } from './service-sibling-provider-result'
 import type { FetchAllCyclePrepared, ProviderRateLimits } from './service-types'
 
@@ -59,33 +55,32 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
     const codexProvenance = codexFetchGated
       ? null
       : this.getCodexProvenance(codexTarget, codexHomePath)
-    const openCodeGoConfig = disabled.has('opencode-go') ? null : this.resolveOpenCodeGoConfig()
-    const cookie = openCodeGoConfig?.sessionCookie ?? ''
-    const workspaceIdOverride = openCodeGoConfig?.workspaceIdOverride ?? ''
-    const openCodeGoApiKey = openCodeGoConfig?.apiKey ?? ''
-    const openCodeGoApiKeyError = openCodeGoConfig?.apiKeyError ?? null
-    const openCodeGoApiKeyReadSkipped = openCodeGoConfig?.apiKeyReadSkipped ?? false
-    const miniMaxConfigResult = this.resolveMiniMaxConfig({ disabled: disabled.has('minimax') })
+    const openCodeGoConfig = this.resolveOpenCodeGoConfig()
+    const cookie = openCodeGoConfig.sessionCookie
+    const workspaceIdOverride = openCodeGoConfig.workspaceIdOverride
+    const openCodeGoApiKey = openCodeGoConfig.apiKey
+    const openCodeGoApiKeyError = openCodeGoConfig.apiKeyError
+    const openCodeGoApiKeyReadSkipped = openCodeGoConfig.apiKeyReadSkipped
+    const miniMaxConfigResult = this.resolveMiniMaxConfig()
     const miniMaxCookie = miniMaxConfigResult.config.sessionCookie
     const miniMaxGroupId = miniMaxConfigResult.config.groupId
     const miniMaxModels = miniMaxConfigResult.config.models
     const miniMaxEndpoint = miniMaxConfigResult.config.endpoint
     const miniMaxApiKey = miniMaxConfigResult.config.apiKey
-    const deepSeekConfigResult = this.resolveDeepSeekConfig({ disabled: disabled.has('deepseek') })
-    const deepSeekApiKey = deepSeekConfigResult.config.apiKey
-    const fireworksConfigResult = this.resolveFireworksConfig({
-      disabled: disabled.has('fireworks')
+    const forkProviderCycle = prepareForkProviderCycle({
+      disabled,
+      resolveConfigs: () => ({
+        deepSeek: this.resolveDeepSeekConfig(),
+        fireworks: this.resolveFireworksConfig(),
+        copilot: this.resolveCopilotConfig()
+      }),
+      syncGenerations: (fingerprints) => ({
+        deepSeek: this.syncDeepSeekFetchGeneration(fingerprints.deepSeek),
+        fireworks: this.syncFireworksFetchGeneration(fingerprints.fireworks),
+        copilot: this.syncCopilotFetchGeneration(fingerprints.copilot)
+      }),
+      apiKeyCredentialError: (provider, message) => this.getApiKeyCredentialError(provider, message)
     })
-    const fireworksApiKey = fireworksConfigResult.config.apiKey
-    const fireworksAccountIdOverride = fireworksConfigResult.config.accountIdOverride
-    const copilotConfigResult = this.resolveCopilotConfig({ disabled: disabled.has('copilot') })
-    // Why synchronous: the gh probe is refreshed out of band, so a subprocess never sits
-    // on the fetch critical path where its latency would stall every other provider.
-    const copilotGhResult = disabled.has('copilot') ? null : readCopilotGhCredentialsForCycle()
-    const copilotCredentials = resolveCopilotCycleCredentials(copilotConfigResult, copilotGhResult)
-    const copilotToken = copilotCredentials.token
-    const copilotEnterpriseSlug = copilotCredentials.enterpriseSlug
-    const copilotSource = copilotCredentials.source
     const geminiCliOAuthEnabled = disabled.has('gemini')
       ? false
       : (this.geminiCliOAuthEnabledResolver?.() ?? false)
@@ -124,17 +119,6 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           baseUrl: ZCODE_PLAN_SITE_BASE_URLS[zcodePlanConfigResult.config.site]
         }
       : null
-    const currentDeepSeekConfigHash = `${deepSeekApiKey}|${deepSeekConfigResult.error ?? ''}`
-    const deepSeekConfigChanged = currentDeepSeekConfigHash !== this.lastDeepSeekConfigHash
-    const deepSeekGeneration = this.syncDeepSeekFetchGeneration(currentDeepSeekConfigHash)
-
-    const currentFireworksConfigHash = `${fireworksApiKey}|${fireworksAccountIdOverride ?? ''}|${fireworksConfigResult.error ?? ''}`
-    const fireworksConfigChanged = currentFireworksConfigHash !== this.lastFireworksConfigHash
-    const fireworksGeneration = this.syncFireworksFetchGeneration(currentFireworksConfigHash)
-
-    const currentCopilotConfigHash = copilotCredentials.configHash
-    const copilotConfigChanged = currentCopilotConfigHash !== this.lastCopilotConfigHash
-    const copilotGeneration = this.syncCopilotFetchGeneration(currentCopilotConfigHash)
 
     this.markProvidersFetching({
       previousState,
@@ -144,9 +128,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       changed: {
         opencodeGo: opencodeConfigChanged,
         minimax: miniMaxConfigChanged,
-        deepseek: deepSeekConfigChanged,
-        fireworks: fireworksConfigChanged,
-        copilot: copilotConfigChanged,
+        deepseek: forkProviderCycle.deepSeek.configChanged,
+        fireworks: forkProviderCycle.fireworks.configChanged,
+        copilot: forkProviderCycle.copilot.configChanged,
         zcode: zcodeConfigChanged
       }
     })
@@ -186,23 +170,13 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
 
     // Why: automated checks must honor the endpoint's Retry-After even when live display is available.
     const claudeFetchGated =
-      !options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude)
+      disabled.has('claude') ||
+      (!options?.force && this.shouldSkipAutomatedFetch('claude', previousState.claude))
 
-    const [
-      claudeResult,
-      codexResult,
-      geminiResult,
-      opencodeGoResult,
-      kimiResult,
-      miniMaxResult,
-      deepSeekResult,
-      fireworksResult,
-      copilotResult
-    ] = await Promise.allSettled([
-      claudeFetchGated
-        ? Promise.resolve(previousState.claude as ProviderRateLimits)
-        : disabled.has('claude')
-          ? Promise.resolve(this.disabledUsageProviderSnapshot('claude'))
+    const [claudeResult, codexResult, geminiResult, opencodeGoResult, kimiResult, miniMaxResult] =
+      await Promise.allSettled([
+        claudeFetchGated
+          ? Promise.resolve(previousState.claude as ProviderRateLimits)
           : fetchClaudeRateLimits({
               authPreparation: claudeAuthPreparation,
               allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
@@ -210,16 +184,15 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
               networkProxySettings: this.networkProxySettingsResolver?.(),
               signal
             }),
-      codexFetchGated
-        ? Promise.resolve(previousState.codex as ProviderRateLimits)
-        : (missingWslCodexHome ??
-          fetchCodexRateLimits({
-            codexHomePath,
-            networkProxySettings: this.networkProxySettingsResolver?.(),
-            signal
-          })),
-      this.fetchUnlessDisabled('gemini', () => fetchGeminiRateLimits(geminiCliOAuthEnabled)),
-      this.fetchUnlessDisabled('opencode-go', () =>
+        codexFetchGated
+          ? Promise.resolve(previousState.codex as ProviderRateLimits)
+          : (missingWslCodexHome ??
+            fetchCodexRateLimits({
+              codexHomePath,
+              networkProxySettings: this.networkProxySettingsResolver?.(),
+              signal
+            })),
+        fetchGeminiRateLimits(geminiCliOAuthEnabled),
         fetchOpenCodeGoUsage({
           settingsApiKey: openCodeGoApiKey,
           // Why here: the key can also come from the environment or OpenCode's
@@ -239,12 +212,9 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
           workspaceIdOverride: workspaceIdOverride || undefined,
           networkProxySettings: this.networkProxySettingsResolver?.(),
           signal
-        })
-      ),
-      this.fetchKimiWithResolvedHome(),
-      disabled.has('minimax')
-        ? Promise.resolve(this.disabledUsageProviderSnapshot('minimax'))
-        : miniMaxConfigResult.error
+        }),
+        this.fetchKimiWithResolvedHome(),
+        miniMaxConfigResult.error
           ? Promise.resolve(this.getMiniMaxCredentialError(miniMaxConfigResult.error))
           : fetchMiniMaxRateLimits({
               cookie: miniMaxCookie,
@@ -252,30 +222,8 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
               models: miniMaxModels,
               endpointMode: miniMaxEndpoint,
               apiKey: miniMaxApiKey
-            }),
-      disabled.has('deepseek')
-        ? Promise.resolve(this.disabledUsageProviderSnapshot('deepseek'))
-        : deepSeekConfigResult.error
-          ? Promise.resolve(this.getApiKeyCredentialError('deepseek', deepSeekConfigResult.error))
-          : fetchDeepSeekRateLimits({ apiKey: deepSeekApiKey }),
-      disabled.has('fireworks')
-        ? Promise.resolve(this.disabledUsageProviderSnapshot('fireworks'))
-        : fireworksConfigResult.error
-          ? Promise.resolve(this.getApiKeyCredentialError('fireworks', fireworksConfigResult.error))
-          : fetchFireworksRateLimits({
-              apiKey: fireworksApiKey,
-              accountIdOverride: fireworksAccountIdOverride
-            }),
-      disabled.has('copilot')
-        ? Promise.resolve(this.disabledUsageProviderSnapshot('copilot'))
-        : copilotConfigResult.error
-          ? Promise.resolve(this.getApiKeyCredentialError('copilot', copilotConfigResult.error))
-          : fetchCopilotRateLimits({
-              token: copilotToken,
-              enterpriseSlug: copilotEnterpriseSlug,
-              source: copilotSource
             })
-    ])
+      ])
 
     if (signal.aborted) {
       return null
@@ -309,12 +257,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
       miniMaxGeneration,
       zcodeConfigChanged,
       zcodeGeneration,
-      deepSeekConfigChanged,
-      deepSeekGeneration,
-      fireworksConfigChanged,
-      fireworksGeneration,
-      copilotConfigChanged,
-      copilotGeneration,
+      forkProviderCycle,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -322,10 +265,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult,
-        deepSeekResult,
-        fireworksResult,
-        copilotResult
+        miniMaxResult
       ],
       grokResultPromise,
       cursorResultPromise,

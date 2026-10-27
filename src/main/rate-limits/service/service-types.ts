@@ -13,6 +13,7 @@ import type {
 } from '../../codex-accounts/runtime-selection'
 import type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
 import type { SettledProviderResult } from './service-sibling-provider-result'
+import type { ForkProviderCyclePrepared } from '../fork/fork-provider-cycle'
 
 export type {
   CodexRateLimitResetResult,
@@ -194,17 +195,9 @@ export type FetchAllCyclePrepared = {
   miniMaxGeneration: number
   zcodeConfigChanged: boolean
   zcodeGeneration: number
-  deepSeekConfigChanged: boolean
-  deepSeekGeneration: number
-  fireworksConfigChanged: boolean
-  fireworksGeneration: number
-  copilotConfigChanged: boolean
-  copilotGeneration: number
+  forkProviderCycle: ForkProviderCyclePrepared
   claudeFetchGated: boolean
   results: [
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
-    PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,
     PromiseSettledResult<ProviderRateLimits>,

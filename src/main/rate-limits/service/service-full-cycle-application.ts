@@ -1,5 +1,6 @@
 import { RateLimitServiceFullCyclePreparation } from './service-full-cycle-preparation'
 import { providerResultSnapshot } from './service-provider-result-snapshot'
+import { applyForkProviderCycle } from '../fork/fork-provider-cycle'
 import { isZcodeUsageCredentialCurrent } from '../zcode-usage-credentials'
 import { settleSiblingProviderResult } from './service-sibling-provider-result'
 
@@ -28,12 +29,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       miniMaxGeneration,
       zcodeConfigChanged,
       zcodeGeneration,
-      deepSeekConfigChanged,
-      deepSeekGeneration,
-      fireworksConfigChanged,
-      fireworksGeneration,
-      copilotConfigChanged,
-      copilotGeneration,
+      forkProviderCycle,
       claudeFetchGated,
       results: [
         claudeResult,
@@ -41,10 +37,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         geminiResult,
         opencodeGoResult,
         kimiResult,
-        miniMaxResult,
-        deepSeekResult,
-        fireworksResult,
-        copilotResult
+        miniMaxResult
       ],
       grokResultPromise,
       cursorResultPromise,
@@ -67,12 +60,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     const kimi = providerResultSnapshot('kimi', kimiResult)
 
     const miniMax = providerResultSnapshot('minimax', miniMaxResult)
-
-    const deepSeek = providerResultSnapshot('deepseek', deepSeekResult)
-
-    const fireworks = providerResultSnapshot('fireworks', fireworksResult)
-
-    const copilot = providerResultSnapshot('copilot', copilotResult)
 
     // Why: a disabled provider skips these late reads too — resolveCodexHome and the
     // Claude auth preparation both touch local credential homes after the fetch.
@@ -110,10 +97,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       this.isSameClaudeTarget(claudeTarget, this.claudeFetchTarget)
     const shouldApplyOpencode = opencodeGeneration === this.opencodeFetchGeneration
     const shouldApplyMiniMax = miniMaxGeneration === this.minimaxFetchGeneration
-    // Why: a credential paste between cycles must discard the in-flight result, or the old key's snapshot overwrites the new one.
-    const shouldApplyDeepSeek = deepSeekGeneration === this.deepseekFetchGeneration
-    const shouldApplyFireworks = fireworksGeneration === this.fireworksFetchGeneration
-    const shouldApplyCopilot = copilotGeneration === this.copilotFetchGeneration
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', claude)
@@ -128,15 +111,6 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
     this.trackActiveFailureStreak('kimi', kimi)
     if (shouldApplyMiniMax) {
       this.trackActiveFailureStreak('minimax', miniMax)
-    }
-    if (shouldApplyDeepSeek) {
-      this.trackActiveFailureStreak('deepseek', deepSeek)
-    }
-    if (shouldApplyFireworks) {
-      this.trackActiveFailureStreak('fireworks', fireworks)
-    }
-    if (shouldApplyCopilot) {
-      this.trackActiveFailureStreak('copilot', copilot)
     }
 
     // Why: apply a Codex result only when provenance and generation still match, else a raced in-flight fetch overwrites the new account.
@@ -161,25 +135,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
         ? miniMaxConfigChanged
           ? miniMax
           : this.applyStalePolicy(miniMax, previousState.minimax)
-        : this.state.minimax,
-      deepseek: shouldApplyDeepSeek
-        ? deepSeekConfigChanged
-          ? deepSeek
-          : this.applyStalePolicy(deepSeek, previousState.deepseek)
-        : this.state.deepseek,
-      fireworks: shouldApplyFireworks
-        ? fireworksConfigChanged
-          ? fireworks
-          : this.applyStalePolicy(fireworks, previousState.fireworks)
-        : this.state.fireworks,
-      copilot: shouldApplyCopilot
-        ? copilotConfigChanged
-          ? copilot
-          : this.applyStalePolicy(copilot, previousState.copilot)
-        : this.state.copilot,
-      // Why: disabled wins over every value above, so Claude's live-session stale
-      // preservation cannot keep a switched-off provider's data on screen.
-      ...this.disabledUsageProviderStateOverrides()
+        : this.state.minimax
     })
 
     const [grokSettled, cursorSettled, zcodeSettled, antigravitySettled] = await Promise.all([
@@ -188,6 +144,7 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       zcodeResultPromise,
       antigravityResultPromise
     ])
+    const { deepseek, fireworks, copilot } = await applyForkProviderCycle(forkProviderCycle)
     if (signal.aborted) {
       return
     }
@@ -223,12 +180,27 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
       previousZcodeAccount !== undefined &&
       zcodeAccount !== undefined &&
       previousZcodeAccount === zcodeAccount
+    // Why: a credential paste between cycles must discard the in-flight result, or the old key's snapshot overwrites the new one.
+    const shouldApplyDeepSeek =
+      forkProviderCycle.deepSeek.generation === this.deepseekFetchGeneration
+    const shouldApplyFireworks =
+      forkProviderCycle.fireworks.generation === this.fireworksFetchGeneration
+    const shouldApplyCopilot = forkProviderCycle.copilot.generation === this.copilotFetchGeneration
     this.trackActiveFailureStreak('grok', grok)
     this.trackActiveFailureStreak('cursor', cursor)
     if (shouldApplyZcode) {
       this.trackActiveFailureStreak('zcode', zcode)
     }
     this.trackActiveFailureStreak('antigravity', antigravity)
+    if (shouldApplyDeepSeek) {
+      this.trackActiveFailureStreak('deepseek', deepseek)
+    }
+    if (shouldApplyFireworks) {
+      this.trackActiveFailureStreak('fireworks', fireworks)
+    }
+    if (shouldApplyCopilot) {
+      this.trackActiveFailureStreak('copilot', copilot)
+    }
     this.updateState({
       ...this.state,
       grok: this.applyStalePolicy(grok, previousState.grok),
@@ -241,8 +213,21 @@ export abstract class RateLimitServiceFullCycleApplication extends RateLimitServ
             ? zcode
             : this.applyStalePolicy(zcode, previousState.zcode),
       antigravity: this.applyStalePolicy(antigravity, previousState.antigravity),
-      // Why: disabled Grok/Cursor must not survive the stale policy above either.
-      ...this.disabledUsageProviderStateOverrides()
+      deepseek: shouldApplyDeepSeek
+        ? forkProviderCycle.deepSeek.configChanged
+          ? deepseek
+          : this.applyStalePolicy(deepseek, previousState.deepseek)
+        : this.state.deepseek,
+      fireworks: shouldApplyFireworks
+        ? forkProviderCycle.fireworks.configChanged
+          ? fireworks
+          : this.applyStalePolicy(fireworks, previousState.fireworks)
+        : this.state.fireworks,
+      copilot: shouldApplyCopilot
+        ? forkProviderCycle.copilot.configChanged
+          ? copilot
+          : this.applyStalePolicy(copilot, previousState.copilot)
+        : this.state.copilot
     })
   }
 }

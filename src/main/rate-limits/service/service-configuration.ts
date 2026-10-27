@@ -159,9 +159,6 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
     const disabled = this.disabledUsageProviderIds()
     return {
       ...this.state,
-      // Why: a disabled provider's slot must read null on every push, not only the
-      // cycle that first observed the toggle, so mobile and the renderer agree.
-      ...this.disabledUsageProviderStateOverrides(),
       // Why: the cookie lives on the filesystem, not GlobalSettings; surface its presence so the renderer keeps the MiniMax bar across reloads.
       minimaxCookieConfigured: disabled.has('minimax') ? false : hasMiniMaxSessionCookie(),
       minimaxApiKeyConfigured: disabled.has('minimax') ? false : hasMiniMaxApiKey(),

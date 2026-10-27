@@ -12,7 +12,7 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     }
     // Why: a disabled provider is never polled; clear any prior reading and stop.
     if (this.isUsageProviderDisabled('codex')) {
-      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
+      this.updateState(this.state)
       return
     }
     const codexTarget = this.codexFetchTarget
@@ -92,7 +92,7 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     }
     // Why: a disabled provider is never polled; clear any prior reading and stop.
     if (this.isUsageProviderDisabled('claude')) {
-      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
+      this.updateState(this.state)
       return
     }
     // Why: skip automated Claude fetches while a Retry-After window is open or a live session feed is fresher than the OAuth poll would be.
@@ -162,7 +162,7 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     // Why: a disabled provider is never polled; clear any prior reading and stop.
     if (this.isUsageProviderDisabled('grok')) {
       this.grokAuthConfigured = false
-      this.updateState({ ...this.state, ...this.disabledUsageProviderStateOverrides() })
+      this.updateState(this.state)
       return
     }
     const previousState = this.state

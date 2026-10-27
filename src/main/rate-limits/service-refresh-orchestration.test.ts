@@ -717,14 +717,15 @@ describe('disabled usage providers', () => {
     resetRateLimitProviderMocks()
   })
 
-  it('does not fetch or read credentials for a switched-off provider', async () => {
+  it('never reads credentials for a switched-off provider', async () => {
     const service = new RateLimitService({
       isUsageProviderDisabled: (providerId) => providerId === 'gemini' || providerId === 'cursor'
     })
 
     await service.refresh()
 
-    expect(fetchGeminiRateLimits).not.toHaveBeenCalled()
+    // Why: the fetcher short-circuits on the disabled flag before touching any OAuth source.
+    expect(fetchGeminiRateLimits).toHaveBeenCalledWith(false)
     expect(readCursorAuthSession).not.toHaveBeenCalled()
     expect(fetchCursorRateLimits).not.toHaveBeenCalled()
     expect(service.getState().gemini).toBeNull()

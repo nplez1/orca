@@ -447,6 +447,25 @@ repeated conflict shape in the repo" (`:256`).
   gate from per-call-site ternaries to the resolvers injected by `provider-account-services.ts`,
   applied once in `updateState`; grok/cursor keep one ternary each.
 
+  **Done 2026-10-27.** `rate-limits/fork/fork-provider-cycle.ts` (147 lines) prepares the three configs,
+  fingerprints them and creates one `trackSettledProviderResult` promise each; apply collapses them with
+  `settleSiblingProviderResult`. The preparation file's `Promise.allSettled` block — the 50-line
+  destructure and tuple — is **byte-identical to `0571e45107`**, verified with `diff`, which was the
+  point of the seam; its fork hunks went 11 → 8 and it lost 60 net lines. The `disabled` gate moved to
+  the injected-resolver boundary in `service-fetch-targets.ts` and is applied once in `updateState`
+  (`disabledUsageProviderSnapshot`), which deleted `fetchUnlessDisabled` from `service-state.ts`.
+  Two tests: sibling settle order (chip `fetching` mid-cycle, `ok` after), and a disabled provider
+  reading nothing (three resolvers, the gh probe and three fetchers all uncalled, slots null).
+
+  **One caveat worth its own line:** with the tuple back to verbatim, a disabled **opencode-go** still
+  enters upstream's `fetchOpenCodeGoUsage` with an empty config — the env/OpenCode-store probe runs,
+  the resolver does not. Same shape for the other upstream-owned providers at their variable
+  boundaries; only gemini and cursor are test-pinned. That is upstream's own code path doing its own
+  early return, not the fork reading a credential, which is why the pinned test now asserts
+  `toHaveBeenCalledWith(false)` instead of `not.toHaveBeenCalled()` — `gemini-usage-fetcher.ts:221`
+  returns before touching any OAuth source. Buying "the fetcher is never entered" would have meant
+  keeping a fork hunk in upstream's tuple, which is the thing this section exists to remove.
+
 **Two properties need tests:** sibling settle order (the fork chip stops showing "fetching"), and
 "a disabled provider never reads its credentials" — assert no resolver call.
 

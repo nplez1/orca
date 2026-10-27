@@ -33,28 +33,40 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFe
     return this.zcodeFetchGeneration
   }
 
-  protected syncDeepSeekFetchGeneration(fingerprint: string): number {
-    if (fingerprint !== this.lastDeepSeekConfigHash) {
+  protected syncDeepSeekFetchGeneration(fingerprint: string): {
+    generation: number
+    changed: boolean
+  } {
+    const changed = fingerprint !== this.lastDeepSeekConfigHash
+    if (changed) {
       this.lastDeepSeekConfigHash = fingerprint
       this.deepseekFetchGeneration += 1
     }
-    return this.deepseekFetchGeneration
+    return { generation: this.deepseekFetchGeneration, changed }
   }
 
-  protected syncFireworksFetchGeneration(fingerprint: string): number {
-    if (fingerprint !== this.lastFireworksConfigHash) {
+  protected syncFireworksFetchGeneration(fingerprint: string): {
+    generation: number
+    changed: boolean
+  } {
+    const changed = fingerprint !== this.lastFireworksConfigHash
+    if (changed) {
       this.lastFireworksConfigHash = fingerprint
       this.fireworksFetchGeneration += 1
     }
-    return this.fireworksFetchGeneration
+    return { generation: this.fireworksFetchGeneration, changed }
   }
 
-  protected syncCopilotFetchGeneration(fingerprint: string): number {
-    if (fingerprint !== this.lastCopilotConfigHash) {
+  protected syncCopilotFetchGeneration(fingerprint: string): {
+    generation: number
+    changed: boolean
+  } {
+    const changed = fingerprint !== this.lastCopilotConfigHash
+    if (changed) {
       this.lastCopilotConfigHash = fingerprint
       this.copilotFetchGeneration += 1
     }
-    return this.copilotFetchGeneration
+    return { generation: this.copilotFetchGeneration, changed }
   }
 
   /** Mark every provider as fetching while its previous data stays visible, so the
@@ -111,9 +123,7 @@ export abstract class RateLimitServiceCycleFetchState extends RateLimitServiceFe
       cursor: this.withFetchingStatus(previousState.cursor, 'cursor'),
       zcode: changed.zcode
         ? this.withFetchingStatus(null, 'zcode')
-        : this.withFetchingStatus(previousState.zcode, 'zcode'),
-      // Why: a disabled provider holds no snapshot at all, so a prior reading cannot linger.
-      ...this.disabledUsageProviderStateOverrides()
+        : this.withFetchingStatus(previousState.zcode, 'zcode')
     })
   }
 }
