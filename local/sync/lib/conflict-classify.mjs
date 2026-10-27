@@ -409,8 +409,15 @@ const LEDGER_FIELDS = {
   Decision: 'decision',
   Why: 'why',
   'Do not': 'doNot',
-  Tooling: 'tooling'
+  Tooling: 'tooling',
+  Resolution: 'resolution'
 }
+
+/**
+ * The verbs a `**Resolution:**` line may carry. A conflict is one of these five things and nothing
+ * else, so naming it turns a decision a human re-derives into one a resolver can apply.
+ */
+export const LEDGER_RESOLUTIONS = ['keep-ours', 'take-theirs', 'delete', 'rerere', 'manual']
 
 // Commas outside `{a,b}` alternation separate globs; inside, they are part of one glob.
 function globList(text) {
@@ -448,7 +455,8 @@ export function parseLedger(markdown) {
         decision: [],
         why: [],
         doNot: [],
-        tooling: []
+        tooling: [],
+        resolution: []
       }
       sections.push(section)
       field = null
@@ -458,7 +466,9 @@ export function parseLedger(markdown) {
       field = null
       continue
     }
-    const entry = /^\*\*(Paths|Decision|Why|Do not|Tooling):\*\*\s*(.*)$/.exec(row.trim())
+    const entry = /^\*\*(Paths|Decision|Why|Do not|Tooling|Resolution):\*\*\s*(.*)$/.exec(
+      row.trim()
+    )
     if (entry) {
       field = LEDGER_FIELDS[entry[1]]
       const value = entry[2].trim()
@@ -516,4 +526,23 @@ export function globMatches(glob, path) {
 
 export function ledgerMatches(sections, path) {
   return sections.filter((section) => section.paths.some((glob) => globMatches(glob, path)))
+}
+
+/**
+ * The actionable half of a ledger entry: one of `LEDGER_RESOLUTIONS`, plus whatever the author wrote
+ * after it as a note. `null` when the section records no resolution, and `unknown` when it records one
+ * this fork does not recognise — an unrecognised verb must read as a defect in the ledger rather than
+ * silently as "no instruction", which is how a malformed entry would otherwise hide.
+ */
+export function ledgerResolution(section) {
+  const line = section?.resolution?.[0]?.trim()
+  if (!line) {
+    return null
+  }
+  const [verb, ...rest] = line.split(/\s+/)
+  return {
+    action: LEDGER_RESOLUTIONS.includes(verb) ? verb : 'unknown',
+    verb,
+    note: rest.join(' ').trim()
+  }
 }

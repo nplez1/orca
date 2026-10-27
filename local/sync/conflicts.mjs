@@ -20,6 +20,7 @@ import {
   classifyFile,
   UNMERGED_STATUS,
   ledgerMatches,
+  ledgerResolution,
   parseLedger
 } from './lib/conflict-classify.mjs'
 
@@ -263,13 +264,22 @@ function loadLedger() {
     const orphans = sections
       .filter((section) => section.paths.length === 0)
       .map((section) => section.title)
+    // Why: an unrecognised Resolution verb is a ledger defect, not "no instruction".
+    const badResolutions = sections
+      .map((section) => ({ section, resolution: ledgerResolution(section) }))
+      .filter(({ resolution }) => resolution?.action === 'unknown')
+      .map(({ section, resolution }) => `${section.title} (${resolution.verb})`)
+    const problems = []
+    if (orphans.length > 0) {
+      problems.push(`ledger section(s) with no Paths, check by hand: ${orphans.join('; ')}`)
+    }
+    if (badResolutions.length > 0) {
+      problems.push(`ledger Resolution verb(s) not in the fixed set: ${badResolutions.join('; ')}`)
+    }
     return {
       found: true,
       sections,
-      note:
-        orphans.length === 0
-          ? null
-          : `ledger section(s) with no Paths, check by hand: ${orphans.join('; ')}`
+      note: problems.length === 0 ? null : problems.join(' | ')
     }
   } catch (error) {
     return {
@@ -285,7 +295,8 @@ function attachLedger(files, ledger) {
     file.ledger = ledgerMatches(ledger.sections, file.path).map((section) => ({
       title: section.title,
       decision: section.decision,
-      doNot: section.doNot
+      doNot: section.doNot,
+      resolution: ledgerResolution(section)
     }))
   }
 }
@@ -377,6 +388,13 @@ function fileRows(file) {
   }
   for (const entry of file.ledger) {
     rows.push(`  ledger — ${entry.title}`)
+    if (entry.resolution) {
+      const { action, verb, note } = entry.resolution
+      const actionLabel = action === 'unknown' ? `${verb} (unrecognised verb)` : action
+      rows.push(
+        `    resolve  ${truncate([actionLabel, note].filter(Boolean).join(' — '), WIDTH - 13)}`
+      )
+    }
     for (const [label, field] of [
       ['decision', 'decision'],
       ['do not  ', 'doNot']
