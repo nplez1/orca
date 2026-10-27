@@ -582,11 +582,32 @@ since 10-16), the full lint chain / `gate-lint.mjs` instead of bare `oxlint`, an
 ### 6.1 Fork-surface smoke selector
 
 Run the tests the fork's own patches touch (fork-side diff `merge-base..M^1`) plus tests coupled one
-import level away, using the existing `branchCoupledPaths` logic. Measured on merge `281cccf5a4`:
-954 fork-touched test files, of which 526 in the timing baseline cost 8.8 test-minutes ≈ 5–10 min at
-2 workers, against 43 minutes for the full gate. Test-or-sibling matching alone caught 11 of 18
-repaired files in the last sync; the import walk closes the rest. This gives the two-tier sync
-check the AGENTS.md verification tiers already describe but the repo does not have.
+import level away, using the existing `branchCoupledPaths` logic.
+
+**Built:** `local/sync/smoke-selector.mjs` (thin CLI over `local/sync/lib/smoke-select.mjs`, 10 fixture
+tests). It resolves a merge revision to `merge-base(M^1,M^2)..M^1`, reads tests and imports at the merge
+commit, and reports provenance per file, the touched tests it _cannot_ run, and any shared harness input
+the diff touches.
+
+**Measured on merge `281cccf5a4`, and it overturns the cost claim below's predecessor.** The fork-side
+diff is 2,844 files containing **exactly 954 test files** — that number reproduces — of which 886 are
+executable unit tests at the merge (28 deleted by the merge, 40 outside the unit suite):
+
+| Mode                       | Selection                   | Cost at the plan's 1.0 s/file rate | At 2 workers |
+| -------------------------- | --------------------------- | ---------------------------------- | ------------ |
+| `--touched-only`           | 886 files                   | 14.8 test-minutes                  | ~7 min       |
+| touched + one import level | 4,459 files (3,573 coupled) | 74.6 test-minutes                  | ~37 min      |
+| full unit gate             | 13,064 files                | —                                  | ~43 min      |
+
+So "526 files / 8.8 test-minutes" is not reconstructable from the tree, and the import walk is **not**
+the cheap mode: it costs within 15% of the full gate it was meant to replace. The cheap mode is
+`--touched-only`, which is where the original 5–10 minute estimate holds. Reach and speed are different
+axes here: touched-only is fast but misses what a re-imported sibling breaks; the walk catches it for
+full-gate money. Neither replaces the release gate, and the selector says which one it is running.
+
+That diff is also already a full-gate change on the repo's own rule — it touches
+`config/vitest.config.ts`, `package.json`, `pnpm-lock.yaml` and six `process-host` files — which is why
+the tool reports harness coupling loudly instead of quietly expanding itself to the whole suite.
 
 ### 6.2 Make the nightly's Linux pass count
 
