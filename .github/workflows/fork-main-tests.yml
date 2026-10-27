@@ -20,8 +20,12 @@ permissions:
   contents: read
 
 concurrency:
+  # Why: a run that never finishes must not block the next night. `cancel-in-progress: false` meant one
+  # wedged run (see the relay job note below) suppressed every later schedule until a human cancelled
+  # it — the fork went eighteen days with no passing nightly and nothing said so. Superseding is safe
+  # here because a run takes minutes and the next schedule is a day away.
   group: fork-main-unit-tests
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   plan:
