@@ -105,6 +105,44 @@ test('upstream removing a comment pair that wrapped context code is refused on b
   )
 })
 
+test('a block comment upstream opens after code on the same line is refused on both hunks', () => {
+  const merged = file(
+    'a()',
+    hunk({
+      ours: ['const x = 1'],
+      base: ['const x =  1'],
+      theirs: ['const x = 1 /* upstream disabled b']
+    }),
+    'b()',
+    hunk({ ours: ['c()'], base: ['c( )'], theirs: ['*/ c()'] }),
+    'd()'
+  )
+  const result = proveFile({ path: 'src/a.ts', merged })
+  assert.equal(result.fullyProven, false)
+  assert.deepEqual(
+    result.hunks.map((proof) => [proof.tier, proof.reason]),
+    [
+      [null, 'a comment crosses the hunk edge on the theirs side'],
+      [null, 'a comment crosses the hunk edge on the theirs side']
+    ]
+  )
+})
+
+test('a comment opener inside JSX text is text, so it cannot cross a hunk edge', () => {
+  const proof = only(
+    file(
+      'const el = <p>/* text</p>',
+      hunk({
+        ours: ['const x = 1 // fork'],
+        base: ['const x = 1'],
+        theirs: ['const x = 2 /* upstream */']
+      })
+    ),
+    'src/a.tsx'
+  )
+  assert.equal(proof.tier, 'fork-unchanged')
+})
+
 test('a hunk wholly inside one comment on every side still proves', () => {
   const proof = only(
     file(
@@ -140,6 +178,37 @@ test('a space on one line of JSX text renders, so upstream removing it is a chan
     'src/a.tsx'
   )
   assert.equal(reindented.tier, 'upstream-unchanged')
+})
+
+test('whitespace between JSX children is a change only where it renders', () => {
+  const children = (lines) => file('const el = (', '  <div>', hunk(lines), '  </div>', ')')
+  const reindented = proveFile({
+    path: 'src/a.tsx',
+    merged: children({
+      ours: ['      <A />'],
+      base: ['    <A />'],
+      theirs: ['    <A />', '    <B />']
+    })
+  })
+  assert.equal(reindented.hunks[0].tier, 'fork-unchanged')
+  assert.equal(
+    reindented.resolvedText,
+    file('const el = (', '  <div>', '    <A />', '    <B />', '  </div>', ')')
+  )
+  const dedented = only(
+    children({ ours: ['<A />'], base: ['    <A />'], theirs: ['    <A />', '    <B />'] }),
+    'src/a.tsx'
+  )
+  assert.equal(dedented.tier, 'fork-unchanged')
+  const unspaced = only(
+    children({
+      ours: ['    <b>{n}</b> <i className="fork" />'],
+      base: ['    <b>{n}</b> <i />'],
+      theirs: ['    <b>{n}</b><i />']
+    }),
+    'src/a.tsx'
+  )
+  assert.equal(unspaced.tier, null)
 })
 
 test('identity-only takes theirs and re-applies the fork literal', () => {

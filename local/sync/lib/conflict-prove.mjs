@@ -64,12 +64,20 @@ export function reconstruct(merged, hunks, side) {
   return { text: out.join('\n'), ranges }
 }
 
-// `getStart` skips a JSX text's leading whitespace, which renders when it sits on one line.
-const tokenStart = (node, sf) =>
-  node.kind === ts.SyntaxKind.JsxText ? node.pos : node.getStart(sf)
+// JSX whitespace renders unless it holds a newline, so a text's own line is where it starts.
+function regionStart(node, sf) {
+  const start = node.getStart(sf)
+  if (node.kind !== ts.SyntaxKind.JsxText) {
+    return start
+  }
+  const lead = sf.text.slice(node.pos, start)
+  return node.pos + Math.max(lead.lastIndexOf('\n'), lead.lastIndexOf('\r')) + 1
+}
 
 function normalizedLeaf(node, sf) {
-  const text = sf.text.slice(tokenStart(node, sf), node.getEnd())
+  // `getStart` skips a JSX text's leading whitespace, which renders when it sits on one line.
+  const from = node.kind === ts.SyntaxKind.JsxText ? node.pos : node.getStart(sf)
+  const text = sf.text.slice(from, node.getEnd())
   if (node.kind === ts.SyntaxKind.JsxText) {
     // JSX drops only whitespace runs that contain a newline; a space on a single line renders.
     const lines = text.split(/\r\n|\r|\n/)
@@ -101,10 +109,15 @@ export function regionNodes(sf, [start, end]) {
   const roots = []
   let straddles = false
   const visit = (node) => {
-    if (isJsDoc(node) || node.kind === ts.SyntaxKind.EndOfFileToken) {
+    // Whitespace between JSX children on separate lines never renders, and it spans the line break.
+    if (
+      isJsDoc(node) ||
+      node.kind === ts.SyntaxKind.EndOfFileToken ||
+      (node.kind === ts.SyntaxKind.JsxText && node.containsOnlyTriviaWhiteSpaces)
+    ) {
       return
     }
-    const nodeStart = tokenStart(node, sf)
+    const nodeStart = regionStart(node, sf)
     const nodeEnd = node.getEnd()
     if (nodeEnd <= start || nodeStart >= end || nodeStart === nodeEnd) {
       return
@@ -126,23 +139,31 @@ export function regionNodes(sf, [start, end]) {
   return { entries, roots, straddles }
 }
 
-/** Every comment's [pos, end), read from the trivia before each token so JSX text never counts as one. */
+/** Every comment's [pos, end), read from the trivia around each token so JSX text never counts as one. */
 export function commentRanges(sf) {
   const ranges = new Map()
+  const jsxTexts = []
   const visit = (node) => {
     if (isJsDoc(node)) {
       return
     }
     const children = node.getChildren(sf)
-    if (children.length === 0 && node.kind !== ts.SyntaxKind.JsxText) {
-      for (const range of ts.getLeadingCommentRanges(sf.text, node.pos) ?? []) {
+    if (node.kind === ts.SyntaxKind.JsxText) {
+      jsxTexts.push([node.pos, node.end])
+    } else if (children.length === 0) {
+      // A comment opening on the previous token's line is that token's trailing comment, not a leading one.
+      for (const range of [
+        ...(ts.getLeadingCommentRanges(sf.text, node.pos) ?? []),
+        ...(ts.getTrailingCommentRanges(sf.text, node.end) ?? [])
+      ]) {
         ranges.set(range.pos, range.end)
       }
     }
     children.forEach(visit)
   }
   visit(sf)
-  return [...ranges]
+  // A trailing scan from a JSX tag's `>` reads the text after it as trivia.
+  return [...ranges].filter(([pos]) => !jsxTexts.some(([from, to]) => pos >= from && pos < to))
 }
 
 /** `crosses` when a comment runs over one edge of [start, end), `enclosed` when one spans both. */
