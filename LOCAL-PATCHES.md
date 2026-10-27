@@ -1405,6 +1405,23 @@ Three changes:
 - **`node local/check-nightly-liveness.mjs`**, because the first two only make a failure faster. See
   below.
 
+**A shard now greens for a known red, and reds for anything else.** `unit-tests.yml`'s shard job leaves
+Vitest's exit code in charge upstream and hands it to `local/check-unit-shard-verdict.mjs` here, so that
+script is what reds a nightly shard. It ignored `local/nightly-linux-known-red.json`, which meant every
+recurrence of the already-triaged daemon disconnect race failed the workflow and emailed an alarm — at
+07:19 on 2026-10-27 for shard 4/5, a failure whose evidence was already written down. It now reads the
+manifest on Linux: a matching red is a tolerated warning and the shard passes, an unmatched one still
+fails by name. Four inputs are never absorbed — a file-level error (including one beside an absorbed
+row), a report declaring more failures than it lists, an unhandled error other than the tolerated
+teardown race, and a shard that failed with nothing to explain it. It cannot see a describe-level hook
+failure that Vitest attributes to a suite rather than to the file's `message`, because
+`numFailedTestSuites` counts failing describes as well as files (2 for one failing file, measured) and
+would red every night.
+
+The night's verdict is still the cross-shard checker's, not the shard's: `--failures` insists on one
+report per declared shard and fails a red that no entry accounts for. What the shard-level change buys
+is that a known red no longer sends mail; a new one still does, once, with its name.
+
 **What the first real runs measured.** The 2026-10-26 scheduled run (id `40308443374`) is unusable as a
 red set: its cancel rewrote the run-level conclusion, so a reader saw four red shards and no verdict.
 The cleaner measurement is the 2026-10-27 dispatch (id `40460070298`, tree = `nplez1/main` plus this
