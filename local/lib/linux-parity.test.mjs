@@ -410,6 +410,29 @@ test('a suite error alongside the listed failure is not absorbed by the entry', 
   assert.equal(result.unexpected[0].test, '(file-level failure)')
 })
 
+test('a short title whose full name carries a describe prefix is still found', () => {
+  // The Mac allowlist stores Vitest's full name; a red-set entry stores the bare title. Matching the
+  // name exactly read a test that passed as absent, and told the operator to keep a prunable entry.
+  const result = judgeLinuxFailures(
+    manifestOf([RED_SET_ENTRY]),
+    linuxIndex([
+      fileResult('src/main/daemon/daemon-race.test.ts', {
+        status: 'passed',
+        assertions: [
+          assertion('DaemonPtyAdapter recovery serializes concurrent checkpoints', 'passed')
+        ]
+      })
+    ])
+  )
+  assert.equal(result.ok, true)
+  assert.equal(result.stale.length, 1)
+  assert.equal(result.stale[0].status, 'passed')
+  assert.match(
+    formatLinuxFailures(result, { allowlistPath: 'a.json', reportCount: 1 }).join('\n'),
+    /prunable/
+  )
+})
+
 test('stale tells a passed entry apart from one that never ran', () => {
   const passed = judgeLinuxFailures(
     manifestOf([RED_SET_ENTRY]),

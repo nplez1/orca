@@ -282,6 +282,34 @@ function entryMatchesFailure(entry, failure) {
 }
 
 /**
+ * What a red-set entry did on Linux, matched the way failures are matched. `judgeParityEntry` is not
+ * used here on purpose: it compares the name exactly, because the Mac allowlist stores Vitest's full
+ * name including the describe prefix, while a red-set entry stores the bare title — so an entry whose
+ * test passed read as `absent` and told the operator to keep an entry that could be pruned.
+ */
+function entryOutcome(entry, index) {
+  const paths = reportPathsFor(index.files, entry.file)
+  if (paths.length === 0) {
+    return { status: ABSENT, detail: 'no shard report collected this file' }
+  }
+  const rows = paths.flatMap((path) =>
+    index.files
+      .get(path)
+      .assertions.filter((assertion) =>
+        entryMatchesFailure(entry, { file: path, test: assertion.test })
+      )
+      .map((assertion) => ({ ...assertion, path }))
+  )
+  if (rows.some((row) => row.status === 'failed')) {
+    return { status: FAILED, detail: `${rows[0].path}: the listed red still fails` }
+  }
+  if (rows.some((row) => row.status === 'passed')) {
+    return { status: PASSED, detail: '' }
+  }
+  return { status: ABSENT, detail: `${entry.file} ran but reported no test of this name` }
+}
+
+/**
  * The complement of `judgeParity`. Parity asks whether this Mac's red set holds on Linux; this asks
  * whether anything else is red there, against `local/nightly-linux-known-red.json`. Without it a
  * nightly is red forever on one upstream race, which teaches everyone to ignore red.
@@ -353,7 +381,7 @@ export function judgeLinuxFailures(manifest, index, { reports = [], expectedRepo
   // real entry the night a shard failed to upload. A matched entry is never stale by definition.
   const stale = (entries ?? [])
     .filter((entry) => !allowlisted.some((row) => entryMatchesFailure(entry, row)))
-    .map((entry) => ({ entry, status: judgeParityEntry(entry, index).status }))
+    .map((entry) => ({ entry, ...entryOutcome(entry, index) }))
 
   const declaredFailures = reports.reduce(
     (sum, report) => sum + (Number(report?.report?.numFailedTests) || 0),
