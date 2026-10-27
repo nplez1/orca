@@ -134,8 +134,8 @@ export function judgeLiveness(runs, now = Date.now()) {
       summary:
         `run ${newest.databaseId} has been ${newest.status} for ${facts.ageHours}h — that is a wedged ` +
         'run, not a slow one. Check which job is stuck (a runner label this fork does not provision ' +
-        'is the known cause) and cancel it: a wedged run blocks the group it shares with every later ' +
-        'night.'
+        'is the known cause) and cancel it: the next scheduled run supersedes it, so leaving it costs ' +
+        'a night of coverage rather than the run itself.'
     }
   }
   // Why an in-flight run does not answer for the backstop: it has produced no verdict yet, so

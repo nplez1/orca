@@ -1586,7 +1586,10 @@ it back on — which is what a fork wants, and why this is documented here inste
 
 - `fork-release.yml` — `workflow_dispatch` only; the feed the patched updater points at.
 - `fork-upstream-tags.yml` — the daily `v*` tag mirror (see above).
-- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. This is the backstop the
+- `fork-main-tests.yml` — the nightly full unit suite, enabled 2026-10-24. Its last passing run is
+  2026-10-08, from before it was disabled in the fleet sweep and re-enabled on 10-24; the first
+  scheduled run after that (10-26) wedged, which is why the absence below starts at 10-08 rather than
+  at 10-24. This is the backstop the
   PR gates gave up (`AGENTS.md` § Verification tiers). It is in `local/check-actions-enablement.mjs`
   `REQUIRED`, not `ALLOWED_INERT`: it has a `schedule`, so "disabled" is drift and should be reported
   as `MISSING`, not silently tolerated. Billing is ~50 min a night because five shards bill
