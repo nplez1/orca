@@ -747,7 +747,28 @@ signature — that is the 8-hunk file. This item is also the strongest upstream 
 - `jira/Content.tsx` board-mode state into `use-jira-board-mode.ts`, mounted through one conditional;
   consistent with the ledger's "upstream's shape, the fork's extra capabilities" (`:813`).
 
-### 6.7 Branch base drift
+### 6.7 Branch base drift — **decided and executed 2026-10-27**
+
+The measurement stands — after 10-25 no branch contained the release tip, the oldest 2,529 commits
+behind — but the policy question underneath it is answered by the product owner: **branches are no
+longer kept upstream-ready.** That idea cost every sync (a branch 2,800 commits behind is a snapshot,
+not a ready state) and its premise is gone. If upstream work is wanted, it is cut **fresh from
+`nplez1/main`**; the code that lands there is the only version worth offering.
+
+Executed: **28 branches retired**, each with a pushed `archive/2026-10-27/<branch>` tag first, so nothing
+is unrecoverable — 8 zero-loss (merged PR whose tip equals the PR head, or a patch already in `main`),
+and 20 archived-with-unlanded-content (the old `nplez1/*` ideas and all twelve upstream-bound
+`fix/*`/`feat/*` branches). The one with real unlanded code is `nplez1/AI-Prompts` (PR #184 closed
+unmerged; it creates `src/shared/ai-prompts/**`, absent from `main`). `nplez1/main`, `nplez1/Fork-Opt`
+and the three `backup/*` snapshots are kept deliberately. The table, the restore commands and the
+per-branch reasoning live in `BRANCHES.md` § "Retired".
+
+What this closes: the "land or delete" bullet, the "catch up on a schedule" bullet (nothing is left to
+catch up), and the "branch age cap" bullet (there is no set to age). The mobile half was measured rather
+than assumed: `mobile/` is upstream's (3,980 files on `main`), and exactly one archived branch carried
+real mobile work — `nplez1/Agent-Dash-Improvements`, 10 files including a PR-sidebar actions feature —
+and every one of those files exists on `main` already, so nothing was lost with it. The standing
+position is upstream's own: mobile parity is upstream's, and the fork ships no mobile app.
 
 After 10-25 **no branch contains the release tip**; the oldest sit 2,529 commits behind, and
 `local/open-pr.mjs` refuses a head that does not descend from its base. With 0 open PRs and ~13
