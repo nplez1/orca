@@ -722,21 +722,52 @@ and must not be opened without an explicit ask**:
 Taken **byte-for-byte** in all three of upstream's files (`git hash-object` against `cffb527b82`, not a
 read-through), so a conflict there resolves by taking upstream. The fork's own Claude half of
 `dd1248998f` is retired: +163/−443 across 5 files, 231 of the deletions a fork-only test file. Three
-things upstream does that the fork did not, and two of them were the fork being *wrong*: the legacy
+things upstream does that the fork did not, and two of them were the fork being _wrong_: the legacy
 `extra_usage` percentage is computed from the amounts first, so a 0–1 fraction `0.0958` reads as 9.58%
 rather than 0.0958%; `monthly` needs a real cap (currency, percentage, limit above 0) rather than a bare
 percentage; and the window comes from the same `ExtraUsageBalance` the Credits section renders, so the two
 cannot disagree. The Codex `spend_control` half stays fork-only and its 23 cases pass unchanged; #134's
 OAuth refresh was already isolated in `claude-accounts/claude-oauth-token-refresh.ts` and was not touched.
 The 2,800-commits-behind branch `fix/claude-codex-enterprise-accounts`, now archived, turned out to be
-the *history* of the code this deletes rather than a source for it.
+the _history_ of the code this deletes rather than a source for it.
 
 `cffb527b82` (pending) covers the Claude half of `dd1248998f`; take it and keep only the Codex
 `spend_control` half (~350 lines removed). Keep #134 (Claude OAuth refresh) as the one permanent
 divergence here — upstream deliberately does not refresh (`1bd308bd84`), and the fork's choice is a
 product decision. Isolate it in `claude-accounts/claude-oauth-*`.
 
-### 6.5 AI Vault: give the fork its own schema
+### 6.5 AI Vault: give the fork its own schema — **done 2026-10-27**
+
+`SESSION_SEARCH_SCHEMA_VERSION` is upstream's **8** again. The fork's list state lives in
+`session_list_facts` (`session_row_id` plus the 8 columns) and `session_metadata_fts`, versioned under
+`meta.session_list_schema_version` (`SESSION_LIST_SCHEMA_VERSION = 1`), and **triggers on `sessions` keep
+them in step** — which is what removed the fork hunks from upstream's writer, retention purge and
+replacement delete: `session-search-retrieval.ts`, `session-search-retention-delete.ts` and
+`ai-vault-host-leg-cache-retention.test.ts` are byte-identical to upstream again. What remains in
+upstream's files is 3 lines in `session-search-schema.ts`, 2 in `session-search-file-records.ts`, and 5
+hunks in `ai-vault-host-leg-cache.ts` for two things that are _not_ the sync delta (the unbounded key,
+and the row-capped prune a paged reply needs).
+
+**A v10 database is migrated, not dropped.** Upstream deletes a file whose version it does not know, so
+the migration runs _before_ its opener, which rules out an ordinary step after it: it renames
+`sessions_fts`, copies the 8 columns into the facts table, drops them from `sessions`, sets the version
+to the literal `'8'` (the upstream content the merged 10 carried) and writes the fork key. Once
+upstream's constant moves past 8, the migrated file is simply rebuilt by upstream's own rule and the
+migration can be deleted with it. The host-leg delta moved to `ipc/ai-vault-host-leg-sync.ts`, wrapping
+`scan` at the `ai-vault.ts` call sites so the cache's signature is upstream's again.
+
+Two claims the plan made that the work corrected: "move 8 columns" understates it — the readers and the
+test seeds had to change too — and "upstream's cache keeps its original signature" is true of `scan` but
+not of the file, which keeps those two unrelated hunks. One behaviour difference is recorded rather than
+hidden: after a delete, upstream's cache cannot expand an `unchanged` reply, so the next plain refresh
+rescans (4 where the fork had 3); the held list makes it a small diff request rather than a full
+re-download, and a new sync test asserts that.
+
+The change also had to move two cross-cutting inventories the agent's scope could not see — the WSL
+mover's table list and its SQL-owning file map — which is the class of miss `wsl-move-dispositions`
+exists to catch. That test failing is why they moved here rather than in gate 1.
+
+Original requirement, kept for the record:
 
 Fork 6→9 plus upstream 6→8 forced a merged value of 10 (`ledger:1682-1692`), and the same shape
 previously hit the parse cache (`:291`). Move the fork's 8 `sessions` columns and `sessions_fts`

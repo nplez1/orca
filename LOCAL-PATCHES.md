@@ -1052,6 +1052,39 @@ because they ride its hydration.
 fork delta is 63 changed lines where it was 384. A conflict there resolves by taking upstream and
 re-adding those hunks.
 
+### `local(vault)`: the list tier's schema is the fork's own
+
+The fork's 8 list columns (`model`, `total_tokens`, `queued_message_count`, `subagent_transcript_count`,
+`modified_at`, `subagent_parent_session_id`, `subagent_agent_type`, `subagent_parent_agent`) and its
+metadata FTS live in `session_list_facts` / `session_metadata_fts`, versioned by
+`meta.session_list_schema_version` (`SESSION_LIST_SCHEMA_VERSION`), both created in
+`ai-vault-search/session-search-list-schema.ts`. **Never merge them back into upstream's `sessions` or
+`SCHEMA_SQL`, and never bump `SESSION_SEARCH_SCHEMA_VERSION` for a fork change** — take upstream's value
+verbatim on every sync and bump the fork's key instead. That is the whole point: the two constants used
+to collide (fork 6→9, upstream 6→8, merged 10) and the same shape had already hit the parse cache.
+
+Triggers on `sessions` maintain both fork tables, so upstream's writer, retention purge and replacement
+delete carry no fork hunks, and `session-search-retrieval.ts` / `session-search-retention-delete.ts` are
+byte-identical to upstream. The only fork lines left are two hook calls in `openSessionSearchDatabase`
+(`session-search-schema.ts`), one `writeSessionListFacts` call in `session-search-file-records.ts`, and
+the list read's `LEFT JOIN` in `session-search-list.ts`.
+
+**The merged-10 migration.** `migrateMergedLegacyLayout` runs before upstream's opener — it has to,
+because upstream deletes a file whose version it does not recognise — and fires only for a version `'10'`
+file that has `sessions_fts`, the legacy columns and no fork key. It renames the FTS table, copies the 8
+columns into the facts table, drops them from `sessions`, sets the version to the literal `'8'` (the
+upstream content the merged 10 carried) and writes the fork key, in one locked transaction. **That
+migration is dead the moment upstream's constant passes 8** — delete it then, and the file will be
+rebuilt by upstream's own rule like any other stale index.
+
+The host-leg sync delta lives in `ipc/ai-vault-host-leg-sync.ts` and wraps `scan` at the `ai-vault.ts`
+call sites, so `scanHostLegWithCache`'s `scan: () => Promise<AiVaultListResult>` stays upstream's
+signature. Two hunks stay in `ai-vault-host-leg-cache.ts` deliberately and are not the delta: the
+unbounded key/bypass, and the row-capped prune, because every paged reply now carries a fingerprint and
+upstream's count-only cap of 8 would no longer bound memory. One behaviour difference to expect: after a
+delete, upstream's cache cannot expand an `unchanged` reply, so the next plain refresh rescans (4 where
+the fork had 3) — a small diff request, not a full re-download.
+
 ### `local(jira)`: a required transition field the issue already fills is not the user's to fill
 
 After the 2026-10-15 sync, two of the three status-change surfaces refused a transition outright with
@@ -1423,7 +1456,7 @@ skipped as intended, and **four files failed across four shards** (shard 3 green
   `DaemonConnectionLostError: Disconnected` out of `disconnectOnly()` at its own line 292. **All five
   files in that chain are upstream-owned with zero fork hunks**, so it is upstream's own race under
   Linux runner timing, not a regression here — and it passes 3/3 on this Mac, so it is not a Mac
-  allowlist entry either. It is the first case that needs a *Linux* flake set, which § 6.2's parity
+  allowlist entry either. It is the first case that needs a _Linux_ flake set, which § 6.2's parity
   checker does not carry; until one exists, read it as an ownerless red and do not "fix" it inside the
   fork.
 
