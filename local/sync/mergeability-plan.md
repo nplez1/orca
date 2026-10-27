@@ -613,7 +613,37 @@ rather than literals. Be honest about the trade: converting a literal to an impo
 cost but **not** sync cost — the import line is still a fork hunk. Only an upstream seam removes
 that.
 
-### 5.9 Tooling: resolve what can be proven
+### 5.9 Tooling: resolve what can be proven — **done 2026-10-27**
+
+Built, all five proof tiers, each judged on the syntax tree of both sides rebuilt as a whole file (so a
+hunk inside a template literal, or one whose edge splits a token, is never proven): `--propose` attaches a
+proof per hunk, `--apply-proven` writes only fully proven files, refuses one edited since the proposal,
+re-proves from disk and stages nothing, and a ledger/manifest deletion is printed as a `git rm` command
+rather than run. Plus `--rename-forecast` (32 real targets on the `281cccf5a4` sync in 2 s, 23 today) and
+`fork-symbols.mjs` (names, not behaviour; an `expected-deletions.json` `symbols` entry acknowledges one).
+43 `node --test` cases across the four new libs; every guard broken on a copy outside git's view and every
+one of the 32 breaks fails a test.
+
+**Measured:** 245 of 421 hunks proven on HEAD vs `upstream/main` `8d72873b78`, 159 of 267 files fully
+proven; 187 of 347 and 113 of 216 on the `281cccf5a4` sync. Survival reported 0 lost and 3 relocated on
+that sync in 2.5 s, and 851 lost when upstream's own tree is fed in as the "merged" result, so it does
+detect losses.
+
+**Two claims below that the work corrected.** The 133-hunk note is at `LOCAL-PATCHES.md:1552`, not
+`:1207`, and its "50 identity-only hunks" does not reproduce: only 1–2 qualify on either range measured,
+and only 7 unproven hunks in the `281cccf5a4` merge contain an identity literal at all. And `typescript`
+in `package.json` is 7.0.2, the native compiler with no JavaScript scanner — the tools use the
+`typescript-api` alias (`npm:typescript@6.0.3`) that `config/scripts/ci-unit-dependency-graph.mjs` already
+uses.
+
+**Two pre-existing defects found on the way, both fixed.** `deletedForkModules` read an `acknowledged`
+object that `6357e7baa9` had replaced with the `deletions[]` manifest, so it reported FAILED on every run;
+it now reads the manifest through the shared parser and asks whether an asserted deletion is _present
+again_, rather than whether this one sync deleted it (which reads all 22 settled entries as stale every
+time). And `conflicts.mjs` ended with `process.exit(main())`, which can truncate a large `--json` piped
+into another command — the new command uses `process.exitCode`.
+
+Original requirement, kept for the record:
 
 `LOCAL-PATCHES.md:1207-1213` records that the 10-25 sync resolved 133 hunks by hand under a proof
 rule — _upstream never touched the region_ — with a script that was never committed. Commit it,
