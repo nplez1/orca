@@ -18,7 +18,6 @@ import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/t
 import type { WorkspacePortScanResult } from '../../../../../shared/workspace-ports'
 import type { CustomPet } from '../../../../../shared/pet-types'
 import type { ReleaseChannel } from '../../../../../shared/release-channel'
-import type { PRCommentInlineDisplay } from '@/lib/pr-comment-inline-display'
 import type { ChangelogData, UpdateStatus } from '../../../../../shared/update-status-types'
 import type { StatusBarUsageMode } from '../../../../../shared/status-bar-usage-mode'
 import type { PersistedUIWriteBaseline } from '../persisted-ui-write-baseline'
@@ -154,14 +153,6 @@ export type UISliceSurfaces = {
   // Why: cleared by the diff decorator after it reveals the line, so the same id can be requested again without a stale value.
   scrollToDiffCommentId: string | null
   setScrollToDiffCommentId: (id: string | null) => void
-  /**
-   * Per-thread expand/collapse choices, keyed by inline comment id.
-   *
-   * Session-only by design: hiding one distracting thread is a reaction to what is on screen right
-   * now, not a preference worth persisting. The global setting is the durable half of the pair.
-   */
-  prCommentInlineDisplayById: Record<string, PRCommentInlineDisplay>
-  setPRCommentInlineDisplay: (commentId: string, display: PRCommentInlineDisplay | null) => void
   /** The floating workspace's directory, resolved from its setting the same way the runtime resolves a floating session's cwd. Null until resolved. */
   floatingWorkspacePath: string | null
   setFloatingWorkspacePath: (path: string | null) => void

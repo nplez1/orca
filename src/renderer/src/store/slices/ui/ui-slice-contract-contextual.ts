@@ -10,14 +10,6 @@ import type { OrcaHookScriptKind } from '../../../lib/orca-hook-trust'
 import type { SettingsNavigationTarget } from '../../../lib/settings-navigation-types'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 
-/** Where the project menu wants the Available Hosts add flow opened, for which host, and from
- *  which of the project's repo rows (several checkouts can share one project). */
-export type ProjectHostAddRequest = {
-  projectId: string
-  repoId: string
-  hostId: ExecutionHostId
-}
-
 export type UISliceContextual = {
   openSettingsPage: () => void
   closeSettingsPage: () => void
@@ -32,11 +24,6 @@ export type UISliceContextual = {
     hostId: ExecutionHostId,
     setupId?: string
   ) => void
-  /** One-shot "add this project to that host" request from the sidebar's Add to… menu, carried
-   *  into Settings → Available Hosts because the add flow lives there. Renderer-only; never persisted. */
-  settingsProjectAddHostRequest: ProjectHostAddRequest | null
-  requestProjectHostAdd: (request: ProjectHostAddRequest) => void
-  clearProjectHostAddRequest: () => void
   /** One-shot Appearance accordion to expand for nested Settings deep links (e.g. Usage percentages under Window & Sidebar). Cleared when Appearance consumes it. */
   appearanceAccordionDeepLink: 'interface' | 'terminal' | 'window' | null
   setAppearanceAccordionDeepLink: (

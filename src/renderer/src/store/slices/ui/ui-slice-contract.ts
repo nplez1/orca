@@ -18,7 +18,7 @@ export type {
   UISliceCore,
   UiViewHistory
 } from './ui-slice-contract-core'
-export type { UISliceContextual, ProjectHostAddRequest } from './ui-slice-contract-contextual'
+export type { UISliceContextual } from './ui-slice-contract-contextual'
 export type {
   UISlicePersistence,
   UISlicePreferences,

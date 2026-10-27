@@ -15,7 +15,7 @@ import { RUNTIME_PROTOCOL_VERSION } from '../../../../../../shared/protocol-vers
 import type { Project, ProjectHostSetup } from '../../../../../../shared/project-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { useAppStore } from '../../../../store/index'
-import type { ProjectHostAddRequest } from '../../../../store/slices/ui'
+import type { ProjectHostAddRequest } from '../../../../store/slices/fork-ui'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 
 let container: HTMLDivElement

@@ -53,6 +53,7 @@ import { createStructuredSessionLaunchDirectorySlice } from './structured-sessio
 import { createWorktreeSetupRunnerSlice } from './worktree-setup-runner'
 import { createStructuredChatSleptAtSlice } from './structured-chat-slept-at'
 import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-attention-slice'
+import { createForkUiSlice } from './fork-ui'
 import '@/i18n/i18n'
 import { withEditorBufferRecords } from '../editor-buffer-record-lifecycle'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
@@ -119,7 +120,8 @@ export function createTestStore() {
         ...createStructuredSessionLaunchDirectorySlice(...a),
         ...createWorktreeSetupRunnerSlice(...a),
         ...createStructuredChatSleptAtSlice(...a),
-        ...createWorkspaceAttentionSlice(...a)
+        ...createWorkspaceAttentionSlice(...a),
+        ...createForkUiSlice(...a)
       }),
       true
     )

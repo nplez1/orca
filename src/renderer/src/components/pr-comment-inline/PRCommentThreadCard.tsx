@@ -12,6 +12,7 @@ import { getDiffCommentLineLabel } from '@/lib/diff-comment-compat'
 import { useCommentCardResize } from '../diff-comments/useCommentCardResize'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'
 import { translate } from '@/i18n/i18n'
+import './pr-comment-thread.css'
 
 type Props = {
   comment: DecoratedDiffComment

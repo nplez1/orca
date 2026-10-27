@@ -21,7 +21,6 @@ export type {
   OpenAgentSendPopoverTargetModeArgs,
   PendingSidebarRowReveal,
   PendingSidebarWorktreeReveal,
-  ProjectHostAddRequest,
   TaskPageData,
   UISlice
 } from './ui/ui-slice-contract'
