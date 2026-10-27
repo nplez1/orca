@@ -23,11 +23,10 @@ concurrency:
   # Why the ref is in the group: `workflow_dispatch` can target any branch, and a dispatch on a feature
   # branch must not cancel the release line's nightly — nor share its slot.
   # Why `cancel-in-progress: true`: a run that never finishes must not hold the slot for the next
-  # night. Under `false` it holds until a human cancels it — which is what happened on 2026-10-26: the
-  # 10-27 schedule never ran because the wedged run was still holding the slot, so one stuck job cost
-  # a night of coverage even though the schedule itself fired. Superseding is safe here: a test shard
-  # takes minutes, and the next schedule is a day away. `plan` is the one job with no
-  # `timeout-minutes` of its own (default 360), so it is the worst case for holding the slot.
+  # night. Under `false` it holds until a human cancels it — on 2026-10-26 the run held it for 17.5 h.
+  # Superseding is safe here: a test shard takes minutes, and the next schedule is a day away. `plan`
+  # is the one job with no `timeout-minutes` of its own (default 360), so it is the worst case for
+  # holding the slot.
   group: fork-main-unit-tests-${{ github.ref }}
   cancel-in-progress: true
 

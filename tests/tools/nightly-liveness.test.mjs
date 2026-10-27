@@ -256,13 +256,41 @@ describe('nightly liveness', () => {
     expect(verdict.runsInLastDay).toBe(1)
   })
 
+  it('cannot tell, rather than pass, when a run newer than the last pass was never inspected', () => {
+    // The hole this closes: a green verdict from before a cancelled run, with that run's jobs
+    // unread, is exactly the state that printed PASS on a night with four red shards.
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 92, conclusion: 'cancelled', createdAt: hoursAgo(6) }),
+        run({ databaseId: 91, createdAt: hoursAgo(30) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 2, unreadRuns: 1 })
+    expect(verdict.summary).toMatch(/cannot tell/)
+    expect(verdict.summary).toMatch(/Not a pass/)
+  })
+
+  it('still reports red, not cannot-tell, when an unread run cannot rescue a red verdict', () => {
+    const verdict = judgeLiveness(
+      [
+        run({ databaseId: 95, conclusion: 'cancelled', createdAt: hoursAgo(2) }),
+        run({ databaseId: 94, conclusion: 'failure', createdAt: hoursAgo(20) })
+      ],
+      NOW
+    )
+    expect(verdict).toMatchObject({ ok: false, code: 1 })
+    expect(verdict.summary).toMatch(/red \(failure\)/)
+  })
+
   it('does not let a cancelled run hide the green run it followed', () => {
     const verdict = judgeLiveness(
       [
         run({ databaseId: 22, conclusion: 'cancelled', createdAt: hoursAgo(19) }),
         run({ databaseId: 21, createdAt: hoursAgo(20) })
       ],
-      NOW
+      NOW,
+      { jobs: { 22: [shard('plan', 'success')] } }
     )
     expect(verdict).toMatchObject({ ok: true, code: 0, verdictRunId: 21, verdictAgeHours: 20 })
     expect(verdict.summary).toMatch(/nightly green/)
@@ -301,7 +329,7 @@ describe('nightly liveness', () => {
     expect(verdict.summary).toMatch(/shard failures may be hidden/)
   })
 
-  it('asks for jobs only on completed runs with no conclusion of their own, newest first', () => {
+  it('asks for jobs only on completed runs newer than the newest resolved verdict', () => {
     expect(
       runsNeedingJobs([
         run({ databaseId: 1, conclusion: 'cancelled', createdAt: hoursAgo(30) }),
@@ -309,7 +337,7 @@ describe('nightly liveness', () => {
         run({ databaseId: 3, status: 'in_progress', conclusion: null, createdAt: hoursAgo(1) }),
         run({ databaseId: 4, conclusion: 'cancelled', createdAt: hoursAgo(2) })
       ])
-    ).toEqual([4, 1])
+    ).toEqual([4])
   })
 })
 
@@ -343,6 +371,7 @@ describe('nightly liveness CLI', () => {
         'scheduleRunId',
         'status',
         'summary',
+        'unreadRuns',
         'verdictAgeHours',
         'verdictRunId',
         'verdictlessRuns',

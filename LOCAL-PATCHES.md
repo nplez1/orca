@@ -1610,8 +1610,8 @@ live, and the section below is why its being live was not the same as its runnin
 
 `fork-main-tests.yml`'s last **passing** run was 2026-10-08. The 2026-10-26 schedule then hit two
 failures at once. Its `relay_integration` job queued on a runner label this fork does not provision —
-`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and the four other shards **failed** (shard
-4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
+`unit-tests.yml` asks for `blacksmith-4vcpu-ubuntu-2404` — and four of its five test shards **failed**
+(shard 4 passed). The run sat for ~17.5 h and was then cancelled, which set the run-level conclusion to
 `cancelled` and hid the red shards behind it. Eighteen days with no passing night, and the only signal
 was absence.
 
@@ -1627,11 +1627,16 @@ Three changes:
   so the job had nothing to test here even if a runner existed. It drops the two `relay-region` unit
   files, which shard discovery excludes and only that job ran. It does **not** drop `browser_contract`:
   this caller never enabled it (its default is `false`).
-- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** A run that never finishes
-  otherwise holds the slot until a human cancels it, and the schedule behind it does not run — which is
-  what happened on 10-27. Superseding is safe because a shard takes minutes and the next schedule is a
-  day away. The ref in the group name keeps a `workflow_dispatch` on some feature branch from
-  cancelling the release line's nightly.
+- **`cancel-in-progress: true`, with the group keyed on `${{ github.ref }}`.** Under `false` a run
+  that never finishes holds the slot until a human cancels it; the 10-26 run held it for 17.5 h.
+  Superseding is safe because a shard takes minutes and the next schedule is a day away. The ref in
+  the group name keeps a `workflow_dispatch` on some feature branch from cancelling the release line's
+  nightly.
+
+**What none of that fixes, and the checker exists for:** the cancelled run did not block 10-27 — it was
+cancelled at 04:02Z, ~50 min before that day's 04:53 cron — and **no scheduled run fired on 10-25 or
+10-27 either**, with the slot free both times. So the missing nights are the scheduler's own
+unreliability, not the wedge, and `cancel-in-progress` does nothing about them. Only the check does.
 
 `node local/check-nightly-liveness.mjs` is what keeps the absence visible. It exits 0 on a fresh green
 run, 1 when the newest scheduled run is stale (past two schedule slots), **wedged** (not `completed` for

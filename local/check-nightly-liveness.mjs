@@ -29,7 +29,7 @@ const HOUR = 60 * 60 * 1000
 const STALE_AFTER_H = 36
 const WEDGED_AFTER_H = 4
 // How many verdict-less completed runs to read jobs for. Bounded because each one is a `gh` call.
-const JOB_LOOKUPS = 3
+const JOB_LOOKUPS = 5
 
 // Every path emits the same keys, with null where there is nothing to report, so a consumer of --json
 // can rely on the shape rather than on which branch produced the verdict.
@@ -49,6 +49,7 @@ const EMPTY_FACTS = {
   verdictAgeHours: null,
   failedJobs: [],
   verdictlessRuns: 0,
+  unreadRuns: 0,
   jobReadError: null
 }
 
@@ -103,9 +104,9 @@ const ageHours = (iso, now) => (now - Date.parse(iso)) / HOUR
 
 /**
  * Conclusions that carry no verdict about the code by themselves. A cancelled run says a human or a
- * timeout stopped it, and reading that as "red" raised a false alarm on 2026-10-27 for a run a human
- * cancelled deliberately. But a cancelled run is not evidence of green either: its jobs still are, so
- * the jobs decide whenever the run-level conclusion does not.
+ * timeout stopped it, so the run-level word alone is not a verdict either way. But a cancelled run is
+ * no evidence of green — run 40308443374 was cancelled with four of five shards failed — so the jobs
+ * decide whenever the run-level conclusion does not.
  */
 const VERDICTLESS = new Set(['cancelled', 'skipped', 'neutral', null, undefined, ''])
 
@@ -130,11 +131,24 @@ export function verdictOf(runRecord, jobs) {
   return { conclusion: failedJobs.length > 0 ? 'failure' : null, failedJobs }
 }
 
-/** Completed runs whose own conclusion is not a verdict, newest first, bounded by `limit`. */
+/**
+ * Completed runs whose own conclusion is not a verdict and which are newer than the newest run that
+ * has one, newest first, bounded by `limit`. The boundary matters: a verdict-less run older than a
+ * resolved verdict cannot change the answer, one newer than it can flip green to red.
+ */
 export function runsNeedingJobs(runs, limit = JOB_LOOKUPS) {
-  return [...runs]
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-    .filter((r) => r.status === 'completed' && VERDICTLESS.has(r.conclusion))
+  const ordered = [...runs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  const newestOwnVerdict = ordered.find(
+    (r) => r.status === 'completed' && !VERDICTLESS.has(r.conclusion)
+  )
+  const boundary = newestOwnVerdict ? Date.parse(newestOwnVerdict.createdAt) : -Infinity
+  return ordered
+    .filter(
+      (r) =>
+        r.status === 'completed' &&
+        VERDICTLESS.has(r.conclusion) &&
+        Date.parse(r.createdAt) >= boundary
+    )
     .slice(0, limit)
     .map((r) => r.databaseId)
 }
@@ -169,6 +183,14 @@ export function judgeLiveness(runs, now = Date.now(), { jobs = {}, jobReadError 
   const inFlight = newest.status !== 'completed'
   const lastDay = scheduled.filter((r) => ageHours(r.createdAt, now) <= 24).length
   const verdictless = resolved.filter((v) => v.conclusion === null)
+  // A verdict-less run newer than the verdict can flip green to red, so it may not be left unread.
+  // `main()` asks for exactly these; seeing one here without jobs means the read was not attempted or
+  // failed, and the honest answer to "is the nightly green" is then that it cannot be known.
+  const unread = verdictless.filter(
+    (v) =>
+      !Object.hasOwn(jobs, v.run.databaseId) &&
+      (verdictRun === null || Date.parse(v.run.createdAt) >= Date.parse(verdictRun.run.createdAt))
+  )
 
   const facts = {
     runId: newest.databaseId,
@@ -186,6 +208,7 @@ export function judgeLiveness(runs, now = Date.now(), { jobs = {}, jobReadError 
     verdictAgeHours: verdictAge === null ? null : Math.round(verdictAge * 10) / 10,
     failedJobs: verdictRun?.failedJobs ?? [],
     verdictlessRuns: verdictless.length,
+    unreadRuns: unread.length,
     jobReadError
   }
 
@@ -232,7 +255,8 @@ export function judgeLiveness(runs, now = Date.now(), { jobs = {}, jobReadError 
         `run ${newest.databaseId} has been ${newest.status} for ${facts.wedgeAgeHours}h of its ` +
         `${facts.ageHours}h life${facts.attempt > 1 ? ` (attempt ${facts.attempt})` : ''} — that is a ` +
         'wedged run, not a slow one. Check which job is stuck (a runner label this fork does not ' +
-        'scheduled run supersedes it, so leaving it costs a night of coverage, not the run.'
+        'provision is the known cause) and cancel it: the next scheduled run supersedes it, so ' +
+        'leaving it costs a night of coverage, not the run.'
     }
   }
   // Why an in-flight run does not answer for the backstop: it has produced no verdict yet, so
@@ -261,6 +285,17 @@ export function judgeLiveness(runs, now = Date.now(), { jobs = {}, jobReadError 
     }
   }
   const green = verdictRun.conclusion === 'success'
+  if (green && unread.length > 0) {
+    return {
+      ...facts,
+      ok: false,
+      code: 2,
+      summary:
+        `cannot tell: ${unread.length} completed run(s) newer than the last passing one were not ` +
+        `inspected (${unread.map((v) => v.run.databaseId).join(', ')}), and a cancelled or skipped ` +
+        'run can still have failed shards. Not a pass.'
+    }
+  }
   return {
     ...facts,
     ok: green,
