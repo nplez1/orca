@@ -648,16 +648,26 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
 
 ### 6.8 Gate cost
 
+- **Verdict cache keyed to the repository — done 2026-10-27.** Both readers resolved the cache from
+  `--absolute-git-dir`, i.e. `.git/worktrees/<name>`, so a revision gated in one worktree was
+  invisible to the other and the same SHA paid the suite twice. `resolvedGateCacheDir` now prefers
+  `--git-common-dir`. Entries were already keyed by revision, allowlist fingerprint and gate inputs,
+  so the shared directory cannot answer for another revision.
+- **The `node-runtime` pool caveat is wrong.** The recorded claim was that the fork's custom pool
+  "never consults `maxWorkers`, so that project is not covered by the cap". It never had to consult it:
+  vitest 5.0.5 wraps any custom `poolRunner` in the same `PoolRunner`
+  (`node_modules/vitest/dist/chunks/index.1TqnEahn.js:5999`), whose `schedule()` returns early once
+  `activeTasks.length >= this.maxWorkers` (`:5883`), and `setMaxWorkers` is applied per task group
+  before tasks run (`:6163`). `VITEST_MAX_WORKERS` becomes `resolved.maxWorkers` at `:9008`. The
+  fork's pool spawns exactly one child per `createPoolWorker`
+  (`config/scripts/vitest-node-runtime-pool.ts:23`) with no internal fan-out, so capping pool workers
+  does cap processes. Capacity planning that treats this project as uncapped is pessimistic by one
+  project's worth of concurrency; it needs one empirical confirmation on an idle machine before the
+  machine-level `AGENTS.md` claim (which lives outside this repo) is corrected.
 - 2,575 s against a 3,600 s cap, with a timeout not cached (`gate-verdict-cache.mjs:83`). Investigate
   the doubling (bun 1.4.4 bump, an uncapped run alongside unqueued work, or the mobile install).
-- Cache the verdict in the **git common dir** (`--git-common-dir`), not the per-worktree gitdir, so
-  the same SHA gated in two worktrees runs once.
 - Batch the isolation re-runs: each unexpected file currently gets a serial cold start with a full
   60-minute allowance (`gate-unit.mjs:563-570`).
-- Re-check the recorded caveat that the `node-runtime` pool ignores `maxWorkers`. In vitest 5.0.5
-  custom poolRunner tasks appear to go through the same queue
-  (`node_modules/vitest/dist/chunks/index.1TqnEahn.js:5881,5999,6163`) and both projects share
-  `groupOrder: 1`. If the caveat is wrong, capacity planning in AGENTS.md is wrong with it.
 - Remove the vitest-direct trap from package scripts (`test:node`, `test:skill-sharing:release` call
   bare `vitest run`, skipping `run-vitest.mjs`'s env). The gate itself is fine; the scripts are what
   produced PR #57's 42 phantom failures.
