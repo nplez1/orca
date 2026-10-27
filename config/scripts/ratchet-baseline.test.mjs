@@ -10,6 +10,7 @@ import {
   parseCountBaseline,
   parseCountNotes,
   parseEntryBaseline,
+  readCountBaseline,
   runCountRatchet,
   runEntryRatchet
 } from './ratchet-baseline.mjs'
@@ -127,6 +128,97 @@ describe('runCountRatchet', () => {
       )
     ).toBe(0)
     expect(readFileSync(join(root, 'baseline.txt'), 'utf8')).toBe('# header\n1 a.ts # why\n')
+  })
+})
+
+describe('count baseline overlay', () => {
+  let root
+  afterEach(() => {
+    vi.restoreAllMocks()
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  const BASE = '# upstream\n2 a.ts\n1 b.ts\n3 c.ts\n2 d.ts\n'
+
+  function ratchet(current, overlay) {
+    root = mkdtempSync(join(tmpdir(), 'orca-count-overlay-'))
+    writeFileSync(join(root, 'baseline.txt'), BASE)
+    if (overlay !== undefined) {
+      writeFileSync(join(root, 'baseline.fork.txt'), overlay)
+    }
+    return {
+      name: 'demo',
+      baselinePath: 'baseline.txt',
+      overlayPath: 'baseline.fork.txt',
+      header: ['# upstream'],
+      collect: () => new Map(current),
+      unit: 'thing(s)',
+      fix: ['Fix the file.']
+    }
+  }
+
+  it('replaces base rows per key, and a 0 row withdraws the allowance', () => {
+    ratchet([], '# fork\n4 a.ts # fork-only reads\n0 b.ts # fork fixed it\n1 new.ts\n')
+    expect(readCountBaseline(root, 'baseline.txt', 'baseline.fork.txt')).toEqual(
+      new Map([
+        ['a.ts', 4],
+        ['b.ts', 0],
+        ['c.ts', 3],
+        ['d.ts', 2],
+        ['new.ts', 1]
+      ])
+    )
+  })
+
+  it('enforces the merged counts, so a 0 row fails a file upstream still allows', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const overlay = '4 a.ts\n0 b.ts\n'
+    const merged = [
+      ['a.ts', 4],
+      ['c.ts', 3],
+      ['d.ts', 2]
+    ]
+    expect(runCountRatchet(ratchet(merged, overlay), root)).toBe(0)
+    expect(runCountRatchet(ratchet([...merged, ['b.ts', 1]], overlay), root)).toBe(1)
+    expect(error.mock.calls.join('\n')).toContain('b.ts: 1 thing(s), baseline allows 0.')
+  })
+
+  it('reads the base alone when the overlay file is missing', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const current = [
+      ['a.ts', 2],
+      ['b.ts', 1],
+      ['c.ts', 3],
+      ['d.ts', 2]
+    ]
+    expect(runCountRatchet(ratchet(current), root)).toBe(0)
+    expect(readCountBaseline(root, 'baseline.txt', 'baseline.fork.txt')).toEqual(
+      readCountBaseline(root, 'baseline.txt')
+    )
+  })
+
+  it('prunes into the overlay, keeping notes and dropping rows that match the base', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const overlay =
+      '# fork\n\n4 a.ts # fork-only reads\n0 b.ts # fork fixed it\n9 c.ts # stale\n5 gone.ts\n'
+    const current = [
+      ['a.ts', 3],
+      ['c.ts', 3],
+      ['d.ts', 1],
+      ['new.ts', 2]
+    ]
+    expect(runCountRatchet(ratchet(current, overlay), root, '--prune')).toBe(0)
+    expect(readFileSync(join(root, 'baseline.txt'), 'utf8')).toBe(BASE)
+    expect(readFileSync(join(root, 'baseline.fork.txt'), 'utf8')).toBe(
+      '# fork\n3 a.ts # fork-only reads\n0 b.ts # fork fixed it\n1 d.ts\n'
+    )
+  })
+
+  it('prunes the base as before when there is no overlay', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    expect(runCountRatchet(ratchet([['a.ts', 1]]), root, '--prune')).toBe(0)
+    expect(readFileSync(join(root, 'baseline.txt'), 'utf8')).toBe('# upstream\n1 a.ts\n')
   })
 })
 

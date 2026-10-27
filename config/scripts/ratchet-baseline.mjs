@@ -128,9 +128,10 @@ export function parseCountNotes(text) {
   return notes
 }
 
-export function formatCountBaseline(counts, header, notes = new Map()) {
+/** `keepZero` for an overlay, where a 0 row withdraws the base file's allowance. */
+export function formatCountBaseline(counts, header, notes = new Map(), { keepZero = false } = {}) {
   const rows = [...counts]
-    .filter(([, count]) => count > 0)
+    .filter(([, count]) => keepZero || count > 0)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([file, count]) =>
       notes.has(file) ? `${count} ${file} # ${notes.get(file)}` : `${count} ${file}`
@@ -159,10 +160,54 @@ export function totalCount(counts) {
   return [...counts.values()].reduce((sum, count) => sum + count, 0)
 }
 
-/** Lowers baseline rows to `current` and keeps their notes; growth still has to be fixed in code. */
-export function pruneCountBaseline(root, baselinePath, header, current) {
+function readIfExists(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+}
+
+/**
+ * A count baseline with an optional overlay applied: overlay rows replace the base's, 0 included,
+ * so the base file can stay byte-identical to the copy another repository owns.
+ */
+export function readCountBaseline(root, baselinePath, overlayPath = undefined) {
+  const base = parseCountBaseline(readIfExists(path.join(root, baselinePath)))
+  if (!overlayPath) {
+    return base
+  }
+  return new Map([...base, ...parseCountBaseline(readIfExists(path.join(root, overlayPath)))])
+}
+
+/** Lowers the merged rows to `current`, then rewrites the overlay as the rows the base disagrees with. */
+function pruneCountOverlay(root, baselinePath, overlayPath, current) {
+  const base = parseCountBaseline(readIfExists(path.join(root, baselinePath)))
+  const overlayFile = path.join(root, overlayPath)
+  const text = fs.readFileSync(overlayFile, 'utf8')
+  const pruned = new Map(
+    [...base, ...parseCountBaseline(text)].map(([rel, allowed]) => [
+      rel,
+      Math.min(allowed, current.get(rel) ?? 0)
+    ])
+  )
+  const overlay = new Map([...pruned].filter(([rel, allowed]) => allowed !== (base.get(rel) ?? 0)))
+  const lines = text.split('\n')
+  const headerEnd = lines.findIndex((line) => !line.startsWith('#'))
+  const header = lines.slice(0, headerEnd === -1 ? lines.length : headerEnd)
+  fs.writeFileSync(
+    overlayFile,
+    formatCountBaseline(overlay, header, parseCountNotes(text), { keepZero: true })
+  )
+  return totalCount(pruned)
+}
+
+/**
+ * Lowers baseline rows to `current` and keeps their notes; growth still has to be fixed in code.
+ * With an existing overlay only the overlay is written; the base file is left as it is.
+ */
+export function pruneCountBaseline(root, baselinePath, header, current, overlayPath = undefined) {
+  if (overlayPath && fs.existsSync(path.join(root, overlayPath))) {
+    return pruneCountOverlay(root, baselinePath, overlayPath, current)
+  }
   const file = path.join(root, baselinePath)
-  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+  const text = readIfExists(file)
   const pruned = new Map(
     [...parseCountBaseline(text)].map(([rel, allowed]) => [
       rel,
@@ -174,20 +219,24 @@ export function pruneCountBaseline(root, baselinePath, header, current) {
 }
 
 /**
- * Gate for a count ratchet `{ name, baselinePath, header, collect(root), fix, unit }`: a file above
- * its baseline fails with `fix`, one below it fails until pruned. `--prune` lowers rows only.
+ * Gate for a count ratchet `{ name, baselinePath, overlayPath?, header, collect(root), fix, unit }`:
+ * a file above its baseline fails with `fix`, one below it fails until pruned. `--prune` lowers
+ * rows only.
  */
 export function runCountRatchet(ratchet, root, arg) {
   const current = ratchet.collect(root)
   if (arg === '--prune') {
-    const total = pruneCountBaseline(root, ratchet.baselinePath, ratchet.header, current)
+    const total = pruneCountBaseline(
+      root,
+      ratchet.baselinePath,
+      ratchet.header,
+      current,
+      ratchet.overlayPath
+    )
     console.log(`${ratchet.name} baseline pruned to ${total}.`)
     return 0
   }
-  const baselineFile = path.join(root, ratchet.baselinePath)
-  const baseline = parseCountBaseline(
-    fs.existsSync(baselineFile) ? fs.readFileSync(baselineFile, 'utf8') : ''
-  )
+  const baseline = readCountBaseline(root, ratchet.baselinePath, ratchet.overlayPath)
   const inScope = ratchet.scope?.(root)
   const keep = (counts) => (inScope ? new Map([...counts].filter(([key]) => inScope(key))) : counts)
   const { grown, shrunk } = diffCounts(keep(current), keep(baseline))
