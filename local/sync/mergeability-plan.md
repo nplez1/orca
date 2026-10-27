@@ -42,8 +42,11 @@ dropped item.
 - **§ 5.4 dashboard delivery** — 20 of the 24 deletions are `pending-decision` in
   `expected-deletions.json`. Restore upstream's subsystem plus a third mode, or keep the deletion and
   let the resolver apply it. The triage note names those paths so they cannot be resolved by accident.
-- **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone; that work is in
-  progress and is the largest remaining item.
+- **§ 5.2 restore the evicted blocks** — the cap is off, so the splits can be undone. **6 of 37 measured
+  splits are undone** (`f77d72467c`): each was upstream's code with nothing of the fork's in it. The
+  other 31 stay, with the measurement recorded — the block carries fork code, was rewritten rather than
+  moved, or upstream has since changed it. Four more are byte-identical to the merge base and differ
+  only by comments upstream has since rewritten, so restoring them would reintroduce stale text.
 - **§ 5.1 i18n overlay, § 5.3 usage providers, § 5.5–§ 5.8** — untouched.
 - **§ 6.3 upstream-facing PRs** — still needs an explicit decision, and three fixes are upstream-worthy
   (the EPIPE listener, the unhandled-rejection ordering, the `/private/var` assertions).
