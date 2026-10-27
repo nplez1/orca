@@ -679,9 +679,16 @@ acts on it, and a recorded "no Orca NP mobile app" decision so `mobile/` work st
   the doubling (bun 1.4.4 bump, an uncapped run alongside unqueued work, or the mobile install).
 - Batch the isolation re-runs: each unexpected file currently gets a serial cold start with a full
   60-minute allowance (`gate-unit.mjs:563-570`).
-- Remove the vitest-direct trap from package scripts (`test:node`, `test:skill-sharing:release` call
-  bare `vitest run`, skipping `run-vitest.mjs`'s env). The gate itself is fine; the scripts are what
-  produced PR #57's 42 phantom failures.
+- **The vitest-direct "trap" is not a trap, on measurement.** `test:node` and
+  `test:skill-sharing:release` both call bare `vitest run`, which is what it looks like, and both
+  scripts are **upstream's** — byte-identical at `upstream/main:package.json:42-43`. `test:node` exists
+  to run the suite on Node rather than Bun, so routing it through `run-vitest.mjs` (which always
+  launches pinned Bun) would defeat it. And the bare form is not broken: the skill-sharing scope runs
+  648 passed | 44 skipped with no env, so "skipping `run-vitest.mjs`'s env" costs nothing on the scopes
+  those scripts cover. Rewiring either one is a permanent fork hunk in upstream's file that buys no
+  behaviour — the residual defect (a bare `vitest` on the _whole_ suite misses
+  `ORCA_BACKGROUND_LAUNCH=1`, so the browser-manager suites red) is upstream's to fix and belongs in
+  the §6.3 list, not in a fork patch.
 - `recordDependencies=false` in the gate means a full run never warms Vitest's dependency records,
   so `check:changed` keeps missing its 95% coverage threshold and runs everything.
 
