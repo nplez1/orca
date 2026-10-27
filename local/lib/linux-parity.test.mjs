@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  formatLinuxFailures,
   formatParity,
   indexShardReports,
   judgeLinuxFailures,
@@ -353,4 +354,77 @@ test('an entry with no evidence is a problem, so the set cannot become a mute bu
   )
   assert.equal(result.ok, false)
   assert.match(result.problems.join(' '), /no evidence/)
+})
+
+test('a shard report that never arrived fails the run', () => {
+  const reports = [{ source: 'a.json', report: report([]) }]
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), linuxIndex([]), {
+    reports,
+    expectedReports: 5
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join(' '), /only 1 of 5 shard report/)
+})
+
+test('a report that declares more failing tests than could be attributed fails the run', () => {
+  const reports = [{ source: 'a.json', report: { ...report([]), numFailedTests: 3 } }]
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), linuxIndex([]), {
+    reports,
+    expectedReports: 1
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join(' '), /declare 3 failing test/)
+})
+
+test('a shard that reports failure with no failing test fails the run', () => {
+  const reports = [{ source: 'a.json', report: { ...report([]), success: false } }]
+  const result = judgeLinuxFailures(manifestOf([]), linuxIndex([]), { reports })
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join(' '), /failure with no failing test/)
+})
+
+test('a sibling whose title contains the listed one is not absorbed', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'failed',
+      assertions: [assertion('serializes concurrent checkpoints under load', 'failed', ['boom'])]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, false)
+  assert.equal(result.unexpected.length, 1)
+})
+
+test('a suite error alongside the listed failure is not absorbed by the entry', () => {
+  const index = linuxIndex([
+    fileResult('src/main/daemon/daemon-race.test.ts', {
+      status: 'failed',
+      message: 'Error: afterAll hook timed out',
+      assertions: [assertion('serializes concurrent checkpoints', 'failed', ['boom'])]
+    })
+  ])
+  const result = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), index)
+  assert.equal(result.ok, false)
+  assert.equal(result.allowlisted.length, 1)
+  assert.equal(result.unexpected.length, 1)
+  assert.equal(result.unexpected[0].test, '(file-level failure)')
+})
+
+test('stale tells a passed entry apart from one that never ran', () => {
+  const passed = judgeLinuxFailures(
+    manifestOf([RED_SET_ENTRY]),
+    linuxIndex([
+      fileResult('src/main/daemon/daemon-race.test.ts', {
+        status: 'passed',
+        assertions: [assertion('serializes concurrent checkpoints', 'passed')]
+      })
+    ])
+  )
+  assert.equal(passed.stale[0].status, 'passed')
+  const neverRan = judgeLinuxFailures(manifestOf([RED_SET_ENTRY]), linuxIndex([]))
+  assert.equal(neverRan.stale[0].status, 'absent')
+  assert.match(
+    formatLinuxFailures(neverRan, { allowlistPath: 'a.json', reportCount: 1 }).join('\n'),
+    /no evidence/
+  )
 })

@@ -61,14 +61,27 @@ function parseArgs(argv) {
     allowlist: DEFAULT_ALLOWLIST,
     redSet: DEFAULT_RED_SET,
     json: false,
-    failures: false
+    failures: false,
+    expectReports: null,
+    allowlistGiven: false,
+    redSetGiven: false
   }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--allowlist') {
       options.allowlist = resolve(argv[(index += 1)] ?? '')
+      options.allowlistGiven = true
     } else if (arg === '--red-set') {
       options.redSet = resolve(argv[(index += 1)] ?? '')
+      options.redSetGiven = true
+    } else if (arg === '--expect-reports') {
+      const raw = argv[(index += 1)]
+      const count = Number(raw)
+      if (!Number.isInteger(count) || count < 1) {
+        console.error(`--expect-reports needs a positive integer, not ${raw}`)
+        process.exit(2)
+      }
+      options.expectReports = count
     } else if (arg === '--failures') {
       options.failures = true
     } else if (arg === '--json') {
@@ -157,9 +170,21 @@ function main() {
     )
     process.exit(2)
   }
+  // A flag that the chosen mode ignores would read as "I checked that" when nothing was checked.
+  if (options.failures && options.allowlistGiven) {
+    console.error('--allowlist belongs to the default mode; --failures judges against --red-set')
+    process.exit(2)
+  }
+  if (!options.failures && options.redSetGiven) {
+    console.error('--red-set needs --failures; the default mode judges the Mac allowlist')
+    process.exit(2)
+  }
 
   const result = options.failures
-    ? judgeLinuxFailures(manifest, indexShardReports(reports))
+    ? judgeLinuxFailures(manifest, indexShardReports(reports), {
+        reports,
+        expectedReports: options.expectReports
+      })
     : judgeParity(manifest, indexShardReports(reports))
   result.problems.push(...unreadable.map((line) => `unreadable report: ${line}`))
   result.ok = result.ok && unreadable.length === 0
