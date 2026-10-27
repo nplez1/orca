@@ -6,7 +6,9 @@ instruction is **"sync upstream"**; everything below is what that means.
 Companions: [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) for the patch series that must survive,
 [BRANCHES.md](./BRANCHES.md) for what each branch is, [RELEASE-RUNBOOK.md](./RELEASE-RUNBOOK.md)
 for publishing, [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) for the
-decisions already made, and [local/sync/README.md](./local/sync/README.md) for the tools.
+decisions already made, [local/sync/README.md](./local/sync/README.md) for the tools, and
+[local/sync/mergeability-plan.md](./local/sync/mergeability-plan.md) for the measured cost of a sync
+and the plan that reduces it.
 
 ## Two shapes, one decision
 
