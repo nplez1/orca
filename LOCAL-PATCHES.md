@@ -1164,14 +1164,14 @@ Unit gate @7811f60dd6 (clean): PASS — 138072 passed; 41 failed (40 allowlisted
 with the rule off, two of upstream's own coverage tests in
 `config/scripts/check-max-lines-ratchet.test.mjs` fail (they assert the installed oxlint still flags an
 over-budget file), and the ratchet script — whose whole job is to freeze who may bypass the rule —
-becomes inert. So the fork was paying four changed lines in a file upstream owns *and* a red gate, to
+becomes inert. So the fork was paying four changed lines in a file upstream owns _and_ a red gate, to
 avoid an exemption list.
 
 The exemption list turned out to be short. With upstream's rule restored, **nine files** exceeded
 budget: eight upstream-owned, over by 1, 3, 3, 9, 20, 23, 31 and 34 lines, and the fork's own
 `local/sync/conflicts.mjs` at 682. The fork's file was split (`local/sync/lib/conflict-report.mjs`,
 leaving 568); the eight upstream files each carry one `oxlint-disable max-lines -- Why:` line naming
-what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an *upstream* file to
+what the fork adds, with a matching `config/max-lines-baseline.txt` row. Splitting an _upstream_ file to
 fit the budget would be the eviction this section exists to stop — a permanent hunk on every sync.
 
 So: upstream's rule, upstream's ratchet, upstream's baseline, 12 grandfathered entries of which four are
@@ -1181,6 +1181,53 @@ already made; restoring the evicted blocks is § 5.2, and this is what makes it 
 
 `.oxlintrc.json` is therefore no longer a file this fork edits — which removes it from the hot-file list
 this section used to keep for it.
+
+#### The rule for next time: whose file is it?
+
+The budget is enforced. Whether an over-budget file gets an exemption is decided by **ownership, not by
+size**, because the two possible fixes cost wildly different amounts at the next sync:
+
+| The file is…                              | Over budget →                        | Why                                                                                                                                                                          |
+| ----------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ours** (absent from the sync base)      | **split it.** No exemption, ever     | A split costs one commit. There is no upstream copy to conflict with, so the cap is a free quality guard                                                                     |
+| **upstream's** (present at the sync base) | **one directive + one baseline row** | Splitting upstream's file is a permanent hunk at that spot on _every_ sync, and it silently drops upstream's later edits there. A two-line directive conflicts once, if ever |
+
+The cap exists to stop files growing without bound. It does **not** exist to push the fork into
+restructuring upstream's code, which is what makes a 3-line overage cost more than the rule saves. So a
+fork line that pushes an upstream file past its budget is not a failure to fix — it is a row.
+
+When the fork's own block inside an upstream file becomes self-contained (a whole component, a catalog
+section), moving it to a fork-owned sibling is still the better outcome, because it removes a fork hunk
+from an upstream file instead of exempting it. That is seam work, tracked in § 5.6/§ 5.5 of
+`mergeability-plan.md`, not a budget decision.
+
+**Never** raise the numbers in `.oxlintrc.json` instead. It weakens the guard for every file to spare a
+few, and it desyncs the `defaultLimitForPath` constants that `check-max-lines-ratchet.test.mjs` pins —
+so the next reader gets a red gate from a config edit that looked harmless.
+
+**Never** turn the rule off. That is what the paragraph above records being tried and reversed: it costs
+two of upstream's own tests and makes the ratchet script blind to the very bypasses it exists to freeze.
+
+To list the offenders without touching the real config, run upstream's rule from a probe copy:
+
+```bash
+git show 0571e45107:.oxlintrc.json > .oxlintrc.maxprobe.json
+npx oxlint --config .oxlintrc.maxprobe.json --format json . | node -e '
+  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+    for (const x of JSON.parse(s).diagnostics.filter(d=>String(d.code).includes("max-lines")))
+      console.log((x.message||"").padEnd(28), String(x.filename).split("/").slice(-2).join("/"))
+  })'
+rm .oxlintrc.maxprobe.json
+```
+
+Then `node config/scripts/check-max-lines-ratchet.mjs` (expect `OK — N grandfathered entries`) and
+`pnpm test config/scripts/check-max-lines-ratchet.test.mjs` for upstream's own coverage. A row whose file
+the fork later slims back under budget is reported stale by `--prune`, so the list shrinks on its own; it
+should never need to grow without a reviewer saying yes.
+
+The eight fork exemptions are listed in `config/max-lines-baseline.txt`, and each file carries its own
+`-- Why:` naming what the fork added there — deliberately, so the reason travels with the code and cannot
+drift away from the file the way a list in this document would.
 
 ### `local(test)`: the gate judges a merge by the merge's own diff
 
