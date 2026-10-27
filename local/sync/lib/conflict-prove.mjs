@@ -286,6 +286,8 @@ export function proveHunk(hunk, trees, index) {
 /**
  * Proofs for one conflicted file. `resolvedText` is set only when every hunk is proven; callers that
  * serialise the result drop it, and `--apply-proven` recomputes it rather than trusting a file.
+ *
+ * @param {{ path: string, status?: string | null, merged?: string | null }} args
  */
 export function proveFile({ path, status = null, merged = null }) {
   const base = { path, mergedSha: merged === null ? null : sha256(merged), fullyProven: false }
