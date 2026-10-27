@@ -292,6 +292,10 @@ function entryMatchesFailure(entry, failure) {
  * by the entry. `notes` carries what it can see but must not enforce: Vitest counts a suite as failed
  * for worker-teardown errors that appear in no `testResults` entry, and failing the night on that
  * would make the verdict permanently red on noise.
+ *
+ * @param {unknown} manifest
+ * @param {{ files: Map<string, { status: string | null, message: string, assertions: { test: string, status: string, detail: string }[] }>, problems: string[] }} index
+ * @param {{ reports?: { source: string, report?: { numFailedTests?: number, numFailedTestSuites?: number, success?: boolean } }[], expectedReports?: number | null }} [options]
  */
 export function judgeLinuxFailures(manifest, index, { reports = [], expectedReports = null } = {}) {
   const problems = [...index.problems]
