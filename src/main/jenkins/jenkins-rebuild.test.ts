@@ -22,21 +22,6 @@ function json(body: unknown): Response {
   })
 }
 
-function buildBody(actions: unknown[] = []): unknown {
-  return { number: 12, building: false, result: 'FAILURE', actions }
-}
-
-const parameterAction = {
-  _class: 'hudson.model.ParametersAction',
-  parameters: [
-    { _class: 'hudson.model.StringParameterValue', name: 'BRANCH', value: 'main' },
-    { _class: 'hudson.model.BooleanParameterValue', name: 'DEPLOY', value: true },
-    // Why no value: Jenkins does not export a password parameter's value, and sending `''` would
-    // blank the job's default rather than leave it alone.
-    { _class: 'hudson.model.PasswordParameterValue', name: 'DEPLOY_TOKEN' }
-  ]
-}
-
 async function loadModules() {
   vi.resetModules()
   vi.doMock('node:os', async () => {
@@ -89,8 +74,15 @@ function posts(): { url: string; init: RequestInit }[] {
   return requests.filter((request) => request.init.method === 'POST')
 }
 
+/** Jenkins answers a rerun with a 302 back to the job page, which the transport follows. */
+function redirectToJob(): Response {
+  const response = new Response(null, { status: 200 })
+  Object.defineProperty(response, 'url', { value: JOB_URL })
+  return response
+}
+
 beforeEach(() => {
-  tempHome = mkdtempSync(join(tmpdir(), 'orca-jenkins-rebuild-'))
+  tempHome = mkdtempSync(join(tmpdir(), 'orca-jenkins-rerun-'))
   requests = []
   route = () => new Response(null, { status: 404 })
 })
@@ -100,143 +92,69 @@ afterEach(() => {
   vi.doUnmock('../network/proxy-settings')
 })
 
-describe('rebuildJenkinsBuild', () => {
-  it('starts a new build with the parameters read in the main process', async () => {
+describe('rerunJenkinsBuild', () => {
+  it('posts to the build’s replay action, authenticated, with the crumb', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
-    route = (url, init) => {
+    route = (url) => {
       if (url.includes('crumbIssuer')) {
         return json({ crumbRequestField: 'Jenkins-Crumb', crumb: 'abc123' })
       }
-      return init.method === 'POST'
-        ? new Response(null, { status: 201 })
-        : json(buildBody([parameterAction]))
+      return redirectToJob()
     }
 
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
 
-    expect(result).toEqual({
-      ok: true,
-      mode: 'parameters',
-      buildNumber: 12,
-      sentParameters: 2,
-      omittedParameters: 1
-    })
-    expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}buildWithParameters`])
-    const body = String(posts()[0].init.body)
-    expect(body).toContain('BRANCH=main')
-    // Why "true": `String(true)` is what Jenkins parses back, while an empty value would be false.
-    expect(body).toContain('DEPLOY=true')
-    // Why absent: an explicit empty value would override the job's default with a blank secret.
-    expect(body).not.toContain('DEPLOY_TOKEN')
-  })
-
-  it('sends the crumb and the saved credentials', async () => {
-    const { connection, rebuild } = await loadModules()
-    configureServer(connection)
-    route = (url, init) => {
-      if (url.includes('crumbIssuer')) {
-        return json({ crumbRequestField: 'Jenkins-Crumb', crumb: 'abc123' })
-      }
-      return init.method === 'POST'
-        ? new Response(null, { status: 201 })
-        : json(buildBody([parameterAction]))
-    }
-
-    await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
-
+    expect(result).toEqual({ ok: true, buildNumber: 12 })
+    // Why this exact path: `ReplayAction.doRebuild` is the rerun behind Jenkins' and Blue Ocean's
+    // own button, and it replays the original script without needing any parameter value.
+    expect(posts().map((request) => request.url)).toEqual([`${BUILD_URL}replay/rebuild`])
+    expect(posts()[0].init.body).toBeUndefined()
     const headers = new Headers(posts()[0].init.headers)
     expect(headers.get('Jenkins-Crumb')).toBe('abc123')
     expect(headers.get('Authorization')).toBe(
       `Basic ${Buffer.from('ada:s3cret').toString('base64')}`
     )
-    expect(posts()[0].init.method).toBe('POST')
   })
 
-  it('uses the parameterless endpoint for a job that takes none', async () => {
+  it('accepts a rerun that answers with a redirect to the job page', async () => {
+    const { connection, rebuild } = await loadModules()
+    configureServer(connection)
+    route = () => redirectToJob()
+
+    // Why: Jenkins ends a queued rerun with `sendRedirect`, so a redirect is the success path and
+    // reading it as ambiguity would tell the user nothing started.
+    await expect(rebuild.rerunJenkinsBuild({ url: CHECK_URL })).resolves.toEqual({
+      ok: true,
+      buildNumber: 12
+    })
+  })
+
+  it('reports a build with no replay action as not replayable', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
     route = (_url, init) =>
-      init.method === 'POST' ? new Response(null, { status: 201 }) : json(buildBody())
+      init.method === 'POST' ? new Response(null, { status: 404 }) : json({})
 
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
 
-    expect(result).toEqual({
-      ok: true,
-      mode: 'build',
-      buildNumber: 12,
-      sentParameters: 0,
-      omittedParameters: 0
-    })
-    expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}build`])
-    expect(posts()[0].init.body).toBeUndefined()
-  })
-
-  it('reports a redirect as unconfirmed rather than as a failure or a success', async () => {
-    const { connection, rebuild } = await loadModules()
-    configureServer(connection)
-    route = (_url, init) => {
-      if (init.method !== 'POST') {
-        return json(buildBody([parameterAction]))
-      }
-      // Why the url: the desktop transport follows redirects, so a write that landed elsewhere is
-      // recognised by where it landed, not by a 3xx status we would never see.
-      const response = new Response(null, { status: 201 })
-      Object.defineProperty(response, 'url', { value: `${JOB_URL}12/` })
-      return response
-    }
-
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
-
-    // Why: a redirect may mean the build was queued, so calling it a failure would invite a retry
-    // that starts a second one, and calling it a success would claim a build nobody saw.
     expect(result.ok).toBe(false)
     if (result.ok) {
       return
     }
-    expect(result.reason).toBe('unconfirmed')
+    // Why its own reason: a freestyle job has no `ReplayAction`, and "no longer available" would
+    // send the user looking for a build that is right there.
+    expect(result.reason).toBe('not-replayable')
     expect(posts()).toHaveLength(1)
   })
 
-  it('starts a build whose parameters were all unreadable instead of refusing', async () => {
+  it('does not retry when Jenkins refuses the rerun', async () => {
     const { connection, rebuild } = await loadModules()
     configureServer(connection)
     route = (_url, init) =>
-      init.method === 'POST'
-        ? new Response(null, { status: 201 })
-        : json(
-            buildBody([
-              {
-                _class: 'hudson.model.ParametersAction',
-                parameters: [{ _class: 'hudson.model.PasswordParameterValue', name: 'TOKEN' }]
-              }
-            ])
-          )
+      init.method === 'POST' ? new Response(null, { status: 403 }) : json({})
 
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
-
-    // Why the parameters endpoint with an empty form: `/build` is refused on a parameterized job,
-    // and only `buildWithParameters` lets every value fall back to its definition default.
-    expect(result).toEqual({
-      ok: true,
-      mode: 'build',
-      buildNumber: 12,
-      sentParameters: 0,
-      omittedParameters: 1
-    })
-    expect(posts().map((request) => request.url)).toEqual([`${JOB_URL}buildWithParameters`])
-    expect(posts()[0].init.body).toBeUndefined()
-  })
-
-  it('does not retry on another endpoint when Jenkins refuses the write', async () => {
-    const { connection, rebuild } = await loadModules()
-    configureServer(connection)
-    route = (_url, init) =>
-      init.method === 'POST'
-        ? new Response(null, { status: 403 })
-        : json(buildBody([parameterAction]))
-
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
 
     expect(result.ok).toBe(false)
     if (result.ok) {
@@ -246,10 +164,31 @@ describe('rebuildJenkinsBuild', () => {
     expect(posts()).toHaveLength(1)
   })
 
+  it('reports a redirect that landed on a failure as unconfirmed', async () => {
+    const { connection, rebuild } = await loadModules()
+    configureServer(connection)
+    route = (_url, init) => {
+      if (init.method !== 'POST') {
+        return json({})
+      }
+      const response = new Response(null, { status: 404 })
+      Object.defineProperty(response, 'url', { value: `${JOB_URL}somewhere` })
+      return response
+    }
+
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) {
+      return
+    }
+    expect(result.reason).toBe('unconfirmed')
+  })
+
   it('refuses without sending anything when no server is configured for the URL', async () => {
     const { rebuild } = await loadModules()
 
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
+    const result = await rebuild.rerunJenkinsBuild({ url: CHECK_URL })
 
     expect(result).toEqual({
       ok: false,
@@ -263,7 +202,7 @@ describe('rebuildJenkinsBuild', () => {
   it('refuses a link that is not a Jenkins build', async () => {
     const { rebuild } = await loadModules()
 
-    const result = await rebuild.rebuildJenkinsBuild({ url: 'https://example.com/not-jenkins' })
+    const result = await rebuild.rerunJenkinsBuild({ url: 'https://example.com/not-jenkins' })
 
     expect(result).toEqual({ ok: false, reason: 'not-jenkins', serverUrl: null, message: null })
     expect(requests).toHaveLength(0)
@@ -274,9 +213,9 @@ describe('rebuildJenkinsBuild', () => {
     configureServer(connection)
 
     // A GitHub Actions job URL parses as a job named `456` with no build, and a job-level Jenkins
-    // link names no build either — neither has a build to start again.
+    // link names no build either — neither has a build to rerun.
     for (const url of [JOB_URL, 'https://github.com/o/r/actions/runs/1/job/456']) {
-      const result = await rebuild.rebuildJenkinsBuild({ url })
+      const result = await rebuild.rerunJenkinsBuild({ url })
       expect(result.ok).toBe(false)
       if (result.ok) {
         return
@@ -284,20 +223,5 @@ describe('rebuildJenkinsBuild', () => {
       expect(result.reason).toBe('no-build')
     }
     expect(requests).toHaveLength(0)
-  })
-
-  it('reports a broken payload rather than guessing a build number', async () => {
-    const { connection, rebuild } = await loadModules()
-    configureServer(connection)
-    route = () => json({ hello: 'world' })
-
-    const result = await rebuild.rebuildJenkinsBuild({ url: CHECK_URL })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) {
-      return
-    }
-    expect(result.reason).toBe('error')
-    expect(posts()).toHaveLength(0)
   })
 })

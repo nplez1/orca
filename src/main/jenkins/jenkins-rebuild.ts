@@ -1,88 +1,30 @@
 import { jenkinsPost, readJenkinsCrumb } from './jenkins-write'
-import {
-  jenkinsGetJson,
-  type JenkinsCredentialArgs,
-  type JenkinsRequestFailure
-} from './jenkins-request'
+import type { JenkinsCredentialArgs } from './jenkins-request'
 import { findJenkinsServerForUrl, readJenkinsServerToken } from './jenkins-server-store'
 import type {
   JenkinsRebuildFailureReason,
   JenkinsRebuildResult
 } from '../../shared/jenkins-rebuild'
-import { asRecord, readArray, readFiniteNumber, readString } from '../../shared/jenkins-payload'
 import { parseJenkinsBuildLocation } from '../../shared/jenkins-urls'
 
 /**
- * Start a Jenkins build again from a check's link.
+ * Rerun a Jenkins build from a check's link.
  *
- * One endpoint pair, both plugin-free: `<job>/buildWithParameters` when the build carried
- * parameters, `<job>/build` when it did not. Deliberately *not* the rebuild plugin's
- * `<build>/rebuild`, which replays the exact build: that action answers a parameterized build with
- * a redirect to a "fill in the parameters" form rather than starting anything, and a redirect is
- * indistinguishable from a queued build once it is followed. A reported "rebuilding" that started
- * nothing is worse than a new build that honestly says it is new.
+ * One endpoint, and it is the operation behind the "Rerun"/"Replay" button in Jenkins and in its
+ * Blue Ocean dashboard: `POST <build>/replay/rebuild` reaches `ReplayAction.doRebuild`, which
+ * replays the build's original script and copies its parameters and SCM revision. The Blue Ocean
+ * route (`POST /blue/rest/organizations/<org>/pipelines/<pipeline>/runs/<id>/replay`) is the same
+ * replay addressed by the pipeline rather than by the build, and it is not used here: a check's
+ * link names the build, and the pipeline path and organization would have to be guessed from it.
  *
- * The parameters are read here, in the main process, and never from the renderer: a secret value is
- * masked before it reaches the renderer, so what the renderer holds is the mask.
+ * Why this and not `build`/`buildWithParameters`: those start a *new* build whose parameters have
+ * to be reconstructed, and a secret parameter's value is masked before it ever reaches the
+ * renderer — while a replay copies the run's own `ParametersAction` on the server. Nothing about
+ * the parameters has to leave Jenkins.
+ *
+ * `POST <build>/replay/run` is the sibling endpoint and is deliberately not used: it reads the whole
+ * script out of the submitted form, so a request without one replays nothing.
  */
-
-/** Only the fields that decide how this build can be started again. */
-const REBUILD_PROBE_TREE = 'number,actions[_class,parameters[_class,name,value]]'
-
-/** A parameter value Jenkins exported, or null when it did not export one. */
-function readParameterValue(value: unknown): string | null {
-  // Why the explicit types: a `BooleanParameterValue` exports `true`, and `String(true)` is the
-  // "true" Jenkins parses back — while `''` would silently become `false`.
-  if (typeof value === 'string') {
-    return value
-  }
-  if (typeof value === 'boolean' || typeof value === 'number') {
-    return String(value)
-  }
-  return null
-}
-
-type RebuildPlan = {
-  buildNumber: number
-  parameters: { name: string; value: string }[]
-  /** Parameters whose value Jenkins did not export, so they stay at the job's default. */
-  omittedParameters: number
-}
-
-/**
- * The plan a build payload describes.
- *
- * Null when the payload is not a build at all — a configured server answering with something else
- * is a broken Jenkins or a proxy wearing its URL, and guessing a build number from it would POST
- * at a job that never ran.
- */
-function readRebuildPlan(body: unknown): RebuildPlan | null {
-  const build = asRecord(body)
-  const buildNumber = readFiniteNumber(build?.number)
-  if (buildNumber === null) {
-    return null
-  }
-  const parameters: { name: string; value: string }[] = []
-  let omittedParameters = 0
-  for (const rawAction of readArray(build?.actions)) {
-    for (const rawParameter of readArray(asRecord(rawAction)?.parameters)) {
-      const parameter = asRecord(rawParameter)
-      const name = readString(parameter?.name)
-      if (name === null) {
-        continue
-      }
-      const value = readParameterValue(parameter?.value)
-      if (value === null) {
-        // Why omit rather than send `''`: an explicit empty value overrides the job's default, so a
-        // password parameter that Jenkins does not export would be blanked instead of left alone.
-        omittedParameters += 1
-        continue
-      }
-      parameters.push({ name, value })
-    }
-  }
-  return { buildNumber, parameters, omittedParameters }
-}
 
 function fail(
   reason: JenkinsRebuildFailureReason,
@@ -92,15 +34,11 @@ function fail(
   return { ok: false, reason, serverUrl, message }
 }
 
-function failFrom(failure: JenkinsRequestFailure, serverUrl: string): JenkinsRebuildResult {
-  return fail(failure.reason, serverUrl, failure.message)
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export async function rebuildJenkinsBuild(args: {
+export async function rerunJenkinsBuild(args: {
   url: string
   signal?: AbortSignal
 }): Promise<JenkinsRebuildResult> {
@@ -108,7 +46,7 @@ export async function rebuildJenkinsBuild(args: {
   if (!location) {
     return fail('not-jenkins', null, null)
   }
-  // Why its own reason: a job-level link is Jenkins, but it names no build to start again. Saying
+  // Why its own reason: a job-level link is Jenkins, but it names no build to rerun. Saying
   // `not-jenkins` there would tell the user their Jenkins link is not Jenkins.
   //
   // Why this also keeps a GitHub Actions link out: `…/actions/runs/1/job/456` parses as a job
@@ -133,55 +71,30 @@ export async function rebuildJenkinsBuild(args: {
     return fail('unauthorized', location.serverUrl, errorMessage(error))
   }
 
-  const request: JenkinsCredentialArgs & { signal?: AbortSignal } = {
+  const request: JenkinsCredentialArgs = {
     username: server.username,
     apiToken,
     configured: true,
     serverBaseUrl: server.baseUrl,
     ...(args.signal ? { signal: args.signal } : {})
   }
-
-  const probe = await jenkinsGetJson({
-    ...request,
-    url: `${location.buildUrl}api/json?tree=${REBUILD_PROBE_TREE}`
-  })
-  if (!probe.ok) {
-    return failFrom(probe.failure, location.serverUrl)
-  }
-  const plan = readRebuildPlan(probe.body)
-  if (!plan) {
-    return fail('error', location.serverUrl, 'Jenkins answered with something that is not a build')
-  }
-
   // Why the configured prefix rather than the build's: `serverUrl` is derived from the job path, so
   // a Jenkins served under a prefix deeper than the one the user declared would ask the wrong host
   // for a crumb. What the user configured is the Jenkins home.
   const crumb = await readJenkinsCrumb({ ...request, serverUrl: server.baseUrl })
-  const triggered = await jenkinsPost({
-    ...request,
-    crumb,
-    // Why `buildWithParameters` also when every value was omitted: the job declares parameters, and
-    // `/build` on a parameterized job is refused rather than defaulted. An empty form here leaves
-    // each of them at its definition default.
-    url: `${location.jobUrl}${plan.parameters.length > 0 || plan.omittedParameters > 0 ? 'buildWithParameters' : 'build'}`,
-    ...(plan.parameters.length > 0
-      ? {
-          body: new URLSearchParams(
-            plan.parameters.map((parameter): [string, string] => [parameter.name, parameter.value])
-          )
-        }
-      : {})
-  })
-  if (!triggered.ok) {
-    return triggered.reason === 'unconfirmed'
-      ? fail('unconfirmed', location.serverUrl, triggered.message)
-      : failFrom(triggered.failure, location.serverUrl)
+  const posted = await jenkinsPost({ ...request, crumb, url: `${location.buildUrl}replay/rebuild` })
+  if (!posted.ok) {
+    if (posted.reason === 'unconfirmed') {
+      return fail('unconfirmed', location.serverUrl, posted.message)
+    }
+    // Why 404 and 409 get their own answer: both mean this build has nothing to replay — a
+    // freestyle job has no `ReplayAction` at all, and a job that can no longer be built refuses the
+    // queue item. Reporting either as "no longer available" would send the user looking for a
+    // build that is right there.
+    if (posted.status === 404 || posted.status === 409) {
+      return fail('not-replayable', location.serverUrl, posted.failure.message)
+    }
+    return fail(posted.failure.reason, location.serverUrl, posted.failure.message)
   }
-  return {
-    ok: true,
-    mode: plan.parameters.length > 0 ? 'parameters' : 'build',
-    buildNumber: plan.buildNumber,
-    sentParameters: plan.parameters.length,
-    omittedParameters: plan.omittedParameters
-  }
+  return { ok: true, buildNumber: location.buildNumber }
 }

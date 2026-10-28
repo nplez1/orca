@@ -3,7 +3,7 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import type { JenkinsSaveServerArgs } from '../../shared/jenkins-servers'
 import { asRecord } from '../../shared/jenkins-payload'
 import { getJenkinsBuildDetails } from '../jenkins/jenkins-build-details'
-import { rebuildJenkinsBuild } from '../jenkins/jenkins-rebuild'
+import { rerunJenkinsBuild } from '../jenkins/jenkins-rebuild'
 import {
   listJenkinsServerSummaries,
   removeJenkinsServerById,
@@ -95,11 +95,11 @@ export function registerJenkinsHandlers(): void {
     })
   })
 
-  ipcMain.handle('jenkins:rebuild', (_event, args: unknown) => {
+  ipcMain.handle('jenkins:rerunBuild', (_event, args: unknown) => {
     const url = readString(asRecord(args)?.url, MAX_URL_LENGTH)
     if (url.length === 0) {
       return { ok: false, reason: 'not-jenkins', serverUrl: null, message: null }
     }
-    return rebuildJenkinsBuild({ url })
+    return rerunJenkinsBuild({ url })
   })
 }

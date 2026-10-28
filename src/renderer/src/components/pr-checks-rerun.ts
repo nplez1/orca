@@ -1,7 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type { GitHubRerunPRChecksResult, PRCheckDetail } from '../../../shared/github/check-types'
 import { selectRerunTargets } from '../../../shared/jenkins-rebuild'
-import { rebuildJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
+import { rerunJenkinsCheck } from '@/runtime/jenkins-rebuild-client'
 
 /**
  * One "Rerun" action over a failure list that can contain both GitHub Actions checks and Jenkins
@@ -68,7 +68,7 @@ export async function rerunChecksAcrossProviders({
   const jenkinsMessages: string[] = []
   for (const check of targets.jenkins) {
     try {
-      const outcome = await rebuildJenkinsCheck(check)
+      const outcome = await rerunJenkinsCheck(check)
       if (outcome.ok) {
         jenkinsStarted += 1
         jenkinsMessages.push(outcome.message)

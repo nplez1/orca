@@ -4,39 +4,30 @@ import { parseJenkinsBuildLocation } from './jenkins-urls'
 import { parseActionsRunId } from './actions-run-url'
 
 /**
- * Starting a Jenkins build again from the Checks surface.
+ * Rerunning a Jenkins build from the Checks surface.
  *
  * A Jenkins check arrives as a GitHub legacy commit status — a name, a state and a `target_url`
- * with no run identifier — so the link is the only handle there is. A Jenkins that publishes
- * GitHub check runs instead (the Checks plugin) carries a `checkRunId` too, which is why the
- * GitHub rerun path has to leave these checks alone: rerequesting such a check run starts a build
- * on the Jenkins side, and this module would start a second one.
+ * with no run identifier — so the link is the only handle there is. A Jenkins that publishes GitHub
+ * check runs instead (the Checks plugin) carries a `checkRunId` too, which is why the GitHub rerun
+ * path has to leave these checks alone: rerequesting such a check run starts a build on the Jenkins
+ * side, and this module would start a second one.
  *
- * Everything provider-specific — the build number, its parameters — is resolved in the main
- * process from that link and never round-tripped through the renderer: a secret parameter value is
- * masked before it reaches the renderer, so replaying the masked copy would POST `••••` at Jenkins.
+ * Nothing about the build's parameters crosses this boundary. Jenkins' own replay copies the run's
+ * `ParametersAction` server-side, which is the only way a secret value can survive an Orca round
+ * trip: it is masked before the renderer ever sees it.
  */
-
-/** How the new build was started, which is what the confirmation copy says. */
-export type JenkinsRebuildMode = 'parameters' | 'build'
 
 export type JenkinsRebuildFailureReason =
   | JenkinsBuildDetailsFailureReason
   /** The link names a job or a permalink rather than a build that can be read back. */
   | 'no-build'
+  /** The build has no replay action — a freestyle job, or a job that can no longer be built. */
+  | 'not-replayable'
   /** Jenkins answered with a redirect, so whether a build started cannot be read from it. */
   | 'unconfirmed'
 
 export type JenkinsRebuildResult =
-  | {
-      ok: true
-      mode: JenkinsRebuildMode
-      buildNumber: number
-      /** Parameters sent from the previous build. */
-      sentParameters: number
-      /** Parameters left at the job's default because Jenkins did not export a value for them. */
-      omittedParameters: number
-    }
+  | { ok: true; buildNumber: number | null }
   | {
       ok: false
       reason: JenkinsRebuildFailureReason

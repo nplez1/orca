@@ -3,7 +3,7 @@ import { LoaderCircle, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { rebuildJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
+import { rerunJenkinsCheck, hasJenkinsApi } from '@/runtime/jenkins-rebuild-client'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
 
@@ -34,7 +34,7 @@ export function JenkinsRebuildButton({
   const run = useCallback(async (): Promise<void> => {
     setRebuilding(true)
     try {
-      const outcome = await rebuildJenkinsCheck(check)
+      const outcome = await rerunJenkinsCheck(check)
       if (!outcome.ok) {
         toast.error(outcome.error)
         return
@@ -45,7 +45,7 @@ export function JenkinsRebuildButton({
       toast.error(
         err instanceof Error
           ? err.message
-          : translate('jenkins.rebuild.failed', 'Jenkins could not start a new build.')
+          : translate('jenkins.rerun.failed', 'Jenkins could not rerun this build.')
       )
     } finally {
       setRebuilding(false)
@@ -73,8 +73,8 @@ export function JenkinsRebuildButton({
         <RotateCw className="size-3" />
       )}
       {rebuilding
-        ? translate('jenkins.rebuild.rerunning', 'Rerunning…')
-        : translate('jenkins.rebuild.action', 'Rerun build')}
+        ? translate('jenkins.rerun.rerunning', 'Rerunning…')
+        : translate('jenkins.rerun.action', 'Rerun build')}
     </Button>
   )
 }

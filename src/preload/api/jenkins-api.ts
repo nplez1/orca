@@ -25,10 +25,10 @@ export type JenkinsApi = {
     conclusion: string | null
   }) => Promise<JenkinsBuildDetailsResult>
   /**
-   * Start the build this check links to again, on the configured server that serves it.
+   * Rerun the build this check links to, on the configured server that serves it.
    *
-   * Takes only the URL: the build number, its parameters and whether it can be replayed are all
-   * read from Jenkins in the main process, so a masked secret never travels back out again.
+   * Takes only the URL. Jenkins replays the build's own script and copies its parameters
+   * server-side, so no parameter value — masked or otherwise — crosses this boundary.
    */
-  rebuild: (args: { url: string }) => Promise<JenkinsRebuildResult>
+  rerunBuild: (args: { url: string }) => Promise<JenkinsRebuildResult>
 }

@@ -2,7 +2,6 @@ import { translate } from '@/i18n/i18n'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
 import type {
   JenkinsRebuildFailureReason,
-  JenkinsRebuildMode,
   JenkinsRebuildResult
 } from '../../../shared/jenkins-rebuild'
 import { isJenkinsCheck } from '../../../shared/jenkins-rebuild'
@@ -10,29 +9,24 @@ import { asRecord } from '../../../shared/jenkins-payload'
 import { parseJenkinsBuildLocation } from '../../../shared/jenkins-urls'
 
 /**
- * Starting a Jenkins build again, from the renderer's side.
+ * Rerunning a Jenkins build, from the renderer's side.
  *
- * The IPC call carries the check's link and nothing else: the build number and its parameters are
- * resolved in the main process. A secret parameter value is masked before it reaches here, so
- * anything this module knew about the parameters would be the mask, and a rebuild that echoed it
- * back would POST `••••` at Jenkins.
+ * The IPC call carries the check's link and nothing else: Jenkins replays the build's own script and
+ * copies its parameters on the server, so no parameter value — masked or otherwise — travels here.
  */
 
 /**
  * Bounds the wait on the renderer side; the IPC call itself has no abort channel.
  *
- * Why sized to the main process's worst case rather than a round trip: the main side makes up to
- * three requests (build probe, crumb, POST) at 10s each, so a tighter bound would report a timeout
- * for a build that then starts.
+ * Why sized to the main process's worst case rather than a round trip: the main side makes up to two
+ * requests (crumb, then the replay) at 10s each.
  */
-const JENKINS_REBUILD_TIMEOUT_MS = 45_000
+const JENKINS_RERUN_TIMEOUT_MS = 30_000
 
-/** Builds this client has a request in flight for, so two surfaces cannot start one build twice. */
+/** Builds this client has a request in flight for, so two surfaces cannot rerun one build twice. */
 const inFlightBuilds = new Set<string>()
 
-export type JenkinsRebuildOutcome =
-  | { ok: true; mode: JenkinsRebuildMode; message: string }
-  | { ok: false; error: string }
+export type JenkinsRerunOutcome = { ok: true; message: string } | { ok: false; error: string }
 
 /** Whether this client has a Jenkins surface at all; a web client has no `jenkins` namespace. */
 export function hasJenkinsApi(): boolean {
@@ -50,84 +44,68 @@ function failureMessage(reason: JenkinsRebuildFailureReason, serverUrl: string |
   switch (reason) {
     case 'no-build':
       return translate(
-        'jenkins.rebuild.noBuild',
+        'jenkins.rerun.noBuild',
         'This check does not link to a numbered Jenkins build, so there is nothing to rerun. Open it in Jenkins instead.'
+      )
+    case 'not-replayable':
+      return translate(
+        'jenkins.rerun.notReplayable',
+        'Jenkins has no rerun for this build. It is a freestyle job rather than a pipeline, or the job is no longer built.'
       )
     case 'not-configured':
       return translate(
-        'jenkins.rebuild.notConfigured',
+        'jenkins.rerun.notConfigured',
         'Orca has no Jenkins server configured for {{value0}}. Add it in Settings → Integrations to rerun this build.',
         { value0: server }
       )
     case 'unauthorized':
       return translate(
-        'jenkins.rebuild.unauthorized',
+        'jenkins.rerun.unauthorized',
         'Jenkins rejected the saved credentials for {{value0}}. Update its API token in Settings → Integrations.',
         { value0: server }
       )
     case 'forbidden':
       return translate(
-        'jenkins.rebuild.forbidden',
-        'The saved Jenkins account cannot start builds on {{value0}}.',
+        'jenkins.rerun.forbidden',
+        'The saved Jenkins account cannot rerun builds on {{value0}}. It needs the Build permission on the job.',
         { value0: server }
       )
     case 'not-found':
       return translate(
-        'jenkins.rebuild.notFound',
-        'This Jenkins job or build is no longer available, so nothing was started.'
+        'jenkins.rerun.notFound',
+        'This Jenkins build is no longer available, so nothing was started.'
       )
     case 'unreachable':
       // Why hedged: a connection reset after the request was sent is classified the same way, and
       // that request may have started a build.
       return translate(
-        'jenkins.rebuild.unreachable',
+        'jenkins.rerun.unreachable',
         'Could not reach {{value0}}. Check Jenkins before retrying, in case a build did start. Builds are triggered from this machine, so a Jenkins on another network stays out of reach.',
         { value0: server }
       )
     case 'timeout':
       return translate(
-        'jenkins.rebuild.timeout',
+        'jenkins.rerun.timeout',
         '{{value0}} did not respond in time. Check Jenkins before retrying, in case a build did start.',
         { value0: server }
       )
     case 'unconfirmed':
       return translate(
-        'jenkins.rebuild.unconfirmed',
-        'Jenkins did not confirm the new build. Check Jenkins before retrying, in case a build did start.'
+        'jenkins.rerun.unconfirmed',
+        'Jenkins did not confirm the rerun. Check Jenkins before retrying, in case a build did start.'
       )
     case 'not-jenkins':
     case 'error':
-      return translate('jenkins.rebuild.failed', 'Jenkins could not start a new build.')
+      return translate('jenkins.rerun.failed', 'Jenkins could not rerun this build.')
   }
 }
 
-function successMessage(
-  mode: JenkinsRebuildMode,
-  sentParameters: number,
-  omittedParameters: number
-): string {
-  // Why the sent count decides the wording: a build whose only parameters are ones Jenkins does not
-  // export has nothing to replay, and "with this build's parameters" would be a claim about a form
-  // that was sent empty.
-  if (sentParameters > 0 && omittedParameters === 0) {
-    return translate(
-      'jenkins.rebuild.parametersStarted',
-      'Jenkins started a new build with this build’s parameters'
-    )
-  }
-  if (omittedParameters > 0) {
-    return translate(
-      'jenkins.rebuild.defaultsStarted',
-      'Jenkins started a new build, with {{value0}} parameter(s) left at the job’s default because Jenkins did not report their value.',
-      { value0: omittedParameters }
-    )
-  }
-  return mode === 'parameters'
-    ? translate(
-        'jenkins.rebuild.parametersStarted',
-        'Jenkins started a new build with this build’s parameters'
-      )
-    : translate('jenkins.rebuild.buildStarted', 'Jenkins started a new build')
+function successMessage(buildNumber: number | null): string {
+  return buildNumber === null
+    ? translate('jenkins.rerun.started', 'Jenkins is rerunning this build')
+    : translate('jenkins.rerun.startedBuild', 'Jenkins is rerunning build #{{value0}}', {
+        value0: buildNumber
+      })
 }
 
 async function callWithTimeout(
@@ -139,12 +117,12 @@ async function callWithTimeout(
       reject(
         new Error(
           translate(
-            'jenkins.rebuild.timedOut',
-            'Timed out waiting for Jenkins to start the build. Check Jenkins before retrying, in case a build did start.'
+            'jenkins.rerun.timedOut',
+            'Timed out waiting for Jenkins to rerun the build. Check Jenkins before retrying, in case a build did start.'
           )
         )
       )
-    }, JENKINS_REBUILD_TIMEOUT_MS)
+    }, JENKINS_RERUN_TIMEOUT_MS)
   })
   try {
     return await Promise.race([pending, timeout])
@@ -153,14 +131,14 @@ async function callWithTimeout(
   }
 }
 
-/** Start the build this check links to again, or explain why Orca cannot. */
-export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<JenkinsRebuildOutcome> {
+/** Rerun the build this check links to, or explain why Orca cannot. */
+export async function rerunJenkinsCheck(check: PRCheckDetail): Promise<JenkinsRerunOutcome> {
   const url = check.url
   if (!url || !isJenkinsCheck(check)) {
     return {
       ok: false,
       error: translate(
-        'jenkins.rebuild.notJenkins',
+        'jenkins.rerun.notJenkins',
         'This check does not link to a Jenkins build, so it cannot be rerun here.'
       )
     }
@@ -171,38 +149,34 @@ export async function rebuildJenkinsCheck(check: PRCheckDetail): Promise<Jenkins
     return {
       ok: false,
       error: translate(
-        'jenkins.rebuild.unavailable',
+        'jenkins.rerun.unavailable',
         'Rerunning Jenkins builds is not available in this client.'
       )
     }
   }
   // Why the build URL and not the check's: one build reaches this surface twice (a legacy status
   // linking `…/42/display/redirect` and a Checks-plugin run linking `…/42/`), and keying on the raw
-  // link would let each affordance start the same build.
+  // link would let each affordance rerun the same build.
   const buildUrl = parseJenkinsBuildLocation(url)?.buildUrl ?? url
   if (inFlightBuilds.has(buildUrl)) {
     return {
       ok: false,
       error: translate(
-        'jenkins.rebuild.inFlight',
+        'jenkins.rerun.inFlight',
         'A rerun of this Jenkins build is already starting.'
       )
     }
   }
   inFlightBuilds.add(buildUrl)
   try {
-    const result = await callWithTimeout(window.api.jenkins.rebuild({ url }))
+    const result = await callWithTimeout(window.api.jenkins.rerunBuild({ url }))
     if (!result) {
       return { ok: false, error: failureMessage('error', null) }
     }
     if (!result.ok) {
       return { ok: false, error: failureMessage(result.reason, result.serverUrl) }
     }
-    return {
-      ok: true,
-      mode: result.mode,
-      message: successMessage(result.mode, result.sentParameters, result.omittedParameters)
-    }
+    return { ok: true, message: successMessage(result.buildNumber) }
   } finally {
     inFlightBuilds.delete(buildUrl)
   }

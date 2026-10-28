@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PRCheckDetail } from '../../../shared/github/check-types'
 import { rerunChecksAcrossProviders } from './pr-checks-rerun'
 
-const rebuildJenkinsCheck = vi.fn()
+const rerunJenkinsCheck = vi.fn()
 
 vi.mock('@/runtime/jenkins-rebuild-client', () => ({
-  rebuildJenkinsCheck: (...args: unknown[]) => rebuildJenkinsCheck(...args)
+  rerunJenkinsCheck: (...args: unknown[]) => rerunJenkinsCheck(...args)
 }))
 
 function check(overrides: Partial<PRCheckDetail>): PRCheckDetail {
@@ -35,7 +35,7 @@ const actionsCheck = (overrides: Partial<PRCheckDetail> = {}): PRCheckDetail =>
   })
 
 beforeEach(() => {
-  rebuildJenkinsCheck.mockReset()
+  rerunJenkinsCheck.mockReset()
 })
 
 afterEach(() => {
@@ -45,11 +45,7 @@ afterEach(() => {
 describe('rerunChecksAcrossProviders', () => {
   it('reruns both providers for a mixed failure list', async () => {
     const rerunGitHub = vi.fn().mockResolvedValue({ ok: true, count: 1 })
-    rebuildJenkinsCheck.mockResolvedValue({
-      ok: true,
-      mode: 'parameters',
-      message: 'Jenkins started a new build'
-    })
+    rerunJenkinsCheck.mockResolvedValue({ ok: true, message: 'Jenkins started a new build' })
 
     const outcome = await rerunChecksAcrossProviders({
       checks: [actionsCheck(), jenkinsCheck()],
@@ -65,11 +61,7 @@ describe('rerunChecksAcrossProviders', () => {
 
   it('never asks GitHub about a list whose only failure is a Jenkins build', async () => {
     const rerunGitHub = vi.fn()
-    rebuildJenkinsCheck.mockResolvedValue({
-      ok: true,
-      mode: 'build',
-      message: 'Jenkins started a new build'
-    })
+    rerunJenkinsCheck.mockResolvedValue({ ok: true, message: 'Jenkins started a new build' })
 
     const outcome = await rerunChecksAcrossProviders({
       checks: [jenkinsCheck()],
@@ -84,11 +76,7 @@ describe('rerunChecksAcrossProviders', () => {
 
   it('reports what started when one leg fails', async () => {
     const rerunGitHub = vi.fn().mockResolvedValue({ ok: false, error: 'gh exploded' })
-    rebuildJenkinsCheck.mockResolvedValue({
-      ok: true,
-      mode: 'build',
-      message: 'Jenkins started a new build'
-    })
+    rerunJenkinsCheck.mockResolvedValue({ ok: true, message: 'Jenkins started a new build' })
 
     const outcome = await rerunChecksAcrossProviders({
       checks: [actionsCheck(), jenkinsCheck()],
@@ -106,11 +94,7 @@ describe('rerunChecksAcrossProviders', () => {
 
   it('keeps going when one leg throws', async () => {
     const rerunGitHub = vi.fn().mockRejectedValue(new Error('rpc timed out'))
-    rebuildJenkinsCheck.mockResolvedValue({
-      ok: true,
-      mode: 'build',
-      message: 'Jenkins started a new build'
-    })
+    rerunJenkinsCheck.mockResolvedValue({ ok: true, message: 'Jenkins started a new build' })
 
     const outcome = await rerunChecksAcrossProviders({
       checks: [actionsCheck(), jenkinsCheck()],
@@ -119,7 +103,7 @@ describe('rerunChecksAcrossProviders', () => {
     })
 
     // The throw used to abort the loop and discard the count of what had started.
-    expect(rebuildJenkinsCheck).toHaveBeenCalledTimes(1)
+    expect(rerunJenkinsCheck).toHaveBeenCalledTimes(1)
     expect(outcome.started).toBe(1)
     expect(outcome.message).toMatch(/rpc timed out/)
   })
@@ -139,6 +123,6 @@ describe('rerunChecksAcrossProviders', () => {
       message: 'No failed checks to rerun.'
     })
     expect(rerunGitHub).not.toHaveBeenCalled()
-    expect(rebuildJenkinsCheck).not.toHaveBeenCalled()
+    expect(rerunJenkinsCheck).not.toHaveBeenCalled()
   })
 })

@@ -13,5 +13,5 @@ export const jenkinsApi: JenkinsApi = {
 
   buildDetails: (args) => ipcRenderer.invoke('jenkins:buildDetails', args),
 
-  rebuild: (args: { url: string }) => ipcRenderer.invoke('jenkins:rebuild', args)
+  rerunBuild: (args: { url: string }) => ipcRenderer.invoke('jenkins:rerunBuild', args)
 }

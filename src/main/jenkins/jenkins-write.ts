@@ -21,8 +21,8 @@ import { getMainHttpClient } from '../network/http-client'
  * Writes against a Jenkins server.
  *
  * Kept apart from the read transport because a write's success is the status line, not a document:
- * `build` and `buildWithParameters` answer a POST whose body nobody reads, and a 201 with no
- * `Location` is the normal case rather than an empty result.
+ * a replay answers 302 back to the job page with no body, and a 201 with no `Location` is the normal
+ * case rather than an empty result.
  */
 
 export type JenkinsPostResult =
@@ -32,7 +32,7 @@ export type JenkinsPostResult =
    * a failure would invite a retry that starts a second one.
    */
   | { ok: false; reason: 'unconfirmed'; message: string }
-  | { ok: false; reason: 'failure'; failure: JenkinsRequestFailure }
+  | { ok: false; reason: 'failure'; status: number; failure: JenkinsRequestFailure }
 
 /**
  * The CSRF field Jenkins requires on a write.
@@ -87,7 +87,12 @@ export async function jenkinsPost(
       signal: jenkinsSignal(args.signal)
     })
   } catch (error) {
-    return { ok: false, reason: 'failure', failure: classifyJenkinsTransportError(error) }
+    return {
+      ok: false,
+      reason: 'failure',
+      status: 0,
+      failure: classifyJenkinsTransportError(error)
+    }
   }
 
   const jenkinsVersion = response.headers.get('x-jenkins')
@@ -95,32 +100,8 @@ export async function jenkinsPost(
     identifiedAsJenkins: jenkinsVersion !== null,
     configured: args.configured === true
   }
-  // Why for both: an opaqueredirect carries no status and no URL, so a chromeless 0 and a visible
-  // 3xx are the same answer — look, do not assume.
-  if (
-    response.type === 'opaqueredirect' ||
-    response.status === 0 ||
-    (response.status >= 300 && response.status < 400)
-  ) {
-    await releaseBody(response)
-    return {
-      ok: false,
-      reason: 'unconfirmed',
-      message: 'Jenkins redirected the build request instead of accepting it'
-    }
-  }
-  // Why the URL rather than a redirect flag: a followed redirect re-issues the write as a GET, so
-  // the status below describes the page it landed on, not the POST. Jenkins answers a queued build
-  // with 201 and no redirect, so a landing URL that differs means the status is no longer evidence
-  // about the write — possibly after starting something, which is what `unconfirmed` says.
-  if (response.url.length > 0 && response.url !== args.url) {
-    await releaseBody(response)
-    return {
-      ok: false,
-      reason: 'unconfirmed',
-      message: `Jenkins redirected the build request to ${response.url}`
-    }
-  }
+  // Why the scope check first: a redirect out of the configured prefix (an SSO interstitial, or a
+  // proxy) is the one case where our credentials went somewhere they were not meant for.
   if (
     isResponseBeyondCredentialScope({
       requestUrl: args.url,
@@ -132,6 +113,7 @@ export async function jenkinsPost(
     return {
       ok: false,
       reason: 'failure',
+      status: response.status,
       failure: {
         reason: isKnownJenkins(evidence) ? 'unauthorized' : 'not-jenkins',
         message: `Jenkins redirected outside its configured URL to ${response.url}`,
@@ -140,19 +122,39 @@ export async function jenkinsPost(
       }
     }
   }
-  if (!response.ok) {
-    const status = response.status
+  // Why a redirect is not ambiguity here: a Jenkins write ends with `sendRedirect` as its normal
+  // success path (the build is queued first), so the landing status is what decides. A landing
+  // that answered 2xx is an accepted write however it got there; a landing that failed is the one
+  // case we cannot read, because the POST itself may have been handled before the hop.
+  const redirected = response.url.length > 0 && response.url !== args.url
+  if (response.type === 'opaqueredirect' || response.status === 0) {
     await releaseBody(response)
     return {
       ok: false,
-      reason: 'failure',
-      failure: {
-        reason: classifyJenkinsHttpStatus(status, evidence),
-        message: `Jenkins responded ${status}${response.statusText ? ` ${response.statusText}` : ''}`,
-        identifiedAsJenkins: evidence.identifiedAsJenkins,
-        jenkinsVersion
-      }
+      reason: 'unconfirmed',
+      message: `Jenkins redirected the build request to ${response.url || 'another page'}`
     }
+  }
+  if (!response.ok) {
+    const status = response.status
+    await releaseBody(response)
+    return redirected
+      ? {
+          ok: false,
+          reason: 'unconfirmed',
+          message: `Jenkins redirected the build request to ${response.url}, which answered ${status}`
+        }
+      : {
+          ok: false,
+          reason: 'failure',
+          status,
+          failure: {
+            reason: classifyJenkinsHttpStatus(status, evidence),
+            message: `Jenkins responded ${status}${response.statusText ? ` ${response.statusText}` : ''}`,
+            identifiedAsJenkins: evidence.identifiedAsJenkins,
+            jenkinsVersion
+          }
+        }
   }
   await releaseBody(response)
   return { ok: true, status: response.status }
