@@ -1,5 +1,8 @@
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
-import { withMirroredEvidenceReceipt } from '../../../../shared/agent-status-freshness'
+import {
+  withMirroredEvidenceReceipt,
+  agentStatusAuthorityObservedAt
+} from '../../../../shared/agent-status-freshness'
 import { agentEntryCompletionAt } from '../../../../shared/agent-completion-time'
 import { agentMainAgentVerdict } from '../../../../shared/agent-main-agent-verdict'
 import { normalizeCompatibleAgentStatusEntryForOwner } from '../../../../shared/agent-title-owner'
@@ -30,6 +33,31 @@ import {
   isMirroredCommandCodeTurnBump,
   writableWebSessionTabsRecord
 } from './state-equality-core'
+
+/** Host dialog observations already granted the fence, per mirrored pane. A republish of the same
+ *  observation is not new evidence; see the `hostDialogIsNew` guard in the patch builder. */
+const lastHostDialogObservationByPaneKey = new Map<string, number>()
+
+/** Bounded the way the authority registries are: a pane that dies with a dialog up never reports a
+ *  clear, and a pane key is never reused. */
+const MAX_TRACKED_HOST_DIALOGS = 512
+
+function noteHostDialogObservation(paneKey: string, observation: number): void {
+  if (
+    !lastHostDialogObservationByPaneKey.has(paneKey) &&
+    lastHostDialogObservationByPaneKey.size >= MAX_TRACKED_HOST_DIALOGS
+  ) {
+    const oldest = lastHostDialogObservationByPaneKey.keys().next().value
+    if (oldest !== undefined) {
+      lastHostDialogObservationByPaneKey.delete(oldest)
+    }
+  }
+  lastHostDialogObservationByPaneKey.set(paneKey, observation)
+}
+
+export function resetHostDialogObservationsForTests(): void {
+  lastHostDialogObservationByPaneKey.clear()
+}
 
 export function buildMirroredAgentStatusPatch(
   state: WebSessionTabsSyncState,
@@ -108,11 +136,21 @@ export function buildMirroredAgentStatusPatch(
     // and only the client's next byte write (or the 30-minute stale boundary) released a dialog that
     // had already been answered.
     const existingIsHostRow = existing?.mirroredEvidenceReceivedAt !== undefined
+    // Why the observation and not the frame: a host that republishes a row it already sent is not
+    // new evidence, and re-piercing on it would reopen a wait the client's bytes have since moved
+    // past — a host dying with a dialog open would pin the client on Needs You for good, since every
+    // unrelated republish carries that frozen row. Only a wait the host is still observing anew wins.
+    const hostObservation = hostPiercesFence ? agentStatusAuthorityObservedAt(entry) : undefined
+    const hostDialogIsNew =
+      hostObservation !== lastHostDialogObservationByPaneKey.get(entry.paneKey)
     // Why outright rather than on a clock comparison: pi re-posts `ui_prompt_active` on every tool
     // event while the dialog is open, so a wait that loses once and wins once more IS the
     // working/waiting oscillation this fence exists to stop — and `updatedAt` is the client's clock
     // against the host's, which skew alone can invert.
-    const hostDialogOutranksClient = hostPiercesFence && !existingIsHostRow
+    const hostDialogOutranksClient = hostPiercesFence && !existingIsHostRow && hostDialogIsNew
+    if (hostObservation !== undefined) {
+      noteHostDialogObservation(entry.paneKey, hostObservation)
+    }
     const clientOwnsEntry =
       !existingIsHostRow &&
       !hostPiercesFence &&

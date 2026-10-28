@@ -59,6 +59,7 @@ import {
   resetRendererOwnedAgentStatusPanesForTests
 } from '../components/terminal-pane/renderer-owned-agent-status-registry'
 import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshot-api'
+import { resetHostDialogObservationsForTests } from './web-session-tabs-sync/agent-status-patch'
 import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking-lifecycle'
 import { shouldApplyWebSessionTabsSnapshot } from './web-session-tabs-sync/tracking-decisions'
 
@@ -277,6 +278,7 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
     vi.setSystemTime(T0)
     resetWebSessionTabsSnapshotFreshnessForTests()
     resetRendererOwnedAgentStatusPanesForTests()
+    resetHostDialogObservationsForTests()
   })
 
   afterEach(() => {
@@ -612,8 +614,9 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
     })
 
     // Why: pi re-posts `ui_prompt_active` on every tool event while the dialog is open, so both
-    // writers keep publishing for the whole wait. Every round must settle on the host's dialog
-    // state, whatever order the two land in — the oscillation the fence was built to stop.
+    // writers keep publishing for the whole wait. Each round's host frame is a NEW observation of the
+    // same open dialog, so it must win that round whatever order the two land in; the client's write
+    // in between is stale bytes and loses again on the next host frame.
     it('keeps the host wait through interleaved client byte writes', () => {
       const store = seedPairedClientStore()
       // The client's clock runs ahead of the host's, so its own byte writes always out-rank the
@@ -650,6 +653,48 @@ describe('remote-paired pane: host snapshot mirror vs client byte-derived status
         rounds.push(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state ?? null)
       }
       expect(rounds).toEqual(Array.from({ length: CYCLES }, () => 'waiting'))
+    })
+
+    // Why: a republish of a row the host already sent is not new evidence. Re-piercing on it would
+    // re-open a wait the client's bytes have moved past, so a host that died with a dialog open
+    // would pin the client on Needs You for as long as it keeps republishing that frozen row.
+    it('does not re-open a wait the host merely republishes', () => {
+      const store = seedPairedClientStore()
+      const clientNow = T0 + 10_000
+      replayClientOscWorking(store, clientNow)
+      const hostWait = (snapshotVersion: number, hostNow: number) =>
+        makeHostSnapshot({
+          snapshotVersion,
+          hostNow,
+          includeAgentStatus: true,
+          agentStatusOverrides: { state: 'waiting', prompt: 'Answer me', agentType: 'pi' }
+        })
+
+      // The first sighting of the host's wait pierces.
+      applyHostSnapshot(store, hostWait(2, T0 + 1_000), T0 + 1_000)
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
+
+      // The client's bytes write again, as they do on every OSC frame.
+      vi.setSystemTime(clientNow + 1_000)
+      markRendererOwnedAgentStatusWrite(MIRROR_PANE_KEY)
+      store
+        .getState()
+        .setAgentStatus(
+          MIRROR_PANE_KEY,
+          { state: 'working', prompt: CLIENT_PROMPT, agentType: 'pi' },
+          'pi',
+          undefined,
+          { tabId: MIRROR_TAB_ID, worktreeId: WT }
+        )
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+
+      // Same row, newer snapshot: the host is repeating itself, so the client keeps its own state.
+      applyHostSnapshot(store, hostWait(3, T0 + 1_000), T0 + 20_000)
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('working')
+
+      // A genuinely new observation of the dialog still wins.
+      applyHostSnapshot(store, hostWait(4, T0 + 30_000), T0 + 30_000)
+      expect(store.getState().agentStatusByPaneKey[MIRROR_PANE_KEY]?.state).toBe('waiting')
     })
 
     it('keeps live client status over a restored, unconfirmed host block', () => {
