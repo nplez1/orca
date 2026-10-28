@@ -127,8 +127,9 @@ session-id search over each agent's own roots — the same idea as
 - **Atomic.** A failed or unparseable chunk keeps the last good ledger and retries next time.
   Completed chunk extracts are kept for that retry only once a fold has produced a ledger —
   an unproduced one is never stored, so a first fold's chunks are lost with it.
-- **The pane opens as a brief, not a log.** The title is the whole-session goal, then the ledger
-  (facts) — collapsed by default — then the written report, then the timeline, also collapsed
+- **The pane opens as a brief, not a log.** The title is the whole-session goal, then the written
+  report, then the ledger (facts) and the timeline — both collapsed by default, and an empty one
+  drops out rather than showing a row
   (`components/activity/session-summary-ledger-view.tsx`). One switch — _Show the full session_ —
   swaps the whole-session report and every fact in; it is a re-render, not a fold. When the reader
   has spoken to the agent only once, the window _is_ the session: the fold then writes one report
