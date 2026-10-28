@@ -540,6 +540,16 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   triage traced to upstream-vs-fork identity or an unconfigured `defaultJiraBoard`, not to a render
   path. The PR says so and the issue stays open.
 - **Targets:** fork issue #189 (`Refs #189`, not `Fixes`). Not upstream-bound.
+- **Second commit (`029d7f1076`), the board half:** the reporter confirmed the machine runs Orca NP and
+  that the board was selected there, and that the list showed no "Return to board" button — which
+  renders whenever `defaultJiraBoard` is set, so the renderer held `null`. Two silent paths can produce
+  that: the picker wrote through `updateSettings`, which only `console.error`s and whose store mirror
+  lands after the host write; and a runtime answering `method_not_found` for the board RPC persisted
+  `viewMode: 'list'` to the device, outliving the runtime that could not serve it. The picker now uses
+  `updateSettingsOrThrow` with a visible failure, and the capability fallback is in memory, keyed by the
+  host that reported it, with a persistent notice and a retry. Which of the two happened on that
+  machine is still unproven; the check that settles it is whether Settings → Tasks still shows the board
+  after a restart.
 - **Verified:** 7 new tests plus the unchanged `jira/SettingsLink.test.tsx`, `pnpm tc:web`, the
   changed-code quality gate (0 findings), `oxfmt --check`. Gate 1 not required by diff scope (both
   paths are under `src/renderer/src/`). No rendered-UI pass: happy-dom cannot assert layout, so the
