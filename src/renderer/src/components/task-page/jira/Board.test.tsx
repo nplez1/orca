@@ -148,7 +148,11 @@ const model: TaskPageJiraBoardModel = {
 
 function boardTree(
   renderedModel: TaskPageJiraBoardModel,
-  props: { onUseIssueList?: () => void; onIssueMoved?: () => void } = {}
+  props: {
+    onUseIssueList?: () => void
+    onBoardUnavailable?: () => void
+    onIssueMoved?: () => void
+  } = {}
 ) {
   return (
     <TooltipProvider>
@@ -156,6 +160,7 @@ function boardTree(
         model={renderedModel}
         selection={{ boardId: '42', siteId: 'site-1' }}
         onUseIssueList={props.onUseIssueList ?? vi.fn()}
+        onBoardUnavailable={props.onBoardUnavailable ?? vi.fn()}
         onIssueMoved={props.onIssueMoved ?? vi.fn()}
       />
     </TooltipProvider>
@@ -165,6 +170,7 @@ function boardTree(
 function renderBoard(
   props: {
     onUseIssueList?: () => void
+    onBoardUnavailable?: () => void
     onIssueMoved?: () => void
     model?: TaskPageJiraBoardModel
   } = {}
@@ -512,16 +518,20 @@ describe('TaskPageJiraBoard', () => {
     expect(await screen.findByText('ABC-2 title')).toBeTruthy()
   })
 
-  it('falls back to the issue list when an older runtime lacks board methods', async () => {
+  it('reports an older runtime that lacks board methods without recording a preference', async () => {
+    const onBoardUnavailable = vi.fn()
     const onUseIssueList = vi.fn()
     mocks.jiraGetBoardOverview.mockRejectedValue(
       Object.assign(new Error('Unknown method: jira.getBoardOverview'), {
         code: 'method_not_found'
       })
     )
-    renderBoard({ onUseIssueList })
+    renderBoard({ onBoardUnavailable, onUseIssueList })
 
-    await waitFor(() => expect(onUseIssueList).toHaveBeenCalledOnce())
+    await waitFor(() => expect(onBoardUnavailable).toHaveBeenCalledOnce())
+    // Why: the parent keeps the fallback in memory, so the board must not ask for the list,
+    // which would record the capability miss as this device's view preference.
+    expect(onUseIssueList).not.toHaveBeenCalled()
   })
 
   it('moves a backlog item into a sprint from its own row', async () => {
@@ -816,6 +826,7 @@ describe('TaskPageJiraBoard external refresh signal', () => {
           model={model}
           selection={{ boardId: '42', siteId: 'site-1' }}
           onUseIssueList={vi.fn()}
+          onBoardUnavailable={vi.fn()}
           onIssueMoved={vi.fn()}
           refreshSignal={signal}
         />

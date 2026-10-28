@@ -19,6 +19,13 @@ export type JiraBoardMode = {
   activeBoard: JiraBoardSelection | null
   /** The configured agile board whichever view is showing, so the list can offer a way back. */
   configuredBoard: JiraBoardSelection | null
+  /**
+   * The runtime serving Jira cannot run the board view. A capability miss, not a preference:
+   * it lives in memory, so an upgraded runtime brings the board back without a settings edit.
+   */
+  runtimeBoardUnavailable: boolean
+  reportRuntimeBoardUnavailable: () => void
+  retryBoard: () => void
   showBoard: () => void
   showIssueList: () => void
   boardRefreshSignal: number
@@ -41,8 +48,14 @@ export function useJiraBoardMode(model: TaskPageComposerActionsModel): JiraBoard
     handleOpenOrUseJiraItem
   } = model
   const defaultJiraBoard = model.settings?.defaultJiraBoard ?? null
+  const boardOwnerHostId = jiraTaskSourceContext?.hostId ?? accountBackedTaskSourceHostId
   const [jiraDetailRefreshSignal, setJiraDetailRefreshSignal] = useState(0)
   const [jiraBoardRefreshSignal, setJiraBoardRefreshSignal] = useState(0)
+  // Why the host id, not a boolean: a capability miss belongs to the runtime that answered it,
+  // so another host (an upgraded one) is available again without the user retrying.
+  const [unavailableBoardHostId, setUnavailableBoardHostId] = useState<string | null>(null)
+  const runtimeBoardUnavailable =
+    unavailableBoardHostId !== null && unavailableBoardHostId === boardOwnerHostId
   const boardSelectionRef = useRef<string | null>(null)
   const jiraBoardSelectionKey = defaultJiraBoard
     ? `${defaultJiraBoard.siteId}:${defaultJiraBoard.boardId}`
@@ -83,8 +96,16 @@ export function useJiraBoardMode(model: TaskPageComposerActionsModel): JiraBoard
   )
 
   return {
-    activeBoard: defaultJiraBoard && jiraBoardViewMode === 'board' ? defaultJiraBoard : null,
+    // Why: a runtime that cannot serve the board must not read as a preference for the list,
+    // so the fallback stays out of `jiraBoardViewMode` and out of localStorage.
+    activeBoard:
+      defaultJiraBoard && jiraBoardViewMode === 'board' && !runtimeBoardUnavailable
+        ? defaultJiraBoard
+        : null,
     configuredBoard: defaultJiraBoard,
+    runtimeBoardUnavailable,
+    reportRuntimeBoardUnavailable: () => setUnavailableBoardHostId(boardOwnerHostId),
+    retryBoard: () => setUnavailableBoardHostId(null),
     showBoard: () => setJiraBoardViewMode('board'),
     showIssueList: () => setJiraBoardViewMode('list'),
     boardRefreshSignal: jiraBoardRefreshSignal,

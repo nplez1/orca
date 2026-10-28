@@ -521,6 +521,42 @@ Run `node local/branch-status.mjs` for the current numbers rather than trusting 
   focused suites were run directly with `node config/scripts/run-vitest.mjs` (the same runner `pnpm test`
   uses) and `pnpm tc` ran through the lock.
 
+### nplez1/bug-windows-tasks-view-has-no-jira-settings-butt — issue #189, PR #205
+
+- **Why:** issue #189 reports "the Tasks view shows no Jira settings button" on Windows. The issue's
+  own triage settled that this is not a Windows bug: the whole Jira cluster in the Tasks source bar,
+  including `TaskPageJiraSettingsLink` — the only in-product route to Settings → Tasks → Jira board
+  view — rendered only while the Jira task source was selected, while the board it configures is
+  global. From GitHub, GitLab or Linear the entry vanished and nothing in the Tasks view said where
+  the configuration went, which is exactly the reporter's description.
+- **Shape:** `SourceBar.tsx` — the settings link renders from every source when
+  `taskSource === 'jira' || (jiraConnected && jira is a visible source)`; the Jira _site selector_
+  stays gated on the selected source because it filters that source's issue list; and both right-hand
+  clusters (Linear scope controls, Jira cluster) now sit in one wrapper so the outer
+  `justify-between` row keeps two children and the Linear band does not split into three columns. New
+  `SourceBar.test.tsx`, 7 cases. Most of the file's diff is the reindentation the wrapper causes.
+- **Scope:** the issue's own remaining acceptance criteria are untouched — which app the Windows
+  machine runs ("Orca" vs "Orca NP"), and the "old Jira board surface" half of the report, which the
+  triage traced to upstream-vs-fork identity or an unconfigured `defaultJiraBoard`, not to a render
+  path. The PR says so and the issue stays open.
+- **Targets:** fork issue #189 (`Refs #189`, not `Fixes`). Not upstream-bound.
+- **Second commit (`029d7f1076`), the board half:** the reporter confirmed the machine runs Orca NP and
+  that the board was selected there, and that the list showed no "Return to board" button — which
+  renders whenever `defaultJiraBoard` is set, so the renderer held `null`. Two silent paths can produce
+  that: the picker wrote through `updateSettings`, which only `console.error`s and whose store mirror
+  lands after the host write; and a runtime answering `method_not_found` for the board RPC persisted
+  `viewMode: 'list'` to the device, outliving the runtime that could not serve it. The picker now uses
+  `updateSettingsOrThrow` with a visible failure, and the capability fallback is in memory, keyed by the
+  host that reported it, with a persistent notice and a retry. Which of the two happened on that
+  machine is still unproven; the check that settles it is whether Settings → Tasks still shows the board
+  after a restart.
+- **Verified:** 7 new tests plus the unchanged `jira/SettingsLink.test.tsx`, `pnpm tc:web`, the
+  changed-code quality gate (0 findings), `oxfmt --check`. Gate 1 not required by diff scope (both
+  paths are under `src/renderer/src/`). No rendered-UI pass: happy-dom cannot assert layout, so the
+  wrapper is reviewed by reading the JSX. Opus review (high): R1 found two SHOULD-FIX (the gear would
+  also have appeared for users who never connected Jira; three children in the `justify-between` row
+  moved the Linear selector into the middle), both fixed in R2, delta clean.
+
 ### nplez1/main
 
 This fork's own line: upstream `main` plus all of the above plus fork-only patches, and the only

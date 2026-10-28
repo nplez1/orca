@@ -62,7 +62,11 @@ export function renderTasksSettingsSection(context: SettingsRenderContext): Reac
       searchEntries={navigation.getSectionSearchEntries('tasks')}
     >
       {view.isSectionMounted('tasks') ? (
-        <TasksPane settings={model.settings} updateSettings={model.updateSettings} />
+        <TasksPane
+          settings={model.settings}
+          updateSettings={model.updateSettings}
+          updateSettingsOrThrow={model.updateSettingsOrThrow}
+        />
       ) : null}
     </SettingsSection>
   )
