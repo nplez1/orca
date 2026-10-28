@@ -44,6 +44,9 @@ function git(root, args) {
   return execFileSync('git', args, {
     cwd: root,
     encoding: 'utf8',
+    // Why: a sync-sized merge lists ~20k changed paths, and the 1 MiB default aborts the spawn
+    // (ENOBUFS) before the ratchet can scope itself. Same ceiling as ast-grep-scan.mjs.
+    maxBuffer: 256 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'ignore']
   })
 }

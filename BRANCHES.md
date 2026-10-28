@@ -1,6 +1,19 @@
 # Branch tracker
 
-Last updated **2026-10-25** — `nplez1/main` merged upstream main @ `0571e45107` (556 commits) from
+Last updated **2026-10-28** — `nplez1/main` merged upstream main @ `f173998203` (838 commits) from
+`7b86cb0846` (merge `2fadfe371b`, merge base `0571e45107`, rollback tag
+`archive/pre-sync-7b86cb0846`). **431 conflicted paths / 621 hunks** — `both-rewrote 223, union 86,
+add/add 72, modify/delete 31, duplicate-tail 11, duplicate-members 3, rename-replay 5` — the largest
+conflict set this fork has taken. 255 hunks were proved mechanically, 69 `docs/agents-md-refs` paths
+were upstream churn absent from both tips, 27 deletions were settled, and the remaining 163 paths
+were resolved in 13 batches. Upstream's delta is a feature wave (WSL host chat, the Jira board
+rework, team agents) plus two test-retirement campaigns and a consolidated
+`config/scripts/run-lint.mjs`. Decisions are in
+[local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-28 sync", and the
+sync log in [LOCAL-PATCHES.md](./LOCAL-PATCHES.md) names each resolution. **Every local branch now
+sits on a pre-sync base** — see § Base drift.
+
+Before that, on **2026-10-25** — `nplez1/main` merged upstream main @ `0571e45107` (556 commits) from
 `095cf32705` (merge `281cccf5a4`, merge base `57b5082404`, rollback tag
 `archive/pre-sync-095cf32705`). 249 conflicted paths / 367 hunks, four to five times the previous
 two syncs: `both-rewrote 167, union 47, modify/delete 23, duplicate-tail 8, rename-replay 2,

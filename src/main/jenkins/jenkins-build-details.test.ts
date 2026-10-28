@@ -28,6 +28,7 @@ function json(body: unknown, headers: Record<string, string> = {}): Response {
 async function loadModules() {
   vi.resetModules()
   vi.doMock('node:os', async () => {
+    // ast-grep-ignore: test-no-in-test-import-actual -- the point of this case is the real homedir, redirected; a stubbed os module would test the stub.
     const actual = await vi.importActual<typeof Os>('node:os')
     return { ...actual, homedir: () => tempHome }
   })

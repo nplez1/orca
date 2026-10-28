@@ -6,13 +6,13 @@
     "",
     "An entry is a claim that a red is not this branch's to fix: it arrives through a merge of someone",
     "else's work, or it is a fork-owned file upstream will rename out from under the fix. Record the",
-    "evidence in LOCAL-PATCHES.md and keep this file the assertion \u2014 both change in the same commit.",
+    "evidence in LOCAL-PATCHES.md and keep this file the assertion — both change in the same commit.",
     "No entry belongs here merely because the fix is inconvenient.",
     "",
     "`step` is the package.json script name (or the literal command, for a bare `oxlint` step).",
     "`match` is an optional regex against one failure line. The ratchets print one `::error::` line or",
     "one `file: N unit(s), baseline allows M.` row per offending entry, so a narrow regex allowlists",
-    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option \u2014",
+    "that entry alone. An entry with no `match` allowlists the whole step, which is the coarse option —",
     "prefer `match` for a ratchet, because a whole-step entry also masks a NEW failure in that step.",
     "A step that prints `::error file=X::text` is matched as `X: text`, so an entry can name one file;",
     "the text alone is the same for every file those ratchets report.",
@@ -20,29 +20,26 @@
     "",
     "Keeping entries: documented in LOCAL-PATCHES.md => keep even when a run reproduces nothing",
     "(the machine state varies). Observed once and undocumented => prune it. An entry that stops",
-    "reproducing is reported stale; `node local/gate-lint.mjs --prune` drops it."
+    "reproducing is reported stale; `node local/gate-lint.mjs --prune` drops it.",
+    "",
+    "2026-10-28 sync: upstream folded `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`,",
+    "so the two #198 entries follow that step. The bare `oxlint` entry went stale and was pruned."
   ],
-  "recordedAt": "2026-10-22",
+  "recordedAt": "2026-10-28",
   "entries": [
     {
-      "step": "check:flaky-test-pattern-ratchet",
+      "step": "lint:ast-grep-gates",
       "match": "^test-no-wall-clock:src/renderer/src/components/github/check-details-cache\\.test\\.ts:",
       "class": "foreign-red",
       "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
-      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198"
+      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198. The step was renamed by the 2026-10-28 sync (upstream folds the flaky ratchet into ast-grep-gates); the red is unchanged."
     },
     {
-      "step": "check:flaky-test-pattern-ratchet",
+      "step": "lint:ast-grep-gates",
       "match": "^test-no-real-time-wait:src/renderer/src/components/right-sidebar/checks-list-expanded-details\\.test\\.tsx:",
       "class": "foreign-red",
       "owner": "941acb70e0 fix(checks): keep cached check details on screen instead of re-spinning (#198)",
-      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198"
-    },
-    {
-      "step": "oxlint",
-      "class": "foreign-red",
-      "owner": "c7c216aae8 feat(checks): rerun Jenkins builds from the Checks surface (#203) + 6aba202d5e feat(docs): publish OSS docs with stable releases",
-      "evidence": "LOCAL-PATCHES.md § local(lint): the bare `oxlint` step is red on the base branch"
+      "evidence": "LOCAL-PATCHES.md § local(lint): two flaky-test-pattern reds inherited from #198. Same step rename as the entry above."
     }
   ]
 }

@@ -3,6 +3,87 @@
 Entries moved verbatim out of [LOCAL-PATCHES.md](../../LOCAL-PATCHES.md) § Sync log, which keeps the
 three most recent inline so that section stays readable. Same text and same order; newest first.
 
+- **2026-10-21 — merge of upstream `bbc8303b47` (418 commits) into the release line, from
+  `43fa95b4cf`** (merge base `83c768d1b4`, rollback tag `archive/pre-sync-43fa95b4cf`, merge commit
+  `276fe47cee`). **63 conflicted paths** — `both-rewrote 33, union 16, rename-replay 7,
+  duplicate-tail 4, add/add 2, duplicate-members 1`. Upstream's delta is a product wave rather than
+  a reorganisation: the Agent Dashboard became a first-class view, the SSH settings screen became a
+  grouped/windowed multi-select list, the MiniMax and GLM accounts sections became self-contained
+  host-aware components, queued-message editing grew image support, and four new quality ratchets
+  went into `pnpm lint`. Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-21 sync"; the
+  ones a reviewer will want first:
+
+  - **The SSH settings screen is upstream's list with the fork's Hide on top.** `SshTargetList.tsx`
+    is now a _different component on each side_ (add/add): upstream's groups by source, windows
+    > 10k imported hosts, and multi-selects. The fork's Hide feature survives as
+    > `partitionSshTargetsByVisibility()` (the offered/hidden split, unit-tested) plus the existing
+    > `SshTargetVisibilityToggle` in the row's action cluster and a collapsible "Hidden (N)" section;
+    > the card keeps upstream's dropdown menu, and Remove is omitted from it for a host
+    > `~/.ssh/config` keeps re-importing. `SshPane` keeps upstream's filter/toolbar/selection and
+    > passes `onSetHidden`; its group totals count non-hidden hosts so a hidden host never reads as
+    > "filtered out".
+  - **MiniMax converges on upstream's component, and the fork's enable switch wraps every section.**
+    Upstream's `MiniMaxAccountsSection` owns its own credential state through
+    `useMiniMaxCredentials(host.owner)` and says where the credential is stored, so the fork's
+    model-driven MiniMax half (`accounts-pane-minimax-section.tsx`, the `MiniMaxCredentialSectionModel`
+    type and its factory in `accounts-pane-credential-sections.ts`) is deleted. What the fork keeps is
+    the per-provider switch, which upstream has no equivalent of: `gateUsageProvider(...)` now wraps
+    upstream's _component_ sections too (MiniMax, Grok, Cursor), not only the model-driven ones.
+    Recorded in `local/sync/expected-deletions.json` with both call sites named.
+  - **The new-tab focus handoff stays a fork hook, carrying upstream's synchronous chat focus.**
+    Upstream changed the same inline code inside `use-tab-bar-create-menu-controller.ts` that the fork
+    had extracted into `new-tab-menu-focus-handoff.ts`, so the hook took upstream's deltas: the
+    `{ focus, synchronous? }` ref, the clear-then-queue that drops a stale animation frame, the
+    unmount path clearing the pending focus, and the chat composer focused **without** waiting a
+    frame because a structured chat mounts synchronously.
+  - **Queued-message editing is upstream's module, and it is a superset.** The fork's
+    `queued-message-text-update.ts` (text-only compare-and-set) is gone;
+    `queued-message-update.ts` does the same decision for text **and** images, refuses an image card
+    the caller was shown no images for, and returns the previous body. Both former callers
+    (`journal-queued-messages.ts`, `structured-agent-session-queued-edit.ts`) now import it, and its
+    `.spec.ts` carries the retry/superseded cases. Acknowledged in `expected-deletions.json`.
+  - **The File Explorer takes upstream's strict-owner routing.**
+    `getFileExplorerOperationOwnerFromState` is upstream's (`resolveOwner`/`HostAuthority`: a twin
+    refuses, focus never decides), which retired the fork's `operationOwnerFromHostId` helper; the
+    fork's `getFileExplorerListUnavailableMessage` copy survives as an export because the list
+    surfaces still import it.
+  - **Nothing of the fork's was silently dropped this time — two were caught and restored.**
+    The clipboard paste-expiry sweep (`sweepExpiredNativeChatPastes`, `NATIVE_CHAT_PASTE_TTL_MS`)
+    vanished with upstream's rewrite of `native-chat-paste-files.ts`, whose header then read "never
+    swept"; the sweep and its `registerClipboardHandlers` call are restored, and the header now says
+    what it actually deletes. The status bar's placeholder-last chip ordering
+    (`isOwnerNotSetUpPlaceholder`) vanished with the roster array the fork had moved into
+    `status-bar-usage-projection.ts`; it is ported there.
+  - **A green typecheck is not a green merge — four files landed over the max-lines budget** and each
+    was split rather than capped: `runtime-environment-connection-observation.ts` (the replication
+    observe folded into the diagnostics seam, which now has exactly one caller),
+    `takeWorktreeLayoutMode()` in `runtime-project-setup-layout-mode.ts`,
+    `src/cli/project-worktree-layout-flag.ts`, and
+    `config/scripts/electron-builder-linux-config.test.mjs` (the Linux packaging contracts, moved
+    out of `electron-builder-config.test.mjs`).
+  - **The branch was red before the merge started.** `1c81139662` added a `translate()` call whose
+    literal default equals the catalog value, so `TabBar.ab589350e5` stopped being runtime-required;
+    the derived `en-runtime-required.json` was never regenerated, and the pre-sync derived-catalog
+    gate refused to start. Fixed as its own commit (`43fa95b4cf`) before the merge.
+  - **`git merge` reported a clean tree that was not clean.** Three seams resolved without a marker:
+    `removeWorktreeMetadataAndTransientState` gained a `{ store, runtime }` argument (two fork call
+    sites passed a bare `store`), `store.migrateWorktreeIdentity` gained a host-qualified target (the
+    fork's relocation controller passed a string), and the two host-sync disposition tables gained
+    upstream's new fields (`agentNativeChatPermissionModes` replicated, `nodeDistMirrorUrl`
+    host-local like `httpProxyUrl`, `pairedTerminalTabCloseIntentsByEnvironment` host-local).
+
+  Verified: `pnpm tc` clean on all four projects, `post-sync.mjs` fully PASS (including the
+  derived-catalog, identity-sweep, deleted-export and repo-wide `oxlint` gates),
+  `check:code-quality:changed` clean once `mobile/` dependencies are installed — without them the
+  mobile type-aware pass reports upstream's own files as failures, which is an install artifact, not
+  a finding. The sidebar goldens were regenerated: every change is upstream's host-identity ordering
+  (row order inside a section, `lastChild`), with no row added or lost. **This merge ships the first
+  fork release with the Linux leg**; nothing in the Linux packaging contract needed a change for it.
+
+Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
+[local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md).
+
 - **2026-10-19 — merge of upstream `83c768d1b4` (170 commits) into the release line, from
   `cc42fb3b93`** (merge base `fc24ac3715`, rollback tag `archive/pre-sync-cc42fb3b93`). Upstream's
   delta is mostly a module reorganisation rather than a feature wave: the SSH tree split into

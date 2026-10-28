@@ -21,15 +21,15 @@
 0 src/renderer/src/components/task-page-jira-status-order.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 8 src/renderer/src/components/task-page/TaskPage.tsx # fork has 8 where upstream allows 9; lowered by a fork prune
 1 src/renderer/src/components/task-page/jira/IssueAssigneeField.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
+2 src/renderer/src/components/task-page/jira/use-task-page-jira-creation-metadata.ts
+2 src/renderer/src/components/task-page/jira/use-task-page-jira-issue-creation.ts
 1 src/renderer/src/components/task-page/linear/task-page-linear-issue-model.tsx # fork has 1 where upstream allows 2; lowered by a fork prune
 0 src/renderer/src/components/task-page/linear/use-task-page-linear-board.ts # fork has 0 where upstream allows 4; lowered by a fork prune
 2 src/renderer/src/components/task-page/linear/use-task-page-linear-issue-creation.ts # fork has 2 where upstream allows 4; lowered by a fork prune
 1 src/renderer/src/components/task-page/linear/use-task-page-linear-project-creation.ts # fork has 1 where upstream allows 2; lowered by a fork prune
+1 src/renderer/src/components/task-page/use-task-page-provider-metadata.ts
 1 src/renderer/src/components/use-new-linear-issue-projects.ts # fork has 1 where upstream allows 2; lowered by a fork prune
-2 src/renderer/src/components/use-task-page-jira-creation-metadata.ts # fork has 2 where upstream allows 4; lowered by a fork prune
-2 src/renderer/src/components/use-task-page-jira-issue-creation.ts # fork has 2 where upstream allows 4; lowered by a fork prune
 0 src/renderer/src/components/use-task-page-jira-list-effects.ts # fork has 0 where upstream allows 1; lowered by a fork prune
-1 src/renderer/src/components/use-task-page-provider-metadata.ts # fork has 1 where upstream allows 2; lowered by a fork prune
 0 src/renderer/src/components/use-worktree-jump-palette-task-url.ts # fork has 0 where upstream allows 1; lowered by a fork prune
 0 src/renderer/src/hooks/useIssueMetadata.ts # fork has 0 where upstream allows 4; lowered by a fork prune
 0 src/renderer/src/lib/linear-issue-url-lookup.ts # fork has 0 where upstream allows 1; lowered by a fork prune

@@ -1900,3 +1900,183 @@ in the code.
 
 **Do not:** set `CI` for the gate instead — other suites read `CI` for their own behaviour, so the flag
 is the narrower switch.
+
+## 2026-10-28 sync (upstream `f173998203`, 838 commits)
+
+Merge base `0571e45107`, pre-sync tip `7b86cb0846`, rollback tag `archive/pre-sync-7b86cb0846`, merge
+commit `2fadfe371b`. **431 conflicted paths, 621 hunks** — `both-rewrote 223, union 86, add/add 72,
+modify/delete 31, duplicate-tail 11, duplicate-members 3, rename-replay 5`. Upstream's delta is a
+feature wave (WSL host chat, Jira board rework, team agents) plus two test-retirement campaigns and a
+consolidated lint runner. Tiers: 255 hunks proved mechanically, 69 docs-churn paths removed, 27
+settled deletions, 163 paths resolved in 13 batches.
+
+### The lint chain is now upstream's single runner, and the gate expands it
+
+**Paths:** `config/scripts/run-lint.mjs`, `package.json`, `local/gate-lint.mjs`
+
+**Decision.** `package.json`'s `lint` is `node config/scripts/run-lint.mjs` — one command, N steps.
+`resolveGateSteps` expands that runner's exported `LINT_STEPS` back into one gate step each (40 total:
+36 upstream + 4 fork) and **fails closed** when the runner cannot be parsed. The three fork ratchets
+upstream does not know (`check:process-host-imports`, `check:workspace-path-sync-fs-ratchet`,
+`check:compat-boundary-imports`) moved into `FORK_LINT_STEPS`; `check:flaky-test-pattern-ratchet` and
+`lint:ast-grep` needed no entry, because upstream folded both into `lint:ast-grep-gates`.
+
+**Why.** Read literally the chain is a single `run-lint` step, which loses per-step attribution and
+`--only` — the two things the gate exists to provide. `FORK_LINT_STEPS` is fork-owned, so a sync
+cannot drop a step from it; that is the same reason the identity check lives there.
+
+**Do not:** restate the step list in `local/gate-lint.mjs`. Reading the runner is what keeps a step
+upstream adds from being skipped.
+
+### Max-lines: thirteen more upstream-owned files over budget, exempted by ownership
+
+**Paths:** `config/max-lines-baseline.txt`, the 13 files named there under "Added 2026-10-28"
+
+**Decision.** Each carries one `eslint-disable max-lines -- Why:` line naming what the fork adds, and a
+baseline row. Overages were 1–18 code lines. The `src/main/orcad/orcad-entry.ts` row went stale (the
+fork's delta shrank) and was pruned; the baseline is 24 entries.
+
+**Why.** The rule in § "`local(lint)`: upstream's `max-lines` budget is enforced again" is ownership,
+not size: splitting an upstream file costs a permanent hunk on every sync.
+
+**Do not:** add a row for a fork-owned file. Those split.
+
+### Retired test inventories, the 2026-10-28 batch
+
+**Paths:** the 13 colocated suites deleted under `src/renderer/src/components/**` and `src/renderer/src/runtime/**`
+
+**Decision.** Upstream's deletion wins for `AgentDashboardSettingsMenu`, `ai-vault-view-defaults`,
+`right-sidebar-activity-visibility`, `ExperimentalPane`, `FloatingWorkspacePane`, `accounts-search`,
+`appearance-status-bar-search`, `create-project-defaults`, `ssh-target-duplicate`,
+`use-worktree-activity-statuses`, `usage-provider-settings-target`, `runtime-jira-priority-client`
+and `runtime-jira-project-client` (all #33770/#34156/#34161/#34234). Three cases were **re-homed, not
+restored**: `getFailedStepsForCheck` into `src/shared/pr-checks-fix-prompt.test.ts`, the Orca NP
+overlay into a trimmed `tui-agent-config.test.ts`, and the `setup` status into a trimmed
+`StatusIndicator.test.ts`.
+
+**Why.** Same reason as the earlier batches — churn the fork would re-pay every sync. The re-homed
+three cover fork code that nothing else exercises.
+
+**Do not:** restore a retired file to carry one fork case. Trim a surviving suite instead, next to the
+code it covers.
+
+### i18n: orphan keys retired, drifted copy re-pointed, one reused key split
+
+**Paths:** `src/renderer/src/i18n/locales/*.json`, `src/renderer/src/i18n/fork/*.json`, `config/scripts/locale-ko-key-overrides.json`
+
+**Decision.** 198 keys with no source reference (test-harness fixtures for the retired suites) were
+removed from every locale, the fork overlay and the ko overrides. Nine English entries whose source
+copy had moved were set to the **source** text, and their translations retired so they fall back to
+English rather than render a stale sentence with the wrong placeholders. The fork's "Gemini CLI
+(legacy)" heading and upstream's "Gemini" label shared one key; the heading took
+`AccountsPane.aa4de4475b`. Two toasts the fork rewords (#169) had upstream translations with different
+placeholders — also retired.
+
+**Why.** The catalog value is what renders, so a stale catalog entry is a wrong string in the app, and
+a reused key is a rendering bug waiting for a locale switch.
+
+**Do not:** hand-merge a locale file. Union the source catalog, then `pnpm run sync:localization-catalog`.
+
+### Checks-panel details: the fork keeps the cached payload when a refresh fails
+
+**Paths:** `src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab-request-details.ts`, `src/renderer/src/components/pull-request-page/checks/details-request.ts`, `src/renderer/src/components/github-checks-tab-state.ts`
+
+**Decision.** #198's `settleGitHubChecksTabDetailsKeepingShown` stays at both call sites, so a failed
+refresh keeps the details already on screen. Upstream's failure-shape expectations in
+`check-details-failure-mapping.test.ts` and `check-details-ingestion.test.ts` now assert the fork's
+contract (payload survives, plus the `readAt`/`readFor` stamps the fork's state writes on every
+settlement).
+
+**Why.** It is the fork's deliberate fix for a pane that re-spun to empty on a transient failure;
+upstream's shape predates it. The stamps are what `isFresh` reads.
+
+**Do not:** revert to `settleGitHubChecksTabDetails` on the failure path to satisfy an upstream test.
+
+### Comment acknowledgements keep the latest-consumer refresh ref
+
+**Paths:** `src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-ai-acknowledgement.tsx`
+
+**Decision.** `commentLaunchCallbacks` is created at queue time, so the post-launch refresh goes
+through a ref, not the captured `fetchComments`. The merge kept the fork's reply-only ack but dropped
+the ref indirection both parents had; it is restored.
+
+**Why.** Without it a head-churn rerender binds the refresh to a stale `fetchComments` whose
+requestKey fails `isCurrentAsyncResult`, and the forced refresh plus `setCommentsLoading(false)` are
+silently dropped.
+
+**Do not:** call `fetchComments` directly from the callbacks.
+
+### The update feed's identity rule covers URLs built in code, not just literals
+
+**Paths:** `src/main/updater-prerelease-feed.ts`
+
+**Decision.** `fetchLatestStableReleaseTag` names `nplez1/orca` in the `releases/latest` URL **and** in
+the redirect-pathname regex. Upstream shipped both as `stablyai/orca`.
+
+**Why.** With upstream's values the fork's own redirect never matches, the function returns `null`,
+and every background and menu check dies in preflight. The identity sweep cannot see this: it scans
+literals, and one side of the bug is a regex.
+
+**Do not:** treat "no identity-sweep finding" as proof a URL is retargeted. Grep the updater for
+`stablyai` after every sync.
+
+### Host-sync disposition: four upstream settings classified, one superseded key dropped
+
+**Paths:** `src/main/orca-profiles/host-settings-sync-disposition.ts`
+
+**Decision.** `claudeSubagentNavigationEnabled`, `orchestrationHeartbeatsEnabled`,
+`orchestrationHeartbeatIntervalMinutes` and `experimentalBrowserExtensions` are `replicated`
+(preferences and feature flags the user turned on, like `orchestrationChatErrorEscalationEnabled` and
+`experimentalConnectors`). `agentNativeChatPermissionModes` is gone from the map because the merged
+`GlobalSettings` no longer declares it and nothing reads it.
+
+**Why.** The map is `satisfies Record<keyof GlobalSettings, …>`, so an unclassified key fails the
+typecheck — which is the point: a new upstream setting cannot silently inherit a disposition.
+
+**Do not:** mark an experimental flag `hostLocal` unless it is a hardware or power decision, the way
+`experimentalEphemeralVms` and `experimentalWslHosts` are.
+
+### TUI launch command: two rules, not a choice between them
+
+**Paths:** `src/shared/tui-agent-config.ts`, `src/shared/tui-agent-config-np.ts`
+
+**Decision.** A remote launch returns `launchCmdByRemotePlatform` first (the relay shim's fixed
+`orca` / `orca.cmd`); a local Linux launch falls through to upstream's
+`skipsLinuxOrcaCliRename(isRemote)`, which reads the real launcher path; otherwise the fork's
+`launchCmdByPlatform` (`orca-np`).
+
+**Why.** Each rule answers a different question — "is this a remote" versus "does this host publish
+its own launcher" — and dropping either reintroduces the bug it fixed.
+
+**Do not:** collapse them into one branch to make an expectation pass.
+
+### Schema versions: no both-sides bump this sync
+
+**Paths:** `src/main/ai-vault/session-parse-cache-database.ts`, `src/main/ai-vault-search/session-search-schema.ts`
+
+**Decision.** The parse-cache constant went 7 → 8 on upstream's side only, so the merged file takes 8.
+`SESSION_SEARCH_SCHEMA_VERSION` is 8 on both sides and moves for neither. The strictly-above rule was
+not triggered; it stays the rule for the next sync that does trigger it.
+
+### Tooling repaired at sync size
+
+**Paths:** `local/sync/lib/post-sync-checks.mjs`, `config/scripts/check-flaky-test-pattern-ratchet.mjs`
+
+**Decision.** The post-sync deletion scan runs `git diff --no-renames` on **both** sides, and the
+flaky-pattern ratchet's `git()` helper sets `maxBuffer: 256 MiB` like its sibling `ast-grep-scan.mjs`.
+
+**Why.** With rename detection off only on our side, an upstream _rename_ of a fork-untouched file
+(`terminal-file-link-detection-ranges.ts`, #33964) read as a fork-only deletion with a lost export.
+And with no `maxBuffer`, a ~20k-path merge aborts the spawn with `ENOBUFS` before the ratchet can
+scope itself — it read as a lint failure rather than a tooling limit.
+
+### Flakes and deliberate exceptions in the flaky-pattern ratchet
+
+**Paths:** `config/flaky-test-pattern-baseline.txt`, `src/main/jenkins/*.test.ts`
+
+**Decision.** `worktree-initial-terminal-close-records.test.ts` goes 2 → 3 wall-clock reads: the third
+is a restored TTL case, and the clock is the subject under test. Three jenkins suites carry
+`// ast-grep-ignore: test-no-in-test-import-actual -- <reason>`: they redirect the **real** homedir,
+which a stubbed `node:os` would not exercise.
+
+**Do not:** use the ignore for a test that merely found mocking inconvenient.

@@ -1740,6 +1740,74 @@ pnpm run sync:localization-runtime-catalog
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md), newest first, so this
 section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three-entry rule.
 
+- **2026-10-28 — merge of upstream `f173998203` (838 commits) into the release line, from
+  `7b86cb0846`** (merge base `0571e45107`, rollback tag `archive/pre-sync-7b86cb0846`, merge commit
+  `2fadfe371b`, then `6491bd5e25`, `029137ad95`). **431 conflicted paths, 621 hunks** —
+  `both-rewrote 223, union 86, add/add 72, modify/delete 31, duplicate-tail 11, duplicate-members 3,
+  rename-replay 5`. Upstream's delta is 22,767 files (−404,589/+510,839): a feature wave (WSL host
+  chat, the Jira board rework, team agents) plus **two sweeping test-retirement campaigns**
+  (#33770, #34156, #34161, #34234) and a consolidated `config/scripts/run-lint.mjs` replacing
+  package.json's inline lint chain. Decisions are in
+  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-28 sync"; the
+  ones a reviewer will want first:
+
+  - **Resolved in four tiers.** `conflicts.mjs --apply-proven` proved **255 of 621 hunks** (167 paths
+    written from syntax-tree proof, not judgement). **69 `docs/agents-md-refs/*.md`** were upstream
+    churn — added and deleted again inside the range, absent from both tips — and were removed.
+    **27 deletions** followed `expected-deletions.json` (14, the dashboard/superseded set) and the
+    ledger's retired-test policy (13 colocated suites). The remaining **163 paths** were resolved in
+    13 disjoint batches, each bound to the ledger and the runbook's convergence rules.
+  - **Upstream's consolidated lint runner would have silently dropped three fork ratchets.**
+    `check:process-host-imports`, `check:workspace-path-sync-fs-ratchet` and
+    `check:compat-boundary-imports` are not in upstream's `LINT_STEPS`, so they moved into
+    `FORK_LINT_STEPS` in `local/gate-lint.mjs`. The same file now **expands `LINT_STEPS` back into one
+    gate step each** — read literally the chain is a single `run-lint` step, which loses per-step
+    attribution and `--only` — and fails closed if the runner cannot be parsed.
+  - **Max-lines: thirteen upstream-owned files went over budget with the fork's delta merged in**
+    (1–18 code lines each). Per the ownership rule in § "`local(lint)`" they are **exempted, not
+    split**, each with a directive naming what the fork adds and a baseline row. The
+    `orcad-entry.ts` row had gone stale and was pruned, so the baseline is 24 entries.
+  - **The update feed was broken by the merge and is the reason this sync was worth running.**
+    Upstream's new `fetchLatestStableReleaseTag()` hardcoded `stablyai/orca` in the
+    `releases/latest` URL _and_ in the redirect-pathname regex, so a fork build's stable fallback
+    never matched the fork's own redirect and every background check died in preflight. Both are
+    retargeted to `nplez1/orca`, which the identity sweep cannot see (it reads literals, not regexes).
+  - **i18n needed a real cleanup, not just a regenerate.** 198 catalog keys had no source reference
+    (test-harness fixtures for the retired suites) and nine English entries had drifted from the
+    source copy the catalog renders. Both were retired from every locale, the fork overlay and
+    `locale-ko-key-overrides.json`; one key was **reused for two different sentences** — the fork's
+    "Gemini CLI (legacy)" heading and upstream's "Gemini" label — and the heading took its own key
+    (`AccountsPane.aa4de4475b`). Two toasts the fork rewords (#169 reply-only flow) had upstream
+    translations with different placeholders; those entries are retired so they fall back to English.
+  - **`main` was red before this merge, and the gate is what caught it.** The merge's own resolution
+    was clean, but the unit gate found **140 failures across 25 test files** — mostly expectations
+    that predate the code they assert, from fork PRs #134, #169, #170, #175, #198 and #203, which
+    merged with `pr.yml` disabled and **no unit lane backstopping them**. Three were merge damage in
+    product code: the updater feed above, a dropped latest-consumer refresh ref in
+    `use-checks-panel-ai-acknowledgement.tsx` (a head-churn rerender silently dropped the post-launch
+    refresh), and the AiVault throttle test hook upstream declares in `ai-vault-session-refresh.ts`.
+    Every other failure was a stale expectation now asserting the fork's contract; no test was
+    deleted, skipped or widened. Four reference repairs followed modules the merge moved and two
+    suites needed the WSL gate mocked so they stop spawning a real `wsl.exe` per case.
+  - **Two tooling bugs surfaced only at this size.** `post-sync`'s deletion scan disabled rename
+    detection on our side only, so an upstream _rename_ of a fork-untouched file
+    (`terminal-file-link-detection-ranges.ts`, #33964) read as a fork-only deletion with a lost
+    export; both sides now run `--no-renames`. And `check-flaky-test-pattern-ratchet.mjs` shells out
+    to `git diff` with no `maxBuffer`, so a ~20k-path merge aborts the spawn with `ENOBUFS` before
+    the ratchet can scope itself; it now uses the 256 MB ceiling its sibling `ast-grep-scan.mjs`
+    already had.
+  - **`local/lint-known-red.json` is back to two entries.** Upstream folded
+    `check:flaky-test-pattern-ratchet` into `lint:ast-grep-gates`, so the two #198 foreign reds
+    follow the new step; the bare-`oxlint` entry went stale (the step is green) and was pruned. Three
+    jenkins suites carry a deliberate `// ast-grep-ignore: test-no-in-test-import-actual` with its
+    reason — they redirect the _real_ homedir, which a stubbed `node:os` would not test.
+
+  Verified on `029137ad95`: `Unit gate @029137ad95 (clean): PASS — 135795 passed; 11 failed, all in
+  unit-known-red.json; 0 flaky re-run passed; 0 unexpected; 1616 s`; `lint gate @029137ad95+dirty:
+  PASS — 39 green, 1 failing: 2 known red, 0 new; 40 steps; 96.0 s` (the `+dirty` part is this
+  record); `pnpm tc` clean on node, cli and web. The tagged revision is past the gated one: the
+  follow-up changes are this record, the lint baselines and two test-file comments.
+
 - **2026-10-25 — merge of upstream `0571e45107` (556 commits) into the release line, from
   `095cf32705`** (merge base `57b5082404`, rollback tag `archive/pre-sync-095cf32705`, merge commit
   `281cccf5a4`, then `995f2dbc27`, `ef2897da2b`, `accb095dd6`, `7811f60dd6`, `1b848feba6`).
@@ -1871,85 +1939,7 @@ section stays readable. `tests/tools/fork-process-docs.test.mjs` holds the three
     `TaskPageGitLabLoadingModel` has no importer in the merged tree, which is why its absence is not a
     loss.
 
-- **2026-10-21 — merge of upstream `bbc8303b47` (418 commits) into the release line, from
-  `43fa95b4cf`** (merge base `83c768d1b4`, rollback tag `archive/pre-sync-43fa95b4cf`, merge commit
-  `276fe47cee`). **63 conflicted paths** — `both-rewrote 33, union 16, rename-replay 7,
-  duplicate-tail 4, add/add 2, duplicate-members 1`. Upstream's delta is a product wave rather than
-  a reorganisation: the Agent Dashboard became a first-class view, the SSH settings screen became a
-  grouped/windowed multi-select list, the MiniMax and GLM accounts sections became self-contained
-  host-aware components, queued-message editing grew image support, and four new quality ratchets
-  went into `pnpm lint`. Decisions are in
-  [local/sync/convergence-ledger.md](./local/sync/convergence-ledger.md) § "2026-10-21 sync"; the
-  ones a reviewer will want first:
-
-  - **The SSH settings screen is upstream's list with the fork's Hide on top.** `SshTargetList.tsx`
-    is now a _different component on each side_ (add/add): upstream's groups by source, windows
-    > 10k imported hosts, and multi-selects. The fork's Hide feature survives as
-    > `partitionSshTargetsByVisibility()` (the offered/hidden split, unit-tested) plus the existing
-    > `SshTargetVisibilityToggle` in the row's action cluster and a collapsible "Hidden (N)" section;
-    > the card keeps upstream's dropdown menu, and Remove is omitted from it for a host
-    > `~/.ssh/config` keeps re-importing. `SshPane` keeps upstream's filter/toolbar/selection and
-    > passes `onSetHidden`; its group totals count non-hidden hosts so a hidden host never reads as
-    > "filtered out".
-  - **MiniMax converges on upstream's component, and the fork's enable switch wraps every section.**
-    Upstream's `MiniMaxAccountsSection` owns its own credential state through
-    `useMiniMaxCredentials(host.owner)` and says where the credential is stored, so the fork's
-    model-driven MiniMax half (`accounts-pane-minimax-section.tsx`, the `MiniMaxCredentialSectionModel`
-    type and its factory in `accounts-pane-credential-sections.ts`) is deleted. What the fork keeps is
-    the per-provider switch, which upstream has no equivalent of: `gateUsageProvider(...)` now wraps
-    upstream's _component_ sections too (MiniMax, Grok, Cursor), not only the model-driven ones.
-    Recorded in `local/sync/expected-deletions.json` with both call sites named.
-  - **The new-tab focus handoff stays a fork hook, carrying upstream's synchronous chat focus.**
-    Upstream changed the same inline code inside `use-tab-bar-create-menu-controller.ts` that the fork
-    had extracted into `new-tab-menu-focus-handoff.ts`, so the hook took upstream's deltas: the
-    `{ focus, synchronous? }` ref, the clear-then-queue that drops a stale animation frame, the
-    unmount path clearing the pending focus, and the chat composer focused **without** waiting a
-    frame because a structured chat mounts synchronously.
-  - **Queued-message editing is upstream's module, and it is a superset.** The fork's
-    `queued-message-text-update.ts` (text-only compare-and-set) is gone;
-    `queued-message-update.ts` does the same decision for text **and** images, refuses an image card
-    the caller was shown no images for, and returns the previous body. Both former callers
-    (`journal-queued-messages.ts`, `structured-agent-session-queued-edit.ts`) now import it, and its
-    `.spec.ts` carries the retry/superseded cases. Acknowledged in `expected-deletions.json`.
-  - **The File Explorer takes upstream's strict-owner routing.**
-    `getFileExplorerOperationOwnerFromState` is upstream's (`resolveOwner`/`HostAuthority`: a twin
-    refuses, focus never decides), which retired the fork's `operationOwnerFromHostId` helper; the
-    fork's `getFileExplorerListUnavailableMessage` copy survives as an export because the list
-    surfaces still import it.
-  - **Nothing of the fork's was silently dropped this time — two were caught and restored.**
-    The clipboard paste-expiry sweep (`sweepExpiredNativeChatPastes`, `NATIVE_CHAT_PASTE_TTL_MS`)
-    vanished with upstream's rewrite of `native-chat-paste-files.ts`, whose header then read "never
-    swept"; the sweep and its `registerClipboardHandlers` call are restored, and the header now says
-    what it actually deletes. The status bar's placeholder-last chip ordering
-    (`isOwnerNotSetUpPlaceholder`) vanished with the roster array the fork had moved into
-    `status-bar-usage-projection.ts`; it is ported there.
-  - **A green typecheck is not a green merge — four files landed over the max-lines budget** and each
-    was split rather than capped: `runtime-environment-connection-observation.ts` (the replication
-    observe folded into the diagnostics seam, which now has exactly one caller),
-    `takeWorktreeLayoutMode()` in `runtime-project-setup-layout-mode.ts`,
-    `src/cli/project-worktree-layout-flag.ts`, and
-    `config/scripts/electron-builder-linux-config.test.mjs` (the Linux packaging contracts, moved
-    out of `electron-builder-config.test.mjs`).
-  - **The branch was red before the merge started.** `1c81139662` added a `translate()` call whose
-    literal default equals the catalog value, so `TabBar.ab589350e5` stopped being runtime-required;
-    the derived `en-runtime-required.json` was never regenerated, and the pre-sync derived-catalog
-    gate refused to start. Fixed as its own commit (`43fa95b4cf`) before the merge.
-  - **`git merge` reported a clean tree that was not clean.** Three seams resolved without a marker:
-    `removeWorktreeMetadataAndTransientState` gained a `{ store, runtime }` argument (two fork call
-    sites passed a bare `store`), `store.migrateWorktreeIdentity` gained a host-qualified target (the
-    fork's relocation controller passed a string), and the two host-sync disposition tables gained
-    upstream's new fields (`agentNativeChatPermissionModes` replicated, `nodeDistMirrorUrl`
-    host-local like `httpProxyUrl`, `pairedTerminalTabCloseIntentsByEnvironment` host-local).
-
-  Verified: `pnpm tc` clean on all four projects, `post-sync.mjs` fully PASS (including the
-  derived-catalog, identity-sweep, deleted-export and repo-wide `oxlint` gates),
-  `check:code-quality:changed` clean once `mobile/` dependencies are installed — without them the
-  mobile type-aware pass reports upstream's own files as failures, which is an install artifact, not
-  a finding. The sidebar goldens were regenerated: every change is upstream's host-identity ordering
-  (row order inside a section, `lastChild`), with no row added or lost. **This merge ships the first
-  fork release with the Linux leg**; nothing in the Linux packaging contract needed a change for it.
-
-Entries from 2026-10-19 back to 2026-09-16 — 24 of them — are in
+Entries from 2026-10-21 back to 2026-09-16 — 25 of them — are in
 [local/sync/sync-log-archive.md](./local/sync/sync-log-archive.md).
 
 ### `local(ci)`: release workflow
