@@ -22,6 +22,7 @@ import {
 import { getEnvironmentRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { openJiraIssueWorkspace } from '@/lib/jira-issue-workspace-open'
 import { TaskPageJiraBoard } from './Board'
+import { TaskPageJiraBoardUnavailableNotice } from './BoardUnavailableNotice'
 import { useJiraBoardMode } from './use-jira-board-mode'
 
 export function TaskPageJiraContent({
@@ -91,6 +92,7 @@ export function TaskPageJiraContent({
           model={model}
           selection={board}
           onUseIssueList={boardMode.showIssueList}
+          onBoardUnavailable={boardMode.reportRuntimeBoardUnavailable}
           onIssueMoved={boardMode.notifyIssueMoved}
           refreshSignal={boardMode.boardRefreshSignal}
         />
@@ -133,6 +135,9 @@ export function TaskPageJiraContent({
         style={jiraListGridStyle(jiraColumns)}
         className="@container flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm"
       >
+        {boardMode.configuredBoard && boardMode.runtimeBoardUnavailable ? (
+          <TaskPageJiraBoardUnavailableNotice onRetry={boardMode.retryBoard} />
+        ) : null}
         <div className="flex min-h-10 flex-none flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3 py-1">
           <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {translate('auto.components.TaskPage.63b2abd3aa', 'Jira issues')}
@@ -155,7 +160,7 @@ export function TaskPageJiraContent({
           </div>
         </div>
 
-        {boardMode.configuredBoard ? (
+        {boardMode.configuredBoard && !boardMode.runtimeBoardUnavailable ? (
           <div className="flex justify-end border-b border-border/50 px-3 py-1.5">
             <Button type="button" variant="ghost" size="xs" onClick={boardMode.showBoard}>
               {translate('auto.components.TaskPage.jiraReturnToBoard', 'Return to board')}

@@ -9,8 +9,11 @@ import { JiraBoardSettings } from './JiraBoardSettings'
 
 const mocks = vi.hoisted(() => ({
   checkJiraConnection: vi.fn().mockResolvedValue(undefined),
-  jiraListBoards: vi.fn()
+  jiraListBoards: vi.fn(),
+  saveError: vi.fn()
 }))
+
+vi.mock('sonner', () => ({ toast: { error: (...args: unknown[]) => mocks.saveError(...args) } }))
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
@@ -42,12 +45,12 @@ afterEach(() => {
 describe('JiraBoardSettings', () => {
   it('loads the configured site boards and saves the picked default board', async () => {
     const user = userEvent.setup()
-    const updateSettings = vi.fn()
+    const updateSettings = vi.fn().mockResolvedValue(undefined)
     mocks.jiraListBoards.mockResolvedValue(boards)
     const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
     const { container } = render(
-      <JiraBoardSettings settings={settings} updateSettings={updateSettings} />
+      <JiraBoardSettings settings={settings} updateSettingsOrThrow={updateSettings} />
     )
     await waitFor(() =>
       expect(mocks.jiraListBoards).toHaveBeenCalledWith({ kind: 'local' }, 'site-1', undefined)
@@ -67,7 +70,7 @@ describe('JiraBoardSettings', () => {
       defaultJiraBoard: { boardId: '42', siteId: 'site-1' }
     })
 
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={vi.fn()} />)
 
     await screen.findByRole('alert')
     await waitFor(() =>
@@ -83,7 +86,7 @@ describe('JiraBoardSettings', () => {
     mocks.jiraListBoards.mockResolvedValue(boards)
     const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={vi.fn()} />)
     await user.click(screen.getByRole('combobox', { name: 'Default board' }))
     await user.type(await screen.findByPlaceholderText('Search boards by name...'), 'Nebulite')
 
@@ -97,7 +100,7 @@ describe('JiraBoardSettings', () => {
     mocks.jiraListBoards.mockResolvedValue([])
     const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
 
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={vi.fn()} />)
     await user.click(screen.getByRole('combobox', { name: 'Default board' }))
     // The permanent "No default board" row keeps the list non-empty, so the picker has
     // to render its own empty state.
@@ -110,10 +113,24 @@ describe('JiraBoardSettings', () => {
       defaultJiraBoard: { boardId: '37169', siteId: 'site-1', name: 'Ps Nebulite Scrum Board' }
     })
 
-    render(<JiraBoardSettings settings={settings} updateSettings={vi.fn()} />)
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={vi.fn()} />)
 
     expect((await screen.findByRole('combobox', { name: 'Default board' })).textContent).toContain(
       'Ps Nebulite Scrum Board'
     )
+  })
+
+  it('reports a board selection that did not persist', async () => {
+    const user = userEvent.setup()
+    mocks.jiraListBoards.mockResolvedValue(boards)
+    const updateSettings = vi.fn().mockRejectedValue(new Error('settings write failed'))
+    const settings = createGlobalSettingsFixture({ defaultJiraBoard: null })
+
+    render(<JiraBoardSettings settings={settings} updateSettingsOrThrow={updateSettings} />)
+
+    await user.click(screen.getByRole('combobox', { name: 'Default board' }))
+    await user.click(await screen.findByRole('option', { name: 'Payments' }))
+
+    await waitFor(() => expect(mocks.saveError).toHaveBeenCalledWith('Could not save. Try again.'))
   })
 })

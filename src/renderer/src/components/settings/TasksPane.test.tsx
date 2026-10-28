@@ -102,7 +102,9 @@ const INCOMPLETE_BANNER = 'Some visible providers still need setup'
 const LINEAR_SETUP_MARKER = 'data-testid="linear-setup"'
 
 function renderPane(): string {
-  return renderToStaticMarkup(<TasksPane settings={baseSettings} updateSettings={vi.fn()} />)
+  return renderToStaticMarkup(
+    <TasksPane settings={baseSettings} updateSettings={vi.fn()} updateSettingsOrThrow={vi.fn()} />
+  )
 }
 
 let root: Root | null = null
@@ -113,14 +115,18 @@ async function renderInteractivePane(): Promise<HTMLDivElement> {
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
-    root?.render(<TasksPane settings={baseSettings} updateSettings={vi.fn()} />)
+    root?.render(
+      <TasksPane settings={baseSettings} updateSettings={vi.fn()} updateSettingsOrThrow={vi.fn()} />
+    )
   })
   return container
 }
 
 async function rerenderInteractivePane(): Promise<void> {
   await act(async () => {
-    root?.render(<TasksPane settings={baseSettings} updateSettings={vi.fn()} />)
+    root?.render(
+      <TasksPane settings={baseSettings} updateSettings={vi.fn()} updateSettingsOrThrow={vi.fn()} />
+    )
   })
 }
 

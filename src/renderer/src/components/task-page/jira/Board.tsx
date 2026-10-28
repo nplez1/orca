@@ -42,12 +42,15 @@ export function TaskPageJiraBoard({
   model,
   selection,
   onUseIssueList,
+  onBoardUnavailable,
   onIssueMoved,
   refreshSignal = 0
 }: {
   model: TaskPageJiraBoardModel
   selection: JiraBoardSelection
   onUseIssueList: () => void
+  /** The runtime cannot serve this board; the parent shows the list and says why. */
+  onBoardUnavailable: () => void
   onIssueMoved: (issue: JiraIssue) => void
   /** A sprint move made outside the board (the open issue's picker), which takes the
    *  item in or out of these lists just as a row move does. */
@@ -119,14 +122,10 @@ export function TaskPageJiraBoard({
       return
     }
     legacyRuntimeFallbackApplied.current = true
-    toast.message(
-      translate(
-        'auto.components.TaskPage.jiraBoardRequiresNewRuntime',
-        'This Jira runtime does not support board views. Showing the issue list instead.'
-      )
-    )
-    onUseIssueList()
-  }, [board.runtimeBoardUnavailable, onUseIssueList])
+    // Why: the fallback must not be recorded as the user's view preference — a runtime
+    // upgrade would never undo it, and the reason would survive only as a toast.
+    onBoardUnavailable()
+  }, [board.runtimeBoardUnavailable, onBoardUnavailable])
 
   return (
     <div className="flex min-h-0 max-h-full flex-1 flex-col overflow-hidden rounded-md border border-border/50 bg-background shadow-sm">

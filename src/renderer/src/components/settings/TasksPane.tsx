@@ -33,6 +33,8 @@ import { translate } from '@/i18n/i18n'
 type TasksPaneProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
+  /** The throwing variant, for the one write in this pane whose failure the user must see. */
+  updateSettingsOrThrow: (updates: Partial<GlobalSettings>) => Promise<void>
 }
 
 const PROVIDER_META: Record<
@@ -93,7 +95,11 @@ const PROVIDER_META: Record<
   }
 }
 
-export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.JSX.Element {
+export function TasksPane({
+  settings,
+  updateSettings,
+  updateSettingsOrThrow
+}: TasksPaneProps): React.JSX.Element {
   const visibleProviders = normalizeVisibleTaskProviders(settings.visibleTaskProviders)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
@@ -267,7 +273,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
         </p>
       </section>
 
-      <JiraBoardSettings settings={settings} updateSettings={updateSettings} />
+      <JiraBoardSettings settings={settings} updateSettingsOrThrow={updateSettingsOrThrow} />
     </div>
   )
 }

@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { runtimeHostIdFromEnvironmentId } from '../../../../shared/task-source-context'
-import type { JiraBoard, JiraSiteSelection } from '../../../../shared/jira/jira-types'
+import type {
+  JiraBoard,
+  JiraBoardSelection,
+  JiraSiteSelection
+} from '../../../../shared/jira/jira-types'
 import { Button } from '@/components/ui/button'
 import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { toast } from 'sonner'
 import { jiraListBoards, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
 import { SearchableSetting } from './SearchableSetting'
 import {
@@ -19,7 +24,8 @@ import { getTasksPaneSearchKeywords } from './tasks-search'
 
 type JiraBoardSettingsProps = {
   settings: GlobalSettings
-  updateSettings: (updates: Partial<GlobalSettings>) => void
+  /** The throwing variant: a board that does not persist has to say so, not log and revert. */
+  updateSettingsOrThrow: (updates: Partial<GlobalSettings>) => Promise<void>
 }
 
 // Why: the picker queries Jira by name, so every keystroke must not become a request.
@@ -31,7 +37,7 @@ function errorMessage(error: unknown): string {
 
 export function JiraBoardSettings({
   settings,
-  updateSettings
+  updateSettingsOrThrow
 }: JiraBoardSettingsProps): React.JSX.Element {
   const jiraStatus = useAppStore((state) => state.jiraStatus)
   const checkJiraConnection = useAppStore((state) => state.checkJiraConnection)
@@ -54,6 +60,13 @@ export function JiraBoardSettings({
   const [retryNonce, setRetryNonce] = useState(0)
   const [boardQuery, setBoardQuery] = useState('')
   const [appliedBoardQuery, setAppliedBoardQuery] = useState('')
+  // Why: the store only mirrors a settings write once it lands, so a rejected write leaves the
+  // picker on the old board — and without this the user never learns the selection did not stick.
+  const saveBoard = (selection: JiraBoardSelection | null): void => {
+    void updateSettingsOrThrow({ defaultJiraBoard: selection }).catch(() => {
+      toast.error(translate('sessionHistory.settings.saveError', 'Could not save. Try again.'))
+    })
+  }
 
   useEffect(() => {
     const timer = setTimeout(
@@ -132,19 +145,17 @@ export function JiraBoardSettings({
             value={selectedBoardValue}
             onValueChange={(value) => {
               if (value === SETTINGS_COMBOBOX_NONE) {
-                updateSettings({ defaultJiraBoard: null })
+                saveBoard(null)
                 return
               }
               const board = boards.find((candidate) => boardOptionValue(candidate) === value)
               if (!board) {
                 return
               }
-              updateSettings({
-                defaultJiraBoard: {
-                  boardId: board.id,
-                  siteId: board.siteId,
-                  name: board.name
-                }
+              saveBoard({
+                boardId: board.id,
+                siteId: board.siteId,
+                name: board.name
               })
             }}
             options={boardOptions}
